@@ -44,16 +44,51 @@ fn runs_fizzbuzz_pdx() {
     );
 }
 
+fn run_repl(input: &str) -> std::process::Output {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to start pdx repl");
+    child
+        .stdin
+        .as_mut()
+        .expect("no stdin")
+        .write_all(input.as_bytes())
+        .expect("failed to write to repl");
+    child.wait_with_output().expect("failed to run pdx repl")
+}
+
 #[test]
-fn fails_without_a_file_argument() {
-    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
-        .output()
-        .expect("failed to run pdx");
-    assert!(!output.status.success());
+fn repl_evaluates_lines() {
+    let output = run_repl("1 + 1\nx = 20\nx * 2 + 2\n");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "=> 2\n=> 20\n=> 42\n"
+    );
+}
+
+#[test]
+fn repl_buffers_multiline_definitions() {
+    let output = run_repl("def double(n)\n  n * 2\nend\ndouble(21)\n");
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "=> 42\n");
+}
+
+#[test]
+fn repl_reports_errors_and_continues() {
+    let output = run_repl("nope\n1 + 1\n");
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "=> 2\n");
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("usage: pdx")
+            .contains("undefined variable nope")
     );
 }
 
