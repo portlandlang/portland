@@ -65,6 +65,16 @@ fn runs_tour_pdx() {
 }
 
 #[test]
+fn runs_mini_lexer_pdx() {
+    let output = run_fixture("mini_lexer.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "identifier: total\npunctuation: =\nidentifier: compute\npunctuation: (\ninteger: 40\npunctuation: ,\ninteger: 2\npunctuation: )\npunctuation: +\ninteger: 1\n"
+    );
+}
+
+#[test]
 fn runs_word_count_pdx_with_argv() {
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .current_dir(env!("CARGO_MANIFEST_DIR"))
