@@ -9,11 +9,13 @@ pub enum TokenKind {
     Dot,
     Equal,
     EqualEqual,
+    FatArrow,
     Greater,
     GreaterEqual,
     Identifier,
     Integer,
     Keyword,
+    LeftBrace,
     LeftBracket,
     LeftParen,
     Less,
@@ -24,6 +26,7 @@ pub enum TokenKind {
     Percent,
     Pipe,
     Plus,
+    RightBrace,
     RightBracket,
     RightParen,
     Slash,
@@ -69,16 +72,18 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' | '|' => {
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' | '|' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
+                    '{' => TokenKind::LeftBrace,
                     '[' => TokenKind::LeftBracket,
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
                     '%' => TokenKind::Percent,
                     '|' => TokenKind::Pipe,
                     '+' => TokenKind::Plus,
+                    '}' => TokenKind::RightBrace,
                     ']' => TokenKind::RightBracket,
                     ')' => TokenKind::RightParen,
                     '/' => TokenKind::Slash,
@@ -93,16 +98,17 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             '=' | '<' | '>' | '!' => {
                 chars.next();
-                let followed_by_equal = matches!(chars.peek(), Some(&(_, '=')));
-                let (kind, length) = match (character, followed_by_equal) {
-                    ('=', true) => (TokenKind::EqualEqual, 2),
-                    ('=', false) => (TokenKind::Equal, 1),
-                    ('>', true) => (TokenKind::GreaterEqual, 2),
-                    ('>', false) => (TokenKind::Greater, 1),
-                    ('<', true) => (TokenKind::LessEqual, 2),
-                    ('<', false) => (TokenKind::Less, 1),
-                    ('!', true) => (TokenKind::NotEqual, 2),
-                    ('!', false) => panic!("unexpected character '!' at byte {start}"),
+                let next = chars.peek().map(|&(_, c)| c);
+                let (kind, length) = match (character, next) {
+                    ('=', Some('=')) => (TokenKind::EqualEqual, 2),
+                    ('=', Some('>')) => (TokenKind::FatArrow, 2),
+                    ('=', _) => (TokenKind::Equal, 1),
+                    ('>', Some('=')) => (TokenKind::GreaterEqual, 2),
+                    ('>', _) => (TokenKind::Greater, 1),
+                    ('<', Some('=')) => (TokenKind::LessEqual, 2),
+                    ('<', _) => (TokenKind::Less, 1),
+                    ('!', Some('=')) => (TokenKind::NotEqual, 2),
+                    ('!', _) => panic!("unexpected character '!' at byte {start}"),
                     _ => unreachable!(),
                 };
                 if length == 2 {
@@ -267,6 +273,20 @@ mod tests {
                 TokenKind::Pipe
             ]
         );
+    }
+
+    #[test]
+    fn lexes_hash_punctuation() {
+        assert_eq!(
+            kinds("{ } =>"),
+            vec![
+                TokenKind::LeftBrace,
+                TokenKind::RightBrace,
+                TokenKind::FatArrow,
+            ]
+        );
+        // `=>` must not lex as `=` then `>`.
+        assert_eq!(texts("a => 1"), vec!["a", "=>", "1"]);
     }
 
     #[test]

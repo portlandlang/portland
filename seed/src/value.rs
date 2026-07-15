@@ -6,6 +6,9 @@ use std::fmt;
 pub enum Value {
     Array(Vec<Value>),
     Boolean(bool),
+    /// Insertion-ordered pairs; lookup is linear. Note: derived equality is
+    /// order-sensitive, unlike Ruby's — acceptable crudeness for the seed.
+    Hash(Vec<(Value, Value)>),
     Integer(i64),
     String(String),
 }
@@ -24,6 +27,16 @@ impl fmt::Display for Value {
                 write!(formatter, "]")
             }
             Value::Boolean(value) => write!(formatter, "{value}"),
+            Value::Hash(pairs) => {
+                write!(formatter, "{{")?;
+                for (index, (key, value)) in pairs.iter().enumerate() {
+                    if index > 0 {
+                        write!(formatter, ", ")?;
+                    }
+                    write!(formatter, "{key} => {value}")?;
+                }
+                write!(formatter, "}}")
+            }
             Value::Integer(value) => write!(formatter, "{value}"),
             Value::String(value) => write!(formatter, "{value}"),
         }

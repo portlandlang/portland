@@ -130,19 +130,44 @@ impl<W: std::io::Write> Interpreter<W> {
                 elements.iter().map(|e| self.value_of(e)).collect(),
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::HashLiteral(entries) => {
+                let mut pairs: Vec<(Value, Value)> = Vec::new();
+                for (key_expression, value_expression) in entries {
+                    let key = self.value_of(key_expression);
+                    let value = self.value_of(value_expression);
+                    // Ruby rule: a duplicate key keeps its position, last value wins.
+                    match pairs.iter_mut().find(|(existing, _)| *existing == key) {
+                        Some(pair) => pair.1 = value,
+                        None => pairs.push((key, value)),
+                    }
+                }
+                Some(Value::Hash(pairs))
+            }
             Expression::Index { index, receiver } => {
                 let receiver = self.value_of(receiver);
                 let index = self.value_of(index);
-                let (Value::Array(elements), Value::Integer(index)) = (&receiver, &index) else {
-                    panic!("cannot index {receiver:?} with {index:?}")
-                };
-                // Ruby-style negative indices; out of range panics — no nil to return.
-                let length = elements.len() as i64;
-                let position = if *index < 0 { length + index } else { *index };
-                if position < 0 || position >= length {
-                    panic!("index {index} out of range for array of length {length}");
+                match (&receiver, &index) {
+                    (Value::Array(elements), Value::Integer(index)) => {
+                        // Ruby-style negative indices; out of range panics — no nil to return.
+                        let length = elements.len() as i64;
+                        let position = if *index < 0 { length + index } else { *index };
+                        if position < 0 || position >= length {
+                            panic!("index {index} out of range for array of length {length}");
+                        }
+                        Some(elements[position as usize].clone())
+                    }
+                    (Value::Hash(pairs), key) => Some(
+                        pairs
+                            .iter()
+                            .find(|(existing, _)| existing == key)
+                            .unwrap_or_else(|| {
+                                panic!("key {key} not found in hash — no nil; check key? first")
+                            })
+                            .1
+                            .clone(),
+                    ),
+                    _ => panic!("cannot index {receiver:?} with {index:?}"),
                 }
-                Some(elements[position as usize].clone())
             }
             Expression::If {
                 condition,
@@ -303,6 +328,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 .unwrap_or_else(|| panic!("last on an empty array — no nil; check empty? first"))
                 .clone(),
             (Value::Array(elements), "length", []) => Value::Integer(elements.len() as i64),
+            (Value::Hash(pairs), "empty?", []) => Value::Boolean(pairs.is_empty()),
+            (Value::Hash(pairs), "key?", [key]) => {
+                Value::Boolean(pairs.iter().any(|(existing, _)| existing == key))
+            }
+            (Value::Hash(pairs), "keys", []) => {
+                Value::Array(pairs.iter().map(|(key, _)| key.clone()).collect())
+            }
+            (Value::Hash(pairs), "length", []) => Value::Integer(pairs.len() as i64),
+            (Value::Hash(pairs), "values", []) => {
+                Value::Array(pairs.iter().map(|(_, value)| value.clone()).collect())
+            }
             (Value::Integer(n), "abs", []) => Value::Integer(n.abs()),
             (Value::Integer(n), "negative?", []) => Value::Boolean(*n < 0),
             (Value::Integer(n), "positive?", []) => Value::Boolean(*n > 0),
@@ -541,6 +577,64 @@ mod tests {
     #[should_panic(expected = "undefined block-taking method")]
     fn panics_on_an_unknown_block_method() {
         evaluate("\"pdx\".each do |c|\n  c\nend\n");
+    }
+
+    #[test]
+    fn evaluates_hash_literals_and_lookup() {
+        let source = "ages = {\"amy\" => 3, \"bo\" => 5}\nages[\"bo\"]\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(5)));
+        assert_eq!(
+            evaluate("{1 => \"one\"}[1]"),
+            Some(Value::String("one".to_string()))
+        );
+    }
+
+    #[test]
+    fn duplicate_hash_keys_keep_position_and_last_value_wins() {
+        assert_eq!(
+            evaluate("{\"a\" => 1, \"a\" => 2}[\"a\"]"),
+            Some(Value::Integer(2))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "not found in hash")]
+    fn panics_on_a_missing_hash_key() {
+        evaluate("{\"a\" => 1}[\"b\"]");
+    }
+
+    #[test]
+    fn calls_builtin_methods_on_hashes() {
+        let hash = "{\"a\" => 1, \"b\" => 2}";
+        assert_eq!(evaluate(&format!("{hash}.length")), Some(Value::Integer(2)));
+        assert_eq!(evaluate("{}.empty?"), Some(Value::Boolean(true)));
+        assert_eq!(
+            evaluate(&format!("{hash}.key?(\"a\")")),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            evaluate(&format!("{hash}.key?(\"z\")")),
+            Some(Value::Boolean(false))
+        );
+        assert_eq!(
+            evaluate(&format!("{hash}.keys")),
+            Some(Value::Array(vec![
+                Value::String("a".to_string()),
+                Value::String("b".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate(&format!("{hash}.values")),
+            Some(Value::Array(vec![Value::Integer(1), Value::Integer(2)]))
+        );
+    }
+
+    #[test]
+    fn puts_prints_hashes_readably() {
+        assert_eq!(
+            output_of("puts({\"a\" => 1, \"b\" => 2})"),
+            "{a => 1, b => 2}\n"
+        );
     }
 
     #[test]

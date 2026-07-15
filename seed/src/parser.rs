@@ -403,6 +403,35 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => Expression::String(unescape(token.text)),
+            TokenKind::LeftBrace => {
+                let mut pairs = Vec::new();
+                if self.peek_kind() != Some(TokenKind::RightBrace) {
+                    loop {
+                        let key = self.expression();
+                        if self.peek_kind() != Some(TokenKind::FatArrow) {
+                            panic!(
+                                "expected => in hash literal, got {:?}",
+                                self.tokens.get(self.position)
+                            );
+                        }
+                        self.position += 1; // the `=>`
+                        let value = self.expression();
+                        pairs.push((key, value));
+                        if self.peek_kind() != Some(TokenKind::Comma) {
+                            break;
+                        }
+                        self.position += 1; // the `,`
+                    }
+                }
+                if self.peek_kind() != Some(TokenKind::RightBrace) {
+                    panic!(
+                        "expected closing brace, got {:?}",
+                        self.tokens.get(self.position)
+                    );
+                }
+                self.position += 1;
+                Expression::HashLiteral(pairs)
+            }
             TokenKind::LeftBracket => {
                 let mut elements = Vec::new();
                 if self.peek_kind() != Some(TokenKind::RightBracket) {

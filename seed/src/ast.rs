@@ -62,6 +62,7 @@ pub enum Expression {
         right: Box<Expression>,
     },
     Boolean(bool),
+    HashLiteral(Vec<(Expression, Expression)>),
     If {
         condition: Box<Expression>,
         else_body: Vec<Statement>,
