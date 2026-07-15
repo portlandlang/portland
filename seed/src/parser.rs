@@ -126,7 +126,29 @@ impl<'source> Parser<'source> {
     }
 
     fn expression(&mut self) -> Expression {
-        self.addition()
+        self.comparison()
+    }
+
+    fn comparison(&mut self) -> Expression {
+        let mut left = self.addition();
+        while let Some(operator) = match self.peek_kind() {
+            Some(TokenKind::EqualEqual) => Some(BinaryOperator::Equals),
+            Some(TokenKind::Greater) => Some(BinaryOperator::Greater),
+            Some(TokenKind::GreaterEqual) => Some(BinaryOperator::GreaterOrEqual),
+            Some(TokenKind::Less) => Some(BinaryOperator::Less),
+            Some(TokenKind::LessEqual) => Some(BinaryOperator::LessOrEqual),
+            Some(TokenKind::NotEqual) => Some(BinaryOperator::NotEquals),
+            _ => None,
+        } {
+            self.position += 1;
+            let right = self.addition();
+            left = Expression::Binary {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        left
     }
 
     fn addition(&mut self) -> Expression {
@@ -209,6 +231,11 @@ impl<'source> Parser<'source> {
                 self.position += 1;
                 inner
             }
+            TokenKind::Keyword => match token.text {
+                "false" => Expression::Boolean(false),
+                "true" => Expression::Boolean(true),
+                _ => panic!("unexpected keyword {:?}", token.text),
+            },
             _ => panic!("unexpected token {token:?}"),
         }
     }

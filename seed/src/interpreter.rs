@@ -74,6 +74,7 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn expression(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
+            Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
             Expression::Binary {
@@ -101,6 +102,21 @@ impl<W: std::io::Write> Interpreter<W> {
                     (Value::String(a), BinaryOperator::Add, Value::String(b)) => {
                         Some(Value::String(a + &b))
                     }
+                    (Value::Integer(a), BinaryOperator::Greater, Value::Integer(b)) => {
+                        Some(Value::Boolean(a > b))
+                    }
+                    (Value::Integer(a), BinaryOperator::GreaterOrEqual, Value::Integer(b)) => {
+                        Some(Value::Boolean(a >= b))
+                    }
+                    (Value::Integer(a), BinaryOperator::Less, Value::Integer(b)) => {
+                        Some(Value::Boolean(a < b))
+                    }
+                    (Value::Integer(a), BinaryOperator::LessOrEqual, Value::Integer(b)) => {
+                        Some(Value::Boolean(a <= b))
+                    }
+                    // Equality is defined for every value pair; mixed types are just unequal.
+                    (left, BinaryOperator::Equals, right) => Some(Value::Boolean(left == right)),
+                    (left, BinaryOperator::NotEquals, right) => Some(Value::Boolean(left != right)),
                     (left, operator, right) => {
                         panic!("cannot apply {operator:?} to {left:?} and {right:?}")
                     }
@@ -191,6 +207,33 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_boolean_literals() {
+        assert_eq!(evaluate("true"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("false"), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn evaluates_integer_comparisons() {
+        assert_eq!(evaluate("1 < 2"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("1 >= 2"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("1 + 1 == 2"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("3 * 3 <= 8"), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn evaluates_equality_across_types() {
+        assert_eq!(evaluate(r#""pdx" == "pdx""#), Some(Value::Boolean(true)));
+        assert_eq!(evaluate(r#"1 == "1""#), Some(Value::Boolean(false)));
+        assert_eq!(evaluate(r#"1 != "1""#), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply")]
+    fn panics_on_ordering_strings() {
+        evaluate(r#""a" < "b""#);
     }
 
     #[test]

@@ -23,7 +23,13 @@ pub enum Statement {
 pub enum BinaryOperator {
     Add,
     Divide,
+    Equals,
+    Greater,
+    GreaterOrEqual,
+    Less,
+    LessOrEqual,
     Multiply,
+    NotEquals,
     Subtract,
 }
 
@@ -34,6 +40,7 @@ pub enum Expression {
         operator: BinaryOperator,
         right: Box<Expression>,
     },
+    Boolean(bool),
     Call {
         arguments: Vec<Expression>,
         name: String,
