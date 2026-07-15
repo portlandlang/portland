@@ -7,9 +7,13 @@
 pub enum TokenKind {
     Identifier,
     Integer,
+    Keyword,
     Newline,
     String,
 }
+
+/// The Stage 0 keyword set — grows as the subset does.
+const KEYWORDS: [&str; 3] = ["def", "do", "end"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Token<'source> {
@@ -61,10 +65,13 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     end = index + suffix.len_utf8();
                     chars.next();
                 }
-                tokens.push(Token {
-                    kind: TokenKind::Identifier,
-                    text: &source[start..end],
-                });
+                let text = &source[start..end];
+                let kind = if KEYWORDS.contains(&text) {
+                    TokenKind::Keyword
+                } else {
+                    TokenKind::Identifier
+                };
+                tokens.push(Token { kind, text });
             }
             _ => panic!("unexpected character {character:?} at byte {start}"),
         }
@@ -125,6 +132,22 @@ mod tests {
             kinds("empty? save!"),
             vec![TokenKind::Identifier, TokenKind::Identifier]
         );
+    }
+
+    #[test]
+    fn lexes_keywords() {
+        assert_eq!(
+            kinds("def do end"),
+            vec![TokenKind::Keyword, TokenKind::Keyword, TokenKind::Keyword]
+        );
+        assert_eq!(texts("def do end"), vec!["def", "do", "end"]);
+    }
+
+    #[test]
+    fn keyword_lookalikes_stay_identifiers() {
+        // `def?` and `ending` are plain identifiers, not keywords.
+        assert_eq!(kinds("def?"), vec![TokenKind::Identifier]);
+        assert_eq!(kinds("ending"), vec![TokenKind::Identifier]);
     }
 
     #[test]
