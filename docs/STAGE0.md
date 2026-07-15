@@ -10,7 +10,8 @@ the tests are the spec until a real one exists.
 ## In
 
 - **Literals** — integers (`i64`), double-quoted strings with `\n` `\t` `\"` `\\`
-  escapes, `true`/`false`, arrays (`[1, "two", [3]]`).
+  escapes, `true`/`false`, arrays (`[1, "two", [3]]`), hashes
+  (`{"key" => value}`, insertion-ordered, any-type keys; missing key panics).
 - **Arithmetic** — `+ - * / %`, unary minus, parens. `+` concatenates strings
   and arrays. Division/modulo currently truncate (Rust semantics, not Ruby's
   floor — flagged to revisit).
@@ -30,7 +31,8 @@ the tests are the spec until a real one exists.
   over the enclosing scope; parameters are block-local.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?`;
   integers: `abs zero? positive? negative?`; arrays: `length first last empty?
-  join` plus `[index]` with negative indices; everything: `to_s`.
+  join` plus `[index]` with negative indices; hashes: `length empty? key? keys
+  values` plus `[key]`; everything: `to_s`.
 - **IO** — `puts(...)`, one line per argument. `puts` produces *no value*;
   using its result is an error (seed-level preview of "no ambient nil").
 - **Comments** — `#` to end of line.
@@ -39,7 +41,7 @@ the tests are the spec until a real one exists.
 ## Out (deliberately, for now)
 
 - Interpolation (`"#{}"`), heredocs, `%w[]` — the Prism-textbook lexer work.
-- Hashes, symbols, floats, ranges.
+- Symbols, floats, ranges.
 - Optionals and the absence story — *the* headline feature, designed at the
   language level (todo 005), not snuck into the seed.
 - Classes/objects, modules, constants.
