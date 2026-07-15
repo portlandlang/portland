@@ -28,6 +28,19 @@ struct Parser<'source> {
 /// each interpolation wrapped in `.to_s`.
 fn string_expression(text: &str) -> Expression {
     let content = &text[1..text.len() - 1];
+    if text.starts_with('\'') {
+        // Single-quoted: everything is literal except \' and \\.
+        let mut result = String::with_capacity(content.len());
+        let mut characters = content.chars().peekable();
+        while let Some(character) = characters.next() {
+            if character == '\\' && matches!(characters.peek(), Some('\'') | Some('\\')) {
+                result.push(characters.next().unwrap());
+            } else {
+                result.push(character);
+            }
+        }
+        return Expression::String(result);
+    }
     let mut parts: Vec<Expression> = Vec::new();
     let mut literal = String::new();
     let mut characters = content.char_indices().peekable();

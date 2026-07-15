@@ -164,6 +164,29 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     }
                 }
             }
+            '\'' => {
+                chars.next();
+                // Single-quoted: no interpolation; only \' and \\ mean anything,
+                // and the parser handles that — the lexer just finds the end.
+                loop {
+                    match chars.next() {
+                        None => panic!("unterminated string starting at byte {start}"),
+                        Some((_, '\\')) => {
+                            if chars.next().is_none() {
+                                panic!("unterminated string starting at byte {start}");
+                            }
+                        }
+                        Some((closing, '\'')) => {
+                            tokens.push(Token {
+                                kind: TokenKind::String,
+                                text: &source[start..=closing],
+                            });
+                            break;
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut end = scan_while(&mut chars, |c| c.is_ascii_alphanumeric() || c == '_');
                 // Ruby-surface joy, kept: a trailing `?` or `!` is part of the name —

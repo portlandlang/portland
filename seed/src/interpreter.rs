@@ -1101,6 +1101,20 @@ mod tests {
     }
 
     #[test]
+    fn single_quoted_strings_are_literal() {
+        assert_eq!(
+            evaluate(r##"'no #{interpolation} or \n escapes'"##),
+            Some(Value::String(
+                "no #{interpolation} or \\n escapes".to_string()
+            ))
+        );
+        assert_eq!(
+            evaluate(r"'it\'s escaped, and so is \\'"),
+            Some(Value::String("it's escaped, and so is \\".to_string()))
+        );
+    }
+
+    #[test]
     fn decodes_string_escapes() {
         assert_eq!(
             evaluate(r#""line1\nline2""#),
