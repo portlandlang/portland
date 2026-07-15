@@ -75,6 +75,23 @@ impl<W: std::io::Write> Interpreter<W> {
     fn expression(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::If {
+                condition,
+                else_body,
+                then_body,
+            } => {
+                let condition = self.value_of(condition);
+                // Strict booleans, no truthiness — Portland has no nil to be falsy.
+                let Value::Boolean(condition) = condition else {
+                    panic!("if condition must be true or false, got {condition:?}")
+                };
+                let body = if condition { then_body } else { else_body };
+                let mut result = None;
+                for statement in body {
+                    result = self.statement(statement);
+                }
+                result
+            }
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
             Expression::Binary {
@@ -234,6 +251,44 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_ordering_strings() {
         evaluate(r#""a" < "b""#);
+    }
+
+    #[test]
+    fn evaluates_the_then_branch() {
+        let source = "if 1 < 2\n  \"yes\"\nelse\n  \"no\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("yes".to_string())));
+    }
+
+    #[test]
+    fn evaluates_the_else_branch() {
+        let source = "if 1 > 2\n  \"yes\"\nelse\n  \"no\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("no".to_string())));
+    }
+
+    #[test]
+    fn if_without_else_produces_nothing_when_false() {
+        assert_eq!(evaluate("if false\n  1\nend\n"), None);
+    }
+
+    #[test]
+    fn if_is_an_expression() {
+        let source = "label = if 2 > 1\n  \"big\"\nelse\n  \"small\"\nend\nlabel\n";
+        assert_eq!(evaluate(source), Some(Value::String("big".to_string())));
+    }
+
+    #[test]
+    fn if_works_inside_methods() {
+        let source = "def sign(n)\n  if n < 0\n    \"negative\"\n  else\n    \"non-negative\"\n  end\nend\nsign(0 - 5)\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("negative".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "must be true or false")]
+    fn panics_on_a_non_boolean_condition() {
+        evaluate("if 1\n  2\nend\n");
     }
 
     #[test]

@@ -62,20 +62,49 @@ impl<'source> Parser<'source> {
         };
         self.expect_statement_boundary();
         self.skip_newlines();
-        let mut body = Vec::new();
-        while !self.peek_is_keyword("end") {
-            if self.position >= self.tokens.len() {
-                panic!("expected end to close def {name}");
-            }
-            body.push(self.statement());
-            self.expect_statement_boundary();
-            self.skip_newlines();
-        }
+        let body = self.body_until(&["end"], &format!("def {name}"));
         self.position += 1; // the `end`
         Statement::MethodDefinition {
             body,
             name,
             parameters,
+        }
+    }
+
+    /// Parse statements up to (not consuming) one of the terminator keywords.
+    fn body_until(&mut self, terminators: &[&str], context: &str) -> Vec<Statement> {
+        let mut body = Vec::new();
+        loop {
+            if terminators.iter().any(|word| self.peek_is_keyword(word)) {
+                return body;
+            }
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close {context}");
+            }
+            body.push(self.statement());
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+    }
+
+    fn if_expression(&mut self) -> Expression {
+        let condition = Box::new(self.expression());
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let then_body = self.body_until(&["else", "end"], "if");
+        let else_body = if self.peek_is_keyword("else") {
+            self.position += 1; // the `else`
+            self.expect_statement_boundary();
+            self.skip_newlines();
+            self.body_until(&["end"], "else")
+        } else {
+            Vec::new()
+        };
+        self.position += 1; // the `end`
+        Expression::If {
+            condition,
+            else_body,
+            then_body,
         }
     }
 
@@ -233,6 +262,7 @@ impl<'source> Parser<'source> {
             }
             TokenKind::Keyword => match token.text {
                 "false" => Expression::Boolean(false),
+                "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
                 _ => panic!("unexpected keyword {:?}", token.text),
             },

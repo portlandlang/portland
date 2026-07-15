@@ -41,6 +41,11 @@ pub enum Expression {
         right: Box<Expression>,
     },
     Boolean(bool),
+    If {
+        condition: Box<Expression>,
+        else_body: Vec<Statement>,
+        then_body: Vec<Statement>,
+    },
     Call {
         arguments: Vec<Expression>,
         name: String,
