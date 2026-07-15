@@ -53,7 +53,9 @@ fn repl() {
             Err(payload) => {
                 let message = panic_message(&*payload);
                 let incomplete = message.contains("unexpected end of input")
-                    || message.contains("expected end to close");
+                    || message.contains("expected end to close")
+                    || message.contains("unterminated string")
+                    || message.contains("unterminated %w");
                 if incomplete {
                     // Mid-entry (an open def, if, or while) — keep reading lines.
                 } else {

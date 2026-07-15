@@ -136,6 +136,16 @@ fn repl_buffers_multiline_definitions() {
 }
 
 #[test]
+fn repl_buffers_multiline_strings() {
+    let output = run_repl("x = \"port\nland\"\nx.length\n");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "=> \"port\\nland\"\n=> 9\n"
+    );
+}
+
+#[test]
 fn repl_reports_errors_and_continues() {
     let output = run_repl("nope\n1 + 1\n");
     assert!(output.status.success());

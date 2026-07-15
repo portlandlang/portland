@@ -414,6 +414,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     receiver
                 }
+                (Value::Integer(from), "downto", [Value::Integer(to)]) => {
+                    let mut current = *from;
+                    while current >= *to {
+                        self.run_block(block, vec![Value::Integer(current)]);
+                        current -= 1;
+                    }
+                    receiver
+                }
+                (Value::Integer(from), "upto", [Value::Integer(to)]) => {
+                    for current in *from..=*to {
+                        self.run_block(block, vec![Value::Integer(current)]);
+                    }
+                    receiver
+                }
                 (receiver, name, _) => {
                     panic!("undefined block-taking method {name} for {receiver:?}")
                 }
@@ -1042,6 +1056,16 @@ mod tests {
     #[test]
     fn argv_is_empty_by_default() {
         assert_eq!(evaluate("argv().length"), Some(Value::Integer(0)));
+    }
+
+    #[test]
+    fn upto_and_downto_iterate_inclusively() {
+        assert_eq!(output_of("1.upto(3) do |n|\n  puts(n)\nend\n"), "1\n2\n3\n");
+        assert_eq!(
+            output_of("3.downto(1) do |n|\n  puts(n)\nend\n"),
+            "3\n2\n1\n"
+        );
+        assert_eq!(output_of("1.upto(0) do |n|\n  puts(n)\nend\n"), "");
     }
 
     #[test]
