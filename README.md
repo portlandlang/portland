@@ -4,9 +4,12 @@ A joyous programming language for Apple silicon.
 
 Close to the metal, on Metal.
 
-> **Status: early design.** No compiler yet. Portland is in the brainstorming-to-scaffolding stage.
-> See [`AGENT.md`](AGENT.md) for the working brief and
-> [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale.
+> **Status: Stage 0 seed.** A tiny Rust interpreter (`seed/`) runs a first slice of
+> Portland — methods, `if`/`elsif`/`else`, `while`, arithmetic, strings, `puts`, a REPL.
+> No compiler yet; the seed is the disposable bootstrap.
+> See [`AGENT.md`](AGENT.md) for the working brief,
+> [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale,
+> and [`todos/`](todos/README.md) for what's next.
 
 ## The idea
 

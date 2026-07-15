@@ -4,10 +4,10 @@ Once the GitHub org exists. This design repo plus the future compiler repo.
 
 ## Tasks
 
-- [ ] `git init` this design repo, first commit, push to org
-- [ ] Decide repo layout: monorepo (`portland` = design + seed + compiler) vs split
-- [ ] Seed compiler crate via `cargo init` (generators over manual creation)
-- [ ] Scripts to Rule Them All: `script/bootstrap`, `script/test`, `script/build`, `script/cibuild`
-- [ ] CHANGELOG.md
-- [ ] License decision
+- [x] `git init` this design repo, first commit — push to org still pending
+- [x] Decide repo layout: monorepo (design + seed + compiler in one repo, cargo workspace at root)
+- [x] Seed crate via `cargo new` (`seed/` = `portland-seed`, `publish = false`)
+- [ ] Scripts to Rule Them All: `script/test` done; `script/bootstrap`, `script/build`, `script/cibuild` pending
+- [x] CHANGELOG.md
+- [ ] License decision (placeholder crate shipped as `MIT OR Apache-2.0`; confirm or change)
 - [ ] Migrate these `todos/` files into GitHub issues once the repo is up
