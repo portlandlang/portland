@@ -94,7 +94,18 @@ impl Parser<'_> {
                 let value = token.text.parse().expect("integer literal out of range");
                 Expression::Integer(value)
             }
-            TokenKind::Identifier => Expression::Variable(token.text.to_string()),
+            TokenKind::Identifier => {
+                if self.peek_kind() == Some(TokenKind::LeftParen) {
+                    self.position += 1; // the `(`
+                    let arguments = self.arguments();
+                    Expression::Call {
+                        arguments,
+                        name: token.text.to_string(),
+                    }
+                } else {
+                    Expression::Variable(token.text.to_string())
+                }
+            }
             TokenKind::String => {
                 let content = &token.text[1..token.text.len() - 1];
                 Expression::String(content.to_string())
@@ -112,6 +123,26 @@ impl Parser<'_> {
             }
             _ => panic!("unexpected token {token:?}"),
         }
+    }
+
+    /// Parse a comma-separated argument list, consuming the closing paren.
+    fn arguments(&mut self) -> Vec<Expression> {
+        let mut arguments = Vec::new();
+        if self.peek_kind() != Some(TokenKind::RightParen) {
+            arguments.push(self.expression());
+            while self.peek_kind() == Some(TokenKind::Comma) {
+                self.position += 1;
+                arguments.push(self.expression());
+            }
+        }
+        if self.peek_kind() != Some(TokenKind::RightParen) {
+            panic!(
+                "expected closing paren after arguments, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1;
+        arguments
     }
 
     fn advance(&mut self) -> Token<'_> {
@@ -195,6 +226,48 @@ mod tests {
                 },
                 Statement::Expression(Expression::Variable("total".to_string())),
             ]
+        );
+    }
+
+    #[test]
+    fn parses_a_method_call_with_arguments() {
+        assert_eq!(
+            expression(r#"greet("world", 2)"#),
+            Expression::Call {
+                arguments: vec![
+                    Expression::String("world".to_string()),
+                    Expression::Integer(2),
+                ],
+                name: "greet".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_a_method_call_with_no_arguments() {
+        assert_eq!(
+            expression("greet()"),
+            Expression::Call {
+                arguments: vec![],
+                name: "greet".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_nested_method_calls() {
+        assert_eq!(
+            expression("outer(inner(1) + 2)"),
+            Expression::Call {
+                arguments: vec![Expression::Add {
+                    left: Box::new(Expression::Call {
+                        arguments: vec![Expression::Integer(1)],
+                        name: "inner".to_string(),
+                    }),
+                    right: Box::new(Expression::Integer(2)),
+                }],
+                name: "outer".to_string(),
+            }
         );
     }
 

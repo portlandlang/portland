@@ -17,6 +17,10 @@ pub enum Expression {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+    Call {
+        arguments: Vec<Expression>,
+        name: String,
+    },
     Integer(i64),
     String(String),
     Variable(String),
