@@ -594,6 +594,10 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn call(&mut self, name: &str, arguments: Vec<Value>) -> Option<Value> {
         if !self.methods.contains_key(name) && name == "puts" {
+            // Like Ruby: bare puts() prints a blank line.
+            if arguments.is_empty() {
+                writeln!(self.output).expect("failed to write output");
+            }
             for argument in &arguments {
                 writeln!(self.output, "{argument}").expect("failed to write output");
             }
@@ -1730,6 +1734,11 @@ mod tests {
     #[test]
     fn puts_prints_a_line() {
         assert_eq!(output_of("puts(\"hello portland\")"), "hello portland\n");
+    }
+
+    #[test]
+    fn bare_puts_prints_a_blank_line() {
+        assert_eq!(output_of("puts()"), "\n");
     }
 
     #[test]

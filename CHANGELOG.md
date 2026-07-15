@@ -31,4 +31,6 @@
 - Default parameter values (trailing only, bound left to right so defaults can reference earlier parameters).
 - `select`/`reject`/`reduce(initial)` blocks and `String#to_i`.
 - Crude IO builtins (`argv()`, `read_file`, `write_file`) — names are placeholders; unblocks real programs. `word_count.pdx` fixture is a working `wc`.
+- `each_with_index`, `sort` (integer arrays), `slice(start, length)` on strings and arrays; bare `puts()` prints a blank line.
+- `mini_lexer.pdx` fixture: a lexer written in Portland, tokenizing Portland-ish source — first compiler work in the language itself.
 - `script/bootstrap` and `script/cibuild`; `todos/018` gap analysis toward Stage 1 self-hosting.
