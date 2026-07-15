@@ -25,6 +25,16 @@ fn runs_arithmetic_pdx() {
 }
 
 #[test]
+fn runs_showcase_pdx() {
+    let output = run_fixture("showcase.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "negative\nzero\npositive\n42\ntrue\n"
+    );
+}
+
+#[test]
 fn fails_without_a_file_argument() {
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .output()
