@@ -6,6 +6,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenKind {
     Integer,
+    Newline,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,6 +21,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
 
     while let Some(&(start, character)) = chars.peek() {
         match character {
+            ' ' | '\t' => {
+                chars.next();
+            }
+            '\n' => {
+                chars.next();
+                tokens.push(Token {
+                    kind: TokenKind::Newline,
+                    text: &source[start..start + 1],
+                });
+            }
             '0'..='9' => {
                 let end = scan_while(&mut chars, |c| c.is_ascii_digit());
                 tokens.push(Token {
@@ -66,5 +77,18 @@ mod tests {
     fn lexes_an_integer_literal() {
         assert_eq!(kinds("42"), vec![TokenKind::Integer]);
         assert_eq!(texts("42"), vec!["42"]);
+    }
+
+    #[test]
+    fn skips_spaces_and_tabs() {
+        assert_eq!(texts("  1 \t 2  "), vec!["1", "2"]);
+    }
+
+    #[test]
+    fn lexes_newlines_as_tokens() {
+        assert_eq!(
+            kinds("1\n2"),
+            vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
+        );
     }
 }
