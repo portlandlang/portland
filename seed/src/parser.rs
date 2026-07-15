@@ -33,6 +33,9 @@ impl<'source> Parser<'source> {
     }
 
     fn statement(&mut self) -> Statement {
+        if self.peek_is_keyword("def") {
+            return self.method_definition();
+        }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && self.peek_kind_at(1) == Some(TokenKind::Equal)
         {
@@ -42,6 +45,68 @@ impl<'source> Parser<'source> {
             return Statement::Assignment { name, value };
         }
         Statement::Expression(self.expression())
+    }
+
+    fn method_definition(&mut self) -> Statement {
+        self.position += 1; // the `def`
+        let token = self.advance();
+        if token.kind != TokenKind::Identifier {
+            panic!("expected method name after def, got {token:?}");
+        }
+        let name = token.text.to_string();
+        let parameters = if self.peek_kind() == Some(TokenKind::LeftParen) {
+            self.position += 1;
+            self.parameters()
+        } else {
+            Vec::new()
+        };
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let mut body = Vec::new();
+        while !self.peek_is_keyword("end") {
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close def {name}");
+            }
+            body.push(self.statement());
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+        self.position += 1; // the `end`
+        Statement::MethodDefinition {
+            body,
+            name,
+            parameters,
+        }
+    }
+
+    /// Parse a comma-separated parameter name list, consuming the closing paren.
+    fn parameters(&mut self) -> Vec<String> {
+        let mut parameters = Vec::new();
+        if self.peek_kind() == Some(TokenKind::Identifier) {
+            parameters.push(self.advance().text.to_string());
+            while self.peek_kind() == Some(TokenKind::Comma) {
+                self.position += 1;
+                let token = self.advance();
+                if token.kind != TokenKind::Identifier {
+                    panic!("expected parameter name, got {token:?}");
+                }
+                parameters.push(token.text.to_string());
+            }
+        }
+        if self.peek_kind() != Some(TokenKind::RightParen) {
+            panic!(
+                "expected closing paren after parameters, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1;
+        parameters
+    }
+
+    fn peek_is_keyword(&self, word: &str) -> bool {
+        self.tokens
+            .get(self.position)
+            .is_some_and(|token| token.kind == TokenKind::Keyword && token.text == word)
     }
 
     fn skip_newlines(&mut self) {
@@ -269,6 +334,42 @@ mod tests {
                 name: "outer".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn parses_a_method_definition() {
+        let source = "def greet(name)\n  \"hello \" + name\nend\n";
+        assert_eq!(
+            parse(source).statements,
+            vec![Statement::MethodDefinition {
+                body: vec![Statement::Expression(Expression::Add {
+                    left: Box::new(Expression::String("hello ".to_string())),
+                    right: Box::new(Expression::Variable("name".to_string())),
+                })],
+                name: "greet".to_string(),
+                parameters: vec!["name".to_string()],
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_a_method_definition_without_parameters() {
+        assert_eq!(
+            parse("def pdx\n  \"portland\"\nend\n").statements,
+            vec![Statement::MethodDefinition {
+                body: vec![Statement::Expression(Expression::String(
+                    "portland".to_string()
+                ))],
+                name: "pdx".to_string(),
+                parameters: vec![],
+            }]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "expected end")]
+    fn panics_on_an_unclosed_method_definition() {
+        parse("def greet(name)\n  name\n");
     }
 
     #[test]

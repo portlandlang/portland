@@ -7,8 +7,16 @@ pub struct Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    Assignment { name: String, value: Expression },
+    Assignment {
+        name: String,
+        value: Expression,
+    },
     Expression(Expression),
+    MethodDefinition {
+        body: Vec<Statement>,
+        name: String,
+        parameters: Vec<String>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
