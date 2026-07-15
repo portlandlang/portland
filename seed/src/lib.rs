@@ -3,4 +3,6 @@
 //! Crude and disposable on purpose — it never has to be good, it has to exist.
 //! Retired at Stage 2, when the compiler written in Portland compiles itself.
 
+pub mod ast;
 pub mod lexer;
+pub mod parser;
