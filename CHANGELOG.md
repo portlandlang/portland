@@ -19,3 +19,7 @@
 - `return` (exits the enclosing method, unwinding through loops) and `break` (exits the enclosing `while`); misuse panics, unsupported-in-blocks stated honestly.
 - `docs/STAGE0.md`: the seed subset documented as built, including what's deliberately out.
 - Hashes: `{"key" => value}` literals (insertion-ordered, duplicate keys last-wins), lookup by any value (missing key panics — no nil), `length`/`empty?`/`key?`/`keys`/`values`.
+- Stdlib breadth: string `chars`/`split`/`include?`/`start_with?`/`end_with?` and `[index]`; integer `even?`/`odd?`; array `include?`/`sum`/`min`/`max`.
+- `unless` (block and postfix) and postfix `if` — guard clauses (`return 0 if n < 0`) work.
+- Short-circuiting `&&`/`||` and `!`, strict booleans.
+- String interpolation `"#{...}"`, desugared to concatenation with auto-`to_s`; lexer keeps token boundaries honest through nested strings and braces.
