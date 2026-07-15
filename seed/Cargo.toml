@@ -1,0 +1,8 @@
+[package]
+name = "portland-seed"
+version = "0.0.0"
+edition = "2024"
+description = "Stage 0 seed compiler for Portland. Crude and disposable on purpose. Never published."
+publish = false
+
+[dependencies]

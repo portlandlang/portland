@@ -1,0 +1,10 @@
+#!/bin/sh
+# Run the full test suite and linters.
+set -e
+cd "$(dirname "$0")/.."
+
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
