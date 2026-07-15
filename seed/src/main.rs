@@ -44,7 +44,7 @@ fn repl() {
             Ok(program) => {
                 buffer.clear();
                 match catch_unwind(AssertUnwindSafe(|| interpreter.program(&program))) {
-                    Ok(Some(value)) => println!("=> {value}"),
+                    Ok(Some(value)) => println!("=> {}", value.inspect()),
                     Ok(None) => {}
                     Err(payload) => eprintln!("error: {}", panic_message(&*payload)),
                 }

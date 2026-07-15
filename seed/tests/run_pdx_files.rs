@@ -94,6 +94,16 @@ fn repl_evaluates_lines() {
 }
 
 #[test]
+fn repl_inspects_string_results() {
+    let output = run_repl("\"port\" + \"land\"\n");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "=> \"portland\"\n"
+    );
+}
+
+#[test]
 fn repl_buffers_multiline_definitions() {
     let output = run_repl("def double(n)\n  n * 2\nend\ndouble(21)\n");
     assert!(output.status.success());

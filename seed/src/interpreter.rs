@@ -510,6 +510,19 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             return None;
         }
+        if !self.methods.contains_key(name) && name == "p" {
+            for argument in &arguments {
+                let inspected = argument.inspect();
+                writeln!(self.output, "{inspected}").expect("failed to write output");
+            }
+            // Like Ruby: p returns its argument, so it drops into any expression.
+            let mut arguments = arguments;
+            return match arguments.len() {
+                0 => None,
+                1 => Some(arguments.remove(0)),
+                _ => Some(Value::Array(arguments)),
+            };
+        }
 
         let method = self
             .methods
@@ -928,6 +941,14 @@ mod tests {
     #[should_panic(expected = "no nil; check empty? first")]
     fn panics_on_first_of_an_empty_array() {
         evaluate("[].first");
+    }
+
+    #[test]
+    fn p_prints_inspected_values_and_returns_its_argument() {
+        assert_eq!(output_of("p(\"hi\")"), "\"hi\"\n");
+        assert_eq!(output_of("p([1, \"two\"])"), "[1, \"two\"]\n");
+        assert_eq!(evaluate("x = p(42)\nx\n"), Some(Value::Integer(42)));
+        assert_eq!(evaluate("p(1) + 1"), Some(Value::Integer(2)));
     }
 
     #[test]
