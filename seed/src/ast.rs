@@ -62,6 +62,12 @@ pub struct Block {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CaseBranch {
+    pub body: Vec<Statement>,
+    pub values: Vec<Expression>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     ArrayLiteral(Vec<Expression>),
     Binary {
@@ -70,6 +76,11 @@ pub enum Expression {
         right: Box<Expression>,
     },
     Boolean(bool),
+    Case {
+        branches: Vec<CaseBranch>,
+        else_body: Vec<Statement>,
+        subject: Box<Expression>,
+    },
     HashLiteral(Vec<(Expression, Expression)>),
     If {
         condition: Box<Expression>,

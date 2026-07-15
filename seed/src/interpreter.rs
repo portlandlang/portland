@@ -139,6 +139,21 @@ impl<W: std::io::Write> Interpreter<W> {
                 elements.iter().map(|e| self.value_of(e)).collect(),
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::Case {
+                branches,
+                else_body,
+                subject,
+            } => {
+                let subject = self.value_of(subject);
+                for branch in branches {
+                    for value in &branch.values {
+                        if self.value_of(value) == subject {
+                            return self.run_body(&branch.body);
+                        }
+                    }
+                }
+                self.run_body(else_body)
+            }
             Expression::HashLiteral(entries) => {
                 let mut pairs: Vec<(Value, Value)> = Vec::new();
                 for (key_expression, value_expression) in entries {
@@ -1122,6 +1137,41 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_ordering_strings() {
         evaluate(r#""a" < "b""#);
+    }
+
+    #[test]
+    fn evaluates_case_with_aligned_thens() {
+        let source = "def size(n)\n  case n\n  when 0 then \"none\"\n  when 1, 2 then \"few\"\n  else\n    \"many\"\n  end\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}size(0)\n")),
+            Some(Value::String("none".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}size(2)\n")),
+            Some(Value::String("few".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}size(9)\n")),
+            Some(Value::String("many".to_string()))
+        );
+    }
+
+    #[test]
+    fn evaluates_case_with_multiline_branches() {
+        let source =
+            "label = case \"b\"\nwhen \"a\"\n  \"first\"\nwhen \"b\"\n  \"second\"\nend\nlabel\n";
+        assert_eq!(evaluate(source), Some(Value::String("second".to_string())));
+    }
+
+    #[test]
+    fn case_without_a_match_or_else_produces_nothing() {
+        assert_eq!(evaluate("case 9\nwhen 1 then 100\nend\n"), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "case needs at least one when")]
+    fn panics_on_a_case_without_when() {
+        evaluate("case 1\nelse\n  2\nend\n");
     }
 
     #[test]

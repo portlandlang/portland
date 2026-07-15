@@ -2,7 +2,8 @@
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
 use crate::ast::{
-    BinaryOperator, Block, Expression, LogicalOperator, Program, Statement, UnaryOperator,
+    BinaryOperator, Block, CaseBranch, Expression, LogicalOperator, Program, Statement,
+    UnaryOperator,
 };
 use crate::lexer::{self, Token, TokenKind};
 
@@ -241,6 +242,55 @@ impl<'source> Parser<'source> {
         let body = self.body_until(&["end"], "while");
         self.position += 1; // the `end`
         Statement::While { body, condition }
+    }
+
+    /// `case subject ... when a, b [then one-liner | body] ... else ... end`.
+    /// Matching is by equality (no ranges or classes to `===` against yet).
+    fn case_expression(&mut self) -> Expression {
+        let subject = Box::new(self.expression());
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let mut branches = Vec::new();
+        while self.peek_is_keyword("when") {
+            self.position += 1; // the `when`
+            let mut values = vec![self.expression()];
+            while self.peek_kind() == Some(TokenKind::Comma) {
+                self.position += 1;
+                values.push(self.expression());
+            }
+            let body;
+            if self.peek_is_keyword("then") {
+                self.position += 1; // the `then`
+                body = vec![self.simple_statement()];
+                self.expect_statement_boundary();
+                self.skip_newlines();
+            } else {
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                body = self.body_until(&["when", "else", "end"], "when");
+            }
+            branches.push(CaseBranch { body, values });
+        }
+        if branches.is_empty() {
+            panic!(
+                "case needs at least one when, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        let else_body = if self.peek_is_keyword("else") {
+            self.position += 1; // the `else`
+            self.expect_statement_boundary();
+            self.skip_newlines();
+            self.body_until(&["end"], "else")
+        } else {
+            Vec::new()
+        };
+        self.position += 1; // the `end`
+        Expression::Case {
+            branches,
+            else_body,
+            subject,
+        }
     }
 
     /// `unless c ... else ... end`, desugared to an `if` with swapped branches.
@@ -645,6 +695,7 @@ impl<'source> Parser<'source> {
                 inner
             }
             TokenKind::Keyword => match token.text {
+                "case" => self.case_expression(),
                 "false" => Expression::Boolean(false),
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
