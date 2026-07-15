@@ -11,11 +11,15 @@ pub enum Statement {
         name: String,
         value: Expression,
     },
+    Break,
     Expression(Expression),
     MethodDefinition {
         body: Vec<Statement>,
         name: String,
         parameters: Vec<String>,
+    },
+    Return {
+        value: Option<Expression>,
     },
     While {
         body: Vec<Statement>,

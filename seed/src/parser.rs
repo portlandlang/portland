@@ -60,6 +60,18 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("while") {
             return self.while_statement();
         }
+        if self.peek_is_keyword("break") {
+            self.position += 1;
+            return Statement::Break;
+        }
+        if self.peek_is_keyword("return") {
+            self.position += 1;
+            let value = match self.peek_kind() {
+                None | Some(TokenKind::Newline) => None,
+                _ => Some(self.expression()),
+            };
+            return Statement::Return { value };
+        }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && self.peek_kind_at(1) == Some(TokenKind::Equal)
         {

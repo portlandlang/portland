@@ -20,9 +20,16 @@ struct Method {
     parameters: Vec<String>,
 }
 
+/// A `return` or `break` in flight, unwinding to whatever handles it.
+enum Pending {
+    Break,
+    Return(Option<Value>),
+}
+
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, Method>,
     output: W,
+    pending: Option<Pending>,
     variables: HashMap<String, Value>,
 }
 
@@ -37,14 +44,28 @@ impl<W: std::io::Write> Interpreter<W> {
         Self {
             methods: HashMap::new(),
             output,
+            pending: None,
             variables: HashMap::new(),
         }
     }
 
     pub fn program(&mut self, program: &Program) -> Option<Value> {
+        let last = self.run_body(&program.statements);
+        match self.pending.take() {
+            None => last,
+            Some(Pending::Break) => panic!("break outside of a loop"),
+            Some(Pending::Return(_)) => panic!("return outside of a method"),
+        }
+    }
+
+    /// Run statements until done or a `return`/`break` starts unwinding.
+    fn run_body(&mut self, statements: &[Statement]) -> Option<Value> {
         let mut last = None;
-        for statement in &program.statements {
+        for statement in statements {
             last = self.statement(statement);
+            if self.pending.is_some() {
+                break;
+            }
         }
         last
     }
@@ -69,6 +90,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.methods.insert(name.clone(), method);
                 None
             }
+            Statement::Break => {
+                self.pending = Some(Pending::Break);
+                None
+            }
+            Statement::Return { value } => {
+                let value = value.as_ref().map(|expression| self.value_of(expression));
+                self.pending = Some(Pending::Return(value));
+                None
+            }
             Statement::While { body, condition } => {
                 loop {
                     let condition = self.value_of(condition);
@@ -78,8 +108,15 @@ impl<W: std::io::Write> Interpreter<W> {
                     if !condition {
                         break;
                     }
-                    for statement in body {
-                        self.statement(statement);
+                    self.run_body(body);
+                    match self.pending {
+                        None => {}
+                        Some(Pending::Break) => {
+                            self.pending = None;
+                            break;
+                        }
+                        // A return keeps unwinding to the enclosing method.
+                        Some(Pending::Return(_)) => break,
                     }
                 }
                 None
@@ -118,11 +155,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     panic!("if condition must be true or false, got {condition:?}")
                 };
                 let body = if condition { then_body } else { else_body };
-                let mut result = None;
-                for statement in body {
-                    result = self.statement(statement);
-                }
-                result
+                self.run_body(body)
             }
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
@@ -304,9 +337,10 @@ impl<W: std::io::Write> Interpreter<W> {
         for (parameter, argument) in block.parameters.iter().zip(arguments) {
             self.variables.insert(parameter.clone(), argument);
         }
-        let mut result = None;
-        for statement in &block.body {
-            result = self.statement(statement);
+        let result = self.run_body(&block.body);
+        if self.pending.is_some() {
+            self.pending = None;
+            panic!("return and break inside blocks are not supported in the seed yet");
         }
         for (parameter, original) in shadowed {
             match original {
@@ -348,11 +382,13 @@ impl<W: std::io::Write> Interpreter<W> {
         let mut scope: HashMap<String, Value> =
             method.parameters.iter().cloned().zip(arguments).collect();
         std::mem::swap(&mut self.variables, &mut scope);
-        let mut result = None;
-        for statement in &method.body {
-            result = self.statement(statement);
-        }
+        let mut result = self.run_body(&method.body);
         std::mem::swap(&mut self.variables, &mut scope);
+        match self.pending.take() {
+            None => {}
+            Some(Pending::Return(value)) => result = value,
+            Some(Pending::Break) => panic!("break outside of a loop"),
+        }
         result
     }
 }
@@ -389,6 +425,62 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn return_exits_a_method_early() {
+        let source =
+            "def sign(n)\n  if n < 0\n    return \"negative\"\n  end\n  \"non-negative\"\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}sign(-1)\n")),
+            Some(Value::String("negative".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}sign(1)\n")),
+            Some(Value::String("non-negative".to_string()))
+        );
+    }
+
+    #[test]
+    fn bare_return_produces_no_value() {
+        let source = "def noop\n  return\n  \"unreached\"\nend\nnoop()\n";
+        assert_eq!(evaluate(source), None);
+    }
+
+    #[test]
+    fn return_unwinds_through_a_while_loop() {
+        let source = "def find_first_multiple(of)\n  n = 1\n  while true\n    if n % of == 0\n      return n\n    end\n    n = n + 1\n  end\nend\nfind_first_multiple(7)\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(7)));
+    }
+
+    #[test]
+    fn break_exits_a_while_loop() {
+        let source = "n = 0\nwhile true\n  n = n + 1\n  if n == 3\n    break\n  end\nend\nn\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    #[should_panic(expected = "return outside of a method")]
+    fn panics_on_a_top_level_return() {
+        evaluate("return 1");
+    }
+
+    #[test]
+    #[should_panic(expected = "break outside of a loop")]
+    fn panics_on_a_top_level_break() {
+        evaluate("break");
+    }
+
+    #[test]
+    #[should_panic(expected = "break outside of a loop")]
+    fn panics_on_a_break_in_a_method_without_a_loop() {
+        evaluate("def f\n  break\nend\nf()\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "not supported in the seed yet")]
+    fn panics_on_a_break_inside_a_block() {
+        evaluate("[1, 2].each do |n|\n  break\nend\n");
     }
 
     #[test]
