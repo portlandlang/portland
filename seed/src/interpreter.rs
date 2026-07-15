@@ -3,7 +3,9 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{BinaryOperator, Block, Expression, Program, Statement, UnaryOperator};
+use crate::ast::{
+    BinaryOperator, Block, Expression, LogicalOperator, Program, Statement, UnaryOperator,
+};
 use crate::parser;
 use crate::value::Value;
 
@@ -259,10 +261,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
                 Some(self.method_call(receiver, name, arguments, block.as_ref()))
             }
+            Expression::Logical {
+                left,
+                operator,
+                right,
+            } => {
+                let left = self.boolean_of(left, "&& and || operands");
+                // Short-circuit: the right side only runs when it can matter.
+                let result = match (operator, left) {
+                    (LogicalOperator::And, false) => false,
+                    (LogicalOperator::Or, true) => true,
+                    _ => self.boolean_of(right, "&& and || operands"),
+                };
+                Some(Value::Boolean(result))
+            }
             Expression::Unary { operand, operator } => {
                 let operand = self.value_of(operand);
                 match (operator, operand) {
                     (UnaryOperator::Negate, Value::Integer(value)) => Some(Value::Integer(-value)),
+                    (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
                     (operator, operand) => {
                         panic!("cannot apply {operator:?} to {operand:?}")
                     }
@@ -450,6 +467,14 @@ impl<W: std::io::Write> Interpreter<W> {
             .unwrap_or_else(|| panic!("{expression:?} produced no value"))
     }
 
+    /// Evaluate an expression that must be a strict boolean.
+    fn boolean_of(&mut self, expression: &Expression, context: &str) -> bool {
+        match self.value_of(expression) {
+            Value::Boolean(value) => value,
+            other => panic!("{context} must be true or false, got {other:?}"),
+        }
+    }
+
     fn call(&mut self, name: &str, arguments: Vec<Value>) -> Option<Value> {
         if !self.methods.contains_key(name) && name == "puts" {
             for argument in &arguments {
@@ -518,6 +543,45 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_logical_operators() {
+        assert_eq!(evaluate("true && false"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("true && true"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("false || true"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("false || false"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("1 < 2 && 2 < 3"), Some(Value::Boolean(true)));
+        assert_eq!(
+            evaluate("false && false || true"),
+            Some(Value::Boolean(true))
+        );
+    }
+
+    #[test]
+    fn logical_operators_short_circuit() {
+        // The right side would panic (undefined method) if evaluated.
+        assert_eq!(evaluate("false && nope()"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("true || nope()"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn evaluates_not() {
+        assert_eq!(evaluate("!true"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("!(1 == 2)"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("!!true"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "must be true or false")]
+    fn panics_on_a_non_boolean_logical_operand() {
+        evaluate("1 && true");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply")]
+    fn panics_on_not_of_an_integer() {
+        evaluate("!1");
     }
 
     #[test]

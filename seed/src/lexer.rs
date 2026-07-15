@@ -5,6 +5,8 @@
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenKind {
+    AmpersandAmpersand,
+    Bang,
     Comma,
     Dot,
     Equal,
@@ -25,6 +27,7 @@ pub enum TokenKind {
     NotEqual,
     Percent,
     Pipe,
+    PipePipe,
     Plus,
     RightBrace,
     RightBracket,
@@ -73,7 +76,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' | '|' => {
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
@@ -82,7 +85,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
                     '%' => TokenKind::Percent,
-                    '|' => TokenKind::Pipe,
+                    // `|` is handled below so `||` can lex as one token.
                     '+' => TokenKind::Plus,
                     '}' => TokenKind::RightBrace,
                     ']' => TokenKind::RightBracket,
@@ -97,10 +100,14 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..start + character.len_utf8()],
                 });
             }
-            '=' | '<' | '>' | '!' => {
+            '=' | '<' | '>' | '!' | '&' | '|' => {
                 chars.next();
                 let next = chars.peek().map(|&(_, c)| c);
                 let (kind, length) = match (character, next) {
+                    ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
+                    ('&', _) => panic!("unexpected character '&' at byte {start}"),
+                    ('|', Some('|')) => (TokenKind::PipePipe, 2),
+                    ('|', _) => (TokenKind::Pipe, 1),
                     ('=', Some('=')) => (TokenKind::EqualEqual, 2),
                     ('=', Some('>')) => (TokenKind::FatArrow, 2),
                     ('=', _) => (TokenKind::Equal, 1),
@@ -109,7 +116,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('<', Some('=')) => (TokenKind::LessEqual, 2),
                     ('<', _) => (TokenKind::Less, 1),
                     ('!', Some('=')) => (TokenKind::NotEqual, 2),
-                    ('!', _) => panic!("unexpected character '!' at byte {start}"),
+                    ('!', _) => (TokenKind::Bang, 1),
                     _ => unreachable!(),
                 };
                 if length == 2 {
@@ -261,6 +268,18 @@ mod tests {
             vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
         );
         assert_eq!(texts("# only a comment"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn lexes_logical_operators() {
+        assert_eq!(
+            kinds("&& || !"),
+            vec![
+                TokenKind::AmpersandAmpersand,
+                TokenKind::PipePipe,
+                TokenKind::Bang,
+            ]
+        );
     }
 
     #[test]

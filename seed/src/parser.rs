@@ -1,7 +1,9 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
-use crate::ast::{BinaryOperator, Block, Expression, Program, Statement, UnaryOperator};
+use crate::ast::{
+    BinaryOperator, Block, Expression, LogicalOperator, Program, Statement, UnaryOperator,
+};
 use crate::lexer::{self, Token, TokenKind};
 
 pub fn parse(source: &str) -> Program {
@@ -293,7 +295,35 @@ impl<'source> Parser<'source> {
     }
 
     fn expression(&mut self) -> Expression {
-        self.comparison()
+        self.logical_or()
+    }
+
+    fn logical_or(&mut self) -> Expression {
+        let mut left = self.logical_and();
+        while self.peek_kind() == Some(TokenKind::PipePipe) {
+            self.position += 1;
+            let right = self.logical_and();
+            left = Expression::Logical {
+                left: Box::new(left),
+                operator: LogicalOperator::Or,
+                right: Box::new(right),
+            };
+        }
+        left
+    }
+
+    fn logical_and(&mut self) -> Expression {
+        let mut left = self.comparison();
+        while self.peek_kind() == Some(TokenKind::AmpersandAmpersand) {
+            self.position += 1;
+            let right = self.comparison();
+            left = Expression::Logical {
+                left: Box::new(left),
+                operator: LogicalOperator::And,
+                right: Box::new(right),
+            };
+        }
+        left
     }
 
     fn comparison(&mut self) -> Expression {
@@ -356,6 +386,13 @@ impl<'source> Parser<'source> {
     }
 
     fn unary(&mut self) -> Expression {
+        if self.peek_kind() == Some(TokenKind::Bang) {
+            self.position += 1;
+            return Expression::Unary {
+                operand: Box::new(self.unary()),
+                operator: UnaryOperator::Not,
+            };
+        }
         if self.peek_kind() == Some(TokenKind::Minus) {
             self.position += 1;
             // Ruby-style: -5 is a negative literal, so -5.abs is 5, not -(5.abs).

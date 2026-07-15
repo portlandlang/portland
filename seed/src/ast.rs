@@ -43,8 +43,15 @@ pub enum BinaryOperator {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LogicalOperator {
+    And,
+    Or,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UnaryOperator {
     Negate,
+    Not,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -77,6 +84,12 @@ pub enum Expression {
         name: String,
     },
     Integer(i64),
+    /// Kept apart from Binary because these short-circuit.
+    Logical {
+        left: Box<Expression>,
+        operator: LogicalOperator,
+        right: Box<Expression>,
+    },
     MethodCall {
         arguments: Vec<Expression>,
         block: Option<Block>,
