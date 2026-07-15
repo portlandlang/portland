@@ -54,6 +54,16 @@ fn runs_blocks_pdx() {
     );
 }
 
+#[test]
+fn runs_tour_pdx() {
+    let output = run_fixture("tour.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "hello, portland!\nhello, stranger\nodd sum: 25\nPDX is portland\n1 + 4 + 9 = 14\n"
+    );
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

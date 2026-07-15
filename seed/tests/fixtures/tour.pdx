@@ -1,0 +1,28 @@
+# The Stage 0 tour — everything the seed speaks, in one file.
+
+def greeting(name)
+  return "hello, stranger" if name.empty?
+  "hello, #{name}!"
+end
+
+puts(greeting("portland"))
+puts(greeting(""))
+
+odds = 0
+n = 0
+while n < 10
+  n += 1
+  next if n.even?
+  odds += n
+end
+puts("odd sum: #{odds}")
+
+cities = {"pdx" => "portland", "sea" => "seattle"}
+cities.each do |code, city|
+  puts("#{code.upcase} is #{city}") unless city == "seattle"
+end
+
+squares = [1, 2, 3].map do |k|
+  k * k
+end
+puts(squares.join(" + ") + " = #{squares.sum}")
