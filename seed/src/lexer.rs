@@ -8,6 +8,7 @@ pub enum TokenKind {
     Identifier,
     Integer,
     Newline,
+    String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,6 +38,18 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 tokens.push(Token {
                     kind: TokenKind::Integer,
                     text: &source[start..end],
+                });
+            }
+            '"' => {
+                chars.next();
+                // No escapes or interpolation yet — Prism's lexer is the textbook for those.
+                scan_while(&mut chars, |c| c != '"');
+                let Some((closing, _)) = chars.next() else {
+                    panic!("unterminated string starting at byte {start}");
+                };
+                tokens.push(Token {
+                    kind: TokenKind::String,
+                    text: &source[start..=closing],
                 });
             }
             'a'..='z' | 'A'..='Z' | '_' => {
@@ -112,6 +125,18 @@ mod tests {
             kinds("empty? save!"),
             vec![TokenKind::Identifier, TokenKind::Identifier]
         );
+    }
+
+    #[test]
+    fn lexes_a_double_quoted_string() {
+        assert_eq!(kinds(r#""hello""#), vec![TokenKind::String]);
+        assert_eq!(texts(r#""hello portland""#), vec![r#""hello portland""#]);
+    }
+
+    #[test]
+    #[should_panic(expected = "unterminated string")]
+    fn panics_on_an_unterminated_string() {
+        lex(r#""oops"#);
     }
 
     #[test]
