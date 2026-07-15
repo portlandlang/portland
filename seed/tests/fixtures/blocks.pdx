@@ -1,0 +1,20 @@
+# Blocks — the Ruby soul.
+
+cities = ["portland", "salem", "eugene"]
+
+cities.each do |city|
+  puts(city.upcase)
+end
+
+lengths = cities.map do |city|
+  city.length
+end
+puts(lengths.join(", "))
+
+def shout(words)
+  words.map do |word|
+    word.upcase + "!"
+  end
+end
+
+puts(shout(["go", "blazers"]).join(" "))

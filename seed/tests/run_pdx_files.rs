@@ -44,6 +44,16 @@ fn runs_fizzbuzz_pdx() {
     );
 }
 
+#[test]
+fn runs_blocks_pdx() {
+    let output = run_fixture("blocks.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "PORTLAND\nSALEM\nEUGENE\n8, 5, 6\nGO! BLAZERS!\n"
+    );
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

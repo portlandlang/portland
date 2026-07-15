@@ -14,3 +14,5 @@
 - Comments (`#` to end of line).
 - String escape sequences (`\n` `\t` `\"` `\\`), decoded in the parser.
 - Dot method calls, chainable, with read-only builtin value methods: `length`, `upcase`, `downcase`, `reverse`, `empty?` on strings; `abs`, `zero?`, `positive?`, `negative?` on integers; `to_s` on everything. `-5` is a negative literal, so `-5.abs == 5`.
+- Arrays: literals, indexing (negative indices; out of range panics — no nil), `+` concatenation, `length`/`first`/`last`/`empty?`/`join`.
+- Blocks: `do |x| ... end` on `each`, `map`, and `times`. Blocks are closures over the enclosing scope; parameters are block-local.
