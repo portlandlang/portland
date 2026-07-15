@@ -33,6 +33,11 @@ pub enum BinaryOperator {
     Subtract,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UnaryOperator {
+    Negate,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Binary {
@@ -52,5 +57,9 @@ pub enum Expression {
     },
     Integer(i64),
     String(String),
+    Unary {
+        operand: Box<Expression>,
+        operator: UnaryOperator,
+    },
     Variable(String),
 }

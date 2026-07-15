@@ -1,7 +1,7 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
-use crate::ast::{BinaryOperator, Expression, Program, Statement};
+use crate::ast::{BinaryOperator, Expression, Program, Statement, UnaryOperator};
 use crate::lexer::{self, Token, TokenKind};
 
 pub fn parse(source: &str) -> Program {
@@ -199,14 +199,14 @@ impl<'source> Parser<'source> {
     }
 
     fn multiplication(&mut self) -> Expression {
-        let mut left = self.primary();
+        let mut left = self.unary();
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::Slash) => Some(BinaryOperator::Divide),
             Some(TokenKind::Star) => Some(BinaryOperator::Multiply),
             _ => None,
         } {
             self.position += 1;
-            let right = self.primary();
+            let right = self.unary();
             left = Expression::Binary {
                 left: Box::new(left),
                 operator,
@@ -214,6 +214,17 @@ impl<'source> Parser<'source> {
             };
         }
         left
+    }
+
+    fn unary(&mut self) -> Expression {
+        if self.peek_kind() == Some(TokenKind::Minus) {
+            self.position += 1;
+            return Expression::Unary {
+                operand: Box::new(self.unary()),
+                operator: UnaryOperator::Negate,
+            };
+        }
+        self.primary()
     }
 
     fn peek_kind(&self) -> Option<TokenKind> {

@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{BinaryOperator, Expression, Program, Statement};
+use crate::ast::{BinaryOperator, Expression, Program, Statement, UnaryOperator};
 use crate::parser;
 use crate::value::Value;
 
@@ -139,6 +139,15 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
             }
+            Expression::Unary { operand, operator } => {
+                let operand = self.value_of(operand);
+                match (operator, operand) {
+                    (UnaryOperator::Negate, Value::Integer(value)) => Some(Value::Integer(-value)),
+                    (operator, operand) => {
+                        panic!("cannot apply {operator:?} to {operand:?}")
+                    }
+                }
+            }
             Expression::Variable(name) => Some(
                 self.variables
                     .get(name)
@@ -224,6 +233,21 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_unary_minus() {
+        assert_eq!(evaluate("-5"), Some(Value::Integer(-5)));
+        assert_eq!(evaluate("-(1 + 2)"), Some(Value::Integer(-3)));
+        assert_eq!(evaluate("10 + -5"), Some(Value::Integer(5)));
+        assert_eq!(evaluate("--5"), Some(Value::Integer(5)));
+        assert_eq!(evaluate("-2 * 3"), Some(Value::Integer(-6)));
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply")]
+    fn panics_on_negating_a_string() {
+        evaluate(r#"-"pdx""#);
     }
 
     #[test]
