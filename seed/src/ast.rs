@@ -3,4 +3,5 @@
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Integer(i64),
+    String(String),
 }

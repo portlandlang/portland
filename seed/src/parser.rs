@@ -32,6 +32,10 @@ impl Parser<'_> {
                 let value = token.text.parse().expect("integer literal out of range");
                 Expression::Integer(value)
             }
+            TokenKind::String => {
+                let content = &token.text[1..token.text.len() - 1];
+                Expression::String(content.to_string())
+            }
             _ => panic!("unexpected token {token:?}"),
         }
     }
@@ -62,5 +66,13 @@ mod tests {
     #[test]
     fn parses_an_integer_literal() {
         assert_eq!(parse("42"), Expression::Integer(42));
+    }
+
+    #[test]
+    fn parses_a_string_literal() {
+        assert_eq!(
+            parse(r#""hello portland""#),
+            Expression::String("hello portland".to_string())
+        );
     }
 }
