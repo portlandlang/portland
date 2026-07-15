@@ -2,6 +2,10 @@
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
+    Add {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
     Integer(i64),
     String(String),
 }

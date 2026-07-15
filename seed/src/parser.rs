@@ -22,7 +22,24 @@ struct Parser<'source> {
 
 impl Parser<'_> {
     fn expression(&mut self) -> Expression {
-        self.primary()
+        self.addition()
+    }
+
+    fn addition(&mut self) -> Expression {
+        let mut left = self.primary();
+        while self.peek_kind() == Some(TokenKind::Plus) {
+            self.position += 1;
+            let right = self.primary();
+            left = Expression::Add {
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        left
+    }
+
+    fn peek_kind(&self) -> Option<TokenKind> {
+        self.tokens.get(self.position).map(|token| token.kind)
     }
 
     fn primary(&mut self) -> Expression {
@@ -66,6 +83,31 @@ mod tests {
     #[test]
     fn parses_an_integer_literal() {
         assert_eq!(parse("42"), Expression::Integer(42));
+    }
+
+    #[test]
+    fn parses_addition() {
+        assert_eq!(
+            parse("1 + 2"),
+            Expression::Add {
+                left: Box::new(Expression::Integer(1)),
+                right: Box::new(Expression::Integer(2)),
+            }
+        );
+    }
+
+    #[test]
+    fn addition_is_left_associative() {
+        assert_eq!(
+            parse("1 + 2 + 3"),
+            Expression::Add {
+                left: Box::new(Expression::Add {
+                    left: Box::new(Expression::Integer(1)),
+                    right: Box::new(Expression::Integer(2)),
+                }),
+                right: Box::new(Expression::Integer(3)),
+            }
+        );
     }
 
     #[test]
