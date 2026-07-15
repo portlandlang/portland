@@ -1,6 +1,8 @@
 //! A tree-walking interpreter — the reference semantics for the Stage 0
 //! subset before any codegen exists. Crude in the seed: type errors panic.
 
+use std::collections::HashMap;
+
 use crate::ast::{Expression, Program, Statement};
 use crate::parser;
 use crate::value::Value;
@@ -12,11 +14,15 @@ pub fn evaluate(source: &str) -> Option<Value> {
     interpreter.program(&program)
 }
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    variables: HashMap<String, Value>,
+}
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            variables: HashMap::new(),
+        }
     }
 
     pub fn program(&mut self, program: &Program) -> Option<Value> {
@@ -29,6 +35,11 @@ impl Interpreter {
 
     fn statement(&mut self, statement: &Statement) -> Option<Value> {
         match statement {
+            Statement::Assignment { name, value } => {
+                let value = self.expression(value);
+                self.variables.insert(name.clone(), value.clone());
+                Some(value)
+            }
             Statement::Expression(expression) => Some(self.expression(expression)),
             other => panic!("cannot evaluate {other:?} yet"),
         }
@@ -47,6 +58,11 @@ impl Interpreter {
                     (left, right) => panic!("cannot add {left:?} and {right:?}"),
                 }
             }
+            Expression::Variable(name) => self
+                .variables
+                .get(name)
+                .unwrap_or_else(|| panic!("undefined variable {name}"))
+                .clone(),
             other => panic!("cannot evaluate {other:?} yet"),
         }
     }
@@ -89,5 +105,27 @@ mod tests {
     #[test]
     fn evaluates_an_empty_program_to_nothing() {
         assert_eq!(evaluate(""), None);
+    }
+
+    #[test]
+    fn evaluates_assignment_and_variable_reference() {
+        assert_eq!(
+            evaluate("total = 1 + 2\ntotal + 10\n"),
+            Some(Value::Integer(13))
+        );
+    }
+
+    #[test]
+    fn assignment_evaluates_to_its_value() {
+        assert_eq!(
+            evaluate("greeting = \"hi\""),
+            Some(Value::String("hi".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined variable")]
+    fn panics_on_an_undefined_variable() {
+        evaluate("nope");
     }
 }
