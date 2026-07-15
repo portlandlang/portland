@@ -5,10 +5,16 @@
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenKind {
+    Comma,
+    Dot,
+    Equal,
     Identifier,
     Integer,
     Keyword,
+    LeftParen,
     Newline,
+    Plus,
+    RightParen,
     String,
 }
 
@@ -42,6 +48,22 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 tokens.push(Token {
                     kind: TokenKind::Integer,
                     text: &source[start..end],
+                });
+            }
+            '(' | ')' | ',' | '.' | '=' | '+' => {
+                let kind = match character {
+                    ',' => TokenKind::Comma,
+                    '.' => TokenKind::Dot,
+                    '=' => TokenKind::Equal,
+                    '(' => TokenKind::LeftParen,
+                    '+' => TokenKind::Plus,
+                    ')' => TokenKind::RightParen,
+                    _ => unreachable!(),
+                };
+                chars.next();
+                tokens.push(Token {
+                    kind,
+                    text: &source[start..start + character.len_utf8()],
                 });
             }
             '"' => {
@@ -148,6 +170,36 @@ mod tests {
         // `def?` and `ending` are plain identifiers, not keywords.
         assert_eq!(kinds("def?"), vec![TokenKind::Identifier]);
         assert_eq!(kinds("ending"), vec![TokenKind::Identifier]);
+    }
+
+    #[test]
+    fn lexes_single_character_punctuation() {
+        assert_eq!(
+            kinds("( ) , . = +"),
+            vec![
+                TokenKind::LeftParen,
+                TokenKind::RightParen,
+                TokenKind::Comma,
+                TokenKind::Dot,
+                TokenKind::Equal,
+                TokenKind::Plus,
+            ]
+        );
+    }
+
+    #[test]
+    fn lexes_a_method_call_line() {
+        assert_eq!(
+            kinds(r#"greet("world", 2)"#),
+            vec![
+                TokenKind::Identifier,
+                TokenKind::LeftParen,
+                TokenKind::String,
+                TokenKind::Comma,
+                TokenKind::Integer,
+                TokenKind::RightParen,
+            ]
+        );
     }
 
     #[test]
