@@ -39,6 +39,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             ' ' | '\t' => {
                 chars.next();
             }
+            '#' => {
+                // Comment runs to end of line; the newline itself still lexes.
+                scan_while(&mut chars, |c| c != '\n');
+            }
             '\n' => {
                 chars.next();
                 tokens.push(Token {
@@ -191,6 +195,15 @@ mod tests {
                 TokenKind::Plus,
             ]
         );
+    }
+
+    #[test]
+    fn skips_comments_to_end_of_line() {
+        assert_eq!(
+            kinds("1 # the loneliest number\n2"),
+            vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
+        );
+        assert_eq!(texts("# only a comment"), Vec::<&str>::new());
     }
 
     #[test]
