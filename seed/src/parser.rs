@@ -60,6 +60,11 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("while") {
             return self.while_statement();
         }
+        let statement = self.simple_statement();
+        self.postfix_modifier(statement)
+    }
+
+    fn simple_statement(&mut self) -> Statement {
         if self.peek_is_keyword("break") {
             self.position += 1;
             return Statement::Break;
@@ -68,6 +73,7 @@ impl<'source> Parser<'source> {
             self.position += 1;
             let value = match self.peek_kind() {
                 None | Some(TokenKind::Newline) => None,
+                _ if self.peek_is_keyword("if") || self.peek_is_keyword("unless") => None,
                 _ => Some(self.expression()),
             };
             return Statement::Return { value };
@@ -81,6 +87,30 @@ impl<'source> Parser<'source> {
             return Statement::Assignment { name, value };
         }
         Statement::Expression(self.expression())
+    }
+
+    /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.
+    fn postfix_modifier(&mut self, statement: Statement) -> Statement {
+        let negated = if self.peek_is_keyword("if") {
+            false
+        } else if self.peek_is_keyword("unless") {
+            true
+        } else {
+            return statement;
+        };
+        self.position += 1; // the `if` / `unless`
+        let condition = Box::new(self.expression());
+        let body = vec![statement];
+        let (then_body, else_body) = if negated {
+            (Vec::new(), body)
+        } else {
+            (body, Vec::new())
+        };
+        Statement::Expression(Expression::If {
+            condition,
+            else_body,
+            then_body,
+        })
     }
 
     fn method_definition(&mut self) -> Statement {
@@ -115,6 +145,28 @@ impl<'source> Parser<'source> {
         let body = self.body_until(&["end"], "while");
         self.position += 1; // the `end`
         Statement::While { body, condition }
+    }
+
+    /// `unless c ... else ... end`, desugared to an `if` with swapped branches.
+    fn unless_expression(&mut self) -> Expression {
+        let condition = Box::new(self.expression());
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let unless_body = self.body_until(&["else", "end"], "unless");
+        let else_body = if self.peek_is_keyword("else") {
+            self.position += 1; // the `else`
+            self.expect_statement_boundary();
+            self.skip_newlines();
+            self.body_until(&["end"], "else")
+        } else {
+            Vec::new()
+        };
+        self.position += 1; // the `end`
+        Expression::If {
+            condition,
+            else_body: unless_body,
+            then_body: else_body,
+        }
     }
 
     /// Parse a `do |params| ... end` block.
@@ -465,6 +517,7 @@ impl<'source> Parser<'source> {
                 "false" => Expression::Boolean(false),
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
+                "unless" => self.unless_expression(),
                 _ => panic!("unexpected keyword {:?}", token.text),
             },
             _ => panic!("unexpected token {token:?}"),

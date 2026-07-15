@@ -521,6 +521,50 @@ mod tests {
     }
 
     #[test]
+    fn postfix_if_guards_a_statement() {
+        assert_eq!(output_of("puts(1) if true"), "1\n");
+        assert_eq!(output_of("puts(1) if false"), "");
+        assert_eq!(evaluate("x = 5 if true\nx\n"), Some(Value::Integer(5)));
+    }
+
+    #[test]
+    fn postfix_unless_negates_the_guard() {
+        assert_eq!(output_of("puts(1) unless false"), "1\n");
+        assert_eq!(output_of("puts(1) unless true"), "");
+    }
+
+    #[test]
+    fn return_with_a_postfix_guard_is_a_guard_clause() {
+        let source = "def clamp(n)\n  return 0 if n < 0\n  n\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}clamp(-5)\n")),
+            Some(Value::Integer(0))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}clamp(3)\n")),
+            Some(Value::Integer(3))
+        );
+    }
+
+    #[test]
+    fn break_with_a_postfix_guard() {
+        let source = "n = 0\nwhile true\n  n = n + 1\n  break if n == 4\nend\nn\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(4)));
+    }
+
+    #[test]
+    fn unless_block_form_runs_on_false() {
+        assert_eq!(
+            evaluate("unless false\n  \"ran\"\nend\n"),
+            Some(Value::String("ran".to_string()))
+        );
+        assert_eq!(
+            evaluate("unless true\n  \"skipped\"\nelse\n  \"else ran\"\nend\n"),
+            Some(Value::String("else ran".to_string()))
+        );
+    }
+
+    #[test]
     fn return_exits_a_method_early() {
         let source =
             "def sign(n)\n  if n < 0\n    return \"negative\"\n  end\n  \"non-negative\"\nend\n";
