@@ -53,6 +53,17 @@ impl Parser<'_> {
                 let content = &token.text[1..token.text.len() - 1];
                 Expression::String(content.to_string())
             }
+            TokenKind::LeftParen => {
+                let inner = self.expression();
+                if self.peek_kind() != Some(TokenKind::RightParen) {
+                    panic!(
+                        "expected closing paren, got {:?}",
+                        self.tokens.get(self.position)
+                    );
+                }
+                self.position += 1;
+                inner
+            }
             _ => panic!("unexpected token {token:?}"),
         }
     }
@@ -108,6 +119,27 @@ mod tests {
                 right: Box::new(Expression::Integer(3)),
             }
         );
+    }
+
+    #[test]
+    fn parses_parenthesized_expressions() {
+        assert_eq!(parse("(42)"), Expression::Integer(42));
+        assert_eq!(
+            parse("1 + (2 + 3)"),
+            Expression::Add {
+                left: Box::new(Expression::Integer(1)),
+                right: Box::new(Expression::Add {
+                    left: Box::new(Expression::Integer(2)),
+                    right: Box::new(Expression::Integer(3)),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "expected closing paren")]
+    fn panics_on_an_unclosed_paren() {
+        parse("(1 + 2");
     }
 
     #[test]
