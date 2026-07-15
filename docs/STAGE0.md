@@ -23,6 +23,9 @@ the tests are the spec until a real one exists.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
   expression, arity-checked calls with parens. Method bodies get a fresh scope:
   no outer locals (Ruby's rule, kept).
+- **`return` / `break`** — `return` (with or without a value) exits the
+  enclosing method, unwinding through loops; `break` exits the enclosing
+  `while`. Neither works inside blocks yet.
 - **Blocks** — `do |x| ... end` on `each`, `map`, `times`. Blocks are closures
   over the enclosing scope; parameters are block-local.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?`;
@@ -43,7 +46,7 @@ the tests are the spec until a real one exists.
 - `together` / concurrency (todos 004, 012), macros (todo 015).
 - Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
   the seed stays read-only rather than prejudging them.
-- `return`, `break`, `next`, `unless`, postfix modifiers, `case/in`.
+- `next`, `unless`, postfix modifiers, `case/in`; `return`/`break` inside blocks.
 - Paren-less method calls (`puts "hi"`) — needs the lexer-feedback dance;
   parens required in Stage 0.
 - Types — the seed is dynamically checked at runtime; inference is the real

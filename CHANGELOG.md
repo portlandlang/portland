@@ -16,3 +16,5 @@
 - Dot method calls, chainable, with read-only builtin value methods: `length`, `upcase`, `downcase`, `reverse`, `empty?` on strings; `abs`, `zero?`, `positive?`, `negative?` on integers; `to_s` on everything. `-5` is a negative literal, so `-5.abs == 5`.
 - Arrays: literals, indexing (negative indices; out of range panics — no nil), `+` concatenation, `length`/`first`/`last`/`empty?`/`join`.
 - Blocks: `do |x| ... end` on `each`, `map`, and `times`. Blocks are closures over the enclosing scope; parameters are block-local.
+- `return` (exits the enclosing method, unwinding through loops) and `break` (exits the enclosing `while`); misuse panics, unsupported-in-blocks stated honestly.
+- `docs/STAGE0.md`: the seed subset documented as built, including what's deliberately out.
