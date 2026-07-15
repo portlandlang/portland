@@ -5,6 +5,7 @@
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenKind {
+    Identifier,
     Integer,
     Newline,
 }
@@ -35,6 +36,20 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 let end = scan_while(&mut chars, |c| c.is_ascii_digit());
                 tokens.push(Token {
                     kind: TokenKind::Integer,
+                    text: &source[start..end],
+                });
+            }
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut end = scan_while(&mut chars, |c| c.is_ascii_alphanumeric() || c == '_');
+                // Ruby-surface joy, kept: a trailing `?` or `!` is part of the name.
+                if let Some(&(index, suffix)) = chars.peek()
+                    && (suffix == '?' || suffix == '!')
+                {
+                    end = index + suffix.len_utf8();
+                    chars.next();
+                }
+                tokens.push(Token {
+                    kind: TokenKind::Identifier,
                     text: &source[start..end],
                 });
             }
@@ -82,6 +97,21 @@ mod tests {
     #[test]
     fn skips_spaces_and_tabs() {
         assert_eq!(texts("  1 \t 2  "), vec!["1", "2"]);
+    }
+
+    #[test]
+    fn lexes_identifiers() {
+        assert_eq!(kinds("photos"), vec![TokenKind::Identifier]);
+        assert_eq!(texts("user_count2"), vec!["user_count2"]);
+    }
+
+    #[test]
+    fn lexes_question_and_bang_identifier_suffixes() {
+        assert_eq!(texts("empty? save!"), vec!["empty?", "save!"]);
+        assert_eq!(
+            kinds("empty? save!"),
+            vec![TokenKind::Identifier, TokenKind::Identifier]
+        );
     }
 
     #[test]
