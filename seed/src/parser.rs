@@ -2,7 +2,7 @@
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
 use crate::ast::{
-    BinaryOperator, Block, CaseBranch, Expression, LogicalOperator, Program, Statement,
+    BinaryOperator, Block, CaseBranch, Expression, LogicalOperator, Parameter, Program, Statement,
     UnaryOperator,
 };
 use crate::lexer::{self, Token, TokenKind};
@@ -405,18 +405,36 @@ impl<'source> Parser<'source> {
         }
     }
 
-    /// Parse a comma-separated parameter name list, consuming the closing paren.
-    fn parameters(&mut self) -> Vec<String> {
-        let mut parameters = Vec::new();
+    /// Parse a comma-separated parameter list (with optional trailing
+    /// `name = default` entries), consuming the closing paren.
+    fn parameters(&mut self) -> Vec<Parameter> {
+        let mut parameters: Vec<Parameter> = Vec::new();
         if self.peek_kind() == Some(TokenKind::Identifier) {
-            parameters.push(self.advance().text.to_string());
-            while self.peek_kind() == Some(TokenKind::Comma) {
-                self.position += 1;
+            loop {
                 let token = self.advance();
                 if token.kind != TokenKind::Identifier {
                     panic!("expected parameter name, got {token:?}");
                 }
-                parameters.push(token.text.to_string());
+                let name = token.text.to_string();
+                let default = if self.peek_kind() == Some(TokenKind::Equal) {
+                    self.position += 1; // the `=`
+                    Some(self.expression())
+                } else {
+                    if parameters
+                        .iter()
+                        .any(|parameter| parameter.default.is_some())
+                    {
+                        panic!(
+                            "required parameter {name} cannot follow a parameter with a default"
+                        );
+                    }
+                    None
+                };
+                parameters.push(Parameter { default, name });
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
             }
         }
         if self.peek_kind() != Some(TokenKind::RightParen) {
@@ -888,7 +906,10 @@ mod tests {
                     right: Box::new(Expression::Variable("name".to_string())),
                 })],
                 name: "greet".to_string(),
-                parameters: vec!["name".to_string()],
+                parameters: vec![Parameter {
+                    default: None,
+                    name: "name".to_string(),
+                }],
             }]
         );
     }

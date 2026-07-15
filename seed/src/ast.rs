@@ -17,7 +17,7 @@ pub enum Statement {
     MethodDefinition {
         body: Vec<Statement>,
         name: String,
-        parameters: Vec<String>,
+        parameters: Vec<Parameter>,
     },
     Return {
         value: Option<Expression>,
@@ -65,6 +65,12 @@ pub struct Block {
 pub struct CaseBranch {
     pub body: Vec<Statement>,
     pub values: Vec<Expression>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Parameter {
+    pub default: Option<Expression>,
+    pub name: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

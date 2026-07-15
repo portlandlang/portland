@@ -4,7 +4,8 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinaryOperator, Block, Expression, LogicalOperator, Program, Statement, UnaryOperator,
+    BinaryOperator, Block, Expression, LogicalOperator, Parameter, Program, Statement,
+    UnaryOperator,
 };
 use crate::parser;
 use crate::value::Value;
@@ -19,7 +20,7 @@ pub fn evaluate(source: &str) -> Option<Value> {
 #[derive(Clone)]
 struct Method {
     body: Vec<Statement>,
-    parameters: Vec<String>,
+    parameters: Vec<Parameter>,
 }
 
 /// A `return`, `break`, or `next` in flight, unwinding to whatever handles it.
@@ -543,18 +544,39 @@ impl<W: std::io::Write> Interpreter<W> {
             .get(name)
             .unwrap_or_else(|| panic!("undefined method {name}"))
             .clone();
-        if arguments.len() != method.parameters.len() {
+        let required = method
+            .parameters
+            .iter()
+            .take_while(|parameter| parameter.default.is_none())
+            .count();
+        let total = method.parameters.len();
+        if arguments.len() < required || arguments.len() > total {
+            let expected = if required == total {
+                format!("{required}")
+            } else {
+                format!("{required} to {total}")
+            };
             panic!(
-                "{name} expects {} argument(s), got {}",
-                method.parameters.len(),
+                "{name} expects {expected} argument(s), got {}",
                 arguments.len()
             );
         }
 
         // Methods get a fresh scope: parameters only, no outer locals.
-        let mut scope: HashMap<String, Value> =
-            method.parameters.iter().cloned().zip(arguments).collect();
+        // Bind left to right so a default can reference earlier parameters.
+        let mut scope: HashMap<String, Value> = HashMap::new();
         std::mem::swap(&mut self.variables, &mut scope);
+        let mut supplied = arguments.into_iter();
+        for parameter in &method.parameters {
+            let value = match supplied.next() {
+                Some(value) => value,
+                None => {
+                    let default = parameter.default.as_ref().unwrap();
+                    self.value_of(default)
+                }
+            };
+            self.variables.insert(parameter.name.clone(), value);
+        }
         let mut result = self.run_body(&method.body);
         std::mem::swap(&mut self.variables, &mut scope);
         match self.pending.take() {
@@ -1439,6 +1461,40 @@ mod tests {
     #[should_panic(expected = "expects 1 argument")]
     fn panics_on_an_arity_mismatch() {
         evaluate("def greet(name)\n  name\nend\ngreet()\n");
+    }
+
+    #[test]
+    fn default_parameter_values_fill_missing_arguments() {
+        let source = "def greet(name = \"world\")\n  \"hello #{name}\"\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}greet()\n")),
+            Some(Value::String("hello world".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}greet(\"pdx\")\n")),
+            Some(Value::String("hello pdx".to_string()))
+        );
+    }
+
+    #[test]
+    fn defaults_can_reference_earlier_parameters() {
+        let source = "def pair(a, b = a * 2)\n  [a, b]\nend\npair(3)\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(vec![Value::Integer(3), Value::Integer(6)]))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "expects 1 to 2 argument(s)")]
+    fn panics_when_over_the_optional_arity() {
+        evaluate("def f(a, b = 1)\n  a\nend\nf(1, 2, 3)\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot follow a parameter with a default")]
+    fn panics_on_a_required_parameter_after_a_default() {
+        evaluate("def f(a = 1, b)\n  b\nend\n");
     }
 
     #[test]
