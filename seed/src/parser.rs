@@ -158,6 +158,26 @@ impl<'source> Parser<'source> {
             let value = self.expression();
             return Statement::Assignment { name, value };
         }
+        if self.peek_kind() == Some(TokenKind::Identifier)
+            && let Some(operator) = match self.peek_kind_at(1) {
+                Some(TokenKind::MinusEqual) => Some(BinaryOperator::Subtract),
+                Some(TokenKind::PercentEqual) => Some(BinaryOperator::Modulo),
+                Some(TokenKind::PlusEqual) => Some(BinaryOperator::Add),
+                Some(TokenKind::SlashEqual) => Some(BinaryOperator::Divide),
+                Some(TokenKind::StarEqual) => Some(BinaryOperator::Multiply),
+                _ => None,
+            }
+        {
+            // `x += e` desugars to `x = x + e`.
+            let name = self.advance().text.to_string();
+            self.position += 1; // the compound operator
+            let value = Expression::Binary {
+                left: Box::new(Expression::Variable(name.clone())),
+                operator,
+                right: Box::new(self.expression()),
+            };
+            return Statement::Assignment { name, value };
+        }
         Statement::Expression(self.expression())
     }
 

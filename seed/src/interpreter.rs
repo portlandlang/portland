@@ -315,6 +315,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     receiver
                 }
+                (Value::Hash(pairs), "each", []) => {
+                    for (key, value) in pairs.clone() {
+                        self.run_block(block, vec![key, value]);
+                    }
+                    receiver
+                }
                 (Value::Array(elements), "map", []) => {
                     let mut results = Vec::new();
                     for element in elements.clone() {
@@ -543,6 +549,34 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_compound_assignment() {
+        assert_eq!(evaluate("x = 1\nx += 2\nx\n"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("x = 10\nx -= 3\nx\n"), Some(Value::Integer(7)));
+        assert_eq!(evaluate("x = 4\nx *= 3\nx\n"), Some(Value::Integer(12)));
+        assert_eq!(evaluate("x = 9\nx /= 2\nx\n"), Some(Value::Integer(4)));
+        assert_eq!(evaluate("x = 9\nx %= 4\nx\n"), Some(Value::Integer(1)));
+        assert_eq!(
+            evaluate("s = \"port\"\ns += \"land\"\ns\n"),
+            Some(Value::String("portland".to_string()))
+        );
+    }
+
+    #[test]
+    fn compound_assignment_takes_a_postfix_guard() {
+        assert_eq!(
+            evaluate("x = 1\nx += 10 if false\nx\n"),
+            Some(Value::Integer(1))
+        );
+    }
+
+    #[test]
+    fn hash_each_yields_key_and_value() {
+        let source =
+            "{\"amy\" => 3, \"bo\" => 5}.each do |name, age|\n  puts(\"#{name} is #{age}\")\nend\n";
+        assert_eq!(output_of(source), "amy is 3\nbo is 5\n");
     }
 
     #[test]

@@ -23,17 +23,22 @@ pub enum TokenKind {
     Less,
     LessEqual,
     Minus,
+    MinusEqual,
     Newline,
     NotEqual,
     Percent,
+    PercentEqual,
     Pipe,
     PipePipe,
     Plus,
+    PlusEqual,
     RightBrace,
     RightBracket,
     RightParen,
     Slash,
+    SlashEqual,
     Star,
+    StarEqual,
     String,
 }
 
@@ -76,22 +81,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
                     '{' => TokenKind::LeftBrace,
                     '[' => TokenKind::LeftBracket,
                     '(' => TokenKind::LeftParen,
-                    '-' => TokenKind::Minus,
-                    '%' => TokenKind::Percent,
-                    // `|` is handled below so `||` can lex as one token.
-                    '+' => TokenKind::Plus,
                     '}' => TokenKind::RightBrace,
                     ']' => TokenKind::RightBracket,
                     ')' => TokenKind::RightParen,
-                    '/' => TokenKind::Slash,
-                    '*' => TokenKind::Star,
                     _ => unreachable!(),
                 };
                 chars.next();
@@ -100,7 +99,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..start + character.len_utf8()],
                 });
             }
-            '=' | '<' | '>' | '!' | '&' | '|' => {
+            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' => {
                 chars.next();
                 let next = chars.peek().map(|&(_, c)| c);
                 let (kind, length) = match (character, next) {
@@ -117,6 +116,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('<', _) => (TokenKind::Less, 1),
                     ('!', Some('=')) => (TokenKind::NotEqual, 2),
                     ('!', _) => (TokenKind::Bang, 1),
+                    ('-', Some('=')) => (TokenKind::MinusEqual, 2),
+                    ('-', _) => (TokenKind::Minus, 1),
+                    ('%', Some('=')) => (TokenKind::PercentEqual, 2),
+                    ('%', _) => (TokenKind::Percent, 1),
+                    ('+', Some('=')) => (TokenKind::PlusEqual, 2),
+                    ('+', _) => (TokenKind::Plus, 1),
+                    ('/', Some('=')) => (TokenKind::SlashEqual, 2),
+                    ('/', _) => (TokenKind::Slash, 1),
+                    ('*', Some('=')) => (TokenKind::StarEqual, 2),
+                    ('*', _) => (TokenKind::Star, 1),
                     _ => unreachable!(),
                 };
                 if length == 2 {
@@ -298,6 +307,20 @@ mod tests {
             vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
         );
         assert_eq!(texts("# only a comment"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn lexes_compound_assignment_operators() {
+        assert_eq!(
+            kinds("+= -= *= /= %="),
+            vec![
+                TokenKind::PlusEqual,
+                TokenKind::MinusEqual,
+                TokenKind::StarEqual,
+                TokenKind::SlashEqual,
+                TokenKind::PercentEqual,
+            ]
+        );
     }
 
     #[test]
