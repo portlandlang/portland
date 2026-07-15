@@ -64,6 +64,21 @@ fn runs_tour_pdx() {
     );
 }
 
+#[test]
+fn runs_word_count_pdx_with_argv() {
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .arg("tests/fixtures/word_count.pdx")
+        .arg("tests/fixtures/haiku.txt")
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "3 lines, 12 words: tests/fixtures/haiku.txt\n"
+    );
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

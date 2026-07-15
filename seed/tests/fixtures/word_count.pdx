@@ -1,0 +1,12 @@
+# A tiny wc: counts lines and words of each file named in argv.
+
+argv().each do |path|
+  content = read_file(path)
+  lines = content.split("\n").reject do |line|
+    line.empty?
+  end
+  words = lines.reduce(0) do |count, line|
+    count + line.split(" ").length
+  end
+  puts("#{lines.length} lines, #{words} words: #{path}")
+end

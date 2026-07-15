@@ -31,6 +31,7 @@ enum Pending {
 }
 
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
+    arguments: Vec<String>,
     methods: HashMap<String, Method>,
     output: W,
     pending: Option<Pending>,
@@ -46,11 +47,17 @@ impl Interpreter {
 impl<W: std::io::Write> Interpreter<W> {
     pub fn with_output(output: W) -> Self {
         Self {
+            arguments: Vec::new(),
             methods: HashMap::new(),
             output,
             pending: None,
             variables: HashMap::new(),
         }
+    }
+
+    /// Command-line arguments exposed to the program via `argv()`.
+    pub fn set_arguments(&mut self, arguments: Vec<String>) {
+        self.arguments = arguments;
     }
 
     pub fn program(&mut self, program: &Program) -> Option<Value> {
@@ -581,6 +588,32 @@ impl<W: std::io::Write> Interpreter<W> {
             };
         }
 
+        // Crude IO builtins so real programs are possible before the object
+        // model exists; names and shapes are placeholders, not decisions.
+        if !self.methods.contains_key(name) {
+            match (name, arguments.as_slice()) {
+                ("argv", []) => {
+                    let arguments = self
+                        .arguments
+                        .iter()
+                        .map(|argument| Value::String(argument.clone()))
+                        .collect();
+                    return Some(Value::Array(arguments));
+                }
+                ("read_file", [Value::String(path)]) => {
+                    let content = std::fs::read_to_string(path)
+                        .unwrap_or_else(|error| panic!("read_file {path:?}: {error}"));
+                    return Some(Value::String(content));
+                }
+                ("write_file", [Value::String(path), Value::String(content)]) => {
+                    std::fs::write(path, content)
+                        .unwrap_or_else(|error| panic!("write_file {path:?}: {error}"));
+                    return None;
+                }
+                _ => {}
+            }
+        }
+
         let method = self
             .methods
             .get(name)
@@ -917,6 +950,34 @@ mod tests {
     #[should_panic(expected = "to_i cannot parse")]
     fn panics_on_an_unparsable_to_i() {
         evaluate("\"pdx\".to_i");
+    }
+
+    #[test]
+    fn reads_a_real_fixture_file() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/haiku.txt");
+        let source = format!("read_file(\"{path}\").include?(\"carpet\")");
+        assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn writes_then_reads_a_file() {
+        let path = "/tmp/portland-seed-write-test.txt";
+        let source = format!("write_file(\"{path}\", \"teal carpet\")\nread_file(\"{path}\")\n");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("teal carpet".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "read_file")]
+    fn panics_on_reading_a_missing_file() {
+        evaluate("read_file(\"no_such_file.txt\")");
+    }
+
+    #[test]
+    fn argv_is_empty_by_default() {
+        assert_eq!(evaluate("argv().length"), Some(Value::Integer(0)));
     }
 
     #[test]

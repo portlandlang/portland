@@ -21,6 +21,7 @@ fn run_file(path: &str) {
     });
     let program = parser::parse(&source);
     let mut interpreter = Interpreter::new();
+    interpreter.set_arguments(std::env::args().skip(2).collect());
     interpreter.program(&program);
 }
 
