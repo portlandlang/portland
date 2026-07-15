@@ -28,5 +28,6 @@ Issue-shaped design and build tasks, kept as files until the GitHub org + repo e
 - [006 — Compile pipeline design](006-compile-pipeline-design.md)
 - [007 — Port Prism's lexer](007-port-prism-lexer.md)
 - [008 — Grammar and AST](008-grammar-and-ast.md)
-- [009 — Stage 0 subset](009-stage-0-subset.md)
-- [016 — Repo scaffolding](016-repo-scaffolding.md)
+- [009 — Stage 0 subset](009-stage-0-subset.md) — mostly done, see `docs/STAGE0.md`
+- [016 — Repo scaffolding](016-repo-scaffolding.md) — mostly done
+- [018 — Toward Stage 1](018-toward-stage-1.md) — gap analysis for self-hosting

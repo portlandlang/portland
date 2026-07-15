@@ -26,3 +26,8 @@
 - Compound assignment (`+= -= *= /= %=`), `next` in `while` loops, `hash.each do |key, value|`.
 - `case/when` with equality matching, multiple values per `when`, and aligned `when x then y` one-liners.
 - `tour.pdx` fixture: the full Stage 0 surface through the real binary.
+- `p` builtin and `inspect` rendering (strings keep quotes; the REPL uses it, like irb).
+- Single-quoted literal strings, `%w[]` word arrays, `*` repetition for strings and arrays.
+- Default parameter values (trailing only, bound left to right so defaults can reference earlier parameters).
+- `select`/`reject`/`reduce(initial)` blocks and `String#to_i`.
+- `script/bootstrap` and `script/cibuild`; `todos/018` gap analysis toward Stage 1 self-hosting.

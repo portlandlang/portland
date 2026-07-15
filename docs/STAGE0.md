@@ -27,27 +27,33 @@ the tests are the spec until a real one exists.
   (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
   booleans: no truthiness, since there is no nil to be falsy.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
-  expression, arity-checked calls with parens. Method bodies get a fresh scope:
-  no outer locals (Ruby's rule, kept).
+  expression, arity-checked calls with parens, default parameter values
+  (trailing only; defaults may reference earlier parameters). Method bodies get
+  a fresh scope: no outer locals (Ruby's rule, kept).
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops; `break` and `next` control the
   enclosing `while`. None work inside blocks yet.
 - **Blocks** — `do |x| ... end` on `each` (arrays, and hashes with
-  `|key, value|`), `map`, `times`. Blocks are closures over the enclosing
-  scope; parameters are block-local.
+  `|key, value|`), `map`, `select`, `reject`, `reduce(initial)`, `times`.
+  Blocks are closures over the enclosing scope; parameters are block-local.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?
-  chars split include? start_with? end_with?` plus `[index]`; integers: `abs
-  zero? positive? negative? even? odd?`; arrays: `length first last empty? join
-  include? sum min max` plus `[index]` with negative indices; hashes: `length
-  empty? key? keys values` plus `[key]`; everything: `to_s`.
-- **IO** — `puts(...)`, one line per argument. `puts` produces *no value*;
+  chars split include? start_with? end_with? to_i` plus `[index]`; integers:
+  `abs zero? positive? negative? even? odd?`; arrays: `length first last empty?
+  join include? sum min max` plus `[index]` with negative indices; hashes:
+  `length empty? key? keys values` plus `[key]`; everything: `to_s`. `*`
+  repeats strings and arrays; `%w[rose city]` builds word arrays.
+- **IO** — `puts(...)`, one line per argument; `puts` produces *no value* —
   using its result is an error (seed-level preview of "no ambient nil").
+  `p(...)` prints `inspect` renderings (strings keep quotes) and returns its
+  argument, like Ruby. The REPL shows results via `inspect`.
 - **Comments** — `#` to end of line.
 - **Names** — `snake_case`, `?`/`!` suffixes are part of the name.
 
 ## Out (deliberately, for now)
 
-- Heredocs, `%w[]`, single-quoted strings — remaining Prism-textbook lexer work.
+- Heredocs — remaining Prism-textbook lexer work (interpolation, `%w[]`, and
+  single-quoted strings are in).
+- File IO and ARGV — the real blocker for writing a compiler in the subset.
 - Symbols, floats, ranges.
 - Optionals and the absence story — *the* headline feature, designed at the
   language level (todo 005), not snuck into the seed.
