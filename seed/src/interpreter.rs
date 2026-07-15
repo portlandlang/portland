@@ -368,6 +368,33 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Value::Array(results)
                 }
+                (Value::Array(elements), "reduce", [initial]) => {
+                    let mut accumulator = initial.clone();
+                    for element in elements.clone() {
+                        accumulator = self
+                            .run_block(block, vec![accumulator, element])
+                            .unwrap_or_else(|| panic!("reduce block produced no value"));
+                    }
+                    accumulator
+                }
+                (Value::Array(elements), "reject", []) => {
+                    let mut kept = Vec::new();
+                    for element in elements.clone() {
+                        if !self.block_boolean(block, element.clone(), "reject") {
+                            kept.push(element);
+                        }
+                    }
+                    Value::Array(kept)
+                }
+                (Value::Array(elements), "select", []) => {
+                    let mut kept = Vec::new();
+                    for element in elements.clone() {
+                        if self.block_boolean(block, element.clone(), "select") {
+                            kept.push(element);
+                        }
+                    }
+                    Value::Array(kept)
+                }
                 (Value::Integer(count), "times", []) => {
                     for index in 0..*count {
                         self.run_block(block, vec![Value::Integer(index)]);
@@ -454,6 +481,13 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(s), "start_with?", [Value::String(prefix)]) => {
                 Value::Boolean(s.starts_with(prefix))
             }
+            (Value::String(s), "to_i", []) => {
+                let trimmed = s.trim();
+                let value = trimmed
+                    .parse()
+                    .unwrap_or_else(|_| panic!("to_i cannot parse {s:?} — no nil to return"));
+                Value::Integer(value)
+            }
             (Value::String(s), "upcase", []) => Value::String(s.to_uppercase()),
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
@@ -470,6 +504,14 @@ impl<W: std::io::Write> Interpreter<W> {
                 other => panic!("{method} needs an array of integers, found {other:?}"),
             })
             .collect()
+    }
+
+    /// Run a block whose result must be a strict boolean (select/reject).
+    fn block_boolean(&mut self, block: &Block, element: Value, method: &str) -> bool {
+        match self.run_block(block, vec![element]) {
+            Some(Value::Boolean(value)) => value,
+            other => panic!("{method} block must produce true or false, got {other:?}"),
+        }
     }
 
     /// Run a block as a closure: it sees the enclosing scope; only its
@@ -828,6 +870,53 @@ mod tests {
                 Value::Integer(9),
             ]))
         );
+    }
+
+    #[test]
+    fn select_keeps_matching_elements() {
+        let source = "[1, 2, 3, 4].select do |n|\n  n.even?\nend\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(vec![Value::Integer(2), Value::Integer(4)]))
+        );
+    }
+
+    #[test]
+    fn reject_drops_matching_elements() {
+        let source = "[1, 2, 3, 4].reject do |n|\n  n.even?\nend\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(vec![Value::Integer(1), Value::Integer(3)]))
+        );
+    }
+
+    #[test]
+    fn reduce_folds_from_an_initial_value() {
+        let source = "[1, 2, 3].reduce(10) do |sum, n|\n  sum + n\nend\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(16)));
+        let concat = "%w[rose city].reduce(\"\") do |all, word|\n  all + word\nend\n";
+        assert_eq!(
+            evaluate(concat),
+            Some(Value::String("rosecity".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "select block must produce true or false")]
+    fn panics_on_a_non_boolean_select_block() {
+        evaluate("[1].select do |n|\n  n\nend\n");
+    }
+
+    #[test]
+    fn converts_strings_to_integers() {
+        assert_eq!(evaluate("\"42\".to_i"), Some(Value::Integer(42)));
+        assert_eq!(evaluate("\" -7 \".to_i"), Some(Value::Integer(-7)));
+    }
+
+    #[test]
+    #[should_panic(expected = "to_i cannot parse")]
+    fn panics_on_an_unparsable_to_i() {
+        evaluate("\"pdx\".to_i");
     }
 
     #[test]
