@@ -1,18 +1,18 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
-use crate::ast::Expression;
+use crate::ast::{Expression, Program, Statement};
 use crate::lexer::{self, Token, TokenKind};
 
-pub fn parse(source: &str) -> Expression {
+pub fn parse(source: &str) -> Program {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
         position: 0,
         tokens,
     };
-    let expression = parser.expression();
+    let program = parser.program();
     parser.expect_end();
-    expression
+    program
 }
 
 struct Parser<'source> {
@@ -21,6 +21,37 @@ struct Parser<'source> {
 }
 
 impl Parser<'_> {
+    fn program(&mut self) -> Program {
+        let mut statements = Vec::new();
+        self.skip_newlines();
+        while self.position < self.tokens.len() {
+            statements.push(self.statement());
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+        Program { statements }
+    }
+
+    fn statement(&mut self) -> Statement {
+        Statement::Expression(self.expression())
+    }
+
+    fn skip_newlines(&mut self) {
+        while self.peek_kind() == Some(TokenKind::Newline) {
+            self.position += 1;
+        }
+    }
+
+    fn expect_statement_boundary(&self) {
+        match self.peek_kind() {
+            None | Some(TokenKind::Newline) => {}
+            _ => panic!(
+                "expected a newline after statement, got {:?}",
+                self.tokens.get(self.position)
+            ),
+        }
+    }
+
     fn expression(&mut self) -> Expression {
         self.addition()
     }
@@ -92,15 +123,47 @@ impl Parser<'_> {
 mod tests {
     use super::*;
 
+    /// Parse a source expected to be a single expression statement.
+    fn expression(source: &str) -> Expression {
+        let mut statements = parse(source).statements;
+        assert_eq!(statements.len(), 1, "expected exactly one statement");
+        match statements.remove(0) {
+            Statement::Expression(expression) => expression,
+        }
+    }
+
+    #[test]
+    fn parses_an_empty_program() {
+        assert_eq!(parse("").statements, vec![]);
+        assert_eq!(parse("\n\n").statements, vec![]);
+    }
+
+    #[test]
+    fn parses_newline_separated_statements() {
+        assert_eq!(
+            parse("1\n2\n").statements,
+            vec![
+                Statement::Expression(Expression::Integer(1)),
+                Statement::Expression(Expression::Integer(2)),
+            ]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "expected a newline after statement")]
+    fn panics_on_two_expressions_without_a_newline() {
+        parse("1 2");
+    }
+
     #[test]
     fn parses_an_integer_literal() {
-        assert_eq!(parse("42"), Expression::Integer(42));
+        assert_eq!(expression("42"), Expression::Integer(42));
     }
 
     #[test]
     fn parses_addition() {
         assert_eq!(
-            parse("1 + 2"),
+            expression("1 + 2"),
             Expression::Add {
                 left: Box::new(Expression::Integer(1)),
                 right: Box::new(Expression::Integer(2)),
@@ -111,7 +174,7 @@ mod tests {
     #[test]
     fn addition_is_left_associative() {
         assert_eq!(
-            parse("1 + 2 + 3"),
+            expression("1 + 2 + 3"),
             Expression::Add {
                 left: Box::new(Expression::Add {
                     left: Box::new(Expression::Integer(1)),
@@ -124,9 +187,9 @@ mod tests {
 
     #[test]
     fn parses_parenthesized_expressions() {
-        assert_eq!(parse("(42)"), Expression::Integer(42));
+        assert_eq!(expression("(42)"), Expression::Integer(42));
         assert_eq!(
-            parse("1 + (2 + 3)"),
+            expression("1 + (2 + 3)"),
             Expression::Add {
                 left: Box::new(Expression::Integer(1)),
                 right: Box::new(Expression::Add {
@@ -146,11 +209,11 @@ mod tests {
     #[test]
     fn parses_a_variable_reference() {
         assert_eq!(
-            parse("greeting"),
+            expression("greeting"),
             Expression::Variable("greeting".to_string())
         );
         assert_eq!(
-            parse(r#""hello " + name"#),
+            expression(r#""hello " + name"#),
             Expression::Add {
                 left: Box::new(Expression::String("hello ".to_string())),
                 right: Box::new(Expression::Variable("name".to_string())),
@@ -161,7 +224,7 @@ mod tests {
     #[test]
     fn parses_a_string_literal() {
         assert_eq!(
-            parse(r#""hello portland""#),
+            expression(r#""hello portland""#),
             Expression::String("hello portland".to_string())
         );
     }
