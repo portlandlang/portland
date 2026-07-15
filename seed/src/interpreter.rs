@@ -375,6 +375,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Value::Array(results)
                 }
+                (Value::Array(elements), "each_with_index", []) => {
+                    for (index, element) in elements.clone().into_iter().enumerate() {
+                        self.run_block(block, vec![element, Value::Integer(index as i64)]);
+                    }
+                    receiver
+                }
                 (Value::Array(elements), "reduce", [initial]) => {
                     let mut accumulator = initial.clone();
                     for element in elements.clone() {
@@ -456,6 +462,18 @@ impl<W: std::io::Write> Interpreter<W> {
                 .min()
                 .map(Value::Integer)
                 .unwrap_or_else(|| panic!("min on an empty array — no nil; check empty? first")),
+            (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
+                let start = usize::try_from(*start)
+                    .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
+                let length = usize::try_from(*length)
+                    .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
+                Value::Array(elements.iter().skip(start).take(length).cloned().collect())
+            }
+            (Value::Array(elements), "sort", []) => {
+                let mut sorted = Self::integers_of(elements, "sort");
+                sorted.sort_unstable();
+                Value::Array(sorted.into_iter().map(Value::Integer).collect())
+            }
             (Value::Array(elements), "sum", []) => {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
             }
@@ -480,6 +498,13 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (Value::String(s), "length", []) => Value::Integer(s.chars().count() as i64),
             (Value::String(s), "reverse", []) => Value::String(s.chars().rev().collect()),
+            (Value::String(s), "slice", [Value::Integer(start), Value::Integer(length)]) => {
+                let start = usize::try_from(*start)
+                    .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
+                let length = usize::try_from(*length)
+                    .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
+                Value::String(s.chars().skip(start).take(length).collect())
+            }
             (Value::String(s), "split", [Value::String(separator)]) => Value::Array(
                 s.split(separator.as_str())
                     .map(|piece| Value::String(piece.to_string()))
@@ -902,6 +927,41 @@ mod tests {
                 Value::Integer(4),
                 Value::Integer(9),
             ]))
+        );
+    }
+
+    #[test]
+    fn each_with_index_yields_element_then_index() {
+        let source =
+            "%w[a b].each_with_index do |letter, index|\n  puts(\"#{index}: #{letter}\")\nend\n";
+        assert_eq!(output_of(source), "0: a\n1: b\n");
+    }
+
+    #[test]
+    fn sorts_integer_arrays() {
+        assert_eq!(
+            evaluate("[3, 1, 2].sort"),
+            Some(Value::Array(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+            ]))
+        );
+    }
+
+    #[test]
+    fn slices_strings_and_arrays() {
+        assert_eq!(
+            evaluate("\"portland\".slice(4, 4)"),
+            Some(Value::String("land".to_string()))
+        );
+        assert_eq!(
+            evaluate("[1, 2, 3, 4].slice(1, 2)"),
+            Some(Value::Array(vec![Value::Integer(2), Value::Integer(3)]))
+        );
+        assert_eq!(
+            evaluate("[1, 2].slice(1, 99)"),
+            Some(Value::Array(vec![Value::Integer(2)]))
         );
     }
 
