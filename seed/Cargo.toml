@@ -5,4 +5,8 @@ edition = "2024"
 description = "Stage 0 seed compiler for Portland. Crude and disposable on purpose. Never published."
 publish = false
 
+[[bin]]
+name = "pdx"
+path = "src/main.rs"
+
 [dependencies]

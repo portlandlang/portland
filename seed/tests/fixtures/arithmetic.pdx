@@ -1,0 +1,2 @@
+base = 40
+puts(base + 1 + 1)
