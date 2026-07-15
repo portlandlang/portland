@@ -20,7 +20,7 @@ struct Parser<'source> {
     tokens: Vec<Token<'source>>,
 }
 
-impl Parser<'_> {
+impl<'source> Parser<'source> {
     fn program(&mut self) -> Program {
         let mut statements = Vec::new();
         self.skip_newlines();
@@ -145,7 +145,7 @@ impl Parser<'_> {
         arguments
     }
 
-    fn advance(&mut self) -> Token<'_> {
+    fn advance(&mut self) -> Token<'source> {
         let token = *self
             .tokens
             .get(self.position)
