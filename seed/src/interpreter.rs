@@ -969,6 +969,48 @@ mod tests {
     }
 
     #[test]
+    fn interpolates_expressions_into_strings() {
+        assert_eq!(
+            evaluate(r#""1 + 1 = #{1 + 1}""#),
+            Some(Value::String("1 + 1 = 2".to_string()))
+        );
+        assert_eq!(
+            evaluate("name = \"world\"\n\"hello #{name}!\"\n"),
+            Some(Value::String("hello world!".to_string()))
+        );
+        assert_eq!(
+            evaluate(r##""#{1}, #{2}, and #{1 + 2}""##),
+            Some(Value::String("1, 2, and 3".to_string()))
+        );
+        assert_eq!(
+            evaluate(r##""#{"pdx".upcase} rules""##),
+            Some(Value::String("PDX rules".to_string()))
+        );
+    }
+
+    #[test]
+    fn escaped_interpolation_stays_literal() {
+        assert_eq!(
+            evaluate(r#""\#{not run}""#),
+            Some(Value::String("#{not run}".to_string()))
+        );
+    }
+
+    #[test]
+    fn interpolation_handles_nested_braces() {
+        assert_eq!(
+            evaluate(r#""age: #{ {"amy" => 3}["amy"] }""#),
+            Some(Value::String("age: 3".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "unterminated string")]
+    fn panics_on_an_unterminated_interpolation() {
+        evaluate(r##""#{1 + 1""##);
+    }
+
+    #[test]
     fn decodes_string_escapes() {
         assert_eq!(
             evaluate(r#""line1\nline2""#),

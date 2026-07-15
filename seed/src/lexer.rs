@@ -129,8 +129,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             '"' => {
                 chars.next();
-                // Escapes pass through raw here; the parser decodes them.
-                // No interpolation yet — Prism's lexer is the textbook for that.
+                // Escapes and `#{...}` pass through raw here; the parser decodes
+                // them. The lexer only has to keep the token boundary honest:
+                // quotes inside an interpolation don't end the string.
                 loop {
                     match chars.next() {
                         None => panic!("unterminated string starting at byte {start}"),
@@ -138,6 +139,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                             if chars.next().is_none() {
                                 panic!("unterminated string starting at byte {start}");
                             }
+                        }
+                        Some((_, '#')) if matches!(chars.peek(), Some(&(_, '{'))) => {
+                            chars.next(); // the `{`
+                            skip_interpolation(&mut chars, start);
                         }
                         Some((closing, '"')) => {
                             tokens.push(Token {
@@ -174,6 +179,31 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
     }
 
     tokens
+}
+
+/// Consume a `#{...}` interpolation body (opening brace already eaten),
+/// tracking brace depth and nested string literals so the enclosing string
+/// token ends at the right quote.
+fn skip_interpolation(chars: &mut std::iter::Peekable<std::str::CharIndices>, start: usize) {
+    let mut depth = 1;
+    while depth > 0 {
+        match chars.next() {
+            None => panic!("unterminated string starting at byte {start}"),
+            Some((_, '{')) => depth += 1,
+            Some((_, '}')) => depth -= 1,
+            Some((_, '"')) => loop {
+                match chars.next() {
+                    None => panic!("unterminated string starting at byte {start}"),
+                    Some((_, '\\')) => {
+                        chars.next();
+                    }
+                    Some((_, '"')) => break,
+                    Some(_) => {}
+                }
+            },
+            Some(_) => {}
+        }
+    }
 }
 
 /// Consume characters while `keep` holds; return the byte offset just past the last one.
@@ -395,6 +425,14 @@ mod tests {
     #[should_panic(expected = "unterminated string")]
     fn panics_on_an_unterminated_string() {
         lex(r#""oops"#);
+    }
+
+    #[test]
+    fn interpolation_keeps_the_string_token_whole() {
+        // A quote inside `#{...}` must not end the string.
+        let source = r##""#{"pdx".upcase} rules""##;
+        assert_eq!(kinds(source), vec![TokenKind::String]);
+        assert_eq!(texts(source), vec![source]);
     }
 
     #[test]

@@ -22,25 +22,95 @@ struct Parser<'source> {
     tokens: Vec<Token<'source>>,
 }
 
-/// Decode a raw string token (quotes included) into its value.
-fn unescape(text: &str) -> String {
+/// Decode a raw string token (quotes included) into an expression:
+/// a plain literal, or — when it contains `#{...}` — a `+` chain with
+/// each interpolation wrapped in `.to_s`.
+fn string_expression(text: &str) -> Expression {
     let content = &text[1..text.len() - 1];
-    let mut result = String::with_capacity(content.len());
-    let mut characters = content.chars();
-    while let Some(character) = characters.next() {
-        if character != '\\' {
-            result.push(character);
-            continue;
-        }
-        match characters.next() {
-            Some('n') => result.push('\n'),
-            Some('t') => result.push('\t'),
-            Some('"') => result.push('"'),
-            Some('\\') => result.push('\\'),
-            other => panic!("unknown escape sequence \\{other:?}"),
+    let mut parts: Vec<Expression> = Vec::new();
+    let mut literal = String::new();
+    let mut characters = content.char_indices().peekable();
+
+    while let Some((index, character)) = characters.next() {
+        match character {
+            '\\' => match characters.next() {
+                Some((_, 'n')) => literal.push('\n'),
+                Some((_, 't')) => literal.push('\t'),
+                Some((_, '"')) => literal.push('"'),
+                Some((_, '\\')) => literal.push('\\'),
+                Some((_, '#')) => literal.push('#'),
+                other => panic!("unknown escape sequence \\{:?}", other.map(|(_, c)| c)),
+            },
+            '#' if matches!(characters.peek(), Some(&(_, '{'))) => {
+                characters.next(); // the `{`
+                let inner_start = index + 2;
+                // Matching close brace by depth; nested string literals are
+                // skipped so their braces and quotes don't miscount.
+                let mut depth = 1;
+                let inner_end = loop {
+                    match characters.next() {
+                        None => panic!("unterminated interpolation in string {text}"),
+                        Some((_, '{')) => depth += 1,
+                        Some((position, '}')) => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break position;
+                            }
+                        }
+                        Some((_, '"')) => loop {
+                            match characters.next() {
+                                None => panic!("unterminated interpolation in string {text}"),
+                                Some((_, '\\')) => {
+                                    characters.next();
+                                }
+                                Some((_, '"')) => break,
+                                Some(_) => {}
+                            }
+                        },
+                        Some(_) => {}
+                    }
+                };
+                if !literal.is_empty() {
+                    parts.push(Expression::String(std::mem::take(&mut literal)));
+                }
+                let inner = expression_from(&content[inner_start..inner_end]);
+                parts.push(Expression::MethodCall {
+                    arguments: Vec::new(),
+                    block: None,
+                    name: "to_s".to_string(),
+                    receiver: Box::new(inner),
+                });
+            }
+            _ => literal.push(character),
         }
     }
-    result
+
+    if parts.is_empty() {
+        return Expression::String(literal);
+    }
+    if !literal.is_empty() {
+        parts.push(Expression::String(literal));
+    }
+    parts
+        .into_iter()
+        .reduce(|left, right| Expression::Binary {
+            left: Box::new(left),
+            operator: BinaryOperator::Add,
+            right: Box::new(right),
+        })
+        .unwrap()
+}
+
+/// Parse a standalone expression source (used for interpolation innards).
+fn expression_from(source: &str) -> Expression {
+    let tokens = lexer::lex(source);
+    let mut parser = Parser {
+        position: 0,
+        tokens,
+    };
+    let expression = parser.expression();
+    parser.expect_end();
+    expression
 }
 
 impl<'source> Parser<'source> {
@@ -491,7 +561,7 @@ impl<'source> Parser<'source> {
                     Expression::Variable(token.text.to_string())
                 }
             }
-            TokenKind::String => Expression::String(unescape(token.text)),
+            TokenKind::String => string_expression(token.text),
             TokenKind::LeftBrace => {
                 let mut pairs = Vec::new();
                 if self.peek_kind() != Some(TokenKind::RightBrace) {
