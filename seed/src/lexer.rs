@@ -8,12 +8,18 @@ pub enum TokenKind {
     Comma,
     Dot,
     Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
     Identifier,
     Integer,
     Keyword,
     LeftParen,
+    Less,
+    LessEqual,
     Minus,
     Newline,
+    NotEqual,
     Plus,
     RightParen,
     Slash,
@@ -22,7 +28,7 @@ pub enum TokenKind {
 }
 
 /// The Stage 0 keyword set — grows as the subset does.
-const KEYWORDS: [&str; 3] = ["def", "do", "end"];
+const KEYWORDS: [&str; 7] = ["def", "do", "else", "end", "false", "if", "true"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Token<'source> {
@@ -57,11 +63,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | ',' | '.' | '=' | '+' | '-' | '*' | '/' => {
+            '(' | ')' | ',' | '.' | '+' | '-' | '*' | '/' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
-                    '=' => TokenKind::Equal,
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
                     '+' => TokenKind::Plus,
@@ -74,6 +79,28 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 tokens.push(Token {
                     kind,
                     text: &source[start..start + character.len_utf8()],
+                });
+            }
+            '=' | '<' | '>' | '!' => {
+                chars.next();
+                let followed_by_equal = matches!(chars.peek(), Some(&(_, '=')));
+                let (kind, length) = match (character, followed_by_equal) {
+                    ('=', true) => (TokenKind::EqualEqual, 2),
+                    ('=', false) => (TokenKind::Equal, 1),
+                    ('>', true) => (TokenKind::GreaterEqual, 2),
+                    ('>', false) => (TokenKind::Greater, 1),
+                    ('<', true) => (TokenKind::LessEqual, 2),
+                    ('<', false) => (TokenKind::Less, 1),
+                    ('!', true) => (TokenKind::NotEqual, 2),
+                    ('!', false) => panic!("unexpected character '!' at byte {start}"),
+                    _ => unreachable!(),
+                };
+                if length == 2 {
+                    chars.next();
+                }
+                tokens.push(Token {
+                    kind,
+                    text: &source[start..start + length],
                 });
             }
             '"' => {
@@ -90,9 +117,11 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut end = scan_while(&mut chars, |c| c.is_ascii_alphanumeric() || c == '_');
-                // Ruby-surface joy, kept: a trailing `?` or `!` is part of the name.
+                // Ruby-surface joy, kept: a trailing `?` or `!` is part of the name —
+                // unless `=` follows, so `x != 1` stays a comparison, not `x!` then `=`.
                 if let Some(&(index, suffix)) = chars.peek()
                     && (suffix == '?' || suffix == '!')
+                    && source.as_bytes().get(index + 1) != Some(&b'=')
                 {
                     end = index + suffix.len_utf8();
                     chars.next();
@@ -211,6 +240,47 @@ mod tests {
         assert_eq!(
             kinds("- * /"),
             vec![TokenKind::Minus, TokenKind::Star, TokenKind::Slash]
+        );
+    }
+
+    #[test]
+    fn lexes_comparison_operators() {
+        assert_eq!(
+            kinds("== != < <= > >="),
+            vec![
+                TokenKind::EqualEqual,
+                TokenKind::NotEqual,
+                TokenKind::Less,
+                TokenKind::LessEqual,
+                TokenKind::Greater,
+                TokenKind::GreaterEqual,
+            ]
+        );
+    }
+
+    #[test]
+    fn not_equal_wins_over_a_bang_identifier_suffix() {
+        assert_eq!(
+            kinds("x != 1"),
+            vec![
+                TokenKind::Identifier,
+                TokenKind::NotEqual,
+                TokenKind::Integer
+            ]
+        );
+        assert_eq!(texts("x != 1"), vec!["x", "!=", "1"]);
+    }
+
+    #[test]
+    fn lexes_condition_keywords() {
+        assert_eq!(
+            kinds("if true else false"),
+            vec![
+                TokenKind::Keyword,
+                TokenKind::Keyword,
+                TokenKind::Keyword,
+                TokenKind::Keyword,
+            ]
         );
     }
 
