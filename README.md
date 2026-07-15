@@ -4,12 +4,35 @@ A joyous programming language for Apple silicon.
 
 Close to the metal, on Metal.
 
-> **Status: Stage 0 seed.** A tiny Rust interpreter (`seed/`) runs a first slice of
-> Portland — methods, `if`/`elsif`/`else`, `while`, arithmetic, strings, `puts`, a REPL.
+> **Status: Stage 0 seed.** A tiny Rust interpreter (`seed/`) runs a real slice of
+> Portland — see [`docs/STAGE0.md`](docs/STAGE0.md) for exactly what.
 > No compiler yet; the seed is the disposable bootstrap.
 > See [`AGENT.md`](AGENT.md) for the working brief,
 > [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale,
 > and [`todos/`](todos/README.md) for what's next.
+
+## A taste
+
+This runs today, via `cargo run --bin pdx` (or line by line in its REPL):
+
+```ruby
+def greeting(name)
+  return "hello, stranger" if name.empty?
+  "hello, #{name}!"
+end
+
+puts(greeting("portland"))
+
+cities = {"pdx" => "portland", "sea" => "seattle"}
+cities.each do |code, city|
+  puts("#{code.upcase} is #{city}") unless city == "seattle"
+end
+
+squares = [1, 2, 3].map do |n|
+  n * n
+end
+puts(squares.join(" + ") + " = #{squares.sum}")
+```
 
 ## The idea
 
