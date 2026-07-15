@@ -1282,6 +1282,24 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "duplicate parameter name")]
+    fn panics_on_duplicate_method_parameters() {
+        evaluate("def f(a, a)\n  a\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate block parameter name")]
+    fn panics_on_duplicate_block_parameters() {
+        evaluate("[1].each do |a, a|\n  a\nend\n");
+    }
+
+    #[test]
+    fn method_chains_may_continue_on_the_next_line() {
+        let source = "\"pdx\"\n  .upcase\n  .reverse\n";
+        assert_eq!(evaluate(source), Some(Value::String("XDP".to_string())));
+    }
+
+    #[test]
     fn chains_method_calls() {
         assert_eq!(
             evaluate(r#""pdx".upcase.reverse"#),

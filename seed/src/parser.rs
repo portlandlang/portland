@@ -339,6 +339,9 @@ impl<'source> Parser<'source> {
                 if token.kind != TokenKind::Identifier {
                     panic!("expected block parameter, got {token:?}");
                 }
+                if parameters.contains(&token.text.to_string()) {
+                    panic!("duplicate block parameter name {}", token.text);
+                }
                 parameters.push(token.text.to_string());
                 match self.peek_kind() {
                     Some(TokenKind::Comma) => self.position += 1,
@@ -430,6 +433,9 @@ impl<'source> Parser<'source> {
                     }
                     None
                 };
+                if parameters.iter().any(|parameter| parameter.name == name) {
+                    panic!("duplicate parameter name {name}");
+                }
                 parameters.push(Parameter { default, name });
                 if self.peek_kind() != Some(TokenKind::Comma) {
                     break;
@@ -593,6 +599,18 @@ impl<'source> Parser<'source> {
     fn postfix_from(&mut self, mut expression: Expression) -> Expression {
         loop {
             match self.peek_kind() {
+                // Fluent style: a chain may continue on the next line
+                // when the line leads with a dot.
+                Some(TokenKind::Newline) => {
+                    let mut offset = 0;
+                    while self.peek_kind_at(offset) == Some(TokenKind::Newline) {
+                        offset += 1;
+                    }
+                    if self.peek_kind_at(offset) != Some(TokenKind::Dot) {
+                        return expression;
+                    }
+                    self.position += offset;
+                }
                 Some(TokenKind::Dot) => {
                     self.position += 1; // the `.`
                     let token = self.advance();
