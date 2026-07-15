@@ -35,6 +35,16 @@ fn runs_showcase_pdx() {
 }
 
 #[test]
+fn runs_fizzbuzz_pdx() {
+    let output = run_fixture("fizzbuzz.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n"
+    );
+}
+
+#[test]
 fn fails_without_a_file_argument() {
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .output()
