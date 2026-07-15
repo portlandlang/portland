@@ -89,7 +89,24 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn expression(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
+            Expression::ArrayLiteral(elements) => Some(Value::Array(
+                elements.iter().map(|e| self.value_of(e)).collect(),
+            )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::Index { index, receiver } => {
+                let receiver = self.value_of(receiver);
+                let index = self.value_of(index);
+                let (Value::Array(elements), Value::Integer(index)) = (&receiver, &index) else {
+                    panic!("cannot index {receiver:?} with {index:?}")
+                };
+                // Ruby-style negative indices; out of range panics — no nil to return.
+                let length = elements.len() as i64;
+                let position = if *index < 0 { length + index } else { *index };
+                if position < 0 || position >= length {
+                    panic!("index {index} out of range for array of length {length}");
+                }
+                Some(elements[position as usize].clone())
+            }
             Expression::If {
                 condition,
                 else_body,
@@ -138,6 +155,11 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     (Value::String(a), BinaryOperator::Add, Value::String(b)) => {
                         Some(Value::String(a + &b))
+                    }
+                    (Value::Array(a), BinaryOperator::Add, Value::Array(b)) => {
+                        let mut combined = a;
+                        combined.extend(b);
+                        Some(Value::Array(combined))
                     }
                     (Value::Integer(a), BinaryOperator::Greater, Value::Integer(b)) => {
                         Some(Value::Boolean(a > b))
@@ -194,6 +216,23 @@ impl<W: std::io::Write> Interpreter<W> {
     /// language-design decision the seed doesn't get to make.
     fn method_call(receiver: Value, name: &str, arguments: Vec<Value>) -> Value {
         match (&receiver, name, arguments.as_slice()) {
+            (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
+            (Value::Array(elements), "first", []) => elements
+                .first()
+                .unwrap_or_else(|| panic!("first on an empty array — no nil; check empty? first"))
+                .clone(),
+            (Value::Array(elements), "join", [Value::String(separator)]) => Value::String(
+                elements
+                    .iter()
+                    .map(|element| element.to_string())
+                    .collect::<Vec<_>>()
+                    .join(separator),
+            ),
+            (Value::Array(elements), "last", []) => elements
+                .last()
+                .unwrap_or_else(|| panic!("last on an empty array — no nil; check empty? first"))
+                .clone(),
+            (Value::Array(elements), "length", []) => Value::Integer(elements.len() as i64),
             (Value::Integer(n), "abs", []) => Value::Integer(n.abs()),
             (Value::Integer(n), "negative?", []) => Value::Boolean(*n < 0),
             (Value::Integer(n), "positive?", []) => Value::Boolean(*n > 0),
@@ -282,6 +321,70 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_array_literals() {
+        assert_eq!(
+            evaluate("[1, 2 + 3, \"pdx\"]"),
+            Some(Value::Array(vec![
+                Value::Integer(1),
+                Value::Integer(5),
+                Value::String("pdx".to_string()),
+            ]))
+        );
+        assert_eq!(evaluate("[]"), Some(Value::Array(vec![])));
+    }
+
+    #[test]
+    fn indexes_arrays() {
+        assert_eq!(evaluate("[10, 20, 30][1]"), Some(Value::Integer(20)));
+        assert_eq!(evaluate("[10, 20, 30][-1]"), Some(Value::Integer(30)));
+        assert_eq!(
+            evaluate("cities = [\"pdx\", \"sea\"]\ncities[0]\n"),
+            Some(Value::String("pdx".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "out of range")]
+    fn panics_on_an_out_of_range_index() {
+        evaluate("[1, 2][5]");
+    }
+
+    #[test]
+    fn concatenates_arrays_with_plus() {
+        assert_eq!(
+            evaluate("[1] + [2, 3]"),
+            Some(Value::Array(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+            ]))
+        );
+    }
+
+    #[test]
+    fn calls_builtin_methods_on_arrays() {
+        assert_eq!(evaluate("[1, 2, 3].length"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("[].empty?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("[7, 8].first"), Some(Value::Integer(7)));
+        assert_eq!(evaluate("[7, 8].last"), Some(Value::Integer(8)));
+        assert_eq!(
+            evaluate("[\"a\", \"b\"].join(\"-\")"),
+            Some(Value::String("a-b".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "no nil; check empty? first")]
+    fn panics_on_first_of_an_empty_array() {
+        evaluate("[].first");
+    }
+
+    #[test]
+    fn puts_prints_arrays_readably() {
+        assert_eq!(output_of("puts([1, 2, 3])"), "[1, 2, 3]\n");
     }
 
     #[test]

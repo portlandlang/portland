@@ -283,25 +283,44 @@ impl<'source> Parser<'source> {
     }
 
     fn postfix_from(&mut self, mut expression: Expression) -> Expression {
-        while self.peek_kind() == Some(TokenKind::Dot) {
-            self.position += 1; // the `.`
-            let token = self.advance();
-            if token.kind != TokenKind::Identifier {
-                panic!("expected method name after dot, got {token:?}");
+        loop {
+            match self.peek_kind() {
+                Some(TokenKind::Dot) => {
+                    self.position += 1; // the `.`
+                    let token = self.advance();
+                    if token.kind != TokenKind::Identifier {
+                        panic!("expected method name after dot, got {token:?}");
+                    }
+                    let arguments = if self.peek_kind() == Some(TokenKind::LeftParen) {
+                        self.position += 1; // the `(`
+                        self.arguments()
+                    } else {
+                        Vec::new()
+                    };
+                    expression = Expression::MethodCall {
+                        arguments,
+                        name: token.text.to_string(),
+                        receiver: Box::new(expression),
+                    };
+                }
+                Some(TokenKind::LeftBracket) => {
+                    self.position += 1; // the `[`
+                    let index = Box::new(self.expression());
+                    if self.peek_kind() != Some(TokenKind::RightBracket) {
+                        panic!(
+                            "expected closing bracket, got {:?}",
+                            self.tokens.get(self.position)
+                        );
+                    }
+                    self.position += 1; // the `]`
+                    expression = Expression::Index {
+                        index,
+                        receiver: Box::new(expression),
+                    };
+                }
+                _ => return expression,
             }
-            let arguments = if self.peek_kind() == Some(TokenKind::LeftParen) {
-                self.position += 1; // the `(`
-                self.arguments()
-            } else {
-                Vec::new()
-            };
-            expression = Expression::MethodCall {
-                arguments,
-                name: token.text.to_string(),
-                receiver: Box::new(expression),
-            };
         }
-        expression
     }
 
     fn peek_kind(&self) -> Option<TokenKind> {
@@ -334,6 +353,24 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => Expression::String(unescape(token.text)),
+            TokenKind::LeftBracket => {
+                let mut elements = Vec::new();
+                if self.peek_kind() != Some(TokenKind::RightBracket) {
+                    elements.push(self.expression());
+                    while self.peek_kind() == Some(TokenKind::Comma) {
+                        self.position += 1;
+                        elements.push(self.expression());
+                    }
+                }
+                if self.peek_kind() != Some(TokenKind::RightBracket) {
+                    panic!(
+                        "expected closing bracket, got {:?}",
+                        self.tokens.get(self.position)
+                    );
+                }
+                self.position += 1;
+                Expression::ArrayLiteral(elements)
+            }
             TokenKind::LeftParen => {
                 let inner = self.expression();
                 if self.peek_kind() != Some(TokenKind::RightParen) {

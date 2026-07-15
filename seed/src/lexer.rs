@@ -14,6 +14,7 @@ pub enum TokenKind {
     Identifier,
     Integer,
     Keyword,
+    LeftBracket,
     LeftParen,
     Less,
     LessEqual,
@@ -22,6 +23,7 @@ pub enum TokenKind {
     NotEqual,
     Percent,
     Plus,
+    RightBracket,
     RightParen,
     Slash,
     Star,
@@ -66,14 +68,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
+            '(' | ')' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
+                    '[' => TokenKind::LeftBracket,
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
                     '%' => TokenKind::Percent,
                     '+' => TokenKind::Plus,
+                    ']' => TokenKind::RightBracket,
                     ')' => TokenKind::RightParen,
                     '/' => TokenKind::Slash,
                     '*' => TokenKind::Star,
@@ -248,6 +252,18 @@ mod tests {
             vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
         );
         assert_eq!(texts("# only a comment"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn lexes_brackets() {
+        assert_eq!(
+            kinds("[1]"),
+            vec![
+                TokenKind::LeftBracket,
+                TokenKind::Integer,
+                TokenKind::RightBracket,
+            ]
+        );
     }
 
     #[test]

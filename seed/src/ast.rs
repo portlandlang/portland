@@ -45,6 +45,7 @@ pub enum UnaryOperator {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
+    ArrayLiteral(Vec<Expression>),
     Binary {
         left: Box<Expression>,
         operator: BinaryOperator,
@@ -55,6 +56,10 @@ pub enum Expression {
         condition: Box<Expression>,
         else_body: Vec<Statement>,
         then_body: Vec<Statement>,
+    },
+    Index {
+        index: Box<Expression>,
+        receiver: Box<Expression>,
     },
     Call {
         arguments: Vec<Expression>,
