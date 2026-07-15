@@ -91,16 +91,24 @@ impl<'source> Parser<'source> {
         let condition = Box::new(self.expression());
         self.expect_statement_boundary();
         self.skip_newlines();
-        let then_body = self.body_until(&["else", "end"], "if");
-        let else_body = if self.peek_is_keyword("else") {
-            self.position += 1; // the `else`
-            self.expect_statement_boundary();
-            self.skip_newlines();
-            self.body_until(&["end"], "else")
+        let then_body = self.body_until(&["else", "elsif", "end"], "if");
+        let else_body;
+        if self.peek_is_keyword("elsif") {
+            // Sugar for `else` holding a nested `if`; the chain shares one `end`,
+            // which the recursive call consumes.
+            self.position += 1; // the `elsif`
+            else_body = vec![Statement::Expression(self.if_expression())];
         } else {
-            Vec::new()
-        };
-        self.position += 1; // the `end`
+            else_body = if self.peek_is_keyword("else") {
+                self.position += 1; // the `else`
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                self.body_until(&["end"], "else")
+            } else {
+                Vec::new()
+            };
+            self.position += 1; // the `end`
+        }
         Expression::If {
             condition,
             else_body,

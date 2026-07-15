@@ -306,6 +306,27 @@ mod tests {
     }
 
     #[test]
+    fn evaluates_elsif_chains() {
+        let source = "def describe(n)\n  if n < 0\n    \"negative\"\n  elsif n == 0\n    \"zero\"\n  elsif n < 10\n    \"small\"\n  else\n    \"big\"\n  end\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}describe(-1)\n")),
+            Some(Value::String("negative".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}describe(0)\n")),
+            Some(Value::String("zero".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}describe(7)\n")),
+            Some(Value::String("small".to_string()))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}describe(42)\n")),
+            Some(Value::String("big".to_string()))
+        );
+    }
+
+    #[test]
     fn if_works_inside_methods() {
         let source = "def sign(n)\n  if n < 0\n    \"negative\"\n  else\n    \"non-negative\"\n  end\nend\nsign(0 - 5)\n";
         assert_eq!(
