@@ -4,10 +4,10 @@ The tiny language the disposable Rust seed compiler must handle — just enough 
 
 ## Tasks
 
-- [ ] List the minimum features: methods, blocks, pattern matching?, strings, arrays, hashes, optionals, what else?
-- [ ] Explicitly list what Stage 0 _omits_ (macros? `together`? GPU dispatch? — almost certainly yes, all deferred)
-- [ ] Write a few sample Portland programs in the subset to pressure-test it
-- [ ] The test: could we rewrite the seed compiler itself in this subset? (Stage 1 depends on it)
+- [x] List the minimum features — documented from the working seed in [docs/STAGE0.md](../docs/STAGE0.md)
+- [x] Explicitly list what Stage 0 _omits_ — same doc
+- [x] Sample programs — `seed/tests/fixtures/*.pdx` (hello, fizzbuzz, blocks, showcase)
+- [ ] The test: could we rewrite the seed compiler itself in this subset? (Not yet — needs at least hashes/structs-of-some-kind, `return`/`break`, and string building. Grow the subset against this question.)
 
 ## Notes
 
