@@ -14,13 +14,21 @@ pub fn evaluate(source: &str) -> Option<Value> {
     interpreter.program(&program)
 }
 
+#[derive(Clone)]
+struct Method {
+    body: Vec<Statement>,
+    parameters: Vec<String>,
+}
+
 pub struct Interpreter {
+    methods: HashMap<String, Method>,
     variables: HashMap<String, Value>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
+            methods: HashMap::new(),
             variables: HashMap::new(),
         }
     }
@@ -41,7 +49,18 @@ impl Interpreter {
                 Some(value)
             }
             Statement::Expression(expression) => Some(self.expression(expression)),
-            other => panic!("cannot evaluate {other:?} yet"),
+            Statement::MethodDefinition {
+                body,
+                name,
+                parameters,
+            } => {
+                let method = Method {
+                    body: body.clone(),
+                    parameters: parameters.clone(),
+                };
+                self.methods.insert(name.clone(), method);
+                None
+            }
         }
     }
 
@@ -63,8 +82,38 @@ impl Interpreter {
                 .get(name)
                 .unwrap_or_else(|| panic!("undefined variable {name}"))
                 .clone(),
-            other => panic!("cannot evaluate {other:?} yet"),
+            Expression::Call { arguments, name } => {
+                let arguments: Vec<Value> = arguments.iter().map(|a| self.expression(a)).collect();
+                self.call(name, arguments)
+            }
         }
+    }
+
+    fn call(&mut self, name: &str, arguments: Vec<Value>) -> Value {
+        let method = self
+            .methods
+            .get(name)
+            .unwrap_or_else(|| panic!("undefined method {name}"))
+            .clone();
+        if arguments.len() != method.parameters.len() {
+            panic!(
+                "{name} expects {} argument(s), got {}",
+                method.parameters.len(),
+                arguments.len()
+            );
+        }
+
+        // Methods get a fresh scope: parameters only, no outer locals.
+        let mut scope: HashMap<String, Value> =
+            method.parameters.iter().cloned().zip(arguments).collect();
+        std::mem::swap(&mut self.variables, &mut scope);
+        let mut result = None;
+        for statement in &method.body {
+            result = self.statement(statement);
+        }
+        std::mem::swap(&mut self.variables, &mut scope);
+
+        result.unwrap_or_else(|| panic!("{name} produced no value"))
     }
 }
 
@@ -127,5 +176,53 @@ mod tests {
     #[should_panic(expected = "undefined variable")]
     fn panics_on_an_undefined_variable() {
         evaluate("nope");
+    }
+
+    #[test]
+    fn defines_and_calls_a_method() {
+        let source = "def greet(name)\n  \"hello \" + name\nend\ngreet(\"world\")\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("hello world".to_string()))
+        );
+    }
+
+    #[test]
+    fn calls_a_method_with_no_parameters() {
+        let source = "def pdx\n  \"portland\"\nend\npdx()\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("portland".to_string()))
+        );
+    }
+
+    #[test]
+    fn method_bodies_return_their_last_expression() {
+        let source = "def compute\n  1\n  2 + 3\nend\ncompute()\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(5)));
+    }
+
+    #[test]
+    fn methods_can_call_other_methods() {
+        let source = "def inner\n  21\nend\ndef outer\n  inner() + inner()\nend\nouter()\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(42)));
+    }
+
+    #[test]
+    #[should_panic(expected = "expects 1 argument")]
+    fn panics_on_an_arity_mismatch() {
+        evaluate("def greet(name)\n  name\nend\ngreet()\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined variable")]
+    fn method_bodies_cannot_see_outer_locals() {
+        evaluate("x = 1\ndef f\n  x\nend\nf()\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined method")]
+    fn panics_on_an_undefined_method() {
+        evaluate("nope()");
     }
 }
