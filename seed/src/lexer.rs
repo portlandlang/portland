@@ -12,9 +12,12 @@ pub enum TokenKind {
     Integer,
     Keyword,
     LeftParen,
+    Minus,
     Newline,
     Plus,
     RightParen,
+    Slash,
+    Star,
     String,
 }
 
@@ -50,14 +53,17 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | ',' | '.' | '=' | '+' => {
+            '(' | ')' | ',' | '.' | '=' | '+' | '-' | '*' | '/' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
                     '=' => TokenKind::Equal,
                     '(' => TokenKind::LeftParen,
+                    '-' => TokenKind::Minus,
                     '+' => TokenKind::Plus,
                     ')' => TokenKind::RightParen,
+                    '/' => TokenKind::Slash,
+                    '*' => TokenKind::Star,
                     _ => unreachable!(),
                 };
                 chars.next();
@@ -184,6 +190,14 @@ mod tests {
                 TokenKind::Equal,
                 TokenKind::Plus,
             ]
+        );
+    }
+
+    #[test]
+    fn lexes_arithmetic_operators() {
+        assert_eq!(
+            kinds("- * /"),
+            vec![TokenKind::Minus, TokenKind::Star, TokenKind::Slash]
         );
     }
 

@@ -87,11 +87,22 @@ impl<W: std::io::Write> Interpreter<W> {
                     (Value::Integer(a), BinaryOperator::Add, Value::Integer(b)) => {
                         Some(Value::Integer(a + b))
                     }
+                    (Value::Integer(a), BinaryOperator::Divide, Value::Integer(b)) => {
+                        // Truncates toward zero (Rust semantics); Ruby floors.
+                        // Revisit when Portland's integer semantics are specified.
+                        Some(Value::Integer(a / b))
+                    }
+                    (Value::Integer(a), BinaryOperator::Multiply, Value::Integer(b)) => {
+                        Some(Value::Integer(a * b))
+                    }
+                    (Value::Integer(a), BinaryOperator::Subtract, Value::Integer(b)) => {
+                        Some(Value::Integer(a - b))
+                    }
                     (Value::String(a), BinaryOperator::Add, Value::String(b)) => {
                         Some(Value::String(a + &b))
                     }
                     (left, operator, right) => {
-                        panic!("cannot add {operator:?} with {left:?} and {right:?}")
+                        panic!("cannot apply {operator:?} to {left:?} and {right:?}")
                     }
                 }
             }
@@ -177,9 +188,38 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "cannot add")]
+    #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn evaluates_subtraction_left_to_right() {
+        assert_eq!(evaluate("10 - 2 - 3"), Some(Value::Integer(5)));
+    }
+
+    #[test]
+    fn multiplication_binds_tighter_than_addition() {
+        assert_eq!(evaluate("2 + 3 * 4"), Some(Value::Integer(14)));
+        assert_eq!(evaluate("(2 + 3) * 4"), Some(Value::Integer(20)));
+    }
+
+    #[test]
+    fn evaluates_division() {
+        assert_eq!(evaluate("42 / 6"), Some(Value::Integer(7)));
+        assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    #[should_panic(expected = "divide by zero")]
+    fn panics_on_dividing_by_zero() {
+        evaluate("1 / 0");
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply")]
+    fn panics_on_multiplying_strings() {
+        evaluate(r#""ab" * "cd""#);
     }
 
     #[test]

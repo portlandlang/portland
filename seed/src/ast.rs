@@ -22,6 +22,9 @@ pub enum Statement {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BinaryOperator {
     Add,
+    Divide,
+    Multiply,
+    Subtract,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

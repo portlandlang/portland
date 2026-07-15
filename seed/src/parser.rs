@@ -130,13 +130,35 @@ impl<'source> Parser<'source> {
     }
 
     fn addition(&mut self) -> Expression {
+        let mut left = self.multiplication();
+        while let Some(operator) = match self.peek_kind() {
+            Some(TokenKind::Minus) => Some(BinaryOperator::Subtract),
+            Some(TokenKind::Plus) => Some(BinaryOperator::Add),
+            _ => None,
+        } {
+            self.position += 1;
+            let right = self.multiplication();
+            left = Expression::Binary {
+                left: Box::new(left),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        left
+    }
+
+    fn multiplication(&mut self) -> Expression {
         let mut left = self.primary();
-        while self.peek_kind() == Some(TokenKind::Plus) {
+        while let Some(operator) = match self.peek_kind() {
+            Some(TokenKind::Slash) => Some(BinaryOperator::Divide),
+            Some(TokenKind::Star) => Some(BinaryOperator::Multiply),
+            _ => None,
+        } {
             self.position += 1;
             let right = self.primary();
             left = Expression::Binary {
-                operator: BinaryOperator::Add,
                 left: Box::new(left),
+                operator,
                 right: Box::new(right),
             };
         }
@@ -405,6 +427,22 @@ mod tests {
                     right: Box::new(Expression::Integer(2)),
                 }),
                 right: Box::new(Expression::Integer(3)),
+            }
+        );
+    }
+
+    #[test]
+    fn multiplication_binds_tighter_than_addition() {
+        assert_eq!(
+            expression("1 + 2 * 3"),
+            Expression::Binary {
+                left: Box::new(Expression::Integer(1)),
+                operator: BinaryOperator::Add,
+                right: Box::new(Expression::Binary {
+                    left: Box::new(Expression::Integer(2)),
+                    operator: BinaryOperator::Multiply,
+                    right: Box::new(Expression::Integer(3)),
+                }),
             }
         );
     }
