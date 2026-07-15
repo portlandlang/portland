@@ -256,6 +256,24 @@ mod tests {
     }
 
     #[test]
+    fn decodes_string_escapes() {
+        assert_eq!(
+            evaluate(r#""line1\nline2""#),
+            Some(Value::String("line1\nline2".to_string()))
+        );
+        assert_eq!(
+            evaluate(r#""say \"hi\"\t\\ done""#),
+            Some(Value::String("say \"hi\"\t\\ done".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown escape sequence")]
+    fn panics_on_an_unknown_escape() {
+        evaluate(r#""\q""#);
+    }
+
+    #[test]
     fn evaluates_unary_minus() {
         assert_eq!(evaluate("-5"), Some(Value::Integer(-5)));
         assert_eq!(evaluate("-(1 + 2)"), Some(Value::Integer(-3)));

@@ -20,6 +20,27 @@ struct Parser<'source> {
     tokens: Vec<Token<'source>>,
 }
 
+/// Decode a raw string token (quotes included) into its value.
+fn unescape(text: &str) -> String {
+    let content = &text[1..text.len() - 1];
+    let mut result = String::with_capacity(content.len());
+    let mut characters = content.chars();
+    while let Some(character) = characters.next() {
+        if character != '\\' {
+            result.push(character);
+            continue;
+        }
+        match characters.next() {
+            Some('n') => result.push('\n'),
+            Some('t') => result.push('\t'),
+            Some('"') => result.push('"'),
+            Some('\\') => result.push('\\'),
+            other => panic!("unknown escape sequence \\{other:?}"),
+        }
+    }
+    result
+}
+
 impl<'source> Parser<'source> {
     fn program(&mut self) -> Program {
         let mut statements = Vec::new();
@@ -278,10 +299,7 @@ impl<'source> Parser<'source> {
                     Expression::Variable(token.text.to_string())
                 }
             }
-            TokenKind::String => {
-                let content = &token.text[1..token.text.len() - 1];
-                Expression::String(content.to_string())
-            }
+            TokenKind::String => Expression::String(unescape(token.text)),
             TokenKind::LeftParen => {
                 let inner = self.expression();
                 if self.peek_kind() != Some(TokenKind::RightParen) {

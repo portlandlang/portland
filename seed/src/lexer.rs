@@ -109,15 +109,26 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             '"' => {
                 chars.next();
-                // No escapes or interpolation yet — Prism's lexer is the textbook for those.
-                scan_while(&mut chars, |c| c != '"');
-                let Some((closing, _)) = chars.next() else {
-                    panic!("unterminated string starting at byte {start}");
-                };
-                tokens.push(Token {
-                    kind: TokenKind::String,
-                    text: &source[start..=closing],
-                });
+                // Escapes pass through raw here; the parser decodes them.
+                // No interpolation yet — Prism's lexer is the textbook for that.
+                loop {
+                    match chars.next() {
+                        None => panic!("unterminated string starting at byte {start}"),
+                        Some((_, '\\')) => {
+                            if chars.next().is_none() {
+                                panic!("unterminated string starting at byte {start}");
+                            }
+                        }
+                        Some((closing, '"')) => {
+                            tokens.push(Token {
+                                kind: TokenKind::String,
+                                text: &source[start..=closing],
+                            });
+                            break;
+                        }
+                        Some(_) => {}
+                    }
+                }
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut end = scan_while(&mut chars, |c| c.is_ascii_alphanumeric() || c == '_');
@@ -313,6 +324,18 @@ mod tests {
     #[should_panic(expected = "unterminated string")]
     fn panics_on_an_unterminated_string() {
         lex(r#""oops"#);
+    }
+
+    #[test]
+    fn escaped_quotes_stay_inside_the_string() {
+        assert_eq!(texts(r#""a\"b""#), vec![r#""a\"b""#]);
+        assert_eq!(kinds(r#""a\"b""#), vec![TokenKind::String]);
+    }
+
+    #[test]
+    #[should_panic(expected = "unterminated string")]
+    fn panics_on_a_string_ending_in_a_backslash() {
+        lex(r#""oops\"#);
     }
 
     #[test]
