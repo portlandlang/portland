@@ -36,6 +36,9 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("def") {
             return self.method_definition();
         }
+        if self.peek_is_keyword("while") {
+            return self.while_statement();
+        }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && self.peek_kind_at(1) == Some(TokenKind::Equal)
         {
@@ -69,6 +72,16 @@ impl<'source> Parser<'source> {
             name,
             parameters,
         }
+    }
+
+    fn while_statement(&mut self) -> Statement {
+        self.position += 1; // the `while`
+        let condition = self.expression();
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let body = self.body_until(&["end"], "while");
+        self.position += 1; // the `end`
+        Statement::While { body, condition }
     }
 
     /// Parse statements up to (not consuming) one of the terminator keywords.

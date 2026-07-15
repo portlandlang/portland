@@ -69,6 +69,21 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.methods.insert(name.clone(), method);
                 None
             }
+            Statement::While { body, condition } => {
+                loop {
+                    let condition = self.value_of(condition);
+                    let Value::Boolean(condition) = condition else {
+                        panic!("while condition must be true or false, got {condition:?}")
+                    };
+                    if !condition {
+                        break;
+                    }
+                    for statement in body {
+                        self.statement(statement);
+                    }
+                }
+                None
+            }
         }
     }
 
@@ -339,6 +354,29 @@ mod tests {
     #[should_panic(expected = "must be true or false")]
     fn panics_on_a_non_boolean_condition() {
         evaluate("if 1\n  2\nend\n");
+    }
+
+    #[test]
+    fn while_loops_until_the_condition_is_false() {
+        let source = "n = 3\nwhile n > 0\n  puts(n)\n  n = n - 1\nend\n";
+        assert_eq!(output_of(source), "3\n2\n1\n");
+    }
+
+    #[test]
+    fn while_computes_a_factorial() {
+        let source = "def factorial(n)\n  result = 1\n  while n > 1\n    result = result * n\n    n = n - 1\n  end\n  result\nend\nfactorial(10)\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3_628_800)));
+    }
+
+    #[test]
+    fn while_with_a_false_condition_never_runs() {
+        assert_eq!(output_of("while false\n  puts(1)\nend\n"), "");
+    }
+
+    #[test]
+    #[should_panic(expected = "while condition must be true or false")]
+    fn panics_on_a_non_boolean_while_condition() {
+        evaluate("while 1\n  2\nend\n");
     }
 
     #[test]

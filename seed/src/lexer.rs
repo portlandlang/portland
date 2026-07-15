@@ -29,7 +29,9 @@ pub enum TokenKind {
 }
 
 /// The Stage 0 keyword set — grows as the subset does.
-const KEYWORDS: [&str; 8] = ["def", "do", "else", "elsif", "end", "false", "if", "true"];
+const KEYWORDS: [&str; 9] = [
+    "def", "do", "else", "elsif", "end", "false", "if", "true", "while",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Token<'source> {

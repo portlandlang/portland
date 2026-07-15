@@ -17,6 +17,10 @@ pub enum Statement {
         name: String,
         parameters: Vec<String>,
     },
+    While {
+        body: Vec<Statement>,
+        condition: Expression,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
