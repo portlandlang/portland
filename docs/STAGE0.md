@@ -34,14 +34,17 @@ the tests are the spec until a real one exists.
   the enclosing method, unwinding through loops; `break` and `next` control the
   enclosing `while`. None work inside blocks yet.
 - **Blocks** — `do |x| ... end` on `each` (arrays, and hashes with
-  `|key, value|`), `map`, `select`, `reject`, `reduce(initial)`, `times`.
-  Blocks are closures over the enclosing scope; parameters are block-local.
+  `|key, value|`), `each_with_index`, `map`, `select`, `reject`,
+  `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures over the
+  enclosing scope; parameters are block-local.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?
   chars split include? start_with? end_with? to_i` plus `[index]`; integers:
   `abs zero? positive? negative? even? odd?`; arrays: `length first last empty?
   join include? sum min max` plus `[index]` with negative indices; hashes:
-  `length empty? key? keys values` plus `[key]`; everything: `to_s`. `*`
-  repeats strings and arrays; `%w[rose city]` builds word arrays.
+  `length empty? key? keys values` plus `[key]`; everything: `to_s`.
+  `slice(start, length)` and `sort` (integers) round out arrays/strings. `*`
+  repeats strings and arrays; `%w[rose city]` builds word arrays. Method
+  chains may continue across newlines with a leading dot.
 - **IO** — `puts(...)`, one line per argument; `puts` produces *no value* —
   using its result is an error (seed-level preview of "no ambient nil").
   `p(...)` prints `inspect` renderings (strings keep quotes) and returns its
