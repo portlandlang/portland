@@ -23,3 +23,6 @@
 - `unless` (block and postfix) and postfix `if` — guard clauses (`return 0 if n < 0`) work.
 - Short-circuiting `&&`/`||` and `!`, strict booleans.
 - String interpolation `"#{...}"`, desugared to concatenation with auto-`to_s`; lexer keeps token boundaries honest through nested strings and braces.
+- Compound assignment (`+= -= *= /= %=`), `next` in `while` loops, `hash.each do |key, value|`.
+- `case/when` with equality matching, multiple values per `when`, and aligned `when x then y` one-liners.
+- `tour.pdx` fixture: the full Stage 0 surface through the real binary.

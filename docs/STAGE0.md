@@ -19,19 +19,22 @@ the tests are the spec until a real one exists.
 - **Comparisons** — `== != < <= > >=`. Equality works across all types (mixed
   types are unequal); ordering is integers-only.
 - **Logical operators** — `&&` `||` (short-circuiting) and `!`, strict booleans.
-- **Variables** — bare assignment `x = 1`, reassignment allowed. No declarations.
+- **Variables** — bare assignment `x = 1`, reassignment allowed, compound
+  assignment (`+= -= *= /= %=`). No declarations.
 - **Control** — `if` / `elsif` / `else` / `end` (an *expression*, per the
-  expression-orientation principle), `unless`, `while ... end`, and postfix
-  guards (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
+  expression-orientation principle), `unless`, `case/when` (equality matching,
+  aligned `when x then y` one-liners), `while ... end`, and postfix guards
+  (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
   booleans: no truthiness, since there is no nil to be falsy.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
   expression, arity-checked calls with parens. Method bodies get a fresh scope:
   no outer locals (Ruby's rule, kept).
-- **`return` / `break`** — `return` (with or without a value) exits the
-  enclosing method, unwinding through loops; `break` exits the enclosing
-  `while`. Neither works inside blocks yet.
-- **Blocks** — `do |x| ... end` on `each`, `map`, `times`. Blocks are closures
-  over the enclosing scope; parameters are block-local.
+- **`return` / `break` / `next`** — `return` (with or without a value) exits
+  the enclosing method, unwinding through loops; `break` and `next` control the
+  enclosing `while`. None work inside blocks yet.
+- **Blocks** — `do |x| ... end` on `each` (arrays, and hashes with
+  `|key, value|`), `map`, `times`. Blocks are closures over the enclosing
+  scope; parameters are block-local.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?
   chars split include? start_with? end_with?` plus `[index]`; integers: `abs
   zero? positive? negative? even? odd?`; arrays: `length first last empty? join
@@ -52,7 +55,7 @@ the tests are the spec until a real one exists.
 - `together` / concurrency (todos 004, 012), macros (todo 015).
 - Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
   the seed stays read-only rather than prejudging them.
-- `next`, `case/in`; `return`/`break` inside blocks.
+- `case/in` pattern matching; `return`/`break`/`next` inside blocks.
 - Paren-less method calls (`puts "hi"`) — needs the lexer-feedback dance;
   parens required in Stage 0.
 - Types — the seed is dynamically checked at runtime; inference is the real

@@ -1,0 +1,7 @@
+#!/bin/sh
+# What CI runs: bootstrap the toolchain, then the full test suite and linters.
+set -e
+cd "$(dirname "$0")/.."
+
+script/bootstrap
+script/test
