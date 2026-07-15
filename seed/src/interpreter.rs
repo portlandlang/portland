@@ -253,6 +253,20 @@ impl<W: std::io::Write> Interpreter<W> {
                         combined.extend(b);
                         Some(Value::Array(combined))
                     }
+                    (Value::String(s), BinaryOperator::Multiply, Value::Integer(count)) => {
+                        let count = usize::try_from(count)
+                            .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
+                        Some(Value::String(s.repeat(count)))
+                    }
+                    (Value::Array(elements), BinaryOperator::Multiply, Value::Integer(count)) => {
+                        let count = usize::try_from(count)
+                            .unwrap_or_else(|_| panic!("cannot repeat an array {count} times"));
+                        let mut repeated = Vec::with_capacity(elements.len() * count);
+                        for _ in 0..count {
+                            repeated.extend(elements.iter().cloned());
+                        }
+                        Some(Value::Array(repeated))
+                    }
                     (Value::Integer(a), BinaryOperator::Greater, Value::Integer(b)) => {
                         Some(Value::Boolean(a > b))
                     }
@@ -1098,6 +1112,44 @@ mod tests {
     #[should_panic(expected = "unterminated string")]
     fn panics_on_an_unterminated_interpolation() {
         evaluate(r##""#{1 + 1""##);
+    }
+
+    #[test]
+    fn evaluates_word_arrays() {
+        assert_eq!(
+            evaluate("%w[rose city]"),
+            Some(Value::Array(vec![
+                Value::String("rose".to_string()),
+                Value::String("city".to_string()),
+            ]))
+        );
+        assert_eq!(evaluate("%w[]"), Some(Value::Array(vec![])));
+        assert_eq!(
+            evaluate("%w[a b c].length + 1 % 2"),
+            Some(Value::Integer(4))
+        );
+    }
+
+    #[test]
+    fn repeats_strings_and_arrays_with_star() {
+        assert_eq!(
+            evaluate("\"ab\" * 3"),
+            Some(Value::String("ababab".to_string()))
+        );
+        assert_eq!(
+            evaluate("[0] * 3"),
+            Some(Value::Array(vec![
+                Value::Integer(0),
+                Value::Integer(0),
+                Value::Integer(0),
+            ]))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot repeat")]
+    fn panics_on_repeating_a_string_a_negative_number_of_times() {
+        evaluate("\"ab\" * -1");
     }
 
     #[test]

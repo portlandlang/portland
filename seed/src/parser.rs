@@ -649,6 +649,15 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => string_expression(token.text),
+            TokenKind::WordArray => {
+                let words = &token.text[3..token.text.len() - 1];
+                Expression::ArrayLiteral(
+                    words
+                        .split_whitespace()
+                        .map(|word| Expression::String(word.to_string()))
+                        .collect(),
+                )
+            }
             TokenKind::LeftBrace => {
                 let mut pairs = Vec::new();
                 if self.peek_kind() != Some(TokenKind::RightBrace) {

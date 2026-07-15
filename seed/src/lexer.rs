@@ -40,6 +40,7 @@ pub enum TokenKind {
     Star,
     StarEqual,
     String,
+    WordArray,
 }
 
 /// The Stage 0 keyword set — grows as the subset does.
@@ -97,6 +98,22 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 tokens.push(Token {
                     kind,
                     text: &source[start..start + character.len_utf8()],
+                });
+            }
+            '%' if source.as_bytes().get(start + 1) == Some(&b'w') => {
+                chars.next(); // the `%`
+                chars.next(); // the `w`
+                match chars.next() {
+                    Some((_, '[')) => {}
+                    other => panic!("expected [ after %w, got {other:?}"),
+                }
+                scan_while(&mut chars, |c| c != ']');
+                let Some((closing, _)) = chars.next() else {
+                    panic!("unterminated %w[] starting at byte {start}");
+                };
+                tokens.push(Token {
+                    kind: TokenKind::WordArray,
+                    text: &source[start..=closing],
                 });
             }
             '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' => {
@@ -330,6 +347,17 @@ mod tests {
             vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
         );
         assert_eq!(texts("# only a comment"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn lexes_word_arrays() {
+        assert_eq!(kinds("%w[rose city]"), vec![TokenKind::WordArray]);
+        assert_eq!(texts("%w[rose city]"), vec!["%w[rose city]"]);
+        // `%` alone is still modulo.
+        assert_eq!(
+            kinds("1 % 2"),
+            vec![TokenKind::Integer, TokenKind::Percent, TokenKind::Integer]
+        );
     }
 
     #[test]
