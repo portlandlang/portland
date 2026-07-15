@@ -12,3 +12,5 @@
 - `puts` builtin with pluggable output; builtins produce no value (a seed-level preview of "no ambient nil").
 - `pdx` binary: runs `.pdx` files (fixture-tested end to end, fizzbuzz included) and opens a REPL when run bare — multi-line definitions buffer, errors report and continue.
 - Comments (`#` to end of line).
+- String escape sequences (`\n` `\t` `\"` `\\`), decoded in the parser.
+- Dot method calls, chainable, with read-only builtin value methods: `length`, `upcase`, `downcase`, `reverse`, `empty?` on strings; `abs`, `zero?`, `positive?`, `negative?` on integers; `to_s` on everything. `-5` is a negative literal, so `-5.abs == 5`.
