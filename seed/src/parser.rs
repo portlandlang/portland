@@ -201,6 +201,7 @@ impl<'source> Parser<'source> {
     fn multiplication(&mut self) -> Expression {
         let mut left = self.unary();
         while let Some(operator) = match self.peek_kind() {
+            Some(TokenKind::Percent) => Some(BinaryOperator::Modulo),
             Some(TokenKind::Slash) => Some(BinaryOperator::Divide),
             Some(TokenKind::Star) => Some(BinaryOperator::Multiply),
             _ => None,

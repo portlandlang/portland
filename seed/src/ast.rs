@@ -28,6 +28,7 @@ pub enum BinaryOperator {
     GreaterOrEqual,
     Less,
     LessOrEqual,
+    Modulo,
     Multiply,
     NotEquals,
     Subtract,

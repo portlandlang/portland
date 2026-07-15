@@ -20,6 +20,7 @@ pub enum TokenKind {
     Minus,
     Newline,
     NotEqual,
+    Percent,
     Plus,
     RightParen,
     Slash,
@@ -63,12 +64,13 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | ',' | '.' | '+' | '-' | '*' | '/' => {
+            '(' | ')' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
+                    '%' => TokenKind::Percent,
                     '+' => TokenKind::Plus,
                     ')' => TokenKind::RightParen,
                     '/' => TokenKind::Slash,

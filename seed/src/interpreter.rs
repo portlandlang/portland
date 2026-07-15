@@ -110,6 +110,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         // Revisit when Portland's integer semantics are specified.
                         Some(Value::Integer(a / b))
                     }
+                    (Value::Integer(a), BinaryOperator::Modulo, Value::Integer(b)) => {
+                        // Truncated remainder (Rust semantics); Ruby's % is floored.
+                        // Revisit when Portland's integer semantics are specified.
+                        Some(Value::Integer(a % b))
+                    }
                     (Value::Integer(a), BinaryOperator::Multiply, Value::Integer(b)) => {
                         Some(Value::Integer(a * b))
                     }
@@ -336,6 +341,12 @@ mod tests {
     #[should_panic(expected = "divide by zero")]
     fn panics_on_dividing_by_zero() {
         evaluate("1 / 0");
+    }
+
+    #[test]
+    fn evaluates_modulo() {
+        assert_eq!(evaluate("10 % 3"), Some(Value::Integer(1)));
+        assert_eq!(evaluate("15 % 5 == 0"), Some(Value::Boolean(true)));
     }
 
     #[test]
