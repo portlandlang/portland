@@ -159,6 +159,15 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
             }
+            Expression::MethodCall {
+                arguments,
+                name,
+                receiver,
+            } => {
+                let receiver = self.value_of(receiver);
+                let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
+                Some(Self::method_call(receiver, name, arguments))
+            }
             Expression::Unary { operand, operator } => {
                 let operand = self.value_of(operand);
                 match (operator, operand) {
@@ -177,6 +186,26 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::Call { arguments, name } => {
                 let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
                 self.call(name, arguments)
+            }
+        }
+    }
+
+    /// Built-in methods on values — read-only on purpose; mutation is a
+    /// language-design decision the seed doesn't get to make.
+    fn method_call(receiver: Value, name: &str, arguments: Vec<Value>) -> Value {
+        match (&receiver, name, arguments.as_slice()) {
+            (Value::Integer(n), "abs", []) => Value::Integer(n.abs()),
+            (Value::Integer(n), "negative?", []) => Value::Boolean(*n < 0),
+            (Value::Integer(n), "positive?", []) => Value::Boolean(*n > 0),
+            (Value::Integer(n), "zero?", []) => Value::Boolean(*n == 0),
+            (Value::String(s), "downcase", []) => Value::String(s.to_lowercase()),
+            (Value::String(s), "empty?", []) => Value::Boolean(s.is_empty()),
+            (Value::String(s), "length", []) => Value::Integer(s.chars().count() as i64),
+            (Value::String(s), "reverse", []) => Value::String(s.chars().rev().collect()),
+            (Value::String(s), "upcase", []) => Value::String(s.to_uppercase()),
+            (receiver, "to_s", []) => Value::String(receiver.to_string()),
+            (receiver, name, arguments) => {
+                panic!("undefined method {name} for {receiver:?} with {arguments:?}")
             }
         }
     }
@@ -253,6 +282,46 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn calls_builtin_methods_on_values() {
+        assert_eq!(evaluate(r#""portland".length"#), Some(Value::Integer(8)));
+        assert_eq!(
+            evaluate(r#""pdx".upcase"#),
+            Some(Value::String("PDX".to_string()))
+        );
+        assert_eq!(evaluate(r#""".empty?"#), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("-5.abs"), Some(Value::Integer(5)));
+        assert_eq!(evaluate("(1 - 1).zero?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("42.to_s"), Some(Value::String("42".to_string())));
+    }
+
+    #[test]
+    fn chains_method_calls() {
+        assert_eq!(
+            evaluate(r#""pdx".upcase.reverse"#),
+            Some(Value::String("XDP".to_string()))
+        );
+        assert_eq!(
+            evaluate(r#""portland".reverse.length + 1"#),
+            Some(Value::Integer(9))
+        );
+    }
+
+    #[test]
+    fn method_calls_work_on_variables_and_results() {
+        let source = "city = \"portland\"\ncity.upcase\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("PORTLAND".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined method shout")]
+    fn panics_on_an_undefined_value_method() {
+        evaluate(r#""pdx".shout"#);
     }
 
     #[test]

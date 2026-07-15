@@ -262,12 +262,46 @@ impl<'source> Parser<'source> {
     fn unary(&mut self) -> Expression {
         if self.peek_kind() == Some(TokenKind::Minus) {
             self.position += 1;
+            // Ruby-style: -5 is a negative literal, so -5.abs is 5, not -(5.abs).
+            if self.peek_kind() == Some(TokenKind::Integer) {
+                let token = self.advance();
+                let value: i64 = token.text.parse().expect("integer literal out of range");
+                return self.postfix_from(Expression::Integer(-value));
+            }
             return Expression::Unary {
                 operand: Box::new(self.unary()),
                 operator: UnaryOperator::Negate,
             };
         }
-        self.primary()
+        self.postfix()
+    }
+
+    /// Chained `.method` calls, binding tighter than any operator.
+    fn postfix(&mut self) -> Expression {
+        let expression = self.primary();
+        self.postfix_from(expression)
+    }
+
+    fn postfix_from(&mut self, mut expression: Expression) -> Expression {
+        while self.peek_kind() == Some(TokenKind::Dot) {
+            self.position += 1; // the `.`
+            let token = self.advance();
+            if token.kind != TokenKind::Identifier {
+                panic!("expected method name after dot, got {token:?}");
+            }
+            let arguments = if self.peek_kind() == Some(TokenKind::LeftParen) {
+                self.position += 1; // the `(`
+                self.arguments()
+            } else {
+                Vec::new()
+            };
+            expression = Expression::MethodCall {
+                arguments,
+                name: token.text.to_string(),
+                receiver: Box::new(expression),
+            };
+        }
+        expression
     }
 
     fn peek_kind(&self) -> Option<TokenKind> {

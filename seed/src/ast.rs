@@ -61,6 +61,11 @@ pub enum Expression {
         name: String,
     },
     Integer(i64),
+    MethodCall {
+        arguments: Vec<Expression>,
+        name: String,
+        receiver: Box<Expression>,
+    },
     String(String),
     Unary {
         operand: Box<Expression>,
