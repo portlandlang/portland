@@ -4,5 +4,7 @@
 //! Retired at Stage 2, when the compiler written in Portland compiles itself.
 
 pub mod ast;
+pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod value;
