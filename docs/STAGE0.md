@@ -46,6 +46,8 @@ the tests are the spec until a real one exists.
   using its result is an error (seed-level preview of "no ambient nil").
   `p(...)` prints `inspect` renderings (strings keep quotes) and returns its
   argument, like Ruby. The REPL shows results via `inspect`.
+  Crude file IO: `argv()`, `read_file(path)`, `write_file(path, content)` —
+  placeholder names until the real object model exists.
 - **Comments** — `#` to end of line.
 - **Names** — `snake_case`, `?`/`!` suffixes are part of the name.
 
@@ -53,7 +55,6 @@ the tests are the spec until a real one exists.
 
 - Heredocs — remaining Prism-textbook lexer work (interpolation, `%w[]`, and
   single-quoted strings are in).
-- File IO and ARGV — the real blocker for writing a compiler in the subset.
 - Symbols, floats, ranges.
 - Optionals and the absence story — *the* headline feature, designed at the
   language level (todo 005), not snuck into the seed.

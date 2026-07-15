@@ -5,9 +5,9 @@ itself be rewritten in the Stage 0 subset? Gap analysis as of 2026-07-15:
 
 ## Blockers
 
-- [ ] **File IO** — a compiler must read source files. `File.read(path)` or
-  similar builtin; also write output. Biggest single blocker.
-- [ ] **ARGV** — the compiler binary needs its command line.
+- [x] **File IO** — crude `read_file`/`write_file` builtins landed
+  (placeholder names; the real `File` API needs the object model).
+- [x] **ARGV** — `argv()` builtin landed.
 - [ ] **Structs or something** — tokens/AST nodes need a shape. Hashes may be
   enough for a crude first pass (`{"kind" => "integer", "text" => "42"}`), but
   it'll be joyless; a minimal record/struct is probably worth designing early
