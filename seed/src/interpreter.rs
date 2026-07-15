@@ -20,15 +20,23 @@ struct Method {
     parameters: Vec<String>,
 }
 
-pub struct Interpreter {
+pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, Method>,
+    output: W,
     variables: HashMap<String, Value>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
+        Self::with_output(std::io::stdout())
+    }
+}
+
+impl<W: std::io::Write> Interpreter<W> {
+    pub fn with_output(output: W) -> Self {
         Self {
             methods: HashMap::new(),
+            output,
             variables: HashMap::new(),
         }
     }
@@ -44,11 +52,11 @@ impl Interpreter {
     fn statement(&mut self, statement: &Statement) -> Option<Value> {
         match statement {
             Statement::Assignment { name, value } => {
-                let value = self.expression(value);
+                let value = self.value_of(value);
                 self.variables.insert(name.clone(), value.clone());
                 Some(value)
             }
-            Statement::Expression(expression) => Some(self.expression(expression)),
+            Statement::Expression(expression) => self.expression(expression),
             Statement::MethodDefinition {
                 body,
                 name,
@@ -64,32 +72,46 @@ impl Interpreter {
         }
     }
 
-    fn expression(&mut self, expression: &Expression) -> Value {
+    fn expression(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
-            Expression::Integer(value) => Value::Integer(*value),
-            Expression::String(value) => Value::String(value.clone()),
+            Expression::Integer(value) => Some(Value::Integer(*value)),
+            Expression::String(value) => Some(Value::String(value.clone())),
             Expression::Add { left, right } => {
-                let left = self.expression(left);
-                let right = self.expression(right);
+                let left = self.value_of(left);
+                let right = self.value_of(right);
                 match (left, right) {
-                    (Value::Integer(a), Value::Integer(b)) => Value::Integer(a + b),
-                    (Value::String(a), Value::String(b)) => Value::String(a + &b),
+                    (Value::Integer(a), Value::Integer(b)) => Some(Value::Integer(a + b)),
+                    (Value::String(a), Value::String(b)) => Some(Value::String(a + &b)),
                     (left, right) => panic!("cannot add {left:?} and {right:?}"),
                 }
             }
-            Expression::Variable(name) => self
-                .variables
-                .get(name)
-                .unwrap_or_else(|| panic!("undefined variable {name}"))
-                .clone(),
+            Expression::Variable(name) => Some(
+                self.variables
+                    .get(name)
+                    .unwrap_or_else(|| panic!("undefined variable {name}"))
+                    .clone(),
+            ),
             Expression::Call { arguments, name } => {
-                let arguments: Vec<Value> = arguments.iter().map(|a| self.expression(a)).collect();
+                let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
                 self.call(name, arguments)
             }
         }
     }
 
-    fn call(&mut self, name: &str, arguments: Vec<Value>) -> Value {
+    /// Evaluate an expression that must produce a value.
+    fn value_of(&mut self, expression: &Expression) -> Value {
+        self.expression(expression)
+            .unwrap_or_else(|| panic!("{expression:?} produced no value"))
+    }
+
+    fn call(&mut self, name: &str, arguments: Vec<Value>) -> Option<Value> {
+        if !self.methods.contains_key(name) && name == "puts" {
+            for argument in &arguments {
+                writeln!(self.output, "{argument}").expect("failed to write output");
+            }
+            return None;
+        }
+
         let method = self
             .methods
             .get(name)
@@ -112,8 +134,7 @@ impl Interpreter {
             result = self.statement(statement);
         }
         std::mem::swap(&mut self.variables, &mut scope);
-
-        result.unwrap_or_else(|| panic!("{name} produced no value"))
+        result
     }
 }
 
@@ -224,5 +245,35 @@ mod tests {
     #[should_panic(expected = "undefined method")]
     fn panics_on_an_undefined_method() {
         evaluate("nope()");
+    }
+
+    /// Run a source and capture what it printed.
+    fn output_of(source: &str) -> String {
+        let program = parser::parse(source);
+        let mut interpreter = Interpreter::with_output(Vec::new());
+        interpreter.program(&program);
+        String::from_utf8(interpreter.output).unwrap()
+    }
+
+    #[test]
+    fn puts_prints_a_line() {
+        assert_eq!(output_of("puts(\"hello portland\")"), "hello portland\n");
+    }
+
+    #[test]
+    fn puts_prints_each_argument_on_its_own_line() {
+        assert_eq!(output_of("puts(1, 2 + 3)"), "1\n5\n");
+    }
+
+    #[test]
+    fn puts_works_inside_methods() {
+        let source = "def shout(word)\n  puts(word + \"!\")\nend\nshout(\"pdx\")\n";
+        assert_eq!(output_of(source), "pdx!\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "produced no value")]
+    fn puts_produces_no_value() {
+        evaluate("1 + puts(\"x\")");
     }
 }
