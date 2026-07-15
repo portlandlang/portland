@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{BinaryOperator, Expression, Program, Statement};
 use crate::parser;
 use crate::value::Value;
 
@@ -76,13 +76,23 @@ impl<W: std::io::Write> Interpreter<W> {
         match expression {
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
-            Expression::Add { left, right } => {
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => {
                 let left = self.value_of(left);
                 let right = self.value_of(right);
-                match (left, right) {
-                    (Value::Integer(a), Value::Integer(b)) => Some(Value::Integer(a + b)),
-                    (Value::String(a), Value::String(b)) => Some(Value::String(a + &b)),
-                    (left, right) => panic!("cannot add {left:?} and {right:?}"),
+                match (left, operator, right) {
+                    (Value::Integer(a), BinaryOperator::Add, Value::Integer(b)) => {
+                        Some(Value::Integer(a + b))
+                    }
+                    (Value::String(a), BinaryOperator::Add, Value::String(b)) => {
+                        Some(Value::String(a + &b))
+                    }
+                    (left, operator, right) => {
+                        panic!("cannot add {operator:?} with {left:?} and {right:?}")
+                    }
                 }
             }
             Expression::Variable(name) => Some(

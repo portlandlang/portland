@@ -1,7 +1,7 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{BinaryOperator, Expression, Program, Statement};
 use crate::lexer::{self, Token, TokenKind};
 
 pub fn parse(source: &str) -> Program {
@@ -134,7 +134,8 @@ impl<'source> Parser<'source> {
         while self.peek_kind() == Some(TokenKind::Plus) {
             self.position += 1;
             let right = self.primary();
-            left = Expression::Add {
+            left = Expression::Binary {
+                operator: BinaryOperator::Add,
                 left: Box::new(left),
                 right: Box::new(right),
             };
@@ -284,7 +285,8 @@ mod tests {
             vec![
                 Statement::Assignment {
                     name: "total".to_string(),
-                    value: Expression::Add {
+                    value: Expression::Binary {
+                        operator: BinaryOperator::Add,
                         left: Box::new(Expression::Integer(1)),
                         right: Box::new(Expression::Integer(2)),
                     },
@@ -324,7 +326,8 @@ mod tests {
         assert_eq!(
             expression("outer(inner(1) + 2)"),
             Expression::Call {
-                arguments: vec![Expression::Add {
+                arguments: vec![Expression::Binary {
+                    operator: BinaryOperator::Add,
                     left: Box::new(Expression::Call {
                         arguments: vec![Expression::Integer(1)],
                         name: "inner".to_string(),
@@ -342,7 +345,8 @@ mod tests {
         assert_eq!(
             parse(source).statements,
             vec![Statement::MethodDefinition {
-                body: vec![Statement::Expression(Expression::Add {
+                body: vec![Statement::Expression(Expression::Binary {
+                    operator: BinaryOperator::Add,
                     left: Box::new(Expression::String("hello ".to_string())),
                     right: Box::new(Expression::Variable("name".to_string())),
                 })],
@@ -381,7 +385,8 @@ mod tests {
     fn parses_addition() {
         assert_eq!(
             expression("1 + 2"),
-            Expression::Add {
+            Expression::Binary {
+                operator: BinaryOperator::Add,
                 left: Box::new(Expression::Integer(1)),
                 right: Box::new(Expression::Integer(2)),
             }
@@ -392,8 +397,10 @@ mod tests {
     fn addition_is_left_associative() {
         assert_eq!(
             expression("1 + 2 + 3"),
-            Expression::Add {
-                left: Box::new(Expression::Add {
+            Expression::Binary {
+                operator: BinaryOperator::Add,
+                left: Box::new(Expression::Binary {
+                    operator: BinaryOperator::Add,
                     left: Box::new(Expression::Integer(1)),
                     right: Box::new(Expression::Integer(2)),
                 }),
@@ -407,9 +414,11 @@ mod tests {
         assert_eq!(expression("(42)"), Expression::Integer(42));
         assert_eq!(
             expression("1 + (2 + 3)"),
-            Expression::Add {
+            Expression::Binary {
+                operator: BinaryOperator::Add,
                 left: Box::new(Expression::Integer(1)),
-                right: Box::new(Expression::Add {
+                right: Box::new(Expression::Binary {
+                    operator: BinaryOperator::Add,
                     left: Box::new(Expression::Integer(2)),
                     right: Box::new(Expression::Integer(3)),
                 }),
@@ -431,7 +440,8 @@ mod tests {
         );
         assert_eq!(
             expression(r#""hello " + name"#),
-            Expression::Add {
+            Expression::Binary {
+                operator: BinaryOperator::Add,
                 left: Box::new(Expression::String("hello ".to_string())),
                 right: Box::new(Expression::Variable("name".to_string())),
             }

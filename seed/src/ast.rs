@@ -19,10 +19,16 @@ pub enum Statement {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BinaryOperator {
+    Add,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
-    Add {
+    Binary {
         left: Box<Expression>,
+        operator: BinaryOperator,
         right: Box<Expression>,
     },
     Call {
