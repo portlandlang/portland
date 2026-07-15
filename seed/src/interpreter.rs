@@ -156,6 +156,16 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         Some(elements[position as usize].clone())
                     }
+                    (Value::String(text), Value::Integer(index)) => {
+                        // Indexing a string yields a one-character string.
+                        let length = text.chars().count() as i64;
+                        let position = if *index < 0 { length + index } else { *index };
+                        if position < 0 || position >= length {
+                            panic!("index {index} out of range for string of length {length}");
+                        }
+                        let character = text.chars().nth(position as usize).unwrap();
+                        Some(Value::String(character.to_string()))
+                    }
                     (Value::Hash(pairs), key) => Some(
                         pairs
                             .iter()
@@ -339,20 +349,67 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Hash(pairs), "values", []) => {
                 Value::Array(pairs.iter().map(|(_, value)| value.clone()).collect())
             }
+            (Value::Array(elements), "include?", [needle]) => {
+                Value::Boolean(elements.contains(needle))
+            }
+            (Value::Array(elements), "max", []) => Self::integers_of(elements, "max")
+                .into_iter()
+                .max()
+                .map(Value::Integer)
+                .unwrap_or_else(|| panic!("max on an empty array — no nil; check empty? first")),
+            (Value::Array(elements), "min", []) => Self::integers_of(elements, "min")
+                .into_iter()
+                .min()
+                .map(Value::Integer)
+                .unwrap_or_else(|| panic!("min on an empty array — no nil; check empty? first")),
+            (Value::Array(elements), "sum", []) => {
+                Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
+            }
             (Value::Integer(n), "abs", []) => Value::Integer(n.abs()),
+            (Value::Integer(n), "even?", []) => Value::Boolean(n % 2 == 0),
             (Value::Integer(n), "negative?", []) => Value::Boolean(*n < 0),
+            (Value::Integer(n), "odd?", []) => Value::Boolean(n % 2 != 0),
             (Value::Integer(n), "positive?", []) => Value::Boolean(*n > 0),
             (Value::Integer(n), "zero?", []) => Value::Boolean(*n == 0),
+            (Value::String(s), "chars", []) => Value::Array(
+                s.chars()
+                    .map(|character| Value::String(character.to_string()))
+                    .collect(),
+            ),
             (Value::String(s), "downcase", []) => Value::String(s.to_lowercase()),
             (Value::String(s), "empty?", []) => Value::Boolean(s.is_empty()),
+            (Value::String(s), "end_with?", [Value::String(suffix)]) => {
+                Value::Boolean(s.ends_with(suffix))
+            }
+            (Value::String(s), "include?", [Value::String(needle)]) => {
+                Value::Boolean(s.contains(needle))
+            }
             (Value::String(s), "length", []) => Value::Integer(s.chars().count() as i64),
             (Value::String(s), "reverse", []) => Value::String(s.chars().rev().collect()),
+            (Value::String(s), "split", [Value::String(separator)]) => Value::Array(
+                s.split(separator.as_str())
+                    .map(|piece| Value::String(piece.to_string()))
+                    .collect(),
+            ),
+            (Value::String(s), "start_with?", [Value::String(prefix)]) => {
+                Value::Boolean(s.starts_with(prefix))
+            }
             (Value::String(s), "upcase", []) => Value::String(s.to_uppercase()),
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")
             }
         }
+    }
+
+    fn integers_of(elements: &[Value], method: &str) -> Vec<i64> {
+        elements
+            .iter()
+            .map(|element| match element {
+                Value::Integer(value) => *value,
+                other => panic!("{method} needs an array of integers, found {other:?}"),
+            })
+            .collect()
     }
 
     /// Run a block as a closure: it sees the enclosing scope; only its
@@ -699,6 +756,68 @@ mod tests {
     #[test]
     fn puts_prints_arrays_readably() {
         assert_eq!(output_of("puts([1, 2, 3])"), "[1, 2, 3]\n");
+    }
+
+    #[test]
+    fn calls_stdlib_breadth_methods() {
+        assert_eq!(
+            evaluate(r#""pdx".chars"#),
+            Some(Value::Array(vec![
+                Value::String("p".to_string()),
+                Value::String("d".to_string()),
+                Value::String("x".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate(r#""a,b".split(",")"#),
+            Some(Value::Array(vec![
+                Value::String("a".to_string()),
+                Value::String("b".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate(r#""portland".include?("land")"#),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            evaluate(r#""portland".start_with?("port")"#),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            evaluate(r#""portland".end_with?("port")"#),
+            Some(Value::Boolean(false))
+        );
+        assert_eq!(evaluate("4.even?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("4.odd?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("[1, 2, 3].sum"), Some(Value::Integer(6)));
+        assert_eq!(evaluate("[3, 1, 2].max"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("[3, 1, 2].min"), Some(Value::Integer(1)));
+        assert_eq!(evaluate("[1, 2].include?(2)"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("[1, 2].include?(9)"), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn indexes_strings_by_character() {
+        assert_eq!(
+            evaluate(r#""pdx"[0]"#),
+            Some(Value::String("p".to_string()))
+        );
+        assert_eq!(
+            evaluate(r#""pdx"[-1]"#),
+            Some(Value::String("x".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "out of range for string")]
+    fn panics_on_an_out_of_range_string_index() {
+        evaluate(r#""pdx"[9]"#);
+    }
+
+    #[test]
+    #[should_panic(expected = "no nil; check empty? first")]
+    fn panics_on_max_of_an_empty_array() {
+        evaluate("[].max");
     }
 
     #[test]
