@@ -22,6 +22,7 @@ pub enum TokenKind {
     Newline,
     NotEqual,
     Percent,
+    Pipe,
     Plus,
     RightBracket,
     RightParen,
@@ -68,7 +69,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' => {
+            '(' | ')' | '[' | ']' | ',' | '.' | '+' | '-' | '*' | '/' | '%' | '|' => {
                 let kind = match character {
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
@@ -76,6 +77,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     '(' => TokenKind::LeftParen,
                     '-' => TokenKind::Minus,
                     '%' => TokenKind::Percent,
+                    '|' => TokenKind::Pipe,
                     '+' => TokenKind::Plus,
                     ']' => TokenKind::RightBracket,
                     ')' => TokenKind::RightParen,
@@ -252,6 +254,19 @@ mod tests {
             vec![TokenKind::Integer, TokenKind::Newline, TokenKind::Integer]
         );
         assert_eq!(texts("# only a comment"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn lexes_block_pipes() {
+        assert_eq!(
+            kinds("do |n|"),
+            vec![
+                TokenKind::Keyword,
+                TokenKind::Pipe,
+                TokenKind::Identifier,
+                TokenKind::Pipe
+            ]
+        );
     }
 
     #[test]

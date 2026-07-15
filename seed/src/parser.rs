@@ -1,7 +1,7 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
-use crate::ast::{BinaryOperator, Expression, Program, Statement, UnaryOperator};
+use crate::ast::{BinaryOperator, Block, Expression, Program, Statement, UnaryOperator};
 use crate::lexer::{self, Token, TokenKind};
 
 pub fn parse(source: &str) -> Program {
@@ -103,6 +103,38 @@ impl<'source> Parser<'source> {
         let body = self.body_until(&["end"], "while");
         self.position += 1; // the `end`
         Statement::While { body, condition }
+    }
+
+    /// Parse a `do |params| ... end` block.
+    fn block(&mut self) -> Block {
+        self.position += 1; // the `do`
+        let mut parameters = Vec::new();
+        if self.peek_kind() == Some(TokenKind::Pipe) {
+            self.position += 1; // the opening `|`
+            loop {
+                let token = self.advance();
+                if token.kind != TokenKind::Identifier {
+                    panic!("expected block parameter, got {token:?}");
+                }
+                parameters.push(token.text.to_string());
+                match self.peek_kind() {
+                    Some(TokenKind::Comma) => self.position += 1,
+                    Some(TokenKind::Pipe) => {
+                        self.position += 1; // the closing `|`
+                        break;
+                    }
+                    _ => panic!(
+                        "expected , or | in block parameters, got {:?}",
+                        self.tokens.get(self.position)
+                    ),
+                }
+            }
+        }
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let body = self.body_until(&["end"], "do");
+        self.position += 1; // the `end`
+        Block { body, parameters }
     }
 
     /// Parse statements up to (not consuming) one of the terminator keywords.
@@ -297,8 +329,14 @@ impl<'source> Parser<'source> {
                     } else {
                         Vec::new()
                     };
+                    let block = if self.peek_is_keyword("do") {
+                        Some(self.block())
+                    } else {
+                        None
+                    };
                     expression = Expression::MethodCall {
                         arguments,
+                        block,
                         name: token.text.to_string(),
                         receiver: Box::new(expression),
                     };

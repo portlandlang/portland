@@ -44,6 +44,12 @@ pub enum UnaryOperator {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Block {
+    pub body: Vec<Statement>,
+    pub parameters: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     ArrayLiteral(Vec<Expression>),
     Binary {
@@ -68,6 +74,7 @@ pub enum Expression {
     Integer(i64),
     MethodCall {
         arguments: Vec<Expression>,
+        block: Option<Block>,
         name: String,
         receiver: Box<Expression>,
     },

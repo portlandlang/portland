@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{BinaryOperator, Expression, Program, Statement, UnaryOperator};
+use crate::ast::{BinaryOperator, Block, Expression, Program, Statement, UnaryOperator};
 use crate::parser;
 use crate::value::Value;
 
@@ -183,12 +183,13 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             Expression::MethodCall {
                 arguments,
+                block,
                 name,
                 receiver,
             } => {
                 let receiver = self.value_of(receiver);
                 let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
-                Some(Self::method_call(receiver, name, arguments))
+                Some(self.method_call(receiver, name, arguments, block.as_ref()))
             }
             Expression::Unary { operand, operator } => {
                 let operand = self.value_of(operand);
@@ -214,7 +215,43 @@ impl<W: std::io::Write> Interpreter<W> {
 
     /// Built-in methods on values — read-only on purpose; mutation is a
     /// language-design decision the seed doesn't get to make.
-    fn method_call(receiver: Value, name: &str, arguments: Vec<Value>) -> Value {
+    fn method_call(
+        &mut self,
+        receiver: Value,
+        name: &str,
+        arguments: Vec<Value>,
+        block: Option<&Block>,
+    ) -> Value {
+        if let Some(block) = block {
+            return match (&receiver, name, arguments.as_slice()) {
+                (Value::Array(elements), "each", []) => {
+                    for element in elements.clone() {
+                        self.run_block(block, vec![element]);
+                    }
+                    receiver
+                }
+                (Value::Array(elements), "map", []) => {
+                    let mut results = Vec::new();
+                    for element in elements.clone() {
+                        let result = self
+                            .run_block(block, vec![element])
+                            .unwrap_or_else(|| panic!("map block produced no value"));
+                        results.push(result);
+                    }
+                    Value::Array(results)
+                }
+                (Value::Integer(count), "times", []) => {
+                    for index in 0..*count {
+                        self.run_block(block, vec![Value::Integer(index)]);
+                    }
+                    receiver
+                }
+                (receiver, name, _) => {
+                    panic!("undefined block-taking method {name} for {receiver:?}")
+                }
+            };
+        }
+
         match (&receiver, name, arguments.as_slice()) {
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
             (Value::Array(elements), "first", []) => elements
@@ -247,6 +284,37 @@ impl<W: std::io::Write> Interpreter<W> {
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")
             }
         }
+    }
+
+    /// Run a block as a closure: it sees the enclosing scope; only its
+    /// parameters are block-local (shadowed, then restored).
+    fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
+        if block.parameters.len() > arguments.len() {
+            panic!(
+                "block expects {} argument(s), got {}",
+                block.parameters.len(),
+                arguments.len()
+            );
+        }
+        let shadowed: Vec<(String, Option<Value>)> = block
+            .parameters
+            .iter()
+            .map(|parameter| (parameter.clone(), self.variables.get(parameter).cloned()))
+            .collect();
+        for (parameter, argument) in block.parameters.iter().zip(arguments) {
+            self.variables.insert(parameter.clone(), argument);
+        }
+        let mut result = None;
+        for statement in &block.body {
+            result = self.statement(statement);
+        }
+        for (parameter, original) in shadowed {
+            match original {
+                Some(value) => self.variables.insert(parameter, value),
+                None => self.variables.remove(&parameter),
+            };
+        }
+        result
     }
 
     /// Evaluate an expression that must produce a value.
@@ -321,6 +389,66 @@ mod tests {
     #[should_panic(expected = "cannot apply")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
+    }
+
+    #[test]
+    fn each_iterates_with_a_closure_over_the_enclosing_scope() {
+        let source = "total = 0\n[1, 2, 3].each do |n|\n  total = total + n\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(6)));
+    }
+
+    #[test]
+    fn each_returns_its_receiver() {
+        let source = "[1, 2].each do |n|\n  n\nend\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(vec![Value::Integer(1), Value::Integer(2)]))
+        );
+    }
+
+    #[test]
+    fn map_builds_a_new_array() {
+        let source = "[1, 2, 3].map do |n|\n  n * n\nend\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(vec![
+                Value::Integer(1),
+                Value::Integer(4),
+                Value::Integer(9),
+            ]))
+        );
+    }
+
+    #[test]
+    fn times_counts_from_zero() {
+        let source = "sum = 0\n3.times do |i|\n  sum = sum + i\nend\nsum\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    fn times_block_may_ignore_its_argument() {
+        let source = "count = 0\n3.times do\n  count = count + 1\nend\ncount\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    fn block_parameters_are_block_local() {
+        let source = "n = 100\n[1, 2].each do |n|\n  n\nend\nn\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(100)));
+    }
+
+    #[test]
+    fn blocks_print_through_the_interpreter_output() {
+        assert_eq!(
+            output_of("[\"rose\", \"city\"].each do |word|\n  puts(word.upcase)\nend\n"),
+            "ROSE\nCITY\n"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined block-taking method")]
+    fn panics_on_an_unknown_block_method() {
+        evaluate("\"pdx\".each do |c|\n  c\nend\n");
     }
 
     #[test]
