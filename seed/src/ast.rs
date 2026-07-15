@@ -7,6 +7,7 @@ pub struct Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    Assignment { name: String, value: Expression },
     Expression(Expression),
 }
 

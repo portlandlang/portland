@@ -33,6 +33,14 @@ impl Parser<'_> {
     }
 
     fn statement(&mut self) -> Statement {
+        if self.peek_kind() == Some(TokenKind::Identifier)
+            && self.peek_kind_at(1) == Some(TokenKind::Equal)
+        {
+            let name = self.advance().text.to_string();
+            self.position += 1; // the `=`
+            let value = self.expression();
+            return Statement::Assignment { name, value };
+        }
         Statement::Expression(self.expression())
     }
 
@@ -70,7 +78,13 @@ impl Parser<'_> {
     }
 
     fn peek_kind(&self) -> Option<TokenKind> {
-        self.tokens.get(self.position).map(|token| token.kind)
+        self.peek_kind_at(0)
+    }
+
+    fn peek_kind_at(&self, offset: usize) -> Option<TokenKind> {
+        self.tokens
+            .get(self.position + offset)
+            .map(|token| token.kind)
     }
 
     fn primary(&mut self) -> Expression {
@@ -129,6 +143,7 @@ mod tests {
         assert_eq!(statements.len(), 1, "expected exactly one statement");
         match statements.remove(0) {
             Statement::Expression(expression) => expression,
+            other => panic!("expected expression statement, got {other:?}"),
         }
     }
 
@@ -153,6 +168,34 @@ mod tests {
     #[should_panic(expected = "expected a newline after statement")]
     fn panics_on_two_expressions_without_a_newline() {
         parse("1 2");
+    }
+
+    #[test]
+    fn parses_an_assignment() {
+        assert_eq!(
+            parse(r#"greeting = "hi""#).statements,
+            vec![Statement::Assignment {
+                name: "greeting".to_string(),
+                value: Expression::String("hi".to_string()),
+            }]
+        );
+    }
+
+    #[test]
+    fn parses_assignment_then_use() {
+        assert_eq!(
+            parse("total = 1 + 2\ntotal\n").statements,
+            vec![
+                Statement::Assignment {
+                    name: "total".to_string(),
+                    value: Expression::Add {
+                        left: Box::new(Expression::Integer(1)),
+                        right: Box::new(Expression::Integer(2)),
+                    },
+                },
+                Statement::Expression(Expression::Variable("total".to_string())),
+            ]
+        );
     }
 
     #[test]
