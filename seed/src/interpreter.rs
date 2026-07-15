@@ -22,9 +22,10 @@ struct Method {
     parameters: Vec<String>,
 }
 
-/// A `return` or `break` in flight, unwinding to whatever handles it.
+/// A `return`, `break`, or `next` in flight, unwinding to whatever handles it.
 enum Pending {
     Break,
+    Next,
     Return(Option<Value>),
 }
 
@@ -56,6 +57,7 @@ impl<W: std::io::Write> Interpreter<W> {
         match self.pending.take() {
             None => last,
             Some(Pending::Break) => panic!("break outside of a loop"),
+            Some(Pending::Next) => panic!("next outside of a loop"),
             Some(Pending::Return(_)) => panic!("return outside of a method"),
         }
     }
@@ -96,6 +98,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.pending = Some(Pending::Break);
                 None
             }
+            Statement::Next => {
+                self.pending = Some(Pending::Next);
+                None
+            }
             Statement::Return { value } => {
                 let value = value.as_ref().map(|expression| self.value_of(expression));
                 self.pending = Some(Pending::Return(value));
@@ -117,6 +123,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             self.pending = None;
                             break;
                         }
+                        Some(Pending::Next) => self.pending = None,
                         // A return keeps unwinding to the enclosing method.
                         Some(Pending::Return(_)) => break,
                     }
@@ -456,7 +463,7 @@ impl<W: std::io::Write> Interpreter<W> {
         let result = self.run_body(&block.body);
         if self.pending.is_some() {
             self.pending = None;
-            panic!("return and break inside blocks are not supported in the seed yet");
+            panic!("return, break, and next inside blocks are not supported in the seed yet");
         }
         for (parameter, original) in shadowed {
             match original {
@@ -512,6 +519,7 @@ impl<W: std::io::Write> Interpreter<W> {
             None => {}
             Some(Pending::Return(value)) => result = value,
             Some(Pending::Break) => panic!("break outside of a loop"),
+            Some(Pending::Next) => panic!("next outside of a loop"),
         }
         result
     }
@@ -686,6 +694,18 @@ mod tests {
     fn return_unwinds_through_a_while_loop() {
         let source = "def find_first_multiple(of)\n  n = 1\n  while true\n    if n % of == 0\n      return n\n    end\n    n = n + 1\n  end\nend\nfind_first_multiple(7)\n";
         assert_eq!(evaluate(source), Some(Value::Integer(7)));
+    }
+
+    #[test]
+    fn next_skips_to_the_following_iteration() {
+        let source = "n = 0\ntotal = 0\nwhile n < 5\n  n += 1\n  next if n.even?\n  total += n\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(9)));
+    }
+
+    #[test]
+    #[should_panic(expected = "next outside of a loop")]
+    fn panics_on_a_top_level_next() {
+        evaluate("next");
     }
 
     #[test]

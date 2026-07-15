@@ -141,6 +141,10 @@ impl<'source> Parser<'source> {
             self.position += 1;
             return Statement::Break;
         }
+        if self.peek_is_keyword("next") {
+            self.position += 1;
+            return Statement::Next;
+        }
         if self.peek_is_keyword("return") {
             self.position += 1;
             let value = match self.peek_kind() {

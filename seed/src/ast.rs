@@ -13,6 +13,7 @@ pub enum Statement {
     },
     Break,
     Expression(Expression),
+    Next,
     MethodDefinition {
         body: Vec<Statement>,
         name: String,
