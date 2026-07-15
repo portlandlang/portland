@@ -49,6 +49,7 @@ impl Parser<'_> {
                 let value = token.text.parse().expect("integer literal out of range");
                 Expression::Integer(value)
             }
+            TokenKind::Identifier => Expression::Variable(token.text.to_string()),
             TokenKind::String => {
                 let content = &token.text[1..token.text.len() - 1];
                 Expression::String(content.to_string())
@@ -140,6 +141,21 @@ mod tests {
     #[should_panic(expected = "expected closing paren")]
     fn panics_on_an_unclosed_paren() {
         parse("(1 + 2");
+    }
+
+    #[test]
+    fn parses_a_variable_reference() {
+        assert_eq!(
+            parse("greeting"),
+            Expression::Variable("greeting".to_string())
+        );
+        assert_eq!(
+            parse(r#""hello " + name"#),
+            Expression::Add {
+                left: Box::new(Expression::String("hello ".to_string())),
+                right: Box::new(Expression::Variable("name".to_string())),
+            }
+        );
     }
 
     #[test]

@@ -8,4 +8,5 @@ pub enum Expression {
     },
     Integer(i64),
     String(String),
+    Variable(String),
 }
