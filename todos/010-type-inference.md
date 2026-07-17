@@ -8,4 +8,4 @@ Hindley-Milner-style: types present (safety) but invisible (joy). Annotations on
 - [ ] Structural typing — "if it quacks," checked at compile time; spec the protocol/shape mechanism
 - [ ] Optionals in the type system (`User?` as sugar for what?)
 - [ ] Boundary annotation syntax — readable-as-docs, never ceremony
-- [ ] Error messages when inference fails — this is where inference-heavy languages get un-joyful; budget real design time
+- [ ] Error messages when inference fails — this is where inference-heavy languages get un-joyous; budget real design time

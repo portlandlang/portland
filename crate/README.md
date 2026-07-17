@@ -1,6 +1,6 @@
 # portland
 
-Placeholder for **Portland** — a joyful programming language for Apple silicon.
+Placeholder for **Portland** — a joyous programming language for Apple silicon.
 
 Close to the metal, on Metal.
 

@@ -2,7 +2,7 @@
 name = "portland"
 version = "0.0.0"
 edition = "2024"
-description = "Placeholder for Portland, a joyful programming language for Apple silicon. Nothing here yet."
+description = "Placeholder for Portland, a joyous programming language for Apple silicon. Nothing here yet."
 homepage = "https://github.com/portlandlang"
 repository = "https://github.com/portlandlang"
 license = "MIT OR Apache-2.0"

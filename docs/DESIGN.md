@@ -22,7 +22,7 @@ Crockford's move was subtraction as design. Applied to Ruby, the finding is that
 
 - **Keep the entire surface.** Blocks, expression-orientation, implicit returns, `?`/`!` suffixes, postfix guards, keyword args, Enumerable-as-one-protocol, pattern matching. All syntactic, all free under static compilation.
 - **Cut the entire runtime.** Runtime monkeypatching, `method_missing`, runtime `define_method`, `eval`, globals, perlisms, footgun redundancies. Replace runtime metaprogramming with compile-time macros (the metaprogramming joy without the runtime mystery or cost). The dynamism we trade away (late-bound monkeypatching) is also Ruby's biggest pain at scale.
-- **Fix Ruby's actively un-joyful parts** — and the fix _is_ the safety story, sold as deleting pain, never as new constraints:
+- **Fix Ruby's actively un-joyous parts** — and the fix _is_ the safety story, sold as deleting pain, never as new constraints:
   - **nil** → optionals + pattern matching. Kills `NoMethodError on nil`.
   - **mutable-by-default** → immutable by default. Also the precondition that makes auto-parallel `.map` safe (immutable data can't race).
   - **the GIL / threads** → redesign wholesale around P/E cores + structured concurrency.
@@ -37,7 +37,7 @@ No _ambient_ nil — the bug is that in Ruby every reference is haunted by a pos
 
 ### Immutability, precisely
 
-Not "always immutable" — local mutation (loop counters, building a buffer, `i += 1`) is joyful and safe. The danger is **shared** mutation (two execution units writing the same memory = races). So: mutate freely inside your own scope; the moment a value is shared (handed to a parallel `.map`, sent across a concurrency boundary) it's frozen. Bare binding is immutable; mutability is the marked, rare case — ceremony goes on the rare thing, never the common thing. A pile of existing Ruby is already correct under this rule.
+Not "always immutable" — local mutation (loop counters, building a buffer, `i += 1`) is joyous and safe. The danger is **shared** mutation (two execution units writing the same memory = races). So: mutate freely inside your own scope; the moment a value is shared (handed to a parallel `.map`, sent across a concurrency boundary) it's frozen. Bare binding is immutable; mutability is the marked, rare case — ceremony goes on the rare thing, never the common thing. A pile of existing Ruby is already correct under this rule.
 
 ## Concurrency
 
