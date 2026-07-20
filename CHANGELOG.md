@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `return`/`break`/`next` now work inside blocks with Ruby semantics: `next` skips the iteration, `break` stops it (the call produces no value), `return` unwinds through the block to the enclosing method — guard-search idioms like `return number if number.even?` inside `each` work.
+- Single-character variable names renamed away everywhere (`character` not `c`, `index` not `i`), per style.
 - MIT license (`LICENSE.md`); the crate's dual-license placeholder becomes plain MIT on its next publish.
 - `compiler/lexer.pdx`: Portland's lexer, written in Portland — tokenizes the full token set (strings with escapes and interpolation, `%w[]`, two-character operators, `?`/`!` names) and lexes its own source with zero error tokens. Step one of Stage 1.
 - Recursion depths measured (and the macOS-26 hang-on-overflow discovered): the seed now runs on a 512 MB-stack thread with explicit depth guards that fail as clean Portland errors instead of hanging.

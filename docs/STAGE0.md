@@ -44,8 +44,9 @@ the tests are the spec until a real one exists.
   Value equality, definition-ordered fields, capitalized names. No methods in
   struct bodies yet — that arrives with the real object model.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
-  the enclosing method, unwinding through loops; `break` and `next` control the
-  enclosing `while`. None work inside blocks yet.
+  the enclosing method, unwinding through loops *and blocks*; `break` and
+  `next` control the enclosing `while` or block iteration. A call broken out
+  of produces no value (where Ruby would say nil).
 - **Blocks** — `do |item| ... end` on `each` (arrays, and hashes with
   `|key, value|`), `each_with_index`, `map`, `select`, `reject`,
   `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures over the
@@ -79,7 +80,7 @@ the tests are the spec until a real one exists.
 - `together` / concurrency (todos 004, 012), macros (todo 015).
 - Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
   the seed stays read-only rather than prejudging them.
-- `case/in` pattern matching; `return`/`break`/`next` inside blocks.
+- `case/in` pattern matching.
 - Paren-less method calls (`puts "hi"`) — needs the lexer-feedback dance;
   parens required in Stage 0.
 - Types — the seed is dynamically checked at runtime; inference is the real

@@ -349,7 +349,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .iter()
                     .map(|(label, expression)| (label.clone(), self.value_of(expression)))
                     .collect();
-                Some(self.method_call(receiver, name, arguments, keyword_arguments, block.as_ref()))
+                self.method_call(receiver, name, arguments, keyword_arguments, block.as_ref())
             }
             Expression::Logical {
                 left,
@@ -446,7 +446,7 @@ impl<W: std::io::Write> Interpreter<W> {
         arguments: Vec<Value>,
         keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
-    ) -> Value {
+    ) -> Option<Value> {
         // `with` builds an updated copy of an immutable struct.
         if name == "with" {
             let Value::Struct { fields, name } = receiver else {
@@ -471,10 +471,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     (field, value)
                 })
                 .collect();
-            return Value::Struct {
+            return Some(Value::Struct {
                 fields: updated,
                 name,
-            };
+            });
         }
         if !keyword_arguments.is_empty() {
             panic!("keyword arguments are only for struct new and with so far");
@@ -488,7 +488,7 @@ impl<W: std::io::Write> Interpreter<W> {
             && block.is_none()
         {
             if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
-                return value.clone();
+                return Some(value.clone());
             }
             if name != "to_s" {
                 panic!("{struct_name} has no field {name}");
@@ -499,77 +499,117 @@ impl<W: std::io::Write> Interpreter<W> {
                 (Value::Array(elements), "each", []) => {
                     for element in elements.clone() {
                         self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (Value::Hash(pairs), "each", []) => {
                     for (key, value) in pairs.clone() {
                         self.run_block(block, vec![key, value]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (Value::Array(elements), "map", []) => {
                     let mut results = Vec::new();
                     for element in elements.clone() {
-                        let result = self
-                            .run_block(block, vec![element])
-                            .unwrap_or_else(|| panic!("map block produced no value"));
+                        let result = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let result =
+                            result.unwrap_or_else(|| panic!("map block produced no value"));
                         results.push(result);
                     }
-                    Value::Array(results)
+                    Some(Value::Array(results))
                 }
                 (Value::Array(elements), "each_with_index", []) => {
                     for (index, element) in elements.clone().into_iter().enumerate() {
                         self.run_block(block, vec![element, Value::Integer(index as i64)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (Value::Array(elements), "reduce", [initial]) => {
                     let mut accumulator = initial.clone();
                     for element in elements.clone() {
-                        accumulator = self
-                            .run_block(block, vec![accumulator, element])
-                            .unwrap_or_else(|| panic!("reduce block produced no value"));
+                        let result = self.run_block(block, vec![accumulator.clone(), element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        accumulator =
+                            result.unwrap_or_else(|| panic!("reduce block produced no value"));
                     }
-                    accumulator
+                    Some(accumulator)
                 }
                 (Value::Array(elements), "reject", []) => {
                     let mut kept = Vec::new();
                     for element in elements.clone() {
-                        if !self.block_boolean(block, element.clone(), "reject") {
-                            kept.push(element);
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => {}
+                            Some(Value::Boolean(false)) => kept.push(element),
+                            other => {
+                                panic!("reject block must produce true or false, got {other:?}")
+                            }
                         }
                     }
-                    Value::Array(kept)
+                    Some(Value::Array(kept))
                 }
                 (Value::Array(elements), "select", []) => {
                     let mut kept = Vec::new();
                     for element in elements.clone() {
-                        if self.block_boolean(block, element.clone(), "select") {
-                            kept.push(element);
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => kept.push(element),
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("select block must produce true or false, got {other:?}")
+                            }
                         }
                     }
-                    Value::Array(kept)
+                    Some(Value::Array(kept))
                 }
                 (Value::Integer(count), "times", []) => {
                     for index in 0..*count {
                         self.run_block(block, vec![Value::Integer(index)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (Value::Integer(from), "downto", [Value::Integer(to)]) => {
                     let mut current = *from;
                     while current >= *to {
                         self.run_block(block, vec![Value::Integer(current)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                         current -= 1;
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (Value::Integer(from), "upto", [Value::Integer(to)]) => {
                     for current in *from..=*to {
                         self.run_block(block, vec![Value::Integer(current)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
                     }
-                    receiver
+                    Some(receiver)
                 }
                 (receiver, name, _) => {
                     panic!("undefined block-taking method {name} for {receiver:?}")
@@ -577,7 +617,7 @@ impl<W: std::io::Write> Interpreter<W> {
             };
         }
 
-        match (&receiver, name, arguments.as_slice()) {
+        Some(match (&receiver, name, arguments.as_slice()) {
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
             (Value::Array(elements), "first", []) => elements
                 .first()
@@ -682,7 +722,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (receiver, name, arguments) => {
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")
             }
-        }
+        })
     }
 
     fn integers_of(elements: &[Value], method: &str) -> Vec<i64> {
@@ -695,11 +735,17 @@ impl<W: std::io::Write> Interpreter<W> {
             .collect()
     }
 
-    /// Run a block whose result must be a strict boolean (select/reject).
-    fn block_boolean(&mut self, block: &Block, element: Value, method: &str) -> bool {
-        match self.run_block(block, vec![element]) {
-            Some(Value::Boolean(value)) => value,
-            other => panic!("{method} block must produce true or false, got {other:?}"),
+    /// After a block ran: `Some(outcome)` when the iteration must stop now.
+    /// A `break` is consumed here and the call produces no value (Ruby's nil);
+    /// a `return` stays pending and unwinds to the enclosing method.
+    fn block_interrupt(&mut self) -> Option<Option<Value>> {
+        match self.pending {
+            None => None,
+            Some(Pending::Break) => {
+                self.pending = None;
+                Some(None)
+            }
+            _ => Some(None),
         }
     }
 
@@ -708,7 +754,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
         if block.parameters.len() > arguments.len() {
             panic!(
-                "block expects {} argument(word), got {}",
+                "block expects {} argument(s), got {}",
                 block.parameters.len(),
                 arguments.len()
             );
@@ -722,9 +768,10 @@ impl<W: std::io::Write> Interpreter<W> {
             self.variables.insert(parameter.clone(), argument);
         }
         let result = self.run_body(&block.body);
-        if self.pending.is_some() {
+        // `next` ends just this invocation of the block; `break` and `return`
+        // stay pending for the iterating caller to handle.
+        if matches!(self.pending, Some(Pending::Next)) {
             self.pending = None;
-            panic!("return, break, and next inside blocks are not supported in the seed yet");
         }
         for (parameter, original) in shadowed {
             match original {
@@ -1081,9 +1128,52 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not supported in the seed yet")]
-    fn panics_on_a_break_inside_a_block() {
-        evaluate("[1, 2].each do |number|\n  break\nend\n");
+    fn break_stops_block_iteration() {
+        let source = "total = 0\n[1, 2, 3, 4].each do |number|\n  break if number == 3\n  total += number\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    fn a_broken_call_produces_no_value() {
+        assert_eq!(evaluate("[1, 2].each do |number|\n  break\nend\n"), None);
+    }
+
+    #[test]
+    fn next_skips_a_block_iteration() {
+        let source = "total = 0\n[1, 2, 3, 4].each do |number|\n  next if number.even?\n  total += number\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(4)));
+    }
+
+    #[test]
+    fn return_unwinds_through_a_block_to_the_enclosing_method() {
+        let source = "def first_even(numbers)\n  numbers.each do |number|\n    return number if number.even?\n  end\n  0 - 1\nend\n";
+        assert_eq!(
+            evaluate(&format!("{source}first_even([1, 3, 4, 5])\n")),
+            Some(Value::Integer(4))
+        );
+        assert_eq!(
+            evaluate(&format!("{source}first_even([1, 3])\n")),
+            Some(Value::Integer(-1))
+        );
+    }
+
+    #[test]
+    fn break_stops_times() {
+        let source =
+            "count = 0\n5.times do |index|\n  break if index == 2\n  count += 1\nend\ncount\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(2)));
+    }
+
+    #[test]
+    fn break_stops_select() {
+        let source = "[1, 2, 3].select do |number|\n  break\n  true\nend\n";
+        assert_eq!(evaluate(source), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "return outside of a method")]
+    fn panics_on_a_top_level_return_from_a_block() {
+        evaluate("[1].each do |number|\n  return number\nend\n");
     }
 
     #[test]
