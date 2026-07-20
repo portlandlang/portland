@@ -70,10 +70,61 @@ def evaluate_expression(node, bindings)
   when "string" then outcome([decode_string(node.value)], bindings)
   when "call" then evaluate_call(node, bindings)
   when "identifier" then evaluate_call(call_node(node.name, []), bindings)
+  when "binary" then evaluate_binary(node, bindings)
+  when "logical" then evaluate_logical(node, bindings)
+  when "unary" then evaluate_unary(node, bindings)
   else
     puts "evaluator: cannot evaluate #{node.kind} yet"
     outcome([], bindings)
   end
+end
+
+# Guest operands are host values, so host operators do the arithmetic and
+# host strictness (type panics, divide by zero) is the guest error story.
+def evaluate_binary(node, bindings)
+  left_step = evaluate_expression(node.left, bindings)
+  right_step = evaluate_expression(node.right, left_step.bindings)
+  left = left_step.value.first
+  right = right_step.value.first
+  result = case node.operator
+  when "+" then left + right
+  when "-" then left - right
+  when "*" then left * right
+  when "/" then left / right
+  when "%" then left % right
+  when "==" then left == right
+  when "!=" then left != right
+  when "<" then left < right
+  when "<=" then left <= right
+  when ">" then left > right
+  when ">=" then left >= right
+  else
+    puts "evaluator: unknown operator #{node.operator}"
+    0
+  end
+  outcome([result], right_step.bindings)
+end
+
+def evaluate_logical(node, bindings)
+  left_step = evaluate_expression(node.left, bindings)
+  left = left_step.value.first
+  if node.operator == "&&"
+    return outcome([false], left_step.bindings) unless left
+    return evaluate_expression(node.right, left_step.bindings)
+  end
+  return outcome([true], left_step.bindings) if left
+  evaluate_expression(node.right, left_step.bindings)
+end
+
+def evaluate_unary(node, bindings)
+  step = evaluate_expression(node.operand, bindings)
+  operand = step.value.first
+  result = if node.operator == "!"
+    !operand
+  else
+    0 - operand
+  end
+  outcome([result], step.bindings)
 end
 
 def evaluate_call(node, bindings)

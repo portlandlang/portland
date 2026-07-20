@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 1 (#19): operators — host operators do the work since guest values are host values; differential harness extracted.
+
 - evaluator.pdx rung 0 (#19): Portland running Portland — Outcome-threaded evaluation of literals and puts/p, run.pdx driver, differential-tested byte-identical against the seed.
 
 - parser.pdx rungs 6 + summit (#18): command calls with never-guess errors, array/hash/%w literals — and the flag: parser.pdx parses lexer.pdx, tokenize.pdx, parse.pdx, and itself with zero error nodes, CI-pinned.

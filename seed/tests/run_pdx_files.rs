@@ -350,12 +350,10 @@ fn portland_run() -> String {
     format!("{}/../compiler/run.pdx", env!("CARGO_MANIFEST_DIR"))
 }
 
-#[test]
-fn portland_evaluator_matches_the_seed() {
-    // Differential test: the Portland-on-Portland evaluator must produce
-    // byte-identical output to the seed running the same file directly.
-    let sample = std::env::temp_dir().join("eval_rung0.pdx");
-    let source = "puts 42\nputs \"rose city\"\nputs \"line\\nbreak\"\nputs true\nputs\n";
+// Differential harness: the Portland-on-Portland evaluator must produce
+// byte-identical output to the seed running the same source directly.
+fn assert_evaluator_matches_seed(name: &str, source: &str) {
+    let sample = std::env::temp_dir().join(name);
     std::fs::write(&sample, source).unwrap();
     let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .arg(&sample)
@@ -366,10 +364,30 @@ fn portland_evaluator_matches_the_seed() {
         .arg(&sample)
         .output()
         .expect("failed to run pdx");
-    assert!(direct.status.success() && hosted.status.success());
+    assert!(
+        direct.status.success() && hosted.status.success(),
+        "{name} failed to run"
+    );
     assert_eq!(
         String::from_utf8(direct.stdout).unwrap(),
-        String::from_utf8(hosted.stdout).unwrap()
+        String::from_utf8(hosted.stdout).unwrap(),
+        "{name} diverged from the seed"
+    );
+}
+
+#[test]
+fn portland_evaluator_matches_the_seed_on_literals() {
+    assert_evaluator_matches_seed(
+        "eval_rung0.pdx",
+        "puts 42\nputs \"rose city\"\nputs \"line\\nbreak\"\nputs true\nputs\n",
+    );
+}
+
+#[test]
+fn portland_evaluator_matches_the_seed_on_operators() {
+    assert_evaluator_matches_seed(
+        "eval_rung1.pdx",
+        "puts 1 + 2 * 3\nputs((1 + 2) * 3)\nputs 10 % 3\nputs 7 / 2\nputs 1 + 1 == 2\nputs 3 > 2 && 2 > 1\nputs false || true\nputs !false\nputs(-5)\nputs \"port\" + \"land\"\nputs 10 - 2 - 3\n",
     );
 }
 
