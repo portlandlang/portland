@@ -85,6 +85,19 @@ the tests are the spec until a real one exists.
 - Types — the seed is dynamically checked at runtime; inference is the real
   compiler's job.
 
+## Depth limits (measured 2026-07-19)
+
+On the default 8 MB main stack the seed died — as a silent macOS *hang*, not a
+crash — at ~1,200 nested parens, ~1,500-term `1 + 1 + …` chains, and ~900
+Portland call frames. (Even a trivial Rust `fn f() { f() }` hangs on overflow
+under macOS 26, so the OS gives no clean failure.) Two fixes, both in:
+
+- The interpreter runs on a **512 MB-stack thread**, moving real limits ~64×
+  out (5,000-deep recursion and nesting are in the test suite).
+- **Explicit depth guards** fail as clean Portland errors long before the Rust
+  stack is at risk: expression nesting > 10,000 (parse), expression evaluation
+  > 100,000, call stack > 10,000 frames.
+
 ## Panics are the error story
 
 The seed panics on every error (parse, type, arity, missing `end`, index out of
