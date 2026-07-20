@@ -8,8 +8,8 @@ on:
 
 jobs:
   cibuild:
-    # Apple-silicon language, Apple-silicon runner.
-    runs-on: macos-15
+    # Apple-silicon language, Apple-silicon runner. macOS 26+ only.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
       - uses: actions/cache@v4
