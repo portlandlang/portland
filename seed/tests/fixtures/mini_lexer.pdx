@@ -1,6 +1,11 @@
 # The Rubinius creed, honored early: compiler work, written in Portland.
 # A tiny lexer that tokenizes a line of Portland-ish source.
 
+struct Token
+  kind
+  text
+end
+
 def punctuation?(c)
   %w[( ) + = ,].include?(c)
 end
@@ -19,7 +24,7 @@ def lex(source)
       next
     end
     if punctuation?(c)
-      tokens += [{"kind" => "punctuation", "text" => c}]
+      tokens += [Token.new(kind: "punctuation", text: c)]
       i += 1
       next
     end
@@ -29,7 +34,7 @@ def lex(source)
         text += source[i]
         i += 1
       end
-      tokens += [{"kind" => "integer", "text" => text}]
+      tokens += [Token.new(kind: "integer", text: text)]
       next
     end
     text = ""
@@ -37,11 +42,11 @@ def lex(source)
       text += source[i]
       i += 1
     end
-    tokens += [{"kind" => "identifier", "text" => text}]
+    tokens += [Token.new(kind: "identifier", text: text)]
   end
   tokens
 end
 
 lex("total = compute(40, 2) + 1").each do |token|
-  puts("#{token["kind"]}: #{token["text"]}")
+  puts("#{token.kind}: #{token.text}")
 end
