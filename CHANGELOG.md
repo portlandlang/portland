@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx rung 2 (#18): postfix — dot calls, indexing, paren call arguments, leading-dot chains across newlines, and negative literals binding Ruby-style (-5.abs).
+
 - parser.pdx rung 1 (#18): the full expression precedence ladder — logicals, comparisons, arithmetic, unary, parens — with identifiers, strings, and booleans as operands.
 
 - parser.pdx rung 0 (#18): Step-threaded recursive descent skeleton, sexp printer, parse.pdx driver — integers parse, unknown tokens become error nodes.

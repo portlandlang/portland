@@ -55,6 +55,25 @@ struct UnaryNode
   operand
 end
 
+struct CallNode
+  kind
+  name
+  arguments
+end
+
+struct MethodCallNode
+  kind
+  receiver
+  name
+  arguments
+end
+
+struct IndexNode
+  kind
+  receiver
+  index
+end
+
 struct ErrorNode
   kind
   message
@@ -86,6 +105,18 @@ end
 
 def unary_node(operator, operand)
   UnaryNode.new(kind: "unary", operator: operator, operand: operand)
+end
+
+def call_node(name, arguments)
+  CallNode.new(kind: "call", name: name, arguments: arguments)
+end
+
+def method_call_node(receiver, name, arguments)
+  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments)
+end
+
+def index_node(receiver, index)
+  IndexNode.new(kind: "index", receiver: receiver, index: index)
 end
 
 def error_node(message)
@@ -156,12 +187,100 @@ def parse_multiplication(tokens, position)
 end
 
 def parse_unary(tokens, position)
+  # Ruby-style: -5 is a negative literal, so -5.abs is (. -5 abs).
+  if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].kind == "integer"
+    literal = Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
+    return postfix_from(tokens, literal)
+  end
   if operator_at?(tokens, position, %w[! -])
     operator = tokens[position].text
     operand = parse_unary(tokens, position + 1)
     return Step.new(node: unary_node(operator, operand.node), position: operand.position)
   end
-  parse_primary(tokens, position)
+  parse_postfix(tokens, position)
+end
+
+def parse_postfix(tokens, position)
+  postfix_from(tokens, parse_primary(tokens, position))
+end
+
+# Chained `.method` calls and `[index]`, binding tighter than any operator.
+# A chain may continue on the next line when that line leads with a dot.
+def postfix_from(tokens, step)
+  while true
+    position = step.position
+    if operator_at?(tokens, position, %w[.])
+      step = parse_dot(tokens, step.node, position + 1)
+      next
+    end
+    if operator_at?(tokens, position, ["["])
+      step = parse_index(tokens, step.node, position + 1)
+      next
+    end
+    if newline_then_dot?(tokens, position)
+      step = Step.new(node: step.node, position: skip_newlines_at(tokens, position))
+      next
+    end
+    break
+  end
+  step
+end
+
+def parse_dot(tokens, receiver, position)
+  if position >= tokens.length
+    return Step.new(node: error_node("expected method name after dot"), position: position)
+  end
+  token = tokens[position]
+  if token.kind != "identifier"
+    return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
+  end
+  if operator_at?(tokens, position + 1, %w[(])
+    arguments = parse_arguments(tokens, position + 2)
+    return Step.new(node: method_call_node(receiver, token.text, arguments.node), position: arguments.position)
+  end
+  Step.new(node: method_call_node(receiver, token.text, []), position: position + 1)
+end
+
+def parse_index(tokens, receiver, position)
+  inner = parse_expression(tokens, position)
+  if operator_at?(tokens, inner.position, ["]"])
+    return Step.new(node: index_node(receiver, inner.node), position: inner.position + 1)
+  end
+  Step.new(node: error_node("expected closing bracket"), position: inner.position)
+end
+
+# Parse a comma-separated argument list, consuming the closing paren.
+# The Step's node is the array of argument nodes.
+def parse_arguments(tokens, position)
+  arguments = []
+  if operator_at?(tokens, position, %w[)])
+    return Step.new(node: arguments, position: position + 1)
+  end
+  step = parse_expression(tokens, position)
+  arguments += [step.node]
+  position = step.position
+  while operator_at?(tokens, position, %w[,])
+    step = parse_expression(tokens, position + 1)
+    arguments += [step.node]
+    position = step.position
+  end
+  if operator_at?(tokens, position, %w[)])
+    return Step.new(node: arguments, position: position + 1)
+  end
+  Step.new(node: [error_node("expected closing paren after arguments")], position: position)
+end
+
+def newline_then_dot?(tokens, position)
+  offset = skip_newlines_at(tokens, position)
+  return false if offset == position
+  operator_at?(tokens, offset, %w[.])
+end
+
+def skip_newlines_at(tokens, position)
+  while position < tokens.length && tokens[position].kind == "newline"
+    position += 1
+  end
+  position
 end
 
 def parse_primary(tokens, position)
@@ -170,7 +289,13 @@ def parse_primary(tokens, position)
   after = position + 1
   case token.kind
   when "integer" then Step.new(node: integer_node(token.text), position: after)
-  when "identifier" then Step.new(node: identifier_node(token.text), position: after)
+  when "identifier"
+    if operator_at?(tokens, after, %w[(])
+      arguments = parse_arguments(tokens, after + 1)
+      Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
+    else
+      Step.new(node: identifier_node(token.text), position: after)
+    end
   when "string" then Step.new(node: string_node(token.text), position: after)
   when "keyword"
     case token.text
@@ -212,6 +337,17 @@ end
 
 # — printing —
 
+def sexp_list(nodes)
+  nodes.map do |node|
+    sexp(node)
+  end.join(" ")
+end
+
+def headed_sexp(head, arguments)
+  return "(#{head})" if arguments.empty?
+  "(#{head} #{sexp_list(arguments)})"
+end
+
 def sexp(node)
   case node.kind
   when "integer" then node.value
@@ -220,6 +356,9 @@ def sexp(node)
   when "string" then node.value
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
+  when "call" then headed_sexp("call #{node.name}", node.arguments)
+  when "method_call" then headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
+  when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
   when "error" then "(error #{node.message})"
   else
     "(unknown #{node.kind})"

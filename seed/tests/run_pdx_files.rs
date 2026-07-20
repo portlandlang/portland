@@ -231,7 +231,22 @@ fn portland_parser_climbs_the_precedence_ladder() {
         .output()
         .expect("failed to run pdx");
     assert!(output.status.success());
-    let expected = "(+ 1 (* 2 3))\n(* (+ 1 2) 3)\n(- (+ 1 2) 3)\n(|| (&& a b) (! c))\n(== x (+ 1 2))\n(- 5)\n(+ \"hi\" name)\n(&& true false)\n(== (% 10 3) 1)\n";
+    let expected = "(+ 1 (* 2 3))\n(* (+ 1 2) 3)\n(- (+ 1 2) 3)\n(|| (&& a b) (! c))\n(== x (+ 1 2))\n-5\n(+ \"hi\" name)\n(&& true false)\n(== (% 10 3) 1)\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
+fn portland_parser_handles_postfix_chains() {
+    let sample = std::env::temp_dir().join("parse_postfix.pdx");
+    let source = "name.upcase\nlist.push(1, 2)\ngreet()\ngreet(\"pdx\", 2)\nitems[0]\nmatrix[1][2]\n\"pdx\".upcase.reverse\n-5.abs\na.b + c.d\nshout(name).length\n\"x\"\n  .upcase\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(. name upcase)\n(. list push 1 2)\n(call greet)\n(call greet \"pdx\" 2)\n([] items 0)\n([] ([] matrix 1) 2)\n(. (. \"pdx\" upcase) reverse)\n(. -5 abs)\n(+ (. a b) (. c d))\n(. (call shout name) length)\n(. \"x\" upcase)\n";
     assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
 }
 
