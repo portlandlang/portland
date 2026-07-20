@@ -54,6 +54,8 @@ def evaluate_statement(node, bindings)
     return outcome([value], [[node.name, "local", value]] + step.bindings)
   when "def"
     return outcome([], [[node.name, "method", [node.parameters, node.body]]] + bindings)
+  when "struct_def"
+    return outcome([], [[node.name, "struct", node.fields]] + bindings)
   when "while" then return evaluate_while(node, bindings)
   when "break" then return signal_outcome("break", [], bindings)
   when "next" then return signal_outcome("next", [], bindings)
@@ -233,8 +235,47 @@ def evaluate_index(node, bindings)
   outcome([receiver[index_step.value.first]], index_step.bindings)
 end
 
+# Guest struct instances are tagged arrays: ["__struct__", name, pairs].
+def evaluate_new(node, bindings)
+  slot = lookup(bindings, node.receiver.name)
+  if slot.empty?
+    puts "evaluator: undefined struct #{node.receiver.name}"
+    return outcome([], bindings)
+  end
+  fields = slot.first[2]
+  provided = []
+  node.arguments.each do |argument|
+    step = evaluate_expression(argument.value, bindings)
+    bindings = step.bindings
+    provided += [[argument.label, step.value.first]]
+  end
+  ordered = []
+  fields.each do |field|
+    index = 0
+    while index < provided.length
+      ordered += [[field, provided[index][1]]] if provided[index][0] == field
+      index += 1
+    end
+  end
+  outcome([["__struct__", node.receiver.name, ordered]], bindings)
+end
+
+def struct_field(instance, field)
+  pairs = instance[2]
+  index = 0
+  while index < pairs.length
+    return pairs[index][1] if pairs[index][0] == field
+    index += 1
+  end
+  puts "evaluator: no field #{field}"
+  ""
+end
+
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, bindings)
+  if node.name == "new" && node.receiver.kind == "identifier"
+    return evaluate_new(node, bindings)
+  end
   step = evaluate_expression(node.receiver, bindings)
   receiver = step.value.first
   bindings = step.bindings
@@ -269,8 +310,9 @@ def evaluate_method_call(node, bindings)
   when "end_with?" then receiver.end_with?(arguments.first)
   when "slice" then receiver.slice(arguments[0], arguments[1])
   else
-    puts "evaluator: cannot evaluate method #{node.name} yet"
-    ""
+    # Anything else is a struct field read; on a non-struct the host
+    # panics, which is the crude error story.
+    struct_field(receiver, node.name)
   end
   outcome([result], bindings)
 end
@@ -334,8 +376,9 @@ end
 def invoke(payload, arguments, bindings)
   parameters = payload[0]
   body = payload[1]
-  scope = bindings.select do |triple|
-    triple[1] == "method"
+  # Everything global survives into the fresh scope; only locals drop.
+  scope = bindings.reject do |triple|
+    triple[1] == "local"
   end
   index = 0
   parameters.each do |parameter|
