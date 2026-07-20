@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 6 + SUMMIT (#19): collections and blocks (guest values are host values, so host dispatch does the work) — and the whole fixture suite (hello, arithmetic, fizzbuzz, showcase, blocks, tour) now runs on the Portland evaluator byte-identical to the seed, CI-pinned. Structs (rung 7) remain for the mini_lexer stretch.
+
 - evaluator.pdx rung 5 (#19): methods — one namespace for locals and methods (the no-shadow rule makes it sound), recursion, defaults, fresh method-only scopes, return unwinding.
 
 - evaluator.pdx rung 4 (#19): control flow — if/unless/while/case, guards, and break/next/return as threaded signals.

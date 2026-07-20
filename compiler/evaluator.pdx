@@ -135,6 +135,10 @@ def evaluate_expression(node, bindings)
   when "binary" then evaluate_binary(node, bindings)
   when "if" then evaluate_if(node, bindings)
   when "case" then evaluate_case(node, bindings)
+  when "array" then evaluate_array(node, bindings)
+  when "hash" then evaluate_hash(node, bindings)
+  when "word_array" then outcome([word_array_elements(node.text)], bindings)
+  when "index" then evaluate_index(node, bindings)
   when "logical" then evaluate_logical(node, bindings)
   when "unary" then evaluate_unary(node, bindings)
   else
@@ -191,15 +195,137 @@ def evaluate_unary(node, bindings)
   outcome([result], step.bindings)
 end
 
-# Rung-3 slice of value methods: just to_s, which interpolation desugars to.
+def evaluate_array(node, bindings)
+  elements = []
+  node.elements.each do |element|
+    step = evaluate_expression(element, bindings)
+    bindings = step.bindings
+    elements += step.value
+  end
+  outcome([elements], bindings)
+end
+
+# Guest hashes are pair lists — Portland can't build a host hash
+# incrementally (the known language gap), so two-parameter each is the
+# supported surface; the rest waits.
+def evaluate_hash(node, bindings)
+  pairs = []
+  node.pairs.each do |pair|
+    key_step = evaluate_expression(pair.key, bindings)
+    bindings = key_step.bindings
+    value_step = evaluate_expression(pair.value, bindings)
+    bindings = value_step.bindings
+    pairs += [[key_step.value.first, value_step.value.first]]
+  end
+  outcome([pairs], bindings)
+end
+
+def word_array_elements(lexeme)
+  content = lexeme.slice(3, lexeme.length - 4)
+  return [] if content.empty?
+  content.split(" ")
+end
+
+def evaluate_index(node, bindings)
+  receiver_step = evaluate_expression(node.receiver, bindings)
+  index_step = evaluate_expression(node.index, receiver_step.bindings)
+  receiver = receiver_step.value.first
+  outcome([receiver[index_step.value.first]], index_step.bindings)
+end
+
+# Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, bindings)
   step = evaluate_expression(node.receiver, bindings)
   receiver = step.value.first
-  if node.name == "to_s"
-    return outcome([receiver.to_s], step.bindings)
+  bindings = step.bindings
+  arguments = []
+  node.arguments.each do |argument|
+    argument_step = evaluate_expression(argument, bindings)
+    bindings = argument_step.bindings
+    arguments += argument_step.value
   end
-  puts "evaluator: cannot evaluate method #{node.name} yet"
-  outcome([], step.bindings)
+  return evaluate_block_call(node, receiver, bindings) unless node.block.empty?
+  result = case node.name
+  when "to_s" then receiver.to_s
+  when "to_i" then receiver.to_i
+  when "length" then receiver.length
+  when "empty?" then receiver.empty?
+  when "upcase" then receiver.upcase
+  when "downcase" then receiver.downcase
+  when "reverse" then receiver.reverse
+  when "chars" then receiver.chars
+  when "abs" then receiver.abs
+  when "even?" then receiver.even?
+  when "odd?" then receiver.odd?
+  when "zero?" then receiver.zero?
+  when "first" then receiver.first
+  when "last" then receiver.last
+  when "sum" then receiver.sum
+  when "sort" then receiver.sort
+  when "join" then receiver.join(arguments.first)
+  when "include?" then receiver.include?(arguments.first)
+  when "split" then receiver.split(arguments.first)
+  when "start_with?" then receiver.start_with?(arguments.first)
+  when "end_with?" then receiver.end_with?(arguments.first)
+  when "slice" then receiver.slice(arguments[0], arguments[1])
+  else
+    puts "evaluator: cannot evaluate method #{node.name} yet"
+    ""
+  end
+  outcome([result], bindings)
+end
+
+# Blocks see the enclosing scope; parameters are prepended for the call.
+# Crude divergence from the seed: assignments made inside a block do not
+# persist afterward (the block's bindings are discarded).
+def run_guest_block(block, arguments, bindings)
+  scope = bindings
+  index = 0
+  block.parameters.each do |parameter|
+    scope = [[parameter, "local", arguments[index]]] + scope if index < arguments.length
+    index += 1
+  end
+  run_body(block.body, scope)
+end
+
+def evaluate_block_call(node, receiver, bindings)
+  block = node.block.first
+  case node.name
+  when "each"
+    if block.parameters.length == 2
+      receiver.each do |pair|
+        run_guest_block(block, pair, bindings)
+      end
+    else
+      receiver.each do |element|
+        run_guest_block(block, [element], bindings)
+      end
+    end
+    outcome([receiver], bindings)
+  when "map"
+    results = receiver.map do |element|
+      run_guest_block(block, [element], bindings).value.first
+    end
+    outcome([results], bindings)
+  when "select"
+    results = receiver.select do |element|
+      run_guest_block(block, [element], bindings).value.first
+    end
+    outcome([results], bindings)
+  when "reject"
+    results = receiver.reject do |element|
+      run_guest_block(block, [element], bindings).value.first
+    end
+    outcome([results], bindings)
+  when "times"
+    receiver.times do |index|
+      run_guest_block(block, [index], bindings)
+    end
+    outcome([receiver], bindings)
+  else
+    puts "evaluator: cannot evaluate block method #{node.name} yet"
+    outcome([], bindings)
+  end
 end
 
 # Run a user method: fresh scope of methods only (no outer locals), params

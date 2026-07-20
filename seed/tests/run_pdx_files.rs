@@ -376,6 +376,43 @@ fn assert_evaluator_matches_seed(name: &str, source: &str) {
 }
 
 #[test]
+fn portland_evaluator_runs_the_fixture_suite() {
+    // The summit of #19: Portland programs running on the Portland
+    // evaluator, byte-identical to the seed.
+    for fixture in [
+        "hello",
+        "arithmetic",
+        "fizzbuzz",
+        "showcase",
+        "blocks",
+        "tour",
+    ] {
+        let path = format!(
+            "{}/tests/fixtures/{fixture}.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&path)
+            .output()
+            .expect("failed to run pdx");
+        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&path)
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            direct.status.success() && hosted.status.success(),
+            "{fixture} failed"
+        );
+        assert_eq!(
+            String::from_utf8(direct.stdout).unwrap(),
+            String::from_utf8(hosted.stdout).unwrap(),
+            "{fixture} diverged from the seed"
+        );
+    }
+}
+
+#[test]
 fn portland_evaluator_matches_the_seed_on_literals() {
     assert_evaluator_matches_seed(
         "eval_rung0.pdx",
