@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx rung 0 (#18): Step-threaded recursive descent skeleton, sexp printer, parse.pdx driver — integers parse, unknown tokens become error nodes.
+
 - `require_relative`: multi-file Portland programs, Ruby-style (resolved against the requiring file, `.pdx` implied, loads once). `compiler/lexer.pdx` is now a library; `compiler/tokenize.pdx` is the command-line driver.
 - Paren-less calls, the Portland way: command calls at statement position (`puts "hello"`) and bare zero-argument calls (`ready?`) — powered by two new rules instead of Ruby's whitespace guessing: shadowing a method with a local is an error, and ambiguous forms (`puts -1`, `puts [1]`, `puts (1)`) are clean parse errors that show both readings. The lexer now records leading whitespace to detect them.
 - `return`/`break`/`next` now work inside blocks with Ruby semantics: `next` skips the iteration, `break` stops it (the call produces no value), `return` unwinds through the block to the enclosing method — guard-search idioms like `return number if number.even?` inside `each` work.
