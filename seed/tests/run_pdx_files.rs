@@ -121,6 +121,35 @@ fn survives_deep_nesting_and_recursion() {
     }
 }
 
+#[test]
+fn fails_cleanly_when_too_deep() {
+    // The depth guards must fire as clean Portland errors — on macOS 26 an
+    // actual stack overflow hangs the process instead of crashing it.
+    let cases = [
+        (
+            "too_deep_parens.pdx",
+            format!("puts({}1{})\n", "(".repeat(15_000), ")".repeat(15_000)),
+            "expression nesting deeper",
+        ),
+        (
+            "runaway_recursion.pdx",
+            "def f\n  f()\nend\nf()\n".to_string(),
+            "call stack deeper",
+        ),
+    ];
+    for (name, source, expected) in cases {
+        let path = std::env::temp_dir().join(name);
+        std::fs::write(&path, source).expect("failed to write probe file");
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&path)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!output.status.success(), "{name} unexpectedly succeeded");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(expected), "{name} stderr: {stderr}");
+    }
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

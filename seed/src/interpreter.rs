@@ -30,8 +30,16 @@ enum Pending {
     Return(Option<Value>),
 }
 
+/// Deep enough for real programs, shallow enough to fail as a clean Portland
+/// error before the Rust stack runs out (overflow hangs rather than crashes
+/// on macOS 26).
+const MAXIMUM_CALL_DEPTH: usize = 10_000;
+const MAXIMUM_EXPRESSION_DEPTH: usize = 100_000;
+
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     arguments: Vec<String>,
+    call_depth: usize,
+    expression_depth: usize,
     methods: HashMap<String, Method>,
     output: W,
     pending: Option<Pending>,
@@ -49,6 +57,8 @@ impl<W: std::io::Write> Interpreter<W> {
     pub fn with_output(output: W) -> Self {
         Self {
             arguments: Vec::new(),
+            call_depth: 0,
+            expression_depth: 0,
             methods: HashMap::new(),
             output,
             pending: None,
@@ -63,6 +73,9 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     pub fn program(&mut self, program: &Program) -> Option<Value> {
+        // A caught panic (REPL) unwinds past the decrements; start fresh.
+        self.call_depth = 0;
+        self.expression_depth = 0;
         let last = self.run_body(&program.statements);
         match self.pending.take() {
             None => last,
@@ -148,6 +161,16 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     fn expression(&mut self, expression: &Expression) -> Option<Value> {
+        self.expression_depth += 1;
+        if self.expression_depth > MAXIMUM_EXPRESSION_DEPTH {
+            panic!("expression evaluation deeper than {MAXIMUM_EXPRESSION_DEPTH} levels");
+        }
+        let result = self.expression_inner(expression);
+        self.expression_depth -= 1;
+        result
+    }
+
+    fn expression_inner(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
             Expression::ArrayLiteral(elements) => Some(Value::Array(
                 elements.iter().map(|e| self.value_of(e)).collect(),
@@ -789,6 +812,10 @@ impl<W: std::io::Write> Interpreter<W> {
             );
         }
 
+        self.call_depth += 1;
+        if self.call_depth > MAXIMUM_CALL_DEPTH {
+            panic!("call stack deeper than {MAXIMUM_CALL_DEPTH} frames (infinite recursion?)");
+        }
         // Methods get a fresh scope: parameters only, no outer locals.
         // Bind left to right so a default can reference earlier parameters.
         let mut scope: HashMap<String, Value> = HashMap::new();
@@ -805,6 +832,7 @@ impl<W: std::io::Write> Interpreter<W> {
             self.variables.insert(parameter.name.clone(), value);
         }
         let mut result = self.run_body(&method.body);
+        self.call_depth -= 1;
         std::mem::swap(&mut self.variables, &mut scope);
         match self.pending.take() {
             None => {}

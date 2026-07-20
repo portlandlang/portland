@@ -10,6 +10,7 @@ use crate::lexer::{self, Token, TokenKind};
 pub fn parse(source: &str) -> Program {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
+        depth: 0,
         position: 0,
         tokens,
     };
@@ -18,7 +19,12 @@ pub fn parse(source: &str) -> Program {
     program
 }
 
+/// Deep enough for any human-written program, shallow enough to fail cleanly
+/// before the Rust stack runs out (overflow hangs rather than crashes on macOS 26).
+const MAXIMUM_NESTING: usize = 10_000;
+
 struct Parser<'source> {
+    depth: usize,
     position: usize,
     tokens: Vec<Token<'source>>,
 }
@@ -120,6 +126,7 @@ fn string_expression(text: &str) -> Expression {
 fn expression_from(source: &str) -> Expression {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
+        depth: 0,
         position: 0,
         tokens,
     };
@@ -519,7 +526,13 @@ impl<'source> Parser<'source> {
     }
 
     fn expression(&mut self) -> Expression {
-        self.logical_or()
+        self.depth += 1;
+        if self.depth > MAXIMUM_NESTING {
+            panic!("expression nesting deeper than {MAXIMUM_NESTING} levels");
+        }
+        let expression = self.logical_or();
+        self.depth -= 1;
+        expression
     }
 
     fn logical_or(&mut self) -> Expression {
