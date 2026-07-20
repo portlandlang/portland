@@ -79,6 +79,32 @@ struct ErrorNode
   message
 end
 
+struct AssignmentNode
+  kind
+  name
+  value
+end
+
+struct ReturnNode
+  kind
+  value
+end
+
+# Bare `return` carries no value — and with no nil in Portland, "no value"
+# is a distinct node kind rather than an empty field. (First real pull
+# toward optionals in the language.)
+struct ReturnBareNode
+  kind
+end
+
+struct BreakNode
+  kind
+end
+
+struct NextNode
+  kind
+end
+
 def integer_node(value)
   IntegerNode.new(kind: "integer", value: value)
 end
@@ -123,6 +149,26 @@ def error_node(message)
   ErrorNode.new(kind: "error", message: message)
 end
 
+def assignment_node(name, value)
+  AssignmentNode.new(kind: "assignment", name: name, value: value)
+end
+
+def return_node(value)
+  ReturnNode.new(kind: "return", value: value)
+end
+
+def return_bare_node
+  ReturnBareNode.new(kind: "return_bare")
+end
+
+def break_node
+  BreakNode.new(kind: "break")
+end
+
+def next_node
+  NextNode.new(kind: "next")
+end
+
 # — parsing —
 
 # True when the token at position is an operator with one of these texts.
@@ -130,6 +176,16 @@ def operator_at?(tokens, position, texts)
   return false if position >= tokens.length
   token = tokens[position]
   token.kind == "operator" && texts.include?(token.text)
+end
+
+def keyword_at?(tokens, position, texts)
+  return false if position >= tokens.length
+  token = tokens[position]
+  token.kind == "keyword" && texts.include?(token.text)
+end
+
+def statement_boundary?(tokens, position)
+  position >= tokens.length || tokens[position].kind == "newline"
 end
 
 def parse_expression(tokens, position)
@@ -319,7 +375,42 @@ def parse_primary(tokens, position)
   end
 end
 
-# Parse a whole file: newline-separated expressions, for now.
+# — statements —
+
+def parse_statement(tokens, position)
+  token = tokens[position]
+  if token.kind == "keyword"
+    case token.text
+    when "return" then return parse_return(tokens, position + 1)
+    when "break" then return Step.new(node: break_node, position: position + 1)
+    when "next" then return Step.new(node: next_node, position: position + 1)
+    end
+  end
+  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[=])
+    value = parse_expression(tokens, position + 2)
+    return Step.new(node: assignment_node(token.text, value.node), position: value.position)
+  end
+  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[+= -= *= /= %=])
+    # `x += e` desugars to `x = x + e`, as in the seed.
+    operator = tokens[position + 1].text.slice(0, 1)
+    value = parse_expression(tokens, position + 2)
+    desugared = binary_node(operator, identifier_node(token.text), value.node)
+    return Step.new(node: assignment_node(token.text, desugared), position: value.position)
+  end
+  parse_expression(tokens, position)
+end
+
+def parse_return(tokens, position)
+  if statement_boundary?(tokens, position) || keyword_at?(tokens, position, %w[if unless])
+    return Step.new(node: return_bare_node, position: position)
+  end
+  value = parse_expression(tokens, position)
+  Step.new(node: return_node(value.node), position: value.position)
+end
+
+# Parse a whole file of newline-separated statements. A statement that ends
+# somewhere other than a newline becomes an error node, then parsing skips
+# to the next line and carries on.
 def parse_program(tokens)
   nodes = []
   position = 0
@@ -328,9 +419,14 @@ def parse_program(tokens)
       position += 1
       next
     end
-    step = parse_expression(tokens, position)
+    step = parse_statement(tokens, position)
     nodes += [step.node]
     position = step.position
+    next if statement_boundary?(tokens, position)
+    nodes += [error_node("expected newline after statement, got #{tokens[position].text}")]
+    while position < tokens.length && tokens[position].kind != "newline"
+      position += 1
+    end
   end
   nodes
 end
@@ -359,6 +455,11 @@ def sexp(node)
   when "call" then headed_sexp("call #{node.name}", node.arguments)
   when "method_call" then headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
   when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
+  when "assignment" then "(= #{node.name} #{sexp(node.value)})"
+  when "return" then "(return #{sexp(node.value)})"
+  when "return_bare" then "(return)"
+  when "break" then "(break)"
+  when "next" then "(next)"
   when "error" then "(error #{node.message})"
   else
     "(unknown #{node.kind})"

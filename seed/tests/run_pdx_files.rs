@@ -251,6 +251,21 @@ fn portland_parser_handles_postfix_chains() {
 }
 
 #[test]
+fn portland_parser_handles_statements() {
+    let sample = std::env::temp_dir().join("parse_statements.pdx");
+    let source = "x = 1 + 2\ntotal += 5\ncount -= 1\nreturn 42\nreturn\nbreak\nnext\nname = shout(\"hi\").length\n1 2\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(= x (+ 1 2))\n(= total (+ total 5))\n(= count (- count 1))\n(return 42)\n(return)\n(break)\n(next)\n(= name (. (call shout \"hi\") length))\n1\n(error expected newline after statement, got 2)\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
 fn portland_parser_reports_error_nodes() {
     let sample = std::env::temp_dir().join("parse_error_sample.pdx");
     std::fs::write(&sample, "]\n").unwrap();
