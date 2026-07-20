@@ -14,32 +14,93 @@
 
 require_relative "parser"
 
+# signal is "none", or an unwinding "break" / "next" / "return"
+# (a return's value rides in the value slot).
 struct Outcome
   value
   bindings
+  signal
 end
 
 def outcome(value, bindings)
-  Outcome.new(value: value, bindings: bindings)
+  Outcome.new(value: value, bindings: bindings, signal: "none")
+end
+
+def signal_outcome(signal, value, bindings)
+  Outcome.new(value: value, bindings: bindings, signal: signal)
 end
 
 # — evaluation —
 
 def evaluate_program(nodes)
-  bindings = []
+  run_body(nodes, [])
+end
+
+# Run statements until done or a signal starts unwinding.
+def run_body(nodes, bindings)
+  result = outcome([], bindings)
   nodes.each do |node|
-    step = evaluate_statement(node, bindings)
-    bindings = step.bindings
+    result = evaluate_statement(node, result.bindings)
+    break unless result.signal == "none"
   end
+  result
 end
 
 def evaluate_statement(node, bindings)
-  if node.kind == "assignment"
+  case node.kind
+  when "assignment"
     step = evaluate_expression(node.value, bindings)
     value = step.value.first
     return outcome([value], [[node.name, value]] + step.bindings)
+  when "while" then return evaluate_while(node, bindings)
+  when "break" then return signal_outcome("break", [], bindings)
+  when "next" then return signal_outcome("next", [], bindings)
+  when "return_bare" then return signal_outcome("return", [], bindings)
+  when "return"
+    step = evaluate_expression(node.value, bindings)
+    return signal_outcome("return", step.value, step.bindings)
   end
   evaluate_expression(node, bindings)
+end
+
+def evaluate_while(node, bindings)
+  while true
+    condition = evaluate_expression(node.condition, bindings)
+    bindings = condition.bindings
+    break unless condition.value.first
+    body = run_body(node.body, bindings)
+    bindings = body.bindings
+    break if body.signal == "break"
+    return signal_outcome("return", body.value, bindings) if body.signal == "return"
+  end
+  outcome([], bindings)
+end
+
+def evaluate_if(node, bindings)
+  condition = evaluate_expression(node.condition, bindings)
+  if condition.value.first
+    run_body(node.then_body, condition.bindings)
+  else
+    run_body(node.else_body, condition.bindings)
+  end
+end
+
+def evaluate_case(node, bindings)
+  subject = evaluate_expression(node.subject, bindings)
+  bindings = subject.bindings
+  branch_index = 0
+  while branch_index < node.branches.length
+    branch = node.branches[branch_index]
+    value_index = 0
+    while value_index < branch.values.length
+      candidate = evaluate_expression(branch.values[value_index], bindings)
+      bindings = candidate.bindings
+      return run_body(branch.body, bindings) if candidate.value.first == subject.value.first
+      value_index += 1
+    end
+    branch_index += 1
+  end
+  run_body(node.else_body, bindings)
 end
 
 # First match wins, so prepending a pair is both set and shadow.
@@ -68,6 +129,8 @@ def evaluate_expression(node, bindings)
       outcome(slot, bindings)
     end
   when "binary" then evaluate_binary(node, bindings)
+  when "if" then evaluate_if(node, bindings)
+  when "case" then evaluate_case(node, bindings)
   when "logical" then evaluate_logical(node, bindings)
   when "unary" then evaluate_unary(node, bindings)
   else

@@ -400,6 +400,14 @@ fn portland_evaluator_matches_the_seed_on_interpolation() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_control_flow() {
+    assert_evaluator_matches_seed(
+        "eval_rung4.pdx",
+        "n = 3\nwhile n > 0\n  puts n\n  n -= 1\nend\ncount = 0\nwhile true\n  count += 1\n  next if count == 2\n  puts count\n  break if count > 3\nend\nif 1 < 2\n  puts \"yes\"\nelse\n  puts \"no\"\nend\nlabel = if 2 > 1\n  \"big\"\nelse\n  \"small\"\nend\nputs label\nputs \"guard\" if true\ncase 5\nwhen 1 then puts \"one\"\nwhen 5 then puts \"five\"\nelse\n  puts \"many\"\nend\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_matches_the_seed_on_operators() {
     assert_evaluator_matches_seed(
         "eval_rung1.pdx",
