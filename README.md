@@ -9,7 +9,7 @@ Close to the metal, on Metal.
 > No compiler yet; the seed is the disposable bootstrap.
 > See [`AGENT.md`](AGENT.md) for the working brief,
 > [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale,
-> and [`todos/`](todos/README.md) for what's next.
+> and the [issues](https://github.com/portlandlang/portland/issues) for what's next.
 
 ## A taste
 

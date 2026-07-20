@@ -1,33 +1,25 @@
-# TODOs
+# TODOs → GitHub Issues
 
-Issue-shaped design and build tasks, kept as files until the GitHub org + repo exist (then migrated to real issues — see [016](016-repo-scaffolding.md)).
+These files were migrated to [GitHub issues](https://github.com/portlandlang/portland/issues)
+on 2026-07-19. Original files live in git history. Completed 001 (squat the
+namespaces) was not migrated — it was done.
 
-## Now (namespace + identity)
-
-- [001 — Squat the namespaces](001-squat-namespaces.md)
-- [002 — Brand story](002-brand-story.md)
-- [017 — Register domains](017-register-domains.md)
-
-## Bikesheds (decide together; one voice)
-
-- [003 — Mutability keyword](003-bikeshed-mutability-keyword.md)
-- [004 — Concurrency sigil](004-bikeshed-concurrency-sigil.md)
-- [005 — Absence word](005-bikeshed-absence-word.md)
-
-## Language design
-
-- [010 — Type inference](010-type-inference.md)
-- [011 — Immutability semantics](011-immutability-semantics.md)
-- [012 — `together` semantics](012-together-semantics.md)
-- [013 — Memory safety / MTE](013-memory-safety-mte.md)
-- [014 — Heterogeneous dispatch](014-heterogeneous-dispatch.md)
-- [015 — Compile-time macros](015-compile-time-macros.md)
-
-## Compiler build-out
-
-- [006 — Compile pipeline design](006-compile-pipeline-design.md)
-- [007 — Port Prism's lexer](007-port-prism-lexer.md)
-- [008 — Grammar and AST](008-grammar-and-ast.md)
-- [009 — Stage 0 subset](009-stage-0-subset.md) — mostly done, see `docs/STAGE0.md`
-- [016 — Repo scaffolding](016-repo-scaffolding.md) — mostly done
-- [018 — Toward Stage 1](018-toward-stage-1.md) — gap analysis for self-hosting
+| Was | Now |
+| --- | --- |
+| 002 — Brand story | [#1](https://github.com/portlandlang/portland/issues/1) |
+| 003 — Bikeshed: the mutability keyword | [#2](https://github.com/portlandlang/portland/issues/2) |
+| 004 — Bikeshed: the concurrency sigil | [#3](https://github.com/portlandlang/portland/issues/3) |
+| 005 — Bikeshed: the absence word | [#4](https://github.com/portlandlang/portland/issues/4) |
+| 006 — Compile pipeline design | [#5](https://github.com/portlandlang/portland/issues/5) |
+| 007 — Port Prism's lexer | [#6](https://github.com/portlandlang/portland/issues/6) |
+| 008 — Grammar and AST | [#7](https://github.com/portlandlang/portland/issues/7) |
+| 009 — Stage 0 subset | [#8](https://github.com/portlandlang/portland/issues/8) |
+| 010 — Type inference | [#9](https://github.com/portlandlang/portland/issues/9) |
+| 011 — Immutability semantics | [#10](https://github.com/portlandlang/portland/issues/10) |
+| 012 — `together` semantics | [#11](https://github.com/portlandlang/portland/issues/11) |
+| 013 — Memory safety / MTE | [#12](https://github.com/portlandlang/portland/issues/12) |
+| 014 — Heterogeneous dispatch | [#13](https://github.com/portlandlang/portland/issues/13) |
+| 015 — Compile-time macros | [#14](https://github.com/portlandlang/portland/issues/14) |
+| 016 — Repo scaffolding | [#15](https://github.com/portlandlang/portland/issues/15) |
+| 017 — Register domains | [#16](https://github.com/portlandlang/portland/issues/16) |
+| 018 — Toward Stage 1 | [#17](https://github.com/portlandlang/portland/issues/17) |
