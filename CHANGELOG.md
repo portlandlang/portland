@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx rung 4 (#18): control flow — if/elsif/else, unless (desugared), while, case/when with then one-liners, and postfix guards.
+
 - parser.pdx rung 3 (#18): statements — assignment, compound assignment (desugared), return/break/next, and error recovery that skips to the next line instead of cascading.
 
 - parser.pdx rung 2 (#18): postfix — dot calls, indexing, paren call arguments, leading-dot chains across newlines, and negative literals binding Ruby-style (-5.abs).

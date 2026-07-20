@@ -266,6 +266,21 @@ fn portland_parser_handles_statements() {
 }
 
 #[test]
+fn portland_parser_handles_control_flow() {
+    let sample = std::env::temp_dir().join("parse_control.pdx");
+    let source = "if ready\n  go\nend\nif a\n  1\nelsif b\n  2\nelse\n  3\nend\nunless quiet\n  shout(\"hi\")\nend\nputs(\"hi\") if ready\nreturn if done\nwhile n > 0\n  n -= 1\nend\ncase n\nwhen 0 then \"none\"\nwhen 1, 2 then \"few\"\nelse\n  \"many\"\nend\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(if ready (then go))\n(if a (then 1) (else (if b (then 2) (else 3))))\n(if quiet (then) (else (call shout \"hi\")))\n(if ready (then (call puts \"hi\")))\n(if done (then (return)))\n(while (> n 0) (= n (- n 1)))\n(case n (when 0 \"none\") (when 1 2 \"few\") (else \"many\"))\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
 fn portland_parser_reports_error_nodes() {
     let sample = std::env::temp_dir().join("parse_error_sample.pdx");
     std::fs::write(&sample, "]\n").unwrap();

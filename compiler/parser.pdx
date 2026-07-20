@@ -105,6 +105,34 @@ struct NextNode
   kind
 end
 
+# An absent else and an empty else both land as [] here — the same
+# conflation the Rust seed makes. (Optionals evidence, exhibit B.)
+struct IfNode
+  kind
+  condition
+  then_body
+  else_body
+end
+
+struct WhileNode
+  kind
+  condition
+  body
+end
+
+struct CaseNode
+  kind
+  subject
+  branches
+  else_body
+end
+
+struct WhenNode
+  kind
+  values
+  body
+end
+
 def integer_node(value)
   IntegerNode.new(kind: "integer", value: value)
 end
@@ -167,6 +195,22 @@ end
 
 def next_node
   NextNode.new(kind: "next")
+end
+
+def if_node(condition, then_body, else_body)
+  IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+end
+
+def while_node(condition, body)
+  WhileNode.new(kind: "while", condition: condition, body: body)
+end
+
+def case_node(subject, branches, else_body)
+  CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
+end
+
+def when_node(values, body)
+  WhenNode.new(kind: "when", values: values, body: body)
 end
 
 # — parsing —
@@ -356,6 +400,9 @@ def parse_primary(tokens, position)
   when "keyword"
     case token.text
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
+    when "if" then parse_if(tokens, after)
+    when "unless" then parse_unless(tokens, after)
+    when "case" then parse_case(tokens, after)
     else
       Step.new(node: error_node("unexpected keyword #{token.text}"), position: after)
     end
@@ -384,6 +431,7 @@ def parse_statement(tokens, position)
     when "return" then return parse_return(tokens, position + 1)
     when "break" then return Step.new(node: break_node, position: position + 1)
     when "next" then return Step.new(node: next_node, position: position + 1)
+    when "while" then return parse_while(tokens, position + 1)
     end
   end
   if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[=])
@@ -408,6 +456,135 @@ def parse_return(tokens, position)
   Step.new(node: return_node(value.node), position: value.position)
 end
 
+# Ruby's postfix guards: `puts(x) if ready`, `return unless valid`.
+def parse_statement_with_guard(tokens, position)
+  step = parse_statement(tokens, position)
+  if keyword_at?(tokens, step.position, %w[if])
+    condition = parse_expression(tokens, step.position + 1)
+    return Step.new(node: if_node(condition.node, [step.node], []), position: condition.position)
+  end
+  if keyword_at?(tokens, step.position, %w[unless])
+    condition = parse_expression(tokens, step.position + 1)
+    return Step.new(node: if_node(condition.node, [], [step.node]), position: condition.position)
+  end
+  step
+end
+
+# Parse statements up to (not consuming) one of the terminator keywords.
+# The Step's node is the array of statement nodes.
+def parse_body(tokens, position, terminators)
+  nodes = []
+  position = skip_newlines_at(tokens, position)
+  while true
+    if position >= tokens.length || keyword_at?(tokens, position, terminators)
+      return Step.new(node: nodes, position: position)
+    end
+    step = parse_statement_with_guard(tokens, position)
+    nodes += [step.node]
+    position = step.position
+    unless statement_boundary?(tokens, position) || keyword_at?(tokens, position, terminators)
+      nodes += [error_node("expected newline after statement, got #{tokens[position].text}")]
+      while position < tokens.length && tokens[position].kind != "newline"
+        position += 1
+      end
+    end
+    position = skip_newlines_at(tokens, position)
+  end
+end
+
+# — control flow —
+
+def parse_if(tokens, position)
+  condition = parse_expression(tokens, position)
+  then_body = parse_body(tokens, condition.position, %w[else elsif end])
+  position = then_body.position
+  if keyword_at?(tokens, position, %w[elsif])
+    # Sugar for else + nested if; the chain shares one end, which the
+    # recursive call consumes.
+    nested = parse_if(tokens, position + 1)
+    return Step.new(node: if_node(condition.node, then_body.node, [nested.node]), position: nested.position)
+  end
+  if keyword_at?(tokens, position, %w[else])
+    else_body = parse_body(tokens, position + 1, %w[end])
+    if keyword_at?(tokens, else_body.position, %w[end])
+      return Step.new(node: if_node(condition.node, then_body.node, else_body.node), position: else_body.position + 1)
+    end
+    return Step.new(node: error_node("expected end to close if"), position: else_body.position)
+  end
+  if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: if_node(condition.node, then_body.node, []), position: position + 1)
+  end
+  Step.new(node: error_node("expected end to close if"), position: position)
+end
+
+# `unless c ... else ... end`, desugared to an if with swapped branches.
+def parse_unless(tokens, position)
+  condition = parse_expression(tokens, position)
+  body = parse_body(tokens, condition.position, %w[else end])
+  position = body.position
+  if keyword_at?(tokens, position, %w[else])
+    else_body = parse_body(tokens, position + 1, %w[end])
+    position = else_body.position
+    if keyword_at?(tokens, position, %w[end])
+      return Step.new(node: if_node(condition.node, else_body.node, body.node), position: position + 1)
+    end
+    return Step.new(node: error_node("expected end to close unless"), position: position)
+  end
+  if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: if_node(condition.node, [], body.node), position: position + 1)
+  end
+  Step.new(node: error_node("expected end to close unless"), position: position)
+end
+
+def parse_while(tokens, position)
+  condition = parse_expression(tokens, position)
+  body = parse_body(tokens, condition.position, %w[end])
+  if keyword_at?(tokens, body.position, %w[end])
+    return Step.new(node: while_node(condition.node, body.node), position: body.position + 1)
+  end
+  Step.new(node: error_node("expected end to close while"), position: body.position)
+end
+
+def parse_case(tokens, position)
+  subject = parse_expression(tokens, position)
+  position = skip_newlines_at(tokens, subject.position)
+  branches = []
+  while keyword_at?(tokens, position, %w[when])
+    step = parse_expression(tokens, position + 1)
+    values = [step.node]
+    position = step.position
+    while operator_at?(tokens, position, %w[,])
+      step = parse_expression(tokens, position + 1)
+      values += [step.node]
+      position = step.position
+    end
+    if keyword_at?(tokens, position, %w[then])
+      body_statement = parse_statement(tokens, position + 1)
+      branches += [when_node(values, [body_statement.node])]
+      position = skip_newlines_at(tokens, body_statement.position)
+    else
+      body = parse_body(tokens, position, %w[when else end])
+      branches += [when_node(values, body.node)]
+      position = body.position
+    end
+  end
+  if branches.empty?
+    return Step.new(node: error_node("case needs at least one when"), position: position)
+  end
+  if keyword_at?(tokens, position, %w[else])
+    else_body = parse_body(tokens, position + 1, %w[end])
+    position = else_body.position
+    if keyword_at?(tokens, position, %w[end])
+      return Step.new(node: case_node(subject.node, branches, else_body.node), position: position + 1)
+    end
+    return Step.new(node: error_node("expected end to close case"), position: position)
+  end
+  if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: case_node(subject.node, branches, []), position: position + 1)
+  end
+  Step.new(node: error_node("expected end to close case"), position: position)
+end
+
 # Parse a whole file of newline-separated statements. A statement that ends
 # somewhere other than a newline becomes an error node, then parsing skips
 # to the next line and carries on.
@@ -419,7 +596,7 @@ def parse_program(tokens)
       position += 1
       next
     end
-    step = parse_statement(tokens, position)
+    step = parse_statement_with_guard(tokens, position)
     nodes += [step.node]
     position = step.position
     next if statement_boundary?(tokens, position)
@@ -444,6 +621,21 @@ def headed_sexp(head, arguments)
   "(#{head} #{sexp_list(arguments)})"
 end
 
+def if_sexp(node)
+  result = "(if #{sexp(node.condition)} #{headed_sexp("then", node.then_body)}"
+  result += " #{headed_sexp("else", node.else_body)}" unless node.else_body.empty?
+  result + ")"
+end
+
+def case_sexp(node)
+  result = "(case #{sexp(node.subject)}"
+  node.branches.each do |branch|
+    result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
+  end
+  result += " #{headed_sexp("else", node.else_body)}" unless node.else_body.empty?
+  result + ")"
+end
+
 def sexp(node)
   case node.kind
   when "integer" then node.value
@@ -456,6 +648,9 @@ def sexp(node)
   when "method_call" then headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
   when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
   when "assignment" then "(= #{node.name} #{sexp(node.value)})"
+  when "if" then if_sexp(node)
+  when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
+  when "case" then case_sexp(node)
   when "return" then "(return #{sexp(node.value)})"
   when "return_bare" then "(return)"
   when "break" then "(break)"
