@@ -296,6 +296,41 @@ fn portland_parser_handles_definitions() {
 }
 
 #[test]
+fn portland_parser_handles_commands_and_literals() {
+    let sample = std::env::temp_dir().join("parse_commands.pdx");
+    let source = "puts \"hello\"\nshout word\nputs 1 + 2\nrequire_relative \"lexer\"\nfoo - 1\ntokens = []\npairs = {\"a\" => 1}\nwords = %w[rose city]\nputs -1\nputs [1]\nputs (1)\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(call puts \"hello\")\n(call shout word)\n(call puts (+ 1 2))\n(call require_relative \"lexer\")\n(- foo 1)\n(= tokens (array))\n(= pairs (hash (=> \"a\" 1)))\n(= words %w[rose city])\n(error ambiguous without parens — write puts(-1) or puts - 1)\n(error ambiguous without parens — write puts([...]) to pass an array or puts[...] to index)\n(error ambiguous without parens — write puts(...) with no space to call)\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
+fn portland_parser_parses_the_whole_compiler_including_itself() {
+    // The summit of #18: Portland parsing Portland, all of it.
+    for file in ["lexer.pdx", "tokenize.pdx", "parse.pdx", "parser.pdx"] {
+        let target = format!("{}/../compiler/{file}", env!("CARGO_MANIFEST_DIR"));
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_parse())
+            .arg(&target)
+            .output()
+            .expect("failed to run pdx");
+        assert!(output.status.success(), "{file} did not parse");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        // `"(error` is the sexp printer's own string literal; a real error
+        // node prints unquoted.
+        let real_errors = stdout.matches("(error ").count() - stdout.matches("\"(error ").count();
+        assert_eq!(real_errors, 0, "{file} produced error nodes");
+        assert!(!stdout.is_empty(), "{file} produced no output");
+    }
+}
+
+#[test]
 fn portland_parser_reports_error_nodes() {
     let sample = std::env::temp_dir().join("parse_error_sample.pdx");
     std::fs::write(&sample, "]\n").unwrap();

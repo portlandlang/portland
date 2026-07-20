@@ -95,6 +95,27 @@ struct StructDefNode
   fields
 end
 
+struct ArrayNode
+  kind
+  elements
+end
+
+struct HashNode
+  kind
+  pairs
+end
+
+struct PairNode
+  kind
+  key
+  value
+end
+
+struct WordArrayNode
+  kind
+  text
+end
+
 struct IndexNode
   kind
   receiver
@@ -210,6 +231,22 @@ end
 
 def struct_def_node(name, fields)
   StructDefNode.new(kind: "struct_def", name: name, fields: fields)
+end
+
+def array_node(elements)
+  ArrayNode.new(kind: "array", elements: elements)
+end
+
+def hash_node(pairs)
+  HashNode.new(kind: "hash", pairs: pairs)
+end
+
+def pair_node(key, value)
+  PairNode.new(kind: "pair", key: key, value: value)
+end
+
+def word_array_node(text)
+  WordArrayNode.new(kind: "word_array", text: text)
 end
 
 def index_node(receiver, index)
@@ -445,6 +482,51 @@ def parse_arguments(tokens, position)
   Step.new(node: [error_node("expected closing paren after arguments")], position: position)
 end
 
+# `[a, b, c]` — position already past the opening bracket.
+def parse_array(tokens, position)
+  elements = []
+  if operator_at?(tokens, position, ["]"])
+    return Step.new(node: array_node(elements), position: position + 1)
+  end
+  step = parse_expression(tokens, position)
+  elements += [step.node]
+  position = step.position
+  while operator_at?(tokens, position, %w[,])
+    step = parse_expression(tokens, position + 1)
+    elements += [step.node]
+    position = step.position
+  end
+  if operator_at?(tokens, position, ["]"])
+    return Step.new(node: array_node(elements), position: position + 1)
+  end
+  Step.new(node: error_node("expected closing bracket in array"), position: position)
+end
+
+# `{key => value, ...}` — position already past the opening brace.
+def parse_hash(tokens, position)
+  pairs = []
+  if operator_at?(tokens, position, ["}"])
+    return Step.new(node: hash_node(pairs), position: position + 1)
+  end
+  while true
+    key = parse_expression(tokens, position)
+    unless operator_at?(tokens, key.position, %w[=>])
+      return Step.new(node: error_node("expected => in hash literal"), position: key.position)
+    end
+    value = parse_expression(tokens, key.position + 1)
+    pairs += [pair_node(key.node, value.node)]
+    position = value.position
+    if operator_at?(tokens, position, %w[,])
+      position += 1
+      next
+    end
+    if operator_at?(tokens, position, ["}"])
+      return Step.new(node: hash_node(pairs), position: position + 1)
+    end
+    return Step.new(node: error_node("expected closing brace in hash"), position: position)
+  end
+end
+
 # One argument: `label: value` makes a keyword argument, else an expression.
 def parse_argument(tokens, position)
   token = tokens[position]
@@ -482,6 +564,7 @@ def parse_primary(tokens, position)
       Step.new(node: identifier_node(token.text), position: after)
     end
   when "string" then Step.new(node: string_node(token.text), position: after)
+  when "word_array" then Step.new(node: word_array_node(token.text), position: after)
   when "keyword"
     case token.text
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
@@ -499,6 +582,10 @@ def parse_primary(tokens, position)
       else
         Step.new(node: error_node("expected closing paren"), position: inner.position)
       end
+    elsif token.text == "["
+      parse_array(tokens, after)
+    elsif token.text == "{"
+      parse_hash(tokens, after)
     else
       Step.new(node: error_node("unexpected #{token.kind} #{token.text}"), position: after)
     end
@@ -521,6 +608,12 @@ def parse_statement(tokens, position)
     when "struct" then return parse_struct(tokens, position + 1)
     end
   end
+  if token.kind == "identifier" && command_start?(tokens, position + 1)
+    return parse_command(tokens, position)
+  end
+  if token.kind == "identifier" && ambiguous_command?(tokens, position + 1)
+    return Step.new(node: error_node(ambiguity_message(tokens, position)), position: skip_line_at(tokens, position))
+  end
   if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[=])
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, value.node), position: value.position)
@@ -541,6 +634,68 @@ def parse_return(tokens, position)
   end
   value = parse_expression(tokens, position)
   Step.new(node: return_node(value.node), position: value.position)
+end
+
+# Paren-less command calls, statement position only: `puts "hello"`.
+# Forms Ruby resolves by whitespace guessing are errors here instead.
+def command_start?(tokens, position)
+  return false if position >= tokens.length
+  token = tokens[position]
+  case token.kind
+  when "integer", "string", "word_array", "identifier" then true
+  when "keyword" then token.text == "true" || token.text == "false"
+  when "operator" then token.text == "!"
+  else
+    false
+  end
+end
+
+def ambiguous_command?(tokens, position)
+  return false if position >= tokens.length
+  token = tokens[position]
+  return false unless token.kind == "operator" && token.leading_space
+  if token.text == "-"
+    after = position + 1
+    return false if after >= tokens.length
+    return !tokens[after].leading_space
+  end
+  token.text == "[" || token.text == "("
+end
+
+def ambiguity_message(tokens, position)
+  name = tokens[position].text
+  following = tokens[position + 1].text
+  if following == "-"
+    argument = tokens[position + 2].text
+    return "ambiguous without parens — write #{name}(-#{argument}) or #{name} - #{argument}"
+  end
+  if following == "["
+    return "ambiguous without parens — write #{name}([...]) to pass an array or #{name}[...] to index"
+  end
+  "ambiguous without parens — write #{name}(...) with no space to call"
+end
+
+def skip_line_at(tokens, position)
+  while position < tokens.length && tokens[position].kind != "newline"
+    position += 1
+  end
+  position
+end
+
+def parse_command(tokens, position)
+  name = tokens[position].text
+  step = parse_expression(tokens, position + 1)
+  arguments = [step.node]
+  position = step.position
+  while operator_at?(tokens, position, %w[,])
+    step = parse_expression(tokens, position + 1)
+    arguments += [step.node]
+    position = step.position
+  end
+  if keyword_at?(tokens, position, %w[do])
+    return Step.new(node: error_node("blocks on paren-less calls aren't supported yet — write #{name}(...) do"), position: skip_line_at(tokens, position))
+  end
+  Step.new(node: call_node(name, arguments), position: position)
 end
 
 # Ruby's postfix guards: `puts(x) if ready`, `return unless valid`.
@@ -814,6 +969,10 @@ def sexp(node)
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
   when "def" then def_sexp(node)
   when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
+  when "array" then headed_sexp("array", node.elements)
+  when "hash" then headed_sexp("hash", node.pairs)
+  when "pair" then "(=> #{sexp(node.key)} #{sexp(node.value)})"
+  when "word_array" then node.text
   when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
   when "assignment" then "(= #{node.name} #{sexp(node.value)})"
   when "if" then if_sexp(node)

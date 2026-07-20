@@ -4,11 +4,13 @@ use std::fmt;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value {
-    Array(Vec<Value>),
+    /// Rc because Portland values are immutable: sharing is invisible, and
+    /// cloning a value must never mean copying a whole collection.
+    Array(std::rc::Rc<Vec<Value>>),
     Boolean(bool),
     /// Insertion-ordered pairs; lookup is linear. Note: derived equality is
     /// order-sensitive, unlike Ruby's — acceptable crudeness for the seed.
-    Hash(Vec<(Value, Value)>),
+    Hash(std::rc::Rc<Vec<(Value, Value)>>),
     Integer(i64),
     String(String),
     /// Immutable named record; fields stay in definition order.
@@ -19,6 +21,14 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn array(elements: Vec<Value>) -> Value {
+        Value::Array(std::rc::Rc::new(elements))
+    }
+
+    pub fn hash(pairs: Vec<(Value, Value)>) -> Value {
+        Value::Hash(std::rc::Rc::new(pairs))
+    }
+
     /// The developer-facing rendering: strings keep their quotes, like irb.
     pub fn inspect(&self) -> String {
         match self {

@@ -43,7 +43,7 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     current_file: Option<std::path::PathBuf>,
     expression_depth: usize,
     loaded: std::collections::HashSet<std::path::PathBuf>,
-    methods: HashMap<String, Method>,
+    methods: HashMap<String, std::rc::Rc<Method>>,
     output: W,
     pending: Option<Pending>,
     structs: HashMap<String, Vec<String>>,
@@ -131,7 +131,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     body: body.clone(),
                     parameters: parameters.clone(),
                 };
-                self.methods.insert(name.clone(), method);
+                self.methods.insert(name.clone(), std::rc::Rc::new(method));
                 None
             }
             Statement::Break => {
@@ -189,7 +189,7 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn expression_inner(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
-            Expression::ArrayLiteral(elements) => Some(Value::Array(
+            Expression::ArrayLiteral(elements) => Some(Value::array(
                 elements
                     .iter()
                     .map(|element| self.value_of(element))
@@ -222,7 +222,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         None => pairs.push((key, value)),
                     }
                 }
-                Some(Value::Hash(pairs))
+                Some(Value::hash(pairs))
             }
             Expression::Index { index, receiver } => {
                 let receiver = self.value_of(receiver);
@@ -306,9 +306,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         Some(Value::String(left + &right))
                     }
                     (Value::Array(left), BinaryOperator::Add, Value::Array(right)) => {
-                        let mut combined = left;
-                        combined.extend(right);
-                        Some(Value::Array(combined))
+                        let mut combined = left.as_ref().clone();
+                        combined.extend(right.iter().cloned());
+                        Some(Value::array(combined))
                     }
                     (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
                         let count = usize::try_from(count)
@@ -322,7 +322,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         for _ in 0..count {
                             repeated.extend(elements.iter().cloned());
                         }
-                        Some(Value::Array(repeated))
+                        Some(Value::array(repeated))
                     }
                     (Value::Integer(left), BinaryOperator::Greater, Value::Integer(right)) => {
                         Some(Value::Boolean(left > right))
@@ -519,7 +519,7 @@ impl<W: std::io::Write> Interpreter<W> {
         if let Some(block) = block {
             return match (&receiver, name, arguments.as_slice()) {
                 (Value::Array(elements), "each", []) => {
-                    for element in elements.clone() {
+                    for element in elements.iter().cloned() {
                         self.run_block(block, vec![element]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -528,7 +528,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     Some(receiver)
                 }
                 (Value::Hash(pairs), "each", []) => {
-                    for (key, value) in pairs.clone() {
+                    for (key, value) in pairs.iter().cloned() {
                         self.run_block(block, vec![key, value]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -538,7 +538,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 (Value::Array(elements), "map", []) => {
                     let mut results = Vec::new();
-                    for element in elements.clone() {
+                    for element in elements.iter().cloned() {
                         let result = self.run_block(block, vec![element]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -547,10 +547,10 @@ impl<W: std::io::Write> Interpreter<W> {
                             result.unwrap_or_else(|| panic!("map block produced no value"));
                         results.push(result);
                     }
-                    Some(Value::Array(results))
+                    Some(Value::array(results))
                 }
                 (Value::Array(elements), "each_with_index", []) => {
-                    for (index, element) in elements.clone().into_iter().enumerate() {
+                    for (index, element) in elements.iter().cloned().enumerate() {
                         self.run_block(block, vec![element, Value::Integer(index as i64)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -560,7 +560,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 (Value::Array(elements), "reduce", [initial]) => {
                     let mut accumulator = initial.clone();
-                    for element in elements.clone() {
+                    for element in elements.iter().cloned() {
                         let result = self.run_block(block, vec![accumulator.clone(), element]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -572,7 +572,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 (Value::Array(elements), "reject", []) => {
                     let mut kept = Vec::new();
-                    for element in elements.clone() {
+                    for element in elements.iter().cloned() {
                         let verdict = self.run_block(block, vec![element.clone()]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -585,11 +585,11 @@ impl<W: std::io::Write> Interpreter<W> {
                             }
                         }
                     }
-                    Some(Value::Array(kept))
+                    Some(Value::array(kept))
                 }
                 (Value::Array(elements), "select", []) => {
                     let mut kept = Vec::new();
-                    for element in elements.clone() {
+                    for element in elements.iter().cloned() {
                         let verdict = self.run_block(block, vec![element.clone()]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -602,7 +602,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             }
                         }
                     }
-                    Some(Value::Array(kept))
+                    Some(Value::array(kept))
                 }
                 (Value::Integer(count), "times", []) => {
                     for index in 0..*count {
@@ -662,11 +662,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Boolean(pairs.iter().any(|(existing, _)| existing == key))
             }
             (Value::Hash(pairs), "keys", []) => {
-                Value::Array(pairs.iter().map(|(key, _)| key.clone()).collect())
+                Value::array(pairs.iter().map(|(key, _)| key.clone()).collect())
             }
             (Value::Hash(pairs), "length", []) => Value::Integer(pairs.len() as i64),
             (Value::Hash(pairs), "values", []) => {
-                Value::Array(pairs.iter().map(|(_, value)| value.clone()).collect())
+                Value::array(pairs.iter().map(|(_, value)| value.clone()).collect())
             }
             (Value::Array(elements), "include?", [needle]) => {
                 Value::Boolean(elements.contains(needle))
@@ -686,12 +686,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                Value::Array(elements.iter().skip(start).take(length).cloned().collect())
+                Value::array(elements.iter().skip(start).take(length).cloned().collect())
             }
             (Value::Array(elements), "sort", []) => {
                 let mut sorted = Self::integers_of(elements, "sort");
                 sorted.sort_unstable();
-                Value::Array(sorted.into_iter().map(Value::Integer).collect())
+                Value::array(sorted.into_iter().map(Value::Integer).collect())
             }
             (Value::Array(elements), "sum", []) => {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
@@ -702,7 +702,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Integer(number), "odd?", []) => Value::Boolean(number % 2 != 0),
             (Value::Integer(number), "positive?", []) => Value::Boolean(*number > 0),
             (Value::Integer(number), "zero?", []) => Value::Boolean(*number == 0),
-            (Value::String(text), "chars", []) => Value::Array(
+            (Value::String(text), "chars", []) => Value::array(
                 text.chars()
                     .map(|character| Value::String(character.to_string()))
                     .collect(),
@@ -724,7 +724,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
                 Value::String(text.chars().skip(start).take(length).collect())
             }
-            (Value::String(text), "split", [Value::String(separator)]) => Value::Array(
+            (Value::String(text), "split", [Value::String(separator)]) => Value::array(
                 text.split(separator.as_str())
                     .map(|piece| Value::String(piece.to_string()))
                     .collect(),
@@ -879,7 +879,7 @@ impl<W: std::io::Write> Interpreter<W> {
             return match arguments.len() {
                 0 => None,
                 1 => Some(arguments.remove(0)),
-                _ => Some(Value::Array(arguments)),
+                _ => Some(Value::array(arguments)),
             };
         }
 
@@ -893,7 +893,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         .iter()
                         .map(|argument| Value::String(argument.clone()))
                         .collect();
-                    return Some(Value::Array(arguments));
+                    return Some(Value::array(arguments));
                 }
                 ("read_file", [Value::String(path)]) => {
                     let content = std::fs::read_to_string(path)
@@ -1259,7 +1259,7 @@ mod tests {
         let source = "[1, 2].each do |number|\n  number\nend\n";
         assert_eq!(
             evaluate(source),
-            Some(Value::Array(vec![Value::Integer(1), Value::Integer(2)]))
+            Some(Value::array(vec![Value::Integer(1), Value::Integer(2)]))
         );
     }
 
@@ -1268,7 +1268,7 @@ mod tests {
         let source = "[1, 2, 3].map do |number|\n  number * number\nend\n";
         assert_eq!(
             evaluate(source),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::Integer(1),
                 Value::Integer(4),
                 Value::Integer(9),
@@ -1287,7 +1287,7 @@ mod tests {
     fn sorts_integer_arrays() {
         assert_eq!(
             evaluate("[3, 1, 2].sort"),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::Integer(1),
                 Value::Integer(2),
                 Value::Integer(3),
@@ -1303,11 +1303,11 @@ mod tests {
         );
         assert_eq!(
             evaluate("[1, 2, 3, 4].slice(1, 2)"),
-            Some(Value::Array(vec![Value::Integer(2), Value::Integer(3)]))
+            Some(Value::array(vec![Value::Integer(2), Value::Integer(3)]))
         );
         assert_eq!(
             evaluate("[1, 2].slice(1, 99)"),
-            Some(Value::Array(vec![Value::Integer(2)]))
+            Some(Value::array(vec![Value::Integer(2)]))
         );
     }
 
@@ -1316,7 +1316,7 @@ mod tests {
         let source = "[1, 2, 3, 4].select do |number|\n  number.even?\nend\n";
         assert_eq!(
             evaluate(source),
-            Some(Value::Array(vec![Value::Integer(2), Value::Integer(4)]))
+            Some(Value::array(vec![Value::Integer(2), Value::Integer(4)]))
         );
     }
 
@@ -1325,7 +1325,7 @@ mod tests {
         let source = "[1, 2, 3, 4].reject do |number|\n  number.even?\nend\n";
         assert_eq!(
             evaluate(source),
-            Some(Value::Array(vec![Value::Integer(1), Value::Integer(3)]))
+            Some(Value::array(vec![Value::Integer(1), Value::Integer(3)]))
         );
     }
 
@@ -1473,14 +1473,14 @@ mod tests {
         );
         assert_eq!(
             evaluate(&format!("{hash}.keys")),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::String("a".to_string()),
                 Value::String("b".to_string()),
             ]))
         );
         assert_eq!(
             evaluate(&format!("{hash}.values")),
-            Some(Value::Array(vec![Value::Integer(1), Value::Integer(2)]))
+            Some(Value::array(vec![Value::Integer(1), Value::Integer(2)]))
         );
     }
 
@@ -1496,13 +1496,13 @@ mod tests {
     fn evaluates_array_literals() {
         assert_eq!(
             evaluate("[1, 2 + 3, \"pdx\"]"),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::Integer(1),
                 Value::Integer(5),
                 Value::String("pdx".to_string()),
             ]))
         );
-        assert_eq!(evaluate("[]"), Some(Value::Array(vec![])));
+        assert_eq!(evaluate("[]"), Some(Value::array(vec![])));
     }
 
     #[test]
@@ -1525,7 +1525,7 @@ mod tests {
     fn concatenates_arrays_with_plus() {
         assert_eq!(
             evaluate("[1] + [2, 3]"),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::Integer(1),
                 Value::Integer(2),
                 Value::Integer(3),
@@ -1568,7 +1568,7 @@ mod tests {
     fn calls_stdlib_breadth_methods() {
         assert_eq!(
             evaluate(r#""pdx".chars"#),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::String("p".to_string()),
                 Value::String("d".to_string()),
                 Value::String("x".to_string()),
@@ -1576,7 +1576,7 @@ mod tests {
         );
         assert_eq!(
             evaluate(r#""a,b".split(",")"#),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::String("a".to_string()),
                 Value::String("b".to_string()),
             ]))
@@ -1824,12 +1824,12 @@ mod tests {
     fn evaluates_word_arrays() {
         assert_eq!(
             evaluate("%w[rose city]"),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::String("rose".to_string()),
                 Value::String("city".to_string()),
             ]))
         );
-        assert_eq!(evaluate("%w[]"), Some(Value::Array(vec![])));
+        assert_eq!(evaluate("%w[]"), Some(Value::array(vec![])));
         assert_eq!(
             evaluate("%w[a b c].length + 1 % 2"),
             Some(Value::Integer(4))
@@ -1844,7 +1844,7 @@ mod tests {
         );
         assert_eq!(
             evaluate("[0] * 3"),
-            Some(Value::Array(vec![
+            Some(Value::array(vec![
                 Value::Integer(0),
                 Value::Integer(0),
                 Value::Integer(0),
@@ -2266,7 +2266,7 @@ mod tests {
         let source = "def pair(base, twice = base * 2)\n  [base, twice]\nend\npair(3)\n";
         assert_eq!(
             evaluate(source),
-            Some(Value::Array(vec![Value::Integer(3), Value::Integer(6)]))
+            Some(Value::array(vec![Value::Integer(3), Value::Integer(6)]))
         );
     }
 
