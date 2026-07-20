@@ -89,6 +89,38 @@ fn runs_word_count_pdx_with_argv() {
     );
 }
 
+#[test]
+fn survives_deep_nesting_and_recursion() {
+    // Regression guard for the deep-stack interpreter thread: these depths
+    // hang-on-overflow with a default 8 MB main stack.
+    let cases = [
+        (
+            "deep_parens.pdx",
+            format!("puts({}1{})\n", "(".repeat(5_000), ")".repeat(5_000)),
+        ),
+        (
+            "deep_recursion.pdx",
+            "def f(n)\n  return 0 if n == 0\n  f(n - 1)\nend\nputs(f(5000))\n".to_string(),
+        ),
+    ];
+    for (name, source) in cases {
+        let path = std::env::temp_dir().join(name);
+        std::fs::write(&path, source).expect("failed to write probe file");
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&path)
+            .output()
+            .expect("failed to run pdx");
+        assert!(output.status.success(), "{name} did not succeed");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let expected = if name == "deep_parens.pdx" {
+            "1\n"
+        } else {
+            "0\n"
+        };
+        assert_eq!(stdout, expected, "{name} output mismatch");
+    }
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

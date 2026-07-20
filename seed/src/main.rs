@@ -8,6 +8,20 @@ use portland_seed::interpreter::Interpreter;
 use portland_seed::parser;
 
 fn main() {
+    // Parser and interpreter both recurse on the stack, and the 8 MB main
+    // stack hangs (rather than crashes) on overflow under macOS. A spawned
+    // thread gets a deep stack and a clean "has overflowed its stack" abort.
+    let seed = std::thread::Builder::new()
+        .name("portland".to_string())
+        .stack_size(512 * 1024 * 1024)
+        .spawn(run)
+        .expect("failed to spawn the interpreter thread");
+    if seed.join().is_err() {
+        process::exit(1);
+    }
+}
+
+fn run() {
     match std::env::args().nth(1) {
         Some(path) => run_file(&path),
         None => repl(),
