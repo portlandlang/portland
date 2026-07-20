@@ -1,0 +1,102 @@
+# Stage 1, act two: Portland running Portland.
+#
+# A library: require_relative "evaluator", then
+# evaluate_program(parse_program(lex(source))).
+#
+# No mutable collections exist, so evaluation threads state the way the
+# parser threads Step: every function returns an Outcome. The value field
+# is a slot — [] for no value, [v] for a value — because statements may
+# produce nothing and there is no nil. Bindings are an assoc array of
+# [name, value] pairs. Guest values are host values, so arithmetic,
+# equality, and puts formatting match the seed for free.
+#
+# To run a file, see run.pdx.
+
+require_relative "parser"
+
+struct Outcome
+  value
+  bindings
+end
+
+def outcome(value, bindings)
+  Outcome.new(value: value, bindings: bindings)
+end
+
+# Decode a raw string lexeme: strip quotes, resolve escapes.
+def decode_string(lexeme)
+  content = lexeme.slice(1, lexeme.length - 2)
+  characters = content.chars
+  result = ""
+  index = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "\\" && index + 1 < characters.length
+      following = characters[index + 1]
+      decoded = case following
+      when "n" then "\n"
+      when "t" then "\t"
+      else
+        following
+      end
+      result += decoded
+      index += 2
+      next
+    end
+    result += character
+    index += 1
+  end
+  result
+end
+
+# — evaluation —
+
+def evaluate_program(nodes)
+  bindings = []
+  nodes.each do |node|
+    step = evaluate_statement(node, bindings)
+    bindings = step.bindings
+  end
+end
+
+def evaluate_statement(node, bindings)
+  evaluate_expression(node, bindings)
+end
+
+def evaluate_expression(node, bindings)
+  case node.kind
+  when "integer" then outcome([node.value.to_i], bindings)
+  when "boolean" then outcome([node.value == "true"], bindings)
+  when "string" then outcome([decode_string(node.value)], bindings)
+  when "call" then evaluate_call(node, bindings)
+  when "identifier" then evaluate_call(call_node(node.name, []), bindings)
+  else
+    puts "evaluator: cannot evaluate #{node.kind} yet"
+    outcome([], bindings)
+  end
+end
+
+def evaluate_call(node, bindings)
+  arguments = []
+  node.arguments.each do |argument|
+    step = evaluate_expression(argument, bindings)
+    bindings = step.bindings
+    arguments += step.value
+  end
+  case node.name
+  when "puts"
+    puts "" if arguments.empty?
+    arguments.each do |argument|
+      puts argument
+    end
+    outcome([], bindings)
+  when "p"
+    arguments.each do |argument|
+      p argument
+    end
+    outcome(arguments, bindings)
+  else
+    puts "evaluator: undefined method #{node.name}"
+    outcome([], bindings)
+  end
+end

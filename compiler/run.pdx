@@ -1,0 +1,7 @@
+# Run a Portland file on the Portland evaluator.
+#
+# Usage: pdx compiler/run.pdx <file.pdx>
+
+require_relative "evaluator"
+
+evaluate_program(parse_program(lex(read_file(argv.first))))

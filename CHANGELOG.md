@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 0 (#19): Portland running Portland — Outcome-threaded evaluation of literals and puts/p, run.pdx driver, differential-tested byte-identical against the seed.
+
 - parser.pdx rungs 6 + summit (#18): command calls with never-guess errors, array/hash/%w literals — and the flag: parser.pdx parses lexer.pdx, tokenize.pdx, parse.pdx, and itself with zero error nodes, CI-pinned.
 - Seed: Value::Array/Hash payloads are now Rc-shared — immutability makes sharing invisible, and the self-parse dropped from 7 minutes to under 8 seconds. lexer.pdx tokens carry leading_space for the parser's ambiguity rules.
 

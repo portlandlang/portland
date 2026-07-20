@@ -346,6 +346,33 @@ fn portland_parser_reports_error_nodes() {
     );
 }
 
+fn portland_run() -> String {
+    format!("{}/../compiler/run.pdx", env!("CARGO_MANIFEST_DIR"))
+}
+
+#[test]
+fn portland_evaluator_matches_the_seed() {
+    // Differential test: the Portland-on-Portland evaluator must produce
+    // byte-identical output to the seed running the same file directly.
+    let sample = std::env::temp_dir().join("eval_rung0.pdx");
+    let source = "puts 42\nputs \"rose city\"\nputs \"line\\nbreak\"\nputs true\nputs\n";
+    std::fs::write(&sample, source).unwrap();
+    let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(direct.status.success() && hosted.status.success());
+    assert_eq!(
+        String::from_utf8(direct.stdout).unwrap(),
+        String::from_utf8(hosted.stdout).unwrap()
+    );
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
