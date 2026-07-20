@@ -60,7 +60,23 @@ def evaluate_program(nodes)
 end
 
 def evaluate_statement(node, bindings)
+  if node.kind == "assignment"
+    step = evaluate_expression(node.value, bindings)
+    value = step.value.first
+    return outcome([value], [[node.name, value]] + step.bindings)
+  end
   evaluate_expression(node, bindings)
+end
+
+# First match wins, so prepending a pair is both set and shadow.
+def lookup(bindings, name)
+  index = 0
+  while index < bindings.length
+    pair = bindings[index]
+    return [pair[1]] if pair[0] == name
+    index += 1
+  end
+  []
 end
 
 def evaluate_expression(node, bindings)
@@ -69,7 +85,13 @@ def evaluate_expression(node, bindings)
   when "boolean" then outcome([node.value == "true"], bindings)
   when "string" then outcome([decode_string(node.value)], bindings)
   when "call" then evaluate_call(node, bindings)
-  when "identifier" then evaluate_call(call_node(node.name, []), bindings)
+  when "identifier"
+    slot = lookup(bindings, node.name)
+    if slot.empty?
+      evaluate_call(call_node(node.name, []), bindings)
+    else
+      outcome(slot, bindings)
+    end
   when "binary" then evaluate_binary(node, bindings)
   when "logical" then evaluate_logical(node, bindings)
   when "unary" then evaluate_unary(node, bindings)

@@ -384,6 +384,14 @@ fn portland_evaluator_matches_the_seed_on_literals() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_variables() {
+    assert_evaluator_matches_seed(
+        "eval_rung2.pdx",
+        "x = 40 + 2\nputs x\nx = x + 1\nputs x\ntotal = 0\ntotal += 5\ntotal *= 3\nputs total\nname = \"rose\"\nputs name + \" city\"\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_matches_the_seed_on_operators() {
     assert_evaluator_matches_seed(
         "eval_rung1.pdx",

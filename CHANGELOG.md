@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 2 (#19): variables — assignment and lookup over prepend-to-shadow assoc bindings.
+
 - evaluator.pdx rung 1 (#19): operators — host operators do the work since guest values are host values; differential harness extracted.
 
 - evaluator.pdx rung 0 (#19): Portland running Portland — Outcome-threaded evaluation of literals and puts/p, run.pdx driver, differential-tested byte-identical against the seed.
