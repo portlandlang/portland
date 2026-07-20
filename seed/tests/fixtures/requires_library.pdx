@@ -1,0 +1,6 @@
+# Loads a sibling file and calls into it; requiring twice is a no-op.
+
+require_relative "library"
+second = require_relative("library")
+puts library_greeting
+puts second

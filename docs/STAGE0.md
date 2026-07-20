@@ -75,6 +75,9 @@ the tests are the spec until a real one exists.
   argument, like Ruby. The REPL shows results via `inspect`.
   Crude file IO: `argv()`, `read_file(path)`, `write_file(path, content)` —
   placeholder names until the real object model exists.
+- **`require_relative "lexer"`** — multi-file programs, Ruby-style: resolved
+  against the requiring file's directory, `.pdx` implied, loads once
+  (returns false on a repeat).
 - **Comments** — `#` to end of line.
 - **Names** — `snake_case`, `?`/`!` suffixes are part of the name.
 

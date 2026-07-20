@@ -39,7 +39,10 @@ const MAXIMUM_EXPRESSION_DEPTH: usize = 100_000;
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     arguments: Vec<String>,
     call_depth: usize,
+    /// The file currently executing; `require_relative` resolves against it.
+    current_file: Option<std::path::PathBuf>,
     expression_depth: usize,
+    loaded: std::collections::HashSet<std::path::PathBuf>,
     methods: HashMap<String, Method>,
     output: W,
     pending: Option<Pending>,
@@ -58,6 +61,8 @@ impl<W: std::io::Write> Interpreter<W> {
         Self {
             arguments: Vec::new(),
             call_depth: 0,
+            current_file: None,
+            loaded: std::collections::HashSet::new(),
             expression_depth: 0,
             methods: HashMap::new(),
             output,
@@ -68,6 +73,11 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// Command-line arguments exposed to the program via `argv()`.
+    /// The path of the file being run, for `require_relative` resolution.
+    pub fn set_current_file(&mut self, path: std::path::PathBuf) {
+        self.current_file = Some(path);
+    }
+
     pub fn set_arguments(&mut self, arguments: Vec<String>) {
         self.arguments = arguments;
     }
@@ -738,7 +748,40 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     fn builtin_name(name: &str) -> bool {
-        matches!(name, "argv" | "p" | "puts" | "read_file" | "write_file")
+        matches!(
+            name,
+            "argv" | "p" | "puts" | "read_file" | "require_relative" | "write_file"
+        )
+    }
+
+    /// Load another Portland file, Ruby-style: the path is resolved against
+    /// the requiring file's directory, `.pdx` is implied, and a file loads
+    /// only once (returns false when already loaded).
+    fn require_relative(&mut self, path: &str) -> bool {
+        let base = self
+            .current_file
+            .as_ref()
+            .and_then(|file| file.parent())
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        let mut resolved = base.join(path);
+        if resolved.extension().is_none() {
+            resolved.set_extension("pdx");
+        }
+        let resolved = resolved
+            .canonicalize()
+            .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
+        if self.loaded.contains(&resolved) {
+            return false;
+        }
+        self.loaded.insert(resolved.clone());
+        let source = std::fs::read_to_string(&resolved)
+            .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
+        let program = parser::parse(&source);
+        let previous_file = self.current_file.replace(resolved);
+        self.run_body(&program.statements);
+        self.current_file = previous_file;
+        true
     }
 
     fn integers_of(elements: &[Value], method: &str) -> Vec<i64> {
@@ -861,6 +904,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     std::fs::write(path, content)
                         .unwrap_or_else(|error| panic!("write_file {path:?}: {error}"));
                     return None;
+                }
+                ("require_relative", [Value::String(path)]) => {
+                    return Some(Value::Boolean(self.require_relative(path)));
                 }
                 _ => {}
             }

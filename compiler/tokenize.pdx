@@ -1,0 +1,9 @@
+# Dump the token stream of a Portland file, one token per line.
+#
+# Usage: pdx compiler/tokenize.pdx <file.pdx>
+
+require_relative "lexer"
+
+lex(read_file(argv.first)).each do |token|
+  puts "#{token.kind} #{token.text}"
+end

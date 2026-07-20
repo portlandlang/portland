@@ -155,12 +155,26 @@ fn portland_lexer() -> String {
     format!("{}/../compiler/lexer.pdx", env!("CARGO_MANIFEST_DIR"))
 }
 
+fn portland_tokenize() -> String {
+    format!("{}/../compiler/tokenize.pdx", env!("CARGO_MANIFEST_DIR"))
+}
+
+#[test]
+fn require_relative_loads_once() {
+    let output = run_fixture("requires_library.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "hello from the library\nfalse\n"
+    );
+}
+
 #[test]
 fn portland_lexer_lexes_a_sample() {
     let sample = std::env::temp_dir().join("lexer_sample.pdx");
     std::fs::write(&sample, "value = 40 + 2\nputs(\"answer #{value}!\")\n").unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
-        .arg(portland_lexer())
+        .arg(portland_tokenize())
         .arg(&sample)
         .output()
         .expect("failed to run pdx");
@@ -173,7 +187,7 @@ fn portland_lexer_lexes_a_sample() {
 fn portland_lexer_lexes_itself() {
     // The Stage 1 milestone in miniature: Portland tokenizing Portland.
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
-        .arg(portland_lexer())
+        .arg(portland_tokenize())
         .arg(portland_lexer())
         .output()
         .expect("failed to run pdx");

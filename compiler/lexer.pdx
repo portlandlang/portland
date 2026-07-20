@@ -1,7 +1,8 @@
 # The Stage 1 dare, step one: Portland's lexer, written in Portland.
 # Tokenizes real Portland source — including this very file.
 #
-# Usage: pdx compiler/lexer.pdx <file.pdx>
+# A library: require_relative "lexer", then call lex(source).
+# To dump tokens from the command line, see tokenize.pdx.
 
 struct Token
   kind
@@ -197,6 +198,3 @@ def lex(source)
   tokens
 end
 
-lex(read_file(argv().first)).each do |token|
-  puts "#{token.kind} #{token.text}"
-end

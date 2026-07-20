@@ -1,0 +1,5 @@
+# A little library for the require_relative fixtures.
+
+def library_greeting
+  "hello from the library"
+end

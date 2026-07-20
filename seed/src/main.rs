@@ -36,6 +36,7 @@ fn run_file(path: &str) {
     let program = parser::parse(&source);
     let mut interpreter = Interpreter::new();
     interpreter.set_arguments(std::env::args().skip(2).collect());
+    interpreter.set_current_file(std::path::PathBuf::from(path));
     interpreter.program(&program);
 }
 
