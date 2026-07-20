@@ -51,7 +51,9 @@ def evaluate_statement(node, bindings)
   when "assignment"
     step = evaluate_expression(node.value, bindings)
     value = step.value.first
-    return outcome([value], [[node.name, value]] + step.bindings)
+    return outcome([value], [[node.name, "local", value]] + step.bindings)
+  when "def"
+    return outcome([], [[node.name, "method", [node.parameters, node.body]]] + bindings)
   when "while" then return evaluate_while(node, bindings)
   when "break" then return signal_outcome("break", [], bindings)
   when "next" then return signal_outcome("next", [], bindings)
@@ -103,12 +105,14 @@ def evaluate_case(node, bindings)
   run_body(node.else_body, bindings)
 end
 
-# First match wins, so prepending a pair is both set and shadow.
+# Bindings are [name, kind, payload] triples — kind is "local" or "method".
+# The no-shadow rule means one namespace serves both. First match wins,
+# so prepending a triple is both set and shadow.
 def lookup(bindings, name)
   index = 0
   while index < bindings.length
-    pair = bindings[index]
-    return [pair[1]] if pair[0] == name
+    triple = bindings[index]
+    return [triple] if triple[0] == name
     index += 1
   end
   []
@@ -123,10 +127,10 @@ def evaluate_expression(node, bindings)
   when "call" then evaluate_call(node, bindings)
   when "identifier"
     slot = lookup(bindings, node.name)
-    if slot.empty?
+    if slot.empty? || slot.first[1] == "method"
       evaluate_call(call_node(node.name, []), bindings)
     else
-      outcome(slot, bindings)
+      outcome([slot.first[2]], bindings)
     end
   when "binary" then evaluate_binary(node, bindings)
   when "if" then evaluate_if(node, bindings)
@@ -198,12 +202,40 @@ def evaluate_method_call(node, bindings)
   outcome([], step.bindings)
 end
 
+# Run a user method: fresh scope of methods only (no outer locals), params
+# bound left to right so defaults can reference earlier ones. The caller's
+# bindings come back untouched — callee scope is discarded.
+def invoke(payload, arguments, bindings)
+  parameters = payload[0]
+  body = payload[1]
+  scope = bindings.select do |triple|
+    triple[1] == "method"
+  end
+  index = 0
+  parameters.each do |parameter|
+    value = if index < arguments.length
+      arguments[index]
+    else
+      default = evaluate_expression(parameter.value, scope)
+      default.value.first
+    end
+    scope = [[parameter.name, "local", value]] + scope
+    index += 1
+  end
+  result = run_body(body, scope)
+  outcome(result.value, bindings)
+end
+
 def evaluate_call(node, bindings)
   arguments = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument, bindings)
     bindings = step.bindings
     arguments += step.value
+  end
+  slot = lookup(bindings, node.name)
+  if !slot.empty? && slot.first[1] == "method"
+    return invoke(slot.first[2], arguments, bindings)
   end
   case node.name
   when "puts"

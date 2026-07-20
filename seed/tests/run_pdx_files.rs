@@ -408,6 +408,14 @@ fn portland_evaluator_matches_the_seed_on_control_flow() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_methods() {
+    assert_evaluator_matches_seed(
+        "eval_rung5.pdx",
+        "def greet(name = \"stranger\")\n  \"hello, #{name}!\"\nend\nputs greet(\"pdx\")\nputs greet()\nputs greet\ndef factorial(n)\n  return 1 if n <= 1\n  n * factorial(n - 1)\nend\nputs factorial(10)\ndef pair(base, twice = base * 2)\n  base + twice\nend\nputs pair(5)\ndef shout(word)\n  puts word + \"!\"\nend\nshout \"go\"\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_matches_the_seed_on_operators() {
     assert_evaluator_matches_seed(
         "eval_rung1.pdx",

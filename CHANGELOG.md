@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 5 (#19): methods — one namespace for locals and methods (the no-shadow rule makes it sound), recursion, defaults, fresh method-only scopes, return unwinding.
+
 - evaluator.pdx rung 4 (#19): control flow — if/unless/while/case, guards, and break/next/return as threaded signals.
 
 - evaluator.pdx rung 3 (#19): string interpolation moved to parse time in parser.pdx (desugared to + chains with .to_s, like the seed); string nodes now hold decoded values, sexps re-encode them.
