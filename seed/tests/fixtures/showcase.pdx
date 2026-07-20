@@ -1,10 +1,10 @@
 # A little of everything the seed understands so far.
 
-def describe(n)
-  if n < 0
+def describe(number)
+  if number < 0
     "negative"
   else
-    if n == 0
+    if number == 0
       "zero"
     else
       "positive"
@@ -16,8 +16,8 @@ puts(describe(0 - 7)) # no unary minus yet, so 0 - 7
 puts(describe(0))
 puts(describe(7 * 6))
 
-def average(a, b)
-  (a + b) / 2
+def average(left, right)
+  (left + right) / 2
 end
 
 answer = average(40, 44)

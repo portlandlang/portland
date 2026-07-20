@@ -10,7 +10,7 @@ use crate::ast::{
 use crate::parser;
 use crate::value::Value;
 
-/// Parse and evaluate a source string, returning the last statement's value.
+/// Parse and evaluate a source string, returning the last statement'word value.
 pub fn evaluate(source: &str) -> Option<Value> {
     let program = parser::parse(source);
     let mut interpreter = Interpreter::new();
@@ -173,7 +173,10 @@ impl<W: std::io::Write> Interpreter<W> {
     fn expression_inner(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
             Expression::ArrayLiteral(elements) => Some(Value::Array(
-                elements.iter().map(|e| self.value_of(e)).collect(),
+                elements
+                    .iter()
+                    .map(|element| self.value_of(element))
+                    .collect(),
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Case {
@@ -263,37 +266,37 @@ impl<W: std::io::Write> Interpreter<W> {
                 let left = self.value_of(left);
                 let right = self.value_of(right);
                 match (left, operator, right) {
-                    (Value::Integer(a), BinaryOperator::Add, Value::Integer(b)) => {
-                        Some(Value::Integer(a + b))
+                    (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
+                        Some(Value::Integer(left + right))
                     }
-                    (Value::Integer(a), BinaryOperator::Divide, Value::Integer(b)) => {
+                    (Value::Integer(left), BinaryOperator::Divide, Value::Integer(right)) => {
                         // Truncates toward zero (Rust semantics); Ruby floors.
-                        // Revisit when Portland's integer semantics are specified.
-                        Some(Value::Integer(a / b))
+                        // Revisit when Portland'word integer semantics are specified.
+                        Some(Value::Integer(left / right))
                     }
-                    (Value::Integer(a), BinaryOperator::Modulo, Value::Integer(b)) => {
-                        // Truncated remainder (Rust semantics); Ruby's % is floored.
-                        // Revisit when Portland's integer semantics are specified.
-                        Some(Value::Integer(a % b))
+                    (Value::Integer(left), BinaryOperator::Modulo, Value::Integer(right)) => {
+                        // Truncated remainder (Rust semantics); Ruby'word % is floored.
+                        // Revisit when Portland'word integer semantics are specified.
+                        Some(Value::Integer(left % right))
                     }
-                    (Value::Integer(a), BinaryOperator::Multiply, Value::Integer(b)) => {
-                        Some(Value::Integer(a * b))
+                    (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
+                        Some(Value::Integer(left * right))
                     }
-                    (Value::Integer(a), BinaryOperator::Subtract, Value::Integer(b)) => {
-                        Some(Value::Integer(a - b))
+                    (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
+                        Some(Value::Integer(left - right))
                     }
-                    (Value::String(a), BinaryOperator::Add, Value::String(b)) => {
-                        Some(Value::String(a + &b))
+                    (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
+                        Some(Value::String(left + &right))
                     }
-                    (Value::Array(a), BinaryOperator::Add, Value::Array(b)) => {
-                        let mut combined = a;
-                        combined.extend(b);
+                    (Value::Array(left), BinaryOperator::Add, Value::Array(right)) => {
+                        let mut combined = left;
+                        combined.extend(right);
                         Some(Value::Array(combined))
                     }
-                    (Value::String(s), BinaryOperator::Multiply, Value::Integer(count)) => {
+                    (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
                         let count = usize::try_from(count)
                             .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
-                        Some(Value::String(s.repeat(count)))
+                        Some(Value::String(text.repeat(count)))
                     }
                     (Value::Array(elements), BinaryOperator::Multiply, Value::Integer(count)) => {
                         let count = usize::try_from(count)
@@ -304,17 +307,19 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         Some(Value::Array(repeated))
                     }
-                    (Value::Integer(a), BinaryOperator::Greater, Value::Integer(b)) => {
-                        Some(Value::Boolean(a > b))
+                    (Value::Integer(left), BinaryOperator::Greater, Value::Integer(right)) => {
+                        Some(Value::Boolean(left > right))
                     }
-                    (Value::Integer(a), BinaryOperator::GreaterOrEqual, Value::Integer(b)) => {
-                        Some(Value::Boolean(a >= b))
+                    (
+                        Value::Integer(left),
+                        BinaryOperator::GreaterOrEqual,
+                        Value::Integer(right),
+                    ) => Some(Value::Boolean(left >= right)),
+                    (Value::Integer(left), BinaryOperator::Less, Value::Integer(right)) => {
+                        Some(Value::Boolean(left < right))
                     }
-                    (Value::Integer(a), BinaryOperator::Less, Value::Integer(b)) => {
-                        Some(Value::Boolean(a < b))
-                    }
-                    (Value::Integer(a), BinaryOperator::LessOrEqual, Value::Integer(b)) => {
-                        Some(Value::Boolean(a <= b))
+                    (Value::Integer(left), BinaryOperator::LessOrEqual, Value::Integer(right)) => {
+                        Some(Value::Boolean(left <= right))
                     }
                     // Equality is defined for every value pair; mixed types are just unequal.
                     (left, BinaryOperator::Equals, right) => Some(Value::Boolean(left == right)),
@@ -336,10 +341,13 @@ impl<W: std::io::Write> Interpreter<W> {
                     return Some(self.construct_struct(receiver, arguments, keyword_arguments));
                 }
                 let receiver = self.value_of(receiver);
-                let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
+                let arguments: Vec<Value> = arguments
+                    .iter()
+                    .map(|argument| self.value_of(argument))
+                    .collect();
                 let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                     .iter()
-                    .map(|(label, e)| (label.clone(), self.value_of(e)))
+                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
                     .collect();
                 Some(self.method_call(receiver, name, arguments, keyword_arguments, block.as_ref()))
             }
@@ -374,7 +382,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     .clone(),
             ),
             Expression::Call { arguments, name } => {
-                let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
+                let arguments: Vec<Value> = arguments
+                    .iter()
+                    .map(|argument| self.value_of(argument))
+                    .collect();
                 self.call(name, arguments)
             }
         }
@@ -401,7 +412,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         let provided: Vec<(String, Value)> = keyword_arguments
             .iter()
-            .map(|(label, e)| (label.clone(), self.value_of(e)))
+            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
             .collect();
         for (label, _) in &provided {
             if !fields.contains(label) {
@@ -623,50 +634,50 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "sum", []) => {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
             }
-            (Value::Integer(n), "abs", []) => Value::Integer(n.abs()),
-            (Value::Integer(n), "even?", []) => Value::Boolean(n % 2 == 0),
-            (Value::Integer(n), "negative?", []) => Value::Boolean(*n < 0),
-            (Value::Integer(n), "odd?", []) => Value::Boolean(n % 2 != 0),
-            (Value::Integer(n), "positive?", []) => Value::Boolean(*n > 0),
-            (Value::Integer(n), "zero?", []) => Value::Boolean(*n == 0),
-            (Value::String(s), "chars", []) => Value::Array(
-                s.chars()
+            (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
+            (Value::Integer(number), "even?", []) => Value::Boolean(number % 2 == 0),
+            (Value::Integer(number), "negative?", []) => Value::Boolean(*number < 0),
+            (Value::Integer(number), "odd?", []) => Value::Boolean(number % 2 != 0),
+            (Value::Integer(number), "positive?", []) => Value::Boolean(*number > 0),
+            (Value::Integer(number), "zero?", []) => Value::Boolean(*number == 0),
+            (Value::String(text), "chars", []) => Value::Array(
+                text.chars()
                     .map(|character| Value::String(character.to_string()))
                     .collect(),
             ),
-            (Value::String(s), "downcase", []) => Value::String(s.to_lowercase()),
-            (Value::String(s), "empty?", []) => Value::Boolean(s.is_empty()),
-            (Value::String(s), "end_with?", [Value::String(suffix)]) => {
-                Value::Boolean(s.ends_with(suffix))
+            (Value::String(text), "downcase", []) => Value::String(text.to_lowercase()),
+            (Value::String(text), "empty?", []) => Value::Boolean(text.is_empty()),
+            (Value::String(text), "end_with?", [Value::String(suffix)]) => {
+                Value::Boolean(text.ends_with(suffix))
             }
-            (Value::String(s), "include?", [Value::String(needle)]) => {
-                Value::Boolean(s.contains(needle))
+            (Value::String(text), "include?", [Value::String(needle)]) => {
+                Value::Boolean(text.contains(needle))
             }
-            (Value::String(s), "length", []) => Value::Integer(s.chars().count() as i64),
-            (Value::String(s), "reverse", []) => Value::String(s.chars().rev().collect()),
-            (Value::String(s), "slice", [Value::Integer(start), Value::Integer(length)]) => {
+            (Value::String(text), "length", []) => Value::Integer(text.chars().count() as i64),
+            (Value::String(text), "reverse", []) => Value::String(text.chars().rev().collect()),
+            (Value::String(text), "slice", [Value::Integer(start), Value::Integer(length)]) => {
                 let start = usize::try_from(*start)
                     .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                Value::String(s.chars().skip(start).take(length).collect())
+                Value::String(text.chars().skip(start).take(length).collect())
             }
-            (Value::String(s), "split", [Value::String(separator)]) => Value::Array(
-                s.split(separator.as_str())
+            (Value::String(text), "split", [Value::String(separator)]) => Value::Array(
+                text.split(separator.as_str())
                     .map(|piece| Value::String(piece.to_string()))
                     .collect(),
             ),
-            (Value::String(s), "start_with?", [Value::String(prefix)]) => {
-                Value::Boolean(s.starts_with(prefix))
+            (Value::String(text), "start_with?", [Value::String(prefix)]) => {
+                Value::Boolean(text.starts_with(prefix))
             }
-            (Value::String(s), "to_i", []) => {
-                let trimmed = s.trim();
+            (Value::String(text), "to_i", []) => {
+                let trimmed = text.trim();
                 let value = trimmed
                     .parse()
-                    .unwrap_or_else(|_| panic!("to_i cannot parse {s:?} — no nil to return"));
+                    .unwrap_or_else(|_| panic!("to_i cannot parse {text:?} — no nil to return"));
                 Value::Integer(value)
             }
-            (Value::String(s), "upcase", []) => Value::String(s.to_uppercase()),
+            (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")
@@ -697,7 +708,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
         if block.parameters.len() > arguments.len() {
             panic!(
-                "block expects {} argument(s), got {}",
+                "block expects {} argument(word), got {}",
                 block.parameters.len(),
                 arguments.len()
             );
@@ -807,7 +818,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 format!("{required} to {total}")
             };
             panic!(
-                "{name} expects {expected} argument(s), got {}",
+                "{name} expects {expected} argument(word), got {}",
                 arguments.len()
             );
         }
@@ -880,13 +891,28 @@ mod tests {
 
     #[test]
     fn evaluates_compound_assignment() {
-        assert_eq!(evaluate("x = 1\nx += 2\nx\n"), Some(Value::Integer(3)));
-        assert_eq!(evaluate("x = 10\nx -= 3\nx\n"), Some(Value::Integer(7)));
-        assert_eq!(evaluate("x = 4\nx *= 3\nx\n"), Some(Value::Integer(12)));
-        assert_eq!(evaluate("x = 9\nx /= 2\nx\n"), Some(Value::Integer(4)));
-        assert_eq!(evaluate("x = 9\nx %= 4\nx\n"), Some(Value::Integer(1)));
         assert_eq!(
-            evaluate("s = \"port\"\ns += \"land\"\ns\n"),
+            evaluate("value = 1\nvalue += 2\nvalue\n"),
+            Some(Value::Integer(3))
+        );
+        assert_eq!(
+            evaluate("value = 10\nvalue -= 3\nvalue\n"),
+            Some(Value::Integer(7))
+        );
+        assert_eq!(
+            evaluate("value = 4\nvalue *= 3\nvalue\n"),
+            Some(Value::Integer(12))
+        );
+        assert_eq!(
+            evaluate("value = 9\nvalue /= 2\nvalue\n"),
+            Some(Value::Integer(4))
+        );
+        assert_eq!(
+            evaluate("value = 9\nvalue %= 4\nvalue\n"),
+            Some(Value::Integer(1))
+        );
+        assert_eq!(
+            evaluate("word = \"port\"\nword += \"land\"\nword\n"),
             Some(Value::String("portland".to_string()))
         );
     }
@@ -894,7 +920,7 @@ mod tests {
     #[test]
     fn compound_assignment_takes_a_postfix_guard() {
         assert_eq!(
-            evaluate("x = 1\nx += 10 if false\nx\n"),
+            evaluate("value = 1\nvalue += 10 if false\nvalue\n"),
             Some(Value::Integer(1))
         );
     }
@@ -949,7 +975,10 @@ mod tests {
     fn postfix_if_guards_a_statement() {
         assert_eq!(output_of("puts(1) if true"), "1\n");
         assert_eq!(output_of("puts(1) if false"), "");
-        assert_eq!(evaluate("x = 5 if true\nx\n"), Some(Value::Integer(5)));
+        assert_eq!(
+            evaluate("value = 5 if true\nvalue\n"),
+            Some(Value::Integer(5))
+        );
     }
 
     #[test]
@@ -960,7 +989,7 @@ mod tests {
 
     #[test]
     fn return_with_a_postfix_guard_is_a_guard_clause() {
-        let source = "def clamp(n)\n  return 0 if n < 0\n  n\nend\n";
+        let source = "def clamp(number)\n  return 0 if number < 0\n  number\nend\n";
         assert_eq!(
             evaluate(&format!("{source}clamp(-5)\n")),
             Some(Value::Integer(0))
@@ -973,7 +1002,8 @@ mod tests {
 
     #[test]
     fn break_with_a_postfix_guard() {
-        let source = "n = 0\nwhile true\n  n = n + 1\n  break if n == 4\nend\nn\n";
+        let source =
+            "number = 0\nwhile true\n  number = number + 1\n  break if number == 4\nend\nnumber\n";
         assert_eq!(evaluate(source), Some(Value::Integer(4)));
     }
 
@@ -991,8 +1021,7 @@ mod tests {
 
     #[test]
     fn return_exits_a_method_early() {
-        let source =
-            "def sign(n)\n  if n < 0\n    return \"negative\"\n  end\n  \"non-negative\"\nend\n";
+        let source = "def sign(number)\n  if number < 0\n    return \"negative\"\n  end\n  \"non-negative\"\nend\n";
         assert_eq!(
             evaluate(&format!("{source}sign(-1)\n")),
             Some(Value::String("negative".to_string()))
@@ -1011,13 +1040,13 @@ mod tests {
 
     #[test]
     fn return_unwinds_through_a_while_loop() {
-        let source = "def find_first_multiple(of)\n  n = 1\n  while true\n    if n % of == 0\n      return n\n    end\n    n = n + 1\n  end\nend\nfind_first_multiple(7)\n";
+        let source = "def find_first_multiple(of)\n  number = 1\n  while true\n    if number % of == 0\n      return number\n    end\n    number = number + 1\n  end\nend\nfind_first_multiple(7)\n";
         assert_eq!(evaluate(source), Some(Value::Integer(7)));
     }
 
     #[test]
     fn next_skips_to_the_following_iteration() {
-        let source = "n = 0\ntotal = 0\nwhile n < 5\n  n += 1\n  next if n.even?\n  total += n\nend\ntotal\n";
+        let source = "number = 0\ntotal = 0\nwhile number < 5\n  number += 1\n  next if number.even?\n  total += number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(9)));
     }
 
@@ -1029,7 +1058,7 @@ mod tests {
 
     #[test]
     fn break_exits_a_while_loop() {
-        let source = "n = 0\nwhile true\n  n = n + 1\n  if n == 3\n    break\n  end\nend\nn\n";
+        let source = "number = 0\nwhile true\n  number = number + 1\n  if number == 3\n    break\n  end\nend\nnumber\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
@@ -1054,18 +1083,19 @@ mod tests {
     #[test]
     #[should_panic(expected = "not supported in the seed yet")]
     fn panics_on_a_break_inside_a_block() {
-        evaluate("[1, 2].each do |n|\n  break\nend\n");
+        evaluate("[1, 2].each do |number|\n  break\nend\n");
     }
 
     #[test]
     fn each_iterates_with_a_closure_over_the_enclosing_scope() {
-        let source = "total = 0\n[1, 2, 3].each do |n|\n  total = total + n\nend\ntotal\n";
+        let source =
+            "total = 0\n[1, 2, 3].each do |number|\n  total = total + number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(6)));
     }
 
     #[test]
     fn each_returns_its_receiver() {
-        let source = "[1, 2].each do |n|\n  n\nend\n";
+        let source = "[1, 2].each do |number|\n  number\nend\n";
         assert_eq!(
             evaluate(source),
             Some(Value::Array(vec![Value::Integer(1), Value::Integer(2)]))
@@ -1074,7 +1104,7 @@ mod tests {
 
     #[test]
     fn map_builds_a_new_array() {
-        let source = "[1, 2, 3].map do |n|\n  n * n\nend\n";
+        let source = "[1, 2, 3].map do |number|\n  number * number\nend\n";
         assert_eq!(
             evaluate(source),
             Some(Value::Array(vec![
@@ -1122,7 +1152,7 @@ mod tests {
 
     #[test]
     fn select_keeps_matching_elements() {
-        let source = "[1, 2, 3, 4].select do |n|\n  n.even?\nend\n";
+        let source = "[1, 2, 3, 4].select do |number|\n  number.even?\nend\n";
         assert_eq!(
             evaluate(source),
             Some(Value::Array(vec![Value::Integer(2), Value::Integer(4)]))
@@ -1131,7 +1161,7 @@ mod tests {
 
     #[test]
     fn reject_drops_matching_elements() {
-        let source = "[1, 2, 3, 4].reject do |n|\n  n.even?\nend\n";
+        let source = "[1, 2, 3, 4].reject do |number|\n  number.even?\nend\n";
         assert_eq!(
             evaluate(source),
             Some(Value::Array(vec![Value::Integer(1), Value::Integer(3)]))
@@ -1140,7 +1170,7 @@ mod tests {
 
     #[test]
     fn reduce_folds_from_an_initial_value() {
-        let source = "[1, 2, 3].reduce(10) do |sum, n|\n  sum + n\nend\n";
+        let source = "[1, 2, 3].reduce(10) do |sum, number|\n  sum + number\nend\n";
         assert_eq!(evaluate(source), Some(Value::Integer(16)));
         let concat = "%w[rose city].reduce(\"\") do |all, word|\n  all + word\nend\n";
         assert_eq!(
@@ -1152,7 +1182,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "select block must produce true or false")]
     fn panics_on_a_non_boolean_select_block() {
-        evaluate("[1].select do |n|\n  n\nend\n");
+        evaluate("[1].select do |number|\n  number\nend\n");
     }
 
     #[test]
@@ -1197,17 +1227,23 @@ mod tests {
 
     #[test]
     fn upto_and_downto_iterate_inclusively() {
-        assert_eq!(output_of("1.upto(3) do |n|\n  puts(n)\nend\n"), "1\n2\n3\n");
         assert_eq!(
-            output_of("3.downto(1) do |n|\n  puts(n)\nend\n"),
+            output_of("1.upto(3) do |number|\n  puts(number)\nend\n"),
+            "1\n2\n3\n"
+        );
+        assert_eq!(
+            output_of("3.downto(1) do |number|\n  puts(number)\nend\n"),
             "3\n2\n1\n"
         );
-        assert_eq!(output_of("1.upto(0) do |n|\n  puts(n)\nend\n"), "");
+        assert_eq!(
+            output_of("1.upto(0) do |number|\n  puts(number)\nend\n"),
+            ""
+        );
     }
 
     #[test]
     fn times_counts_from_zero() {
-        let source = "sum = 0\n3.times do |i|\n  sum = sum + i\nend\nsum\n";
+        let source = "sum = 0\n3.times do |index|\n  sum = sum + index\nend\nsum\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
@@ -1219,7 +1255,7 @@ mod tests {
 
     #[test]
     fn block_parameters_are_block_local() {
-        let source = "n = 100\n[1, 2].each do |n|\n  n\nend\nn\n";
+        let source = "number = 100\n[1, 2].each do |number|\n  number\nend\nnumber\n";
         assert_eq!(evaluate(source), Some(Value::Integer(100)));
     }
 
@@ -1234,7 +1270,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "undefined block-taking method")]
     fn panics_on_an_unknown_block_method() {
-        evaluate("\"pdx\".each do |c|\n  c\nend\n");
+        evaluate("\"pdx\".each do |character|\n  character\nend\n");
     }
 
     #[test]
@@ -1358,7 +1394,7 @@ mod tests {
     fn p_prints_inspected_values_and_returns_its_argument() {
         assert_eq!(output_of("p(\"hi\")"), "\"hi\"\n");
         assert_eq!(output_of("p([1, \"two\"])"), "[1, \"two\"]\n");
-        assert_eq!(evaluate("x = p(42)\nx\n"), Some(Value::Integer(42)));
+        assert_eq!(evaluate("value = p(42)\nvalue\n"), Some(Value::Integer(42)));
         assert_eq!(evaluate("p(1) + 1"), Some(Value::Integer(2)));
     }
 
@@ -1490,13 +1526,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "missing field text")]
     fn panics_on_a_missing_struct_field() {
-        evaluate("struct Token\n  kind\n  text\nend\nToken.new(kind: \"x\")\n");
+        evaluate("struct Token\n  kind\n  text\nend\nToken.new(kind: \"value\")\n");
     }
 
     #[test]
     #[should_panic(expected = "has no field speed")]
     fn panics_on_an_unknown_struct_field() {
-        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"x\", speed: 9)\n");
+        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"value\", speed: 9)\n");
     }
 
     #[test]
@@ -1520,7 +1556,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "has no field speed")]
     fn panics_on_with_of_an_unknown_field() {
-        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"x\").with(speed: 9)\n");
+        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"value\").with(speed: 9)\n");
     }
 
     #[test]
@@ -1539,13 +1575,13 @@ mod tests {
     #[test]
     #[should_panic(expected = "duplicate parameter name")]
     fn panics_on_duplicate_method_parameters() {
-        evaluate("def f(a, a)\n  a\nend\n");
+        evaluate("def f(same, same)\n  same\nend\n");
     }
 
     #[test]
     #[should_panic(expected = "duplicate block parameter name")]
     fn panics_on_duplicate_block_parameters() {
-        evaluate("[1].each do |a, a|\n  a\nend\n");
+        evaluate("[1].each do |same, same|\n  same\nend\n");
     }
 
     #[test]
@@ -1670,8 +1706,8 @@ mod tests {
             ))
         );
         assert_eq!(
-            evaluate(r"'it\'s escaped, and so is \\'"),
-            Some(Value::String("it's escaped, and so is \\".to_string()))
+            evaluate(r"'it\'word escaped, and so is \\'"),
+            Some(Value::String("it'word escaped, and so is \\".to_string()))
         );
     }
 
@@ -1737,7 +1773,7 @@ mod tests {
 
     #[test]
     fn evaluates_case_with_aligned_thens() {
-        let source = "def size(n)\n  case n\n  when 0 then \"none\"\n  when 1, 2 then \"few\"\n  else\n    \"many\"\n  end\nend\n";
+        let source = "def size(number)\n  case number\n  when 0 then \"none\"\n  when 1, 2 then \"few\"\n  else\n    \"many\"\n  end\nend\n";
         assert_eq!(
             evaluate(&format!("{source}size(0)\n")),
             Some(Value::String("none".to_string()))
@@ -1795,7 +1831,7 @@ mod tests {
 
     #[test]
     fn evaluates_elsif_chains() {
-        let source = "def describe(n)\n  if n < 0\n    \"negative\"\n  elsif n == 0\n    \"zero\"\n  elsif n < 10\n    \"small\"\n  else\n    \"big\"\n  end\nend\n";
+        let source = "def describe(number)\n  if number < 0\n    \"negative\"\n  elsif number == 0\n    \"zero\"\n  elsif number < 10\n    \"small\"\n  else\n    \"big\"\n  end\nend\n";
         assert_eq!(
             evaluate(&format!("{source}describe(-1)\n")),
             Some(Value::String("negative".to_string()))
@@ -1816,7 +1852,7 @@ mod tests {
 
     #[test]
     fn if_works_inside_methods() {
-        let source = "def sign(n)\n  if n < 0\n    \"negative\"\n  else\n    \"non-negative\"\n  end\nend\nsign(0 - 5)\n";
+        let source = "def sign(number)\n  if number < 0\n    \"negative\"\n  else\n    \"non-negative\"\n  end\nend\nsign(0 - 5)\n";
         assert_eq!(
             evaluate(source),
             Some(Value::String("negative".to_string()))
@@ -1831,13 +1867,13 @@ mod tests {
 
     #[test]
     fn while_loops_until_the_condition_is_false() {
-        let source = "n = 3\nwhile n > 0\n  puts(n)\n  n = n - 1\nend\n";
+        let source = "number = 3\nwhile number > 0\n  puts(number)\n  number = number - 1\nend\n";
         assert_eq!(output_of(source), "3\n2\n1\n");
     }
 
     #[test]
     fn while_computes_a_factorial() {
-        let source = "def factorial(n)\n  result = 1\n  while n > 1\n    result = result * n\n    n = n - 1\n  end\n  result\nend\nfactorial(10)\n";
+        let source = "def factorial(number)\n  result = 1\n  while number > 1\n    result = result * number\n    number = number - 1\n  end\n  result\nend\nfactorial(10)\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3_628_800)));
     }
 
@@ -1965,7 +2001,7 @@ mod tests {
 
     #[test]
     fn defaults_can_reference_earlier_parameters() {
-        let source = "def pair(a, b = a * 2)\n  [a, b]\nend\npair(3)\n";
+        let source = "def pair(base, twice = base * 2)\n  [base, twice]\nend\npair(3)\n";
         assert_eq!(
             evaluate(source),
             Some(Value::Array(vec![Value::Integer(3), Value::Integer(6)]))
@@ -1973,9 +2009,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "expects 1 to 2 argument(s)")]
+    #[should_panic(expected = "expects 1 to 2 argument(word)")]
     fn panics_when_over_the_optional_arity() {
-        evaluate("def f(a, b = 1)\n  a\nend\nf(1, 2, 3)\n");
+        evaluate("def f(required, extra = 1)\n  required\nend\nf(1, 2, 3)\n");
     }
 
     #[test]
@@ -1987,7 +2023,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "undefined variable")]
     fn method_bodies_cannot_see_outer_locals() {
-        evaluate("x = 1\ndef f\n  x\nend\nf()\n");
+        evaluate("value = 1\ndef f\n  value\nend\nf()\n");
     }
 
     #[test]
@@ -2028,6 +2064,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "produced no value")]
     fn puts_produces_no_value() {
-        evaluate("1 + puts(\"x\")");
+        evaluate("1 + puts(\"value\")");
     }
 }

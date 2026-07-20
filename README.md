@@ -29,8 +29,8 @@ cities.each do |code, city|
   puts("#{code.upcase} is #{city}") unless city == "seattle"
 end
 
-squares = [1, 2, 3].map do |n|
-  n * n
+squares = [1, 2, 3].map do |number|
+  number * number
 end
 puts(squares.join(" + ") + " = #{squares.sum}")
 ```

@@ -83,7 +83,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             '#' => {
                 // Comment runs to end of line; the newline itself still lexes.
-                scan_while(&mut chars, |c| c != '\n');
+                scan_while(&mut chars, |character| character != '\n');
             }
             '\n' => {
                 chars.next();
@@ -93,7 +93,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 });
             }
             '0'..='9' => {
-                let end = scan_while(&mut chars, |c| c.is_ascii_digit());
+                let end = scan_while(&mut chars, |character| character.is_ascii_digit());
                 tokens.push(Token {
                     kind: TokenKind::Integer,
                     text: &source[start..end],
@@ -125,7 +125,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     Some((_, '[')) => {}
                     other => panic!("expected [ after %w, got {other:?}"),
                 }
-                scan_while(&mut chars, |c| c != ']');
+                scan_while(&mut chars, |character| character != ']');
                 let Some((closing, _)) = chars.next() else {
                     panic!("unterminated %w[] starting at byte {start}");
                 };
@@ -136,7 +136,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             }
             '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' => {
                 chars.next();
-                let next = chars.peek().map(|&(_, c)| c);
+                let next = chars.peek().map(|&(_, following)| following);
                 let (kind, length) = match (character, next) {
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
                     ('&', _) => panic!("unexpected character '&' at byte {start}"),
@@ -223,7 +223,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 }
             }
             'a'..='z' | 'A'..='Z' | '_' => {
-                let mut end = scan_while(&mut chars, |c| c.is_ascii_alphanumeric() || c == '_');
+                let mut end = scan_while(&mut chars, |character| {
+                    character.is_ascii_alphanumeric() || character == '_'
+                });
                 // Ruby-surface joy, kept: a trailing `?` or `!` is part of the name —
                 // unless `=` follows, so `x != 1` stays a comparison, not `x!` then `=`.
                 if let Some(&(index, suffix)) = chars.peek()
@@ -419,7 +421,7 @@ mod tests {
     #[test]
     fn lexes_block_pipes() {
         assert_eq!(
-            kinds("do |n|"),
+            kinds("do |item|"),
             vec![
                 TokenKind::Keyword,
                 TokenKind::Pipe,

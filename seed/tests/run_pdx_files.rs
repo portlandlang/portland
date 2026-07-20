@@ -100,7 +100,8 @@ fn survives_deep_nesting_and_recursion() {
         ),
         (
             "deep_recursion.pdx",
-            "def f(n)\n  return 0 if n == 0\n  f(n - 1)\nend\nputs(f(5000))\n".to_string(),
+            "def f(number)\n  return 0 if number == 0\n  f(number - 1)\nend\nputs(f(5000))\n"
+                .to_string(),
         ),
     ];
     for (name, source) in cases {
@@ -157,14 +158,14 @@ fn portland_lexer() -> String {
 #[test]
 fn portland_lexer_lexes_a_sample() {
     let sample = std::env::temp_dir().join("lexer_sample.pdx");
-    std::fs::write(&sample, "x = 40 + 2\nputs(\"answer #{x}!\")\n").unwrap();
+    std::fs::write(&sample, "value = 40 + 2\nputs(\"answer #{value}!\")\n").unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .arg(portland_lexer())
         .arg(&sample)
         .output()
         .expect("failed to run pdx");
     assert!(output.status.success());
-    let expected = "identifier x\noperator =\ninteger 40\noperator +\ninteger 2\nnewline \nidentifier puts\noperator (\nstring \"answer #{x}!\"\noperator )\nnewline \n";
+    let expected = "identifier value\noperator =\ninteger 40\noperator +\ninteger 2\nnewline \nidentifier puts\noperator (\nstring \"answer #{value}!\"\noperator )\nnewline \n";
     assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
 }
 
@@ -209,7 +210,7 @@ fn run_repl(input: &str) -> std::process::Output {
 
 #[test]
 fn repl_evaluates_lines() {
-    let output = run_repl("1 + 1\nx = 20\nx * 2 + 2\n");
+    let output = run_repl("1 + 1\nvalue = 20\nvalue * 2 + 2\n");
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
@@ -229,14 +230,14 @@ fn repl_inspects_string_results() {
 
 #[test]
 fn repl_buffers_multiline_definitions() {
-    let output = run_repl("def double(n)\n  n * 2\nend\ndouble(21)\n");
+    let output = run_repl("def double(number)\n  number * 2\nend\ndouble(21)\n");
     assert!(output.status.success());
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "=> 42\n");
 }
 
 #[test]
 fn repl_buffers_multiline_strings() {
-    let output = run_repl("x = \"port\nland\"\nx.length\n");
+    let output = run_repl("value = \"port\nland\"\nvalue.length\n");
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),

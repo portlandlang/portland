@@ -1,15 +1,15 @@
 # The rite of passage.
 
-n = 1
-while n <= 15
-  if n % 15 == 0
+number = 1
+while number <= 15
+  if number % 15 == 0
     puts("FizzBuzz")
-  elsif n % 3 == 0
+  elsif number % 3 == 0
     puts("Fizz")
-  elsif n % 5 == 0
+  elsif number % 5 == 0
     puts("Buzz")
   else
-    puts(n)
+    puts(number)
   end
-  n = n + 1
+  number = number + 1
 end

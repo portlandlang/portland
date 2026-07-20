@@ -8,16 +8,16 @@ struct Token
   text
 end
 
-def digit?(c)
-  "0123456789".include?(c)
+def digit?(character)
+  "0123456789".include?(character)
 end
 
-def name_start?(c)
-  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".include?(c)
+def name_start?(character)
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".include?(character)
 end
 
-def name_character?(c)
-  name_start?(c) || digit?(c)
+def name_character?(character)
+  name_start?(character) || digit?(character)
 end
 
 def keyword?(word)
@@ -28,149 +28,149 @@ def two_character_operator?(pair)
   %w[== != <= >= && || += -= *= /= %= =>].include?(pair)
 end
 
-def one_character_operator?(c)
-  "(){}[],.:+-*/%<>=!|&".include?(c)
+def one_character_operator?(character)
+  "(){}[],.:+-*/%<>=!|&".include?(character)
 end
 
 # Read a plain quoted lexeme (single-quoted, or a string nested inside an
 # interpolation); backslash escapes the next character.
-def read_simple_string(chars, start, quote)
-  text = chars[start]
-  i = start + 1
-  while i < chars.length
-    c = chars[i]
-    if c == "\\"
-      text += c
-      text += chars[i + 1] if i + 1 < chars.length
-      i += 2
+def read_simple_string(characters, start, quote)
+  text = characters[start]
+  index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text += character
+      text += characters[index + 1] if index + 1 < characters.length
+      index += 2
       next
     end
-    text += c
-    i += 1
-    return text if c == quote
+    text += character
+    index += 1
+    return text if character == quote
   end
   text
 end
 
 # Read a '#{...}' interpolation, tracking brace depth and nested strings.
-def read_interpolation(chars, start)
+def read_interpolation(characters, start)
   text = '#{'
-  i = start + 2
+  index = start + 2
   depth = 1
-  while i < chars.length && depth > 0
-    c = chars[i]
-    if c == "{"
+  while index < characters.length && depth > 0
+    character = characters[index]
+    if character == "{"
       depth += 1
-    elsif c == "}"
+    elsif character == "}"
       depth -= 1
-    elsif c == "\""
-      nested = read_simple_string(chars, i, "\"")
+    elsif character == "\""
+      nested = read_simple_string(characters, index, "\"")
       text += nested
-      i += nested.length
+      index += nested.length
       next
     end
-    text += c
-    i += 1
+    text += character
+    index += 1
   end
   text
 end
 
 # Read a double-quoted lexeme: escapes and interpolation included.
-def read_double_quoted(chars, start)
-  text = chars[start]
-  i = start + 1
-  while i < chars.length
-    c = chars[i]
-    if c == "\\"
-      text += c
-      text += chars[i + 1] if i + 1 < chars.length
-      i += 2
+def read_double_quoted(characters, start)
+  text = characters[start]
+  index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text += character
+      text += characters[index + 1] if index + 1 < characters.length
+      index += 2
       next
     end
-    if c == "#" && i + 1 < chars.length && chars[i + 1] == "{"
-      inner = read_interpolation(chars, i)
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
       text += inner
-      i += inner.length
+      index += inner.length
       next
     end
-    text += c
-    i += 1
-    return text if c == "\""
+    text += character
+    index += 1
+    return text if character == "\""
   end
   text
 end
 
-def read_word_array(chars, start)
+def read_word_array(characters, start)
   text = "%w["
-  i = start + 3
-  while i < chars.length
-    c = chars[i]
-    text += c
-    i += 1
-    return text if c == "]"
+  index = start + 3
+  while index < characters.length
+    character = characters[index]
+    text += character
+    index += 1
+    return text if character == "]"
   end
   text
 end
 
 def lex(source)
-  chars = source.chars
+  characters = source.chars
   tokens = []
-  i = 0
-  while i < chars.length
-    c = chars[i]
-    if c == " " || c == "\t"
-      i += 1
+  index = 0
+  while index < characters.length
+    character = characters[index]
+    if character == " " || character == "\t"
+      index += 1
       next
     end
-    if c == "#"
-      while i < chars.length && chars[i] != "\n"
-        i += 1
+    if character == "#"
+      while index < characters.length && characters[index] != "\n"
+        index += 1
       end
       next
     end
-    if c == "\n"
+    if character == "\n"
       tokens += [Token.new(kind: "newline", text: "")]
-      i += 1
+      index += 1
       next
     end
-    if c == "\""
-      text = read_double_quoted(chars, i)
+    if character == "\""
+      text = read_double_quoted(characters, index)
       tokens += [Token.new(kind: "string", text: text)]
-      i += text.length
+      index += text.length
       next
     end
-    if c == "'"
-      text = read_simple_string(chars, i, "'")
+    if character == "'"
+      text = read_simple_string(characters, index, "'")
       tokens += [Token.new(kind: "string", text: text)]
-      i += text.length
+      index += text.length
       next
     end
-    if c == "%" && i + 2 < chars.length && chars[i + 1] == "w" && chars[i + 2] == "["
-      text = read_word_array(chars, i)
+    if character == "%" && index + 2 < characters.length && characters[index + 1] == "w" && characters[index + 2] == "["
+      text = read_word_array(characters, index)
       tokens += [Token.new(kind: "word_array", text: text)]
-      i += text.length
+      index += text.length
       next
     end
-    if digit?(c)
+    if digit?(character)
       text = ""
-      while i < chars.length && digit?(chars[i])
-        text += chars[i]
-        i += 1
+      while index < characters.length && digit?(characters[index])
+        text += characters[index]
+        index += 1
       end
       tokens += [Token.new(kind: "integer", text: text)]
       next
     end
-    if name_start?(c)
+    if name_start?(character)
       text = ""
-      while i < chars.length && name_character?(chars[i])
-        text += chars[i]
-        i += 1
+      while index < characters.length && name_character?(characters[index])
+        text += characters[index]
+        index += 1
       end
-      if i < chars.length && (chars[i] == "?" || chars[i] == "!")
-        followed_by_equal = i + 1 < chars.length && chars[i + 1] == "="
+      if index < characters.length && (characters[index] == "?" || characters[index] == "!")
+        followed_by_equal = index + 1 < characters.length && characters[index + 1] == "="
         unless followed_by_equal
-          text += chars[i]
-          i += 1
+          text += characters[index]
+          index += 1
         end
       end
       kind = if keyword?(text)
@@ -181,18 +181,18 @@ def lex(source)
       tokens += [Token.new(kind: kind, text: text)]
       next
     end
-    if i + 1 < chars.length && two_character_operator?(c + chars[i + 1])
-      tokens += [Token.new(kind: "operator", text: c + chars[i + 1])]
-      i += 2
+    if index + 1 < characters.length && two_character_operator?(character + characters[index + 1])
+      tokens += [Token.new(kind: "operator", text: character + characters[index + 1])]
+      index += 2
       next
     end
-    if one_character_operator?(c)
-      tokens += [Token.new(kind: "operator", text: c)]
-      i += 1
+    if one_character_operator?(character)
+      tokens += [Token.new(kind: "operator", text: character)]
+      index += 1
       next
     end
-    tokens += [Token.new(kind: "error", text: c)]
-    i += 1
+    tokens += [Token.new(kind: "error", text: character)]
+    index += 1
   end
   tokens
 end

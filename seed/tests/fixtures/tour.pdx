@@ -9,11 +9,11 @@ puts(greeting("portland"))
 puts(greeting(""))
 
 odds = 0
-n = 0
-while n < 10
-  n += 1
-  next if n.even?
-  odds += n
+number = 0
+while number < 10
+  number += 1
+  next if number.even?
+  odds += number
 end
 puts("odd sum: #{odds}")
 
@@ -22,7 +22,7 @@ cities.each do |code, city|
   puts("#{code.upcase} is #{city}") unless city == "seattle"
 end
 
-squares = [1, 2, 3].map do |k|
-  k * k
+squares = [1, 2, 3].map do |number|
+  number * number
 end
 puts(squares.join(" + ") + " = #{squares.sum}")

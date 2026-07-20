@@ -46,7 +46,7 @@ the tests are the spec until a real one exists.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops; `break` and `next` control the
   enclosing `while`. None work inside blocks yet.
-- **Blocks** — `do |x| ... end` on `each` (arrays, and hashes with
+- **Blocks** — `do |item| ... end` on `each` (arrays, and hashes with
   `|key, value|`), `each_with_index`, `map`, `select`, `reject`,
   `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures over the
   enclosing scope; parameters are block-local.

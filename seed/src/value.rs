@@ -23,7 +23,7 @@ impl Value {
     pub fn inspect(&self) -> String {
         match self {
             Value::Array(elements) => {
-                let inner: Vec<String> = elements.iter().map(|e| e.inspect()).collect();
+                let inner: Vec<String> = elements.iter().map(|element| element.inspect()).collect();
                 format!("[{}]", inner.join(", "))
             }
             Value::Boolean(value) => value.to_string(),

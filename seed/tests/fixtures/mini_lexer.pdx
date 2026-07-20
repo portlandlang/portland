@@ -6,41 +6,41 @@ struct Token
   text
 end
 
-def punctuation?(c)
-  %w[( ) + = ,].include?(c)
+def punctuation?(character)
+  %w[( ) + = ,].include?(character)
 end
 
-def digit?(c)
-  %w[0 1 2 3 4 5 6 7 8 9].include?(c)
+def digit?(character)
+  %w[0 1 2 3 4 5 6 7 8 9].include?(character)
 end
 
 def lex(source)
   tokens = []
-  i = 0
-  while i < source.length
-    c = source[i]
-    if c == " "
-      i += 1
+  index = 0
+  while index < source.length
+    character = source[index]
+    if character == " "
+      index += 1
       next
     end
-    if punctuation?(c)
-      tokens += [Token.new(kind: "punctuation", text: c)]
-      i += 1
+    if punctuation?(character)
+      tokens += [Token.new(kind: "punctuation", text: character)]
+      index += 1
       next
     end
-    if digit?(c)
+    if digit?(character)
       text = ""
-      while i < source.length && digit?(source[i])
-        text += source[i]
-        i += 1
+      while index < source.length && digit?(source[index])
+        text += source[index]
+        index += 1
       end
       tokens += [Token.new(kind: "integer", text: text)]
       next
     end
     text = ""
-    while i < source.length && source[i] != " " && !punctuation?(source[i])
-      text += source[i]
-      i += 1
+    while index < source.length && source[index] != " " && !punctuation?(source[index])
+      text += source[index]
+      index += 1
     end
     tokens += [Token.new(kind: "identifier", text: text)]
   end
