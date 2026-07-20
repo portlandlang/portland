@@ -1,15 +1,14 @@
 #!/bin/sh
 # Install the toolchain this repo needs.
 set -e
+cd "$(dirname "$0")/.."
 
 if ! command -v brew > /dev/null 2>&1; then
   echo "script/bootstrap: Homebrew is required (https://brew.sh)" >&2
   exit 1
 fi
 
-if ! command -v rustup > /dev/null 2>&1 && [ ! -x /opt/homebrew/opt/rustup/bin/rustup ]; then
-  brew install rustup
-fi
+brew bundle check > /dev/null 2>&1 || brew bundle
 
 export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 rustup default stable > /dev/null
