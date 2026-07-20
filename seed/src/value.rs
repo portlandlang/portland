@@ -11,6 +11,11 @@ pub enum Value {
     Hash(Vec<(Value, Value)>),
     Integer(i64),
     String(String),
+    /// Immutable named record; fields stay in definition order.
+    Struct {
+        fields: Vec<(String, Value)>,
+        name: String,
+    },
 }
 
 impl Value {
@@ -31,6 +36,13 @@ impl Value {
             }
             Value::Integer(value) => value.to_string(),
             Value::String(value) => format!("{value:?}"),
+            Value::Struct { fields, name } => {
+                let inner: Vec<String> = fields
+                    .iter()
+                    .map(|(field, value)| format!("{field}: {}", value.inspect()))
+                    .collect();
+                format!("{name}({})", inner.join(", "))
+            }
         }
     }
 }
@@ -61,6 +73,7 @@ impl fmt::Display for Value {
             }
             Value::Integer(value) => write!(formatter, "{value}"),
             Value::String(value) => write!(formatter, "{value}"),
+            Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
         }
     }
 }

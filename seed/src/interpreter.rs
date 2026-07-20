@@ -35,6 +35,7 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, Method>,
     output: W,
     pending: Option<Pending>,
+    structs: HashMap<String, Vec<String>>,
     variables: HashMap<String, Value>,
 }
 
@@ -51,6 +52,7 @@ impl<W: std::io::Write> Interpreter<W> {
             methods: HashMap::new(),
             output,
             pending: None,
+            structs: HashMap::new(),
             variables: HashMap::new(),
         }
     }
@@ -113,6 +115,10 @@ impl<W: std::io::Write> Interpreter<W> {
             Statement::Return { value } => {
                 let value = value.as_ref().map(|expression| self.value_of(expression));
                 self.pending = Some(Pending::Return(value));
+                None
+            }
+            Statement::StructDefinition { fields, name } => {
+                self.structs.insert(name.clone(), fields.clone());
                 None
             }
             Statement::While { body, condition } => {
@@ -298,12 +304,21 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::MethodCall {
                 arguments,
                 block,
+                keyword_arguments,
                 name,
                 receiver,
             } => {
+                // `Name.new(...)` constructs a struct; the name is not a value.
+                if name == "new" {
+                    return Some(self.construct_struct(receiver, arguments, keyword_arguments));
+                }
                 let receiver = self.value_of(receiver);
                 let arguments: Vec<Value> = arguments.iter().map(|a| self.value_of(a)).collect();
-                Some(self.method_call(receiver, name, arguments, block.as_ref()))
+                let keyword_arguments: Vec<(String, Value)> = keyword_arguments
+                    .iter()
+                    .map(|(label, e)| (label.clone(), self.value_of(e)))
+                    .collect();
+                Some(self.method_call(receiver, name, arguments, keyword_arguments, block.as_ref()))
             }
             Expression::Logical {
                 left,
@@ -342,6 +357,52 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// `Name.new(field: value, ...)` — validate against the definition and
+    /// build the value with fields in definition order.
+    fn construct_struct(
+        &mut self,
+        receiver: &Expression,
+        arguments: &[Expression],
+        keyword_arguments: &[(String, Expression)],
+    ) -> Value {
+        let Expression::Variable(struct_name) = receiver else {
+            panic!("new needs a struct name receiver, got {receiver:?}")
+        };
+        let fields = self
+            .structs
+            .get(struct_name)
+            .unwrap_or_else(|| panic!("undefined struct {struct_name}"))
+            .clone();
+        if !arguments.is_empty() {
+            panic!("{struct_name}.new takes keyword arguments, not positional ones");
+        }
+        let provided: Vec<(String, Value)> = keyword_arguments
+            .iter()
+            .map(|(label, e)| (label.clone(), self.value_of(e)))
+            .collect();
+        for (label, _) in &provided {
+            if !fields.contains(label) {
+                panic!("{struct_name} has no field {label}");
+            }
+        }
+        let ordered: Vec<(String, Value)> = fields
+            .iter()
+            .map(|field| {
+                let value = provided
+                    .iter()
+                    .find(|(label, _)| label == field)
+                    .unwrap_or_else(|| panic!("{struct_name}.new is missing field {field}"))
+                    .1
+                    .clone();
+                (field.clone(), value)
+            })
+            .collect();
+        Value::Struct {
+            fields: ordered,
+            name: struct_name.clone(),
+        }
+    }
+
     /// Built-in methods on values — read-only on purpose; mutation is a
     /// language-design decision the seed doesn't get to make.
     fn method_call(
@@ -349,8 +410,56 @@ impl<W: std::io::Write> Interpreter<W> {
         receiver: Value,
         name: &str,
         arguments: Vec<Value>,
+        keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
     ) -> Value {
+        // `with` builds an updated copy of an immutable struct.
+        if name == "with" {
+            let Value::Struct { fields, name } = receiver else {
+                panic!("with is only for structs, got {receiver:?}")
+            };
+            if !arguments.is_empty() {
+                panic!("{name}.with takes keyword arguments, not positional ones");
+            }
+            for (label, _) in &keyword_arguments {
+                if !fields.iter().any(|(field, _)| field == label) {
+                    panic!("{name} has no field {label}");
+                }
+            }
+            let updated = fields
+                .into_iter()
+                .map(|(field, value)| {
+                    let value = keyword_arguments
+                        .iter()
+                        .find(|(label, _)| *label == field)
+                        .map(|(_, new_value)| new_value.clone())
+                        .unwrap_or(value);
+                    (field, value)
+                })
+                .collect();
+            return Value::Struct {
+                fields: updated,
+                name,
+            };
+        }
+        if !keyword_arguments.is_empty() {
+            panic!("keyword arguments are only for struct new and with so far");
+        }
+        // Struct field access reads like a method call: token.kind
+        if let Value::Struct {
+            fields,
+            name: struct_name,
+        } = &receiver
+            && arguments.is_empty()
+            && block.is_none()
+        {
+            if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
+                return value.clone();
+            }
+            if name != "to_s" {
+                panic!("{struct_name} has no field {name}");
+            }
+        }
         if let Some(block) = block {
             return match (&receiver, name, arguments.as_slice()) {
                 (Value::Array(elements), "each", []) => {
@@ -1290,6 +1399,100 @@ mod tests {
     #[should_panic(expected = "no nil; check empty? first")]
     fn panics_on_max_of_an_empty_array() {
         evaluate("[].max");
+    }
+
+    const TOKEN_STRUCT: &str = "struct Token\n  kind\n  text\nend\n";
+
+    #[test]
+    fn constructs_a_struct_and_reads_its_fields() {
+        let source = format!(
+            "{TOKEN_STRUCT}token = Token.new(kind: \"integer\", text: \"42\")\ntoken.kind + \" \" + token.text\n"
+        );
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("integer 42".to_string()))
+        );
+    }
+
+    #[test]
+    fn struct_keyword_arguments_are_order_independent() {
+        let source = format!(
+            "{TOKEN_STRUCT}Token.new(text: \"42\", kind: \"integer\") == Token.new(kind: \"integer\", text: \"42\")\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn structs_compare_by_value() {
+        let source = format!(
+            "{TOKEN_STRUCT}Token.new(kind: \"a\", text: \"b\") == Token.new(kind: \"a\", text: \"c\")\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn with_builds_an_updated_copy_without_mutating() {
+        let source = format!(
+            "{TOKEN_STRUCT}a = Token.new(kind: \"integer\", text: \"42\")\nb = a.with(text: \"43\")\na.text + b.text\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::String("4243".to_string())));
+    }
+
+    #[test]
+    fn structs_render_readably() {
+        let source = format!("{TOKEN_STRUCT}puts(Token.new(kind: \"integer\", text: \"42\"))\n");
+        assert_eq!(
+            output_of(&source),
+            "Token(kind: \"integer\", text: \"42\")\n"
+        );
+    }
+
+    #[test]
+    fn structs_interpolate_via_to_s() {
+        let source =
+            format!("{TOKEN_STRUCT}t = Token.new(kind: \"plus\", text: \"+\")\n\"saw #{{t}}\"\n");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String(
+                "saw Token(kind: \"plus\", text: \"+\")".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "missing field text")]
+    fn panics_on_a_missing_struct_field() {
+        evaluate("struct Token\n  kind\n  text\nend\nToken.new(kind: \"x\")\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "has no field speed")]
+    fn panics_on_an_unknown_struct_field() {
+        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"x\", speed: 9)\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined struct")]
+    fn panics_on_constructing_an_undefined_struct() {
+        evaluate("Nope.new(kind: 1)");
+    }
+
+    #[test]
+    #[should_panic(expected = "keyword arguments, not positional")]
+    fn panics_on_positional_struct_construction() {
+        evaluate("struct Token\n  kind\nend\nToken.new(\"integer\")\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "start with a capital letter")]
+    fn panics_on_a_lowercase_struct_name() {
+        evaluate("struct token\n  kind\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "has no field speed")]
+    fn panics_on_with_of_an_unknown_field() {
+        evaluate("struct Token\n  kind\nend\nToken.new(kind: \"x\").with(speed: 9)\n");
     }
 
     #[test]

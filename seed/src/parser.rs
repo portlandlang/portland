@@ -91,6 +91,7 @@ fn string_expression(text: &str) -> Expression {
                 parts.push(Expression::MethodCall {
                     arguments: Vec::new(),
                     block: None,
+                    keyword_arguments: Vec::new(),
                     name: "to_s".to_string(),
                     receiver: Box::new(inner),
                 });
@@ -142,6 +143,9 @@ impl<'source> Parser<'source> {
     fn statement(&mut self) -> Statement {
         if self.peek_is_keyword("def") {
             return self.method_definition();
+        }
+        if self.peek_is_keyword("struct") {
+            return self.struct_definition();
         }
         if self.peek_is_keyword("while") {
             return self.while_statement();
@@ -245,6 +249,45 @@ impl<'source> Parser<'source> {
             name,
             parameters,
         }
+    }
+
+    /// `struct Name` then one field name per line, closed by `end`.
+    fn struct_definition(&mut self) -> Statement {
+        self.position += 1; // the `struct`
+        let token = self.advance();
+        if token.kind != TokenKind::Identifier {
+            panic!("expected struct name after struct, got {token:?}");
+        }
+        if !token.text.chars().next().unwrap().is_ascii_uppercase() {
+            panic!(
+                "struct names start with a capital letter, got {}",
+                token.text
+            );
+        }
+        let name = token.text.to_string();
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let mut fields: Vec<String> = Vec::new();
+        while !self.peek_is_keyword("end") {
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close struct {name}");
+            }
+            let token = self.advance();
+            if token.kind != TokenKind::Identifier {
+                panic!("expected a field name in struct {name}, got {token:?}");
+            }
+            if fields.contains(&token.text.to_string()) {
+                panic!("duplicate field {} in struct {name}", token.text);
+            }
+            fields.push(token.text.to_string());
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+        if fields.is_empty() {
+            panic!("struct {name} needs at least one field");
+        }
+        self.position += 1; // the `end`
+        Statement::StructDefinition { fields, name }
     }
 
     fn while_statement(&mut self) -> Statement {
@@ -617,12 +660,13 @@ impl<'source> Parser<'source> {
                     if token.kind != TokenKind::Identifier {
                         panic!("expected method name after dot, got {token:?}");
                     }
-                    let arguments = if self.peek_kind() == Some(TokenKind::LeftParen) {
-                        self.position += 1; // the `(`
-                        self.arguments()
-                    } else {
-                        Vec::new()
-                    };
+                    let (arguments, keyword_arguments) =
+                        if self.peek_kind() == Some(TokenKind::LeftParen) {
+                            self.position += 1; // the `(`
+                            self.call_arguments()
+                        } else {
+                            (Vec::new(), Vec::new())
+                        };
                     let block = if self.peek_is_keyword("do") {
                         Some(self.block())
                     } else {
@@ -631,6 +675,7 @@ impl<'source> Parser<'source> {
                     expression = Expression::MethodCall {
                         arguments,
                         block,
+                        keyword_arguments,
                         name: token.text.to_string(),
                         receiver: Box::new(expression),
                     };
@@ -675,7 +720,12 @@ impl<'source> Parser<'source> {
             TokenKind::Identifier => {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
-                    let arguments = self.arguments();
+                    let (arguments, keyword_arguments) = self.call_arguments();
+                    if !keyword_arguments.is_empty() {
+                        panic!(
+                            "keyword arguments are only supported on struct new and with so far"
+                        );
+                    }
                     Expression::Call {
                         arguments,
                         name: token.text.to_string(),
@@ -765,13 +815,31 @@ impl<'source> Parser<'source> {
     }
 
     /// Parse a comma-separated argument list, consuming the closing paren.
-    fn arguments(&mut self) -> Vec<Expression> {
-        let mut arguments = Vec::new();
+    /// Keyword arguments (`label: value`) may only follow positional ones.
+    fn call_arguments(&mut self) -> (Vec<Expression>, Vec<(String, Expression)>) {
+        let mut positional = Vec::new();
+        let mut keyword: Vec<(String, Expression)> = Vec::new();
         if self.peek_kind() != Some(TokenKind::RightParen) {
-            arguments.push(self.expression());
-            while self.peek_kind() == Some(TokenKind::Comma) {
-                self.position += 1;
-                arguments.push(self.expression());
+            loop {
+                if self.peek_kind() == Some(TokenKind::Identifier)
+                    && self.peek_kind_at(1) == Some(TokenKind::Colon)
+                {
+                    let label = self.advance().text.to_string();
+                    self.position += 1; // the `:`
+                    if keyword.iter().any(|(existing, _)| *existing == label) {
+                        panic!("duplicate keyword argument {label}");
+                    }
+                    keyword.push((label, self.expression()));
+                } else {
+                    if !keyword.is_empty() {
+                        panic!("positional arguments cannot follow keyword arguments");
+                    }
+                    positional.push(self.expression());
+                }
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
             }
         }
         if self.peek_kind() != Some(TokenKind::RightParen) {
@@ -781,7 +849,7 @@ impl<'source> Parser<'source> {
             );
         }
         self.position += 1;
-        arguments
+        (positional, keyword)
     }
 
     fn advance(&mut self) -> Token<'source> {

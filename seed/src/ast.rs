@@ -22,6 +22,10 @@ pub enum Statement {
     Return {
         value: Option<Expression>,
     },
+    StructDefinition {
+        fields: Vec<String>,
+        name: String,
+    },
     While {
         body: Vec<Statement>,
         condition: Expression,
@@ -111,6 +115,7 @@ pub enum Expression {
     MethodCall {
         arguments: Vec<Expression>,
         block: Option<Block>,
+        keyword_arguments: Vec<(String, Expression)>,
         name: String,
         receiver: Box<Expression>,
     },
