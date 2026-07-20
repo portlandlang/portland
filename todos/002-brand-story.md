@@ -9,3 +9,7 @@ Banked but not done. The city's brand is the language's brand: keep-it-weird, cr
 - [ ] Visual identity — teal PDX-airport-carpet palette
 - [ ] Mark — rose (Rose City → red → Ruby lineage), not another faceted gem
 - [ ] Website skeleton on the domain once registered
+
+## Carpet
+
+- [ ] https://codepen.io/natehorstmann/pen/GgEBKp
