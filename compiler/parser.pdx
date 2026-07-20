@@ -61,11 +61,38 @@ struct CallNode
   arguments
 end
 
+# block holds zero or one BlockNode — the empty-array absence pattern again.
 struct MethodCallNode
   kind
   receiver
   name
   arguments
+  block
+end
+
+struct BlockNode
+  kind
+  parameters
+  body
+end
+
+struct KeywordArgumentNode
+  kind
+  label
+  value
+end
+
+struct DefNode
+  kind
+  name
+  parameters
+  body
+end
+
+struct StructDefNode
+  kind
+  name
+  fields
 end
 
 struct IndexNode
@@ -165,8 +192,24 @@ def call_node(name, arguments)
   CallNode.new(kind: "call", name: name, arguments: arguments)
 end
 
-def method_call_node(receiver, name, arguments)
-  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments)
+def method_call_node(receiver, name, arguments, block)
+  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+end
+
+def block_node(parameters, body)
+  BlockNode.new(kind: "block", parameters: parameters, body: body)
+end
+
+def keyword_argument_node(label, value)
+  KeywordArgumentNode.new(kind: "keyword_argument", label: label, value: value)
+end
+
+def def_node(name, parameters, body)
+  DefNode.new(kind: "def", name: name, parameters: parameters, body: body)
+end
+
+def struct_def_node(name, fields)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields)
 end
 
 def index_node(receiver, index)
@@ -334,11 +377,43 @@ def parse_dot(tokens, receiver, position)
   if token.kind != "identifier"
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end
-  if operator_at?(tokens, position + 1, %w[(])
-    arguments = parse_arguments(tokens, position + 2)
-    return Step.new(node: method_call_node(receiver, token.text, arguments.node), position: arguments.position)
+  position += 1
+  arguments = []
+  if operator_at?(tokens, position, %w[(])
+    argument_step = parse_arguments(tokens, position + 1)
+    arguments = argument_step.node
+    position = argument_step.position
   end
-  Step.new(node: method_call_node(receiver, token.text, []), position: position + 1)
+  block = []
+  if keyword_at?(tokens, position, %w[do])
+    block_step = parse_block(tokens, position + 1)
+    block = [block_step.node]
+    position = block_step.position
+  end
+  Step.new(node: method_call_node(receiver, token.text, arguments, block), position: position)
+end
+
+# `do |params| ... end`, position already past the `do`.
+def parse_block(tokens, position)
+  parameters = []
+  if operator_at?(tokens, position, %w[|])
+    position += 1
+    while position < tokens.length && tokens[position].kind == "identifier"
+      parameters += [tokens[position].text]
+      position += 1
+      position += 1 if operator_at?(tokens, position, %w[,])
+    end
+    if operator_at?(tokens, position, %w[|])
+      position += 1
+    else
+      return Step.new(node: error_node("expected | to close block parameters"), position: position)
+    end
+  end
+  body = parse_body(tokens, position, %w[end])
+  if keyword_at?(tokens, body.position, %w[end])
+    return Step.new(node: block_node(parameters, body.node), position: body.position + 1)
+  end
+  Step.new(node: error_node("expected end to close do"), position: body.position)
 end
 
 def parse_index(tokens, receiver, position)
@@ -356,11 +431,11 @@ def parse_arguments(tokens, position)
   if operator_at?(tokens, position, %w[)])
     return Step.new(node: arguments, position: position + 1)
   end
-  step = parse_expression(tokens, position)
+  step = parse_argument(tokens, position)
   arguments += [step.node]
   position = step.position
   while operator_at?(tokens, position, %w[,])
-    step = parse_expression(tokens, position + 1)
+    step = parse_argument(tokens, position + 1)
     arguments += [step.node]
     position = step.position
   end
@@ -368,6 +443,16 @@ def parse_arguments(tokens, position)
     return Step.new(node: arguments, position: position + 1)
   end
   Step.new(node: [error_node("expected closing paren after arguments")], position: position)
+end
+
+# One argument: `label: value` makes a keyword argument, else an expression.
+def parse_argument(tokens, position)
+  token = tokens[position]
+  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[:])
+    value = parse_expression(tokens, position + 2)
+    return Step.new(node: keyword_argument_node(token.text, value.node), position: value.position)
+  end
+  parse_expression(tokens, position)
 end
 
 def newline_then_dot?(tokens, position)
@@ -432,6 +517,8 @@ def parse_statement(tokens, position)
     when "break" then return Step.new(node: break_node, position: position + 1)
     when "next" then return Step.new(node: next_node, position: position + 1)
     when "while" then return parse_while(tokens, position + 1)
+    when "def" then return parse_def(tokens, position + 1)
+    when "struct" then return parse_struct(tokens, position + 1)
     end
   end
   if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[=])
@@ -490,6 +577,68 @@ def parse_body(tokens, position, terminators)
     end
     position = skip_newlines_at(tokens, position)
   end
+end
+
+# — definitions —
+
+def parse_def(tokens, position)
+  if position >= tokens.length || tokens[position].kind != "identifier"
+    return Step.new(node: error_node("expected method name after def"), position: position)
+  end
+  name = tokens[position].text
+  position += 1
+  parameters = []
+  if operator_at?(tokens, position, %w[(])
+    parameter_step = parse_parameters(tokens, position + 1)
+    parameters = parameter_step.node
+    position = parameter_step.position
+  end
+  body = parse_body(tokens, position, %w[end])
+  if keyword_at?(tokens, body.position, %w[end])
+    return Step.new(node: def_node(name, parameters, body.node), position: body.position + 1)
+  end
+  Step.new(node: error_node("expected end to close def #{name}"), position: body.position)
+end
+
+# Parameter names, each optionally `name = default`, consuming the closing paren.
+def parse_parameters(tokens, position)
+  parameters = []
+  while position < tokens.length && tokens[position].kind == "identifier"
+    name = tokens[position].text
+    position += 1
+    if operator_at?(tokens, position, %w[=])
+      default = parse_expression(tokens, position + 1)
+      parameters += [assignment_node(name, default.node)]
+      position = default.position
+    else
+      parameters += [identifier_node(name)]
+    end
+    position += 1 if operator_at?(tokens, position, %w[,])
+  end
+  if operator_at?(tokens, position, %w[)])
+    return Step.new(node: parameters, position: position + 1)
+  end
+  Step.new(node: [error_node("expected closing paren after parameters")], position: position)
+end
+
+def parse_struct(tokens, position)
+  if position >= tokens.length || tokens[position].kind != "identifier"
+    return Step.new(node: error_node("expected struct name after struct"), position: position)
+  end
+  name = tokens[position].text
+  unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
+    return Step.new(node: error_node("struct names start with a capital letter, got #{name}"), position: position + 1)
+  end
+  position = skip_newlines_at(tokens, position + 1)
+  fields = []
+  while position < tokens.length && tokens[position].kind == "identifier"
+    fields += [tokens[position].text]
+    position = skip_newlines_at(tokens, position + 1)
+  end
+  if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: struct_def_node(name, fields), position: position + 1)
+  end
+  Step.new(node: error_node("expected end to close struct #{name}"), position: position)
 end
 
 # — control flow —
@@ -621,6 +770,22 @@ def headed_sexp(head, arguments)
   "(#{head} #{sexp_list(arguments)})"
 end
 
+def method_call_sexp(node)
+  plain = headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
+  return plain if node.block.empty?
+  block = node.block.first
+  head = "do"
+  head += " |#{block.parameters.join(" ")}|" unless block.parameters.empty?
+  inner = plain.slice(1, plain.length - 2)
+  "(#{inner} #{headed_sexp(head, block.body)})"
+end
+
+def def_sexp(node)
+  result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
+  result += " #{sexp_list(node.body)}" unless node.body.empty?
+  result + ")"
+end
+
 def if_sexp(node)
   result = "(if #{sexp(node.condition)} #{headed_sexp("then", node.then_body)}"
   result += " #{headed_sexp("else", node.else_body)}" unless node.else_body.empty?
@@ -645,7 +810,10 @@ def sexp(node)
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
   when "call" then headed_sexp("call #{node.name}", node.arguments)
-  when "method_call" then headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
+  when "method_call" then method_call_sexp(node)
+  when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
+  when "def" then def_sexp(node)
+  when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
   when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
   when "assignment" then "(= #{node.name} #{sexp(node.value)})"
   when "if" then if_sexp(node)

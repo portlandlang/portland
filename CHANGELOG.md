@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx rung 5 (#18): definitions — def with defaults, struct, do-blocks with parameters, keyword arguments.
+
 - parser.pdx rung 4 (#18): control flow — if/elsif/else, unless (desugared), while, case/when with then one-liners, and postfix guards.
 
 - parser.pdx rung 3 (#18): statements — assignment, compound assignment (desugared), return/break/next, and error recovery that skips to the next line instead of cascading.

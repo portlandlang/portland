@@ -281,6 +281,21 @@ fn portland_parser_handles_control_flow() {
 }
 
 #[test]
+fn portland_parser_handles_definitions() {
+    let sample = std::env::temp_dir().join("parse_defs.pdx");
+    let source = "def pair(base, twice = base * 2)\n  base + twice\nend\ndef ready?\n  true\nend\nstruct Token\n  kind\n  text\nend\nToken.new(kind: \"integer\", text: \"42\")\ntoken.with(text: \"43\")\nlist.map do |item|\n  item * 2\nend\ncities.each do |code, city|\n  puts(city)\nend\n5.times do\n  beep\nend\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(def pair (params base (= twice (* base 2))) (+ base twice))\n(def ready? (params) true)\n(struct Token kind text)\n(. Token new (: kind \"integer\") (: text \"42\"))\n(. token with (: text \"43\"))\n(. list map (do |item| (* item 2)))\n(. cities each (do |code city| (call puts city)))\n(. 5 times (do beep))\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
 fn portland_parser_reports_error_nodes() {
     let sample = std::env::temp_dir().join("parse_error_sample.pdx");
     std::fs::write(&sample, "]\n").unwrap();
