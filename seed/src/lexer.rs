@@ -7,6 +7,7 @@
 pub enum TokenKind {
     AmpersandAmpersand,
     Bang,
+    Colon,
     Comma,
     Dot,
     Equal,
@@ -44,9 +45,9 @@ pub enum TokenKind {
 }
 
 /// The Stage 0 keyword set — grows as the subset does.
-const KEYWORDS: [&str; 16] = [
-    "break", "case", "def", "do", "else", "elsif", "end", "false", "if", "next", "return", "then",
-    "true", "unless", "when", "while",
+const KEYWORDS: [&str; 17] = [
+    "break", "case", "def", "do", "else", "elsif", "end", "false", "if", "next", "return",
+    "struct", "then", "true", "unless", "when", "while",
 ];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -82,8 +83,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..end],
                 });
             }
-            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' => {
+            '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | ':' => {
                 let kind = match character {
+                    ':' => TokenKind::Colon,
                     ',' => TokenKind::Comma,
                     '.' => TokenKind::Dot,
                     '{' => TokenKind::LeftBrace,
@@ -371,6 +373,18 @@ mod tests {
                 TokenKind::SlashEqual,
                 TokenKind::PercentEqual,
             ]
+        );
+    }
+
+    #[test]
+    fn lexes_struct_and_keyword_argument_labels() {
+        assert_eq!(
+            kinds("struct Token"),
+            vec![TokenKind::Keyword, TokenKind::Identifier]
+        );
+        assert_eq!(
+            kinds("kind: 1"),
+            vec![TokenKind::Identifier, TokenKind::Colon, TokenKind::Integer]
         );
     }
 
