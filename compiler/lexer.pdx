@@ -1,0 +1,202 @@
+# The Stage 1 dare, step one: Portland's lexer, written in Portland.
+# Tokenizes real Portland source — including this very file.
+#
+# Usage: pdx compiler/lexer.pdx <file.pdx>
+
+struct Token
+  kind
+  text
+end
+
+def digit?(c)
+  "0123456789".include?(c)
+end
+
+def name_start?(c)
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".include?(c)
+end
+
+def name_character?(c)
+  name_start?(c) || digit?(c)
+end
+
+def keyword?(word)
+  %w[break case def do else elsif end false if next return struct then true unless when while].include?(word)
+end
+
+def two_character_operator?(pair)
+  %w[== != <= >= && || += -= *= /= %= =>].include?(pair)
+end
+
+def one_character_operator?(c)
+  "(){}[],.:+-*/%<>=!|&".include?(c)
+end
+
+# Read a plain quoted lexeme (single-quoted, or a string nested inside an
+# interpolation); backslash escapes the next character.
+def read_simple_string(chars, start, quote)
+  text = chars[start]
+  i = start + 1
+  while i < chars.length
+    c = chars[i]
+    if c == "\\"
+      text += c
+      text += chars[i + 1] if i + 1 < chars.length
+      i += 2
+      next
+    end
+    text += c
+    i += 1
+    return text if c == quote
+  end
+  text
+end
+
+# Read a '#{...}' interpolation, tracking brace depth and nested strings.
+def read_interpolation(chars, start)
+  text = '#{'
+  i = start + 2
+  depth = 1
+  while i < chars.length && depth > 0
+    c = chars[i]
+    if c == "{"
+      depth += 1
+    elsif c == "}"
+      depth -= 1
+    elsif c == "\""
+      nested = read_simple_string(chars, i, "\"")
+      text += nested
+      i += nested.length
+      next
+    end
+    text += c
+    i += 1
+  end
+  text
+end
+
+# Read a double-quoted lexeme: escapes and interpolation included.
+def read_double_quoted(chars, start)
+  text = chars[start]
+  i = start + 1
+  while i < chars.length
+    c = chars[i]
+    if c == "\\"
+      text += c
+      text += chars[i + 1] if i + 1 < chars.length
+      i += 2
+      next
+    end
+    if c == "#" && i + 1 < chars.length && chars[i + 1] == "{"
+      inner = read_interpolation(chars, i)
+      text += inner
+      i += inner.length
+      next
+    end
+    text += c
+    i += 1
+    return text if c == "\""
+  end
+  text
+end
+
+def read_word_array(chars, start)
+  text = "%w["
+  i = start + 3
+  while i < chars.length
+    c = chars[i]
+    text += c
+    i += 1
+    return text if c == "]"
+  end
+  text
+end
+
+def lex(source)
+  chars = source.chars
+  tokens = []
+  i = 0
+  while i < chars.length
+    c = chars[i]
+    if c == " " || c == "\t"
+      i += 1
+      next
+    end
+    if c == "#"
+      while i < chars.length && chars[i] != "\n"
+        i += 1
+      end
+      next
+    end
+    if c == "\n"
+      tokens += [Token.new(kind: "newline", text: "")]
+      i += 1
+      next
+    end
+    if c == "\""
+      text = read_double_quoted(chars, i)
+      tokens += [Token.new(kind: "string", text: text)]
+      i += text.length
+      next
+    end
+    if c == "'"
+      text = read_simple_string(chars, i, "'")
+      tokens += [Token.new(kind: "string", text: text)]
+      i += text.length
+      next
+    end
+    if c == "%" && i + 2 < chars.length && chars[i + 1] == "w" && chars[i + 2] == "["
+      text = read_word_array(chars, i)
+      tokens += [Token.new(kind: "word_array", text: text)]
+      i += text.length
+      next
+    end
+    if digit?(c)
+      text = ""
+      while i < chars.length && digit?(chars[i])
+        text += chars[i]
+        i += 1
+      end
+      tokens += [Token.new(kind: "integer", text: text)]
+      next
+    end
+    if name_start?(c)
+      text = ""
+      while i < chars.length && name_character?(chars[i])
+        text += chars[i]
+        i += 1
+      end
+      if i < chars.length && (chars[i] == "?" || chars[i] == "!")
+        followed_by_equal = i + 1 < chars.length && chars[i + 1] == "="
+        unless followed_by_equal
+          text += chars[i]
+          i += 1
+        end
+      end
+      kind = if keyword?(text)
+        "keyword"
+      else
+        "identifier"
+      end
+      tokens += [Token.new(kind: kind, text: text)]
+      next
+    end
+    if i + 1 < chars.length && two_character_operator?(c + chars[i + 1])
+      tokens += [Token.new(kind: "operator", text: c + chars[i + 1])]
+      i += 2
+      next
+    end
+    if one_character_operator?(c)
+      tokens += [Token.new(kind: "operator", text: c)]
+      i += 1
+      next
+    end
+    tokens += [Token.new(kind: "error", text: c)]
+    i += 1
+  end
+  tokens
+end
+
+lex(read_file(argv().first)).each do |token|
+  puts("#{token.kind} #{token.text}")
+end

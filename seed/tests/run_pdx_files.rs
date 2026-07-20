@@ -150,6 +150,44 @@ fn fails_cleanly_when_too_deep() {
     }
 }
 
+fn portland_lexer() -> String {
+    format!("{}/../compiler/lexer.pdx", env!("CARGO_MANIFEST_DIR"))
+}
+
+#[test]
+fn portland_lexer_lexes_a_sample() {
+    let sample = std::env::temp_dir().join("lexer_sample.pdx");
+    std::fs::write(&sample, "x = 40 + 2\nputs(\"answer #{x}!\")\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_lexer())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "identifier x\noperator =\ninteger 40\noperator +\ninteger 2\nnewline \nidentifier puts\noperator (\nstring \"answer #{x}!\"\noperator )\nnewline \n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
+fn portland_lexer_lexes_itself() {
+    // The Stage 1 milestone in miniature: Portland tokenizing Portland.
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_lexer())
+        .arg(portland_lexer())
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("keyword struct"));
+    assert!(stdout.contains("identifier read_interpolation"));
+    assert!(stdout.contains("keyword def"));
+    let errors: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.starts_with("error "))
+        .collect();
+    assert!(errors.is_empty(), "error tokens: {errors:?}");
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
