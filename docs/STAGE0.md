@@ -30,6 +30,19 @@ the tests are the spec until a real one exists.
   expression, arity-checked calls with parens, default parameter values
   (trailing only; defaults may reference earlier parameters). Method bodies get
   a fresh scope: no outer locals (Ruby's rule, kept).
+- **Structs** — immutable named records, the seed of the object model:
+  ```ruby
+  struct Token
+    kind
+    text
+  end
+
+  token = Token.new(kind: "integer", text: "42")   # kwargs only, all fields required
+  token.kind                                       # field access
+  token.with(text: "43")                           # updated copy; nothing mutates
+  ```
+  Value equality, definition-ordered fields, capitalized names. No methods in
+  struct bodies yet — that arrives with the real object model.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops; `break` and `next` control the
   enclosing `while`. None work inside blocks yet.
@@ -61,7 +74,8 @@ the tests are the spec until a real one exists.
 - Symbols, floats, ranges.
 - Optionals and the absence story — *the* headline feature, designed at the
   language level (todo 005), not snuck into the seed.
-- Classes/objects, modules, constants.
+- Classes/objects, modules, constants; methods inside `struct` bodies.
+- Keyword arguments on regular methods (`new`/`with` only so far).
 - `together` / concurrency (todos 004, 012), macros (todo 015).
 - Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
   the seed stays read-only rather than prejudging them.
