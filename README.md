@@ -22,7 +22,7 @@ def greeting(name)
   "hello, #{name}!"
 end
 
-puts(greeting("portland"))
+puts greeting("portland")
 
 cities = {"pdx" => "portland", "sea" => "seattle"}
 cities.each do |code, city|

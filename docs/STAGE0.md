@@ -27,9 +27,19 @@ the tests are the spec until a real one exists.
   (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
   booleans: no truthiness, since there is no nil to be falsy.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
-  expression, arity-checked calls with parens, default parameter values
-  (trailing only; defaults may reference earlier parameters). Method bodies get
-  a fresh scope: no outer locals (Ruby's rule, kept).
+  expression, arity-checked calls, default parameter values (trailing only;
+  defaults may reference earlier parameters). Method bodies get a fresh scope:
+  no outer locals (Ruby's rule, kept).
+- **Paren-less calls, the Portland way** — *command calls* at statement
+  position (`puts "hello"`, `shout word, other`) and *bare zero-argument
+  calls* (`ready?`, `pdx`) anywhere. Two rules replace Ruby's guessing:
+  - **No shadowing.** A name is a local or a method, never both — assigning
+    `greet = 1` where a method `greet` exists is an error. Bare names are
+    therefore always unambiguous.
+  - **Never guess.** Forms Ruby resolves by whitespace heuristics are clean
+    errors instead: `puts -1`, `puts [1]`, `puts (1)` each say
+    *"ambiguous without parens"* and show both readings. `foo - 1` stays
+    subtraction. Blocks don't attach to command calls yet.
 - **Structs** — immutable named records, the seed of the object model:
   ```ruby
   struct Token
@@ -81,8 +91,7 @@ the tests are the spec until a real one exists.
 - Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
   the seed stays read-only rather than prejudging them.
 - `case/in` pattern matching.
-- Paren-less method calls (`puts "hi"`) — needs the lexer-feedback dance;
-  parens required in Stage 0.
+- Command calls nested in expressions (`x = foo bar`) — statement position only.
 - Types — the seed is dynamically checked at runtime; inference is the real
   compiler's job.
 

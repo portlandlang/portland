@@ -207,7 +207,60 @@ impl<'source> Parser<'source> {
             };
             return Statement::Assignment { name, value };
         }
+        if self.peek_kind() == Some(TokenKind::Identifier)
+            && let Some(command) = self.command_call()
+        {
+            return command;
+        }
         Statement::Expression(self.expression())
+    }
+
+    /// Paren-less command calls, statement position only: `puts "hello"`.
+    /// Forms Ruby resolves by whitespace guessing are errors here instead.
+    fn command_call(&mut self) -> Option<Statement> {
+        let name = self.tokens[self.position].text;
+        let next = *self.tokens.get(self.position + 1)?;
+        let starts_command = match next.kind {
+            TokenKind::Bang
+            | TokenKind::Identifier
+            | TokenKind::Integer
+            | TokenKind::String
+            | TokenKind::WordArray => true,
+            TokenKind::Keyword => matches!(next.text, "false" | "true"),
+            TokenKind::Minus if next.leading_space => {
+                // `foo - 1` is subtraction; `foo -1` would be a guess.
+                let after = self.tokens.get(self.position + 2)?;
+                if after.leading_space {
+                    return None;
+                }
+                panic!(
+                    "ambiguous without parens — write {name}(-{}) or {name} - {}",
+                    after.text, after.text
+                );
+            }
+            TokenKind::LeftBracket if next.leading_space => {
+                panic!(
+                    "ambiguous without parens — write {name}([...]) to pass an array or {name}[...] to index"
+                );
+            }
+            TokenKind::LeftParen if next.leading_space => {
+                panic!("ambiguous without parens — write {name}(...) with no space to call");
+            }
+            _ => false,
+        };
+        if !starts_command {
+            return None;
+        }
+        let name = self.advance().text.to_string();
+        let mut arguments = vec![self.expression()];
+        while self.peek_kind() == Some(TokenKind::Comma) {
+            self.position += 1; // the `,`
+            arguments.push(self.expression());
+        }
+        if self.peek_is_keyword("do") {
+            panic!("blocks on paren-less calls aren't supported yet — write {name}(...) do");
+        }
+        Some(Statement::Expression(Expression::Call { arguments, name }))
     }
 
     /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.

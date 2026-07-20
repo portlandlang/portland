@@ -68,6 +68,9 @@ const KEYWORDS: [&str; 17] = [
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Token<'source> {
+    /// Whether a space or tab immediately precedes this token (set after the
+    /// scan; the never-guess ambiguity errors need it).
+    pub leading_space: bool,
     pub kind: TokenKind,
     pub text: &'source str,
 }
@@ -88,6 +91,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             '\n' => {
                 chars.next();
                 tokens.push(Token {
+                    leading_space: false,
                     kind: TokenKind::Newline,
                     text: &source[start..start + 1],
                 });
@@ -95,6 +99,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             '0'..='9' => {
                 let end = scan_while(&mut chars, |character| character.is_ascii_digit());
                 tokens.push(Token {
+                    leading_space: false,
                     kind: TokenKind::Integer,
                     text: &source[start..end],
                 });
@@ -114,6 +119,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 };
                 chars.next();
                 tokens.push(Token {
+                    leading_space: false,
                     kind,
                     text: &source[start..start + character.len_utf8()],
                 });
@@ -130,6 +136,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     panic!("unterminated %w[] starting at byte {start}");
                 };
                 tokens.push(Token {
+                    leading_space: false,
                     kind: TokenKind::WordArray,
                     text: &source[start..=closing],
                 });
@@ -167,6 +174,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     chars.next();
                 }
                 tokens.push(Token {
+                    leading_space: false,
                     kind,
                     text: &source[start..start + length],
                 });
@@ -190,6 +198,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         }
                         Some((closing, '"')) => {
                             tokens.push(Token {
+                                leading_space: false,
                                 kind: TokenKind::String,
                                 text: &source[start..=closing],
                             });
@@ -213,6 +222,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         }
                         Some((closing, '\'')) => {
                             tokens.push(Token {
+                                leading_space: false,
                                 kind: TokenKind::String,
                                 text: &source[start..=closing],
                             });
@@ -241,10 +251,22 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 } else {
                     TokenKind::Identifier
                 };
-                tokens.push(Token { kind, text });
+                tokens.push(Token {
+                    leading_space: false,
+                    kind,
+                    text,
+                });
             }
             _ => panic!("unexpected character {character:?} at byte {start}"),
         }
+    }
+
+    // Every token's text is a slice of `source`, so its offset tells us what
+    // came just before it.
+    let source_start = source.as_ptr() as usize;
+    for token in &mut tokens {
+        let offset = token.text.as_ptr() as usize - source_start;
+        token.leading_space = offset > 0 && matches!(source.as_bytes()[offset - 1], b' ' | b'\t');
     }
 
     tokens
@@ -392,6 +414,21 @@ mod tests {
                 TokenKind::PercentEqual,
             ]
         );
+    }
+
+    #[test]
+    fn records_leading_whitespace() {
+        let spaces: Vec<bool> = lex("foo -1")
+            .iter()
+            .map(|token| token.leading_space)
+            .collect();
+        // foo (line start), - (after a space), 1 (glued to the minus)
+        assert_eq!(spaces, vec![false, true, false]);
+        let spaced: Vec<bool> = lex("foo - 1")
+            .iter()
+            .map(|token| token.leading_space)
+            .collect();
+        assert_eq!(spaced, vec![false, true, true]);
     }
 
     #[test]

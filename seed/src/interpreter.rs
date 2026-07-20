@@ -100,6 +100,10 @@ impl<W: std::io::Write> Interpreter<W> {
     fn statement(&mut self, statement: &Statement) -> Option<Value> {
         match statement {
             Statement::Assignment { name, value } => {
+                // The no-shadow rule: a name is a local or a method, never both.
+                if self.methods.contains_key(name) || Self::builtin_name(name) {
+                    panic!("local {name} shadows method {name} — rename one");
+                }
                 let value = self.value_of(value);
                 self.variables.insert(name.clone(), value.clone());
                 Some(value)
@@ -110,6 +114,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 name,
                 parameters,
             } => {
+                if self.variables.contains_key(name) {
+                    panic!("method {name} shadows local {name} — rename one");
+                }
                 let method = Method {
                     body: body.clone(),
                     parameters: parameters.clone(),
@@ -375,12 +382,17 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
             }
-            Expression::Variable(name) => Some(
-                self.variables
-                    .get(name)
-                    .unwrap_or_else(|| panic!("undefined variable {name}"))
-                    .clone(),
-            ),
+            Expression::Variable(name) => {
+                // A bare name is a local if one exists, otherwise a
+                // zero-argument call — unambiguous because shadowing is an error.
+                if let Some(value) = self.variables.get(name) {
+                    Some(value.clone())
+                } else if self.methods.contains_key(name) || Self::builtin_name(name) {
+                    self.call(name, Vec::new())
+                } else {
+                    panic!("undefined variable or method {name}")
+                }
+            }
             Expression::Call { arguments, name } => {
                 let arguments: Vec<Value> = arguments
                     .iter()
@@ -725,6 +737,10 @@ impl<W: std::io::Write> Interpreter<W> {
         })
     }
 
+    fn builtin_name(name: &str) -> bool {
+        matches!(name, "argv" | "p" | "puts" | "read_file" | "write_file")
+    }
+
     fn integers_of(elements: &[Value], method: &str) -> Vec<i64> {
         elements
             .iter()
@@ -765,6 +781,9 @@ impl<W: std::io::Write> Interpreter<W> {
             .map(|parameter| (parameter.clone(), self.variables.get(parameter).cloned()))
             .collect();
         for (parameter, argument) in block.parameters.iter().zip(arguments) {
+            if self.methods.contains_key(parameter) || Self::builtin_name(parameter) {
+                panic!("block parameter {parameter} shadows method {parameter} — rename one");
+            }
             self.variables.insert(parameter.clone(), argument);
         }
         let result = self.run_body(&block.body);
@@ -880,6 +899,12 @@ impl<W: std::io::Write> Interpreter<W> {
         std::mem::swap(&mut self.variables, &mut scope);
         let mut supplied = arguments.into_iter();
         for parameter in &method.parameters {
+            if self.methods.contains_key(&parameter.name) || Self::builtin_name(&parameter.name) {
+                panic!(
+                    "parameter {} shadows method {} — rename one",
+                    parameter.name, parameter.name
+                );
+            }
             let value = match supplied.next() {
                 Some(value) => value,
                 None => {
@@ -2038,6 +2063,107 @@ mod tests {
     #[should_panic(expected = "undefined variable")]
     fn panics_on_an_undefined_variable() {
         evaluate("nope");
+    }
+
+    #[test]
+    fn command_calls_work_at_statement_position() {
+        assert_eq!(output_of("puts \"hello\""), "hello\n");
+        assert_eq!(output_of("puts \"a\", \"b\""), "a\nb\n");
+        assert_eq!(output_of("puts 1 + 2"), "3\n");
+        assert_eq!(output_of("name = \"pdx\"\nputs name\n"), "pdx\n");
+        assert_eq!(output_of("puts true"), "true\n");
+        assert_eq!(output_of("puts %w[rose city]"), "[rose, city]\n");
+        assert_eq!(
+            output_of("def shout(word)\n  puts(word.upcase)\nend\nshout \"pdx\"\n"),
+            "PDX\n"
+        );
+    }
+
+    #[test]
+    fn command_calls_take_postfix_guards() {
+        assert_eq!(output_of("puts \"hi\" if false"), "");
+        assert_eq!(output_of("puts \"hi\" unless false"), "hi\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "ambiguous without parens")]
+    fn panics_on_a_glued_minus_argument() {
+        evaluate("puts -1");
+    }
+
+    #[test]
+    #[should_panic(expected = "ambiguous without parens")]
+    fn panics_on_a_spaced_bracket_argument() {
+        evaluate("puts [1]");
+    }
+
+    #[test]
+    #[should_panic(expected = "ambiguous without parens")]
+    fn panics_on_a_spaced_paren_argument() {
+        evaluate("puts (1)");
+    }
+
+    #[test]
+    #[should_panic(expected = "blocks on paren-less calls")]
+    fn panics_on_a_block_after_a_command_call() {
+        evaluate("puts \"x\" do\n  1\nend\n");
+    }
+
+    #[test]
+    fn spaced_minus_stays_subtraction() {
+        assert_eq!(evaluate("total = 10\ntotal - 1\n"), Some(Value::Integer(9)));
+    }
+
+    #[test]
+    fn bare_zero_argument_calls_resolve_to_methods() {
+        let source = "def pdx\n  \"rose city\"\nend\npdx\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("rose city".to_string()))
+        );
+    }
+
+    #[test]
+    fn bare_question_mark_methods_read_as_prose() {
+        let source = "def ready?\n  true\nend\nputs \"go\" if ready?\n";
+        assert_eq!(output_of(source), "go\n");
+    }
+
+    #[test]
+    fn bare_builtins_resolve_too() {
+        assert_eq!(evaluate("argv.length"), Some(Value::Integer(0)));
+    }
+
+    #[test]
+    fn locals_still_win_when_no_method_exists() {
+        assert_eq!(
+            evaluate("greeting = \"hi\"\ngreeting\n"),
+            Some(Value::String("hi".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "local greet shadows method greet")]
+    fn panics_when_a_local_shadows_a_method() {
+        evaluate("def greet\n  1\nend\ngreet = 2\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "method greet shadows local greet")]
+    fn panics_when_a_method_shadows_a_local() {
+        evaluate("greet = 2\ndef greet\n  1\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "parameter greet shadows method greet")]
+    fn panics_when_a_parameter_shadows_a_method() {
+        evaluate("def greet\n  1\nend\ndef call_it(greet)\n  greet\nend\ncall_it(5)\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "shadows method puts")]
+    fn panics_when_a_local_shadows_a_builtin() {
+        evaluate("puts = 1");
     }
 
     #[test]

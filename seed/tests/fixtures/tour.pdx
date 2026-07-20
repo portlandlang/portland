@@ -5,8 +5,8 @@ def greeting(name)
   "hello, #{name}!"
 end
 
-puts(greeting("portland"))
-puts(greeting(""))
+puts greeting("portland")
+puts greeting("")
 
 odds = 0
 number = 0
@@ -15,7 +15,7 @@ while number < 10
   next if number.even?
   odds += number
 end
-puts("odd sum: #{odds}")
+puts "odd sum: #{odds}"
 
 cities = {"pdx" => "portland", "sea" => "seattle"}
 cities.each do |code, city|

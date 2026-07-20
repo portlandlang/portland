@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Paren-less calls, the Portland way: command calls at statement position (`puts "hello"`) and bare zero-argument calls (`ready?`) — powered by two new rules instead of Ruby's whitespace guessing: shadowing a method with a local is an error, and ambiguous forms (`puts -1`, `puts [1]`, `puts (1)`) are clean parse errors that show both readings. The lexer now records leading whitespace to detect them.
 - `return`/`break`/`next` now work inside blocks with Ruby semantics: `next` skips the iteration, `break` stops it (the call produces no value), `return` unwinds through the block to the enclosing method — guard-search idioms like `return number if number.even?` inside `each` work.
 - Single-character variable names renamed away everywhere (`character` not `c`, `index` not `i`), per style.
 - MIT license (`LICENSE.md`); the crate's dual-license placeholder becomes plain MIT on its next publish.

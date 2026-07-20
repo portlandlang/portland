@@ -253,7 +253,7 @@ fn repl_reports_errors_and_continues() {
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("undefined variable nope")
+            .contains("undefined variable or method nope")
     );
 }
 

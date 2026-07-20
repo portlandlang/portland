@@ -198,5 +198,5 @@ def lex(source)
 end
 
 lex(read_file(argv().first)).each do |token|
-  puts("#{token.kind} #{token.text}")
+  puts "#{token.kind} #{token.text}"
 end
