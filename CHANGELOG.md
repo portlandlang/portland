@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx rung 1 (#18): the full expression precedence ladder — logicals, comparisons, arithmetic, unary, parens — with identifiers, strings, and booleans as operands.
+
 - parser.pdx rung 0 (#18): Step-threaded recursive descent skeleton, sexp printer, parse.pdx driver — integers parse, unknown tokens become error nodes.
 
 - `require_relative`: multi-file Portland programs, Ruby-style (resolved against the requiring file, `.pdx` implied, loads once). `compiler/lexer.pdx` is now a library; `compiler/tokenize.pdx` is the command-line driver.

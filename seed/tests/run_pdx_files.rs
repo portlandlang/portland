@@ -221,6 +221,21 @@ fn portland_parser_parses_integers() {
 }
 
 #[test]
+fn portland_parser_climbs_the_precedence_ladder() {
+    let sample = std::env::temp_dir().join("parse_ladder.pdx");
+    let source = "1 + 2 * 3\n(1 + 2) * 3\n1 + 2 - 3\na && b || !c\nx == 1 + 2\n-5\n\"hi\" + name\ntrue && false\n10 % 3 == 1\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let expected = "(+ 1 (* 2 3))\n(* (+ 1 2) 3)\n(- (+ 1 2) 3)\n(|| (&& a b) (! c))\n(== x (+ 1 2))\n(- 5)\n(+ \"hi\" name)\n(&& true false)\n(== (% 10 3) 1)\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
 fn portland_parser_reports_error_nodes() {
     let sample = std::env::temp_dir().join("parse_error_sample.pdx");
     std::fs::write(&sample, "]\n").unwrap();
