@@ -563,7 +563,7 @@ def parse_primary(tokens, position)
     else
       Step.new(node: identifier_node(token.text), position: after)
     end
-  when "string" then Step.new(node: string_node(token.text), position: after)
+  when "string" then Step.new(node: string_expression(token.text), position: after)
   when "word_array" then Step.new(node: word_array_node(token.text), position: after)
   when "keyword"
     case token.text
@@ -592,6 +592,115 @@ def parse_primary(tokens, position)
   else
     Step.new(node: error_node("unexpected #{token.kind} #{token.text}"), position: after)
   end
+end
+
+# — strings —
+# Decoded at parse time, like the seed: a plain lexeme becomes a string node
+# holding its decoded value; interpolation desugars to a + chain with each
+# inner expression wrapped in .to_s.
+
+def decode_escape(character)
+  case character
+  when "n" then "\n"
+  when "t" then "\t"
+  else
+    character
+  end
+end
+
+# Collect the source inside #{...}: Step.node is the inner source text.
+def read_inner_source(characters, start)
+  inner = ""
+  index = start
+  depth = 1
+  while index < characters.length
+    character = characters[index]
+    if character == "{"
+      depth += 1
+    elsif character == "}"
+      depth -= 1
+      return Step.new(node: inner, position: index + 1) if depth == 0
+    elsif character == "\""
+      nested = read_simple_string(characters, index, "\"")
+      inner += nested
+      index += nested.length
+      next
+    end
+    inner += character
+    index += 1
+  end
+  Step.new(node: inner, position: index)
+end
+
+def string_expression(lexeme)
+  content = lexeme.slice(1, lexeme.length - 2)
+  characters = content.chars
+  if lexeme.slice(0, 1) == "'"
+    result = ""
+    index = 0
+    while index < characters.length
+      character = characters[index]
+      following = ""
+      following = characters[index + 1] if index + 1 < characters.length
+      # Single-quoted: only \' and \\ mean anything; other backslashes stay.
+      if character == "\\" && (following == "'" || following == "\\")
+        result += following
+        index += 2
+        next
+      end
+      result += character
+      index += 1
+    end
+    return string_node(result)
+  end
+  parts = []
+  literal = ""
+  index = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "\\" && index + 1 < characters.length
+      literal += decode_escape(characters[index + 1])
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      parts += [string_node(literal)] unless literal.empty?
+      literal = ""
+      inner = read_inner_source(characters, index + 2)
+      inner_step = parse_expression(lex(inner.node), 0)
+      parts += [method_call_node(inner_step.node, "to_s", [], [])]
+      index = inner.position
+      next
+    end
+    literal += character
+    index += 1
+  end
+  return string_node(literal) if parts.empty?
+  parts += [string_node(literal)] unless literal.empty?
+  chain = parts.first
+  index = 1
+  while index < parts.length
+    chain = binary_node("+", chain, parts[index])
+    index += 1
+  end
+  chain
+end
+
+# Re-encode a decoded string for sexp display.
+def encode_string(text)
+  result = "\""
+  text.chars.each do |character|
+    encoded = case character
+    when "\\" then "\\\\"
+    when "\"" then "\\\""
+    when "\n" then "\\n"
+    when "\t" then "\\t"
+    else
+      character
+    end
+    result += encoded
+  end
+  result + "\""
 end
 
 # — statements —
@@ -961,7 +1070,7 @@ def sexp(node)
   when "integer" then node.value
   when "identifier" then node.name
   when "boolean" then node.value
-  when "string" then node.value
+  when "string" then encode_string(node.value)
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
   when "call" then headed_sexp("call #{node.name}", node.arguments)

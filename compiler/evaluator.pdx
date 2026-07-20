@@ -23,32 +23,6 @@ def outcome(value, bindings)
   Outcome.new(value: value, bindings: bindings)
 end
 
-# Decode a raw string lexeme: strip quotes, resolve escapes.
-def decode_string(lexeme)
-  content = lexeme.slice(1, lexeme.length - 2)
-  characters = content.chars
-  result = ""
-  index = 0
-  while index < characters.length
-    character = characters[index]
-    if character == "\\" && index + 1 < characters.length
-      following = characters[index + 1]
-      decoded = case following
-      when "n" then "\n"
-      when "t" then "\t"
-      else
-        following
-      end
-      result += decoded
-      index += 2
-      next
-    end
-    result += character
-    index += 1
-  end
-  result
-end
-
 # — evaluation —
 
 def evaluate_program(nodes)
@@ -83,7 +57,8 @@ def evaluate_expression(node, bindings)
   case node.kind
   when "integer" then outcome([node.value.to_i], bindings)
   when "boolean" then outcome([node.value == "true"], bindings)
-  when "string" then outcome([decode_string(node.value)], bindings)
+  when "string" then outcome([node.value], bindings)
+  when "method_call" then evaluate_method_call(node, bindings)
   when "call" then evaluate_call(node, bindings)
   when "identifier"
     slot = lookup(bindings, node.name)
@@ -147,6 +122,17 @@ def evaluate_unary(node, bindings)
     0 - operand
   end
   outcome([result], step.bindings)
+end
+
+# Rung-3 slice of value methods: just to_s, which interpolation desugars to.
+def evaluate_method_call(node, bindings)
+  step = evaluate_expression(node.receiver, bindings)
+  receiver = step.value.first
+  if node.name == "to_s"
+    return outcome([receiver.to_s], step.bindings)
+  end
+  puts "evaluator: cannot evaluate method #{node.name} yet"
+  outcome([], step.bindings)
 end
 
 def evaluate_call(node, bindings)

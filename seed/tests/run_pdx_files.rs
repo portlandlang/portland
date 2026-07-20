@@ -392,6 +392,14 @@ fn portland_evaluator_matches_the_seed_on_variables() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_interpolation() {
+    assert_evaluator_matches_seed(
+        "eval_rung3.pdx",
+        "name = \"portland\"\nputs \"hello #{name}!\"\nputs \"sum: #{1 + 2 * 3}\"\nputs 'literal #{nope} and \\n stays'\nputs \"a#{1}b#{2}c\"\nanswer = 42\nputs \"#{answer}\"\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_matches_the_seed_on_operators() {
     assert_evaluator_matches_seed(
         "eval_rung1.pdx",

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- evaluator.pdx rung 3 (#19): string interpolation moved to parse time in parser.pdx (desugared to + chains with .to_s, like the seed); string nodes now hold decoded values, sexps re-encode them.
+
 - evaluator.pdx rung 2 (#19): variables — assignment and lookup over prepend-to-shadow assoc bindings.
 
 - evaluator.pdx rung 1 (#19): operators — host operators do the work since guest values are host values; differential harness extracted.
