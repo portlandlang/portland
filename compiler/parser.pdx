@@ -1,0 +1,76 @@
+# The Stage 1 main course: Portland's parser, written in Portland.
+#
+# A library: require_relative "parser", then parse_program(lex(source)).
+# Structs are immutable, so parsing threads position through returns:
+# every parse function takes (tokens, position) and answers a Step.
+# AST nodes are structs carrying a kind field for case dispatch.
+#
+# To dump parse trees from the command line, see parse.pdx.
+
+require_relative "lexer"
+
+struct Step
+  node
+  position
+end
+
+struct IntegerNode
+  kind
+  value
+end
+
+struct ErrorNode
+  kind
+  message
+end
+
+def integer_node(value)
+  IntegerNode.new(kind: "integer", value: value)
+end
+
+def error_node(message)
+  ErrorNode.new(kind: "error", message: message)
+end
+
+# — parsing —
+
+def parse_expression(tokens, position)
+  parse_primary(tokens, position)
+end
+
+def parse_primary(tokens, position)
+  token = tokens[position]
+  case token.kind
+  when "integer" then Step.new(node: integer_node(token.text), position: position + 1)
+  else
+    message = "unexpected #{token.kind} #{token.text}"
+    Step.new(node: error_node(message), position: position + 1)
+  end
+end
+
+# Parse a whole file: newline-separated expressions, for now.
+def parse_program(tokens)
+  nodes = []
+  position = 0
+  while position < tokens.length
+    if tokens[position].kind == "newline"
+      position += 1
+      next
+    end
+    step = parse_expression(tokens, position)
+    nodes += [step.node]
+    position = step.position
+  end
+  nodes
+end
+
+# — printing —
+
+def sexp(node)
+  case node.kind
+  when "integer" then node.value
+  when "error" then "(error #{node.message})"
+  else
+    "(unknown #{node.kind})"
+  end
+end

@@ -203,6 +203,39 @@ fn portland_lexer_lexes_itself() {
     assert!(errors.is_empty(), "error tokens: {errors:?}");
 }
 
+fn portland_parse() -> String {
+    format!("{}/../compiler/parse.pdx", env!("CARGO_MANIFEST_DIR"))
+}
+
+#[test]
+fn portland_parser_parses_integers() {
+    let sample = std::env::temp_dir().join("parse_sample.pdx");
+    std::fs::write(&sample, "42\n7\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "42\n7\n");
+}
+
+#[test]
+fn portland_parser_reports_error_nodes() {
+    let sample = std::env::temp_dir().join("parse_error_sample.pdx");
+    std::fs::write(&sample, "]\n").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "(error unexpected operator ])\n"
+    );
+}
+
 fn run_repl(input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;

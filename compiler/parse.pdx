@@ -1,0 +1,9 @@
+# Print the parse tree of a Portland file, one S-expression per statement.
+#
+# Usage: pdx compiler/parse.pdx <file.pdx>
+
+require_relative "parser"
+
+parse_program(lex(read_file(argv.first))).each do |node|
+  puts sexp(node)
+end
