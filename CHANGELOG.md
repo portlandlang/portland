@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MIT license (`LICENSE.md`); the crate's dual-license placeholder becomes plain MIT on its next publish.
 - Recursion depths measured (and the macOS-26 hang-on-overflow discovered): the seed now runs on a 512 MB-stack thread with explicit depth guards that fail as clean Portland errors instead of hanging.
 - Structs: `struct Name ... end` immutable records with kwargs-only construction (`Token.new(kind: ...)`), field access, `.with(...)` updated copies, and value equality. First user: `mini_lexer.pdx`, now hash-free.
 

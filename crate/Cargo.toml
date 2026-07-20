@@ -5,7 +5,7 @@ edition = "2024"
 description = "Placeholder for Portland, a joyous programming language for Apple silicon. Nothing here yet."
 homepage = "https://github.com/portlandlang"
 repository = "https://github.com/portlandlang"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 keywords = ["portland", "language", "compiler", "apple-silicon"]
 categories = ["compilers"]
 
