@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- docs/DECISIONS.md: the decision log — `mutable`, the `~` task sigil, bitwise-probably-out, `<<` TBD.
+- docs/adr/: architecture decision records, one per file — 0001 `mutable`, 0002 the `~` task sigil, 0003 bitwise-out (tentative, `<<` append TBD).
 
 - evaluator.pdx rung 7 + stretch (#19): structs (tagged-array instances, kwargs construction, field access) — and mini_lexer.pdx now runs on the Portland evaluator byte-identical to the seed. Every rung of #19 is complete.
 
