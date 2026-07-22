@@ -27,13 +27,13 @@ Three tiers; you live almost entirely in tier 1.
 
    ```ruby
    together do
-     user  = • fetch_user
-     posts = • fetch_posts
+     user  = ~ fetch_user
+     posts = ~ fetch_posts
    end
    # user, posts in scope here
    ```
 
-   The `•` marks "runs concurrently"; the block is the join boundary. Two registers: terse positional (`a, b = together do … end`) and named-at-site (above). Both a word form (`spawn`) and a symbol form (the sigil), like `lambda`/`->` — but they must be **dead-identical** (don't repeat the `lambda`/`proc` `return` footgun) and the symbol must be one easy keystroke.
+   The `~` marks "runs concurrently"; the block is the join boundary. Two registers: terse positional (`a, b = together do … end`) and named-at-site (above). Both a word form (`spawn`) and a symbol form (the sigil), like `lambda`/`->` — but they must be **dead-identical** (don't repeat the `lambda`/`proc` `return` footgun) and the symbol must be one easy keystroke.
 
 3. **Explicit control — rare.** Cancellation, timeouts, racing strategies.
 
