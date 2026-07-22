@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/DECISIONS.md: the decision log — `mutable`, the `~` task sigil, bitwise-probably-out, `<<` TBD.
+
 - evaluator.pdx rung 7 + stretch (#19): structs (tagged-array instances, kwargs construction, field access) — and mini_lexer.pdx now runs on the Portland evaluator byte-identical to the seed. Every rung of #19 is complete.
 
 - evaluator.pdx rung 6 + SUMMIT (#19): collections and blocks (guest values are host values, so host dispatch does the work) — and the whole fixture suite (hello, arithmetic, fizzbuzz, showcase, blocks, tour) now runs on the Portland evaluator byte-identical to the seed, CI-pinned. Structs (rung 7) remain for the mini_lexer stretch.
