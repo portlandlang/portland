@@ -14,6 +14,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0001](0001-2026-07-20-mutable-keyword.md) — the mutability keyword is `mutable`
 - [0002](0002-2026-07-20-together-task-sigil.md) — the `together` task sigil is `~`
 - [0003](0003-2026-07-20-bitwise-operators-out.md) — bitwise operators out of the grammar (tentative: `<<` append TBD)
+- [0004](0004-2026-07-20-together-meanwhile.md) — concurrency vocabulary: `together` + `meanwhile` + `~` (tentative)
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)
