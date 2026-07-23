@@ -14,8 +14,8 @@ the tests are the spec until a real one exists.
   `true`/`false`, arrays (`[1, "two", [3]]`), hashes
   (`{"key" => value}`, insertion-ordered, any-type keys; missing key panics).
 - **Arithmetic** — `+ - * / %`, unary minus, parens. `+` concatenates strings
-  and arrays. Division/modulo currently truncate (Rust semantics, not Ruby's
-  floor — flagged to revisit).
+  and arrays. Integer division and modulo are **floored, Ruby's rule**
+  (ADR 0018): `-7 / 2` is `-4` and `-7 % 2` is `1`.
 - **Comparisons** — `== != < <= > >=`. Equality works across all types (mixed
   types are unequal); ordering is integers-only.
 - **Logical operators** — `&&` `||` (short-circuiting) and `!`, strict
@@ -135,7 +135,8 @@ the tests are the spec until a real one exists.
 
 - Heredocs — remaining Prism-textbook lexer work (interpolation, `%w[]`, and
   single-quoted strings are in).
-- Symbols, floats, ranges.
+- Symbols, floats (decided in ADR 0018, not yet built), ranges.
+- Brace blocks and `it` — decided (ADRs 0016, 0017), not yet built.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
 - Classes/objects (if they exist at all), modules, constants, inheritance,

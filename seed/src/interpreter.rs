@@ -10,11 +10,34 @@ use crate::ast::{
 use crate::parser;
 use crate::value::Value;
 
-/// Parse and evaluate a source string, returning the last statement'word value.
+/// Parse and evaluate a source string, returning the last statement's value.
 pub fn evaluate(source: &str) -> Option<Value> {
     let program = parser::parse(source);
     let mut interpreter = Interpreter::new();
     interpreter.program(&program)
+}
+
+/// Integer division, floored — Ruby's rule, not Rust's truncation
+/// (ADR 0018): `-7 / 2` is `-4`, because the quotient rounds toward
+/// negative infinity rather than toward zero.
+fn floored_divide(left: i64, right: i64) -> i64 {
+    let quotient = left / right;
+    if left % right != 0 && (left < 0) != (right < 0) {
+        quotient - 1
+    } else {
+        quotient
+    }
+}
+
+/// Modulo whose result takes the sign of the divisor — Ruby's rule
+/// (ADR 0018): `-7 % 2` is `1`, and `7 % -2` is `-1`.
+fn floored_modulo(left: i64, right: i64) -> i64 {
+    let remainder = left % right;
+    if remainder != 0 && (remainder < 0) != (right < 0) {
+        remainder + right
+    } else {
+        remainder
+    }
 }
 
 #[derive(Clone)]
@@ -501,14 +524,10 @@ impl<W: std::io::Write> Interpreter<W> {
                         Some(Value::Integer(left + right))
                     }
                     (Value::Integer(left), BinaryOperator::Divide, Value::Integer(right)) => {
-                        // Truncates toward zero (Rust semantics); Ruby floors.
-                        // Revisit when Portland'word integer semantics are specified.
-                        Some(Value::Integer(left / right))
+                        Some(Value::Integer(floored_divide(left, right)))
                     }
                     (Value::Integer(left), BinaryOperator::Modulo, Value::Integer(right)) => {
-                        // Truncated remainder (Rust semantics); Ruby'word % is floored.
-                        // Revisit when Portland'word integer semantics are specified.
-                        Some(Value::Integer(left % right))
+                        Some(Value::Integer(floored_modulo(left, right)))
                     }
                     (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
                         Some(Value::Integer(left * right))
@@ -2504,8 +2523,8 @@ mod tests {
             ))
         );
         assert_eq!(
-            evaluate(r"'it\'word escaped, and so is \\'"),
-            Some(Value::String("it'word escaped, and so is \\".to_string()))
+            evaluate(r"'it\'s escaped, and so is \\'"),
+            Some(Value::String("it's escaped, and so is \\".to_string()))
         );
     }
 
@@ -2704,6 +2723,16 @@ mod tests {
         assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
     }
 
+    /// Ruby floors; Rust truncates. ADR 0018 picks Ruby, so the two
+    /// mixed-sign quotients round toward negative infinity.
+    #[test]
+    fn division_floors_like_ruby() {
+        assert_eq!(evaluate("-7 / 2"), Some(Value::Integer(-4)));
+        assert_eq!(evaluate("7 / -2"), Some(Value::Integer(-4)));
+        assert_eq!(evaluate("-7 / -2"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("-6 / 2"), Some(Value::Integer(-3)));
+    }
+
     #[test]
     #[should_panic(expected = "divide by zero")]
     fn panics_on_dividing_by_zero() {
@@ -2714,6 +2743,16 @@ mod tests {
     fn evaluates_modulo() {
         assert_eq!(evaluate("10 % 3"), Some(Value::Integer(1)));
         assert_eq!(evaluate("15 % 5 == 0"), Some(Value::Boolean(true)));
+    }
+
+    /// The remainder takes the sign of the divisor (ADR 0018) — Ruby's
+    /// rule, and the identity `(a / b) * b + (a % b) == a` holds.
+    #[test]
+    fn modulo_takes_the_sign_of_the_divisor_like_ruby() {
+        assert_eq!(evaluate("-7 % 2"), Some(Value::Integer(1)));
+        assert_eq!(evaluate("7 % -2"), Some(Value::Integer(-1)));
+        assert_eq!(evaluate("-7 % -2"), Some(Value::Integer(-1)));
+        assert_eq!(evaluate("-6 % 2"), Some(Value::Integer(0)));
     }
 
     #[test]

@@ -445,6 +445,16 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
+/// ADR 0018: the trio delegates `/` and `%` to the host, so Ruby's
+/// floored semantics must reach hosted programs unchanged.
+#[test]
+fn portland_evaluator_matches_the_seed_on_floored_division() {
+    assert_evaluator_matches_seed(
+        "evaluator_floored_division.pdx",
+        "p(-7 / 2)\np(7 / -2)\np(-7 / -2)\np(-6 / 2)\np(-7 % 2)\np(7 % -2)\np(-7 % -2)\np(-6 % 2)\np(7 / 2)\np(10 % 3)\n",
+    );
+}
+
 #[test]
 fn portland_evaluator_matches_the_seed_on_branchless_branches() {
     assert_evaluator_matches_seed(

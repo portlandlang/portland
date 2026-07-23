@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- ADR 0018 + seed: numbers decided, and the oldest crude-on-purpose call retired — integer `/` and `%` now **floor like Ruby** instead of truncating like Rust (`-7 / 2` is `-4`, `-7 % 2` is `1`; expectations verified against real Ruby, all four sign combinations pinned, plus a differential test proving the trio inherits it). Floats ride along decided but unbuilt: IEEE doubles, Ruby's printing, mixed-arithmetic promotion, `div`/`fdiv` on demand. Python's always-real `/` was rejected as a silent divergence; a never-guess error on integer `/` as too heavy for arithmetic this common. No ledger file: this is a deliberate non-difference.
+
+- Fixed collateral damage from an earlier mechanical sweep: three comments and one test's string data read `'word` where they meant `'s` (`"it'word escaped"`). The test asserted its own corrupted value on both sides, so it passed while checking the wrong thing.
+
 - ADR 0017: `it` decided — an ordinary binding under the no-shadow rule, not Ruby's soft keyword: `{ it.sexp }` works; contesting the name anywhere in reach is a rename-one error; nested `it` is a shadow, so it errors ("name your parameters"); no mixing with `|parameters|`; wherever `it` compiles it has exactly one meaning. Numbered parameters `_1`–`_9` are out (polyfill autocorrects `_1 → it` free). Ledger: parentheses.md + removed-syntax.md. Build lands with brace blocks.
 
 - ADR 0016: brace blocks decided — `{ ... }` and `do ... end` mean exactly the same thing (Ruby's braces-bind-tight precedence guess dies); the one colliding position, a bare `{` after a paren-less command call, is a compile error naming each reading with its rewrite (up to three: hash argument, inner call's block, outer call's block — the parser peeks to shrink the menu, never to pick). Ledger: parentheses.md. Build pending; `it` and `&:symbol` deliberately undecided.
