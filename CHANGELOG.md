@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, optionals rung 4 (#21): Exhibit A resolved — `ReturnBareNode` is gone; bare `return` is a `ReturnNode` whose value is nil, exactly the shape the Rust seed always had. Seed fix along the way: the maybe predicates fall through struct field access like `to_s` does.
+
 - Trio, optionals rung 3 (#21): evaluator.pdx speaks optionals, differentially tested byte-identical to the seed — nil literal, `nil?`/`some?`, typed or with or-guard divergers riding the signal machinery, `&.`, `some`/`panic` builtins, min/max. The slot pattern grew raw extractors (`slot_value`/`value_at` via `each`) because host lookups now lift stored nils — the wrapper touching its own implementation.
 
 - Trio, optionals rung 2 (#21): parser.pdx parses the optionals surface — `nil` literal, `or`/`and`/`not` normalized to their sigils in the tree (dead-identical by construction), or-guard right sides (`return`/`break`/`next`/command-form `panic`), and `&.` as `SafeMethodCallNode`; still parses the whole compiler including itself.

@@ -550,7 +550,8 @@ impl<W: std::io::Write> Interpreter<W> {
             if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
                 return Some(value.clone());
             }
-            if name != "to_s" {
+            // to_s and the maybe predicates fall through to the generic arms.
+            if !matches!(name, "nil?" | "some?" | "to_s") {
                 panic!("{struct_name} has no field {name}");
             }
         }
@@ -1666,6 +1667,16 @@ mod tests {
     }
 
     const TOKEN_STRUCT: &str = "struct Token\n  kind\n  text\nend\n";
+
+    #[test]
+    fn maybe_predicates_work_on_structs() {
+        let source =
+            format!("{TOKEN_STRUCT}token = Token.new(kind: \"a\", text: \"b\")\ntoken.some?");
+        assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
+        let source =
+            format!("{TOKEN_STRUCT}token = Token.new(kind: \"a\", text: \"b\")\ntoken.nil?");
+        assert_eq!(evaluate(&source), Some(Value::Boolean(false)));
+    }
 
     #[test]
     fn constructs_a_struct_and_reads_its_fields() {

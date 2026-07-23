@@ -147,16 +147,12 @@ struct AssignmentNode
   value
 end
 
+# Exhibit A, resolved: bare `return` is a ReturnNode whose value is nil.
+# This struct once had a ReturnBareNode twin because absence couldn't be
+# said — the first real pull toward optionals, now speakable (ADR 0006).
 struct ReturnNode
   kind
   value
-end
-
-# Bare `return` carries no value — and with no nil in Portland, "no value"
-# is a distinct node kind rather than an empty field. (First real pull
-# toward optionals in the language.)
-struct ReturnBareNode
-  kind
 end
 
 struct BreakNode
@@ -288,7 +284,7 @@ def return_node(value)
 end
 
 def return_bare_node
-  ReturnBareNode.new(kind: "return_bare")
+  return_node(nil)
 end
 
 def break_node
@@ -1130,6 +1126,11 @@ def case_sexp(node)
   result + ")"
 end
 
+def return_sexp(node)
+  return "(return)" if node.value.nil?
+  "(return #{sexp(node.value)})"
+end
+
 def sexp(node)
   case node.kind
   when "integer" then node.value
@@ -1154,8 +1155,7 @@ def sexp(node)
   when "if" then if_sexp(node)
   when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
   when "case" then case_sexp(node)
-  when "return" then "(return #{sexp(node.value)})"
-  when "return_bare" then "(return)"
+  when "return" then return_sexp(node)
   when "break" then "(break)"
   when "next" then "(next)"
   when "error" then "(error #{node.message})"

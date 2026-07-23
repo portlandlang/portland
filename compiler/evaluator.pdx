@@ -83,8 +83,8 @@ def evaluate_statement(node, bindings)
   when "while" then return evaluate_while(node, bindings)
   when "break" then return signal_outcome("break", [], bindings)
   when "next" then return signal_outcome("next", [], bindings)
-  when "return_bare" then return signal_outcome("return", [], bindings)
   when "return"
+    return signal_outcome("return", [], bindings) if node.value.nil?
     step = evaluate_expression(node.value, bindings)
     return signal_outcome("return", step.value, step.bindings)
   end
