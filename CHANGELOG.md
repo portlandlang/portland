@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio: `<<` and `[]=` threaded (AppendNode/IndexUpdateNode, sexps, evaluator handlers) — and the sugar retires the pair-list era: evaluate_hash builds **host hashes** with `built[key] = value`, so guest hash indexing, `p hash`, and hash `each` all match the seed byte-identically; trio `[]=` is hash-only for now (array index assignment waits for type predicates); differential pinned.
+
 - Seed: `<<` and `[]=` as rebinding sugar (ADR 0015 §2) — `line << word` concatenates strings and appends one array element; `hash[k] = v` / `array[i] = v` are functional updates rebound on the name (arrays replace in range or append at the end); both gate on `mutable` and cannot spook aliases (tested). Statement position only; `<<` enters the lexer append-only.
 
 - ADR 0001 implemented (the `mutable` branch): `mutable name = ...` declares the one rebindable kind of name; bare assignment creates immutables or rebinds mutables; compound assignment gates on `mutable`; the three closure rules (accumulators licensed, outer-immutable rebinds refused with the fix named, fresh block-locals die at `end`); `mutable` parameters (`def f(mutable position)` — a parameter is a binding site); loop iterations are fresh scopes for their own locals (the block rule applied to `while`); pattern captures follow assignment rules (immutable clash errors, suggesting the pin) and failed guards roll their captures back. The whole codebase took its own medicine: seed tests, fixtures, and the trio are fully migrated; the trio parses `mutable` as syntax (the seed is the enforcement oracle — documented crude divergence).

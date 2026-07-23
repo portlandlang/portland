@@ -282,6 +282,7 @@ end
 
 def evaluate_expression(node, bindings)
   case node
+  in AppendNode then evaluate_append(node, bindings)
   in ArrayNode then evaluate_array(node, bindings)
   in BinaryNode then evaluate_binary(node, bindings)
   in BooleanNode(value:) then outcome([value == "true"], bindings)
@@ -291,6 +292,7 @@ def evaluate_expression(node, bindings)
   in HashNode then evaluate_hash(node, bindings)
   in IfNode then evaluate_if(node, bindings)
   in IndexNode then evaluate_index(node, bindings)
+  in IndexUpdateNode then evaluate_index_update(node, bindings)
   in IntegerNode(value:) then outcome([value.to_i], bindings)
   in LogicalNode then evaluate_logical(node, bindings)
   in MatchAssertNode then evaluate_match_assert(node, bindings)
@@ -376,19 +378,55 @@ def evaluate_array(node, mutable bindings)
   outcome([elements], bindings)
 end
 
-# Guest hashes are pair lists — Portland can't build a host hash
-# incrementally (the known language gap), so two-parameter each is the
-# supported surface; the rest waits.
+# Guest hashes are host hashes now: `[]=` (ADR 0015) is exactly the
+# incremental construction Portland used to lack — the pair-list era ends.
 def evaluate_hash(node, mutable bindings)
-  mutable pairs = []
+  mutable built = {}
   node.pairs.each do |pair|
     key_step = evaluate_expression(pair.key, bindings)
     bindings = key_step.bindings
     value_step = evaluate_expression(pair.value, bindings)
     bindings = value_step.bindings
-    pairs += [[slot_value(key_step.value), slot_value(value_step.value)]]
+    built[slot_value(key_step.value)] = slot_value(value_step.value)
   end
-  outcome([pairs], bindings)
+  outcome([built], bindings)
+end
+
+def evaluate_append(node, mutable bindings)
+  slot = lookup(bindings, node.name)
+  panic("undefined variable #{node.name}") if slot.empty?
+  current = value_at(slot.first, 2)
+  value_step = evaluate_expression(node.value, bindings)
+  bindings = value_step.bindings
+  value = slot_value(value_step.value)
+  # Crude string-vs-array probe (no type predicates yet): an empty slice
+  # of a string is "", of an array is [].
+  appended = if current.slice(0, 0) == ""
+    current + value
+  else
+    current + [value]
+  end
+  outcome([appended], bindings)
+end
+
+# Hash-only in the trio: array index assignment waits for type predicates
+# (object-model territory); the seed is the full oracle.
+def evaluate_index_update(node, mutable bindings)
+  slot = lookup(bindings, node.name)
+  panic("undefined variable #{node.name}") if slot.empty?
+  current = value_at(slot.first, 2)
+  index_step = evaluate_expression(node.index, bindings)
+  bindings = index_step.bindings
+  key = slot_value(index_step.value)
+  value_step = evaluate_expression(node.value, bindings)
+  bindings = value_step.bindings
+  value = slot_value(value_step.value)
+  mutable rebuilt = {}
+  current.each do |existing_key, existing_value|
+    rebuilt[existing_key] = existing_value
+  end
+  rebuilt[key] = value
+  outcome([rebuilt], bindings)
 end
 
 def word_array_elements(lexeme)
@@ -512,8 +550,8 @@ def evaluate_block_call(node, receiver, bindings)
   case node.name
   when "each"
     if block.parameters.length == 2
-      receiver.each do |pair|
-        run_guest_block(block, pair, bindings)
+      receiver.each do |first, second|
+        run_guest_block(block, [first, second], bindings)
       end
     else
       receiver.each do |element|

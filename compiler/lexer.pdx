@@ -27,7 +27,7 @@ def keyword?(word)
 end
 
 def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= => &.].include?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &. <<].include?(pair)
 end
 
 def one_character_operator?(character)

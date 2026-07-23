@@ -478,6 +478,15 @@ fn portland_evaluator_matches_the_seed_on_one_line_patterns() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_append_and_index_assignment() {
+    // Guest hashes are host hashes now, so whole-hash rendering matches too.
+    assert_evaluator_matches_seed(
+        "evaluator_rebinding_sugar.pdx",
+        "mutable config = {\"theme\" => \"teal\"}\nconfig[\"digest\"] = nil\nconfig[\"theme\"] = \"grey\"\np config\np config[\"theme\"]\np config[\"digest\"]\np config[\"missing\"]\nmutable line = \"port\"\nline << \"land\"\nputs line\nmutable list = [1]\nlist << 2\np list.length\nconfig.each do |key, value|\n  puts key\nend\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.

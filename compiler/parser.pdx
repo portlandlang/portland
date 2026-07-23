@@ -158,6 +158,21 @@ struct LogicalNode
   right
 end
 
+# `name << value` — rebinding append (ADR 0015).
+struct AppendNode
+  kind
+  name
+  value
+end
+
+# `name[index] = value` — a functional update rebound on the name.
+struct IndexUpdateNode
+  kind
+  name
+  index
+  value
+end
+
 # `expr => pattern` — match or panic (rightward destructuring).
 struct MatchAssertNode
   kind
@@ -268,6 +283,10 @@ def alternative_pattern_node(options)
   AlternativePatternNode.new(kind: "alternative_pattern", options: options)
 end
 
+def append_node(name, value)
+  AppendNode.new(kind: "append", name: name, value: value)
+end
+
 def array_node(elements)
   ArrayNode.new(kind: "array", elements: elements)
 end
@@ -326,6 +345,10 @@ end
 
 def if_node(condition, then_body, else_body)
   IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+end
+
+def index_update_node(name, index, value)
+  IndexUpdateNode.new(kind: "index_update", name: name, index: index, value: value)
 end
 
 def in_branch_node(pattern, guard, body)
@@ -904,6 +927,10 @@ def parse_statement(tokens, position)
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, value.node), position: value.position)
   end
+  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[<<])
+    value = parse_expression(tokens, position + 2)
+    return Step.new(node: assignment_node(token.text, append_node(token.text, value.node)), position: value.position)
+  end
   if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[+= -= *= /= %=])
     # `x += e` desugars to `x = x + e`, as in the seed.
     operator = tokens[position + 1].text.slice(0, 1)
@@ -912,6 +939,12 @@ def parse_statement(tokens, position)
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
   step = parse_expression(tokens, position)
+  # `name[index] = value` — a functional update rebound on the name.
+  if operator_at?(tokens, step.position, %w[=]) && step.node.kind == "index" && step.node.receiver.kind == "identifier"
+    name = step.node.receiver.name
+    value = parse_expression(tokens, step.position + 1)
+    return Step.new(node: assignment_node(name, index_update_node(name, step.node.index, value.node)), position: value.position)
+  end
   # Rightward destructuring (ADR 0013 §4): `expr => pattern` matches or
   # panics — the pattern-grammar answer to multiple assignment.
   if operator_at?(tokens, step.position, %w[=>])
@@ -1490,6 +1523,7 @@ end
 def sexp(node)
   case node.kind
   when "alternative_pattern" then headed_sexp("|", node.options)
+  when "append" then "(<< #{node.name} #{sexp(node.value)})"
   when "array" then headed_sexp("array", node.elements)
   when "array_pattern" then array_pattern_sexp(node)
   when "assignment" then "(= #{node.name} #{sexp(node.value)})"
@@ -1505,6 +1539,7 @@ def sexp(node)
   when "identifier" then node.name
   when "if" then if_sexp(node)
   when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
+  when "index_update" then "([]= #{node.name} #{sexp(node.index)} #{sexp(node.value)})"
   when "integer" then node.value
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
   when "keyword_parameter" then keyword_parameter_sexp(node)
