@@ -111,10 +111,10 @@ the tests are the spec until a real one exists.
   maybe tracking) — the tree-walker previews those errors as panics.
 - Classes/objects, modules, constants; methods inside `struct` bodies.
 - Keyword arguments on regular methods (`new`/`with` only so far).
-- `together` / concurrency (todos 004, 012), macros (todo 015).
-- Mutating methods (`push`, `upcase!`) — mutability semantics are todo 011;
-  the seed stays read-only rather than prejudging them.
-- `case/in` pattern matching.
+- `together` / concurrency (#11), macros (#14).
+- Mutating methods (`push`, `upcase!`) — mutable-values semantics are
+  #10; the seed stays read-only rather than prejudging them.
+- `case/in` pattern matching (#20).
 - Command calls nested in expressions (`x = foo bar`) — statement position only.
 - Types — the seed is dynamically checked at runtime; inference is the real
   compiler's job.
