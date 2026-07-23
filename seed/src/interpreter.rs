@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinaryOperator, Block, Expression, GuardAction, LogicalOperator, Parameter, Program, Statement,
-    UnaryOperator,
+    BinaryOperator, Block, Expression, GuardAction, LogicalOperator, Parameter, Pattern, Program,
+    Statement, UnaryOperator,
 };
 use crate::parser;
 use crate::value::Value;
@@ -220,6 +220,39 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
                 None
+            }
+            Expression::CaseIn {
+                branches,
+                else_body,
+                subject,
+            } => {
+                let subject = self.value_of(subject);
+                for branch in branches {
+                    let Some(captures) = self.match_pattern(&branch.pattern, &subject) else {
+                        continue;
+                    };
+                    // Captures bind into the enclosing scope and persist,
+                    // Ruby-style — fenced by no-shadow (ADR 0013 §3).
+                    for (name, value) in captures {
+                        if self.methods.contains_key(&name) || Self::builtin_name(&name) {
+                            panic!("capture {name} shadows method {name} — rename one");
+                        }
+                        self.variables.insert(name, value);
+                    }
+                    if branch.body.is_empty() {
+                        return Some(Value::Nil);
+                    }
+                    return self.run_body(&branch.body);
+                }
+                if else_body.is_empty() {
+                    // The runtime preview of compile-checked exhaustiveness
+                    // (ADR 0013 §1): the real compiler refuses to build this.
+                    panic!(
+                        "no pattern matched {} — add an in branch or an else",
+                        subject.inspect()
+                    );
+                }
+                self.run_body(else_body)
             }
             Expression::Case {
                 branches,
@@ -908,6 +941,28 @@ impl<W: std::io::Write> Interpreter<W> {
             };
         }
         result
+    }
+
+    /// Try one pattern against a value: `Some(captures)` on a match (empty
+    /// for literal patterns), `None` on a miss.
+    fn match_pattern(
+        &mut self,
+        pattern: &Pattern,
+        subject: &Value,
+    ) -> Option<Vec<(String, Value)>> {
+        match pattern {
+            Pattern::Alternative(options) => options
+                .iter()
+                .find_map(|option| self.match_pattern(option, subject)),
+            Pattern::Capture(name) => Some(vec![(name.clone(), subject.clone())]),
+            Pattern::Literal(expression) => {
+                if self.value_of(expression) == *subject {
+                    Some(Vec::new())
+                } else {
+                    None
+                }
+            }
+        }
     }
 
     /// Evaluate an expression that must produce a value.
@@ -2733,6 +2788,45 @@ mod tests {
     #[should_panic(expected = "expects")]
     fn keyword_parameters_do_not_take_positional_values() {
         evaluate("def greet(name:)\n  name\nend\ngreet(\"x\")\n");
+    }
+
+    #[test]
+    fn case_in_matches_literals_and_nil() {
+        let source = "case [].first\nin 1 then \"one\"\nin nil then \"empty\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("empty".to_string())));
+        let source = "case 1\nin 1 then \"one\"\nin nil then \"empty\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("one".to_string())));
+    }
+
+    #[test]
+    fn case_in_captures_bind_and_persist() {
+        // A bare lowercase pattern captures, Ruby-style (ADR 0013 §3), and
+        // the binding persists past the case, like Ruby's.
+        let source = "case 41\nin nil then 0\nin found then found + 1\nend\nfound\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(41)));
+        let source = "case 41\nin nil then 0\nin found then found + 1\nend\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(42)));
+    }
+
+    #[test]
+    fn case_in_alternatives() {
+        let source = "case 2\nin 1 | 2 | 3 then \"few\"\nelse\n  \"many\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("few".to_string())));
+        let source = "case 9\nin 1 | 2 | 3 then \"few\"\nelse\n  \"many\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("many".to_string())));
+    }
+
+    #[test]
+    #[should_panic(expected = "no pattern matched")]
+    fn case_in_without_a_match_panics() {
+        // The runtime preview of compile-checked exhaustiveness (ADR 0013 §1).
+        evaluate("case 9\nin 1 then \"one\"\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "shadows method")]
+    fn case_in_captures_obey_no_shadow() {
+        evaluate("def taken\n  1\nend\ncase 5\nin taken then taken\nend\n");
     }
 
     #[test]

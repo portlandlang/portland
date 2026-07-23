@@ -2,8 +2,8 @@
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
 use crate::ast::{
-    BinaryOperator, Block, CaseBranch, Expression, GuardAction, LogicalOperator, Parameter,
-    Program, Statement, UnaryOperator,
+    BinaryOperator, Block, CaseBranch, Expression, GuardAction, InBranch, LogicalOperator,
+    Parameter, Pattern, Program, Statement, UnaryOperator,
 };
 use crate::lexer::{self, Token, TokenKind};
 
@@ -393,6 +393,9 @@ impl<'source> Parser<'source> {
         let subject = Box::new(self.expression());
         self.expect_statement_boundary();
         self.skip_newlines();
+        if self.peek_is_keyword("in") {
+            return self.case_in_branches(subject);
+        }
         let mut branches = Vec::new();
         while self.peek_is_keyword("when") {
             self.position += 1; // the `when`
@@ -433,6 +436,92 @@ impl<'source> Parser<'source> {
             branches,
             else_body,
             subject,
+        }
+    }
+
+    /// `case/in` branches (ADR 0013): each `in` takes one pattern, then a
+    /// `then` one-liner or an indented body, exactly like `when`.
+    fn case_in_branches(&mut self, subject: Box<Expression>) -> Expression {
+        let mut branches = Vec::new();
+        while self.peek_is_keyword("in") {
+            self.position += 1; // the `in`
+            let pattern = self.pattern();
+            let body;
+            if self.peek_is_keyword("then") {
+                self.position += 1; // the `then`
+                body = vec![self.simple_statement()];
+                self.expect_statement_boundary();
+                self.skip_newlines();
+            } else {
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                body = self.body_until(&["in", "else", "end"], "in");
+            }
+            branches.push(InBranch { body, pattern });
+        }
+        if self.peek_is_keyword("when") {
+            panic!("cannot mix when and in branches in one case");
+        }
+        let else_body = if self.peek_is_keyword("else") {
+            self.position += 1; // the `else`
+            self.expect_statement_boundary();
+            self.skip_newlines();
+            self.body_until(&["end"], "else")
+        } else {
+            Vec::new()
+        };
+        self.position += 1; // the `end`
+        Expression::CaseIn {
+            branches,
+            else_body,
+            subject,
+        }
+    }
+
+    /// One pattern, with `|` alternatives binding loosest.
+    fn pattern(&mut self) -> Pattern {
+        let first = self.pattern_primary();
+        if self.peek_kind() != Some(TokenKind::Pipe) {
+            return first;
+        }
+        let mut alternatives = vec![first];
+        while self.peek_kind() == Some(TokenKind::Pipe) {
+            self.position += 1; // the `|`
+            alternatives.push(self.pattern_primary());
+        }
+        Pattern::Alternative(alternatives)
+    }
+
+    fn pattern_primary(&mut self) -> Pattern {
+        let token = self.advance();
+        match token.kind {
+            TokenKind::Integer => {
+                let value = token.text.parse().expect("integer literal out of range");
+                Pattern::Literal(Expression::Integer(value))
+            }
+            TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
+                let value: i64 = self
+                    .advance()
+                    .text
+                    .parse()
+                    .expect("integer literal out of range");
+                Pattern::Literal(Expression::Integer(-value))
+            }
+            TokenKind::String => Pattern::Literal(string_expression(token.text)),
+            TokenKind::Keyword => match token.text {
+                "false" => Pattern::Literal(Expression::Boolean(false)),
+                "nil" => Pattern::Literal(Expression::Nil),
+                "true" => Pattern::Literal(Expression::Boolean(true)),
+                other => panic!("unexpected keyword {other:?} in a pattern"),
+            },
+            TokenKind::Identifier => {
+                let name = token.text;
+                if name.starts_with(|character: char| character.is_ascii_uppercase()) {
+                    panic!("struct patterns aren't built yet — coming in a later rung");
+                }
+                Pattern::Capture(name.to_string())
+            }
+            other => panic!("unsupported pattern starting with {other:?}"),
         }
     }
 

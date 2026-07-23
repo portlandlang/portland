@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, case/in rung 1 (#26): `in` branches on `case` — literal patterns (integers, strings, booleans, nil), captures (bind and persist, no-shadow-fenced), `|` alternatives, `then` one-liners, and the runtime exhaustiveness preview (no match + no else = a panic naming the subject). Struct patterns, pin, and guards are later rungs.
+
 - parser.pdx: pure-refactor alphabetization — structs, builders, sexp helpers, and the sexp dispatcher's branches sort alphabetically (the precedence ladder keeps its narrative order); two stale exhibit comments updated.
 
 - Trio: keyword arguments threaded through parser.pdx (`KeywordParameterNode`, label-aware command arguments) and evaluator.pdx (label binding with defaults), differentially pinned; ADR 0014 records the decision (Ruby 3 semantics, splats deferred); STAGE0/ROADMAP synced.

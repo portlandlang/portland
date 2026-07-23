@@ -34,11 +34,6 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ## Coming ⬜
 
-### Tooling (next up ⬆️)
-
-- [ ] #24 — Zed, the rest: `tree-sitter-portland` fork as the grammars drift; registry publication
-- [ ] #25 — benchmarks: `script/bench` harness for seed/trio workloads; eventually compiled Portland vs Ruby with receipts
-
 ### Language surface (decide, then build)
 
 - [ ] #26 — build `case/in` per ADR 0013 (seed runtime half + trio; the payoff is the trio's dispatch rewritten as real patterns)
@@ -68,3 +63,8 @@ One page: where Portland is going and how close it is. Above the line is done �
 - [ ] #23 — the living ruby/spec fork as compatibility oracle
 - [ ] The polyfill gem + migration linter (wish, not yet a commitment)
 - [ ] #1 — brand story: voice, tagline, the teal carpet, the rose
+
+### Tooling
+
+- [ ] #24 — Zed, the rest: `tree-sitter-portland` fork as the grammars drift; registry publication
+- [ ] #25 — benchmarks: `script/bench` harness for seed/trio workloads; eventually compiled Portland vs Ruby with receipts

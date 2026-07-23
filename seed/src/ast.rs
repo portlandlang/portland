@@ -83,6 +83,25 @@ pub struct CaseBranch {
     pub values: Vec<Expression>,
 }
 
+/// A `case/in` pattern (ADR 0013). Grows by rung: literals, captures, and
+/// alternatives first; struct/array patterns, pin, and guards follow.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Pattern {
+    /// `in 1 | 2 | 3` — first matching alternative wins.
+    Alternative(Vec<Pattern>),
+    /// A bare lowercase name: matches anything, binds it (Ruby's rule,
+    /// fenced by no-shadow and exhaustiveness per ADR 0013 §3).
+    Capture(String),
+    /// A literal value to compare against: integers, strings, booleans, nil.
+    Literal(Expression),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InBranch {
+    pub body: Vec<Statement>,
+    pub pattern: Pattern,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Parameter {
     pub default: Option<Expression>,
@@ -100,6 +119,11 @@ pub enum Expression {
     Boolean(bool),
     Case {
         branches: Vec<CaseBranch>,
+        else_body: Vec<Statement>,
+        subject: Box<Expression>,
+    },
+    CaseIn {
+        branches: Vec<InBranch>,
         else_body: Vec<Statement>,
         subject: Box<Expression>,
     },
