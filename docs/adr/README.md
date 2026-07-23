@@ -15,6 +15,8 @@ and revisions get a new ADR that supersedes the old one.
 - [0002](0002-2026-07-20-together-task-sigil.md) — the `together` task sigil is `~`
 - [0003](0003-2026-07-20-bitwise-operators-out.md) — bitwise operators out of the grammar (tentative: `<<` append TBD)
 - [0004](0004-2026-07-20-together-meanwhile.md) — concurrency vocabulary: `together` + `meanwhile` + `~` (tentative)
+- [0005](0005-2026-07-22-optionals-wrapper-model.md) — optionals are a wrapper, with a collapsed-feeling surface
+- [0006](0006-2026-07-22-absence-word-nil.md) — the absence word is `nil` (partner word still open)
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)
