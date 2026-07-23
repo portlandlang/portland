@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0016: brace blocks decided — `{ ... }` and `do ... end` mean exactly the same thing (Ruby's braces-bind-tight precedence guess dies); the one colliding position, a bare `{` after a paren-less command call, is a compile error naming each reading with its rewrite (up to three: hash argument, inner call's block, outer call's block — the parser peeks to shrink the menu, never to pick). Ledger: parentheses.md. Build pending; `it` and `&:symbol` deliberately undecided.
+
 - Trio, `<<` sweep: the deferred taste pass — parser.pdx and evaluator.pdx retire ~45 `X += [item]` / `text += part` appends to `<<` (ADR 0015 sugar, matching lexer.pdx). Counters keep `+=`; genuine array concatenations (`captures += sub_captures`) stay `+=` because `<<` appends exactly one element.
 
 - Trio, guest `with` (#27): the evaluator builds an updated copy of a tagged-array struct — field order kept, replaced labels take the new value, checked before any dispatch like the seed; the struct-methods differential now exercises single, chained, and original-untouched `with`. The trio's last flagged #27 gap outside the full object-model session.

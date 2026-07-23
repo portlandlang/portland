@@ -31,6 +31,37 @@ The never-guess principle generalizes past parens: wherever one spelling
 has two genuine readings ([`Boolean?` with `or`](word-operators.md), for
 instance), Portland errors and asks, rather than picking for you.
 
+## Brace blocks (ADR 0016 — decided, not yet built)
+
+Ruby gives `{ ... }` and `do ... end` different binding strength: after
+`render config`, a brace block belongs to `config` (nearest call) while a
+`do/end` block belongs to `render` (farthest). That's a precedence guess
+the reader has to know.
+
+Portland takes brace blocks with no precedence split: the two forms mean
+exactly the same thing, and the one position where readings collide — a
+bare `{` right after a paren-less command call — is a compile error
+naming each reading with its rewrite:
+
+```ruby
+render config { "a" => 1 }
+# error: `{` after a command call could be three things — parenthesize the one you mean:
+#   a hash argument to config:  render config({ "a" => 1 })
+#   a block for config:         render(config { "a" => 1 })
+#   a block for render:         render(config) { "a" => 1 }
+```
+
+(The parser peeks to shrink the menu — `{ |item| ...` can't be a hash, so
+only the two owners are offered — but never to pick a winner.)
+
+## Migration (brace blocks)
+
+- Community style already avoids the ambiguous form (RuboCop's
+  `Style/BlockDelimiters`: braces for one-line dot-call blocks, `do/end`
+  for command position) — that code compiles verbatim, same meaning.
+- Code that leans on braces-bind-tight gets the loud three-way error, one
+  paren from compiling. Nothing silently rebinds.
+
 ## Migration
 
 - Code following Ruby community style (parens except for DSL-ish command

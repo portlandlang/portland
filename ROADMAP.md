@@ -22,6 +22,8 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ `case/in` specced (#20, ADR 0013): compile-checked exhaustiveness, static `===`, fenced captures, keyword-only struct patterns
 - ✅ A branch that doesn't happen is nil (#22, ADR 0012) — branchless `if`, finished `while`, broken-out calls; built in seed + trio
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
+- ✅ **Object model, first increment** (#27): methods in struct bodies + builtin type patterns, seed + trio — and the taste payoff: the trio's AST prints itself (`node.sexp`), Token knows its kinds, guest `with` works
+- ✅ Decided: brace blocks with the whose-block never-guess error (0016) — no precedence split from `do/end`; build pending
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -38,9 +40,10 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Language surface (decide, then build)
 
+- [ ] Brace blocks (ADR 0016 — decided; build)
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
-- [ ] Symbols, floats (one small division talk), ranges (build)
-- [ ] #27 — the object model: methods in struct bodies first (incl. type predicates), the full session later
+- [ ] Symbols (a real session), floats (one small division talk), ranges (three small questions)
+- [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first
 - [ ] #14 — compile-time macros
