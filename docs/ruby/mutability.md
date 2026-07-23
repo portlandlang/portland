@@ -1,9 +1,10 @@
 # Mutability
 
-**Status:** the keyword and rebinding rules are decided
-([ADR 0001](../adr/0001-2026-07-20-mutable-keyword.md)); mutable *values*
-(`push!`-style, `<<` append) are deliberately undecided. Not yet
-implemented.
+**Status:** fully decided — the keyword and rebinding rules
+([ADR 0001](../adr/0001-2026-07-20-mutable-keyword.md)) and the values
+question ([ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md):
+values never mutate; names do). Implementation in progress; `!`-suffix
+semantics deferred.
 
 ## Ruby
 
@@ -40,6 +41,23 @@ inside a block:
 - outer immutable `name` → error, with the fix named
 - no outer `name` → fresh block-local, dies at `end`
 
+And the values question is answered (ADR 0015): **values never mutate;
+names do.** No `push`, no `map!`, no aliased buffers. `<<` and index
+assignment survive as *rebinding* sugar in the `+=` family:
+
+```ruby
+mutable line = ""
+line << word            # ≡ line = line + word — aliases can't be spooked
+mutable counts = {}
+counts["portland"] = 1  # ≡ a functional update of counts
+```
+
+Why: aliased mutation is Ruby's action-at-a-distance bug class; immutable
+values are what let tier-1 parallelism spread `.map` across cores; and
+immutable values can't form reference cycles, which is what makes plain
+reference counting exact — no GC pauses, ever. Performance is the
+runtime's job (refcount-1 buffer reuse), not the semantics'.
+
 ## Migration
 
 - A large fraction of existing Ruby never rebinds or mutates — it is
@@ -47,6 +65,16 @@ inside a block:
 - Rebinding without `mutable` is a loud error with a one-word fix at the
   binding site. `grep mutable` then audits a codebase's entire mutation
   surface.
-- In-place mutation (`push`, `upcase!`, `<<` append) awaits the
-  mutable-values decision — the seed deliberately ships no mutating
-  methods rather than prejudge it.
+- Every `<<` / `+=` / `[]=` site gates on that `mutable` declaration —
+  which is the loudness mechanism for the one real semantic change:
+  Ruby's `<<` mutates through aliases, Portland's rebinds one name. The
+  compile error brings a human to every such site; the linter explains
+  the aliasing difference there.
+- Bang mutators (`upcase!`, `merge!`) are loud unknown-method errors;
+  the rewrite is rebinding (`word = word.upcase`). Whether `!` returns
+  as sugar for exactly that is deferred (ADR 0015 §5).
+- `freeze` / `frozen?` / `dup` / `clone` /
+  `# frozen_string_literal: true` are meaningless in a
+  values-never-mutate language: the first four are loud errors, the
+  magic comment is ignored-not-an-error (it asks for what is already
+  true).

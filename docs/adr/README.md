@@ -25,6 +25,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0012](0012-2026-07-22-branchless-if-is-nil.md) — a branch that doesn't happen produces nil (`if`/`while`/broken-out calls)
 - [0013](0013-2026-07-22-case-in-spec.md) — the `case/in` spec: exhaustive, static, Ruby-shaped (edges tentative)
 - [0014](0014-2026-07-22-keyword-arguments.md) — keyword arguments are Ruby 3's; splats stay out
+- [0015](0015-2026-07-23-values-never-mutate.md) — values never mutate; names do (`<<` and `[]=` as rebinding sugar; `!` deferred)
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)

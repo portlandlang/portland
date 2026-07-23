@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0015 (#10): values never mutate; names do — no in-place mutators ever (securing RC-exactness, #12); `<<` and `[]=` return as rebinding sugar in the `+=` family, `mutable`-gated (the loudness mechanism for the aliasing change); the share-boundary question dissolves; bang methods out with `!` semantics deferred (leading candidate: rebinding sugar). Ledger updated.
+
 - Trio, case/in final sliver (#26): the one-line forms — `expr in pattern` and `expr => pattern` — threaded through parser.pdx and evaluator.pdx, differentially pinned. #26 complete; hash and find patterns stay deliberately deferred.
 
 - Trio, case/in payoff + fixture (#26): the evaluator's dispatchers (`evaluate_statement`, `evaluate_expression`, `match_pattern` itself) are rewritten as `case/in` struct patterns — Portland matching on Portland's own AST, byte-identical throughout; nil-subject guards close the wrong-shape gap for the common case; patterns.pdx joins the fixture suite (direct and hosted); STAGE0 and the ledger record the runtime half as built.
