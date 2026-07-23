@@ -21,6 +21,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0008](0008-2026-07-22-unwrap-toolkit.md) — the unwrap toolkit: narrowing, or-guard, `&.`, `case/in` — and nothing else
 - [0009](0009-2026-07-22-presence-word-some.md) — the presence word is `some`/`some?`
 - [0010](0010-2026-07-22-partial-operations-return-maybes.md) — partial operations return maybes; the only crash is one you typed; `fetch` retires
+- [0011](0011-2026-07-22-together-single-register.md) — `together` has one register: named-at-site (no positional)
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)

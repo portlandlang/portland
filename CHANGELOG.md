@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/adr/ 0011: `together` has one register — named-at-site only, no positional form; destructuring assignment stays unentangled. Closes the last open item on #3.
+
 - docs/adr/ 0010 + docs/ruby/lookups.md: partial operations return maybes — the only crash is one you typed (`or panic "why"`); `fetch` retires (all three arities are the or-guard, lazy for free).
 
 - docs/adr/ 0009: the presence word is `some`/`some?` — ecosystem-verified unclaimed (dry-monads precedent, with our exact meaning); ledger synced.

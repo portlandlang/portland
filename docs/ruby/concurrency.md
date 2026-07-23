@@ -35,7 +35,10 @@ in tier 1:
    render(user, orders, news)     # plain values after end
    ```
 
-   No handles, no futures, no `await`, no computer words anywhere.
+   No handles, no futures, no `await`, no computer words anywhere. And
+   one register only — results are always named at the task site; there
+   is no positional `a, b = together do ... end` form
+   ([ADR 0011](../adr/0011-2026-07-22-together-single-register.md)).
 3. **Explicit control — rare.** Cancellation, timeouts, racing.
 
 The runtime places work on P/E cores (and, for data-parallel tier 1, GPU) —
