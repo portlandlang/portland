@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ROADMAP.md: Zed v0 above the line — zed-portland shipped and verified; #24's remainder is the grammar fork and registry.
+
 - ROADMAP.md: Tooling section (next up) — Zed extension (#24, escalated: .pdx is un-highlighted today) and benchmarks (#25).
 
 - ROADMAP.md: the one-page burn-down — done 🎉 above the line, dropped ❌, coming ⬜ below; linked from the README.

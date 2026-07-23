@@ -16,6 +16,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ **Optionals built** — the runtime half, in the seed _and_ the trio, differentially pinned; the exhibits that demanded the feature now use it
 - ✅ Memory-model direction: RC is exact under immutability (no cycles); MTE/MIE as defense-in-depth, surveyed on #12
 - ✅ Evidence engine: the [ruby_research](https://github.com/portlandlang/ruby_research) corpus reports
+- ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -32,7 +33,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Tooling (next up ⬆️)
 
-- [ ] #24 — Zed language extension: `.pdx` highlighting now (reuse tree-sitter-ruby), `tree-sitter-portland` as the grammars drift
+- [ ] #24 — Zed, the rest: `tree-sitter-portland` fork as the grammars drift; registry publication
 - [ ] #25 — benchmarks: `script/bench` harness for seed/trio workloads; eventually compiled Portland vs Ruby with receipts
 
 ### Language surface (decide, then build)
