@@ -59,6 +59,15 @@ pub enum UnaryOperator {
     Not,
 }
 
+/// What an or-guard does when the left side is absent (ADR 0007/0008):
+/// `user = find_user(id) or return`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GuardAction {
+    Break,
+    Next,
+    Return(Option<Box<Expression>>),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Block {
     pub body: Vec<Statement>,
@@ -91,6 +100,8 @@ pub enum Expression {
         else_body: Vec<Statement>,
         subject: Box<Expression>,
     },
+    /// A diverging or-guard right side; only ever built there.
+    Guard(GuardAction),
     HashLiteral(Vec<(Expression, Expression)>),
     If {
         condition: Box<Expression>,

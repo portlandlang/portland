@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    BinaryOperator, Block, Expression, LogicalOperator, Parameter, Program, Statement,
+    BinaryOperator, Block, Expression, GuardAction, LogicalOperator, Parameter, Program, Statement,
     UnaryOperator,
 };
 use crate::parser;
@@ -114,7 +114,14 @@ impl<W: std::io::Write> Interpreter<W> {
                 if self.methods.contains_key(name) || Self::builtin_name(name) {
                     panic!("local {name} shadows method {name} — rename one");
                 }
-                let value = self.value_of(value);
+                let Some(value) = self.expression(value) else {
+                    if self.pending.is_some() {
+                        // An or-guard diverted (`x = f() or return`): no
+                        // binding happens; the pending signal unwinds.
+                        return None;
+                    }
+                    panic!("assignment to {name} produced no value");
+                };
                 self.variables.insert(name.clone(), value.clone());
                 Some(value)
             }
@@ -197,6 +204,19 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Nil => Some(Value::Nil),
+            // Only reached when an or-guard's left side was absent: divert
+            // control and produce no value; the unwinding machinery takes over.
+            Expression::Guard(action) => {
+                match action {
+                    GuardAction::Break => self.pending = Some(Pending::Break),
+                    GuardAction::Next => self.pending = Some(Pending::Next),
+                    GuardAction::Return(value) => {
+                        let value = value.as_ref().map(|expression| self.value_of(expression));
+                        self.pending = Some(Pending::Return(value));
+                    }
+                }
+                None
+            }
             Expression::Case {
                 branches,
                 else_body,
@@ -771,7 +791,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn builtin_name(name: &str) -> bool {
         matches!(
             name,
-            "argv" | "p" | "puts" | "read_file" | "require_relative" | "write_file"
+            "argv" | "p" | "panic" | "puts" | "read_file" | "require_relative" | "write_file"
         )
     }
 
@@ -895,6 +915,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 writeln!(self.output, "{argument}").expect("failed to write output");
             }
             return None;
+        }
+        if !self.methods.contains_key(name) && name == "panic" {
+            // The only crash is one you typed (ADR 0010).
+            match arguments.as_slice() {
+                [Value::String(message)] => panic!("{message}"),
+                _ => panic!("panic needs one string message"),
+            }
         }
         if !self.methods.contains_key(name) && name == "p" {
             for argument in &arguments {
@@ -2424,6 +2451,46 @@ mod tests {
         // Ruby parses `x = nil or 7` as `(x = nil) or 7`; Portland's or is
         // dead-identical to ||, so this is `x = (nil or 7)` (ADR 0007).
         assert_eq!(evaluate("x = nil or 7\nx"), Some(Value::Integer(7)));
+    }
+
+    #[test]
+    fn or_return_guards_a_method() {
+        let absent = "def bump(x)\n  value = x or return 0\n  value + 1\nend\nbump(nil)\n";
+        assert_eq!(evaluate(absent), Some(Value::Integer(0)));
+        let present = "def bump(x)\n  value = x or return 0\n  value + 1\nend\nbump(41)\n";
+        assert_eq!(evaluate(present), Some(Value::Integer(42)));
+    }
+
+    #[test]
+    fn bare_or_return_produces_no_value() {
+        let source = "def check(x)\n  value = x or return\n  value\nend\ncheck(nil)\n";
+        assert_eq!(evaluate(source), None);
+    }
+
+    #[test]
+    fn or_break_leaves_the_loop() {
+        let source = "total = 0\nwhile true\n  total += 1\n  x = nil or break\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(1)));
+    }
+
+    #[test]
+    #[should_panic(expected = "boom")]
+    fn or_panic_asserts_with_a_message() {
+        evaluate("x = nil or panic \"boom\"");
+    }
+
+    #[test]
+    fn or_panic_is_skipped_when_present() {
+        assert_eq!(
+            evaluate("x = 5 or panic \"boom\"\nx"),
+            Some(Value::Integer(5))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "kaboom")]
+    fn panic_builtin_works_at_statement_position() {
+        evaluate("panic \"kaboom\"");
     }
 
     #[test]

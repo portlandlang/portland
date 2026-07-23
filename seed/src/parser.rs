@@ -2,8 +2,8 @@
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
 use crate::ast::{
-    BinaryOperator, Block, CaseBranch, Expression, LogicalOperator, Parameter, Program, Statement,
-    UnaryOperator,
+    BinaryOperator, Block, CaseBranch, Expression, GuardAction, LogicalOperator, Parameter,
+    Program, Statement, UnaryOperator,
 };
 use crate::lexer::{self, Token, TokenKind};
 
@@ -594,7 +594,10 @@ impl<'source> Parser<'source> {
         // semantics — Ruby's looser-than-assignment `or` is the cut perlism.
         while self.peek_kind() == Some(TokenKind::PipePipe) || self.peek_is_keyword("or") {
             self.position += 1;
-            let right = self.logical_and();
+            let right = match self.guard_right() {
+                Some(right) => right,
+                None => self.logical_and(),
+            };
             left = Expression::Logical {
                 left: Box::new(left),
                 operator: LogicalOperator::Or,
@@ -602,6 +605,44 @@ impl<'source> Parser<'source> {
             };
         }
         left
+    }
+
+    /// The diverging right side of an or-guard: `or return [value]`,
+    /// `or break`, `or next`, and command-form `or panic "why"` (the one
+    /// paren-less command allowed off statement position — ADR 0007's
+    /// blessed assertion line).
+    fn guard_right(&mut self) -> Option<Expression> {
+        if self.peek_is_keyword("break") {
+            self.position += 1;
+            return Some(Expression::Guard(GuardAction::Break));
+        }
+        if self.peek_is_keyword("next") {
+            self.position += 1;
+            return Some(Expression::Guard(GuardAction::Next));
+        }
+        if self.peek_is_keyword("return") {
+            self.position += 1;
+            let value = match self.peek_kind() {
+                None | Some(TokenKind::Newline) => None,
+                _ if self.peek_is_keyword("if") || self.peek_is_keyword("unless") => None,
+                _ => Some(Box::new(self.expression())),
+            };
+            return Some(Expression::Guard(GuardAction::Return(value)));
+        }
+        let panic_command = self
+            .tokens
+            .get(self.position)
+            .is_some_and(|token| token.kind == TokenKind::Identifier && token.text == "panic")
+            && self.peek_kind_at(1) == Some(TokenKind::String);
+        if panic_command {
+            self.position += 1;
+            let message = self.expression();
+            return Some(Expression::Call {
+                arguments: vec![message],
+                name: "panic".to_string(),
+            });
+        }
+        None
     }
 
     fn logical_and(&mut self) -> Expression {

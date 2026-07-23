@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, optionals rung 3c: the or-guard divergers (ADR 0008) — `x = f() or return [value]` / `or break` / `or next` skip the binding and unwind, and `panic "why"` arrives as the language's only crash spelling (ADR 0010), including the paren-less command form in or-guard position.
+
 - Seed, optionals rung 3b: `or` / `and` / `not` word forms, dead-identical to `||` / `&&` / `!` (ADR 0007) — same precedence (`x = nil or 7` binds the or first, unlike Ruby), same typed semantics.
 
 - Seed, optionals rung 3a: typed `||` (ADR 0007) — nil left unwraps-or-else (short-circuit, lazy right), booleans stay logical, `&&` refuses nil; the static halves (dead right sides, `Boolean?` never-guess) stay flagged as out of the seed's reach.
