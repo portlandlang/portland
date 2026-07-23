@@ -542,20 +542,20 @@ end
 
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
-  if node.name == "new" && node.receiver.kind == "identifier"
+  if node.name == "new" && (node.receiver in IdentifierNode)
     return evaluate_new(node, bindings)
   end
   step = evaluate_expression(node.receiver, bindings)
   receiver = slot_value(step.value)
   bindings = step.bindings
   # `&.`: an absent receiver short-circuits; arguments never run.
-  if node.kind == "safe_method_call" && receiver.nil?
+  if (node in SafeMethodCallNode) && receiver.nil?
     return outcome([nil], bindings)
   end
   mutable arguments = []
   mutable keyword_values = []
   node.arguments.each do |argument|
-    if argument.kind == "keyword_argument"
+    if argument in KeywordArgumentNode
       argument_step = evaluate_expression(argument.value, bindings)
       bindings = argument_step.bindings
       keyword_values += [[argument.label, slot_value(argument_step.value)]]
@@ -680,7 +680,7 @@ end
 def bind_parameters(parameters, arguments, keyword_values, mutable scope)
   mutable index = 0
   parameters.each do |parameter|
-    if parameter.kind == "keyword_parameter"
+    if parameter in KeywordParameterNode
       value = keyword_value_for(keyword_values, parameter, scope)
       scope = [[parameter.name, "local", value]] + scope
     else
@@ -715,7 +715,7 @@ def evaluate_call(node, mutable bindings)
   mutable arguments = []
   mutable keyword_values = []
   node.arguments.each do |argument|
-    if argument.kind == "keyword_argument"
+    if argument in KeywordArgumentNode
       step = evaluate_expression(argument.value, bindings)
       bindings = step.bindings
       keyword_values += [[argument.label, slot_value(step.value)]]
