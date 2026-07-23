@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, optionals rung 1 (#21): lexer.pdx learns the optionals surface — `nil`/`and`/`or`/`not` keywords and the `&.` operator.
+
 - docs: STAGE0.md records the optionals runtime half as built; ledger statuses synced.
 
 - Seed, optionals rung 6: `some(x)` and the nested case (ADR 0005/0009) — identity on plain values, a real box only around nil/Some; lookups lift found values with it, so `[nil].first` ≠ `[].first` and a stored hash nil beats the or-guard default (fetch semantics, ADR 0010).

@@ -23,11 +23,11 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[break case def do else elsif end false if next return struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end false if next nil not or return struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= =>].include?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &.].include?(pair)
 end
 
 def one_character_operator?(character)

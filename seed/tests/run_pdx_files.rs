@@ -203,6 +203,28 @@ fn portland_lexer_lexes_itself() {
     assert!(errors.is_empty(), "error tokens: {errors:?}");
 }
 
+#[test]
+fn portland_lexer_lexes_the_optionals_tokens() {
+    let sample = std::env::temp_dir().join("lex_optionals.pdx");
+    std::fs::write(
+        &sample,
+        "x = nil or fallback\nuser&.name\nnot done and ready?\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_tokenize())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("keyword nil"), "{stdout}");
+    assert!(stdout.contains("keyword or"), "{stdout}");
+    assert!(stdout.contains("keyword and"), "{stdout}");
+    assert!(stdout.contains("keyword not"), "{stdout}");
+    assert!(stdout.contains("operator &."), "{stdout}");
+}
+
 fn portland_parse() -> String {
     format!("{}/../compiler/parse.pdx", env!("CARGO_MANIFEST_DIR"))
 }
