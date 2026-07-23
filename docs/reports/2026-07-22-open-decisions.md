@@ -276,4 +276,25 @@ must analyze them; and each decision should feed evidence to the next.
 
 ---
 
+## Evidence engine: portlandlang/ruby_research
+
+The companion repo
+([portlandlang/ruby_research](https://github.com/portlandlang/ruby_research))
+runs re-runnable reports over the rubygems.org corpus and mirrors our
+removal list in `config/portland_removals.yml` (update it as ADRs land).
+Its `PORTLAND_DECISION_CANDIDATES.md` lists ~30 Ruby features the docs
+don't yet rule on, with measured prevalence — feed each into its matching
+session above (in-place mutators → #10, exceptions → the error-handling
+issue, singleton classes/zsuper/hooks → the object model, `defined?` and
+the reflection family → #9, destructuring → the ADR 0011 leftover).
+
+Report wishlist agreed 2026-07-22, in decision-order priority:
+accumulator-shape analysis of mutation sites (#10's deciding evidence),
+error-handling census, nil-idiom census (polyfill sizing, `fetch` arity
+split), `case` anatomy (#20), args/splat census (kwargs), class-shape
+census (object model), concurrency-shape census (#11). Known fix with
+ADR consequences: split `<<`-append out of the bitwise counter (currently
+inflates it to 56%, which would otherwise challenge ADR 0003's "rare"
+claim).
+
 *Everything here is a proposal. ADRs are where decisions become real.*
