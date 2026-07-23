@@ -95,8 +95,14 @@ the tests are the spec until a real one exists.
   token.kind                                       # field access
   token.with(text: "43")                           # updated copy; nothing mutates
   ```
-  Value equality, definition-ordered fields, capitalized names. No methods in
-  struct bodies yet — that arrives with the real object model.
+  Value equality, definition-ordered fields, capitalized names. **Methods
+  in struct bodies** (#27): fields first, then `def`s; inside a method,
+  bare names resolve locals → the receiver's fields → own methods →
+  top-level methods (no-shadow enforced across layers;
+  `new`/`with`/`nil?`/`some?` reserved); `self` is the receiver, for the
+  pass-myself-along case. And **builtin type patterns**: `in String` /
+  `Integer` / `Array` / `Hash` / `Boolean` — the type predicate is a
+  pattern, not a reflection API (`is_a?`/`.class` stay dead).
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops *and blocks*; `break` and
   `next` control the enclosing `while` or block iteration. A call broken out
@@ -132,7 +138,8 @@ the tests are the spec until a real one exists.
 - Symbols, floats, ranges.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
-- Classes/objects, modules, constants; methods inside `struct` bodies.
+- Classes/objects (if they exist at all), modules, constants, inheritance,
+  class-level methods — the full object-model session (#27).
 - Splats (`*args`, `**kwargs`) — deferred, ADR 0014.
 - `together` / concurrency (#11), macros (#14).
 - Mutating methods (`push`, `upcase!`) — permanently, by design: values

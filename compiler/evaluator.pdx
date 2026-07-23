@@ -87,8 +87,8 @@ def evaluate_statement(node, bindings)
     return signal_outcome("return", [], bindings) if value.nil?
     step = evaluate_expression(value, bindings)
     signal_outcome("return", step.value, step.bindings)
-  in StructDefNode(name:, fields:)
-    outcome([], [[name, "struct", fields]] + bindings)
+  in StructDefNode(name:, fields:, methods:)
+    outcome([], [[name, "struct", [fields, methods]]] + bindings)
   else
     evaluate_expression(node, bindings)
   end
@@ -250,7 +250,28 @@ def match_array(pattern, subject, bindings)
   captures
 end
 
+# Builtin type patterns bootstrap on the seed's own (#27): the trio asks
+# the host `subject in Integer` to answer the guest's `in Integer`.
+def match_builtin_type(pattern, subject)
+  matched = case pattern.name
+  when "Boolean" then subject in Boolean
+  when "Hash" then subject in Hash
+  when "Integer" then subject in Integer
+  when "String" then subject in String
+  when "Array"
+    # Guest struct instances are tagged host arrays — exclude them.
+    (subject in Array) && !(subject in ["__struct__", *])
+  else
+    false
+  end
+  return [] if matched
+  nil
+end
+
 def match_struct(pattern, subject, bindings)
+  if %w[Array Boolean Hash Integer String].include?(pattern.name)
+    return match_builtin_type(pattern, subject)
+  end
   return nil if subject.nil?
   return nil unless value_at(subject, 0) == "__struct__"
   return nil unless value_at(subject, 1) == pattern.name
@@ -299,6 +320,7 @@ def evaluate_expression(node, bindings)
   in MatchTestNode then evaluate_match_test(node, bindings)
   in MethodCallNode | SafeMethodCallNode then evaluate_method_call(node, bindings)
   in NilNode then outcome([nil], bindings)
+  in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
   in UnaryNode then evaluate_unary(node, bindings)
   in WordArrayNode(text:) then outcome([word_array_elements(text)], bindings)
@@ -449,7 +471,7 @@ def evaluate_new(node, mutable bindings)
     puts "evaluator: undefined struct #{node.receiver.name}"
     return outcome([], bindings)
   end
-  fields = slot.first[2]
+  fields = value_at(slot.first[2], 0)
   mutable provided = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument.value, bindings)
@@ -478,6 +500,46 @@ def struct_field(instance, field)
   ""
 end
 
+def evaluate_self(bindings)
+  slot = lookup(bindings, "__self__")
+  panic("self only exists inside a struct method") if slot.empty?
+  outcome([value_at(slot.first, 2)], bindings)
+end
+
+# The struct method `method_name` for a tagged-array instance, if any.
+# The struct-shape test is a pattern — the trio's first type predicate.
+def struct_method_for(receiver, method_name, bindings)
+  return nil unless receiver in ["__struct__", *]
+  slot = lookup(bindings, value_at(receiver, 1))
+  return nil if slot.empty?
+  methods = value_at(slot.first[2], 1)
+  return nil if methods.nil?
+  mutable found = nil
+  methods.each do |method|
+    found = method if method.name == method_name
+  end
+  found
+end
+
+# Run one struct method: globals + self + the receiver's fields, then
+# parameters (#27).
+def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
+  mutable scope = bindings.reject do |triple|
+    triple[1] == "local"
+  end
+  scope = [["__self__", "local", receiver]] + scope
+  mutable pair_index = 0
+  pairs = value_at(receiver, 2)
+  while pair_index < pairs.length
+    pair = pairs[pair_index]
+    scope = [[pair[0], "local", value_at(pair, 1)]] + scope
+    pair_index += 1
+  end
+  scope = bind_parameters(method.parameters, arguments, keyword_values, scope)
+  result = run_body(method.body, scope)
+  outcome(result.value, bindings)
+end
+
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
   if node.name == "new" && node.receiver.kind == "identifier"
@@ -491,12 +553,22 @@ def evaluate_method_call(node, mutable bindings)
     return outcome([nil], bindings)
   end
   mutable arguments = []
+  mutable keyword_values = []
   node.arguments.each do |argument|
-    argument_step = evaluate_expression(argument, bindings)
-    bindings = argument_step.bindings
-    arguments += argument_step.value
+    if argument.kind == "keyword_argument"
+      argument_step = evaluate_expression(argument.value, bindings)
+      bindings = argument_step.bindings
+      keyword_values += [[argument.label, slot_value(argument_step.value)]]
+    else
+      argument_step = evaluate_expression(argument, bindings)
+      bindings = argument_step.bindings
+      arguments += argument_step.value
+    end
   end
   return evaluate_block_call(node, receiver, bindings) if node.block.some?
+  # Struct methods dispatch before builtins and field access (#27).
+  own = struct_method_for(receiver, node.name, bindings)
+  return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
@@ -603,16 +675,9 @@ def keyword_value_for(keyword_values, parameter, scope)
   slot_value(default.value)
 end
 
-# Run a user method: fresh scope of methods only (no outer locals), params
-# bound left to right so defaults can reference earlier ones. The caller's
-# bindings come back untouched — callee scope is discarded.
-def invoke(payload, arguments, keyword_values, bindings)
-  parameters = payload[0]
-  body = payload[1]
-  # Everything global survives into the fresh scope; only locals drop.
-  mutable scope = bindings.reject do |triple|
-    triple[1] == "local"
-  end
+# Bind parameters onto a scope, left to right so defaults can reference
+# earlier ones.
+def bind_parameters(parameters, arguments, keyword_values, mutable scope)
   mutable index = 0
   parameters.each do |parameter|
     if parameter.kind == "keyword_parameter"
@@ -629,6 +694,19 @@ def invoke(payload, arguments, keyword_values, bindings)
       index += 1
     end
   end
+  scope
+end
+
+# Run a user method: fresh scope of methods only (no outer locals). The
+# caller's bindings come back untouched — callee scope is discarded.
+def invoke(payload, arguments, keyword_values, bindings)
+  parameters = payload[0]
+  body = payload[1]
+  # Everything global survives into the fresh scope; only locals drop.
+  mutable scope = bindings.reject do |triple|
+    triple[1] == "local"
+  end
+  scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   outcome(result.value, bindings)
 end
@@ -646,6 +724,13 @@ def evaluate_call(node, mutable bindings)
       bindings = step.bindings
       arguments += step.value
     end
+  end
+  # Inside a struct method, bare calls reach own methods first (#27).
+  self_slot = lookup(bindings, "__self__")
+  unless self_slot.empty?
+    receiver = value_at(self_slot.first, 2)
+    own = struct_method_for(receiver, node.name, bindings)
+    return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   end
   slot = lookup(bindings, node.name)
   if !slot.empty? && slot.first[1] == "method"

@@ -212,6 +212,11 @@ struct PairNode
   value
 end
 
+# `self` — the receiver, inside a struct method.
+struct SelfNode
+  kind
+end
+
 # Exhibit A, resolved: bare `return` is a ReturnNode whose value is nil.
 # This struct once had a ReturnBareNode twin because absence couldn't be
 # said — the first real pull toward optionals, now speakable (ADR 0006).
@@ -244,6 +249,7 @@ struct StructDefNode
   kind
   name
   fields
+  methods
 end
 
 # `in ReturnNode(value: nil)` — keyword-only; fields are [label, pattern]
@@ -419,8 +425,12 @@ def string_node(value)
   StringNode.new(kind: "string", value: value)
 end
 
-def struct_def_node(name, fields)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields)
+def self_node
+  SelfNode.new(kind: "self")
+end
+
+def struct_def_node(name, fields, methods)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, methods: methods)
 end
 
 def struct_pattern_node(name, fields)
@@ -767,6 +777,7 @@ def parse_primary(tokens, position)
     case token.text
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
     when "nil" then Step.new(node: nil_node, position: after)
+    when "self" then Step.new(node: self_node, position: after)
     when "if" then parse_if(tokens, after)
     when "unless" then parse_unless(tokens, after)
     when "case" then parse_case(tokens, after)
@@ -1299,8 +1310,15 @@ def parse_struct(tokens, mutable position)
     fields += [tokens[position].text]
     position = skip_newlines_at(tokens, position + 1)
   end
+  # Methods after the fields (#27).
+  mutable methods = []
+  while keyword_at?(tokens, position, %w[def])
+    method = parse_def(tokens, position + 1)
+    methods << method.node
+    position = skip_newlines_at(tokens, method.position)
+  end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: struct_def_node(name, fields), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, methods), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
 end
@@ -1506,6 +1524,12 @@ def return_sexp(node)
   "(return #{sexp(node.value)})"
 end
 
+def struct_def_sexp(node)
+  mutable result = "(struct #{node.name} #{node.fields.join(" ")}"
+  result += " #{sexp_list(node.methods)}" unless node.methods.empty?
+  result + ")"
+end
+
 def struct_pattern_sexp(node)
   parts = node.fields.map do |field|
     "(: #{field[0]} #{sexp(field[1])})"
@@ -1552,8 +1576,9 @@ def sexp(node)
   when "pin" then "(^ #{node.name})"
   when "return" then return_sexp(node)
   when "safe_method_call" then method_call_sexp(node, "&.")
+  when "self" then "self"
   when "string" then encode_string(node.value)
-  when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
+  when "struct_def" then struct_def_sexp(node)
   when "struct_pattern" then struct_pattern_sexp(node)
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
   when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)

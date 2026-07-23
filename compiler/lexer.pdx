@@ -23,7 +23,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end false if in mutable next nil not or return struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end false if in mutable next nil not or return self struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)

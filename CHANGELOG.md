@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, #27 increment: struct methods threaded (StructDefNode carries methods; `self` keyword; own-method bare calls via a `__self__` binding; dispatch before builtins and fields) and builtin type patterns bootstrap on the seed's own (`subject in Integer` answers the guest's `in Integer`; the struct-shape probe became a pattern too) — differentially pinned. Known gaps: guest `with`, method/field collision checks (seed is the oracle).
+
 - Seed, #27 increment: methods in struct bodies — fields first then `def`s, dispatched on instances before field access; bare names resolve locals → fields → own methods → top-level (no-shadow enforced across layers, `new`/`with`/`nil?`/`some?` reserved); `self` is the receiver and that's its whole job; kwargs/guards/defaults all work; top-level bodies clear the receiver. Plus builtin type patterns: `in String` / `Integer` / `Array` / `Hash` / `Boolean` — the type predicate, pattern-flavored, no reflection API.
 
 - ROADMAP: the two missing design issues opened — #27 object model (struct-methods increment first, type predicates included) and #28 error handling (exceptions vs typed results, `!` decided with it).
