@@ -15,28 +15,16 @@ struct Step
   position
 end
 
-struct IntegerNode
+# AST node structs, alphabetical; each carries a kind for case dispatch.
+
+struct ArrayNode
   kind
-  value
+  elements
 end
 
-struct IdentifierNode
+struct AssignmentNode
   kind
   name
-end
-
-struct BooleanNode
-  kind
-  value
-end
-
-# Absence (ADR 0006): the literal has no payload, only its kind.
-struct NilNode
-  kind
-end
-
-struct StringNode
-  kind
   value
 end
 
@@ -47,23 +35,95 @@ struct BinaryNode
   right
 end
 
-struct LogicalNode
+struct BlockNode
   kind
-  operator
-  left
-  right
+  parameters
+  body
 end
 
-struct UnaryNode
+struct BooleanNode
   kind
-  operator
-  operand
+  value
+end
+
+struct BreakNode
+  kind
 end
 
 struct CallNode
   kind
   name
   arguments
+end
+
+struct CaseNode
+  kind
+  subject
+  branches
+  else_body
+end
+
+struct DefNode
+  kind
+  name
+  parameters
+  body
+end
+
+struct ErrorNode
+  kind
+  message
+end
+
+struct HashNode
+  kind
+  pairs
+end
+
+struct IdentifierNode
+  kind
+  name
+end
+
+# Exhibit B, resolved: an absent else is nil, distinct from a present,
+# empty else (ADR 0012).
+struct IfNode
+  kind
+  condition
+  then_body
+  else_body
+end
+
+struct IndexNode
+  kind
+  receiver
+  index
+end
+
+struct IntegerNode
+  kind
+  value
+end
+
+struct KeywordArgumentNode
+  kind
+  label
+  value
+end
+
+# `label:` (required) or `label: default`; default is nil or a node —
+# an honest maybe.
+struct KeywordParameterNode
+  kind
+  name
+  default
+end
+
+struct LogicalNode
+  kind
+  operator
+  left
+  right
 end
 
 # Exhibit C, resolved: block is nil or a BlockNode — an honest maybe, no
@@ -76,83 +136,18 @@ struct MethodCallNode
   block
 end
 
-# `&.` — same shape as MethodCallNode; an absent receiver short-circuits.
-struct SafeMethodCallNode
+struct NextNode
   kind
-  receiver
-  name
-  arguments
-  block
 end
 
-struct BlockNode
+# Absence (ADR 0006): the literal has no payload, only its kind.
+struct NilNode
   kind
-  parameters
-  body
-end
-
-struct KeywordArgumentNode
-  kind
-  label
-  value
-end
-
-# `label:` (required) or `label: default`; default is nil or a node —
-# an honest maybe, per ADR 0012's era.
-struct KeywordParameterNode
-  kind
-  name
-  default
-end
-
-struct DefNode
-  kind
-  name
-  parameters
-  body
-end
-
-struct StructDefNode
-  kind
-  name
-  fields
-end
-
-struct ArrayNode
-  kind
-  elements
-end
-
-struct HashNode
-  kind
-  pairs
 end
 
 struct PairNode
   kind
   key
-  value
-end
-
-struct WordArrayNode
-  kind
-  text
-end
-
-struct IndexNode
-  kind
-  receiver
-  index
-end
-
-struct ErrorNode
-  kind
-  message
-end
-
-struct AssignmentNode
-  kind
-  name
   value
 end
 
@@ -164,34 +159,30 @@ struct ReturnNode
   value
 end
 
-struct BreakNode
+# `&.` — same shape as MethodCallNode; an absent receiver short-circuits.
+struct SafeMethodCallNode
   kind
+  receiver
+  name
+  arguments
+  block
 end
 
-struct NextNode
+struct StringNode
   kind
+  value
 end
 
-# An absent else and an empty else both land as [] here — the same
-# conflation the Rust seed makes. (Optionals evidence, exhibit B.)
-struct IfNode
+struct StructDefNode
   kind
-  condition
-  then_body
-  else_body
+  name
+  fields
 end
 
-struct WhileNode
+struct UnaryNode
   kind
-  condition
-  body
-end
-
-struct CaseNode
-  kind
-  subject
-  branches
-  else_body
+  operator
+  operand
 end
 
 struct WhenNode
@@ -200,52 +191,77 @@ struct WhenNode
   body
 end
 
-def integer_node(value)
-  IntegerNode.new(kind: "integer", value: value)
+struct WhileNode
+  kind
+  condition
+  body
 end
 
-def identifier_node(name)
-  IdentifierNode.new(kind: "identifier", name: name)
+struct WordArrayNode
+  kind
+  text
 end
 
-def boolean_node(value)
-  BooleanNode.new(kind: "boolean", value: value)
+# Node builders, alphabetical.
+
+def array_node(elements)
+  ArrayNode.new(kind: "array", elements: elements)
 end
 
-def nil_node
-  NilNode.new(kind: "nil")
-end
-
-def string_node(value)
-  StringNode.new(kind: "string", value: value)
+def assignment_node(name, value)
+  AssignmentNode.new(kind: "assignment", name: name, value: value)
 end
 
 def binary_node(operator, left, right)
   BinaryNode.new(kind: "binary", operator: operator, left: left, right: right)
 end
 
-def logical_node(operator, left, right)
-  LogicalNode.new(kind: "logical", operator: operator, left: left, right: right)
+def block_node(parameters, body)
+  BlockNode.new(kind: "block", parameters: parameters, body: body)
 end
 
-def unary_node(operator, operand)
-  UnaryNode.new(kind: "unary", operator: operator, operand: operand)
+def boolean_node(value)
+  BooleanNode.new(kind: "boolean", value: value)
+end
+
+def break_node
+  BreakNode.new(kind: "break")
 end
 
 def call_node(name, arguments)
   CallNode.new(kind: "call", name: name, arguments: arguments)
 end
 
-def method_call_node(receiver, name, arguments, block)
-  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+def case_node(subject, branches, else_body)
+  CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
 end
 
-def safe_method_call_node(receiver, name, arguments, block)
-  SafeMethodCallNode.new(kind: "safe_method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+def def_node(name, parameters, body)
+  DefNode.new(kind: "def", name: name, parameters: parameters, body: body)
 end
 
-def block_node(parameters, body)
-  BlockNode.new(kind: "block", parameters: parameters, body: body)
+def error_node(message)
+  ErrorNode.new(kind: "error", message: message)
+end
+
+def hash_node(pairs)
+  HashNode.new(kind: "hash", pairs: pairs)
+end
+
+def identifier_node(name)
+  IdentifierNode.new(kind: "identifier", name: name)
+end
+
+def if_node(condition, then_body, else_body)
+  IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+end
+
+def index_node(receiver, index)
+  IndexNode.new(kind: "index", receiver: receiver, index: index)
+end
+
+def integer_node(value)
+  IntegerNode.new(kind: "integer", value: value)
 end
 
 def keyword_argument_node(label, value)
@@ -256,72 +272,60 @@ def keyword_parameter_node(name, default)
   KeywordParameterNode.new(kind: "keyword_parameter", name: name, default: default)
 end
 
-def def_node(name, parameters, body)
-  DefNode.new(kind: "def", name: name, parameters: parameters, body: body)
+def logical_node(operator, left, right)
+  LogicalNode.new(kind: "logical", operator: operator, left: left, right: right)
 end
 
-def struct_def_node(name, fields)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields)
-end
-
-def array_node(elements)
-  ArrayNode.new(kind: "array", elements: elements)
-end
-
-def hash_node(pairs)
-  HashNode.new(kind: "hash", pairs: pairs)
-end
-
-def pair_node(key, value)
-  PairNode.new(kind: "pair", key: key, value: value)
-end
-
-def word_array_node(text)
-  WordArrayNode.new(kind: "word_array", text: text)
-end
-
-def index_node(receiver, index)
-  IndexNode.new(kind: "index", receiver: receiver, index: index)
-end
-
-def error_node(message)
-  ErrorNode.new(kind: "error", message: message)
-end
-
-def assignment_node(name, value)
-  AssignmentNode.new(kind: "assignment", name: name, value: value)
-end
-
-def return_node(value)
-  ReturnNode.new(kind: "return", value: value)
-end
-
-def return_bare_node
-  return_node(nil)
-end
-
-def break_node
-  BreakNode.new(kind: "break")
+def method_call_node(receiver, name, arguments, block)
+  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
 end
 
 def next_node
   NextNode.new(kind: "next")
 end
 
-def if_node(condition, then_body, else_body)
-  IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+def nil_node
+  NilNode.new(kind: "nil")
+end
+
+def pair_node(key, value)
+  PairNode.new(kind: "pair", key: key, value: value)
+end
+
+def return_bare_node
+  return_node(nil)
+end
+
+def return_node(value)
+  ReturnNode.new(kind: "return", value: value)
+end
+
+def safe_method_call_node(receiver, name, arguments, block)
+  SafeMethodCallNode.new(kind: "safe_method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+end
+
+def string_node(value)
+  StringNode.new(kind: "string", value: value)
+end
+
+def struct_def_node(name, fields)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields)
+end
+
+def unary_node(operator, operand)
+  UnaryNode.new(kind: "unary", operator: operator, operand: operand)
+end
+
+def when_node(values, body)
+  WhenNode.new(kind: "when", values: values, body: body)
 end
 
 def while_node(condition, body)
   WhileNode.new(kind: "while", condition: condition, body: body)
 end
 
-def case_node(subject, branches, else_body)
-  CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
-end
-
-def when_node(values, body)
-  WhenNode.new(kind: "when", values: values, body: body)
+def word_array_node(text)
+  WordArrayNode.new(kind: "word_array", text: text)
 end
 
 # — parsing —
@@ -1109,16 +1113,42 @@ def parse_program(tokens)
 end
 
 # — printing —
+# Helpers alphabetical; the sexp dispatcher last, its branches alphabetical.
 
-def sexp_list(nodes)
-  nodes.map do |node|
-    sexp(node)
-  end.join(" ")
+def branch_sexp(head, body)
+  return "(#{head})" if body.nil?
+  headed_sexp(head, body)
+end
+
+def case_sexp(node)
+  result = "(case #{sexp(node.subject)}"
+  node.branches.each do |branch|
+    result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
+  end
+  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
+  result + ")"
+end
+
+def def_sexp(node)
+  result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
+  result += " #{sexp_list(node.body)}" unless node.body.empty?
+  result + ")"
 end
 
 def headed_sexp(head, arguments)
   return "(#{head})" if arguments.empty?
   "(#{head} #{sexp_list(arguments)})"
+end
+
+def if_sexp(node)
+  result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
+  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
+  result + ")"
+end
+
+def keyword_parameter_sexp(node)
+  return "(: #{node.name})" if node.default.nil?
+  "(: #{node.name} #{sexp(node.default)})"
 end
 
 def method_call_sexp(node, head)
@@ -1131,71 +1161,46 @@ def method_call_sexp(node, head)
   "(#{inner} #{headed_sexp(head, block.body)})"
 end
 
-def def_sexp(node)
-  result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
-  result += " #{sexp_list(node.body)}" unless node.body.empty?
-  result + ")"
-end
-
-def branch_sexp(head, body)
-  return "(#{head})" if body.nil?
-  headed_sexp(head, body)
-end
-
-def if_sexp(node)
-  result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
-  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
-  result + ")"
-end
-
-def case_sexp(node)
-  result = "(case #{sexp(node.subject)}"
-  node.branches.each do |branch|
-    result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
-  end
-  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
-  result + ")"
-end
-
-def keyword_parameter_sexp(node)
-  return "(: #{node.name})" if node.default.nil?
-  "(: #{node.name} #{sexp(node.default)})"
-end
-
 def return_sexp(node)
   return "(return)" if node.value.nil?
   "(return #{sexp(node.value)})"
 end
 
+def sexp_list(nodes)
+  nodes.map do |node|
+    sexp(node)
+  end.join(" ")
+end
+
 def sexp(node)
   case node.kind
-  when "integer" then node.value
-  when "identifier" then node.name
-  when "boolean" then node.value
-  when "nil" then "nil"
-  when "string" then encode_string(node.value)
+  when "array" then headed_sexp("array", node.elements)
+  when "assignment" then "(= #{node.name} #{sexp(node.value)})"
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
-  when "unary" then "(#{node.operator} #{sexp(node.operand)})"
+  when "boolean" then node.value
+  when "break" then "(break)"
   when "call" then headed_sexp("call #{node.name}", node.arguments)
-  when "method_call" then method_call_sexp(node, ".")
-  when "safe_method_call" then method_call_sexp(node, "&.")
+  when "case" then case_sexp(node)
+  when "def" then def_sexp(node)
+  when "error" then "(error #{node.message})"
+  when "hash" then headed_sexp("hash", node.pairs)
+  when "identifier" then node.name
+  when "if" then if_sexp(node)
+  when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
+  when "integer" then node.value
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
   when "keyword_parameter" then keyword_parameter_sexp(node)
-  when "def" then def_sexp(node)
-  when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
-  when "array" then headed_sexp("array", node.elements)
-  when "hash" then headed_sexp("hash", node.pairs)
-  when "pair" then "(=> #{sexp(node.key)} #{sexp(node.value)})"
-  when "word_array" then node.text
-  when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
-  when "assignment" then "(= #{node.name} #{sexp(node.value)})"
-  when "if" then if_sexp(node)
-  when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
-  when "case" then case_sexp(node)
-  when "return" then return_sexp(node)
-  when "break" then "(break)"
+  when "method_call" then method_call_sexp(node, ".")
   when "next" then "(next)"
-  when "error" then "(error #{node.message})"
+  when "nil" then "nil"
+  when "pair" then "(=> #{sexp(node.key)} #{sexp(node.value)})"
+  when "return" then return_sexp(node)
+  when "safe_method_call" then method_call_sexp(node, "&.")
+  when "string" then encode_string(node.value)
+  when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
+  when "unary" then "(#{node.operator} #{sexp(node.operand)})"
+  when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
+  when "word_array" then node.text
   else
     "(unknown #{node.kind})"
   end

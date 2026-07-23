@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- parser.pdx: pure-refactor alphabetization — structs, builders, sexp helpers, and the sexp dispatcher's branches sort alphabetically (the precedence ladder keeps its narrative order); two stale exhibit comments updated.
+
 - Trio: keyword arguments threaded through parser.pdx (`KeywordParameterNode`, label-aware command arguments) and evaluator.pdx (label binding with defaults), differentially pinned; ADR 0014 records the decision (Ruby 3 semantics, splats deferred); STAGE0/ROADMAP synced.
 
 - Seed: keyword arguments on regular methods, Ruby 3 style — `label:` required, `label: default` optional, strictly separate from positionals, kwargs on paren and command calls, defaults may reference earlier parameters; missing/unknown labels are named panics. Splats stay out (deferred, per the open-decisions report).
