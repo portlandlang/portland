@@ -2,71 +2,153 @@
 
 A joyous programming language for Apple silicon.
 
-**Status:** pre-code. This file and `docs/DESIGN.md` are a design brief captured from a brainstorming session on 2026-06-28 (originally held in another project's working dir, hence this handoff). There is no compiler yet. Don't assume code exists — we're at the "squat the namespaces and write the first files" stage.
+**Status:** Stage 0 seed built, Stage 1 begun. The Rust seed (`seed/`)
+lexes, parses, and interprets a real slice of Portland — including the
+headline optionals feature — with a `pdx` binary and REPL. The Portland
+trio (`compiler/lexer.pdx`, `parser.pdx`, `evaluator.pdx`) is Portland
+written in Portland: the parser parses the whole compiler including
+itself, and the evaluator runs the fixture suite byte-identical to the
+seed. See [ROADMAP.md](ROADMAP.md) for the one-page burn-down,
+[docs/STAGE0.md](docs/STAGE0.md) for exactly what's built, and
+[docs/reports/2026-07-22-open-decisions.md](docs/reports/2026-07-22-open-decisions.md)
+for what's next.
 
 ## North star
 
-Programmer happiness first, like Ruby. Job one is the joy of reading and writing the code. Safety and performance are job 1.1 — not tradeoffs _against_ joy, but _contributors_ to it. The rule every feature must pass: does this make the beautiful line also the safe, fast line — or does it force a different, uglier line to get safe and fast? Reject the latter.
+Programmer happiness first, like Ruby. Job one is the joy of reading and
+writing the code. Safety and performance are job 1.1 — not tradeoffs
+_against_ joy, but _contributors_ to it. The rule every feature must
+pass: does this make the beautiful line also the safe, fast line — or
+does it force a different, uglier line to get safe and fast? Reject the
+latter.
 
-The premise: a language that runs **only** on Apple silicon (A-series / M-series), and is **not** Swift. Locking to one vendor's hardware is the feature — it lets us make assumptions general, portable languages are forbidden to make.
+The premise: a language that runs **only** on Apple silicon (A-series /
+M-series, macOS 26+), and is **not** Swift. Locking to one vendor's
+hardware is the feature — it lets us make assumptions general, portable
+languages are forbidden to make.
 
-## Locked design decisions
+## How decisions get made (the working method)
 
-- **Ruby's good parts, kept (the surface):** blocks-as-prose (`.map`/`.each`/`yield`), everything-is-an-expression, implicit returns, `?`/`!` method suffixes, postfix guards, keyword args, Enumerable as one unifying protocol, modern pattern matching (promoted to load-bearing). ~90% of Ruby's joy is this ergonomic surface and it survives static compilation.
-- **Ruby's bad parts, cut (the runtime):** runtime monkeypatching / open classes, `method_missing`, runtime `define_method`, `eval`, globals, perlisms, redundant footguns (`for`, `and`/`or` precedence). Replace runtime metaprogramming with **compile-time macros**. The cut-list and the "blocks static safety/speed" list are nearly the same set.
-- **No ambient nil.** Absence is one explicit case of an optional (`User?`), never a free-floating bottom every value can secretly be. You only meet it when the type says so. Kills `NoMethodError on nil` — Ruby's #1 production crash.
-- **Immutable by default; mutable when local.** Bare binding is immutable (`foo = "abc"`); mutability needs an explicit marker (`let`/`var`/`mut` — TBD). The real line is **immutable when shared, mutable when local**: mutate freely in your own scope, but a value frozen the moment it crosses a boundary where it could race. The compiler enforces it.
-- **Types inferred, not written.** Hindley-Milner-style; types present (the safety) but invisible (the joy). Annotations only at public boundaries, as docs. Duck typing becomes **structural** typing — "if it quacks," checked at compile time.
+- **ADRs** — every language decision is one file in
+  [docs/adr/](docs/adr/) (`NNNN-date-slug`, Accepted/Tentative/
+  Superseded). Issues discuss; ADRs decide. Twelve exist so far.
+- **The Ruby ledger** — every Ruby-divergent decision gets a file in
+  [docs/ruby/](docs/ruby/), updated alongside its ADR. Two promises
+  govern it: divergence is **loud, never silent** (agreements compile
+  verbatim; differences are compile errors with suggested rewrites), and
+  the **polyfill test** (a future gem + linter should be able to teach
+  each idiom inside valid Ruby before a codebase flips).
+- **The Ruby-match tiebreaker** — for anything end users type, matching
+  Ruby is the preferred answer unless it costs a design principle. Tie
+  goes to Ruby.
+- **Never guess** — where one spelling has two genuine readings
+  (`puts -1`, `Boolean?` with `or`), Portland errors and asks rather
+  than picking. No shadowing: a name is a local or a method, never both.
+- **Demand-driven** — features get built when a real Portland file pulls
+  for them; issues are commitments, not wishes. The evidence engine is
+  [portlandlang/ruby_research](https://github.com/portlandlang/ruby_research)
+  (corpus reports over rubygems.org).
+- **The differential harness** — the seed is the oracle; the trio must
+  match it byte-identically. Never hand-write expected output.
+
+## Decided (ADRs, in brief)
+
+- **Ruby's good parts, kept (the surface):** blocks-as-prose,
+  everything-is-an-expression, implicit returns, `?`/`!` suffixes,
+  postfix guards, keyword args, Enumerable as one protocol, pattern
+  matching (promoted to load-bearing).
+- **Ruby's bad parts, cut (the runtime):** monkeypatching / open
+  classes, `method_missing`, runtime `define_method`, `eval`, globals,
+  truthiness, perlisms (`for`, the `and`/`or` secret precedence, …).
+  Runtime metaprogramming's replacement is **compile-time macros**
+  (undesigned, #14).
+- **Optionals** (ADRs 0005–0010, 0012 — designed *and* built, runtime
+  half): no ambient nil; absence is one explicit case of a maybe. The
+  wrapper model with a collapsed-feeling surface; the words are
+  `nil`/`nil?` and `some`/`some?`; `or`/`and`/`not` are dead-identical
+  to their sigils and `or` is typed (unwrap-or-else, with `or return` /
+  `or panic "why"` as the or-guard); the unwrap toolkit is narrowing,
+  or-guard, `&.`, `case/in` — no `if let`, no force-unwrap; partial
+  operations (`[].first`, `hash[missing]`, out-of-range indexing) return
+  maybes and `fetch` retires; a branch that doesn't happen is nil. The
+  only crash is one you typed.
+- **Immutable by default;** the mutability keyword is **`mutable`**
+  (ADR 0001), fused to first assignment, gating rebinding only. The real
+  line is immutable-when-shared, mutable-when-local; mutable *values*
+  (`push!`, `<<`) are deliberately undecided (#10).
+- **Concurrency vocabulary** (ADRs 0002, 0004, 0011 — tentative,
+  unimplemented): `together` blocks with `meanwhile`/`~` dead-identical
+  task markers, named-at-site as the only register. Semantics are #11.
+- **Bitwise operators out** (ADR 0003, tentative) — named methods
+  instead; `<<` append travels with the mutable-values decision.
+- **Types inferred, not written** — Hindley-Milner-ish direction, design
+  open (#9). Annotations only at public boundaries, as docs. Duck typing
+  becomes structural. The optionals *static* half (narrowing,
+  unhandled-maybe errors, exhaustiveness) lives there.
 
 ## Concurrency (one model, baked in — never a library that gets deprecated)
 
 Three tiers; you live almost entirely in tier 1.
 
-1. **Implicit — you do nothing.** `photos.map { it.thumbnail }` spreads across cores when worth it, safe _because_ values are immutable. You never typed a concurrency word.
-2. **`together` — say "these are independent."** Name each result at its task site so there's no fragile positional coupling:
+1. **Implicit — you do nothing.** `photos.map { it.thumbnail }` spreads
+   across cores when worth it, safe _because_ values are immutable.
+2. **`together` — say "these are independent."**
 
    ```ruby
    together do
-     user  = ~ fetch_user
-     posts = ~ fetch_posts
+     meanwhile user = fetch_user(id)
+     ~ orders = recent_orders(id)      # ~ and meanwhile are dead-identical
    end
-   # user, posts in scope here
+   render(user, orders)                # plain values after end
    ```
 
-   The `~` marks "runs concurrently"; the block is the join boundary. Two registers: terse positional (`a, b = together do … end`) and named-at-site (above). Both a word form (`spawn`) and a symbol form (the sigil), like `lambda`/`->` — but they must be **dead-identical** (don't repeat the `lambda`/`proc` `return` footgun) and the symbol must be one easy keystroke.
-
-3. **Explicit control — rare.** Cancellation, timeouts, racing strategies.
+3. **Explicit control — rare.** Cancellation, timeouts, racing.
 
 ## Implementation strategy
 
-- **Frontend in Rust. Backend on MLIR / LLVM.** MLIR isn't cargo-cult: the heterogeneous-compute thesis (one program → CPU, GPU, matrix unit) is exactly what MLIR exists for, and on Apple silicon the road to the metal _is_ LLVM (Metal's AIR is LLVM; SME has LLVM intrinsics).
-- **Parser: hand-written recursive descent.** Not the `ruby_prism` crate (parse-only FFI over C, no lexer API, can't extend the grammar). Not PEG / parser-combinator libs (wrong fit for Ruby's context-sensitive lexing; weaker errors). Instead: **port Prism's lexer from its C source** as the textbook for Ruby's lexical hell (heredocs, regex-vs-division, interpolation), and **grow our own grammar fresh in Rust** against our own AST. "Port the hard lexical bits, grow your own grammar." Don't fork-and-prune Prism — subtraction is cost with no payoff.
-- **Self-host as early as possible** (Rubinius creed). Bootstrap:
-  - **Stage 0** — Rust _seed_ compiler for a tiny subset. Crude and disposable on purpose.
-  - **Stage 1** — rewrite the compiler in that subset; build it with the seed.
-  - **Stage 2 (fixpoint)** — the compiler compiles itself; **retire the seed**.
-  - **Stage 3** — push the primitive boundary _down_: stdlib + compiler internals move into the language; the Rust floor shrinks to its irreducible core (memory, LLVM/MLIR glue, GPU dispatch, syscalls).
-  - Keep the last-known-good compiler binary (bootstrap chore) and the Rust seed buildable as an escape hatch.
-- **Greenfield, NOT an alt-implementation.** No incumbent to displace, so it dodges the social trap that actually sank Rubinius (which was never a technical failure). The cost is instead cold-start adoption — solved with joy + the killer niche (Apple-silicon-native Ruby-joy).
+- **Frontend in Rust. Backend on MLIR / LLVM** (#5, undesigned). MLIR
+  isn't cargo-cult: the heterogeneous-compute thesis (one program → CPU,
+  GPU, matrix unit) is what MLIR exists for, and on Apple silicon the
+  road to the metal _is_ LLVM.
+- **Parser: hand-written recursive descent** (built). Prism's C lexer is
+  the textbook for the hard lexical parts still to come (heredocs, #6).
+- **Memory model** (#12, plan proposed): the language is memory-safe by
+  semantics on every chip; reference counting is *exact* under
+  immutability (immutable values can't form cycles) — no tracing GC, no
+  borrow-checker ceremony. EMTE/MIE (A19/M5+) is defense-in-depth for
+  the Rust floor, never the foundation.
+- **Self-host as early as possible** (Rubinius creed). Stage 0 seed
+  (built, disposable on purpose) → Stage 1 rewrite in Portland (the trio
+  is its beginning) → Stage 2 fixpoint, **seed retires** → Stage 3 the
+  primitive boundary descends.
+- **Greenfield, NOT an alt-implementation.** No incumbent to displace —
+  dodges the social trap that sank Rubinius. The cost is cold-start
+  adoption, solved with joy + the killer niche. The migration story
+  (ledger, polyfill test, eventual ruby/spec fork — #23) is how Rubyists
+  get here.
 
-## Hardware bets (turn these into language semantics, not library calls)
+## Hardware bets (language semantics, not library calls)
 
-- **Unified memory (UMA):** no host/device distinction, no `device` keyword, data lives once. The same `.map` line is a GPU dispatch on a big array and one core on a small one.
-- **Heterogeneous units:** P/E cores, Metal GPU, SME matrix (M4+) — the runtime _places_ work.
-- **Hardware safety:** Memory Tagging (MTE) → memory safety with zero annotations, no GC pause, no borrow-checker ceremony. PAC everywhere.
-- **Energy topology:** P/E cores + QoS as a type-level effect (`@ecore @background` = placement as an effect).
-- **Honest limit:** the Neural Engine and old AMX are not openly programmable — reach them via CoreML / Accelerate / MPS. The GPU (Metal) and CPU (NEON, SME on M4+) _are_ directly targetable. Don't pretend we compile straight to the NPU.
+- **Unified memory:** no host/device distinction; the same `.map` line
+  is a GPU dispatch on a big array and one core on a small one (#13).
+- **Heterogeneous units:** P/E cores, Metal GPU, SME matrix — the
+  runtime _places_ work.
+- **Hardware safety:** MIE/EMTE as hardening (see #12); PAC for the
+  runtime floor.
+- **Honest limit:** the Neural Engine isn't openly programmable — reach
+  it via CoreML/Accelerate/MPS. Don't pretend we compile straight to the
+  NPU.
 
-## Name & namespaces
+## Name & namespaces (done)
 
-- **Name: Portland. Extension: `.pdx`.** (First pick was Hop/`.hop`, but `@hoplang` + `hoplang.com` were already taken by another new language.) Portland fits better anyway: keep-it-weird craft ethos, the teal PDX-airport-carpet as a ready-made visual identity, a faint Rose City → red → Ruby lineage echo, and `.pdx` is the user's hometown airport code stamped on every file.
-- **Availability checked:** domains `pdxlang.org` / `portlandlang.org` (+ hyphenated) free; GitHub orgs `pdxlang` / `portlandlang` free (bare `portland`/`pdx` blocked — taken as _users_, same namespace as orgs); crates.io `portland` free (bare `pdx` is a reserved placeholder). Plan: org = `pdxlang` or `portlandlang`; crate = `portland`.
-- `.pdx` collides with an Adobe Acrobat catalog index format — deemed a non-issue for source files.
+**Portland**, extension **`.pdx`** — keep-it-weird craft ethos, the teal
+PDX-carpet identity, a faint Rose City → Ruby lineage echo. Repo:
+[portlandlang/portland](https://github.com/portlandlang/portland)
+(public; `pdxlang` org squatted; crates.io `portland` is a name squat
+only). Companions: `ruby_research` (evidence),
+`zed-portland` (`.pdx` editor support, shipped). Brand story is banked,
+not done (#1).
 
-## Next steps
-
-1. Squat the namespaces: crate `portland`, GitHub org (`pdxlang`/`portlandlang`), domain.
-2. Brand story (banked but not done): voice, tagline ("close to the metal, on Metal" is a positioning asset), the teal-carpet / Rose City identity.
-3. First real technical drill-down still open: the compile pipeline inside the Rust floor (lexer → parser → inference → MLIR → CPU/GPU/SME).
-
-See `docs/DESIGN.md` for the fuller rationale behind every decision above.
+See [docs/DESIGN.md](docs/DESIGN.md) for the original rationale behind
+every decision above, and the [issues](https://github.com/portlandlang/portland/issues)
+for everything in motion.

@@ -1,6 +1,6 @@
 # Portland — design notes
 
-Captured 2026-06-28 from a brainstorming session. This is the longer-form rationale; `AGENT.md` is the lean summary. Nothing here is built yet — it's the thinking, recorded so it isn't lost.
+Captured 2026-06-28 from a brainstorming session, and kept as that moment's record — the original thinking, preserved so it isn't lost. `AGENT.md` is the living lean summary; much of what's below has since been built (see `STAGE0.md`) or decided precisely (see `adr/`). Where this document and an ADR disagree, the ADR wins.
 
 ## The seed question
 
