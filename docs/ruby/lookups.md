@@ -2,7 +2,7 @@
 
 **Status:** decided
 ([ADR 0010](../adr/0010-2026-07-22-partial-operations-return-maybes.md)).
-Nothing implemented yet — the seed still panics at these sites.
+Built in the seed (runtime half), 2026-07-22 — see `../STAGE0.md`.
 
 ## Ruby
 

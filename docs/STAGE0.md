@@ -18,7 +18,28 @@ the tests are the spec until a real one exists.
   floor — flagged to revisit).
 - **Comparisons** — `== != < <= > >=`. Equality works across all types (mixed
   types are unequal); ordering is integers-only.
-- **Logical operators** — `&&` `||` (short-circuiting) and `!`, strict booleans.
+- **Logical operators** — `&&` `||` (short-circuiting) and `!`, strict
+  booleans — plus the word forms `and` `or` `not`, **dead-identical** to the
+  sigils (ADR 0007): same precedence (`x = nil or 7` binds the `or` first,
+  unlike Ruby), same semantics. `||`/`or` is *typed*: booleans get logical
+  or; a maybe gets unwrap-or-else (below).
+- **Optionals, the runtime half** (ADRs 0005–0010) — `nil` is a keyword
+  literal: no methods (`nil.upcase` panics "handle the nil case first"),
+  not falsy, `puts nil` refuses. `nil?`/`some?` work on every value — the
+  one dispatch a maybe allows. Partial operations return maybes instead of
+  panicking: `[].first`/`last`/`min`/`max`, out-of-range array and string
+  indexing, missing hash keys. The unwrap toolkit: `x or default` (lazy),
+  the or-guard divergers (`x = f() or return` / `break` / `next`, and
+  `or panic "why"` — the language's only crash spelling, also a builtin at
+  statement position), and safe navigation `&.` (absent receiver
+  short-circuits; arguments never run). The wrapper's nested case:
+  `some(x)` is identity on plain values and a real box only around
+  nil/Some, lookups lift found values through it — so `[nil].first` ≠
+  `[].first`, and a stored hash nil beats the or-guard default (fetch's
+  rule). The *static* half (flow narrowing, unhandled-maybe compile
+  errors, `Boolean?` never-guess, dead right sides) is structurally out of
+  a tree-walker's reach — those panic at runtime here and refuse at
+  compile time in real Portland.
 - **Variables** — bare assignment `x = 1`, reassignment allowed, compound
   assignment (`+= -= *= /= %=`). No declarations.
 - **Control** — `if` / `elsif` / `else` / `end` (an *expression*, per the
@@ -86,8 +107,8 @@ the tests are the spec until a real one exists.
 - Heredocs — remaining Prism-textbook lexer work (interpolation, `%w[]`, and
   single-quoted strings are in).
 - Symbols, floats, ranges.
-- Optionals and the absence story — *the* headline feature, designed at the
-  language level (todo 005), not snuck into the seed.
+- The static half of optionals (narrowing, exhaustiveness, compile-time
+  maybe tracking) — the tree-walker previews those errors as panics.
 - Classes/objects, modules, constants; methods inside `struct` bodies.
 - Keyword arguments on regular methods (`new`/`with` only so far).
 - `together` / concurrency (todos 004, 012), macros (todo 015).
@@ -119,7 +140,8 @@ actual compiler, not the seed.
 
 ## Where nil would have been
 
-Ruby returns `nil` from: `if` with no taken branch, `puts`, out-of-range index,
-`first`/`last` on empty. The seed returns *nothing* (an expression that
-produces no value) for the first two and panics for the rest. Portland proper
-answers all of these with optionals.
+Ruby returns `nil` from: `if` with no taken branch, `puts`, out-of-range
+index, `first`/`last` on empty. The last two now genuinely return Portland's
+`nil` (ADR 0010). The first two still produce *nothing* (an expression with
+no value) — the value of a branchless `if` and of a broken-out-of call is an
+explicitly undecided design question, noted in ADR 0010.
