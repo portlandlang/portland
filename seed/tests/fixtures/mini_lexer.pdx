@@ -15,8 +15,8 @@ def digit?(character)
 end
 
 def lex(source)
-  tokens = []
-  index = 0
+  mutable tokens = []
+  mutable index = 0
   while index < source.length
     character = source[index]
     if character == " "
@@ -29,7 +29,7 @@ def lex(source)
       next
     end
     if digit?(character)
-      text = ""
+      mutable text = ""
       while index < source.length && digit?(source[index])
         text += source[index]
         index += 1
@@ -37,7 +37,7 @@ def lex(source)
       tokens += [Token.new(kind: "integer", text: text)]
       next
     end
-    text = ""
+    mutable text = ""
     while index < source.length && source[index] != " " && !punctuation?(source[index])
       text += source[index]
       index += 1

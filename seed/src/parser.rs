@@ -163,6 +163,25 @@ impl<'source> Parser<'source> {
     }
 
     fn simple_statement(&mut self) -> Statement {
+        if self.peek_is_keyword("mutable") {
+            self.position += 1; // the `mutable`
+            let token = self.advance();
+            if token.kind != TokenKind::Identifier {
+                panic!("expected a name after mutable, got {token:?}");
+            }
+            let name = token.text.to_string();
+            if self.peek_kind() != Some(TokenKind::Equal) {
+                // Fused to first assignment (ADR 0001): no uninitialized holes.
+                panic!("mutable is fused to the first assignment — write `mutable {name} = ...`");
+            }
+            self.position += 1; // the `=`
+            let value = self.expression();
+            return Statement::Assignment {
+                mutable: true,
+                name,
+                value,
+            };
+        }
         if self.peek_is_keyword("break") {
             self.position += 1;
             return Statement::Break;
@@ -186,7 +205,11 @@ impl<'source> Parser<'source> {
             let name = self.advance().text.to_string();
             self.position += 1; // the `=`
             let value = self.expression();
-            return Statement::Assignment { name, value };
+            return Statement::Assignment {
+                mutable: false,
+                name,
+                value,
+            };
         }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && let Some(operator) = match self.peek_kind_at(1) {
@@ -206,7 +229,11 @@ impl<'source> Parser<'source> {
                 operator,
                 right: Box::new(self.expression()),
             };
-            return Statement::Assignment { name, value };
+            return Statement::Assignment {
+                mutable: false,
+                name,
+                value,
+            };
         }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && let Some(command) = self.command_call()
@@ -744,8 +771,14 @@ impl<'source> Parser<'source> {
     fn parameters(&mut self) -> (Vec<Parameter>, Vec<Parameter>) {
         let mut parameters: Vec<Parameter> = Vec::new();
         let mut keyword_parameters: Vec<Parameter> = Vec::new();
-        if self.peek_kind() == Some(TokenKind::Identifier) {
+        if self.peek_kind() == Some(TokenKind::Identifier) || self.peek_is_keyword("mutable") {
             loop {
+                let mutable = if self.peek_is_keyword("mutable") {
+                    self.position += 1; // the `mutable`
+                    true
+                } else {
+                    false
+                };
                 let token = self.advance();
                 if token.kind != TokenKind::Identifier {
                     panic!("expected parameter name, got {token:?}");
@@ -766,7 +799,11 @@ impl<'source> Parser<'source> {
                         Some(TokenKind::Comma | TokenKind::RightParen) => None,
                         _ => Some(self.expression()),
                     };
-                    keyword_parameters.push(Parameter { default, name });
+                    keyword_parameters.push(Parameter {
+                        default,
+                        mutable,
+                        name,
+                    });
                 } else {
                     if !keyword_parameters.is_empty() {
                         panic!("positional parameter {name} cannot follow a keyword parameter");
@@ -785,7 +822,11 @@ impl<'source> Parser<'source> {
                         }
                         None
                     };
-                    parameters.push(Parameter { default, name });
+                    parameters.push(Parameter {
+                        default,
+                        mutable,
+                        name,
+                    });
                 }
                 if self.peek_kind() != Some(TokenKind::Comma) {
                     break;
@@ -1278,6 +1319,7 @@ mod tests {
         assert_eq!(
             parse(r#"greeting = "hi""#).statements,
             vec![Statement::Assignment {
+                mutable: false,
                 name: "greeting".to_string(),
                 value: Expression::String("hi".to_string()),
             }]
@@ -1290,6 +1332,7 @@ mod tests {
             parse("total = 1 + 2\ntotal\n").statements,
             vec![
                 Statement::Assignment {
+                    mutable: false,
                     name: "total".to_string(),
                     value: Expression::Binary {
                         operator: BinaryOperator::Add,
@@ -1364,6 +1407,7 @@ mod tests {
                 name: "greet".to_string(),
                 parameters: vec![Parameter {
                     default: None,
+                    mutable: false,
                     name: "name".to_string(),
                 }],
             }]

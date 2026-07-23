@@ -1,6 +1,6 @@
 # The rite of passage.
 
-number = 1
+mutable number = 1
 while number <= 15
   if number % 15 == 0
     puts("FizzBuzz")

@@ -8,6 +8,10 @@ pub struct Program {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Assignment {
+        /// `mutable name = ...` declares a rebindable name (ADR 0001);
+        /// a bare assignment either creates an immutable binding or
+        /// rebinds an existing mutable one.
+        mutable: bool,
         name: String,
         value: Expression,
     },
@@ -128,6 +132,9 @@ pub struct InBranch {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Parameter {
     pub default: Option<Expression>,
+    /// `def f(mutable position)` — a parameter is a binding site, so the
+    /// ADR 0001 marker applies there too.
+    pub mutable: bool,
     pub name: String,
 }
 

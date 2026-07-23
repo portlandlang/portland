@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0001 implemented (the `mutable` branch): `mutable name = ...` declares the one rebindable kind of name; bare assignment creates immutables or rebinds mutables; compound assignment gates on `mutable`; the three closure rules (accumulators licensed, outer-immutable rebinds refused with the fix named, fresh block-locals die at `end`); `mutable` parameters (`def f(mutable position)` — a parameter is a binding site); loop iterations are fresh scopes for their own locals (the block rule applied to `while`); pattern captures follow assignment rules (immutable clash errors, suggesting the pin) and failed guards roll their captures back. The whole codebase took its own medicine: seed tests, fixtures, and the trio are fully migrated; the trio parses `mutable` as syntax (the seed is the enforcement oracle — documented crude divergence).
+
 - ADR 0015 (#10): values never mutate; names do — no in-place mutators ever (securing RC-exactness, #12); `<<` and `[]=` return as rebinding sugar in the `+=` family, `mutable`-gated (the loudness mechanism for the aliasing change); the share-boundary question dissolves; bang methods out with `!` semantics deferred (leading candidate: rebinding sugar). Ledger updated.
 
 - Trio, case/in final sliver (#26): the one-line forms — `expr in pattern` and `expr => pattern` — threaded through parser.pdx and evaluator.pdx, differentially pinned. #26 complete; hash and find patterns stay deliberately deferred.

@@ -23,7 +23,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end false if in next nil not or return struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end false if in mutable next nil not or return struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)
@@ -37,8 +37,8 @@ end
 # Read a plain quoted lexeme (single-quoted, or a string nested inside an
 # interpolation); backslash escapes the next character.
 def read_simple_string(characters, start, quote)
-  text = characters[start]
-  index = start + 1
+  mutable text = characters[start]
+  mutable index = start + 1
   while index < characters.length
     character = characters[index]
     if character == "\\"
@@ -56,9 +56,9 @@ end
 
 # Read a '#{...}' interpolation, tracking brace depth and nested strings.
 def read_interpolation(characters, start)
-  text = '#{'
-  index = start + 2
-  depth = 1
+  mutable text = '#{'
+  mutable index = start + 2
+  mutable depth = 1
   while index < characters.length && depth > 0
     character = characters[index]
     if character == "{"
@@ -79,8 +79,8 @@ end
 
 # Read a double-quoted lexeme: escapes and interpolation included.
 def read_double_quoted(characters, start)
-  text = characters[start]
-  index = start + 1
+  mutable text = characters[start]
+  mutable index = start + 1
   while index < characters.length
     character = characters[index]
     if character == "\\"
@@ -103,8 +103,8 @@ def read_double_quoted(characters, start)
 end
 
 def read_word_array(characters, start)
-  text = "%w["
-  index = start + 3
+  mutable text = "%w["
+  mutable index = start + 3
   while index < characters.length
     character = characters[index]
     text += character
@@ -116,8 +116,8 @@ end
 
 def lex(source)
   characters = source.chars
-  tokens = []
-  index = 0
+  mutable tokens = []
+  mutable index = 0
   while index < characters.length
     character = characters[index]
     if character == " " || character == "\t"
@@ -157,7 +157,7 @@ def lex(source)
       next
     end
     if digit?(character)
-      text = ""
+      mutable text = ""
       while index < characters.length && digit?(characters[index])
         text += characters[index]
         index += 1
@@ -166,7 +166,7 @@ def lex(source)
       next
     end
     if name_start?(character)
-      text = ""
+      mutable text = ""
       while index < characters.length && name_character?(characters[index])
         text += characters[index]
         index += 1

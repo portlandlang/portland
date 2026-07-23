@@ -451,7 +451,7 @@ end
 # `or` is dead-identical to `||` (ADR 0007): word forms normalize to the
 # sigil in the tree itself, so the two spellings cannot drift apart.
 def parse_logical_or(tokens, position)
-  step = parse_logical_and(tokens, position)
+  mutable step = parse_logical_and(tokens, position)
   while operator_at?(tokens, step.position, %w[||]) || keyword_at?(tokens, step.position, %w[or])
     right = parse_or_right(tokens, step.position + 1)
     step = Step.new(node: logical_node("||", step.node, right.node), position: right.position)
@@ -488,7 +488,7 @@ def or_panic_command?(tokens, position)
 end
 
 def parse_logical_and(tokens, position)
-  step = parse_comparison(tokens, position)
+  mutable step = parse_comparison(tokens, position)
   while operator_at?(tokens, step.position, %w[&&]) || keyword_at?(tokens, step.position, %w[and])
     right = parse_comparison(tokens, step.position + 1)
     step = Step.new(node: logical_node("&&", step.node, right.node), position: right.position)
@@ -497,7 +497,7 @@ def parse_logical_and(tokens, position)
 end
 
 def parse_comparison(tokens, position)
-  step = parse_addition(tokens, position)
+  mutable step = parse_addition(tokens, position)
   while operator_at?(tokens, step.position, %w[== != < <= > >=])
     operator = tokens[step.position].text
     right = parse_addition(tokens, step.position + 1)
@@ -507,7 +507,7 @@ def parse_comparison(tokens, position)
 end
 
 def parse_addition(tokens, position)
-  step = parse_multiplication(tokens, position)
+  mutable step = parse_multiplication(tokens, position)
   while operator_at?(tokens, step.position, %w[+ -])
     operator = tokens[step.position].text
     right = parse_multiplication(tokens, step.position + 1)
@@ -517,7 +517,7 @@ def parse_addition(tokens, position)
 end
 
 def parse_multiplication(tokens, position)
-  step = parse_unary(tokens, position)
+  mutable step = parse_unary(tokens, position)
   while operator_at?(tokens, step.position, %w[* / %])
     operator = tokens[step.position].text
     right = parse_unary(tokens, step.position + 1)
@@ -551,7 +551,7 @@ end
 
 # Chained `.method` calls and `[index]`, binding tighter than any operator.
 # A chain may continue on the next line when that line leads with a dot.
-def postfix_from(tokens, step)
+def postfix_from(tokens, mutable step)
   while true
     position = step.position
     if operator_at?(tokens, position, %w[.])
@@ -575,7 +575,7 @@ def postfix_from(tokens, step)
   step
 end
 
-def parse_dot(tokens, receiver, position, safe)
+def parse_dot(tokens, receiver, mutable position, safe)
   if position >= tokens.length
     return Step.new(node: error_node("expected method name after dot"), position: position)
   end
@@ -584,14 +584,14 @@ def parse_dot(tokens, receiver, position, safe)
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end
   position += 1
-  arguments = []
+  mutable arguments = []
   if operator_at?(tokens, position, %w[(])
     argument_step = parse_arguments(tokens, position + 1)
     arguments = argument_step.node
     position = argument_step.position
   end
   # Exhibit C, resolved: an absent block is nil, not an empty array.
-  block = nil
+  mutable block = nil
   if keyword_at?(tokens, position, %w[do])
     block_step = parse_block(tokens, position + 1)
     block = block_step.node
@@ -606,8 +606,8 @@ def parse_dot(tokens, receiver, position, safe)
 end
 
 # `do |params| ... end`, position already past the `do`.
-def parse_block(tokens, position)
-  parameters = []
+def parse_block(tokens, mutable position)
+  mutable parameters = []
   if operator_at?(tokens, position, %w[|])
     position += 1
     while position < tokens.length && tokens[position].kind == "identifier"
@@ -638,12 +638,12 @@ end
 
 # Parse a comma-separated argument list, consuming the closing paren.
 # The Step's node is the array of argument nodes.
-def parse_arguments(tokens, position)
-  arguments = []
+def parse_arguments(tokens, mutable position)
+  mutable arguments = []
   if operator_at?(tokens, position, %w[)])
     return Step.new(node: arguments, position: position + 1)
   end
-  step = parse_argument(tokens, position)
+  mutable step = parse_argument(tokens, position)
   arguments += [step.node]
   position = step.position
   while operator_at?(tokens, position, %w[,])
@@ -658,12 +658,12 @@ def parse_arguments(tokens, position)
 end
 
 # `[a, b, c]` — position already past the opening bracket.
-def parse_array(tokens, position)
-  elements = []
+def parse_array(tokens, mutable position)
+  mutable elements = []
   if operator_at?(tokens, position, ["]"])
     return Step.new(node: array_node(elements), position: position + 1)
   end
-  step = parse_expression(tokens, position)
+  mutable step = parse_expression(tokens, position)
   elements += [step.node]
   position = step.position
   while operator_at?(tokens, position, %w[,])
@@ -678,8 +678,8 @@ def parse_array(tokens, position)
 end
 
 # `{key => value, ...}` — position already past the opening brace.
-def parse_hash(tokens, position)
-  pairs = []
+def parse_hash(tokens, mutable position)
+  mutable pairs = []
   if operator_at?(tokens, position, ["}"])
     return Step.new(node: hash_node(pairs), position: position + 1)
   end
@@ -718,7 +718,7 @@ def newline_then_dot?(tokens, position)
   operator_at?(tokens, offset, %w[.])
 end
 
-def skip_newlines_at(tokens, position)
+def skip_newlines_at(tokens, mutable position)
   while position < tokens.length && tokens[position].kind == "newline"
     position += 1
   end
@@ -786,9 +786,9 @@ end
 
 # Collect the source inside #{...}: Step.node is the inner source text.
 def read_inner_source(characters, start)
-  inner = ""
-  index = start
-  depth = 1
+  mutable inner = ""
+  mutable index = start
+  mutable depth = 1
   while index < characters.length
     character = characters[index]
     if character == "{"
@@ -812,11 +812,11 @@ def string_expression(lexeme)
   content = lexeme.slice(1, lexeme.length - 2)
   characters = content.chars
   if lexeme.slice(0, 1) == "'"
-    result = ""
-    index = 0
+    mutable result = ""
+    mutable index = 0
     while index < characters.length
       character = characters[index]
-      following = ""
+      mutable following = ""
       following = characters[index + 1] if index + 1 < characters.length
       # Single-quoted: only \' and \\ mean anything; other backslashes stay.
       if character == "\\" && (following == "'" || following == "\\")
@@ -829,9 +829,9 @@ def string_expression(lexeme)
     end
     return string_node(result)
   end
-  parts = []
-  literal = ""
-  index = 0
+  mutable parts = []
+  mutable literal = ""
+  mutable index = 0
   while index < characters.length
     character = characters[index]
     if character == "\\" && index + 1 < characters.length
@@ -853,7 +853,7 @@ def string_expression(lexeme)
   end
   return string_node(literal) if parts.empty?
   parts += [string_node(literal)] unless literal.empty?
-  chain = parts.first
+  mutable chain = parts.first
   index = 1
   while index < parts.length
     chain = binary_node("+", chain, parts[index])
@@ -864,7 +864,7 @@ end
 
 # Re-encode a decoded string for sexp display.
 def encode_string(text)
-  result = "\""
+  mutable result = "\""
   text.chars.each do |character|
     encoded = case character
     when "\\" then "\\\\"
@@ -890,6 +890,7 @@ def parse_statement(tokens, position)
     when "next" then return Step.new(node: next_node, position: position + 1)
     when "while" then return parse_while(tokens, position + 1)
     when "def" then return parse_def(tokens, position + 1)
+    when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
     end
   end
@@ -926,6 +927,20 @@ def parse_return(tokens, position)
   end
   value = parse_expression(tokens, position)
   Step.new(node: return_node(value.node), position: value.position)
+end
+
+# `mutable name = expr` (ADR 0001) — syntax-only in the trio: the flag is
+# dropped and the seed is the oracle for enforcement (crude divergence).
+def parse_mutable(tokens, position)
+  if position >= tokens.length || tokens[position].kind != "identifier"
+    return Step.new(node: error_node("expected a name after mutable"), position: position)
+  end
+  name = tokens[position].text
+  unless operator_at?(tokens, position + 1, %w[=])
+    return Step.new(node: error_node("mutable is fused to the first assignment — write `mutable #{name} = ...`"), position: position + 1)
+  end
+  value = parse_expression(tokens, position + 2)
+  Step.new(node: assignment_node(name, value.node), position: value.position)
 end
 
 # Paren-less command calls, statement position only: `puts "hello"`.
@@ -967,17 +982,17 @@ def ambiguity_message(tokens, position)
   "ambiguous without parens — write #{name}(...) with no space to call"
 end
 
-def skip_line_at(tokens, position)
+def skip_line_at(tokens, mutable position)
   while position < tokens.length && tokens[position].kind != "newline"
     position += 1
   end
   position
 end
 
-def parse_command(tokens, position)
+def parse_command(tokens, mutable position)
   name = tokens[position].text
-  step = parse_argument(tokens, position + 1)
-  arguments = [step.node]
+  mutable step = parse_argument(tokens, position + 1)
+  mutable arguments = [step.node]
   position = step.position
   while operator_at?(tokens, position, %w[,])
     step = parse_argument(tokens, position + 1)
@@ -1006,8 +1021,8 @@ end
 
 # Parse statements up to (not consuming) one of the terminator keywords.
 # The Step's node is the array of statement nodes.
-def parse_body(tokens, position, terminators)
-  nodes = []
+def parse_body(tokens, mutable position, terminators)
+  mutable nodes = []
   position = skip_newlines_at(tokens, position)
   while true
     if position >= tokens.length || keyword_at?(tokens, position, terminators)
@@ -1028,13 +1043,13 @@ end
 
 # — definitions —
 
-def parse_def(tokens, position)
+def parse_def(tokens, mutable position)
   if position >= tokens.length || tokens[position].kind != "identifier"
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text
   position += 1
-  parameters = []
+  mutable parameters = []
   if operator_at?(tokens, position, %w[(])
     parameter_step = parse_parameters(tokens, position + 1)
     parameters = parameter_step.node
@@ -1049,9 +1064,11 @@ end
 
 # Parameter names: `name`, `name = default`, and Ruby-3-style keyword
 # parameters `label:` / `label: default`; consumes the closing paren.
-def parse_parameters(tokens, position)
-  parameters = []
-  while position < tokens.length && tokens[position].kind == "identifier"
+def parse_parameters(tokens, mutable position)
+  mutable parameters = []
+  while position < tokens.length && (tokens[position].kind == "identifier" || keyword_at?(tokens, position, %w[mutable]))
+    # A `mutable` marker on a parameter is syntax-only here, like the statement.
+    position += 1 if keyword_at?(tokens, position, %w[mutable])
     name = tokens[position].text
     position += 1
     if operator_at?(tokens, position, %w[:])
@@ -1080,8 +1097,8 @@ end
 
 # — patterns (ADR 0013) —
 
-def parse_case_in(tokens, subject, position)
-  branches = []
+def parse_case_in(tokens, subject, mutable position)
+  mutable branches = []
   while keyword_at?(tokens, position, %w[in])
     branch = parse_in_branch(tokens, position + 1)
     branches += [branch.node]
@@ -1101,10 +1118,10 @@ def parse_case_in(tokens, subject, position)
   Step.new(node: error_node("expected end to close case"), position: position)
 end
 
-def parse_in_branch(tokens, position)
+def parse_in_branch(tokens, mutable position)
   pattern = parse_pattern(tokens, position)
   position = pattern.position
-  guard = nil
+  mutable guard = nil
   if keyword_at?(tokens, position, %w[if])
     guard_step = parse_expression(tokens, position + 1)
     guard = guard_step.node
@@ -1118,11 +1135,11 @@ def parse_in_branch(tokens, position)
   Step.new(node: in_branch_node(pattern.node, guard, body.node), position: body.position)
 end
 
-def parse_pattern(tokens, position)
+def parse_pattern(tokens, mutable position)
   first = parse_pattern_primary(tokens, position)
   position = first.position
   return first unless operator_at?(tokens, position, %w[|])
-  options = [first.node]
+  mutable options = [first.node]
   while operator_at?(tokens, position, %w[|])
     option = parse_pattern_primary(tokens, position + 1)
     options += [option.node]
@@ -1174,10 +1191,10 @@ def parse_pattern_primary(tokens, position)
 end
 
 # `[p, p]` exact, or `[p, *rest]` — a splat may only end the pattern.
-def parse_array_pattern(tokens, position)
-  elements = []
-  splat = false
-  rest_name = nil
+def parse_array_pattern(tokens, mutable position)
+  mutable elements = []
+  mutable splat = false
+  mutable rest_name = nil
   unless operator_at?(tokens, position, ["]"])
     while true
       if operator_at?(tokens, position, %w[*])
@@ -1203,12 +1220,12 @@ def parse_array_pattern(tokens, position)
 end
 
 # `Name(field: pattern, other:)` — keyword-only; bare `Name` matches by type.
-def parse_struct_pattern(tokens, name, position)
+def parse_struct_pattern(tokens, name, mutable position)
   unless operator_at?(tokens, position, %w[(])
     return Step.new(node: struct_pattern_node(name, []), position: position)
   end
   position += 1
-  fields = []
+  mutable fields = []
   unless operator_at?(tokens, position, %w[)])
     while true
       token = tokens[position]
@@ -1235,7 +1252,7 @@ def parse_struct_pattern(tokens, name, position)
   Step.new(node: struct_pattern_node(name, fields), position: position + 1)
 end
 
-def parse_struct(tokens, position)
+def parse_struct(tokens, mutable position)
   if position >= tokens.length || tokens[position].kind != "identifier"
     return Step.new(node: error_node("expected struct name after struct"), position: position)
   end
@@ -1244,7 +1261,7 @@ def parse_struct(tokens, position)
     return Step.new(node: error_node("struct names start with a capital letter, got #{name}"), position: position + 1)
   end
   position = skip_newlines_at(tokens, position + 1)
-  fields = []
+  mutable fields = []
   while position < tokens.length && tokens[position].kind == "identifier"
     fields += [tokens[position].text]
     position = skip_newlines_at(tokens, position + 1)
@@ -1257,7 +1274,7 @@ end
 
 # — control flow —
 
-def parse_if(tokens, position)
+def parse_if(tokens, mutable position)
   condition = parse_expression(tokens, position)
   then_body = parse_body(tokens, condition.position, %w[else elsif end])
   position = then_body.position
@@ -1283,7 +1300,7 @@ def parse_if(tokens, position)
 end
 
 # `unless c ... else ... end`, desugared to an if with swapped branches.
-def parse_unless(tokens, position)
+def parse_unless(tokens, mutable position)
   condition = parse_expression(tokens, position)
   body = parse_body(tokens, condition.position, %w[else end])
   position = body.position
@@ -1310,14 +1327,14 @@ def parse_while(tokens, position)
   Step.new(node: error_node("expected end to close while"), position: body.position)
 end
 
-def parse_case(tokens, position)
+def parse_case(tokens, mutable position)
   subject = parse_expression(tokens, position)
   position = skip_newlines_at(tokens, subject.position)
   return parse_case_in(tokens, subject.node, position) if keyword_at?(tokens, position, %w[in])
-  branches = []
+  mutable branches = []
   while keyword_at?(tokens, position, %w[when])
-    step = parse_expression(tokens, position + 1)
-    values = [step.node]
+    mutable step = parse_expression(tokens, position + 1)
+    mutable values = [step.node]
     position = step.position
     while operator_at?(tokens, position, %w[,])
       step = parse_expression(tokens, position + 1)
@@ -1355,8 +1372,8 @@ end
 # somewhere other than a newline becomes an error node, then parsing skips
 # to the next line and carries on.
 def parse_program(tokens)
-  nodes = []
-  position = 0
+  mutable nodes = []
+  mutable position = 0
   while position < tokens.length
     if tokens[position].kind == "newline"
       position += 1
@@ -1378,11 +1395,11 @@ end
 # Helpers alphabetical; the sexp dispatcher last, its branches alphabetical.
 
 def array_pattern_sexp(node)
-  parts = node.elements.map do |element|
+  mutable parts = node.elements.map do |element|
     sexp(element)
   end
   if node.splat
-    rest = "*"
+    mutable rest = "*"
     rest += node.rest_name if node.rest_name.some?
     parts += [rest]
   end
@@ -1396,7 +1413,7 @@ def branch_sexp(head, body)
 end
 
 def case_in_sexp(node)
-  result = "(case #{sexp(node.subject)}"
+  mutable result = "(case #{sexp(node.subject)}"
   node.branches.each do |branch|
     result += " #{in_branch_sexp(branch)}"
   end
@@ -1405,7 +1422,7 @@ def case_in_sexp(node)
 end
 
 def case_sexp(node)
-  result = "(case #{sexp(node.subject)}"
+  mutable result = "(case #{sexp(node.subject)}"
   node.branches.each do |branch|
     result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
   end
@@ -1414,7 +1431,7 @@ def case_sexp(node)
 end
 
 def def_sexp(node)
-  result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
+  mutable result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
   result += " #{sexp_list(node.body)}" unless node.body.empty?
   result + ")"
 end
@@ -1425,13 +1442,13 @@ def headed_sexp(head, arguments)
 end
 
 def in_branch_sexp(branch)
-  head = "in #{sexp(branch.pattern)}"
+  mutable head = "in #{sexp(branch.pattern)}"
   head += " if #{sexp(branch.guard)}" if branch.guard.some?
   headed_sexp(head, branch.body)
 end
 
 def if_sexp(node)
-  result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
+  mutable result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
   result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
   result + ")"
 end
@@ -1441,11 +1458,11 @@ def keyword_parameter_sexp(node)
   "(: #{node.name} #{sexp(node.default)})"
 end
 
-def method_call_sexp(node, head)
-  plain = headed_sexp("#{head} #{sexp(node.receiver)} #{node.name}", node.arguments)
+def method_call_sexp(node, dot)
+  plain = headed_sexp("#{dot} #{sexp(node.receiver)} #{node.name}", node.arguments)
   return plain if node.block.nil?
   block = node.block
-  head = "do"
+  mutable head = "do"
   head += " |#{block.parameters.join(" ")}|" unless block.parameters.empty?
   inner = plain.slice(1, plain.length - 2)
   "(#{inner} #{headed_sexp(head, block.body)})"

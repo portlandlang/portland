@@ -8,8 +8,8 @@ end
 puts greeting("portland")
 puts greeting("")
 
-odds = 0
-number = 0
+mutable odds = 0
+mutable number = 0
 while number < 10
   number += 1
   next if number.even?

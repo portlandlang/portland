@@ -35,7 +35,7 @@ end
 # `each` is the unwrapped path. An empty slot comes back nil (crude: the
 # evaluator conflates "no value" with nil where the seed panics).
 def slot_value(values)
-  result = nil
+  mutable result = nil
   values.each do |value|
     result = value
   end
@@ -45,7 +45,7 @@ end
 # Raw positional read for the same reason — used where a triple or pair
 # may hold nil in a value position.
 def value_at(list, target_index)
-  result = nil
+  mutable result = nil
   list.each_with_index do |element, index|
     result = element if index == target_index
   end
@@ -60,7 +60,7 @@ end
 
 # Run statements until done or a signal starts unwinding.
 def run_body(nodes, bindings)
-  result = outcome([], bindings)
+  mutable result = outcome([], bindings)
   nodes.each do |node|
     result = evaluate_statement(node, result.bindings)
     break unless result.signal == "none"
@@ -94,7 +94,7 @@ def evaluate_statement(node, bindings)
   end
 end
 
-def evaluate_while(node, bindings)
+def evaluate_while(node, mutable bindings)
   while true
     condition = evaluate_expression(node.condition, bindings)
     bindings = condition.bindings
@@ -120,13 +120,13 @@ def evaluate_if(node, bindings)
   run_body(body, condition.bindings)
 end
 
-def evaluate_case(node, bindings)
+def evaluate_case(node, mutable bindings)
   subject = evaluate_expression(node.subject, bindings)
   bindings = subject.bindings
-  branch_index = 0
+  mutable branch_index = 0
   while branch_index < node.branches.length
     branch = node.branches[branch_index]
-    value_index = 0
+    mutable value_index = 0
     while value_index < branch.values.length
       candidate = evaluate_expression(branch.values[value_index], bindings)
       bindings = candidate.bindings
@@ -139,11 +139,11 @@ def evaluate_case(node, bindings)
   run_body(node.else_body, bindings)
 end
 
-def evaluate_case_in(node, bindings)
+def evaluate_case_in(node, mutable bindings)
   subject_step = evaluate_expression(node.subject, bindings)
   bindings = subject_step.bindings
   subject = slot_value(subject_step.value)
-  branch_index = 0
+  mutable branch_index = 0
   while branch_index < node.branches.length
     branch = node.branches[branch_index]
     captures = match_pattern(branch.pattern, subject, bindings)
@@ -152,7 +152,7 @@ def evaluate_case_in(node, bindings)
       captures.each do |capture|
         bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
       end
-      guard_ok = true
+      mutable guard_ok = true
       unless branch.guard.nil?
         guard_step = evaluate_expression(branch.guard, bindings)
         bindings = guard_step.bindings
@@ -168,7 +168,7 @@ def evaluate_case_in(node, bindings)
   run_body(node.else_body, bindings)
 end
 
-def evaluate_match_assert(node, bindings)
+def evaluate_match_assert(node, mutable bindings)
   subject_step = evaluate_expression(node.subject, bindings)
   bindings = subject_step.bindings
   subject = slot_value(subject_step.value)
@@ -180,7 +180,7 @@ def evaluate_match_assert(node, bindings)
   outcome([nil], bindings)
 end
 
-def evaluate_match_test(node, bindings)
+def evaluate_match_test(node, mutable bindings)
   subject_step = evaluate_expression(node.subject, bindings)
   bindings = subject_step.bindings
   subject = slot_value(subject_step.value)
@@ -222,7 +222,7 @@ def match_pin(pattern, subject, bindings)
 end
 
 def match_alternative(pattern, subject, bindings)
-  index = 0
+  mutable index = 0
   while index < pattern.options.length
     captures = match_pattern(pattern.options[index], subject, bindings)
     return captures unless captures.nil?
@@ -235,8 +235,8 @@ def match_array(pattern, subject, bindings)
   return nil if subject.nil?
   return nil if pattern.splat == false && subject.length != pattern.elements.length
   return nil if subject.length < pattern.elements.length
-  captures = []
-  index = 0
+  mutable captures = []
+  mutable index = 0
   while index < pattern.elements.length
     element_captures = match_pattern(pattern.elements[index], value_at(subject, index), bindings)
     return nil if element_captures.nil?
@@ -254,8 +254,8 @@ def match_struct(pattern, subject, bindings)
   return nil if subject.nil?
   return nil unless value_at(subject, 0) == "__struct__"
   return nil unless value_at(subject, 1) == pattern.name
-  captures = []
-  index = 0
+  mutable captures = []
+  mutable index = 0
   while index < pattern.fields.length
     field = pattern.fields[index]
     value = struct_field(subject, field[0])
@@ -271,7 +271,7 @@ end
 # The no-shadow rule means one namespace serves both. First match wins,
 # so prepending a triple is both set and shadow.
 def lookup(bindings, name)
-  index = 0
+  mutable index = 0
   while index < bindings.length
     triple = bindings[index]
     return [triple] if triple[0] == name
@@ -366,8 +366,8 @@ def evaluate_unary(node, bindings)
   outcome([result], step.bindings)
 end
 
-def evaluate_array(node, bindings)
-  elements = []
+def evaluate_array(node, mutable bindings)
+  mutable elements = []
   node.elements.each do |element|
     step = evaluate_expression(element, bindings)
     bindings = step.bindings
@@ -379,8 +379,8 @@ end
 # Guest hashes are pair lists — Portland can't build a host hash
 # incrementally (the known language gap), so two-parameter each is the
 # supported surface; the rest waits.
-def evaluate_hash(node, bindings)
-  pairs = []
+def evaluate_hash(node, mutable bindings)
+  mutable pairs = []
   node.pairs.each do |pair|
     key_step = evaluate_expression(pair.key, bindings)
     bindings = key_step.bindings
@@ -405,22 +405,22 @@ def evaluate_index(node, bindings)
 end
 
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
-def evaluate_new(node, bindings)
+def evaluate_new(node, mutable bindings)
   slot = lookup(bindings, node.receiver.name)
   if slot.empty?
     puts "evaluator: undefined struct #{node.receiver.name}"
     return outcome([], bindings)
   end
   fields = slot.first[2]
-  provided = []
+  mutable provided = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument.value, bindings)
     bindings = step.bindings
     provided += [[argument.label, slot_value(step.value)]]
   end
-  ordered = []
+  mutable ordered = []
   fields.each do |field|
-    index = 0
+    mutable index = 0
     while index < provided.length
       ordered += [[field, value_at(provided[index], 1)]] if provided[index][0] == field
       index += 1
@@ -431,7 +431,7 @@ end
 
 def struct_field(instance, field)
   pairs = instance[2]
-  index = 0
+  mutable index = 0
   while index < pairs.length
     return value_at(pairs[index], 1) if pairs[index][0] == field
     index += 1
@@ -441,7 +441,7 @@ def struct_field(instance, field)
 end
 
 # Guest receivers are host values, so host method dispatch does the work.
-def evaluate_method_call(node, bindings)
+def evaluate_method_call(node, mutable bindings)
   if node.name == "new" && node.receiver.kind == "identifier"
     return evaluate_new(node, bindings)
   end
@@ -452,7 +452,7 @@ def evaluate_method_call(node, bindings)
   if node.kind == "safe_method_call" && receiver.nil?
     return outcome([nil], bindings)
   end
-  arguments = []
+  mutable arguments = []
   node.arguments.each do |argument|
     argument_step = evaluate_expression(argument, bindings)
     bindings = argument_step.bindings
@@ -498,8 +498,8 @@ end
 # Crude divergence from the seed: assignments made inside a block do not
 # persist afterward (the block's bindings are discarded).
 def run_guest_block(block, arguments, bindings)
-  scope = bindings
-  index = 0
+  mutable scope = bindings
+  mutable index = 0
   block.parameters.each do |parameter|
     scope = [[parameter, "local", value_at(arguments, index)]] + scope if index < arguments.length
     index += 1
@@ -551,7 +551,7 @@ end
 # parameter's default in the method scope. Missing required labels are the
 # crude error story.
 def keyword_value_for(keyword_values, parameter, scope)
-  index = 0
+  mutable index = 0
   while index < keyword_values.length
     pair = keyword_values[index]
     return value_at(pair, 1) if pair[0] == parameter.name
@@ -572,10 +572,10 @@ def invoke(payload, arguments, keyword_values, bindings)
   parameters = payload[0]
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop.
-  scope = bindings.reject do |triple|
+  mutable scope = bindings.reject do |triple|
     triple[1] == "local"
   end
-  index = 0
+  mutable index = 0
   parameters.each do |parameter|
     if parameter.kind == "keyword_parameter"
       value = keyword_value_for(keyword_values, parameter, scope)
@@ -595,9 +595,9 @@ def invoke(payload, arguments, keyword_values, bindings)
   outcome(result.value, bindings)
 end
 
-def evaluate_call(node, bindings)
-  arguments = []
-  keyword_values = []
+def evaluate_call(node, mutable bindings)
+  mutable arguments = []
+  mutable keyword_values = []
   node.arguments.each do |argument|
     if argument.kind == "keyword_argument"
       step = evaluate_expression(argument.value, bindings)

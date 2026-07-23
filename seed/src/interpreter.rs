@@ -48,7 +48,14 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     output: W,
     pending: Option<Pending>,
     structs: HashMap<String, Vec<String>>,
-    variables: HashMap<String, Value>,
+    variables: HashMap<String, Binding>,
+}
+
+/// A named binding: immutable unless declared `mutable` (ADR 0001).
+#[derive(Clone)]
+struct Binding {
+    mutable: bool,
+    value: Value,
 }
 
 impl Interpreter {
@@ -110,11 +117,11 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn statement(&mut self, statement: &Statement) -> Option<Value> {
         match statement {
-            Statement::Assignment { name, value } => {
-                // The no-shadow rule: a name is a local or a method, never both.
-                if self.methods.contains_key(name) || Self::builtin_name(name) {
-                    panic!("local {name} shadows method {name} — rename one");
-                }
+            Statement::Assignment {
+                mutable,
+                name,
+                value,
+            } => {
                 let Some(value) = self.expression(value) else {
                     if self.pending.is_some() {
                         // An or-guard diverted (`x = f() or return`): no
@@ -123,7 +130,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     panic!("assignment to {name} produced no value");
                 };
-                self.variables.insert(name.clone(), value.clone());
+                self.assign(name, value.clone(), *mutable);
                 Some(value)
             }
             Statement::Expression(expression) => self.expression(expression),
@@ -170,7 +177,14 @@ impl<W: std::io::Write> Interpreter<W> {
                     if !condition {
                         break;
                     }
+                    // Each iteration is a fresh scope for its own locals
+                    // (the block rule of ADR 0001, applied to loops): names
+                    // first assigned inside the body die at iteration end,
+                    // so plain immutable bindings work per-iteration.
+                    let preexisting: std::collections::HashSet<String> =
+                        self.variables.keys().cloned().collect();
                     self.run_body(body);
+                    self.variables.retain(|name, _| preexisting.contains(name));
                     match self.pending {
                         None => {}
                         Some(Pending::Break) => {
@@ -253,12 +267,24 @@ impl<W: std::io::Write> Interpreter<W> {
                         continue;
                     };
                     // Captures bind into the enclosing scope and persist,
-                    // Ruby-style — fenced by no-shadow (ADR 0013 §3). They
-                    // bind before the guard runs so the guard can see them.
+                    // Ruby-style — fenced by the assignment rules (ADR 0013
+                    // §3). They bind before the guard runs so the guard can
+                    // see them — but a failed guard rolls its captures back
+                    // (tidier than Ruby's leak, and immutability needs it).
+                    let saved: Vec<(String, Option<Binding>)> = captures
+                        .iter()
+                        .map(|(name, _)| (name.clone(), self.variables.get(name).cloned()))
+                        .collect();
                     self.bind_captures(captures);
                     if let Some(guard) = &branch.guard
                         && !self.boolean_of(guard, "pattern guard")
                     {
+                        for (name, original) in saved {
+                            match original {
+                                Some(binding) => self.variables.insert(name, binding),
+                                None => self.variables.remove(&name),
+                            };
+                        }
                         continue;
                     }
                     if branch.body.is_empty() {
@@ -496,8 +522,8 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::Variable(name) => {
                 // A bare name is a local if one exists, otherwise a
                 // zero-argument call — unambiguous because shadowing is an error.
-                if let Some(value) = self.variables.get(name) {
-                    Some(value.clone())
+                if let Some(binding) = self.variables.get(name) {
+                    Some(binding.value.clone())
                 } else if self.methods.contains_key(name) || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
                 } else {
@@ -929,8 +955,9 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    /// Run a block as a closure: it sees the enclosing scope; only its
-    /// parameters are block-local (shadowed, then restored).
+    /// Run a block as a closure: it sees the enclosing scope; its parameters
+    /// are block-local (shadowed, then restored), and names first assigned
+    /// inside the block die at `end` (ADR 0001's third closure rule).
     fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
         if block.parameters.len() > arguments.len() {
             panic!(
@@ -939,7 +966,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 arguments.len()
             );
         }
-        let shadowed: Vec<(String, Option<Value>)> = block
+        let preexisting: std::collections::HashSet<String> =
+            self.variables.keys().cloned().collect();
+        let shadowed: Vec<(String, Option<Binding>)> = block
             .parameters
             .iter()
             .map(|parameter| (parameter.clone(), self.variables.get(parameter).cloned()))
@@ -948,7 +977,13 @@ impl<W: std::io::Write> Interpreter<W> {
             if self.methods.contains_key(parameter) || Self::builtin_name(parameter) {
                 panic!("block parameter {parameter} shadows method {parameter} — rename one");
             }
-            self.variables.insert(parameter.clone(), argument);
+            self.variables.insert(
+                parameter.clone(),
+                Binding {
+                    mutable: false,
+                    value: argument,
+                },
+            );
         }
         let result = self.run_body(&block.body);
         // `next` ends just this invocation of the block; `break` and `return`
@@ -956,22 +991,70 @@ impl<W: std::io::Write> Interpreter<W> {
         if matches!(self.pending, Some(Pending::Next)) {
             self.pending = None;
         }
+        // Fresh block-locals die at end; outer bindings survive.
+        self.variables.retain(|name, _| preexisting.contains(name));
         for (parameter, original) in shadowed {
             match original {
-                Some(value) => self.variables.insert(parameter, value),
+                Some(binding) => self.variables.insert(parameter, binding),
                 None => self.variables.remove(&parameter),
             };
         }
         result
     }
 
-    /// Bind pattern captures into the enclosing scope, no-shadow-fenced.
+    /// Bind or rebind a name, enforcing ADR 0001: `mutable` declares a new
+    /// rebindable name exactly once; a bare assignment creates an immutable
+    /// binding or rebinds an existing mutable one.
+    fn assign(&mut self, name: &str, value: Value, declare_mutable: bool) {
+        // The no-shadow rule: a name is a local or a method, never both.
+        if self.methods.contains_key(name) || Self::builtin_name(name) {
+            panic!("local {name} shadows method {name} — rename one");
+        }
+        if declare_mutable {
+            if self.variables.contains_key(name) {
+                panic!("{name} is already declared — mutable declares a new name once");
+            }
+            self.variables.insert(
+                name.to_string(),
+                Binding {
+                    mutable: true,
+                    value,
+                },
+            );
+            return;
+        }
+        match self.variables.get(name) {
+            Some(binding) if !binding.mutable => {
+                panic!(
+                    "{name} is immutable — declare it `mutable {name} = ...` if it needs to change"
+                );
+            }
+            Some(_) => {
+                self.variables.insert(
+                    name.to_string(),
+                    Binding {
+                        mutable: true,
+                        value,
+                    },
+                );
+            }
+            None => {
+                self.variables.insert(
+                    name.to_string(),
+                    Binding {
+                        mutable: false,
+                        value,
+                    },
+                );
+            }
+        }
+    }
+
+    /// Bind pattern captures into the enclosing scope: same rules as a bare
+    /// assignment (immutable clash = error, suggesting the ^ pin).
     fn bind_captures(&mut self, captures: Vec<(String, Value)>) {
         for (name, value) in captures {
-            if self.methods.contains_key(&name) || Self::builtin_name(&name) {
-                panic!("capture {name} shadows method {name} — rename one");
-            }
-            self.variables.insert(name, value);
+            self.assign(&name, value, false);
         }
     }
 
@@ -1011,6 +1094,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .variables
                     .get(name)
                     .unwrap_or_else(|| panic!("undefined variable {name} in a ^ pin"))
+                    .value
                     .clone();
                 if value == *subject {
                     Some(Vec::new())
@@ -1185,7 +1269,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // Methods get a fresh scope: parameters only, no outer locals.
         // Bind left to right so a default can reference earlier parameters.
-        let mut scope: HashMap<String, Value> = HashMap::new();
+        let mut scope: HashMap<String, Binding> = HashMap::new();
         std::mem::swap(&mut self.variables, &mut scope);
         let mut supplied = arguments.into_iter();
         for parameter in &method.parameters {
@@ -1202,7 +1286,13 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.value_of(default)
                 }
             };
-            self.variables.insert(parameter.name.clone(), value);
+            self.variables.insert(
+                parameter.name.clone(),
+                Binding {
+                    mutable: parameter.mutable,
+                    value,
+                },
+            );
         }
         // Keyword parameters bind after positionals, in declaration order,
         // so their defaults can reference any earlier parameter.
@@ -1224,7 +1314,13 @@ impl<W: std::io::Write> Interpreter<W> {
                     None => panic!("{name} missing keyword argument {}", parameter.name),
                 },
             };
-            self.variables.insert(parameter.name.clone(), value);
+            self.variables.insert(
+                parameter.name.clone(),
+                Binding {
+                    mutable: parameter.mutable,
+                    value,
+                },
+            );
         }
         if let Some((label, _)) = keyword_arguments.first() {
             panic!("{name} got unknown keyword argument {label}");
@@ -1279,27 +1375,27 @@ mod tests {
     #[test]
     fn evaluates_compound_assignment() {
         assert_eq!(
-            evaluate("value = 1\nvalue += 2\nvalue\n"),
+            evaluate("mutable value = 1\nvalue += 2\nvalue\n"),
             Some(Value::Integer(3))
         );
         assert_eq!(
-            evaluate("value = 10\nvalue -= 3\nvalue\n"),
+            evaluate("mutable value = 10\nvalue -= 3\nvalue\n"),
             Some(Value::Integer(7))
         );
         assert_eq!(
-            evaluate("value = 4\nvalue *= 3\nvalue\n"),
+            evaluate("mutable value = 4\nvalue *= 3\nvalue\n"),
             Some(Value::Integer(12))
         );
         assert_eq!(
-            evaluate("value = 9\nvalue /= 2\nvalue\n"),
+            evaluate("mutable value = 9\nvalue /= 2\nvalue\n"),
             Some(Value::Integer(4))
         );
         assert_eq!(
-            evaluate("value = 9\nvalue %= 4\nvalue\n"),
+            evaluate("mutable value = 9\nvalue %= 4\nvalue\n"),
             Some(Value::Integer(1))
         );
         assert_eq!(
-            evaluate("word = \"port\"\nword += \"land\"\nword\n"),
+            evaluate("mutable word = \"port\"\nword += \"land\"\nword\n"),
             Some(Value::String("portland".to_string()))
         );
     }
@@ -1389,8 +1485,7 @@ mod tests {
 
     #[test]
     fn break_with_a_postfix_guard() {
-        let source =
-            "number = 0\nwhile true\n  number = number + 1\n  break if number == 4\nend\nnumber\n";
+        let source = "mutable number = 0\nwhile true\n  number = number + 1\n  break if number == 4\nend\nnumber\n";
         assert_eq!(evaluate(source), Some(Value::Integer(4)));
     }
 
@@ -1427,13 +1522,13 @@ mod tests {
 
     #[test]
     fn return_unwinds_through_a_while_loop() {
-        let source = "def find_first_multiple(of)\n  number = 1\n  while true\n    if number % of == 0\n      return number\n    end\n    number = number + 1\n  end\nend\nfind_first_multiple(7)\n";
+        let source = "def find_first_multiple(of)\n  mutable number = 1\n  while true\n    if number % of == 0\n      return number\n    end\n    number = number + 1\n  end\nend\nfind_first_multiple(7)\n";
         assert_eq!(evaluate(source), Some(Value::Integer(7)));
     }
 
     #[test]
     fn next_skips_to_the_following_iteration() {
-        let source = "number = 0\ntotal = 0\nwhile number < 5\n  number += 1\n  next if number.even?\n  total += number\nend\ntotal\n";
+        let source = "mutable number = 0\nmutable total = 0\nwhile number < 5\n  number += 1\n  next if number.even?\n  total += number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(9)));
     }
 
@@ -1445,7 +1540,7 @@ mod tests {
 
     #[test]
     fn break_exits_a_while_loop() {
-        let source = "number = 0\nwhile true\n  number = number + 1\n  if number == 3\n    break\n  end\nend\nnumber\n";
+        let source = "mutable number = 0\nwhile true\n  number = number + 1\n  if number == 3\n    break\n  end\nend\nnumber\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
@@ -1469,7 +1564,7 @@ mod tests {
 
     #[test]
     fn break_stops_block_iteration() {
-        let source = "total = 0\n[1, 2, 3, 4].each do |number|\n  break if number == 3\n  total += number\nend\ntotal\n";
+        let source = "mutable total = 0\n[1, 2, 3, 4].each do |number|\n  break if number == 3\n  total += number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
@@ -1483,7 +1578,7 @@ mod tests {
 
     #[test]
     fn next_skips_a_block_iteration() {
-        let source = "total = 0\n[1, 2, 3, 4].each do |number|\n  next if number.even?\n  total += number\nend\ntotal\n";
+        let source = "mutable total = 0\n[1, 2, 3, 4].each do |number|\n  next if number.even?\n  total += number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(4)));
     }
 
@@ -1502,8 +1597,7 @@ mod tests {
 
     #[test]
     fn break_stops_times() {
-        let source =
-            "count = 0\n5.times do |index|\n  break if index == 2\n  count += 1\nend\ncount\n";
+        let source = "mutable count = 0\n5.times do |index|\n  break if index == 2\n  count += 1\nend\ncount\n";
         assert_eq!(evaluate(source), Some(Value::Integer(2)));
     }
 
@@ -1522,7 +1616,7 @@ mod tests {
     #[test]
     fn each_iterates_with_a_closure_over_the_enclosing_scope() {
         let source =
-            "total = 0\n[1, 2, 3].each do |number|\n  total = total + number\nend\ntotal\n";
+            "mutable total = 0\n[1, 2, 3].each do |number|\n  total = total + number\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(6)));
     }
 
@@ -1676,13 +1770,13 @@ mod tests {
 
     #[test]
     fn times_counts_from_zero() {
-        let source = "sum = 0\n3.times do |index|\n  sum = sum + index\nend\nsum\n";
+        let source = "mutable sum = 0\n3.times do |index|\n  sum = sum + index\nend\nsum\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
     #[test]
     fn times_block_may_ignore_its_argument() {
-        let source = "count = 0\n3.times do\n  count = count + 1\nend\ncount\n";
+        let source = "mutable count = 0\n3.times do\n  count = count + 1\nend\ncount\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
@@ -2280,13 +2374,14 @@ mod tests {
 
     #[test]
     fn while_loops_until_the_condition_is_false() {
-        let source = "number = 3\nwhile number > 0\n  puts(number)\n  number = number - 1\nend\n";
+        let source =
+            "mutable number = 3\nwhile number > 0\n  puts(number)\n  number = number - 1\nend\n";
         assert_eq!(output_of(source), "3\n2\n1\n");
     }
 
     #[test]
     fn while_computes_a_factorial() {
-        let source = "def factorial(number)\n  result = 1\n  while number > 1\n    result = result * number\n    number = number - 1\n  end\n  result\nend\nfactorial(10)\n";
+        let source = "def factorial(mutable number)\n  mutable result = 1\n  while number > 1\n    result = result * number\n    number = number - 1\n  end\n  result\nend\nfactorial(10)\n";
         assert_eq!(evaluate(source), Some(Value::Integer(3_628_800)));
     }
 
@@ -2667,7 +2762,8 @@ mod tests {
 
     #[test]
     fn or_break_leaves_the_loop() {
-        let source = "total = 0\nwhile true\n  total += 1\n  x = nil or break\nend\ntotal\n";
+        let source =
+            "mutable total = 0\nwhile true\n  total += 1\n  x = nil or break\nend\ntotal\n";
         assert_eq!(evaluate(source), Some(Value::Integer(1)));
     }
 
@@ -2827,7 +2923,7 @@ mod tests {
     #[test]
     fn while_produces_nil() {
         assert_eq!(
-            evaluate("n = 0\nwhile n < 3\n  n += 1\nend"),
+            evaluate("mutable n = 0\nwhile n < 3\n  n += 1\nend"),
             Some(Value::Nil)
         );
     }
@@ -3041,6 +3137,82 @@ mod tests {
     #[should_panic(expected = "pattern mismatch")]
     fn rightward_destructuring_panics_on_mismatch() {
         evaluate("[1] => [a, b]\n");
+    }
+
+    #[test]
+    fn while_iterations_are_fresh_scopes_for_their_own_locals() {
+        // `current` is a plain immutable binding, born and dying once per
+        // iteration; `index` and `total` persist because they're outer.
+        let source = "mutable index = 0\nmutable total = 0\nwhile index < 3\n  current = index * 10\n  total += current\n  index += 1\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(30)));
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined variable or method current")]
+    fn while_body_locals_die_at_loop_end() {
+        evaluate("mutable index = 0\nwhile index < 2\n  current = 1\n  index += 1\nend\ncurrent\n");
+    }
+
+    #[test]
+    fn mutable_declares_a_rebindable_name() {
+        assert_eq!(
+            evaluate("mutable count = 1\ncount = 5\ncount\n"),
+            Some(Value::Integer(5))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "count is immutable")]
+    fn rebinding_an_immutable_name_panics() {
+        evaluate("count = 1\ncount = 2\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "count is immutable")]
+    fn compound_assignment_requires_mutable() {
+        evaluate("count = 1\ncount += 1\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "already declared")]
+    fn mutable_declares_once() {
+        evaluate("mutable count = 1\nmutable count = 2\n");
+    }
+
+    #[test]
+    fn blocks_rebind_outer_mutables_the_accumulator_pattern() {
+        let source = "mutable total = 0\n[1, 2].each do |n|\n  total += n\nend\ntotal\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    #[should_panic(expected = "total is immutable")]
+    fn blocks_may_not_rebind_outer_immutables() {
+        evaluate("total = 0\n[1, 2].each do |n|\n  total += n\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined variable or method scratch")]
+    fn fresh_block_locals_die_at_end() {
+        evaluate("[1].each do |n|\n  scratch = n\nend\nscratch\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "number is immutable")]
+    fn parameters_are_immutable_unless_marked() {
+        evaluate("def bump(number)\n  number += 1\nend\nbump(1)\n");
+    }
+
+    #[test]
+    fn mutable_parameters_may_rebind() {
+        let source = "def bump(mutable number)\n  number += 1\n  number\nend\nbump(41)\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(42)));
+    }
+
+    #[test]
+    #[should_panic(expected = "found is immutable")]
+    fn captures_may_not_silently_rebind_immutables() {
+        evaluate("found = 1\ncase 9\nin found then found\nend\n");
     }
 
     #[test]
