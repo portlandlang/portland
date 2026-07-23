@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- docs/ruby/: the Ruby → Portland difference ledger — one file per difference (nil/optionals, truthiness, word operators, mutability, metaprogramming, types, concurrency, parentheses, bitwise, removed syntax), README with the two migration promises (loud-never-silent divergence, the polyfill test).
+
+- docs/adr/ 0005–0007: optionals are a wrapper with a collapsed-feeling surface; the absence word is `nil` (partner word open); `or`/`and`/`not` dead-identical with their sigils, `or` typed with never-guess on `Boolean?`.
+
 - docs/adr/: architecture decision records, one per file — 0001 `mutable`, 0002 the `~` task sigil, 0003 bitwise-out (tentative, `<<` append TBD).
 
 - evaluator.pdx rung 7 + stretch (#19): structs (tagged-array instances, kwargs construction, field access) — and mini_lexer.pdx now runs on the Portland evaluator byte-identical to the seed. Every rung of #19 is complete.
