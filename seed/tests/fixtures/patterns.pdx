@@ -1,0 +1,31 @@
+# Pattern matching (ADR 0013): case/in matches shapes and binds pieces.
+
+struct Token
+  kind
+  text
+end
+
+def describe(token)
+  case token
+  in Token(kind: "integer", text:) then "int #{text}"
+  in Token(kind:) then kind
+  in nil then "absent"
+  end
+end
+
+puts describe(Token.new(kind: "integer", text: "42"))
+puts describe(Token.new(kind: "plus", text: "+"))
+puts describe([].first)
+
+case [1, 2, 3]
+in [] then puts "empty"
+in [first, *rest] then puts "#{first} then #{rest.length} more"
+end
+
+limit = 10
+case 50
+in ^limit then puts "at the limit"
+in over if over > limit then puts "over by #{over - limit}"
+else
+  puts "under"
+end

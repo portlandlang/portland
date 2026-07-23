@@ -78,6 +78,16 @@ fn runs_optionals_pdx() {
 }
 
 #[test]
+fn runs_patterns_pdx() {
+    let output = run_fixture("patterns.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "int 42\nplus\nabsent\n1 then 2 more\nover by 40\n"
+    );
+}
+
+#[test]
 fn runs_mini_lexer_pdx() {
     let output = run_fixture("mini_lexer.pdx");
     assert!(output.status.success());
@@ -470,6 +480,7 @@ fn portland_evaluator_runs_the_fixture_suite() {
         "showcase",
         "blocks",
         "tour",
+        "patterns",
     ] {
         let path = format!(
             "{}/tests/fixtures/{fixture}.pdx",

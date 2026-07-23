@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, case/in payoff + fixture (#26): the evaluator's dispatchers (`evaluate_statement`, `evaluate_expression`, `match_pattern` itself) are rewritten as `case/in` struct patterns — Portland matching on Portland's own AST, byte-identical throughout; nil-subject guards close the wrong-shape gap for the common case; patterns.pdx joins the fixture suite (direct and hosted); STAGE0 and the ledger record the runtime half as built.
+
 - Trio, case/in rung 5 (#26): the pattern surface threaded through the trio — lexer.pdx (`in`, `^`), parser.pdx (pattern grammar with literals-as-nodes, captures, alternatives, pin, guards, array and keyword-only struct patterns; `field:` desugars to a capture at parse time; sexps), evaluator.pdx (guest matcher over tagged-array structs) — differentially pinned against the seed. Known crude gap noted: no type predicates yet, so wrong-shaped subjects panic instead of missing.
 
 - Seed, case/in rung 4 (#26): the one-line forms — `expr in pattern` is a boolean test (binds captures on a hit, reads as a condition: `if node in BreakNode`), and `expr => pattern` is rightward destructuring that panics on mismatch (`pair => [a, b]` — the pattern-grammar answer to multiple assignment).

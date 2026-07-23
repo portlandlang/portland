@@ -68,27 +68,30 @@ def run_body(nodes, bindings)
   result
 end
 
+# The payoff of #26: the evaluator dispatches on its own AST with the
+# struct patterns it just learned to run — Portland matching on Portland.
 def evaluate_statement(node, bindings)
-  case node.kind
-  when "assignment"
-    step = evaluate_expression(node.value, bindings)
+  case node
+  in BreakNode then signal_outcome("break", [], bindings)
+  in NextNode then signal_outcome("next", [], bindings)
+  in WhileNode then evaluate_while(node, bindings)
+  in AssignmentNode(name:, value:)
+    step = evaluate_expression(value, bindings)
     # An or-guard diverted (`x = f() or return`): skip the binding, unwind.
     return step unless step.signal == "none"
-    value = slot_value(step.value)
-    return outcome([value], [[node.name, "local", value]] + step.bindings)
-  when "def"
-    return outcome([], [[node.name, "method", [node.parameters, node.body]]] + bindings)
-  when "struct_def"
-    return outcome([], [[node.name, "struct", node.fields]] + bindings)
-  when "while" then return evaluate_while(node, bindings)
-  when "break" then return signal_outcome("break", [], bindings)
-  when "next" then return signal_outcome("next", [], bindings)
-  when "return"
-    return signal_outcome("return", [], bindings) if node.value.nil?
-    step = evaluate_expression(node.value, bindings)
-    return signal_outcome("return", step.value, step.bindings)
+    bound = slot_value(step.value)
+    outcome([bound], [[name, "local", bound]] + step.bindings)
+  in DefNode(name:, parameters:, body:)
+    outcome([], [[name, "method", [parameters, body]]] + bindings)
+  in ReturnNode(value:)
+    return signal_outcome("return", [], bindings) if value.nil?
+    step = evaluate_expression(value, bindings)
+    signal_outcome("return", step.value, step.bindings)
+  in StructDefNode(name:, fields:)
+    outcome([], [[name, "struct", fields]] + bindings)
+  else
+    evaluate_expression(node, bindings)
   end
-  evaluate_expression(node, bindings)
 end
 
 def evaluate_while(node, bindings)
@@ -170,12 +173,12 @@ end
 # patterns against wrong-shaped subjects panic instead of missing — the
 # trio has no type predicates yet (object-model territory).
 def match_pattern(pattern, subject, bindings)
-  case pattern.kind
-  when "identifier" then [[pattern.name, subject]]
-  when "pin" then match_pin(pattern, subject, bindings)
-  when "alternative_pattern" then match_alternative(pattern, subject, bindings)
-  when "array_pattern" then match_array(pattern, subject, bindings)
-  when "struct_pattern" then match_struct(pattern, subject, bindings)
+  case pattern
+  in AlternativePatternNode then match_alternative(pattern, subject, bindings)
+  in ArrayPatternNode then match_array(pattern, subject, bindings)
+  in IdentifierNode(name:) then [[name, subject]]
+  in PinNode then match_pin(pattern, subject, bindings)
+  in StructPatternNode then match_struct(pattern, subject, bindings)
   else
     match_literal(pattern, subject, bindings)
   end
@@ -205,6 +208,7 @@ def match_alternative(pattern, subject, bindings)
 end
 
 def match_array(pattern, subject, bindings)
+  return nil if subject.nil?
   return nil if pattern.splat == false && subject.length != pattern.elements.length
   return nil if subject.length < pattern.elements.length
   captures = []
@@ -223,6 +227,7 @@ def match_array(pattern, subject, bindings)
 end
 
 def match_struct(pattern, subject, bindings)
+  return nil if subject.nil?
   return nil unless value_at(subject, 0) == "__struct__"
   return nil unless value_at(subject, 1) == pattern.name
   captures = []
@@ -252,31 +257,30 @@ def lookup(bindings, name)
 end
 
 def evaluate_expression(node, bindings)
-  case node.kind
-  when "integer" then outcome([node.value.to_i], bindings)
-  when "boolean" then outcome([node.value == "true"], bindings)
-  when "nil" then outcome([nil], bindings)
-  when "string" then outcome([node.value], bindings)
-  when "method_call" then evaluate_method_call(node, bindings)
-  when "safe_method_call" then evaluate_method_call(node, bindings)
-  when "call" then evaluate_call(node, bindings)
-  when "identifier"
-    slot = lookup(bindings, node.name)
+  case node
+  in ArrayNode then evaluate_array(node, bindings)
+  in BinaryNode then evaluate_binary(node, bindings)
+  in BooleanNode(value:) then outcome([value == "true"], bindings)
+  in CallNode then evaluate_call(node, bindings)
+  in CaseInNode then evaluate_case_in(node, bindings)
+  in CaseNode then evaluate_case(node, bindings)
+  in HashNode then evaluate_hash(node, bindings)
+  in IfNode then evaluate_if(node, bindings)
+  in IndexNode then evaluate_index(node, bindings)
+  in IntegerNode(value:) then outcome([value.to_i], bindings)
+  in LogicalNode then evaluate_logical(node, bindings)
+  in MethodCallNode | SafeMethodCallNode then evaluate_method_call(node, bindings)
+  in NilNode then outcome([nil], bindings)
+  in StringNode(value:) then outcome([value], bindings)
+  in UnaryNode then evaluate_unary(node, bindings)
+  in WordArrayNode(text:) then outcome([word_array_elements(text)], bindings)
+  in IdentifierNode(name:)
+    slot = lookup(bindings, name)
     if slot.empty? || slot.first[1] == "method"
-      evaluate_call(call_node(node.name, []), bindings)
+      evaluate_call(call_node(name, []), bindings)
     else
       outcome([value_at(slot.first, 2)], bindings)
     end
-  when "binary" then evaluate_binary(node, bindings)
-  when "if" then evaluate_if(node, bindings)
-  when "case" then evaluate_case(node, bindings)
-  when "case_in" then evaluate_case_in(node, bindings)
-  when "array" then evaluate_array(node, bindings)
-  when "hash" then evaluate_hash(node, bindings)
-  when "word_array" then outcome([word_array_elements(node.text)], bindings)
-  when "index" then evaluate_index(node, bindings)
-  when "logical" then evaluate_logical(node, bindings)
-  when "unary" then evaluate_unary(node, bindings)
   else
     puts "evaluator: cannot evaluate #{node.kind} yet"
     outcome([], bindings)

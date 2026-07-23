@@ -47,6 +47,16 @@ the tests are the spec until a real one exists.
   aligned `when x then y` one-liners), `while ... end`, and postfix guards
   (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
   booleans: no truthiness, since there is no nil to be falsy.
+- **`case/in` pattern matching** (ADR 0013, runtime half) — literal and
+  `nil` patterns, captures (bind and persist, no-shadow-fenced), `|`
+  alternatives, pin `^variable`, guards (`in x if x > 10`, bind-first),
+  array patterns with a trailing splat (`in [first, *rest]`), and
+  keyword-only struct patterns (`in Token(kind: "integer", text:)` — the
+  `field:` shorthand binds). One-line forms: `expr in pattern` (boolean,
+  binds on a hit) and `expr => pattern` (rightward destructuring, panics
+  on mismatch). No match and no `else` panics — the runtime preview of
+  compile-checked exhaustiveness. Hash patterns and the find pattern are
+  deliberately unbuilt.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
   expression, arity-checked calls, default parameter values (trailing only;
   defaults may reference earlier parameters), and **keyword parameters**
@@ -117,7 +127,7 @@ the tests are the spec until a real one exists.
 - `together` / concurrency (#11), macros (#14).
 - Mutating methods (`push`, `upcase!`) — mutable-values semantics are
   #10; the seed stays read-only rather than prejudging them.
-- `case/in` pattern matching (#20).
+- Hash patterns and the find pattern (`in [*, x, *]`) — deferred (ADR 0013).
 - Command calls nested in expressions (`x = foo bar`) — statement position only.
 - Types — the seed is dynamically checked at runtime; inference is the real
   compiler's job.
