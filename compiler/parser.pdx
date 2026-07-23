@@ -650,17 +650,17 @@ end
 def operator_at?(tokens, position, texts)
   return false if position >= tokens.length
   token = tokens[position]
-  token.kind == "operator" && texts.include?(token.text)
+  token.operator? && texts.include?(token.text)
 end
 
 def keyword_at?(tokens, position, texts)
   return false if position >= tokens.length
   token = tokens[position]
-  token.kind == "keyword" && texts.include?(token.text)
+  token.keyword? && texts.include?(token.text)
 end
 
 def statement_boundary?(tokens, position)
-  position >= tokens.length || tokens[position].kind == "newline"
+  position >= tokens.length || tokens[position].newline?
 end
 
 def parse_expression(tokens, position)
@@ -708,7 +708,7 @@ def or_panic_command?(tokens, position)
   return false if position + 1 >= tokens.length
   token = tokens[position]
   message = tokens[position + 1]
-  token.kind == "identifier" && token.text == "panic" && message.kind == "string"
+  token.identifier? && token.text == "panic" && message.string?
 end
 
 def parse_logical_and(tokens, position)
@@ -752,7 +752,7 @@ end
 
 def parse_unary(tokens, position)
   # Ruby-style: -5 is a negative literal, so -5.abs is (. -5 abs).
-  if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].kind == "integer"
+  if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].integer?
     literal = Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
     return postfix_from(tokens, literal)
   end
@@ -804,7 +804,7 @@ def parse_dot(tokens, receiver, mutable position, safe)
     return Step.new(node: error_node("expected method name after dot"), position: position)
   end
   token = tokens[position]
-  if token.kind != "identifier"
+  unless token.identifier?
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end
   position += 1
@@ -834,7 +834,7 @@ def parse_block(tokens, mutable position)
   mutable parameters = []
   if operator_at?(tokens, position, %w[|])
     position += 1
-    while position < tokens.length && tokens[position].kind == "identifier"
+    while position < tokens.length && tokens[position].identifier?
       parameters += [tokens[position].text]
       position += 1
       position += 1 if operator_at?(tokens, position, %w[,])
@@ -929,7 +929,7 @@ end
 # One argument: `label: value` makes a keyword argument, else an expression.
 def parse_argument(tokens, position)
   token = tokens[position]
-  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[:])
+  if token.identifier? && operator_at?(tokens, position + 1, %w[:])
     value = parse_expression(tokens, position + 2)
     return Step.new(node: keyword_argument_node(token.text, value.node), position: value.position)
   end
@@ -943,7 +943,7 @@ def newline_then_dot?(tokens, position)
 end
 
 def skip_newlines_at(tokens, mutable position)
-  while position < tokens.length && tokens[position].kind == "newline"
+  while position < tokens.length && tokens[position].newline?
     position += 1
   end
   position
@@ -1108,7 +1108,7 @@ end
 
 def parse_statement(tokens, position)
   token = tokens[position]
-  if token.kind == "keyword"
+  if token.keyword?
     case token.text
     when "return" then return parse_return(tokens, position + 1)
     when "break" then return Step.new(node: break_node, position: position + 1)
@@ -1119,21 +1119,21 @@ def parse_statement(tokens, position)
     when "struct" then return parse_struct(tokens, position + 1)
     end
   end
-  if token.kind == "identifier" && command_start?(tokens, position + 1)
+  if token.identifier? && command_start?(tokens, position + 1)
     return parse_command(tokens, position)
   end
-  if token.kind == "identifier" && ambiguous_command?(tokens, position + 1)
+  if token.identifier? && ambiguous_command?(tokens, position + 1)
     return Step.new(node: error_node(ambiguity_message(tokens, position)), position: skip_line_at(tokens, position))
   end
-  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[=])
+  if token.identifier? && operator_at?(tokens, position + 1, %w[=])
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, value.node), position: value.position)
   end
-  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[<<])
+  if token.identifier? && operator_at?(tokens, position + 1, %w[<<])
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, append_node(token.text, value.node)), position: value.position)
   end
-  if token.kind == "identifier" && operator_at?(tokens, position + 1, %w[+= -= *= /= %=])
+  if token.identifier? && operator_at?(tokens, position + 1, %w[+= -= *= /= %=])
     # `x += e` desugars to `x = x + e`, as in the seed.
     operator = tokens[position + 1].text.slice(0, 1)
     value = parse_expression(tokens, position + 2)
@@ -1142,7 +1142,7 @@ def parse_statement(tokens, position)
   end
   step = parse_expression(tokens, position)
   # `name[index] = value` — a functional update rebound on the name.
-  if operator_at?(tokens, step.position, %w[=]) && step.node.kind == "index" && step.node.receiver.kind == "identifier"
+  if operator_at?(tokens, step.position, %w[=]) && (step.node in IndexNode) && (step.node.receiver in IdentifierNode)
     name = step.node.receiver.name
     value = parse_expression(tokens, step.position + 1)
     return Step.new(node: assignment_node(name, index_update_node(name, step.node.index, value.node)), position: value.position)
@@ -1167,7 +1167,7 @@ end
 # `mutable name = expr` (ADR 0001) — syntax-only in the trio: the flag is
 # dropped and the seed is the oracle for enforcement (crude divergence).
 def parse_mutable(tokens, position)
-  if position >= tokens.length || tokens[position].kind != "identifier"
+  if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected a name after mutable"), position: position)
   end
   name = tokens[position].text
@@ -1195,7 +1195,7 @@ end
 def ambiguous_command?(tokens, position)
   return false if position >= tokens.length
   token = tokens[position]
-  return false unless token.kind == "operator" && token.leading_space
+  return false unless token.operator? && token.leading_space
   if token.text == "-"
     after = position + 1
     return false if after >= tokens.length
@@ -1218,7 +1218,7 @@ def ambiguity_message(tokens, position)
 end
 
 def skip_line_at(tokens, mutable position)
-  while position < tokens.length && tokens[position].kind != "newline"
+  while position < tokens.length && !tokens[position].newline?
     position += 1
   end
   position
@@ -1268,7 +1268,7 @@ def parse_body(tokens, mutable position, terminators)
     position = step.position
     unless statement_boundary?(tokens, position) || keyword_at?(tokens, position, terminators)
       nodes += [error_node("expected newline after statement, got #{tokens[position].text}")]
-      while position < tokens.length && tokens[position].kind != "newline"
+      while position < tokens.length && !tokens[position].newline?
         position += 1
       end
     end
@@ -1279,7 +1279,7 @@ end
 # — definitions —
 
 def parse_def(tokens, mutable position)
-  if position >= tokens.length || tokens[position].kind != "identifier"
+  if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text
@@ -1301,7 +1301,7 @@ end
 # parameters `label:` / `label: default`; consumes the closing paren.
 def parse_parameters(tokens, mutable position)
   mutable parameters = []
-  while position < tokens.length && (tokens[position].kind == "identifier" || keyword_at?(tokens, position, %w[mutable]))
+  while position < tokens.length && (tokens[position].identifier? || keyword_at?(tokens, position, %w[mutable]))
     # A `mutable` marker on a parameter is syntax-only here, like the statement.
     position += 1 if keyword_at?(tokens, position, %w[mutable])
     name = tokens[position].text
@@ -1390,32 +1390,32 @@ def parse_pattern_primary(tokens, position)
     return Step.new(node: error_node("expected a pattern"), position: position)
   end
   token = tokens[position]
-  if token.kind == "integer"
+  if token.integer?
     return Step.new(node: integer_node(token.text), position: position + 1)
   end
-  if token.kind == "operator" && token.text == "-" && position + 1 < tokens.length && tokens[position + 1].kind == "integer"
+  if token.operator? && token.text == "-" && position + 1 < tokens.length && tokens[position + 1].integer?
     return Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
   end
-  if token.kind == "string"
+  if token.string?
     return Step.new(node: string_expression(token.text), position: position + 1)
   end
-  if token.kind == "keyword"
+  if token.keyword?
     if token.text == "true" || token.text == "false"
       return Step.new(node: boolean_node(token.text), position: position + 1)
     end
     return Step.new(node: nil_node, position: position + 1) if token.text == "nil"
     return Step.new(node: error_node("unexpected keyword #{token.text} in a pattern"), position: position + 1)
   end
-  if token.kind == "operator" && token.text == "^"
-    if position + 1 < tokens.length && tokens[position + 1].kind == "identifier"
+  if token.operator? && token.text == "^"
+    if position + 1 < tokens.length && tokens[position + 1].identifier?
       return Step.new(node: pin_node(tokens[position + 1].text), position: position + 2)
     end
     return Step.new(node: error_node("expected a variable name after ^"), position: position + 1)
   end
-  if token.kind == "operator" && token.text == "["
+  if token.operator? && token.text == "["
     return parse_array_pattern(tokens, position + 1)
   end
-  if token.kind == "identifier"
+  if token.identifier?
     name = token.text
     if "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
       return parse_struct_pattern(tokens, name, position + 1)
@@ -1435,7 +1435,7 @@ def parse_array_pattern(tokens, mutable position)
       if operator_at?(tokens, position, %w[*])
         splat = true
         position += 1
-        if position < tokens.length && tokens[position].kind == "identifier"
+        if position < tokens.length && tokens[position].identifier?
           rest_name = tokens[position].text
           position += 1
         end
@@ -1464,7 +1464,7 @@ def parse_struct_pattern(tokens, name, mutable position)
   unless operator_at?(tokens, position, %w[)])
     while true
       token = tokens[position]
-      unless token.kind == "identifier" && operator_at?(tokens, position + 1, %w[:])
+      unless token.identifier? && operator_at?(tokens, position + 1, %w[:])
         return Step.new(node: error_node("struct patterns are keyword-only — write #{name}(field: pattern)"), position: position + 1)
       end
       label = token.text
@@ -1488,7 +1488,7 @@ def parse_struct_pattern(tokens, name, mutable position)
 end
 
 def parse_struct(tokens, mutable position)
-  if position >= tokens.length || tokens[position].kind != "identifier"
+  if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected struct name after struct"), position: position)
   end
   name = tokens[position].text
@@ -1497,7 +1497,7 @@ def parse_struct(tokens, mutable position)
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable fields = []
-  while position < tokens.length && tokens[position].kind == "identifier"
+  while position < tokens.length && tokens[position].identifier?
     fields += [tokens[position].text]
     position = skip_newlines_at(tokens, position + 1)
   end
@@ -1617,7 +1617,7 @@ def parse_program(tokens)
   mutable nodes = []
   mutable position = 0
   while position < tokens.length
-    if tokens[position].kind == "newline"
+    if tokens[position].newline?
       position += 1
       next
     end
@@ -1626,7 +1626,7 @@ def parse_program(tokens)
     position = step.position
     next if statement_boundary?(tokens, position)
     nodes += [error_node("expected newline after statement, got #{tokens[position].text}")]
-    while position < tokens.length && tokens[position].kind != "newline"
+    while position < tokens.length && !tokens[position].newline?
       position += 1
     end
   end

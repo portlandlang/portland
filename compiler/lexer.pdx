@@ -8,6 +8,30 @@ struct Token
   kind
   text
   leading_space
+
+  def identifier?
+    kind == "identifier"
+  end
+
+  def integer?
+    kind == "integer"
+  end
+
+  def keyword?
+    kind == "keyword"
+  end
+
+  def newline?
+    kind == "newline"
+  end
+
+  def operator?
+    kind == "operator"
+  end
+
+  def string?
+    kind == "string"
+  end
 end
 
 def digit?(character)

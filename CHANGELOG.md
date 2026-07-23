@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, #27 taste payoff (third slice): Token grew the six kind predicates (`identifier?`, `integer?`, `keyword?`, `newline?`, `operator?`, `string?`) — the issue's own motivating example — and parser.pdx's 29 `token.kind == "..."` string comparisons became predicate calls; the index-assignment head check became type patterns.
+
 - Trio, #27 taste payoff (second slice): the evaluator's `node.kind == "..."` string checks became type patterns — `argument in KeywordArgumentNode`, `(node in SafeMethodCallNode)`, and friends. One `kind` read remains (the cannot-evaluate error message).
 
 - Trio, #27 taste payoff: every AST node struct renders its own S-expression via a `sexp` method — the per-node `*_sexp` helpers moved into their struct bodies (fields read bare, children recurse with `child.sexp`, `MethodCallNode`/`SafeMethodCallNode` share `method_call_sexp(self, dot)`), and the 40-branch `case node.kind` dispatcher dissolved into polymorphic `node.sexp`. Shared renderers (`headed_sexp`, `sexp_list`, `branch_sexp`, `encode_string`) stay top-level. Output byte-identical; the `kind` field survives only for the evaluator's few remaining shape checks.
