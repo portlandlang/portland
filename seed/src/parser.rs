@@ -226,7 +226,7 @@ impl<'source> Parser<'source> {
             | TokenKind::Integer
             | TokenKind::String
             | TokenKind::WordArray => true,
-            TokenKind::Keyword => matches!(next.text, "false" | "true"),
+            TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             TokenKind::Minus if next.leading_space => {
                 // `foo - 1` is subtraction; `foo -1` would be a guess.
                 let after = self.tokens.get(self.position + 2)?;
@@ -871,6 +871,7 @@ impl<'source> Parser<'source> {
             TokenKind::Keyword => match token.text {
                 "case" => self.case_expression(),
                 "false" => Expression::Boolean(false),
+                "nil" => Expression::Nil,
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
                 "unless" => self.unless_expression(),

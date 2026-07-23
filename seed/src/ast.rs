@@ -119,6 +119,10 @@ pub enum Expression {
         name: String,
         receiver: Box<Expression>,
     },
+    /// Absence — the empty case of a maybe (ADR 0006). Not Ruby's nil: it has
+    /// no methods and is not falsy; the seed panics where the real compiler
+    /// will reject at compile time.
+    Nil,
     String(String),
     Unary {
         operand: Box<Expression>,

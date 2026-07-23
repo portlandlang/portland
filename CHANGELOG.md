@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, optionals rung 1: the `nil` literal (ADR 0006) — lexes as a keyword, `Value::Nil`, equality across types, `p nil` renders `nil`, and `puts nil` panics as the crude preview of the future compile error.
+
 - docs/adr/ 0011: `together` has one register — named-at-site only, no positional form; destructuring assignment stays unentangled. Closes the last open item on #3.
 
 - docs/adr/ 0010 + docs/ruby/lookups.md: partial operations return maybes — the only crash is one you typed (`or panic "why"`); `fetch` retires (all three arities are the or-guard, lazy for free).

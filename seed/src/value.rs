@@ -12,6 +12,10 @@ pub enum Value {
     /// order-sensitive, unlike Ruby's — acceptable crudeness for the seed.
     Hash(std::rc::Rc<Vec<(Value, Value)>>),
     Integer(i64),
+    /// Absence (ADR 0005/0006): the empty case of a maybe. No methods, not
+    /// falsy — the seed enforces both with runtime panics where the real
+    /// compiler will refuse to build.
+    Nil,
     String(String),
     /// Immutable named record; fields stay in definition order.
     Struct {
@@ -45,6 +49,7 @@ impl Value {
                 format!("{{{}}}", inner.join(", "))
             }
             Value::Integer(value) => value.to_string(),
+            Value::Nil => "nil".to_string(),
             Value::String(value) => format!("{value:?}"),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
@@ -82,6 +87,7 @@ impl fmt::Display for Value {
                 write!(formatter, "}}")
             }
             Value::Integer(value) => write!(formatter, "{value}"),
+            Value::Nil => write!(formatter, "nil"),
             Value::String(value) => write!(formatter, "{value}"),
             Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
         }

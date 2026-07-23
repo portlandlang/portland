@@ -196,6 +196,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect(),
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::Nil => Some(Value::Nil),
             Expression::Case {
                 branches,
                 else_body,
@@ -865,6 +866,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 writeln!(self.output).expect("failed to write output");
             }
             for argument in &arguments {
+                // Crude preview of the compile error: nil has no rendering.
+                if matches!(argument, Value::Nil) {
+                    panic!(
+                        "puts got nil — handle the nil case first (p renders nil for debugging)"
+                    );
+                }
                 writeln!(self.output, "{argument}").expect("failed to write output");
             }
             return None;
@@ -2300,6 +2307,29 @@ mod tests {
         let mut interpreter = Interpreter::with_output(Vec::new());
         interpreter.program(&program);
         String::from_utf8(interpreter.output).unwrap()
+    }
+
+    #[test]
+    fn evaluates_a_nil_literal() {
+        assert_eq!(evaluate("nil"), Some(Value::Nil));
+    }
+
+    #[test]
+    fn nil_equals_only_nil() {
+        assert_eq!(evaluate("nil == nil"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("nil == 1"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("1 != nil"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn p_renders_nil() {
+        assert_eq!(output_of("p(nil)"), "nil\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "handle the nil case")]
+    fn puts_rejects_nil() {
+        evaluate("puts(nil)");
     }
 
     #[test]
