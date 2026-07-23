@@ -49,8 +49,11 @@ the tests are the spec until a real one exists.
   booleans: no truthiness, since there is no nil to be falsy.
 - **Methods** — `def name(a, b) ... end`, implicit return of the last
   expression, arity-checked calls, default parameter values (trailing only;
-  defaults may reference earlier parameters). Method bodies get a fresh scope:
-  no outer locals (Ruby's rule, kept).
+  defaults may reference earlier parameters), and **keyword parameters**
+  (ADR 0014): `label:` required, `label: default` optional, strictly
+  separate from positionals, labels accepted on paren and command calls,
+  missing/unknown labels are named errors. Method bodies get a fresh
+  scope: no outer locals (Ruby's rule, kept).
 - **Paren-less calls, the Portland way** — *command calls* at statement
   position (`puts "hello"`, `shout word, other`) and *bare zero-argument
   calls* (`ready?`, `pdx`) anywhere. Two rules replace Ruby's guessing:
@@ -110,7 +113,7 @@ the tests are the spec until a real one exists.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
 - Classes/objects, modules, constants; methods inside `struct` bodies.
-- Keyword arguments on regular methods (`new`/`with` only so far).
+- Splats (`*args`, `**kwargs`) — deferred, ADR 0014.
 - `together` / concurrency (#11), macros (#14).
 - Mutating methods (`push`, `upcase!`) — mutable-values semantics are
   #10; the seed stays read-only rather than prejudging them.

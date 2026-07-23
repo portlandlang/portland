@@ -444,6 +444,14 @@ fn portland_evaluator_matches_the_seed_on_branchless_branches() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_keyword_arguments() {
+    assert_evaluator_matches_seed(
+        "evaluator_kwargs.pdx",
+        "def greet(name:, greeting: \"hi\")\n  \"#{greeting} #{name}\"\nend\nputs greet(name: \"pdx\")\nputs greet(greeting: \"yo\", name: \"pdx\")\ndef tag(word, separator: \"-\")\n  word + separator + word\nend\nputs tag(\"go\")\nputs tag(\"go\", separator: \"+\")\ndef shout(word:)\n  puts word.upcase\nend\nshout word: \"pdx\"\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.

@@ -97,6 +97,14 @@ struct KeywordArgumentNode
   value
 end
 
+# `label:` (required) or `label: default`; default is nil or a node —
+# an honest maybe, per ADR 0012's era.
+struct KeywordParameterNode
+  kind
+  name
+  default
+end
+
 struct DefNode
   kind
   name
@@ -242,6 +250,10 @@ end
 
 def keyword_argument_node(label, value)
   KeywordArgumentNode.new(kind: "keyword_argument", label: label, value: value)
+end
+
+def keyword_parameter_node(name, default)
+  KeywordParameterNode.new(kind: "keyword_parameter", name: name, default: default)
 end
 
 def def_node(name, parameters, body)
@@ -856,11 +868,11 @@ end
 
 def parse_command(tokens, position)
   name = tokens[position].text
-  step = parse_expression(tokens, position + 1)
+  step = parse_argument(tokens, position + 1)
   arguments = [step.node]
   position = step.position
   while operator_at?(tokens, position, %w[,])
-    step = parse_expression(tokens, position + 1)
+    step = parse_argument(tokens, position + 1)
     arguments += [step.node]
     position = step.position
   end
@@ -927,13 +939,23 @@ def parse_def(tokens, position)
   Step.new(node: error_node("expected end to close def #{name}"), position: body.position)
 end
 
-# Parameter names, each optionally `name = default`, consuming the closing paren.
+# Parameter names: `name`, `name = default`, and Ruby-3-style keyword
+# parameters `label:` / `label: default`; consumes the closing paren.
 def parse_parameters(tokens, position)
   parameters = []
   while position < tokens.length && tokens[position].kind == "identifier"
     name = tokens[position].text
     position += 1
-    if operator_at?(tokens, position, %w[=])
+    if operator_at?(tokens, position, %w[:])
+      position += 1
+      if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
+        parameters += [keyword_parameter_node(name, nil)]
+      else
+        default = parse_expression(tokens, position)
+        parameters += [keyword_parameter_node(name, default.node)]
+        position = default.position
+      end
+    elsif operator_at?(tokens, position, %w[=])
       default = parse_expression(tokens, position + 1)
       parameters += [assignment_node(name, default.node)]
       position = default.position
@@ -1135,6 +1157,11 @@ def case_sexp(node)
   result + ")"
 end
 
+def keyword_parameter_sexp(node)
+  return "(: #{node.name})" if node.default.nil?
+  "(: #{node.name} #{sexp(node.default)})"
+end
+
 def return_sexp(node)
   return "(return)" if node.value.nil?
   "(return #{sexp(node.value)})"
@@ -1153,6 +1180,7 @@ def sexp(node)
   when "method_call" then method_call_sexp(node, ".")
   when "safe_method_call" then method_call_sexp(node, "&.")
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
+  when "keyword_parameter" then keyword_parameter_sexp(node)
   when "def" then def_sexp(node)
   when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
   when "array" then headed_sexp("array", node.elements)

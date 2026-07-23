@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio: keyword arguments threaded through parser.pdx (`KeywordParameterNode`, label-aware command arguments) and evaluator.pdx (label binding with defaults), differentially pinned; ADR 0014 records the decision (Ruby 3 semantics, splats deferred); STAGE0/ROADMAP synced.
+
 - Seed: keyword arguments on regular methods, Ruby 3 style — `label:` required, `label: default` optional, strictly separate from positionals, kwargs on paren and command calls, defaults may reference earlier parameters; missing/unknown labels are named panics. Splats stay out (deferred, per the open-decisions report).
 
 - ADR 0013 (#20): the `case/in` spec — compile-checked exhaustiveness (`else` opts out), `===` as a statically resolved method, Ruby captures fenced by no-shadow + unreachable-arm errors + an unused lint, pin/guards/alternatives/one-line forms in (tentative), find pattern deferred, struct patterns keyword-only. Ledger: docs/ruby/pattern-matching.md; building is #26.

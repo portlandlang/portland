@@ -414,10 +414,28 @@ def evaluate_block_call(node, receiver, bindings)
   end
 end
 
+# Find a label among the supplied keyword arguments, else evaluate the
+# parameter's default in the method scope. Missing required labels are the
+# crude error story.
+def keyword_value_for(keyword_values, parameter, scope)
+  index = 0
+  while index < keyword_values.length
+    pair = keyword_values[index]
+    return value_at(pair, 1) if pair[0] == parameter.name
+    index += 1
+  end
+  if parameter.default.nil?
+    puts "evaluator: missing keyword argument #{parameter.name}"
+    return nil
+  end
+  default = evaluate_expression(parameter.default, scope)
+  slot_value(default.value)
+end
+
 # Run a user method: fresh scope of methods only (no outer locals), params
 # bound left to right so defaults can reference earlier ones. The caller's
 # bindings come back untouched — callee scope is discarded.
-def invoke(payload, arguments, bindings)
+def invoke(payload, arguments, keyword_values, bindings)
   parameters = payload[0]
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop.
@@ -426,14 +444,19 @@ def invoke(payload, arguments, bindings)
   end
   index = 0
   parameters.each do |parameter|
-    value = if index < arguments.length
-      value_at(arguments, index)
+    if parameter.kind == "keyword_parameter"
+      value = keyword_value_for(keyword_values, parameter, scope)
+      scope = [[parameter.name, "local", value]] + scope
     else
-      default = evaluate_expression(parameter.value, scope)
-      slot_value(default.value)
+      value = if index < arguments.length
+        value_at(arguments, index)
+      else
+        default = evaluate_expression(parameter.value, scope)
+        slot_value(default.value)
+      end
+      scope = [[parameter.name, "local", value]] + scope
+      index += 1
     end
-    scope = [[parameter.name, "local", value]] + scope
-    index += 1
   end
   result = run_body(body, scope)
   outcome(result.value, bindings)
@@ -441,14 +464,21 @@ end
 
 def evaluate_call(node, bindings)
   arguments = []
+  keyword_values = []
   node.arguments.each do |argument|
-    step = evaluate_expression(argument, bindings)
-    bindings = step.bindings
-    arguments += step.value
+    if argument.kind == "keyword_argument"
+      step = evaluate_expression(argument.value, bindings)
+      bindings = step.bindings
+      keyword_values += [[argument.label, slot_value(step.value)]]
+    else
+      step = evaluate_expression(argument, bindings)
+      bindings = step.bindings
+      arguments += step.value
+    end
   end
   slot = lookup(bindings, node.name)
   if !slot.empty? && slot.first[1] == "method"
-    return invoke(slot.first[2], arguments, bindings)
+    return invoke(slot.first[2], arguments, keyword_values, bindings)
   end
   case node.name
   when "puts"
