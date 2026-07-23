@@ -157,8 +157,22 @@ pub enum Expression {
         else_body: Vec<Statement>,
         subject: Box<Expression>,
     },
+    /// `name << value` — rebinding append (ADR 0015): strings concatenate,
+    /// arrays gain one element; the name must be a mutable binding.
+    Append {
+        name: String,
+        value: Box<Expression>,
+    },
     /// A diverging or-guard right side; only ever built there.
     Guard(GuardAction),
+    /// `name[index] = value` — a functional update rebound onto the name
+    /// (ADR 0015): arrays replace in range (or append at the end), hashes
+    /// replace or add the pair.
+    IndexUpdate {
+        index: Box<Expression>,
+        name: String,
+        value: Box<Expression>,
+    },
     /// `expr => pattern` — match or panic; rightward destructuring
     /// (ADR 0013 §4). Produces nil.
     MatchAssert {

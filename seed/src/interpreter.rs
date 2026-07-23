@@ -222,6 +222,67 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Nil => Some(Value::Nil),
+            Expression::Append { name, value } => {
+                let current = self
+                    .variables
+                    .get(name)
+                    .unwrap_or_else(|| panic!("undefined variable {name}"))
+                    .value
+                    .clone();
+                let value = self.value_of(value);
+                match (current, value) {
+                    (Value::String(mut base), Value::String(suffix)) => {
+                        base.push_str(&suffix);
+                        Some(Value::String(base))
+                    }
+                    (Value::Array(elements), element) => {
+                        let mut elements = elements.as_ref().clone();
+                        elements.push(element);
+                        Some(Value::array(elements))
+                    }
+                    (current, value) => {
+                        panic!(
+                            "cannot append {value:?} to {current:?} — << takes a string or an array on the left"
+                        )
+                    }
+                }
+            }
+            Expression::IndexUpdate { index, name, value } => {
+                let current = self
+                    .variables
+                    .get(name)
+                    .unwrap_or_else(|| panic!("undefined variable {name}"))
+                    .value
+                    .clone();
+                let index = self.value_of(index);
+                let value = self.value_of(value);
+                match (current, index) {
+                    (Value::Array(elements), Value::Integer(index)) => {
+                        let mut elements = elements.as_ref().clone();
+                        let length = elements.len() as i64;
+                        let position = if index < 0 { length + index } else { index };
+                        if position == length {
+                            elements.push(value);
+                        } else if position >= 0 && position < length {
+                            elements[position as usize] = value;
+                        } else {
+                            panic!("index {index} out of range for assignment to {name}");
+                        }
+                        Some(Value::array(elements))
+                    }
+                    (Value::Hash(pairs), key) => {
+                        let mut pairs = pairs.as_ref().clone();
+                        match pairs.iter_mut().find(|(existing, _)| *existing == key) {
+                            Some(pair) => pair.1 = value,
+                            None => pairs.push((key, value)),
+                        }
+                        Some(Value::hash(pairs))
+                    }
+                    (current, index) => {
+                        panic!("cannot index-assign {current:?} with {index:?}")
+                    }
+                }
+            }
             // Only reached when an or-guard's left side was absent: divert
             // control and produce no value; the unwinding machinery takes over.
             Expression::Guard(action) => {
@@ -3213,6 +3274,59 @@ mod tests {
     #[should_panic(expected = "found is immutable")]
     fn captures_may_not_silently_rebind_immutables() {
         evaluate("found = 1\ncase 9\nin found then found\nend\n");
+    }
+
+    #[test]
+    fn append_rebinds_strings_and_arrays() {
+        assert_eq!(
+            evaluate("mutable line = \"port\"\nline << \"land\"\nline\n"),
+            Some(Value::String("portland".to_string()))
+        );
+        assert_eq!(
+            evaluate("mutable list = [1]\nlist << 2\nlist\n"),
+            Some(Value::array(vec![Value::Integer(1), Value::Integer(2)]))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "line is immutable")]
+    fn append_requires_a_mutable_binding() {
+        evaluate("line = \"\"\nline << \"x\"\n");
+    }
+
+    #[test]
+    fn append_cannot_spook_aliases() {
+        // The ADR 0015 headline: << rebinds one name; other names holding
+        // the old value are untouched (Ruby's aliased mutation dies here).
+        let source = "mutable a = [1]\nb = a\na << 2\nb.length\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(1)));
+    }
+
+    #[test]
+    fn index_assignment_updates_arrays_and_hashes() {
+        assert_eq!(
+            evaluate("mutable items = [1, 2]\nitems[0] = 9\nitems\n"),
+            Some(Value::array(vec![Value::Integer(9), Value::Integer(2)]))
+        );
+        assert_eq!(
+            evaluate("mutable items = [1]\nitems[1] = 2\nitems\n"),
+            Some(Value::array(vec![Value::Integer(1), Value::Integer(2)]))
+        );
+        let source =
+            "mutable counts = {\"a\" => 1}\ncounts[\"b\"] = 2\ncounts[\"a\"] = 5\ncounts[\"a\"]\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(5)));
+    }
+
+    #[test]
+    #[should_panic(expected = "counts is immutable")]
+    fn index_assignment_requires_a_mutable_binding() {
+        evaluate("counts = {\"a\" => 1}\ncounts[\"a\"] = 2\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "out of range for assignment")]
+    fn index_assignment_stays_in_bounds() {
+        evaluate("mutable items = [1]\nitems[5] = 9\n");
     }
 
     #[test]

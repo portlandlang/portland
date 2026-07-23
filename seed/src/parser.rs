@@ -235,12 +235,45 @@ impl<'source> Parser<'source> {
                 value,
             };
         }
+        // `name << value` — rebinding append (ADR 0015), statement position
+        // only, so Ruby's three-way `<<` lexer pileup never returns.
+        if self.peek_kind() == Some(TokenKind::Identifier)
+            && self.peek_kind_at(1) == Some(TokenKind::LessLess)
+        {
+            let name = self.advance().text.to_string();
+            self.position += 1; // the `<<`
+            let value = Box::new(self.expression());
+            return Statement::Assignment {
+                mutable: false,
+                name: name.clone(),
+                value: Expression::Append { name, value },
+            };
+        }
         if self.peek_kind() == Some(TokenKind::Identifier)
             && let Some(command) = self.command_call()
         {
             return command;
         }
         let expression = self.expression();
+        // `name[index] = value` — a functional update rebound on the name.
+        if self.peek_kind() == Some(TokenKind::Equal) {
+            if let Expression::Index { index, receiver } = &expression
+                && let Expression::Variable(name) = receiver.as_ref()
+            {
+                self.position += 1; // the `=`
+                let value = Box::new(self.expression());
+                return Statement::Assignment {
+                    mutable: false,
+                    name: name.clone(),
+                    value: Expression::IndexUpdate {
+                        index: index.clone(),
+                        name: name.clone(),
+                        value,
+                    },
+                };
+            }
+            panic!("only one level of index assignment is supported — assign to name[index]");
+        }
         // Rightward destructuring (ADR 0013 §4): `expr => pattern` matches
         // or panics — the pattern-grammar answer to multiple assignment.
         if self.peek_kind() == Some(TokenKind::FatArrow) {

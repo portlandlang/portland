@@ -25,6 +25,7 @@ pub enum TokenKind {
     LeftParen,
     Less,
     LessEqual,
+    LessLess,
     Minus,
     MinusEqual,
     Newline,
@@ -164,6 +165,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('>', Some('=')) => (TokenKind::GreaterEqual, 2),
                     ('>', _) => (TokenKind::Greater, 1),
                     ('<', Some('=')) => (TokenKind::LessEqual, 2),
+                    // `<<` exists only as the rebinding append (ADR 0015);
+                    // bit-shift is out (ADR 0003), heredocs are future.
+                    ('<', Some('<')) => (TokenKind::LessLess, 2),
                     ('<', _) => (TokenKind::Less, 1),
                     ('!', Some('=')) => (TokenKind::NotEqual, 2),
                     ('!', _) => (TokenKind::Bang, 1),
