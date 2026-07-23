@@ -23,7 +23,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end false if next nil not or return struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end false if in next nil not or return struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)
@@ -31,7 +31,7 @@ def two_character_operator?(pair)
 end
 
 def one_character_operator?(character)
-  "(){}[],.:+-*/%<>=!|&".include?(character)
+  "(){}[],.:+-*/%<>=!|&^".include?(character)
 end
 
 # Read a plain quoted lexeme (single-quoted, or a string nested inside an

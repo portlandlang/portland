@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, case/in rung 5 (#26): the pattern surface threaded through the trio — lexer.pdx (`in`, `^`), parser.pdx (pattern grammar with literals-as-nodes, captures, alternatives, pin, guards, array and keyword-only struct patterns; `field:` desugars to a capture at parse time; sexps), evaluator.pdx (guest matcher over tagged-array structs) — differentially pinned against the seed. Known crude gap noted: no type predicates yet, so wrong-shaped subjects panic instead of missing.
+
 - Seed, case/in rung 4 (#26): the one-line forms — `expr in pattern` is a boolean test (binds captures on a hit, reads as a condition: `if node in BreakNode`), and `expr => pattern` is rightward destructuring that panics on mismatch (`pair => [a, b]` — the pattern-grammar answer to multiple assignment).
 
 - Seed, case/in rung 3 (#26): pin `^variable` (compare, don't capture; `^` enters the lexer as pin-only — xor stays out per ADR 0003), guards (`in x if x > 10` — bind first, guard sees captures, false falls through), and array patterns (`[a, b]` exact, `[first, *rest]` / `[first, *]` with a trailing splat; suffix-after-splat waits with the find pattern).

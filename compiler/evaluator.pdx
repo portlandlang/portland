@@ -136,6 +136,108 @@ def evaluate_case(node, bindings)
   run_body(node.else_body, bindings)
 end
 
+def evaluate_case_in(node, bindings)
+  subject_step = evaluate_expression(node.subject, bindings)
+  bindings = subject_step.bindings
+  subject = slot_value(subject_step.value)
+  branch_index = 0
+  while branch_index < node.branches.length
+    branch = node.branches[branch_index]
+    captures = match_pattern(branch.pattern, subject, bindings)
+    unless captures.nil?
+      # Captures bind before the guard runs, and persist (Ruby's rule).
+      captures.each do |capture|
+        bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+      end
+      guard_ok = true
+      unless branch.guard.nil?
+        guard_step = evaluate_expression(branch.guard, bindings)
+        bindings = guard_step.bindings
+        guard_ok = slot_value(guard_step.value)
+      end
+      return run_body(branch.body, bindings) if guard_ok
+    end
+    branch_index += 1
+  end
+  if node.else_body.nil?
+    panic("no pattern matched — add an in branch or an else")
+  end
+  run_body(node.else_body, bindings)
+end
+
+# Try a pattern against a value: an array of [name, value] captures on a
+# match (empty for literals), nil on a miss. Crude gap: array and struct
+# patterns against wrong-shaped subjects panic instead of missing — the
+# trio has no type predicates yet (object-model territory).
+def match_pattern(pattern, subject, bindings)
+  case pattern.kind
+  when "identifier" then [[pattern.name, subject]]
+  when "pin" then match_pin(pattern, subject, bindings)
+  when "alternative_pattern" then match_alternative(pattern, subject, bindings)
+  when "array_pattern" then match_array(pattern, subject, bindings)
+  when "struct_pattern" then match_struct(pattern, subject, bindings)
+  else
+    match_literal(pattern, subject, bindings)
+  end
+end
+
+def match_literal(pattern, subject, bindings)
+  value_step = evaluate_expression(pattern, bindings)
+  return [] if slot_value(value_step.value) == subject
+  nil
+end
+
+def match_pin(pattern, subject, bindings)
+  slot = lookup(bindings, pattern.name)
+  panic("undefined variable #{pattern.name} in a ^ pin") if slot.empty?
+  return [] if value_at(slot.first, 2) == subject
+  nil
+end
+
+def match_alternative(pattern, subject, bindings)
+  index = 0
+  while index < pattern.options.length
+    captures = match_pattern(pattern.options[index], subject, bindings)
+    return captures unless captures.nil?
+    index += 1
+  end
+  nil
+end
+
+def match_array(pattern, subject, bindings)
+  return nil if pattern.splat == false && subject.length != pattern.elements.length
+  return nil if subject.length < pattern.elements.length
+  captures = []
+  index = 0
+  while index < pattern.elements.length
+    element_captures = match_pattern(pattern.elements[index], value_at(subject, index), bindings)
+    return nil if element_captures.nil?
+    captures += element_captures
+    index += 1
+  end
+  if pattern.splat && pattern.rest_name.some?
+    rest = subject.slice(pattern.elements.length, subject.length - pattern.elements.length)
+    captures += [[pattern.rest_name, rest]]
+  end
+  captures
+end
+
+def match_struct(pattern, subject, bindings)
+  return nil unless value_at(subject, 0) == "__struct__"
+  return nil unless value_at(subject, 1) == pattern.name
+  captures = []
+  index = 0
+  while index < pattern.fields.length
+    field = pattern.fields[index]
+    value = struct_field(subject, field[0])
+    sub_captures = match_pattern(field[1], value, bindings)
+    return nil if sub_captures.nil?
+    captures += sub_captures
+    index += 1
+  end
+  captures
+end
+
 # Bindings are [name, kind, payload] triples — kind is "local" or "method".
 # The no-shadow rule means one namespace serves both. First match wins,
 # so prepending a triple is both set and shadow.
@@ -168,6 +270,7 @@ def evaluate_expression(node, bindings)
   when "binary" then evaluate_binary(node, bindings)
   when "if" then evaluate_if(node, bindings)
   when "case" then evaluate_case(node, bindings)
+  when "case_in" then evaluate_case_in(node, bindings)
   when "array" then evaluate_array(node, bindings)
   when "hash" then evaluate_hash(node, bindings)
   when "word_array" then outcome([word_array_elements(node.text)], bindings)

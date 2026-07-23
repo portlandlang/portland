@@ -17,9 +17,24 @@ end
 
 # AST node structs, alphabetical; each carries a kind for case dispatch.
 
+# `in 1 | 2` — first matching option wins.
+struct AlternativePatternNode
+  kind
+  options
+end
+
 struct ArrayNode
   kind
   elements
+end
+
+# `in [a, b]` exact, `in [first, *rest]` with a trailing splat; rest_name
+# is nil for an anonymous `*`.
+struct ArrayPatternNode
+  kind
+  elements
+  splat
+  rest_name
 end
 
 struct AssignmentNode
@@ -54,6 +69,14 @@ struct CallNode
   kind
   name
   arguments
+end
+
+# `case/in` (ADR 0013): else_body is nil when absent.
+struct CaseInNode
+  kind
+  subject
+  branches
+  else_body
 end
 
 struct CaseNode
@@ -92,6 +115,15 @@ struct IfNode
   condition
   then_body
   else_body
+end
+
+# One `in` branch: guard is nil or an expression, evaluated after the
+# pattern binds (ADR 0013 §4).
+struct InBranchNode
+  kind
+  pattern
+  guard
+  body
 end
 
 struct IndexNode
@@ -154,6 +186,12 @@ end
 # Exhibit A, resolved: bare `return` is a ReturnNode whose value is nil.
 # This struct once had a ReturnBareNode twin because absence couldn't be
 # said — the first real pull toward optionals, now speakable (ADR 0006).
+# `in ^name` — compare against the variable's value instead of capturing.
+struct PinNode
+  kind
+  name
+end
+
 struct ReturnNode
   kind
   value
@@ -174,6 +212,14 @@ struct StringNode
 end
 
 struct StructDefNode
+  kind
+  name
+  fields
+end
+
+# `in ReturnNode(value: nil)` — keyword-only; fields are [label, pattern]
+# pairs (the `field:` bind-shorthand desugars to a capture at parse time).
+struct StructPatternNode
   kind
   name
   fields
@@ -204,8 +250,16 @@ end
 
 # Node builders, alphabetical.
 
+def alternative_pattern_node(options)
+  AlternativePatternNode.new(kind: "alternative_pattern", options: options)
+end
+
 def array_node(elements)
   ArrayNode.new(kind: "array", elements: elements)
+end
+
+def array_pattern_node(elements, splat, rest_name)
+  ArrayPatternNode.new(kind: "array_pattern", elements: elements, splat: splat, rest_name: rest_name)
 end
 
 def assignment_node(name, value)
@@ -232,6 +286,10 @@ def call_node(name, arguments)
   CallNode.new(kind: "call", name: name, arguments: arguments)
 end
 
+def case_in_node(subject, branches, else_body)
+  CaseInNode.new(kind: "case_in", subject: subject, branches: branches, else_body: else_body)
+end
+
 def case_node(subject, branches, else_body)
   CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
 end
@@ -254,6 +312,10 @@ end
 
 def if_node(condition, then_body, else_body)
   IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+end
+
+def in_branch_node(pattern, guard, body)
+  InBranchNode.new(kind: "in_branch", pattern: pattern, guard: guard, body: body)
 end
 
 def index_node(receiver, index)
@@ -292,6 +354,10 @@ def pair_node(key, value)
   PairNode.new(kind: "pair", key: key, value: value)
 end
 
+def pin_node(name)
+  PinNode.new(kind: "pin", name: name)
+end
+
 def return_bare_node
   return_node(nil)
 end
@@ -310,6 +376,10 @@ end
 
 def struct_def_node(name, fields)
   StructDefNode.new(kind: "struct_def", name: name, fields: fields)
+end
+
+def struct_pattern_node(name, fields)
+  StructPatternNode.new(kind: "struct_pattern", name: name, fields: fields)
 end
 
 def unary_node(operator, operand)
@@ -974,6 +1044,163 @@ def parse_parameters(tokens, position)
   Step.new(node: [error_node("expected closing paren after parameters")], position: position)
 end
 
+# — patterns (ADR 0013) —
+
+def parse_case_in(tokens, subject, position)
+  branches = []
+  while keyword_at?(tokens, position, %w[in])
+    branch = parse_in_branch(tokens, position + 1)
+    branches += [branch.node]
+    position = skip_newlines_at(tokens, branch.position)
+  end
+  if keyword_at?(tokens, position, %w[else])
+    else_body = parse_body(tokens, position + 1, %w[end])
+    position = else_body.position
+    if keyword_at?(tokens, position, %w[end])
+      return Step.new(node: case_in_node(subject, branches, else_body.node), position: position + 1)
+    end
+    return Step.new(node: error_node("expected end to close case"), position: position)
+  end
+  if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: case_in_node(subject, branches, nil), position: position + 1)
+  end
+  Step.new(node: error_node("expected end to close case"), position: position)
+end
+
+def parse_in_branch(tokens, position)
+  pattern = parse_pattern(tokens, position)
+  position = pattern.position
+  guard = nil
+  if keyword_at?(tokens, position, %w[if])
+    guard_step = parse_expression(tokens, position + 1)
+    guard = guard_step.node
+    position = guard_step.position
+  end
+  if keyword_at?(tokens, position, %w[then])
+    body_statement = parse_statement(tokens, position + 1)
+    return Step.new(node: in_branch_node(pattern.node, guard, [body_statement.node]), position: body_statement.position)
+  end
+  body = parse_body(tokens, position, %w[in else end])
+  Step.new(node: in_branch_node(pattern.node, guard, body.node), position: body.position)
+end
+
+def parse_pattern(tokens, position)
+  first = parse_pattern_primary(tokens, position)
+  position = first.position
+  return first unless operator_at?(tokens, position, %w[|])
+  options = [first.node]
+  while operator_at?(tokens, position, %w[|])
+    option = parse_pattern_primary(tokens, position + 1)
+    options += [option.node]
+    position = option.position
+  end
+  Step.new(node: alternative_pattern_node(options), position: position)
+end
+
+# Literal patterns reuse the literal expression nodes; a bare lowercase
+# identifier is a capture; capitalized names start struct patterns.
+def parse_pattern_primary(tokens, position)
+  if position >= tokens.length
+    return Step.new(node: error_node("expected a pattern"), position: position)
+  end
+  token = tokens[position]
+  if token.kind == "integer"
+    return Step.new(node: integer_node(token.text), position: position + 1)
+  end
+  if token.kind == "operator" && token.text == "-" && position + 1 < tokens.length && tokens[position + 1].kind == "integer"
+    return Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
+  end
+  if token.kind == "string"
+    return Step.new(node: string_expression(token.text), position: position + 1)
+  end
+  if token.kind == "keyword"
+    if token.text == "true" || token.text == "false"
+      return Step.new(node: boolean_node(token.text), position: position + 1)
+    end
+    return Step.new(node: nil_node, position: position + 1) if token.text == "nil"
+    return Step.new(node: error_node("unexpected keyword #{token.text} in a pattern"), position: position + 1)
+  end
+  if token.kind == "operator" && token.text == "^"
+    if position + 1 < tokens.length && tokens[position + 1].kind == "identifier"
+      return Step.new(node: pin_node(tokens[position + 1].text), position: position + 2)
+    end
+    return Step.new(node: error_node("expected a variable name after ^"), position: position + 1)
+  end
+  if token.kind == "operator" && token.text == "["
+    return parse_array_pattern(tokens, position + 1)
+  end
+  if token.kind == "identifier"
+    name = token.text
+    if "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
+      return parse_struct_pattern(tokens, name, position + 1)
+    end
+    return Step.new(node: identifier_node(name), position: position + 1)
+  end
+  Step.new(node: error_node("unsupported pattern starting with #{token.text}"), position: position + 1)
+end
+
+# `[p, p]` exact, or `[p, *rest]` — a splat may only end the pattern.
+def parse_array_pattern(tokens, position)
+  elements = []
+  splat = false
+  rest_name = nil
+  unless operator_at?(tokens, position, ["]"])
+    while true
+      if operator_at?(tokens, position, %w[*])
+        splat = true
+        position += 1
+        if position < tokens.length && tokens[position].kind == "identifier"
+          rest_name = tokens[position].text
+          position += 1
+        end
+        break
+      end
+      element = parse_pattern(tokens, position)
+      elements += [element.node]
+      position = element.position
+      break unless operator_at?(tokens, position, %w[,])
+      position += 1
+    end
+  end
+  unless operator_at?(tokens, position, ["]"])
+    return Step.new(node: error_node("expected closing bracket in array pattern"), position: position)
+  end
+  Step.new(node: array_pattern_node(elements, splat, rest_name), position: position + 1)
+end
+
+# `Name(field: pattern, other:)` — keyword-only; bare `Name` matches by type.
+def parse_struct_pattern(tokens, name, position)
+  unless operator_at?(tokens, position, %w[(])
+    return Step.new(node: struct_pattern_node(name, []), position: position)
+  end
+  position += 1
+  fields = []
+  unless operator_at?(tokens, position, %w[)])
+    while true
+      token = tokens[position]
+      unless token.kind == "identifier" && operator_at?(tokens, position + 1, %w[:])
+        return Step.new(node: error_node("struct patterns are keyword-only — write #{name}(field: pattern)"), position: position + 1)
+      end
+      label = token.text
+      position += 2
+      if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
+        # `field:` shorthand desugars to a capture named after the field.
+        fields += [[label, identifier_node(label)]]
+      else
+        sub_pattern = parse_pattern(tokens, position)
+        fields += [[label, sub_pattern.node]]
+        position = sub_pattern.position
+      end
+      break unless operator_at?(tokens, position, %w[,])
+      position += 1
+    end
+  end
+  unless operator_at?(tokens, position, %w[)])
+    return Step.new(node: error_node("expected closing paren in struct pattern #{name}"), position: position)
+  end
+  Step.new(node: struct_pattern_node(name, fields), position: position + 1)
+end
+
 def parse_struct(tokens, position)
   if position >= tokens.length || tokens[position].kind != "identifier"
     return Step.new(node: error_node("expected struct name after struct"), position: position)
@@ -1052,6 +1279,7 @@ end
 def parse_case(tokens, position)
   subject = parse_expression(tokens, position)
   position = skip_newlines_at(tokens, subject.position)
+  return parse_case_in(tokens, subject.node, position) if keyword_at?(tokens, position, %w[in])
   branches = []
   while keyword_at?(tokens, position, %w[when])
     step = parse_expression(tokens, position + 1)
@@ -1115,9 +1343,31 @@ end
 # — printing —
 # Helpers alphabetical; the sexp dispatcher last, its branches alphabetical.
 
+def array_pattern_sexp(node)
+  parts = node.elements.map do |element|
+    sexp(element)
+  end
+  if node.splat
+    rest = "*"
+    rest += node.rest_name if node.rest_name.some?
+    parts += [rest]
+  end
+  return "(array-pattern)" if parts.empty?
+  "(array-pattern #{parts.join(" ")})"
+end
+
 def branch_sexp(head, body)
   return "(#{head})" if body.nil?
   headed_sexp(head, body)
+end
+
+def case_in_sexp(node)
+  result = "(case #{sexp(node.subject)}"
+  node.branches.each do |branch|
+    result += " #{in_branch_sexp(branch)}"
+  end
+  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
+  result + ")"
 end
 
 def case_sexp(node)
@@ -1138,6 +1388,12 @@ end
 def headed_sexp(head, arguments)
   return "(#{head})" if arguments.empty?
   "(#{head} #{sexp_list(arguments)})"
+end
+
+def in_branch_sexp(branch)
+  head = "in #{sexp(branch.pattern)}"
+  head += " if #{sexp(branch.guard)}" if branch.guard.some?
+  headed_sexp(head, branch.body)
 end
 
 def if_sexp(node)
@@ -1166,6 +1422,14 @@ def return_sexp(node)
   "(return #{sexp(node.value)})"
 end
 
+def struct_pattern_sexp(node)
+  parts = node.fields.map do |field|
+    "(: #{field[0]} #{sexp(field[1])})"
+  end
+  return "(pattern #{node.name})" if parts.empty?
+  "(pattern #{node.name} #{parts.join(" ")})"
+end
+
 def sexp_list(nodes)
   nodes.map do |node|
     sexp(node)
@@ -1174,13 +1438,16 @@ end
 
 def sexp(node)
   case node.kind
+  when "alternative_pattern" then headed_sexp("|", node.options)
   when "array" then headed_sexp("array", node.elements)
+  when "array_pattern" then array_pattern_sexp(node)
   when "assignment" then "(= #{node.name} #{sexp(node.value)})"
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
   when "boolean" then node.value
   when "break" then "(break)"
   when "call" then headed_sexp("call #{node.name}", node.arguments)
   when "case" then case_sexp(node)
+  when "case_in" then case_in_sexp(node)
   when "def" then def_sexp(node)
   when "error" then "(error #{node.message})"
   when "hash" then headed_sexp("hash", node.pairs)
@@ -1194,10 +1461,12 @@ def sexp(node)
   when "next" then "(next)"
   when "nil" then "nil"
   when "pair" then "(=> #{sexp(node.key)} #{sexp(node.value)})"
+  when "pin" then "(^ #{node.name})"
   when "return" then return_sexp(node)
   when "safe_method_call" then method_call_sexp(node, "&.")
   when "string" then encode_string(node.value)
   when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
+  when "struct_pattern" then struct_pattern_sexp(node)
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
   when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
   when "word_array" then node.text

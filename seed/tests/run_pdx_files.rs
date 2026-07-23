@@ -452,6 +452,14 @@ fn portland_evaluator_matches_the_seed_on_keyword_arguments() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_case_in() {
+    assert_evaluator_matches_seed(
+        "evaluator_case_in.pdx",
+        "struct ReturnNode\n  value\nend\nstruct BreakNode\n  label\nend\nnode = ReturnNode.new(value: nil)\ncase node\nin ReturnNode(value: nil) then puts \"(return)\"\nin ReturnNode(value:) then puts value\nend\nother = ReturnNode.new(value: 7)\ncase other\nin ReturnNode(value: nil) then puts \"(return)\"\nin ReturnNode(value:) then puts value\nend\ncase BreakNode.new(label: \"b\")\nin ReturnNode then puts \"return\"\nin BreakNode(label:) then puts label\nend\ncase 2\nin 1 | 2 then puts \"few\"\nelse\n  puts \"many\"\nend\nexpected = 5\ncase 5\nin ^expected then puts \"pinned\"\nelse\n  puts \"no\"\nend\ncase 50\nin score if score > 10 then puts \"big\"\nin score then puts \"small\"\nend\ncase [1, 2, 3]\nin [first, *rest] then puts first + rest.length\nend\ncase [].first\nin nil then puts \"empty\"\nin x then puts x\nend\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.
