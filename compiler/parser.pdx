@@ -3,7 +3,7 @@
 # A library: require_relative "parser", then parse_program(lex(source)).
 # Structs are immutable, so parsing threads position through returns:
 # every parse function takes (tokens, position) and answers a Step.
-# AST nodes are structs carrying a kind field for case dispatch.
+# AST nodes are structs; each prints itself via its sexp method (#27).
 # The Rust seed parser is the reference; the ladder here mirrors it.
 #
 # To dump parse trees from the command line, see parse.pdx.
@@ -15,17 +15,27 @@ struct Step
   position
 end
 
-# AST node structs, alphabetical; each carries a kind for case dispatch.
+# AST node structs, alphabetical. Each renders its own S-expression via a
+# sexp method — polymorphic dispatch, no case ladder. The kind field stays
+# for the evaluator's few remaining shape checks.
 
 # `in 1 | 2` — first matching option wins.
 struct AlternativePatternNode
   kind
   options
+
+  def sexp
+    headed_sexp("|", options)
+  end
 end
 
 struct ArrayNode
   kind
   elements
+
+  def sexp
+    headed_sexp("array", elements)
+  end
 end
 
 # `in [a, b]` exact, `in [first, *rest]` with a trailing splat; rest_name
@@ -35,12 +45,29 @@ struct ArrayPatternNode
   elements
   splat
   rest_name
+
+  def sexp
+    mutable parts = elements.map do |element|
+      element.sexp
+    end
+    if splat
+      mutable rest = "*"
+      rest += rest_name if rest_name.some?
+      parts += [rest]
+    end
+    return "(array-pattern)" if parts.empty?
+    "(array-pattern #{parts.join(" ")})"
+  end
 end
 
 struct AssignmentNode
   kind
   name
   value
+
+  def sexp
+    "(= #{name} #{value.sexp})"
+  end
 end
 
 struct BinaryNode
@@ -48,6 +75,10 @@ struct BinaryNode
   operator
   left
   right
+
+  def sexp
+    "(#{operator} #{left.sexp} #{right.sexp})"
+  end
 end
 
 struct BlockNode
@@ -59,16 +90,28 @@ end
 struct BooleanNode
   kind
   value
+
+  def sexp
+    value
+  end
 end
 
 struct BreakNode
   kind
+
+  def sexp
+    "(break)"
+  end
 end
 
 struct CallNode
   kind
   name
   arguments
+
+  def sexp
+    headed_sexp("call #{name}", arguments)
+  end
 end
 
 # `case/in` (ADR 0013): else_body is nil when absent.
@@ -77,6 +120,15 @@ struct CaseInNode
   subject
   branches
   else_body
+
+  def sexp
+    mutable result = "(case #{subject.sexp}"
+    branches.each do |branch|
+      result += " #{branch.sexp}"
+    end
+    result += " #{headed_sexp("else", else_body)}" if else_body.some?
+    result + ")"
+  end
 end
 
 struct CaseNode
@@ -84,6 +136,15 @@ struct CaseNode
   subject
   branches
   else_body
+
+  def sexp
+    mutable result = "(case #{subject.sexp}"
+    branches.each do |branch|
+      result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
+    end
+    result += " #{headed_sexp("else", else_body)}" if else_body.some?
+    result + ")"
+  end
 end
 
 struct DefNode
@@ -91,21 +152,39 @@ struct DefNode
   name
   parameters
   body
+
+  def sexp
+    mutable result = "(def #{name} #{headed_sexp("params", parameters)}"
+    result += " #{sexp_list(body)}" unless body.empty?
+    result + ")"
+  end
 end
 
 struct ErrorNode
   kind
   message
+
+  def sexp
+    "(error #{message})"
+  end
 end
 
 struct HashNode
   kind
   pairs
+
+  def sexp
+    headed_sexp("hash", pairs)
+  end
 end
 
 struct IdentifierNode
   kind
   name
+
+  def sexp
+    name
+  end
 end
 
 # Exhibit B, resolved: an absent else is nil, distinct from a present,
@@ -115,6 +194,12 @@ struct IfNode
   condition
   then_body
   else_body
+
+  def sexp
+    mutable result = "(if #{condition.sexp} #{branch_sexp("then", then_body)}"
+    result += " #{headed_sexp("else", else_body)}" if else_body.some?
+    result + ")"
+  end
 end
 
 # One `in` branch: guard is nil or an expression, evaluated after the
@@ -124,23 +209,41 @@ struct InBranchNode
   pattern
   guard
   body
+
+  def sexp
+    mutable head = "in #{pattern.sexp}"
+    head += " if #{guard.sexp}" if guard.some?
+    headed_sexp(head, body)
+  end
 end
 
 struct IndexNode
   kind
   receiver
   index
+
+  def sexp
+    "([] #{receiver.sexp} #{index.sexp})"
+  end
 end
 
 struct IntegerNode
   kind
   value
+
+  def sexp
+    value
+  end
 end
 
 struct KeywordArgumentNode
   kind
   label
   value
+
+  def sexp
+    "(: #{label} #{value.sexp})"
+  end
 end
 
 # `label:` (required) or `label: default`; default is nil or a node —
@@ -149,6 +252,11 @@ struct KeywordParameterNode
   kind
   name
   default
+
+  def sexp
+    return "(: #{name})" if default.nil?
+    "(: #{name} #{default.sexp})"
+  end
 end
 
 struct LogicalNode
@@ -156,6 +264,10 @@ struct LogicalNode
   operator
   left
   right
+
+  def sexp
+    "(#{operator} #{left.sexp} #{right.sexp})"
+  end
 end
 
 # `name << value` — rebinding append (ADR 0015).
@@ -163,6 +275,10 @@ struct AppendNode
   kind
   name
   value
+
+  def sexp
+    "(<< #{name} #{value.sexp})"
+  end
 end
 
 # `name[index] = value` — a functional update rebound on the name.
@@ -171,6 +287,10 @@ struct IndexUpdateNode
   name
   index
   value
+
+  def sexp
+    "([]= #{name} #{index.sexp} #{value.sexp})"
+  end
 end
 
 # `expr => pattern` — match or panic (rightward destructuring).
@@ -178,6 +298,10 @@ struct MatchAssertNode
   kind
   subject
   pattern
+
+  def sexp
+    "(=> #{subject.sexp} #{pattern.sexp})"
+  end
 end
 
 # `expr in pattern` — a boolean test, binding captures on a hit.
@@ -185,6 +309,10 @@ struct MatchTestNode
   kind
   subject
   pattern
+
+  def sexp
+    "(in #{subject.sexp} #{pattern.sexp})"
+  end
 end
 
 # Exhibit C, resolved: block is nil or a BlockNode — an honest maybe, no
@@ -195,26 +323,46 @@ struct MethodCallNode
   name
   arguments
   block
+
+  def sexp
+    method_call_sexp(self, ".")
+  end
 end
 
 struct NextNode
   kind
+
+  def sexp
+    "(next)"
+  end
 end
 
 # Absence (ADR 0006): the literal has no payload, only its kind.
 struct NilNode
   kind
+
+  def sexp
+    "nil"
+  end
 end
 
 struct PairNode
   kind
   key
   value
+
+  def sexp
+    "(=> #{key.sexp} #{value.sexp})"
+  end
 end
 
 # `self` — the receiver, inside a struct method.
 struct SelfNode
   kind
+
+  def sexp
+    "self"
+  end
 end
 
 # Exhibit A, resolved: bare `return` is a ReturnNode whose value is nil.
@@ -224,11 +372,20 @@ end
 struct PinNode
   kind
   name
+
+  def sexp
+    "(^ #{name})"
+  end
 end
 
 struct ReturnNode
   kind
   value
+
+  def sexp
+    return "(return)" if value.nil?
+    "(return #{value.sexp})"
+  end
 end
 
 # `&.` — same shape as MethodCallNode; an absent receiver short-circuits.
@@ -238,11 +395,19 @@ struct SafeMethodCallNode
   name
   arguments
   block
+
+  def sexp
+    method_call_sexp(self, "&.")
+  end
 end
 
 struct StringNode
   kind
   value
+
+  def sexp
+    encode_string(value)
+  end
 end
 
 struct StructDefNode
@@ -250,6 +415,12 @@ struct StructDefNode
   name
   fields
   methods
+
+  def sexp
+    mutable result = "(struct #{name} #{fields.join(" ")}"
+    result += " #{sexp_list(methods)}" unless methods.empty?
+    result + ")"
+  end
 end
 
 # `in ReturnNode(value: nil)` — keyword-only; fields are [label, pattern]
@@ -258,12 +429,24 @@ struct StructPatternNode
   kind
   name
   fields
+
+  def sexp
+    parts = fields.map do |field|
+      "(: #{field[0]} #{field[1].sexp})"
+    end
+    return "(pattern #{name})" if parts.empty?
+    "(pattern #{name} #{parts.join(" ")})"
+  end
 end
 
 struct UnaryNode
   kind
   operator
   operand
+
+  def sexp
+    "(#{operator} #{operand.sexp})"
+  end
 end
 
 struct WhenNode
@@ -276,11 +459,19 @@ struct WhileNode
   kind
   condition
   body
+
+  def sexp
+    headed_sexp("while #{condition.sexp}", body)
+  end
 end
 
 struct WordArrayNode
   kind
   text
+
+  def sexp
+    text
+  end
 end
 
 # Node builders, alphabetical.
@@ -1445,46 +1636,9 @@ end
 # — printing —
 # Helpers alphabetical; the sexp dispatcher last, its branches alphabetical.
 
-def array_pattern_sexp(node)
-  mutable parts = node.elements.map do |element|
-    sexp(element)
-  end
-  if node.splat
-    mutable rest = "*"
-    rest += node.rest_name if node.rest_name.some?
-    parts += [rest]
-  end
-  return "(array-pattern)" if parts.empty?
-  "(array-pattern #{parts.join(" ")})"
-end
-
 def branch_sexp(head, body)
   return "(#{head})" if body.nil?
   headed_sexp(head, body)
-end
-
-def case_in_sexp(node)
-  mutable result = "(case #{sexp(node.subject)}"
-  node.branches.each do |branch|
-    result += " #{in_branch_sexp(branch)}"
-  end
-  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
-  result + ")"
-end
-
-def case_sexp(node)
-  mutable result = "(case #{sexp(node.subject)}"
-  node.branches.each do |branch|
-    result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
-  end
-  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
-  result + ")"
-end
-
-def def_sexp(node)
-  mutable result = "(def #{node.name} #{headed_sexp("params", node.parameters)}"
-  result += " #{sexp_list(node.body)}" unless node.body.empty?
-  result + ")"
 end
 
 def headed_sexp(head, arguments)
@@ -1492,25 +1646,8 @@ def headed_sexp(head, arguments)
   "(#{head} #{sexp_list(arguments)})"
 end
 
-def in_branch_sexp(branch)
-  mutable head = "in #{sexp(branch.pattern)}"
-  head += " if #{sexp(branch.guard)}" if branch.guard.some?
-  headed_sexp(head, branch.body)
-end
-
-def if_sexp(node)
-  mutable result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
-  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
-  result + ")"
-end
-
-def keyword_parameter_sexp(node)
-  return "(: #{node.name})" if node.default.nil?
-  "(: #{node.name} #{sexp(node.default)})"
-end
-
 def method_call_sexp(node, dot)
-  plain = headed_sexp("#{dot} #{sexp(node.receiver)} #{node.name}", node.arguments)
+  plain = headed_sexp("#{dot} #{node.receiver.sexp} #{node.name}", node.arguments)
   return plain if node.block.nil?
   block = node.block
   mutable head = "do"
@@ -1519,71 +1656,8 @@ def method_call_sexp(node, dot)
   "(#{inner} #{headed_sexp(head, block.body)})"
 end
 
-def return_sexp(node)
-  return "(return)" if node.value.nil?
-  "(return #{sexp(node.value)})"
-end
-
-def struct_def_sexp(node)
-  mutable result = "(struct #{node.name} #{node.fields.join(" ")}"
-  result += " #{sexp_list(node.methods)}" unless node.methods.empty?
-  result + ")"
-end
-
-def struct_pattern_sexp(node)
-  parts = node.fields.map do |field|
-    "(: #{field[0]} #{sexp(field[1])})"
-  end
-  return "(pattern #{node.name})" if parts.empty?
-  "(pattern #{node.name} #{parts.join(" ")})"
-end
-
 def sexp_list(nodes)
   nodes.map do |node|
-    sexp(node)
+    node.sexp
   end.join(" ")
-end
-
-def sexp(node)
-  case node.kind
-  when "alternative_pattern" then headed_sexp("|", node.options)
-  when "append" then "(<< #{node.name} #{sexp(node.value)})"
-  when "array" then headed_sexp("array", node.elements)
-  when "array_pattern" then array_pattern_sexp(node)
-  when "assignment" then "(= #{node.name} #{sexp(node.value)})"
-  when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
-  when "boolean" then node.value
-  when "break" then "(break)"
-  when "call" then headed_sexp("call #{node.name}", node.arguments)
-  when "case" then case_sexp(node)
-  when "case_in" then case_in_sexp(node)
-  when "def" then def_sexp(node)
-  when "error" then "(error #{node.message})"
-  when "hash" then headed_sexp("hash", node.pairs)
-  when "identifier" then node.name
-  when "if" then if_sexp(node)
-  when "index" then "([] #{sexp(node.receiver)} #{sexp(node.index)})"
-  when "index_update" then "([]= #{node.name} #{sexp(node.index)} #{sexp(node.value)})"
-  when "integer" then node.value
-  when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
-  when "keyword_parameter" then keyword_parameter_sexp(node)
-  when "match_assert" then "(=> #{sexp(node.subject)} #{sexp(node.pattern)})"
-  when "match_test" then "(in #{sexp(node.subject)} #{sexp(node.pattern)})"
-  when "method_call" then method_call_sexp(node, ".")
-  when "next" then "(next)"
-  when "nil" then "nil"
-  when "pair" then "(=> #{sexp(node.key)} #{sexp(node.value)})"
-  when "pin" then "(^ #{node.name})"
-  when "return" then return_sexp(node)
-  when "safe_method_call" then method_call_sexp(node, "&.")
-  when "self" then "self"
-  when "string" then encode_string(node.value)
-  when "struct_def" then struct_def_sexp(node)
-  when "struct_pattern" then struct_pattern_sexp(node)
-  when "unary" then "(#{node.operator} #{sexp(node.operand)})"
-  when "while" then headed_sexp("while #{sexp(node.condition)}", node.body)
-  when "word_array" then node.text
-  else
-    "(unknown #{node.kind})"
-  end
 end

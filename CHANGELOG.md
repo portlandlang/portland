@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, #27 taste payoff: every AST node struct renders its own S-expression via a `sexp` method — the per-node `*_sexp` helpers moved into their struct bodies (fields read bare, children recurse with `child.sexp`, `MethodCallNode`/`SafeMethodCallNode` share `method_call_sexp(self, dot)`), and the 40-branch `case node.kind` dispatcher dissolved into polymorphic `node.sexp`. Shared renderers (`headed_sexp`, `sexp_list`, `branch_sexp`, `encode_string`) stay top-level. Output byte-identical; the `kind` field survives only for the evaluator's few remaining shape checks.
+
 - Trio, #27 increment: struct methods threaded (StructDefNode carries methods; `self` keyword; own-method bare calls via a `__self__` binding; dispatch before builtins and fields) and builtin type patterns bootstrap on the seed's own (`subject in Integer` answers the guest's `in Integer`; the struct-shape probe became a pattern too) — differentially pinned. Known gaps: guest `with`, method/field collision checks (seed is the oracle).
 
 - Seed, #27 increment: methods in struct bodies — fields first then `def`s, dispatched on instances before field access; bare names resolve locals → fields → own methods → top-level (no-shadow enforced across layers, `new`/`with`/`nil?`/`some?` reserved); `self` is the receiver and that's its whole job; kwargs/guards/defaults all work; top-level bodies clear the receiver. Plus builtin type patterns: `in String` / `Integer` / `Array` / `Hash` / `Boolean` — the type predicate, pattern-flavored, no reflection API.

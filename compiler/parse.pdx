@@ -5,5 +5,5 @@
 require_relative "parser"
 
 parse_program(lex(read_file(argv.first))).each do |node|
-  puts sexp(node)
+  puts node.sexp
 end
