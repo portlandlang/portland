@@ -253,15 +253,40 @@ impl<'source> Parser<'source> {
             return None;
         }
         let name = self.advance().text.to_string();
-        let mut arguments = vec![self.expression()];
-        while self.peek_kind() == Some(TokenKind::Comma) {
+        let mut arguments = Vec::new();
+        let mut keyword_arguments: Vec<(String, Expression)> = Vec::new();
+        loop {
+            if self.peek_kind() == Some(TokenKind::Identifier)
+                && self.peek_kind_at(1) == Some(TokenKind::Colon)
+            {
+                let label = self.advance().text.to_string();
+                self.position += 1; // the `:`
+                if keyword_arguments
+                    .iter()
+                    .any(|(existing, _)| *existing == label)
+                {
+                    panic!("duplicate keyword argument {label}");
+                }
+                keyword_arguments.push((label, self.expression()));
+            } else {
+                if !keyword_arguments.is_empty() {
+                    panic!("positional arguments cannot follow keyword arguments");
+                }
+                arguments.push(self.expression());
+            }
+            if self.peek_kind() != Some(TokenKind::Comma) {
+                break;
+            }
             self.position += 1; // the `,`
-            arguments.push(self.expression());
         }
         if self.peek_is_keyword("do") {
             panic!("blocks on paren-less calls aren't supported yet — write {name}(...) do");
         }
-        Some(Statement::Expression(Expression::Call { arguments, name }))
+        Some(Statement::Expression(Expression::Call {
+            arguments,
+            keyword_arguments,
+            name,
+        }))
     }
 
     /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.
@@ -295,11 +320,11 @@ impl<'source> Parser<'source> {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
-        let parameters = if self.peek_kind() == Some(TokenKind::LeftParen) {
+        let (parameters, keyword_parameters) = if self.peek_kind() == Some(TokenKind::LeftParen) {
             self.position += 1;
             self.parameters()
         } else {
-            Vec::new()
+            (Vec::new(), Vec::new())
         };
         self.expect_statement_boundary();
         self.skip_newlines();
@@ -307,6 +332,7 @@ impl<'source> Parser<'source> {
         self.position += 1; // the `end`
         Statement::MethodDefinition {
             body,
+            keyword_parameters,
             name,
             parameters,
         }
@@ -514,8 +540,9 @@ impl<'source> Parser<'source> {
 
     /// Parse a comma-separated parameter list (with optional trailing
     /// `name = default` entries), consuming the closing paren.
-    fn parameters(&mut self) -> Vec<Parameter> {
+    fn parameters(&mut self) -> (Vec<Parameter>, Vec<Parameter>) {
         let mut parameters: Vec<Parameter> = Vec::new();
+        let mut keyword_parameters: Vec<Parameter> = Vec::new();
         if self.peek_kind() == Some(TokenKind::Identifier) {
             loop {
                 let token = self.advance();
@@ -523,24 +550,42 @@ impl<'source> Parser<'source> {
                     panic!("expected parameter name, got {token:?}");
                 }
                 let name = token.text.to_string();
-                let default = if self.peek_kind() == Some(TokenKind::Equal) {
-                    self.position += 1; // the `=`
-                    Some(self.expression())
-                } else {
-                    if parameters
+                if parameters.iter().any(|parameter| parameter.name == name)
+                    || keyword_parameters
                         .iter()
-                        .any(|parameter| parameter.default.is_some())
-                    {
-                        panic!(
-                            "required parameter {name} cannot follow a parameter with a default"
-                        );
-                    }
-                    None
-                };
-                if parameters.iter().any(|parameter| parameter.name == name) {
+                        .any(|parameter| parameter.name == name)
+                {
                     panic!("duplicate parameter name {name}");
                 }
-                parameters.push(Parameter { default, name });
+                if self.peek_kind() == Some(TokenKind::Colon) {
+                    // `label:` (required) or `label: default` (optional) —
+                    // keyword parameters, Ruby 3 style.
+                    self.position += 1; // the `:`
+                    let default = match self.peek_kind() {
+                        Some(TokenKind::Comma | TokenKind::RightParen) => None,
+                        _ => Some(self.expression()),
+                    };
+                    keyword_parameters.push(Parameter { default, name });
+                } else {
+                    if !keyword_parameters.is_empty() {
+                        panic!("positional parameter {name} cannot follow a keyword parameter");
+                    }
+                    let default = if self.peek_kind() == Some(TokenKind::Equal) {
+                        self.position += 1; // the `=`
+                        Some(self.expression())
+                    } else {
+                        if parameters
+                            .iter()
+                            .any(|parameter| parameter.default.is_some())
+                        {
+                            panic!(
+                                "required parameter {name} cannot follow a parameter with a default"
+                            );
+                        }
+                        None
+                    };
+                    parameters.push(Parameter { default, name });
+                }
                 if self.peek_kind() != Some(TokenKind::Comma) {
                     break;
                 }
@@ -554,7 +599,7 @@ impl<'source> Parser<'source> {
             );
         }
         self.position += 1;
-        parameters
+        (parameters, keyword_parameters)
     }
 
     fn peek_is_keyword(&self, word: &str) -> bool {
@@ -640,6 +685,7 @@ impl<'source> Parser<'source> {
             let message = self.expression();
             return Some(Expression::Call {
                 arguments: vec![message],
+                keyword_arguments: Vec::new(),
                 name: "panic".to_string(),
             });
         }
@@ -833,13 +879,9 @@ impl<'source> Parser<'source> {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
-                    if !keyword_arguments.is_empty() {
-                        panic!(
-                            "keyword arguments are only supported on struct new and with so far"
-                        );
-                    }
                     Expression::Call {
                         arguments,
+                        keyword_arguments,
                         name: token.text.to_string(),
                     }
                 } else {
@@ -1059,6 +1101,7 @@ mod tests {
                     Expression::String("world".to_string()),
                     Expression::Integer(2),
                 ],
+                keyword_arguments: vec![],
                 name: "greet".to_string(),
             }
         );
@@ -1070,6 +1113,7 @@ mod tests {
             expression("greet()"),
             Expression::Call {
                 arguments: vec![],
+                keyword_arguments: vec![],
                 name: "greet".to_string(),
             }
         );
@@ -1084,10 +1128,12 @@ mod tests {
                     operator: BinaryOperator::Add,
                     left: Box::new(Expression::Call {
                         arguments: vec![Expression::Integer(1)],
+                        keyword_arguments: vec![],
                         name: "inner".to_string(),
                     }),
                     right: Box::new(Expression::Integer(2)),
                 }],
+                keyword_arguments: vec![],
                 name: "outer".to_string(),
             }
         );
@@ -1104,6 +1150,7 @@ mod tests {
                     left: Box::new(Expression::String("hello ".to_string())),
                     right: Box::new(Expression::Variable("name".to_string())),
                 })],
+                keyword_parameters: vec![],
                 name: "greet".to_string(),
                 parameters: vec![Parameter {
                     default: None,
@@ -1121,6 +1168,7 @@ mod tests {
                 body: vec![Statement::Expression(Expression::String(
                     "portland".to_string()
                 ))],
+                keyword_parameters: vec![],
                 name: "pdx".to_string(),
                 parameters: vec![],
             }]

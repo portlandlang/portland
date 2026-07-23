@@ -20,6 +20,7 @@ pub fn evaluate(source: &str) -> Option<Value> {
 #[derive(Clone)]
 struct Method {
     body: Vec<Statement>,
+    keyword_parameters: Vec<Parameter>,
     parameters: Vec<Parameter>,
 }
 
@@ -128,6 +129,7 @@ impl<W: std::io::Write> Interpreter<W> {
             Statement::Expression(expression) => self.expression(expression),
             Statement::MethodDefinition {
                 body,
+                keyword_parameters,
                 name,
                 parameters,
             } => {
@@ -136,6 +138,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 let method = Method {
                     body: body.clone(),
+                    keyword_parameters: keyword_parameters.clone(),
                     parameters: parameters.clone(),
                 };
                 self.methods.insert(name.clone(), std::rc::Rc::new(method));
@@ -441,17 +444,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 if let Some(value) = self.variables.get(name) {
                     Some(value.clone())
                 } else if self.methods.contains_key(name) || Self::builtin_name(name) {
-                    self.call(name, Vec::new())
+                    self.call(name, Vec::new(), Vec::new())
                 } else {
                     panic!("undefined variable or method {name}")
                 }
             }
-            Expression::Call { arguments, name } => {
+            Expression::Call {
+                arguments,
+                keyword_arguments,
+                name,
+            } => {
                 let arguments: Vec<Value> = arguments
                     .iter()
                     .map(|argument| self.value_of(argument))
                     .collect();
-                self.call(name, arguments)
+                let keyword_arguments: Vec<(String, Value)> = keyword_arguments
+                    .iter()
+                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                    .collect();
+                self.call(name, arguments, keyword_arguments)
             }
         }
     }
@@ -913,7 +924,15 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    fn call(&mut self, name: &str, arguments: Vec<Value>) -> Option<Value> {
+    fn call(
+        &mut self,
+        name: &str,
+        arguments: Vec<Value>,
+        keyword_arguments: Vec<(String, Value)>,
+    ) -> Option<Value> {
+        if !self.methods.contains_key(name) && !keyword_arguments.is_empty() {
+            panic!("{name} takes no keyword arguments");
+        }
         if !self.methods.contains_key(name) && name == "puts" {
             // Like Ruby: bare puts() prints a blank line.
             if arguments.is_empty() {
@@ -1034,6 +1053,31 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             };
             self.variables.insert(parameter.name.clone(), value);
+        }
+        // Keyword parameters bind after positionals, in declaration order,
+        // so their defaults can reference any earlier parameter.
+        let mut keyword_arguments = keyword_arguments;
+        for parameter in &method.keyword_parameters {
+            if self.methods.contains_key(&parameter.name) || Self::builtin_name(&parameter.name) {
+                panic!(
+                    "parameter {} shadows method {} — rename one",
+                    parameter.name, parameter.name
+                );
+            }
+            let position = keyword_arguments
+                .iter()
+                .position(|(label, _)| *label == parameter.name);
+            let value = match position {
+                Some(index) => keyword_arguments.remove(index).1,
+                None => match &parameter.default {
+                    Some(default) => self.value_of(default),
+                    None => panic!("{name} missing keyword argument {}", parameter.name),
+                },
+            };
+            self.variables.insert(parameter.name.clone(), value);
+        }
+        if let Some((label, _)) = keyword_arguments.first() {
+            panic!("{name} got unknown keyword argument {label}");
         }
         let mut result = self.run_body(&method.body);
         self.call_depth -= 1;
@@ -2642,6 +2686,53 @@ mod tests {
     fn a_broken_out_call_produces_nil() {
         let source = "found = [1, 2, 3].each do |number|\n  break\nend\nfound";
         assert_eq!(evaluate(source), Some(Value::Nil));
+    }
+
+    #[test]
+    fn keyword_arguments_on_methods() {
+        let source = "def greet(name:, greeting: \"hi\")\n  \"#{greeting} #{name}\"\nend\ngreet(name: \"pdx\")\n";
+        assert_eq!(evaluate(source), Some(Value::String("hi pdx".to_string())));
+        let source = "def greet(name:, greeting: \"hi\")\n  \"#{greeting} #{name}\"\nend\ngreet(greeting: \"yo\", name: \"pdx\")\n";
+        assert_eq!(evaluate(source), Some(Value::String("yo pdx".to_string())));
+    }
+
+    #[test]
+    fn keyword_and_positional_parameters_mix() {
+        let source =
+            "def tag(word, separator: \"-\")\n  word + separator + word\nend\ntag(\"go\")\n";
+        assert_eq!(evaluate(source), Some(Value::String("go-go".to_string())));
+        let source = "def tag(word, separator: \"-\")\n  word + separator + word\nend\ntag(\"go\", separator: \"+\")\n";
+        assert_eq!(evaluate(source), Some(Value::String("go+go".to_string())));
+    }
+
+    #[test]
+    fn keyword_arguments_work_on_command_calls() {
+        let source = "def shout(word:)\n  puts(word.upcase)\nend\nshout word: \"pdx\"\n";
+        assert_eq!(output_of(source), "PDX\n");
+    }
+
+    #[test]
+    fn keyword_defaults_may_reference_earlier_parameters() {
+        let source = "def frame(word, edge: word)\n  edge + word + edge\nend\nframe(\"o\")\n";
+        assert_eq!(evaluate(source), Some(Value::String("ooo".to_string())));
+    }
+
+    #[test]
+    #[should_panic(expected = "missing keyword argument name")]
+    fn panics_on_a_missing_required_keyword() {
+        evaluate("def greet(name:)\n  name\nend\ngreet()\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown keyword argument extra")]
+    fn panics_on_an_unknown_keyword() {
+        evaluate("def greet(name:)\n  name\nend\ngreet(name: \"x\", extra: 1)\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "expects")]
+    fn keyword_parameters_do_not_take_positional_values() {
+        evaluate("def greet(name:)\n  name\nend\ngreet(\"x\")\n");
     }
 
     #[test]

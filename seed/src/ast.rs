@@ -16,6 +16,9 @@ pub enum Statement {
     Next,
     MethodDefinition {
         body: Vec<Statement>,
+        /// `label:` (required) and `label: default` (optional) parameters,
+        /// Ruby 3 style: strictly separate from positionals.
+        keyword_parameters: Vec<Parameter>,
         name: String,
         parameters: Vec<Parameter>,
     },
@@ -114,6 +117,7 @@ pub enum Expression {
     },
     Call {
         arguments: Vec<Expression>,
+        keyword_arguments: Vec<(String, Expression)>,
         name: String,
     },
     Integer(i64),
