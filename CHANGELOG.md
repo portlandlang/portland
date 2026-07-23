@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/adr/ 0010 + docs/ruby/lookups.md: partial operations return maybes — the only crash is one you typed (`or panic "why"`); `fetch` retires (all three arities are the or-guard, lazy for free).
+
 - docs/adr/ 0009: the presence word is `some`/`some?` — ecosystem-verified unclaimed (dry-monads precedent, with our exact meaning); ledger synced.
 
 - docs/adr/ 0008: the unwrap toolkit — flow narrowing, the or-guard, `&.` (flattening), `case/in`; deliberately no `if let` and no force-unwrap operator (`or panic "why"` is the hatch).

@@ -39,6 +39,8 @@ promises govern every difference here:
 - [nil and optionals](nil-and-optionals.md) — no ambient nil; absence is
   an explicit maybe; the word is still `nil`
 - [truthiness](truthiness.md) — conditions take booleans, nothing else
+- [lookups and `fetch`](lookups.md) — partial operations return maybes;
+  the only crash is one you typed; `fetch` retires
 - [word operators](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!`
   are dead-identical; `or` is typed
 - [mutability](mutability.md) — immutable by default; `mutable` marks the
