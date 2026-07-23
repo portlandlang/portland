@@ -641,6 +641,14 @@ impl<W: std::io::Write> Interpreter<W> {
         }
 
         Some(match (&receiver, name, arguments.as_slice()) {
+            // The maybe predicates (ADR 0006/0009) come first: they are the
+            // one thing callable on any value including nil, because
+            // statically they belong to the maybe, not to nil.
+            (_, "nil?", []) => Value::Boolean(matches!(receiver, Value::Nil)),
+            (_, "some?", []) => Value::Boolean(!matches!(receiver, Value::Nil)),
+            (Value::Nil, name, _) => {
+                panic!("nil has no method {name} — handle the nil case first")
+            }
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
             (Value::Array(elements), "first", []) => elements
                 .first()
@@ -2330,6 +2338,27 @@ mod tests {
     #[should_panic(expected = "handle the nil case")]
     fn puts_rejects_nil() {
         evaluate("puts(nil)");
+    }
+
+    #[test]
+    fn nil_predicate_answers_absence() {
+        assert_eq!(evaluate("nil.nil?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("1.nil?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("\"rose\".nil?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("false.nil?"), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn some_predicate_answers_presence() {
+        assert_eq!(evaluate("nil.some?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("1.some?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("[].some?"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "nil has no method upcase")]
+    fn nil_refuses_ordinary_methods() {
+        evaluate("nil.upcase");
     }
 
     #[test]
