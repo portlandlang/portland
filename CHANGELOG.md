@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/adr/ 0008: the unwrap toolkit — flow narrowing, the or-guard, `&.` (flattening), `case/in`; deliberately no `if let` and no force-unwrap operator (`or panic "why"` is the hatch).
+
 - docs/ruby/: the Ruby → Portland difference ledger — one file per difference (nil/optionals, truthiness, word operators, mutability, metaprogramming, types, concurrency, parentheses, bitwise, removed syntax), README with the two migration promises (loud-never-silent divergence, the polyfill test).
 
 - docs/adr/ 0005–0007: optionals are a wrapper with a collapsed-feeling surface; the absence word is `nil` (partner word open); `or`/`and`/`not` dead-identical with their sigils, `or` typed with never-guess on `Boolean?`.
