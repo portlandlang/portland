@@ -489,6 +489,26 @@ def evaluate_new(node, mutable bindings)
   outcome([["__struct__", node.receiver.name, ordered]], bindings)
 end
 
+# `with` builds an updated copy of a guest struct (#27): the fields keep
+# their order, replaced labels take the new value.
+def struct_with(instance, keyword_values)
+  mutable updated = []
+  pairs = instance[2]
+  mutable index = 0
+  while index < pairs.length
+    field = pairs[index][0]
+    mutable value = value_at(pairs[index], 1)
+    mutable replacement_index = 0
+    while replacement_index < keyword_values.length
+      value = value_at(keyword_values[replacement_index], 1) if keyword_values[replacement_index][0] == field
+      replacement_index += 1
+    end
+    updated << [field, value]
+    index += 1
+  end
+  ["__struct__", value_at(instance, 1), updated]
+end
+
 def struct_field(instance, field)
   pairs = instance[2]
   mutable index = 0
@@ -566,6 +586,10 @@ def evaluate_method_call(node, mutable bindings)
     end
   end
   return evaluate_block_call(node, receiver, bindings) if node.block.some?
+  # `with` copies-and-updates before any dispatch, like the seed (#27).
+  if node.name == "with" && (receiver in ["__struct__", *])
+    return outcome([struct_with(receiver, keyword_values)], bindings)
+  end
   # Struct methods dispatch before builtins and field access (#27).
   own = struct_method_for(receiver, node.name, bindings)
   return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?

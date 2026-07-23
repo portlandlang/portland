@@ -488,11 +488,9 @@ fn portland_evaluator_matches_the_seed_on_append_and_index_assignment() {
 
 #[test]
 fn portland_evaluator_matches_the_seed_on_struct_methods_and_type_patterns() {
-    // Guest `with` on methoded structs is untested here: trio `with` is a
-    // known gap; the seed is the oracle.
     assert_evaluator_matches_seed(
         "evaluator_struct_methods.pdx",
-        "struct Token\n  kind\n  text\n\n  def integer?\n    kind == \"integer\"\n  end\n\n  def describe\n    \"#{kind}: #{text}\"\n  end\n\n  def loud\n    describe.upcase\n  end\n\n  def mirror\n    self\n  end\nend\ntoken = Token.new(kind: \"integer\", text: \"42\")\nputs token.integer?\nputs token.describe\nputs token.loud\nputs token.mirror == token\ncase 5\nin String then puts \"text\"\nin Integer then puts \"number\"\nend\nputs([] in Array)\nputs(token in Array)\nputs(\"x\" in String)\n",
+        "struct Token\n  kind\n  text\n\n  def integer?\n    kind == \"integer\"\n  end\n\n  def describe\n    \"#{kind}: #{text}\"\n  end\n\n  def loud\n    describe.upcase\n  end\n\n  def mirror\n    self\n  end\nend\ntoken = Token.new(kind: \"integer\", text: \"42\")\nputs token.integer?\nputs token.describe\nputs token.loud\nputs token.mirror == token\nrenamed = token.with(text: \"7\")\nputs renamed.describe\nputs token.describe\nputs renamed.with(kind: \"string\", text: \"go\").describe\ncase 5\nin String then puts \"text\"\nin Integer then puts \"number\"\nend\nputs([] in Array)\nputs(token in Array)\nputs(\"x\" in String)\n",
     );
 }
 
