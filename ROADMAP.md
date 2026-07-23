@@ -26,6 +26,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ Decided: brace blocks with the whose-block never-guess error (0016) — no precedence split from `do/end`; build pending
 - ✅ Decided: `it` as a normal binding under no-shadow (0017) — nested `it` is a shadow, shadows are errors; build pending
 - ✅ Decided: numbers (0018) — Ruby's floored `/` and `%` (**built**: the seed's truncation retired); floats specced, build pending
+- ✅ Decided: ranges (0019) — slices are collections not maybes; range patterns prove exhaustiveness; endless ranges close loudly; build pending
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -45,7 +46,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
-- [ ] Symbols (a real session), floats (ADR 0018 — decided; build), ranges (three small questions)
+- [ ] Symbols (a real session), floats (ADR 0018) and ranges (ADR 0019) — both decided; build
 - [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first

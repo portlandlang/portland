@@ -28,6 +28,11 @@ spelling (ADR 0007/0008), so `grep panic` lists every crash site in a
 codebase. Negative indices survive, made safe by the maybe
 (`array[-99]` is nil, not a crash).
 
+**Slices are the exception, and deliberately so**: `array[1..3]` returns
+a plain collection, never a maybe (ADR 0019, [ranges](ranges.md)). One
+*element* has an honest absence answer; a *sub-collection* of nothing is
+`[]`.
+
 `fetch` retires — all three arities are the or-guard:
 
 ```ruby

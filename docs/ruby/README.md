@@ -41,6 +41,8 @@ promises govern every difference here:
 - [truthiness](truthiness.md) — conditions take booleans, nothing else
 - [lookups and `fetch`](lookups.md) — partial operations return maybes;
   the only crash is one you typed; `fetch` retires
+- [ranges](ranges.md) — slices are collections, never maybes; range
+  patterns prove exhaustiveness; endless ranges close loudly
 - [pattern matching](pattern-matching.md) — `case/in` compile-checked
   exhaustive; `===` static; captures fenced
 - [word operators](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!`

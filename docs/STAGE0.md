@@ -135,7 +135,7 @@ the tests are the spec until a real one exists.
 
 - Heredocs — remaining Prism-textbook lexer work (interpolation, `%w[]`, and
   single-quoted strings are in).
-- Symbols, floats (decided in ADR 0018, not yet built), ranges.
+- Symbols; floats (ADR 0018) and ranges (ADR 0019) — both decided, not yet built.
 - Brace blocks and `it` — decided (ADRs 0016, 0017), not yet built.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
