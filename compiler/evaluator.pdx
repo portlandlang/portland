@@ -30,6 +30,28 @@ def signal_outcome(signal, value, bindings)
   Outcome.new(value: value, bindings: bindings, signal: signal)
 end
 
+# Pull a slot's value raw. Host `first`/`[index]` lift a stored nil to
+# some(nil) (ADR 0005), but the slot pattern wants the value as-is —
+# `each` is the unwrapped path. An empty slot comes back nil (crude: the
+# evaluator conflates "no value" with nil where the seed panics).
+def slot_value(values)
+  result = nil
+  values.each do |value|
+    result = value
+  end
+  result
+end
+
+# Raw positional read for the same reason — used where a triple or pair
+# may hold nil in a value position.
+def value_at(list, target_index)
+  result = nil
+  list.each_with_index do |element, index|
+    result = element if index == target_index
+  end
+  result
+end
+
 # — evaluation —
 
 def evaluate_program(nodes)
@@ -50,7 +72,9 @@ def evaluate_statement(node, bindings)
   case node.kind
   when "assignment"
     step = evaluate_expression(node.value, bindings)
-    value = step.value.first
+    # An or-guard diverted (`x = f() or return`): skip the binding, unwind.
+    return step unless step.signal == "none"
+    value = slot_value(step.value)
     return outcome([value], [[node.name, "local", value]] + step.bindings)
   when "def"
     return outcome([], [[node.name, "method", [node.parameters, node.body]]] + bindings)
@@ -124,15 +148,17 @@ def evaluate_expression(node, bindings)
   case node.kind
   when "integer" then outcome([node.value.to_i], bindings)
   when "boolean" then outcome([node.value == "true"], bindings)
+  when "nil" then outcome([nil], bindings)
   when "string" then outcome([node.value], bindings)
   when "method_call" then evaluate_method_call(node, bindings)
+  when "safe_method_call" then evaluate_method_call(node, bindings)
   when "call" then evaluate_call(node, bindings)
   when "identifier"
     slot = lookup(bindings, node.name)
     if slot.empty? || slot.first[1] == "method"
       evaluate_call(call_node(node.name, []), bindings)
     else
-      outcome([slot.first[2]], bindings)
+      outcome([value_at(slot.first, 2)], bindings)
     end
   when "binary" then evaluate_binary(node, bindings)
   when "if" then evaluate_if(node, bindings)
@@ -154,8 +180,8 @@ end
 def evaluate_binary(node, bindings)
   left_step = evaluate_expression(node.left, bindings)
   right_step = evaluate_expression(node.right, left_step.bindings)
-  left = left_step.value.first
-  right = right_step.value.first
+  left = slot_value(left_step.value)
+  right = slot_value(right_step.value)
   result = case node.operator
   when "+" then left + right
   when "-" then left - right
@@ -175,20 +201,25 @@ def evaluate_binary(node, bindings)
   outcome([result], right_step.bindings)
 end
 
+# Typed or, mirrored from the seed (ADR 0007): nil unwraps-or-else and the
+# right side may be an or-guard diverger (a statement node); booleans stay
+# logical; a present wrapped value unwraps one layer via host `or`.
 def evaluate_logical(node, bindings)
   left_step = evaluate_expression(node.left, bindings)
-  left = left_step.value.first
+  left = slot_value(left_step.value)
   if node.operator == "&&"
     return outcome([false], left_step.bindings) unless left
     return evaluate_expression(node.right, left_step.bindings)
   end
-  return outcome([true], left_step.bindings) if left
-  evaluate_expression(node.right, left_step.bindings)
+  return evaluate_statement(node.right, left_step.bindings) if left.nil?
+  return outcome([true], left_step.bindings) if left == true
+  return evaluate_expression(node.right, left_step.bindings) if left == false
+  outcome([left or nil], left_step.bindings)
 end
 
 def evaluate_unary(node, bindings)
   step = evaluate_expression(node.operand, bindings)
-  operand = step.value.first
+  operand = slot_value(step.value)
   result = if node.operator == "!"
     !operand
   else
@@ -217,7 +248,7 @@ def evaluate_hash(node, bindings)
     bindings = key_step.bindings
     value_step = evaluate_expression(pair.value, bindings)
     bindings = value_step.bindings
-    pairs += [[key_step.value.first, value_step.value.first]]
+    pairs += [[slot_value(key_step.value), slot_value(value_step.value)]]
   end
   outcome([pairs], bindings)
 end
@@ -231,8 +262,8 @@ end
 def evaluate_index(node, bindings)
   receiver_step = evaluate_expression(node.receiver, bindings)
   index_step = evaluate_expression(node.index, receiver_step.bindings)
-  receiver = receiver_step.value.first
-  outcome([receiver[index_step.value.first]], index_step.bindings)
+  receiver = slot_value(receiver_step.value)
+  outcome([receiver[slot_value(index_step.value)]], index_step.bindings)
 end
 
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
@@ -247,13 +278,13 @@ def evaluate_new(node, bindings)
   node.arguments.each do |argument|
     step = evaluate_expression(argument.value, bindings)
     bindings = step.bindings
-    provided += [[argument.label, step.value.first]]
+    provided += [[argument.label, slot_value(step.value)]]
   end
   ordered = []
   fields.each do |field|
     index = 0
     while index < provided.length
-      ordered += [[field, provided[index][1]]] if provided[index][0] == field
+      ordered += [[field, value_at(provided[index], 1)]] if provided[index][0] == field
       index += 1
     end
   end
@@ -264,7 +295,7 @@ def struct_field(instance, field)
   pairs = instance[2]
   index = 0
   while index < pairs.length
-    return pairs[index][1] if pairs[index][0] == field
+    return value_at(pairs[index], 1) if pairs[index][0] == field
     index += 1
   end
   puts "evaluator: no field #{field}"
@@ -277,8 +308,12 @@ def evaluate_method_call(node, bindings)
     return evaluate_new(node, bindings)
   end
   step = evaluate_expression(node.receiver, bindings)
-  receiver = step.value.first
+  receiver = slot_value(step.value)
   bindings = step.bindings
+  # `&.`: an absent receiver short-circuits; arguments never run.
+  if node.kind == "safe_method_call" && receiver.nil?
+    return outcome([nil], bindings)
+  end
   arguments = []
   node.arguments.each do |argument|
     argument_step = evaluate_expression(argument, bindings)
@@ -287,6 +322,8 @@ def evaluate_method_call(node, bindings)
   end
   return evaluate_block_call(node, receiver, bindings) unless node.block.empty?
   result = case node.name
+  when "nil?" then receiver.nil?
+  when "some?" then receiver.some?
   when "to_s" then receiver.to_s
   when "to_i" then receiver.to_i
   when "length" then receiver.length
@@ -303,6 +340,8 @@ def evaluate_method_call(node, bindings)
   when "last" then receiver.last
   when "sum" then receiver.sum
   when "sort" then receiver.sort
+  when "min" then receiver.min
+  when "max" then receiver.max
   when "join" then receiver.join(arguments.first)
   when "include?" then receiver.include?(arguments.first)
   when "split" then receiver.split(arguments.first)
@@ -324,7 +363,7 @@ def run_guest_block(block, arguments, bindings)
   scope = bindings
   index = 0
   block.parameters.each do |parameter|
-    scope = [[parameter, "local", arguments[index]]] + scope if index < arguments.length
+    scope = [[parameter, "local", value_at(arguments, index)]] + scope if index < arguments.length
     index += 1
   end
   run_body(block.body, scope)
@@ -346,17 +385,17 @@ def evaluate_block_call(node, receiver, bindings)
     outcome([receiver], bindings)
   when "map"
     results = receiver.map do |element|
-      run_guest_block(block, [element], bindings).value.first
+      slot_value(run_guest_block(block, [element], bindings).value)
     end
     outcome([results], bindings)
   when "select"
     results = receiver.select do |element|
-      run_guest_block(block, [element], bindings).value.first
+      slot_value(run_guest_block(block, [element], bindings).value)
     end
     outcome([results], bindings)
   when "reject"
     results = receiver.reject do |element|
-      run_guest_block(block, [element], bindings).value.first
+      slot_value(run_guest_block(block, [element], bindings).value)
     end
     outcome([results], bindings)
   when "times"
@@ -383,10 +422,10 @@ def invoke(payload, arguments, bindings)
   index = 0
   parameters.each do |parameter|
     value = if index < arguments.length
-      arguments[index]
+      value_at(arguments, index)
     else
       default = evaluate_expression(parameter.value, scope)
-      default.value.first
+      slot_value(default.value)
     end
     scope = [[parameter.name, "local", value]] + scope
     index += 1
@@ -418,6 +457,10 @@ def evaluate_call(node, bindings)
       p argument
     end
     outcome(arguments, bindings)
+  when "some"
+    outcome([some(slot_value(arguments))], bindings)
+  when "panic"
+    panic(slot_value(arguments))
   else
     puts "evaluator: undefined method #{node.name}"
     outcome([], bindings)

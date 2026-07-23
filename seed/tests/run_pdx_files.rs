@@ -415,6 +415,14 @@ fn assert_evaluator_matches_seed(name: &str, source: &str) {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_optionals() {
+    assert_evaluator_matches_seed(
+        "evaluator_optionals.pdx",
+        "p nil\np nil == nil\np nil.nil?\np 5.some?\nx = nil or 7\nputs x\ndef bump(value)\n  found = value or return 0\n  found + 1\nend\nputs bump(41)\nputs bump(nil)\np([].first)\np([nil].first)\np([1, 2][9])\np([1, 2][-1])\np([].min)\ntheme = [].first or \"grey\"\nputs theme\nname = [].first&.upcase or \"FRIEND\"\nputs name\np some(nil)\np some(5)\nkept = 5 or panic \"unreachable\"\nputs kept\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.
