@@ -16,6 +16,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ **Optionals built** — the runtime half, in the seed _and_ the trio, differentially pinned; the exhibits that demanded the feature now use it
 - ✅ Memory-model direction: RC is exact under immutability (no cycles); MTE/MIE as defense-in-depth, surveyed on #12
 - ✅ Evidence engine: the [ruby_research](https://github.com/portlandlang/ruby_research) corpus reports
+- ✅ `case/in` specced (#20, ADR 0013): compile-checked exhaustiveness, static `===`, fenced captures, keyword-only struct patterns
 - ✅ A branch that doesn't happen is nil (#22, ADR 0012) — branchless `if`, finished `while`, broken-out calls; built in seed + trio
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 
@@ -39,7 +40,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Language surface (decide, then build)
 
-- [ ] #20 — `case/in` pattern matching spec (exhaustiveness, `when` without `===`, pattern edges)
+- [ ] #26 — build `case/in` per ADR 0013 (seed runtime half + trio; the payoff is the trio's dispatch rewritten as real patterns)
 - [ ] Keyword arguments on regular methods (build; Ruby-match)
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
 - [ ] Symbols, floats (one small division talk), ranges (build)

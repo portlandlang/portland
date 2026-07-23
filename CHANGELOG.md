@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0013 (#20): the `case/in` spec — compile-checked exhaustiveness (`else` opts out), `===` as a statically resolved method, Ruby captures fenced by no-shadow + unreachable-arm errors + an unused lint, pin/guards/alternatives/one-line forms in (tentative), find pattern deferred, struct patterns keyword-only. Ledger: docs/ruby/pattern-matching.md; building is #26.
+
 - AGENT.md rewritten against reality: status (seed + trio built, optionals shipped), the working method (ADRs, ledger, Ruby-match tiebreaker, never-guess, demand-driven, differential harness), decided-so-far, and pointers to ROADMAP/report. DESIGN.md marked as the historical capture it is (ADRs win on disagreement).
 
 - ADR 0012 (#22): a branch that doesn't happen produces nil — branchless `if`, finished `while`, and broken-out calls are maybes (Ruby-match, typed); `puts` stays valueless by the could-it-ever rule. Built in seed + trio, differentially pinned; STAGE0's "where nil would have been" ledger closes.

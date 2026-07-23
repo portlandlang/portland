@@ -23,6 +23,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0010](0010-2026-07-22-partial-operations-return-maybes.md) — partial operations return maybes; the only crash is one you typed; `fetch` retires
 - [0011](0011-2026-07-22-together-single-register.md) — `together` has one register: named-at-site (no positional)
 - [0012](0012-2026-07-22-branchless-if-is-nil.md) — a branch that doesn't happen produces nil (`if`/`while`/broken-out calls)
+- [0013](0013-2026-07-22-case-in-spec.md) — the `case/in` spec: exhaustive, static, Ruby-shaped (edges tentative)
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)
