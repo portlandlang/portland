@@ -49,7 +49,7 @@ pub enum TokenKind {
 
 /// The Stage 0 keyword set — grows as the subset does.
 #[rustfmt::skip]
-const KEYWORDS: [&str; 23] = [
+const KEYWORDS: [&str; 24] = [
     "and",
     "break",
     "case",
@@ -67,6 +67,7 @@ const KEYWORDS: [&str; 23] = [
     "not",
     "or",
     "return",
+    "self",
     "struct",
     "then",
     "true",

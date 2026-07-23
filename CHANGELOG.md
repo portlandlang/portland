@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, #27 increment: methods in struct bodies — fields first then `def`s, dispatched on instances before field access; bare names resolve locals → fields → own methods → top-level (no-shadow enforced across layers, `new`/`with`/`nil?`/`some?` reserved); `self` is the receiver and that's its whole job; kwargs/guards/defaults all work; top-level bodies clear the receiver. Plus builtin type patterns: `in String` / `Integer` / `Array` / `Hash` / `Boolean` — the type predicate, pattern-flavored, no reflection API.
+
 - ROADMAP: the two missing design issues opened — #27 object model (struct-methods increment first, type predicates included) and #28 error handling (exceptions vs typed results, `!` decided with it).
 
 - Accumulator retirement: lexer.pdx and mini_lexer.pdx speak `<<` (`text << character`, `tokens << Token.new(...)`); STAGE0's variables section became the bindings section; ledger and ROADMAP record #10 complete.

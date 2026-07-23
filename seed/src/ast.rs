@@ -31,6 +31,9 @@ pub enum Statement {
     },
     StructDefinition {
         fields: Vec<String>,
+        /// Methods defined in the struct body (each a `MethodDefinition`
+        /// statement), dispatched on instances (#27).
+        methods: Vec<Statement>,
         name: String,
     },
     While {
@@ -219,6 +222,9 @@ pub enum Expression {
     /// no methods and is not falsy; the seed panics where the real compiler
     /// will reject at compile time.
     Nil,
+    /// `self` — the receiver, inside a struct method; its whole job is the
+    /// pass-myself-along case.
+    SelfValue,
     String(String),
     Unary {
         operand: Box<Expression>,

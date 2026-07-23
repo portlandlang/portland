@@ -47,8 +47,16 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, std::rc::Rc<Method>>,
     output: W,
     pending: Option<Pending>,
-    structs: HashMap<String, Vec<String>>,
+    /// The receiver while a struct method runs: `(struct name, instance)`.
+    self_receiver: Option<(String, Value)>,
+    structs: HashMap<String, StructInfo>,
     variables: HashMap<String, Binding>,
+}
+
+#[derive(Clone)]
+struct StructInfo {
+    fields: Vec<String>,
+    methods: HashMap<String, std::rc::Rc<Method>>,
 }
 
 /// A named binding: immutable unless declared `mutable` (ADR 0001).
@@ -75,6 +83,7 @@ impl<W: std::io::Write> Interpreter<W> {
             methods: HashMap::new(),
             output,
             pending: None,
+            self_receiver: None,
             structs: HashMap::new(),
             variables: HashMap::new(),
         }
@@ -164,8 +173,38 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.pending = Some(Pending::Return(value));
                 None
             }
-            Statement::StructDefinition { fields, name } => {
-                self.structs.insert(name.clone(), fields.clone());
+            Statement::StructDefinition {
+                fields,
+                methods,
+                name,
+            } => {
+                let mut method_table = HashMap::new();
+                for method in methods {
+                    let Statement::MethodDefinition {
+                        body,
+                        keyword_parameters,
+                        name: method_name,
+                        parameters,
+                    } = method
+                    else {
+                        unreachable!()
+                    };
+                    method_table.insert(
+                        method_name.clone(),
+                        std::rc::Rc::new(Method {
+                            body: body.clone(),
+                            keyword_parameters: keyword_parameters.clone(),
+                            parameters: parameters.clone(),
+                        }),
+                    );
+                }
+                self.structs.insert(
+                    name.clone(),
+                    StructInfo {
+                        fields: fields.clone(),
+                        methods: method_table,
+                    },
+                );
                 None
             }
             Statement::While { body, condition } => {
@@ -222,6 +261,13 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Nil => Some(Value::Nil),
+            Expression::SelfValue => {
+                let (_, receiver) = self
+                    .self_receiver
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("self only exists inside a struct method"));
+                Some(receiver.clone())
+            }
             Expression::Append { name, value } => {
                 let current = self
                     .variables
@@ -585,6 +631,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 // zero-argument call — unambiguous because shadowing is an error.
                 if let Some(binding) = self.variables.get(name) {
                     Some(binding.value.clone())
+                } else if let Some(method) = self.own_struct_method(name) {
+                    // Bare own-method calls inside a struct method (#27).
+                    let (struct_name, receiver) = self.self_receiver.clone().unwrap();
+                    self.call_struct_method(struct_name, receiver, method, Vec::new(), Vec::new())
                 } else if self.methods.contains_key(name) || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
                 } else {
@@ -624,6 +674,7 @@ impl<W: std::io::Write> Interpreter<W> {
             .structs
             .get(struct_name)
             .unwrap_or_else(|| panic!("undefined struct {struct_name}"))
+            .fields
             .clone();
         if !arguments.is_empty() {
             panic!("{struct_name}.new takes keyword arguments, not positional ones");
@@ -694,10 +745,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 name,
             });
         }
-        if !keyword_arguments.is_empty() {
-            panic!("keyword arguments are only for struct new and with so far");
+        // Struct methods dispatch before field access (#27): token.integer?
+        if let Value::Struct {
+            name: struct_name, ..
+        } = &receiver
+        {
+            let method = self
+                .structs
+                .get(struct_name)
+                .and_then(|info| info.methods.get(name))
+                .cloned();
+            if let Some(method) = method {
+                let struct_name = struct_name.clone();
+                return self.call_struct_method(
+                    struct_name,
+                    receiver,
+                    method,
+                    arguments,
+                    keyword_arguments,
+                );
+            }
         }
-        // Struct field access reads like a method call: token.kind
+        if !keyword_arguments.is_empty() {
+            panic!("keyword arguments are only for struct new, with, and struct methods so far");
+        }
         if let Value::Struct {
             fields,
             name: struct_name,
@@ -1174,6 +1245,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 fields: pattern_fields,
                 name,
             } => {
+                // Builtin type patterns (#27): `in String`, `in Integer`, …
+                // — the type predicate, pattern-flavored. No reflection API.
+                if matches!(
+                    name.as_str(),
+                    "Array" | "Boolean" | "Hash" | "Integer" | "String"
+                ) {
+                    if !pattern_fields.is_empty() {
+                        panic!("the builtin type pattern {name} takes no fields");
+                    }
+                    let matched = matches!(
+                        (name.as_str(), subject),
+                        ("Array", Value::Array(_))
+                            | ("Boolean", Value::Boolean(_))
+                            | ("Hash", Value::Hash(_))
+                            | ("Integer", Value::Integer(_))
+                            | ("String", Value::String(_))
+                    );
+                    return if matched { Some(Vec::new()) } else { None };
+                }
                 let Value::Struct {
                     fields,
                     name: struct_name,
@@ -1219,12 +1309,148 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// The struct method `name` on the current receiver, if both exist.
+    fn own_struct_method(&self, name: &str) -> Option<std::rc::Rc<Method>> {
+        let (struct_name, _) = self.self_receiver.as_ref()?;
+        self.structs
+            .get(struct_name)
+            .and_then(|info| info.methods.get(name))
+            .cloned()
+    }
+
+    /// Run one struct method: a fresh scope of the receiver's fields (bare,
+    /// immutable) plus parameters; `self` is the receiver (#27).
+    fn call_struct_method(
+        &mut self,
+        struct_name: String,
+        receiver: Value,
+        method: std::rc::Rc<Method>,
+        arguments: Vec<Value>,
+        keyword_arguments: Vec<(String, Value)>,
+    ) -> Option<Value> {
+        let required = method
+            .parameters
+            .iter()
+            .take_while(|parameter| parameter.default.is_none())
+            .count();
+        let total = method.parameters.len();
+        if arguments.len() < required || arguments.len() > total {
+            let expected = if required == total {
+                format!("{required}")
+            } else {
+                format!("{required} to {total}")
+            };
+            panic!(
+                "{struct_name} method expects {expected} argument(s), got {}",
+                arguments.len()
+            );
+        }
+        self.call_depth += 1;
+        if self.call_depth > MAXIMUM_CALL_DEPTH {
+            panic!("call stack deeper than {MAXIMUM_CALL_DEPTH} frames (infinite recursion?)");
+        }
+        let mut scope: HashMap<String, Binding> = HashMap::new();
+        std::mem::swap(&mut self.variables, &mut scope);
+        let field_names: Vec<String> = if let Value::Struct { fields, .. } = &receiver {
+            for (field, value) in fields {
+                self.variables.insert(
+                    field.clone(),
+                    Binding {
+                        mutable: false,
+                        value: value.clone(),
+                    },
+                );
+            }
+            fields.iter().map(|(field, _)| field.clone()).collect()
+        } else {
+            panic!("struct method on a non-struct receiver: {receiver:?}");
+        };
+        let mut supplied = arguments.into_iter();
+        for parameter in &method.parameters {
+            if field_names.contains(&parameter.name) {
+                panic!(
+                    "parameter {} shadows a field of {struct_name} — rename one",
+                    parameter.name
+                );
+            }
+            let value = match supplied.next() {
+                Some(value) => value,
+                None => {
+                    let default = parameter.default.as_ref().unwrap();
+                    self.value_of(default)
+                }
+            };
+            self.variables.insert(
+                parameter.name.clone(),
+                Binding {
+                    mutable: parameter.mutable,
+                    value,
+                },
+            );
+        }
+        let mut keyword_arguments = keyword_arguments;
+        for parameter in &method.keyword_parameters {
+            if field_names.contains(&parameter.name) {
+                panic!(
+                    "parameter {} shadows a field of {struct_name} — rename one",
+                    parameter.name
+                );
+            }
+            let position = keyword_arguments
+                .iter()
+                .position(|(label, _)| *label == parameter.name);
+            let value = match position {
+                Some(index) => keyword_arguments.remove(index).1,
+                None => match &parameter.default {
+                    Some(default) => self.value_of(default),
+                    None => panic!(
+                        "{struct_name} method missing keyword argument {}",
+                        parameter.name
+                    ),
+                },
+            };
+            self.variables.insert(
+                parameter.name.clone(),
+                Binding {
+                    mutable: parameter.mutable,
+                    value,
+                },
+            );
+        }
+        if let Some((label, _)) = keyword_arguments.first() {
+            panic!("{struct_name} method got unknown keyword argument {label}");
+        }
+        let previous_self = self.self_receiver.replace((struct_name, receiver));
+        let mut result = self.run_body(&method.body);
+        self.call_depth -= 1;
+        self.self_receiver = previous_self;
+        std::mem::swap(&mut self.variables, &mut scope);
+        match self.pending.take() {
+            None => {}
+            Some(Pending::Return(value)) => result = value,
+            Some(Pending::Break) => panic!("break outside of a loop"),
+            Some(Pending::Next) => panic!("next outside of a loop"),
+        }
+        result
+    }
+
     fn call(
         &mut self,
         name: &str,
         arguments: Vec<Value>,
         keyword_arguments: Vec<(String, Value)>,
     ) -> Option<Value> {
+        // Inside a struct method, bare calls reach own methods first (#27).
+        if let Some(method) = self.own_struct_method(name) {
+            let (struct_name, receiver) = self.self_receiver.clone().unwrap();
+            return self.call_struct_method(
+                struct_name,
+                receiver,
+                method,
+                arguments,
+                keyword_arguments,
+            );
+        }
         if !self.methods.contains_key(name) && !keyword_arguments.is_empty() {
             panic!("{name} takes no keyword arguments");
         }
@@ -1386,8 +1612,12 @@ impl<W: std::io::Write> Interpreter<W> {
         if let Some((label, _)) = keyword_arguments.first() {
             panic!("{name} got unknown keyword argument {label}");
         }
+        // A top-level method body has no receiver, even when called from
+        // inside a struct method.
+        let previous_self = self.self_receiver.take();
         let mut result = self.run_body(&method.body);
         self.call_depth -= 1;
+        self.self_receiver = previous_self;
         std::mem::swap(&mut self.variables, &mut scope);
         match self.pending.take() {
             None => {}
@@ -3327,6 +3557,87 @@ mod tests {
     #[should_panic(expected = "out of range for assignment")]
     fn index_assignment_stays_in_bounds() {
         evaluate("mutable items = [1]\nitems[5] = 9\n");
+    }
+
+    const METHODED_TOKEN: &str = "struct Token\n  kind\n  text\n\n  def integer?\n    kind == \"integer\"\n  end\n\n  def describe\n    \"#{kind}: #{text}\"\n  end\n\n  def loud\n    describe.upcase\n  end\n\n  def mirror\n    self\n  end\n\n  def framed(edge: \"|\")\n    edge + text + edge\n  end\nend\n";
+
+    #[test]
+    fn struct_methods_see_fields_bare() {
+        let source = format!("{METHODED_TOKEN}Token.new(kind: \"integer\", text: \"42\").integer?");
+        assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
+        let source = format!("{METHODED_TOKEN}Token.new(kind: \"plus\", text: \"+\").describe");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("plus: +".to_string()))
+        );
+    }
+
+    #[test]
+    fn struct_methods_call_their_own_methods_bare() {
+        let source = format!("{METHODED_TOKEN}Token.new(kind: \"plus\", text: \"+\").loud");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("PLUS: +".to_string()))
+        );
+    }
+
+    #[test]
+    fn self_is_the_receiver() {
+        let source = format!(
+            "{METHODED_TOKEN}token = Token.new(kind: \"a\", text: \"b\")\ntoken.mirror == token"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn struct_methods_take_keyword_arguments() {
+        let source =
+            format!("{METHODED_TOKEN}Token.new(kind: \"a\", text: \"x\").framed(edge: \"!\")");
+        assert_eq!(evaluate(&source), Some(Value::String("!x!".to_string())));
+        let source = format!("{METHODED_TOKEN}Token.new(kind: \"a\", text: \"x\").framed");
+        assert_eq!(evaluate(&source), Some(Value::String("|x|".to_string())));
+    }
+
+    #[test]
+    fn with_and_new_still_work_on_methoded_structs() {
+        let source = format!(
+            "{METHODED_TOKEN}Token.new(kind: \"integer\", text: \"42\").with(text: \"43\").describe"
+        );
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("integer: 43".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "kind is a field")]
+    fn struct_methods_may_not_collide_with_fields() {
+        evaluate("struct Bad\n  kind\n\n  def kind\n    1\n  end\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "reserved")]
+    fn struct_methods_may_not_claim_reserved_names() {
+        evaluate("struct Bad\n  value\n\n  def with\n    1\n  end\nend\n");
+    }
+
+    #[test]
+    fn builtin_type_patterns_match_by_kind() {
+        assert_eq!(evaluate("5 in Integer"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("\"x\" in Integer"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("[] in Array"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("\"x\" in String"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("{} in Hash"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("true in Boolean"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("[].first in String"), Some(Value::Boolean(false)));
+        let source = "case 5\nin String then \"text\"\nin Integer then \"number\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("number".to_string())));
+    }
+
+    #[test]
+    #[should_panic(expected = "takes no fields")]
+    fn builtin_type_patterns_take_no_fields() {
+        evaluate("5 in Integer(x:)\n");
     }
 
     #[test]

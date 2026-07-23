@@ -426,13 +426,43 @@ impl<'source> Parser<'source> {
         self.expect_statement_boundary();
         self.skip_newlines();
         let mut fields: Vec<String> = Vec::new();
+        let mut methods: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
             if self.position >= self.tokens.len() {
                 panic!("expected end to close struct {name}");
             }
+            // Fields first, then methods (#27).
+            if self.peek_is_keyword("def") {
+                let method = self.method_definition();
+                let Statement::MethodDefinition {
+                    name: method_name, ..
+                } = &method
+                else {
+                    unreachable!()
+                };
+                if fields.contains(method_name) {
+                    panic!(
+                        "{method_name} is a field of {name} — a name is a field or a method, never both"
+                    );
+                }
+                if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                    panic!("{method_name} is reserved on structs");
+                }
+                if methods.iter().any(|existing| {
+                    matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
+                }) {
+                    panic!("duplicate method {method_name} in struct {name}");
+                }
+                methods.push(method);
+                self.skip_newlines();
+                continue;
+            }
             let token = self.advance();
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
+            }
+            if !methods.is_empty() {
+                panic!("fields come before methods in struct {name}");
             }
             if fields.contains(&token.text.to_string()) {
                 panic!("duplicate field {} in struct {name}", token.text);
@@ -445,7 +475,11 @@ impl<'source> Parser<'source> {
             panic!("struct {name} needs at least one field");
         }
         self.position += 1; // the `end`
-        Statement::StructDefinition { fields, name }
+        Statement::StructDefinition {
+            fields,
+            methods,
+            name,
+        }
     }
 
     fn while_statement(&mut self) -> Statement {
@@ -1244,6 +1278,7 @@ impl<'source> Parser<'source> {
                 "case" => self.case_expression(),
                 "false" => Expression::Boolean(false),
                 "nil" => Expression::Nil,
+                "self" => Expression::SelfValue,
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
                 "unless" => self.unless_expression(),
