@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- todos/ deleted — the migration table served its purpose; GitHub issues are the backlog (original files in git history).
+
 - docs/reports/: 2026-07-22 open-decisions report — every known pending decision with options, tradeoffs, unlocks, recommended order and answers; records the Ruby-match-preferred tiebreaker.
 
 - Trio, optionals rung 6 (#21): Exhibit B resolved — an absent `else` (and `case` else, and the empty half of a postfix-guard desugar) is nil, distinct from a present empty one; absent branches produce no value in the evaluator.
