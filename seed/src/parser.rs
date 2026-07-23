@@ -590,7 +590,9 @@ impl<'source> Parser<'source> {
 
     fn logical_or(&mut self) -> Expression {
         let mut left = self.logical_and();
-        while self.peek_kind() == Some(TokenKind::PipePipe) {
+        // `or` is dead-identical to `||` (ADR 0007): same precedence, same
+        // semantics — Ruby's looser-than-assignment `or` is the cut perlism.
+        while self.peek_kind() == Some(TokenKind::PipePipe) || self.peek_is_keyword("or") {
             self.position += 1;
             let right = self.logical_and();
             left = Expression::Logical {
@@ -604,7 +606,8 @@ impl<'source> Parser<'source> {
 
     fn logical_and(&mut self) -> Expression {
         let mut left = self.comparison();
-        while self.peek_kind() == Some(TokenKind::AmpersandAmpersand) {
+        while self.peek_kind() == Some(TokenKind::AmpersandAmpersand) || self.peek_is_keyword("and")
+        {
             self.position += 1;
             let right = self.comparison();
             left = Expression::Logical {
@@ -676,7 +679,7 @@ impl<'source> Parser<'source> {
     }
 
     fn unary(&mut self) -> Expression {
-        if self.peek_kind() == Some(TokenKind::Bang) {
+        if self.peek_kind() == Some(TokenKind::Bang) || self.peek_is_keyword("not") {
             self.position += 1;
             return Expression::Unary {
                 operand: Box::new(self.unary()),

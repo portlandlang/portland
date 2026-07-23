@@ -2410,6 +2410,23 @@ mod tests {
     }
 
     #[test]
+    fn word_operators_are_dead_identical_to_their_sigils() {
+        assert_eq!(evaluate("nil or 5"), Some(Value::Integer(5)));
+        assert_eq!(evaluate("3 or nope()"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("false and true"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("true and true"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("not true"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("not not false"), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn word_or_has_sigil_precedence_not_rubys() {
+        // Ruby parses `x = nil or 7` as `(x = nil) or 7`; Portland's or is
+        // dead-identical to ||, so this is `x = (nil or 7)` (ADR 0007).
+        assert_eq!(evaluate("x = nil or 7\nx"), Some(Value::Integer(7)));
+    }
+
+    #[test]
     fn puts_prints_a_line() {
         assert_eq!(output_of("puts(\"hello portland\")"), "hello portland\n");
     }

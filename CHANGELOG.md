@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, optionals rung 3b: `or` / `and` / `not` word forms, dead-identical to `||` / `&&` / `!` (ADR 0007) — same precedence (`x = nil or 7` binds the or first, unlike Ruby), same typed semantics.
+
 - Seed, optionals rung 3a: typed `||` (ADR 0007) — nil left unwraps-or-else (short-circuit, lazy right), booleans stay logical, `&&` refuses nil; the static halves (dead right sides, `Boolean?` never-guess) stay flagged as out of the seed's reach.
 
 - Seed, optionals rung 2: `nil?` and `some?` on every value (ADR 0009) — the one dispatch that works on nil; every other method on nil panics with "handle the nil case first".
