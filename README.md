@@ -8,7 +8,8 @@ Close to the metal, on Metal.
 > real slice of Portland — see [`docs/STAGE0.md`](docs/STAGE0.md) for exactly what.
 > The first self-hosted piece exists: [`compiler/lexer.pdx`](compiler/lexer.pdx) is
 > Portland's lexer, written in Portland, and it tokenizes its own source.
-> See [`AGENT.md`](AGENT.md) for the working brief,
+> See [`ROADMAP.md`](ROADMAP.md) for where this is going and how close it is,
+> [`AGENT.md`](AGENT.md) for the working brief,
 > [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale,
 > and the [issues](https://github.com/portlandlang/portland/issues) for what's next.
 

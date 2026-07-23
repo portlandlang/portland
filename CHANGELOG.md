@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- ROADMAP.md: the one-page burn-down — done 🎉 above the line, dropped ❌, coming ⬜ below; linked from the README.
+
+- seed/tests/fixtures/optionals.pdx: the absence story as a living-documentation fixture, output pinned in the end-to-end suite.
+
 - todos/ deleted — the migration table served its purpose; GitHub issues are the backlog (original files in git history).
 
 - docs/reports/: 2026-07-22 open-decisions report — every known pending decision with options, tradeoffs, unlocks, recommended order and answers; records the Ruby-match-preferred tiebreaker.

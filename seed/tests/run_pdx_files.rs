@@ -65,6 +65,19 @@ fn runs_tour_pdx() {
 }
 
 #[test]
+fn runs_optionals_pdx() {
+    // Living documentation for ADRs 0005–0010. Direct-run only: the hosted
+    // evaluator can't index guest hashes yet (pair-list gap, #10), so the
+    // optionals differential lives in its own hash-free test below.
+    let output = run_fixture("optionals.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "teal\n30\nsome(nil)\nnil\nPORTLAND!\n...\n0\n9\nFRIEND\ntrue\ntrue\n"
+    );
+}
+
+#[test]
 fn runs_mini_lexer_pdx() {
     let output = run_fixture("mini_lexer.pdx");
     assert!(output.status.success());
