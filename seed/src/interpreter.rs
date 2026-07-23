@@ -250,11 +250,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 let index = self.value_of(index);
                 match (&receiver, &index) {
                     (Value::Array(elements), Value::Integer(index)) => {
-                        // Ruby-style negative indices; out of range panics — no nil to return.
+                        // Partial operations return maybes (ADR 0010): negative
+                        // indices stay Ruby-style, out of range is nil.
                         let length = elements.len() as i64;
                         let position = if *index < 0 { length + index } else { *index };
                         if position < 0 || position >= length {
-                            panic!("index {index} out of range for array of length {length}");
+                            return Some(Value::Nil);
                         }
                         Some(elements[position as usize].clone())
                     }
@@ -263,7 +264,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         let length = text.chars().count() as i64;
                         let position = if *index < 0 { length + index } else { *index };
                         if position < 0 || position >= length {
-                            panic!("index {index} out of range for string of length {length}");
+                            return Some(Value::Nil);
                         }
                         let character = text.chars().nth(position as usize).unwrap();
                         Some(Value::String(character.to_string()))
@@ -272,11 +273,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         pairs
                             .iter()
                             .find(|(existing, _)| existing == key)
-                            .unwrap_or_else(|| {
-                                panic!("key {key} not found in hash — no nil; check key? first")
-                            })
-                            .1
-                            .clone(),
+                            .map_or(Value::Nil, |(_, value)| value.clone()),
                     ),
                     _ => panic!("cannot index {receiver:?} with {index:?}"),
                 }
@@ -682,10 +679,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 panic!("nil has no method {name} — handle the nil case first")
             }
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
-            (Value::Array(elements), "first", []) => elements
-                .first()
-                .unwrap_or_else(|| panic!("first on an empty array — no nil; check empty? first"))
-                .clone(),
+            (Value::Array(elements), "first", []) => {
+                elements.first().cloned().unwrap_or(Value::Nil)
+            }
             (Value::Array(elements), "join", [Value::String(separator)]) => Value::String(
                 elements
                     .iter()
@@ -693,10 +689,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect::<Vec<_>>()
                     .join(separator),
             ),
-            (Value::Array(elements), "last", []) => elements
-                .last()
-                .unwrap_or_else(|| panic!("last on an empty array — no nil; check empty? first"))
-                .clone(),
+            (Value::Array(elements), "last", []) => elements.last().cloned().unwrap_or(Value::Nil),
             (Value::Array(elements), "length", []) => Value::Integer(elements.len() as i64),
             (Value::Hash(pairs), "empty?", []) => Value::Boolean(pairs.is_empty()),
             (Value::Hash(pairs), "key?", [key]) => {
@@ -715,13 +708,11 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "max", []) => Self::integers_of(elements, "max")
                 .into_iter()
                 .max()
-                .map(Value::Integer)
-                .unwrap_or_else(|| panic!("max on an empty array — no nil; check empty? first")),
+                .map_or(Value::Nil, Value::Integer),
             (Value::Array(elements), "min", []) => Self::integers_of(elements, "min")
                 .into_iter()
                 .min()
-                .map(Value::Integer)
-                .unwrap_or_else(|| panic!("min on an empty array — no nil; check empty? first")),
+                .map_or(Value::Nil, Value::Integer),
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
                 let start = usize::try_from(*start)
                     .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
@@ -1507,12 +1498,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "not found in hash")]
-    fn panics_on_a_missing_hash_key() {
-        evaluate("{\"a\" => 1}[\"b\"]");
-    }
-
-    #[test]
     fn calls_builtin_methods_on_hashes() {
         let hash = "{\"a\" => 1, \"b\" => 2}";
         assert_eq!(evaluate(&format!("{hash}.length")), Some(Value::Integer(2)));
@@ -1570,12 +1555,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "out of range")]
-    fn panics_on_an_out_of_range_index() {
-        evaluate("[1, 2][5]");
-    }
-
-    #[test]
     fn concatenates_arrays_with_plus() {
         assert_eq!(
             evaluate("[1] + [2, 3]"),
@@ -1597,12 +1576,6 @@ mod tests {
             evaluate("[\"a\", \"b\"].join(\"-\")"),
             Some(Value::String("a-b".to_string()))
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "no nil; check empty? first")]
-    fn panics_on_first_of_an_empty_array() {
-        evaluate("[].first");
     }
 
     #[test]
@@ -1666,18 +1639,6 @@ mod tests {
             evaluate(r#""pdx"[-1]"#),
             Some(Value::String("x".to_string()))
         );
-    }
-
-    #[test]
-    #[should_panic(expected = "out of range for string")]
-    fn panics_on_an_out_of_range_string_index() {
-        evaluate(r#""pdx"[9]"#);
-    }
-
-    #[test]
-    #[should_panic(expected = "no nil; check empty? first")]
-    fn panics_on_max_of_an_empty_array() {
-        evaluate("[].max");
     }
 
     const TOKEN_STRUCT: &str = "struct Token\n  kind\n  text\nend\n";
@@ -2491,6 +2452,34 @@ mod tests {
     #[should_panic(expected = "kaboom")]
     fn panic_builtin_works_at_statement_position() {
         evaluate("panic \"kaboom\"");
+    }
+
+    #[test]
+    fn partial_operations_return_nil_instead_of_panicking() {
+        assert_eq!(evaluate("[].first"), Some(Value::Nil));
+        assert_eq!(evaluate("[].last"), Some(Value::Nil));
+        assert_eq!(evaluate("[].min"), Some(Value::Nil));
+        assert_eq!(evaluate("[].max"), Some(Value::Nil));
+        assert_eq!(evaluate("[1, 2][9]"), Some(Value::Nil));
+        assert_eq!(evaluate("[1, 2][-9]"), Some(Value::Nil));
+        assert_eq!(evaluate("\"pdx\"[9]"), Some(Value::Nil));
+        assert_eq!(evaluate("{\"a\" => 1}[\"zzz\"]"), Some(Value::Nil));
+    }
+
+    #[test]
+    fn partial_operations_still_answer_when_they_can() {
+        assert_eq!(evaluate("[7, 8].first"), Some(Value::Integer(7)));
+        assert_eq!(evaluate("[1, 2][-1]"), Some(Value::Integer(2)));
+        assert_eq!(evaluate("{\"a\" => 1}[\"a\"]"), Some(Value::Integer(1)));
+    }
+
+    #[test]
+    fn lookups_compose_with_the_or_guard() {
+        assert_eq!(evaluate("[].first or 42"), Some(Value::Integer(42)));
+        assert_eq!(
+            evaluate("theme = {\"a\" => 1}[\"theme\"] or \"teal\"\ntheme"),
+            Some(Value::String("teal".to_string()))
+        );
     }
 
     #[test]
