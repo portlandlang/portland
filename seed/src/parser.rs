@@ -446,6 +446,12 @@ impl<'source> Parser<'source> {
         while self.peek_is_keyword("in") {
             self.position += 1; // the `in`
             let pattern = self.pattern();
+            let guard = if self.peek_is_keyword("if") {
+                self.position += 1; // the `if`
+                Some(self.expression())
+            } else {
+                None
+            };
             let body;
             if self.peek_is_keyword("then") {
                 self.position += 1; // the `then`
@@ -457,7 +463,11 @@ impl<'source> Parser<'source> {
                 self.skip_newlines();
                 body = self.body_until(&["in", "else", "end"], "in");
             }
-            branches.push(InBranch { body, pattern });
+            branches.push(InBranch {
+                body,
+                guard,
+                pattern,
+            });
         }
         if self.peek_is_keyword("when") {
             panic!("cannot mix when and in branches in one case");
@@ -521,8 +531,52 @@ impl<'source> Parser<'source> {
                 }
                 Pattern::Capture(name)
             }
+            TokenKind::Caret => {
+                let name = self.advance();
+                if name.kind != TokenKind::Identifier {
+                    panic!("expected a variable name after ^, got {name:?}");
+                }
+                Pattern::Pin(name.text.to_string())
+            }
+            TokenKind::LeftBracket => self.array_pattern(),
             other => panic!("unsupported pattern starting with {other:?}"),
         }
+    }
+
+    /// `[p, p]` exact, or `[p, *rest]` — a splat may only end the pattern
+    /// (suffix-after-splat travels with the deferred find pattern).
+    fn array_pattern(&mut self) -> Pattern {
+        let mut elements = Vec::new();
+        let mut rest: Option<Option<String>> = None;
+        if self.peek_kind() != Some(TokenKind::RightBracket) {
+            loop {
+                if self.peek_kind() == Some(TokenKind::Star) {
+                    self.position += 1; // the `*`
+                    rest = if self.peek_kind() == Some(TokenKind::Identifier) {
+                        Some(Some(self.advance().text.to_string()))
+                    } else {
+                        Some(None)
+                    };
+                    if self.peek_kind() == Some(TokenKind::Comma) {
+                        panic!("a * rest must end an array pattern");
+                    }
+                    break;
+                }
+                elements.push(self.pattern());
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
+            }
+        }
+        if self.peek_kind() != Some(TokenKind::RightBracket) {
+            panic!(
+                "expected closing bracket in array pattern, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1; // the `]`
+        Pattern::Array { elements, rest }
     }
 
     /// `Name(field: pattern, other:)` — keyword-only (ADR 0013 §5); a bare

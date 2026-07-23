@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, case/in rung 3 (#26): pin `^variable` (compare, don't capture; `^` enters the lexer as pin-only — xor stays out per ADR 0003), guards (`in x if x > 10` — bind first, guard sees captures, false falls through), and array patterns (`[a, b]` exact, `[first, *rest]` / `[first, *]` with a trailing splat; suffix-after-splat waits with the find pattern).
+
 - Seed, case/in rung 2 (#26): struct patterns, keyword-only (ADR 0013 §5) — `in ReturnNode(value: nil)` refines by field, `in Token(kind:)` binds shorthand, `in Token(kind: k)` binds named, bare `in BreakNode` matches by type; positional fields refuse with the keyword-only error; sub-patterns recurse (alternatives and literals nest).
 
 - Seed, case/in rung 1 (#26): `in` branches on `case` — literal patterns (integers, strings, booleans, nil), captures (bind and persist, no-shadow-fenced), `|` alternatives, `then` one-liners, and the runtime exhaustiveness preview (no match + no else = a panic naming the subject). Struct patterns, pin, and guards are later rungs.

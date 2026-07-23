@@ -89,11 +89,21 @@ pub struct CaseBranch {
 pub enum Pattern {
     /// `in 1 | 2 | 3` — first matching alternative wins.
     Alternative(Vec<Pattern>),
+    /// `in [a, b]` exact, or `in [first, *rest]` — `rest` is `None` for an
+    /// exact-length match, `Some(None)` for an anonymous `*`, and
+    /// `Some(Some(name))` to bind the remainder.
+    Array {
+        elements: Vec<Pattern>,
+        rest: Option<Option<String>>,
+    },
     /// A bare lowercase name: matches anything, binds it (Ruby's rule,
     /// fenced by no-shadow and exhaustiveness per ADR 0013 §3).
     Capture(String),
     /// A literal value to compare against: integers, strings, booleans, nil.
     Literal(Expression),
+    /// `in ^name` — compare against the variable's value instead of
+    /// capturing (ADR 0013 §4).
+    Pin(String),
     /// `in ReturnNode(value: nil)` — match by struct type, refine or bind by
     /// field. Keyword-only (ADR 0013 §5); a field with no sub-pattern binds
     /// under its own name (`in Token(kind:)` binds `kind`). Bare
@@ -107,6 +117,10 @@ pub enum Pattern {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InBranch {
     pub body: Vec<Statement>,
+    /// `in pattern if condition` — evaluated after the pattern binds; a
+    /// false guard falls through to the next branch (and doesn't count
+    /// toward exhaustiveness, ADR 0013 §4).
+    pub guard: Option<Expression>,
     pub pattern: Pattern,
 }
 

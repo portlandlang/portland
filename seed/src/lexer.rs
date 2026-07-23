@@ -8,6 +8,7 @@ pub enum TokenKind {
     AmpersandAmpersand,
     AmpersandDot,
     Bang,
+    Caret,
     Colon,
     Comma,
     Dot,
@@ -147,7 +148,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..=closing],
                 });
             }
-            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' => {
+            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' => {
                 chars.next();
                 let next = chars.peek().map(|&(_, following)| following);
                 let (kind, length) = match (character, next) {
@@ -175,6 +176,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('/', _) => (TokenKind::Slash, 1),
                     ('*', Some('=')) => (TokenKind::StarEqual, 2),
                     ('*', _) => (TokenKind::Star, 1),
+                    // `^` exists only as the pattern pin (ADR 0013 §4);
+                    // bitwise xor is out (ADR 0003).
+                    ('^', _) => (TokenKind::Caret, 1),
                     _ => unreachable!(),
                 };
                 if length == 2 {

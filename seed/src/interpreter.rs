@@ -232,12 +232,18 @@ impl<W: std::io::Write> Interpreter<W> {
                         continue;
                     };
                     // Captures bind into the enclosing scope and persist,
-                    // Ruby-style — fenced by no-shadow (ADR 0013 §3).
+                    // Ruby-style — fenced by no-shadow (ADR 0013 §3). They
+                    // bind before the guard runs so the guard can see them.
                     for (name, value) in captures {
                         if self.methods.contains_key(&name) || Self::builtin_name(&name) {
                             panic!("capture {name} shadows method {name} — rename one");
                         }
                         self.variables.insert(name, value);
+                    }
+                    if let Some(guard) = &branch.guard
+                        && !self.boolean_of(guard, "pattern guard")
+                    {
+                        continue;
                     }
                     if branch.body.is_empty() {
                         return Some(Value::Nil);
@@ -954,7 +960,38 @@ impl<W: std::io::Write> Interpreter<W> {
             Pattern::Alternative(options) => options
                 .iter()
                 .find_map(|option| self.match_pattern(option, subject)),
+            Pattern::Array { elements, rest } => {
+                let Value::Array(values) = subject else {
+                    return None;
+                };
+                match rest {
+                    None if values.len() != elements.len() => return None,
+                    Some(_) if values.len() < elements.len() => return None,
+                    _ => {}
+                }
+                let mut captures = Vec::new();
+                for (element, value) in elements.iter().zip(values.iter()) {
+                    captures.extend(self.match_pattern(element, value)?);
+                }
+                if let Some(Some(name)) = rest {
+                    let remainder = values[elements.len()..].to_vec();
+                    captures.push((name.clone(), Value::array(remainder)));
+                }
+                Some(captures)
+            }
             Pattern::Capture(name) => Some(vec![(name.clone(), subject.clone())]),
+            Pattern::Pin(name) => {
+                let value = self
+                    .variables
+                    .get(name)
+                    .unwrap_or_else(|| panic!("undefined variable {name} in a ^ pin"))
+                    .clone();
+                if value == *subject {
+                    Some(Vec::new())
+                } else {
+                    None
+                }
+            }
             Pattern::Literal(expression) => {
                 if self.value_of(expression) == *subject {
                     Some(Vec::new())
@@ -2910,6 +2947,44 @@ mod tests {
             "{NODE_STRUCTS}case ReturnNode.new(value: 1)\nin ReturnNode(5) then \"no\"\nend\n"
         );
         evaluate(&source);
+    }
+
+    #[test]
+    fn case_in_pin_compares_instead_of_capturing() {
+        let source = "expected = 2\ncase 2\nin ^expected then \"hit\"\nelse\n  \"miss\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("hit".to_string())));
+        let source = "expected = 9\ncase 2\nin ^expected then \"hit\"\nelse\n  \"miss\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("miss".to_string())));
+    }
+
+    #[test]
+    fn case_in_guards_refine_matches() {
+        let source = "case 50\nin score if score > 10 then \"big\"\nin score then \"small\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("big".to_string())));
+        let source = "case 5\nin score if score > 10 then \"big\"\nin score then \"small\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("small".to_string())));
+    }
+
+    #[test]
+    fn case_in_array_patterns_match_exactly() {
+        let source =
+            "case [1, 2]\nin [] then \"empty\"\nin [a, b] then a + b\nelse\n  \"other\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+        let source =
+            "case []\nin [] then \"empty\"\nin [a, b] then a + b\nelse\n  \"other\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("empty".to_string())));
+        let source = "case [1, 2, 3]\nin [a, b] then a + b\nelse\n  \"other\"\nend\n";
+        assert_eq!(evaluate(source), Some(Value::String("other".to_string())));
+    }
+
+    #[test]
+    fn case_in_array_patterns_take_a_rest() {
+        let source = "case [1, 2, 3]\nin [first, *rest] then first + rest.length\nend\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+        let source = "case [1]\nin [first, *rest] then rest\nend\n";
+        assert_eq!(evaluate(source), Some(Value::array(Vec::new())));
+        let source = "case [1, 2, 3]\nin [first, *] then first\nend\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(1)));
     }
 
     #[test]
