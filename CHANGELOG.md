@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, `<<` sweep: the deferred taste pass — parser.pdx and evaluator.pdx retire ~45 `X += [item]` / `text += part` appends to `<<` (ADR 0015 sugar, matching lexer.pdx). Counters keep `+=`; genuine array concatenations (`captures += sub_captures`) stay `+=` because `<<` appends exactly one element.
+
 - Trio, guest `with` (#27): the evaluator builds an updated copy of a tagged-array struct — field order kept, replaced labels take the new value, checked before any dispatch like the seed; the struct-methods differential now exercises single, chained, and original-untouched `with`. The trio's last flagged #27 gap outside the full object-model session.
 
 - Trio, #27 taste payoff (third slice): Token grew the six kind predicates (`identifier?`, `integer?`, `keyword?`, `newline?`, `operator?`, `string?`) — the issue's own motivating example — and parser.pdx's 29 `token.kind == "..."` string comparisons became predicate calls; the index-assignment head check became type patterns.

@@ -245,7 +245,7 @@ def match_array(pattern, subject, bindings)
   end
   if pattern.splat && pattern.rest_name.some?
     rest = subject.slice(pattern.elements.length, subject.length - pattern.elements.length)
-    captures += [[pattern.rest_name, rest]]
+    captures << [pattern.rest_name, rest]
   end
   captures
 end
@@ -476,13 +476,13 @@ def evaluate_new(node, mutable bindings)
   node.arguments.each do |argument|
     step = evaluate_expression(argument.value, bindings)
     bindings = step.bindings
-    provided += [[argument.label, slot_value(step.value)]]
+    provided << [argument.label, slot_value(step.value)]
   end
   mutable ordered = []
   fields.each do |field|
     mutable index = 0
     while index < provided.length
-      ordered += [[field, value_at(provided[index], 1)]] if provided[index][0] == field
+      ordered << [field, value_at(provided[index], 1)] if provided[index][0] == field
       index += 1
     end
   end
@@ -578,7 +578,7 @@ def evaluate_method_call(node, mutable bindings)
     if argument in KeywordArgumentNode
       argument_step = evaluate_expression(argument.value, bindings)
       bindings = argument_step.bindings
-      keyword_values += [[argument.label, slot_value(argument_step.value)]]
+      keyword_values << [argument.label, slot_value(argument_step.value)]
     else
       argument_step = evaluate_expression(argument, bindings)
       bindings = argument_step.bindings
@@ -742,7 +742,7 @@ def evaluate_call(node, mutable bindings)
     if argument in KeywordArgumentNode
       step = evaluate_expression(argument.value, bindings)
       bindings = step.bindings
-      keyword_values += [[argument.label, slot_value(step.value)]]
+      keyword_values << [argument.label, slot_value(step.value)]
     else
       step = evaluate_expression(argument, bindings)
       bindings = step.bindings
