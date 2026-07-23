@@ -17,6 +17,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0004](0004-2026-07-20-together-meanwhile.md) — concurrency vocabulary: `together` + `meanwhile` + `~` (tentative)
 - [0005](0005-2026-07-22-optionals-wrapper-model.md) — optionals are a wrapper, with a collapsed-feeling surface
 - [0006](0006-2026-07-22-absence-word-nil.md) — the absence word is `nil` (partner word still open)
+- [0007](0007-2026-07-22-or-and-not-dead-identical.md) — `or`/`||`, `and`/`&&`, `not`/`!` dead-identical; `or` is typed
 
 Decisions made before this log exists as-built documentation in
 `docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)
