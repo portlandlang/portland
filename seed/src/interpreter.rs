@@ -221,6 +221,27 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 None
             }
+            Expression::MatchAssert { pattern, subject } => {
+                let subject = self.value_of(subject);
+                let Some(captures) = self.match_pattern(pattern, &subject) else {
+                    panic!(
+                        "pattern mismatch: {} — the => form panics when it can't destructure",
+                        subject.inspect()
+                    );
+                };
+                self.bind_captures(captures);
+                Some(Value::Nil)
+            }
+            Expression::MatchTest { pattern, subject } => {
+                let subject = self.value_of(subject);
+                match self.match_pattern(pattern, &subject) {
+                    Some(captures) => {
+                        self.bind_captures(captures);
+                        Some(Value::Boolean(true))
+                    }
+                    None => Some(Value::Boolean(false)),
+                }
+            }
             Expression::CaseIn {
                 branches,
                 else_body,
@@ -234,12 +255,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     // Captures bind into the enclosing scope and persist,
                     // Ruby-style — fenced by no-shadow (ADR 0013 §3). They
                     // bind before the guard runs so the guard can see them.
-                    for (name, value) in captures {
-                        if self.methods.contains_key(&name) || Self::builtin_name(&name) {
-                            panic!("capture {name} shadows method {name} — rename one");
-                        }
-                        self.variables.insert(name, value);
-                    }
+                    self.bind_captures(captures);
                     if let Some(guard) = &branch.guard
                         && !self.boolean_of(guard, "pattern guard")
                     {
@@ -947,6 +963,16 @@ impl<W: std::io::Write> Interpreter<W> {
             };
         }
         result
+    }
+
+    /// Bind pattern captures into the enclosing scope, no-shadow-fenced.
+    fn bind_captures(&mut self, captures: Vec<(String, Value)>) {
+        for (name, value) in captures {
+            if self.methods.contains_key(&name) || Self::builtin_name(&name) {
+                panic!("capture {name} shadows method {name} — rename one");
+            }
+            self.variables.insert(name, value);
+        }
     }
 
     /// Try one pattern against a value: `Some(captures)` on a match (empty
@@ -2985,6 +3011,36 @@ mod tests {
         assert_eq!(evaluate(source), Some(Value::array(Vec::new())));
         let source = "case [1, 2, 3]\nin [first, *] then first\nend\n";
         assert_eq!(evaluate(source), Some(Value::Integer(1)));
+    }
+
+    #[test]
+    fn one_line_in_is_a_boolean_test_that_binds() {
+        assert_eq!(evaluate("5 in 1 | 5"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("5 in nil"), Some(Value::Boolean(false)));
+        let source = format!(
+            "{NODE_STRUCTS}node = ReturnNode.new(value: 7)\nhit = node in ReturnNode(value:)\nvalue + 1\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Integer(8)));
+    }
+
+    #[test]
+    fn one_line_in_reads_as_a_condition() {
+        let source = format!(
+            "{NODE_STRUCTS}node = BreakNode.new(label: \"b\")\nif node in BreakNode\n  \"break\"\nelse\n  \"other\"\nend\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::String("break".to_string())));
+    }
+
+    #[test]
+    fn rightward_destructuring_binds_or_panics() {
+        let source = "pair = [1, 2]\npair => [a, b]\na + b\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    #[should_panic(expected = "pattern mismatch")]
+    fn rightward_destructuring_panics_on_mismatch() {
+        evaluate("[1] => [a, b]\n");
     }
 
     #[test]

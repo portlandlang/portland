@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, case/in rung 4 (#26): the one-line forms — `expr in pattern` is a boolean test (binds captures on a hit, reads as a condition: `if node in BreakNode`), and `expr => pattern` is rightward destructuring that panics on mismatch (`pair => [a, b]` — the pattern-grammar answer to multiple assignment).
+
 - Seed, case/in rung 3 (#26): pin `^variable` (compare, don't capture; `^` enters the lexer as pin-only — xor stays out per ADR 0003), guards (`in x if x > 10` — bind first, guard sees captures, false falls through), and array patterns (`[a, b]` exact, `[first, *rest]` / `[first, *]` with a trailing splat; suffix-after-splat waits with the find pattern).
 
 - Seed, case/in rung 2 (#26): struct patterns, keyword-only (ADR 0013 §5) — `in ReturnNode(value: nil)` refines by field, `in Token(kind:)` binds shorthand, `in Token(kind: k)` binds named, bare `in BreakNode` matches by type; positional fields refuse with the keyword-only error; sub-patterns recurse (alternatives and literals nest).

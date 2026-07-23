@@ -213,7 +213,18 @@ impl<'source> Parser<'source> {
         {
             return command;
         }
-        Statement::Expression(self.expression())
+        let expression = self.expression();
+        // Rightward destructuring (ADR 0013 §4): `expr => pattern` matches
+        // or panics — the pattern-grammar answer to multiple assignment.
+        if self.peek_kind() == Some(TokenKind::FatArrow) {
+            self.position += 1; // the `=>`
+            let pattern = self.pattern();
+            return Statement::Expression(Expression::MatchAssert {
+                pattern,
+                subject: Box::new(expression),
+            });
+        }
+        Statement::Expression(expression)
     }
 
     /// Paren-less command calls, statement position only: `puts "hello"`.
@@ -507,7 +518,7 @@ impl<'source> Parser<'source> {
         match token.kind {
             TokenKind::Integer => {
                 let value = token.text.parse().expect("integer literal out of range");
-                Pattern::Literal(Expression::Integer(value))
+                Pattern::Literal(Box::new(Expression::Integer(value)))
             }
             TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
                 let value: i64 = self
@@ -515,13 +526,13 @@ impl<'source> Parser<'source> {
                     .text
                     .parse()
                     .expect("integer literal out of range");
-                Pattern::Literal(Expression::Integer(-value))
+                Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
-            TokenKind::String => Pattern::Literal(string_expression(token.text)),
+            TokenKind::String => Pattern::Literal(Box::new(string_expression(token.text))),
             TokenKind::Keyword => match token.text {
-                "false" => Pattern::Literal(Expression::Boolean(false)),
-                "nil" => Pattern::Literal(Expression::Nil),
-                "true" => Pattern::Literal(Expression::Boolean(true)),
+                "false" => Pattern::Literal(Box::new(Expression::Boolean(false))),
+                "nil" => Pattern::Literal(Box::new(Expression::Nil)),
+                "true" => Pattern::Literal(Box::new(Expression::Boolean(true))),
                 other => panic!("unexpected keyword {other:?} in a pattern"),
             },
             TokenKind::Identifier => {
@@ -819,7 +830,16 @@ impl<'source> Parser<'source> {
         if self.depth > MAXIMUM_NESTING {
             panic!("expression nesting deeper than {MAXIMUM_NESTING} levels");
         }
-        let expression = self.logical_or();
+        let mut expression = self.logical_or();
+        // One-line pattern test (ADR 0013 §4): `expr in pattern` is a
+        // boolean, binding its captures on a hit. Binds loosest of all.
+        if self.peek_is_keyword("in") {
+            self.position += 1; // the `in`
+            expression = Expression::MatchTest {
+                pattern: self.pattern(),
+                subject: Box::new(expression),
+            };
+        }
         self.depth -= 1;
         expression
     }

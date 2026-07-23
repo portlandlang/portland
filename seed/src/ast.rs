@@ -100,7 +100,8 @@ pub enum Pattern {
     /// fenced by no-shadow and exhaustiveness per ADR 0013 §3).
     Capture(String),
     /// A literal value to compare against: integers, strings, booleans, nil.
-    Literal(Expression),
+    /// (Boxed to break the Pattern ↔ Expression cycle.)
+    Literal(Box<Expression>),
     /// `in ^name` — compare against the variable's value instead of
     /// capturing (ADR 0013 §4).
     Pin(String),
@@ -151,6 +152,17 @@ pub enum Expression {
     },
     /// A diverging or-guard right side; only ever built there.
     Guard(GuardAction),
+    /// `expr => pattern` — match or panic; rightward destructuring
+    /// (ADR 0013 §4). Produces nil.
+    MatchAssert {
+        pattern: Pattern,
+        subject: Box<Expression>,
+    },
+    /// `expr in pattern` — a boolean test, binding captures on a hit.
+    MatchTest {
+        pattern: Pattern,
+        subject: Box<Expression>,
+    },
     HashLiteral(Vec<(Expression, Expression)>),
     If {
         condition: Box<Expression>,
