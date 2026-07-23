@@ -129,6 +129,8 @@ pub enum Expression {
         keyword_arguments: Vec<(String, Expression)>,
         name: String,
         receiver: Box<Expression>,
+        /// `&.` — an absent receiver short-circuits to nil (ADR 0008).
+        safe: bool,
     },
     /// Absence — the empty case of a maybe (ADR 0006). Not Ruby's nil: it has
     /// no methods and is not falsy; the seed panics where the real compiler

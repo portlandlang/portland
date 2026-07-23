@@ -370,12 +370,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 keyword_arguments,
                 name,
                 receiver,
+                safe,
             } => {
                 // `Name.new(...)` constructs a struct; the name is not a value.
                 if name == "new" {
                     return Some(self.construct_struct(receiver, arguments, keyword_arguments));
                 }
                 let receiver = self.value_of(receiver);
+                // `&.`: an absent receiver short-circuits — arguments never run.
+                if *safe && matches!(receiver, Value::Nil) {
+                    return Some(Value::Nil);
+                }
                 let arguments: Vec<Value> = arguments
                     .iter()
                     .map(|argument| self.value_of(argument))
@@ -2480,6 +2485,27 @@ mod tests {
             evaluate("theme = {\"a\" => 1}[\"theme\"] or \"teal\"\ntheme"),
             Some(Value::String("teal".to_string()))
         );
+    }
+
+    #[test]
+    fn safe_navigation_passes_nil_through() {
+        assert_eq!(evaluate("nil&.upcase"), Some(Value::Nil));
+        // The arguments never evaluate when the receiver is absent.
+        assert_eq!(evaluate("nil&.include?(nope())"), Some(Value::Nil));
+    }
+
+    #[test]
+    fn safe_navigation_calls_through_on_a_present_receiver() {
+        assert_eq!(
+            evaluate("\"pdx\"&.upcase"),
+            Some(Value::String("PDX".to_string()))
+        );
+    }
+
+    #[test]
+    fn safe_navigation_chains_into_the_or_guard() {
+        let source = "name = {\"a\" => \"pdx\"}[\"b\"]&.upcase or \"ROSE\"\nname";
+        assert_eq!(evaluate(source), Some(Value::String("ROSE".to_string())));
     }
 
     #[test]

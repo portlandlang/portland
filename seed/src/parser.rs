@@ -100,6 +100,7 @@ fn string_expression(text: &str) -> Expression {
                     keyword_arguments: Vec::new(),
                     name: "to_s".to_string(),
                     receiver: Box::new(inner),
+                    safe: false,
                 });
             }
             _ => literal.push(character),
@@ -764,8 +765,8 @@ impl<'source> Parser<'source> {
                     }
                     self.position += offset;
                 }
-                Some(TokenKind::Dot) => {
-                    self.position += 1; // the `.`
+                Some(kind @ (TokenKind::Dot | TokenKind::AmpersandDot)) => {
+                    self.position += 1; // the `.` or `&.`
                     let token = self.advance();
                     if token.kind != TokenKind::Identifier {
                         panic!("expected method name after dot, got {token:?}");
@@ -788,6 +789,7 @@ impl<'source> Parser<'source> {
                         keyword_arguments,
                         name: token.text.to_string(),
                         receiver: Box::new(expression),
+                        safe: kind == TokenKind::AmpersandDot,
                     };
                 }
                 Some(TokenKind::LeftBracket) => {

@@ -6,6 +6,7 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TokenKind {
     AmpersandAmpersand,
+    AmpersandDot,
     Bang,
     Colon,
     Comma,
@@ -150,6 +151,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 let next = chars.peek().map(|&(_, following)| following);
                 let (kind, length) = match (character, next) {
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
+                    ('&', Some('.')) => (TokenKind::AmpersandDot, 2),
                     ('&', _) => panic!("unexpected character '&' at byte {start}"),
                     ('|', Some('|')) => (TokenKind::PipePipe, 2),
                     ('|', _) => (TokenKind::Pipe, 1),
