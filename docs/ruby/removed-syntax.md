@@ -21,6 +21,9 @@ the one Ruby's own style guides already preferred.
   [bitwise operators](bitwise-operators.md).
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never
   learned them and nothing has missed them.
+- **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was
+  invented to replace (ADR 0017). `it` covers one parameter; names cover
+  the rest. The polyfill autocorrects `_1 → it` for free.
 
 ## Kept, to be clear
 

@@ -54,6 +54,21 @@ render config { "a" => 1 }
 (The parser peeks to shrink the menu — `{ |item| ...` can't be a hash, so
 only the two owners are offered — but never to pick a winner.)
 
+## `it` (ADR 0017 — decided, not yet built)
+
+Ruby 3.4's `it` is a soft keyword: a local or method named `it` silently
+wins over the block parameter. Portland makes `it` an ordinary binding
+under the no-shadow rule — `nodes.map { it.sexp }` just works; naming
+anything else `it` in the same reach is a rename-one compile error; `it`
+nested under a block that also uses `it` is shadowing, so it errors
+("name your parameters"); `it` alongside declared `|parameters|` errors
+(Ruby agrees). Wherever `it` compiles, it has exactly one possible
+meaning.
+
+Numbered parameters (`_1`–`_9`) are out — see
+[removed syntax](removed-syntax.md). The polyfill autocorrects `_1 → it`
+for free (both are valid Ruby today).
+
 ## Migration (brace blocks)
 
 - Community style already avoids the ambiguous form (RuboCop's

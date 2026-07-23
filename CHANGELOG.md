@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0017: `it` decided — an ordinary binding under the no-shadow rule, not Ruby's soft keyword: `{ it.sexp }` works; contesting the name anywhere in reach is a rename-one error; nested `it` is a shadow, so it errors ("name your parameters"); no mixing with `|parameters|`; wherever `it` compiles it has exactly one meaning. Numbered parameters `_1`–`_9` are out (polyfill autocorrects `_1 → it` free). Ledger: parentheses.md + removed-syntax.md. Build lands with brace blocks.
+
 - ADR 0016: brace blocks decided — `{ ... }` and `do ... end` mean exactly the same thing (Ruby's braces-bind-tight precedence guess dies); the one colliding position, a bare `{` after a paren-less command call, is a compile error naming each reading with its rewrite (up to three: hash argument, inner call's block, outer call's block — the parser peeks to shrink the menu, never to pick). Ledger: parentheses.md. Build pending; `it` and `&:symbol` deliberately undecided.
 
 - Trio, `<<` sweep: the deferred taste pass — parser.pdx and evaluator.pdx retire ~45 `X += [item]` / `text += part` appends to `<<` (ADR 0015 sugar, matching lexer.pdx). Counters keep `+=`; genuine array concatenations (`captures += sub_captures`) stay `+=` because `<<` appends exactly one element.

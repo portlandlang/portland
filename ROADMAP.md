@@ -24,6 +24,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 - ✅ **Object model, first increment** (#27): methods in struct bodies + builtin type patterns, seed + trio — and the taste payoff: the trio's AST prints itself (`node.sexp`), Token knows its kinds, guest `with` works
 - ✅ Decided: brace blocks with the whose-block never-guess error (0016) — no precedence split from `do/end`; build pending
+- ✅ Decided: `it` as a normal binding under no-shadow (0017) — nested `it` is a shadow, shadows are errors; build pending
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -35,12 +36,13 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ❌ `fetch`, force-unwrap operators, `if let`-style binding conditionals
 - ❌ Bitwise operators (tentative; named methods instead)
 - ❌ Positional `together` register
+- ❌ Numbered block parameters (`_1`–`_9`) — `it` and named parameters cover the space
 
 ## Coming ⬜
 
 ### Language surface (decide, then build)
 
-- [ ] Brace blocks (ADR 0016 — decided; build)
+- [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
 - [ ] Symbols (a real session), floats (one small division talk), ranges (three small questions)
 - [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
