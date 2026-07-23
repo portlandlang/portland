@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, optionals rung 3a: typed `||` (ADR 0007) — nil left unwraps-or-else (short-circuit, lazy right), booleans stay logical, `&&` refuses nil; the static halves (dead right sides, `Boolean?` never-guess) stay flagged as out of the seed's reach.
+
 - Seed, optionals rung 2: `nil?` and `some?` on every value (ADR 0009) — the one dispatch that works on nil; every other method on nil panics with "handle the nil case first".
 
 - Seed, optionals rung 1: the `nil` literal (ADR 0006) — lexes as a keyword, `Value::Nil`, equality across types, `p nil` renders `nil`, and `puts nil` panics as the crude preview of the future compile error.

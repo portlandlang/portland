@@ -374,14 +374,26 @@ impl<W: std::io::Write> Interpreter<W> {
                 operator,
                 right,
             } => {
-                let left = self.boolean_of(left, "&& and || operands");
-                // Short-circuit: the right side only runs when it can matter.
-                let result = match (operator, left) {
-                    (LogicalOperator::And, false) => false,
-                    (LogicalOperator::Or, true) => true,
-                    _ => self.boolean_of(right, "&& and || operands"),
-                };
-                Some(Value::Boolean(result))
+                // Typed `or` (ADR 0007): booleans get logical or; a maybe gets
+                // unwrap-or-else. Short-circuit either way — the right side
+                // only runs when it can matter. The static halves (dead right
+                // sides, the Boolean? never-guess) are out of the seed's reach.
+                let left = self.value_of(left);
+                match (operator, left) {
+                    (LogicalOperator::Or, Value::Nil) => self.expression(right),
+                    (LogicalOperator::Or, Value::Boolean(true)) => Some(Value::Boolean(true)),
+                    (LogicalOperator::Or, Value::Boolean(false)) => {
+                        Some(Value::Boolean(self.boolean_of(right, "|| operands")))
+                    }
+                    (LogicalOperator::Or, present) => Some(present),
+                    (LogicalOperator::And, Value::Boolean(false)) => Some(Value::Boolean(false)),
+                    (LogicalOperator::And, Value::Boolean(true)) => {
+                        Some(Value::Boolean(self.boolean_of(right, "&& operands")))
+                    }
+                    (LogicalOperator::And, other) => {
+                        panic!("&& needs true or false, got {other:?}")
+                    }
+                }
             }
             Expression::Unary { operand, operator } => {
                 let operand = self.value_of(operand);
@@ -1093,7 +1105,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "must be true or false")]
+    #[should_panic(expected = "&& needs true or false")]
     fn panics_on_a_non_boolean_logical_operand() {
         evaluate("1 && true");
     }
@@ -2359,6 +2371,42 @@ mod tests {
     #[should_panic(expected = "nil has no method upcase")]
     fn nil_refuses_ordinary_methods() {
         evaluate("nil.upcase");
+    }
+
+    #[test]
+    fn or_on_nil_yields_the_right_side() {
+        assert_eq!(evaluate("nil || 5"), Some(Value::Integer(5)));
+        assert_eq!(
+            evaluate("nil || \"teal\""),
+            Some(Value::String("teal".to_string()))
+        );
+        assert_eq!(evaluate("nil || nil"), Some(Value::Nil));
+    }
+
+    #[test]
+    fn or_on_a_present_value_yields_it_and_skips_the_right_side() {
+        // Real Portland flags a never-absent left as dead code at compile
+        // time; the seed's runtime can only do the unwrap-or-else half.
+        assert_eq!(evaluate("3 || 5"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("3 || nope()"), Some(Value::Integer(3)));
+    }
+
+    #[test]
+    fn or_on_booleans_stays_logical() {
+        assert_eq!(evaluate("false || true"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("true || false"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    #[should_panic(expected = "must be true or false")]
+    fn or_on_false_needs_a_boolean_right_side() {
+        evaluate("false || 5");
+    }
+
+    #[test]
+    #[should_panic(expected = "&& needs true or false")]
+    fn and_refuses_nil() {
+        evaluate("nil && true");
     }
 
     #[test]
