@@ -30,6 +30,11 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ## Coming ⬜
 
+### Tooling (next up ⬆️)
+
+- [ ] #24 — Zed language extension: `.pdx` highlighting now (reuse tree-sitter-ruby), `tree-sitter-portland` as the grammars drift
+- [ ] #25 — benchmarks: `script/bench` harness for seed/trio workloads; eventually compiled Portland vs Ruby with receipts
+
 ### Language surface (decide, then build)
 
 - [ ] #22 — the value of a branchless `if`

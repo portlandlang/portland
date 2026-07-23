@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ROADMAP.md: Tooling section (next up) — Zed extension (#24, escalated: .pdx is un-highlighted today) and benchmarks (#25).
+
 - ROADMAP.md: the one-page burn-down — done 🎉 above the line, dropped ❌, coming ⬜ below; linked from the README.
 
 - seed/tests/fixtures/optionals.pdx: the absence story as a living-documentation fixture, output pinned in the end-to-end suite.
