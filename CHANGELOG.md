@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/adr/ 0009: the presence word is `some`/`some?` — ecosystem-verified unclaimed (dry-monads precedent, with our exact meaning); ledger synced.
+
 - docs/adr/ 0008: the unwrap toolkit — flow narrowing, the or-guard, `&.` (flattening), `case/in`; deliberately no `if let` and no force-unwrap operator (`or panic "why"` is the hatch).
 
 - docs/ruby/: the Ruby → Portland difference ledger — one file per difference (nil/optionals, truthiness, word operators, mutability, metaprogramming, types, concurrency, parentheses, bitwise, removed syntax), README with the two migration promises (loud-never-silent divergence, the polyfill test).

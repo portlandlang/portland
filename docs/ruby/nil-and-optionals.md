@@ -1,8 +1,10 @@
 # nil and optionals
 
-**Status:** model and word decided ([ADR 0005](../adr/0005-2026-07-22-optionals-wrapper-model.md),
-[ADR 0006](../adr/0006-2026-07-22-absence-word-nil.md)); unwrap ergonomics
-sketched, not locked. Nothing implemented yet.
+**Status:** decided — the model ([ADR 0005](../adr/0005-2026-07-22-optionals-wrapper-model.md)),
+both words ([ADR 0006](../adr/0006-2026-07-22-absence-word-nil.md),
+[ADR 0009](../adr/0009-2026-07-22-presence-word-some.md)), and the unwrap
+toolkit ([ADR 0008](../adr/0008-2026-07-22-unwrap-toolkit.md)). Nothing
+implemented yet.
 
 ## Ruby
 
@@ -60,6 +62,8 @@ not reproduced.)
   polyfill covers the whole unnested surface and the linter flags nested
   sites as fix-at-flip-time.
 
-Still open: the partner word for presence (`some?`-shaped; must be
-unclaimed across Ruby core, Rails, and major gems so the polyfill can
-define it — `present?` is disqualified).
+The presence partner is **`some`** / **`some?`** (ADR 0009) — unclaimed in
+Ruby core, Rails, and Hanami; precedented with exactly this meaning by
+dry-monads' `Maybe#some?`. Auto-wrapping means `some(x)` is written only
+in the rare nested case (`some(nil)`: present-but-absent-inside), where a
+bare `nil` would be a never-guess error.

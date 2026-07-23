@@ -1,7 +1,8 @@
 # Truthiness
 
 **Status:** locked by the design brief (strict booleans follow from no
-ambient nil); the rewrites below ride on the sketched unwrap ergonomics.
+ambient nil); the rewrites below are the decided unwrap toolkit
+([ADR 0008](../adr/0008-2026-07-22-unwrap-toolkit.md)).
 
 ## Ruby
 
@@ -18,7 +19,7 @@ suggests the rewrite. What it becomes depends on what the Ruby line meant:
 
 ```ruby
 # "do this only if it's there" — predicate + narrowing
-if user.some?                    # partner word pending; user narrows inside
+if user.some?                    # user narrows to a plain User inside
   greet(user)
 end
 
