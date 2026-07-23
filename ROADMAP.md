@@ -40,8 +40,8 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
 - [ ] Symbols, floats (one small division talk), ranges (build)
-- [ ] Object model — methods in struct bodies first, the full session later (issue to open)
-- [ ] Error handling — exceptions vs typed results (issue to open)
+- [ ] #27 — the object model: methods in struct bodies first (incl. type predicates), the full session later
+- [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first
 - [ ] #14 — compile-time macros
 

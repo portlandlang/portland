@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ROADMAP: the two missing design issues opened — #27 object model (struct-methods increment first, type predicates included) and #28 error handling (exceptions vs typed results, `!` decided with it).
+
 - Accumulator retirement: lexer.pdx and mini_lexer.pdx speak `<<` (`text << character`, `tokens << Token.new(...)`); STAGE0's variables section became the bindings section; ledger and ROADMAP record #10 complete.
 
 - Trio: `<<` and `[]=` threaded (AppendNode/IndexUpdateNode, sexps, evaluator handlers) — and the sugar retires the pair-list era: evaluate_hash builds **host hashes** with `built[key] = value`, so guest hash indexing, `p hash`, and hash `each` all match the seed byte-identically; trio `[]=` is hash-only for now (array index assignment waits for type predicates); differential pinned.
