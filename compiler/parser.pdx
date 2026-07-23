@@ -875,11 +875,11 @@ def parse_statement_with_guard(tokens, position)
   step = parse_statement(tokens, position)
   if keyword_at?(tokens, step.position, %w[if])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: if_node(condition.node, [step.node], []), position: condition.position)
+    return Step.new(node: if_node(condition.node, [step.node], nil), position: condition.position)
   end
   if keyword_at?(tokens, step.position, %w[unless])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: if_node(condition.node, [], [step.node]), position: condition.position)
+    return Step.new(node: if_node(condition.node, nil, [step.node]), position: condition.position)
   end
   step
 end
@@ -988,7 +988,9 @@ def parse_if(tokens, position)
     return Step.new(node: error_node("expected end to close if"), position: else_body.position)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: if_node(condition.node, then_body.node, []), position: position + 1)
+    # Exhibit B, resolved: an absent else is nil — no longer conflated
+    # with a present, empty else.
+    return Step.new(node: if_node(condition.node, then_body.node, nil), position: position + 1)
   end
   Step.new(node: error_node("expected end to close if"), position: position)
 end
@@ -1007,7 +1009,7 @@ def parse_unless(tokens, position)
     return Step.new(node: error_node("expected end to close unless"), position: position)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: if_node(condition.node, [], body.node), position: position + 1)
+    return Step.new(node: if_node(condition.node, nil, body.node), position: position + 1)
   end
   Step.new(node: error_node("expected end to close unless"), position: position)
 end
@@ -1056,7 +1058,7 @@ def parse_case(tokens, position)
     return Step.new(node: error_node("expected end to close case"), position: position)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: case_node(subject.node, branches, []), position: position + 1)
+    return Step.new(node: case_node(subject.node, branches, nil), position: position + 1)
   end
   Step.new(node: error_node("expected end to close case"), position: position)
 end
@@ -1113,9 +1115,14 @@ def def_sexp(node)
   result + ")"
 end
 
+def branch_sexp(head, body)
+  return "(#{head})" if body.nil?
+  headed_sexp(head, body)
+end
+
 def if_sexp(node)
-  result = "(if #{sexp(node.condition)} #{headed_sexp("then", node.then_body)}"
-  result += " #{headed_sexp("else", node.else_body)}" unless node.else_body.empty?
+  result = "(if #{sexp(node.condition)} #{branch_sexp("then", node.then_body)}"
+  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
   result + ")"
 end
 
@@ -1124,7 +1131,7 @@ def case_sexp(node)
   node.branches.each do |branch|
     result += " #{headed_sexp("when #{sexp_list(branch.values)}", branch.body)}"
   end
-  result += " #{headed_sexp("else", node.else_body)}" unless node.else_body.empty?
+  result += " #{headed_sexp("else", node.else_body)}" if node.else_body.some?
   result + ")"
 end
 

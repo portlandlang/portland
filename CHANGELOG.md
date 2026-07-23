@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, optionals rung 6 (#21): Exhibit B resolved — an absent `else` (and `case` else, and the empty half of a postfix-guard desugar) is nil, distinct from a present empty one; absent branches produce no value in the evaluator.
+
 - Trio, optionals rung 5 (#21): Exhibit C resolved — a method call's block is nil or a BlockNode, no longer a zero-or-one array; the evaluator asks `node.block.some?`.
 
 - Trio, optionals rung 4 (#21): Exhibit A resolved — `ReturnBareNode` is gone; bare `return` is a `ReturnNode` whose value is nil, exactly the shape the Rust seed always had. Seed fix along the way: the maybe predicates fall through struct field access like `to_s` does.

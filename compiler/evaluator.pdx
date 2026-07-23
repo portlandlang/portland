@@ -106,11 +106,14 @@ end
 
 def evaluate_if(node, bindings)
   condition = evaluate_expression(node.condition, bindings)
-  if condition.value.first
-    run_body(node.then_body, condition.bindings)
+  body = if slot_value(condition.value)
+    node.then_body
   else
-    run_body(node.else_body, condition.bindings)
+    node.else_body
   end
+  # An absent branch (Exhibit B: nil, not an empty list) produces no value.
+  return outcome([], condition.bindings) if body.nil?
+  run_body(body, condition.bindings)
 end
 
 def evaluate_case(node, bindings)
@@ -128,6 +131,7 @@ def evaluate_case(node, bindings)
     end
     branch_index += 1
   end
+  return outcome([], bindings) if node.else_body.nil?
   run_body(node.else_body, bindings)
 end
 
