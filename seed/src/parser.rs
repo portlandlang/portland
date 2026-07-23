@@ -515,14 +515,61 @@ impl<'source> Parser<'source> {
                 other => panic!("unexpected keyword {other:?} in a pattern"),
             },
             TokenKind::Identifier => {
-                let name = token.text;
+                let name = token.text.to_string();
                 if name.starts_with(|character: char| character.is_ascii_uppercase()) {
-                    panic!("struct patterns aren't built yet — coming in a later rung");
+                    return self.struct_pattern(name);
                 }
-                Pattern::Capture(name.to_string())
+                Pattern::Capture(name)
             }
             other => panic!("unsupported pattern starting with {other:?}"),
         }
+    }
+
+    /// `Name(field: pattern, other:)` — keyword-only (ADR 0013 §5); a bare
+    /// `Name` with no parens matches by type alone.
+    fn struct_pattern(&mut self, name: String) -> Pattern {
+        if self.peek_kind() != Some(TokenKind::LeftParen) {
+            return Pattern::Struct {
+                fields: Vec::new(),
+                name,
+            };
+        }
+        self.position += 1; // the `(`
+        let mut fields: Vec<(String, Option<Pattern>)> = Vec::new();
+        if self.peek_kind() != Some(TokenKind::RightParen) {
+            loop {
+                let label_token = self.advance();
+                if label_token.kind != TokenKind::Identifier
+                    || self.peek_kind() != Some(TokenKind::Colon)
+                {
+                    panic!(
+                        "struct patterns are keyword-only — write {name}(field: pattern) or {name}(field:)"
+                    );
+                }
+                let label = label_token.text.to_string();
+                self.position += 1; // the `:`
+                if fields.iter().any(|(existing, _)| *existing == label) {
+                    panic!("duplicate field {label} in a struct pattern");
+                }
+                let sub_pattern = match self.peek_kind() {
+                    Some(TokenKind::Comma | TokenKind::RightParen) => None,
+                    _ => Some(self.pattern()),
+                };
+                fields.push((label, sub_pattern));
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
+            }
+        }
+        if self.peek_kind() != Some(TokenKind::RightParen) {
+            panic!(
+                "expected closing paren in struct pattern {name}, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1; // the `)`
+        Pattern::Struct { fields, name }
     }
 
     /// `unless c ... else ... end`, desugared to an `if` with swapped branches.

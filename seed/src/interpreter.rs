@@ -962,6 +962,38 @@ impl<W: std::io::Write> Interpreter<W> {
                     None
                 }
             }
+            Pattern::Struct {
+                fields: pattern_fields,
+                name,
+            } => {
+                let Value::Struct {
+                    fields,
+                    name: struct_name,
+                } = subject
+                else {
+                    return None;
+                };
+                if struct_name != name {
+                    return None;
+                }
+                let mut captures = Vec::new();
+                for (label, sub_pattern) in pattern_fields {
+                    let value = fields
+                        .iter()
+                        .find(|(field, _)| field == label)
+                        .unwrap_or_else(|| panic!("{name} has no field {label}"))
+                        .1
+                        .clone();
+                    match sub_pattern {
+                        // `field:` shorthand binds under the field's name.
+                        None => captures.push((label.clone(), value)),
+                        Some(sub_pattern) => {
+                            captures.extend(self.match_pattern(sub_pattern, &value)?)
+                        }
+                    }
+                }
+                Some(captures)
+            }
         }
     }
 
@@ -2827,6 +2859,57 @@ mod tests {
     #[should_panic(expected = "shadows method")]
     fn case_in_captures_obey_no_shadow() {
         evaluate("def taken\n  1\nend\ncase 5\nin taken then taken\nend\n");
+    }
+
+    const NODE_STRUCTS: &str = "struct ReturnNode\n  value\nend\nstruct BreakNode\n  label\nend\n";
+
+    #[test]
+    fn case_in_struct_patterns_match_by_type() {
+        let source = format!(
+            "{NODE_STRUCTS}node = BreakNode.new(label: \"b\")\ncase node\nin ReturnNode then \"return\"\nin BreakNode then \"break\"\nend\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::String("break".to_string())));
+    }
+
+    #[test]
+    fn case_in_struct_patterns_refine_by_field_value() {
+        let source = format!(
+            "{NODE_STRUCTS}node = ReturnNode.new(value: nil)\ncase node\nin ReturnNode(value: nil) then \"(return)\"\nin ReturnNode(value:) then value\nend\n"
+        );
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("(return)".to_string()))
+        );
+    }
+
+    #[test]
+    fn case_in_struct_patterns_bind_fields_shorthand_and_named() {
+        let source = format!(
+            "{NODE_STRUCTS}node = ReturnNode.new(value: 5)\ncase node\nin ReturnNode(value: nil) then \"(return)\"\nin ReturnNode(value:) then value + 1\nend\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Integer(6)));
+        let source = format!(
+            "{NODE_STRUCTS}node = ReturnNode.new(value: 5)\ncase node\nin ReturnNode(value: held) then held * 2\nend\n"
+        );
+        assert_eq!(evaluate(&source), Some(Value::Integer(10)));
+    }
+
+    #[test]
+    #[should_panic(expected = "no pattern matched")]
+    fn case_in_struct_patterns_miss_on_wrong_type() {
+        let source = format!(
+            "{NODE_STRUCTS}node = BreakNode.new(label: \"b\")\ncase node\nin ReturnNode then \"return\"\nend\n"
+        );
+        evaluate(&source);
+    }
+
+    #[test]
+    #[should_panic(expected = "keyword-only")]
+    fn case_in_struct_patterns_reject_positional_fields() {
+        let source = format!(
+            "{NODE_STRUCTS}case ReturnNode.new(value: 1)\nin ReturnNode(5) then \"no\"\nend\n"
+        );
+        evaluate(&source);
     }
 
     #[test]

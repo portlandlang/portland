@@ -94,6 +94,14 @@ pub enum Pattern {
     Capture(String),
     /// A literal value to compare against: integers, strings, booleans, nil.
     Literal(Expression),
+    /// `in ReturnNode(value: nil)` — match by struct type, refine or bind by
+    /// field. Keyword-only (ADR 0013 §5); a field with no sub-pattern binds
+    /// under its own name (`in Token(kind:)` binds `kind`). Bare
+    /// `in BreakNode` is a type-only match (empty fields).
+    Struct {
+        fields: Vec<(String, Option<Pattern>)>,
+        name: String,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
