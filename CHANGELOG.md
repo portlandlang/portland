@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accumulator retirement: lexer.pdx and mini_lexer.pdx speak `<<` (`text << character`, `tokens << Token.new(...)`); STAGE0's variables section became the bindings section; ledger and ROADMAP record #10 complete.
+
 - Trio: `<<` and `[]=` threaded (AppendNode/IndexUpdateNode, sexps, evaluator handlers) — and the sugar retires the pair-list era: evaluate_hash builds **host hashes** with `built[key] = value`, so guest hash indexing, `p hash`, and hash `each` all match the seed byte-identically; trio `[]=` is hash-only for now (array index assignment waits for type predicates); differential pinned.
 
 - Seed: `<<` and `[]=` as rebinding sugar (ADR 0015 §2) — `line << word` concatenates strings and appends one array element; `hash[k] = v` / `array[i] = v` are functional updates rebound on the name (arrays replace in range or append at the end); both gate on `mutable` and cannot spook aliases (tested). Statement position only; `<<` enters the lexer append-only.

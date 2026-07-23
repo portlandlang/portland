@@ -18,6 +18,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ Evidence engine: the [ruby_research](https://github.com/portlandlang/ruby_research) corpus reports
 - ✅ **`case/in` built** (#26, ADR 0013) — the full runtime pattern surface in seed + trio, and the evaluator dispatches on its own AST with struct patterns
 - ✅ Keyword arguments, Ruby 3 style (ADR 0014) — built in seed + trio; splats deferred
+- ✅ **Mutability, complete** (#10, ADRs 0001 + 0015): values never mutate, names do; `mutable` enforced everywhere (parameters, closures, loop scopes); `<<`/`[]=` as alias-proof rebinding sugar; guest hashes became host hashes
 - ✅ `case/in` specced (#20, ADR 0013): compile-checked exhaustiveness, static `===`, fenced captures, keyword-only struct patterns
 - ✅ A branch that doesn't happen is nil (#22, ADR 0012) — branchless `if`, finished `while`, broken-out calls; built in seed + trio
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
@@ -39,7 +40,6 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
 - [ ] Symbols, floats (one small division talk), ranges (build)
-- [ ] #10 — mutable values and `<<` append
 - [ ] Object model — methods in struct bodies first, the full session later (issue to open)
 - [ ] Error handling — exceptions vs typed results (issue to open)
 - [ ] #11 — `together` semantics, serial implementation first

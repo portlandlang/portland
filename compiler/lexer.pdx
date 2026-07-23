@@ -42,12 +42,12 @@ def read_simple_string(characters, start, quote)
   while index < characters.length
     character = characters[index]
     if character == "\\"
-      text += character
-      text += characters[index + 1] if index + 1 < characters.length
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
       index += 2
       next
     end
-    text += character
+    text << character
     index += 1
     return text if character == quote
   end
@@ -67,11 +67,11 @@ def read_interpolation(characters, start)
       depth -= 1
     elsif character == "\""
       nested = read_simple_string(characters, index, "\"")
-      text += nested
+      text << nested
       index += nested.length
       next
     end
-    text += character
+    text << character
     index += 1
   end
   text
@@ -84,18 +84,18 @@ def read_double_quoted(characters, start)
   while index < characters.length
     character = characters[index]
     if character == "\\"
-      text += character
-      text += characters[index + 1] if index + 1 < characters.length
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
       index += 2
       next
     end
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
       inner = read_interpolation(characters, index)
-      text += inner
+      text << inner
       index += inner.length
       next
     end
-    text += character
+    text << character
     index += 1
     return text if character == "\""
   end
@@ -107,7 +107,7 @@ def read_word_array(characters, start)
   mutable index = start + 3
   while index < characters.length
     character = characters[index]
-    text += character
+    text << character
     index += 1
     return text if character == "]"
   end
@@ -134,47 +134,47 @@ def lex(source)
       next
     end
     if character == "\n"
-      tokens += [Token.new(kind: "newline", text: "", leading_space: leading)]
+      tokens << Token.new(kind: "newline", text: "", leading_space: leading)
       index += 1
       next
     end
     if character == "\""
       text = read_double_quoted(characters, index)
-      tokens += [Token.new(kind: "string", text: text, leading_space: leading)]
+      tokens << Token.new(kind: "string", text: text, leading_space: leading)
       index += text.length
       next
     end
     if character == "'"
       text = read_simple_string(characters, index, "'")
-      tokens += [Token.new(kind: "string", text: text, leading_space: leading)]
+      tokens << Token.new(kind: "string", text: text, leading_space: leading)
       index += text.length
       next
     end
     if character == "%" && index + 2 < characters.length && characters[index + 1] == "w" && characters[index + 2] == "["
       text = read_word_array(characters, index)
-      tokens += [Token.new(kind: "word_array", text: text, leading_space: leading)]
+      tokens << Token.new(kind: "word_array", text: text, leading_space: leading)
       index += text.length
       next
     end
     if digit?(character)
       mutable text = ""
       while index < characters.length && digit?(characters[index])
-        text += characters[index]
+        text << characters[index]
         index += 1
       end
-      tokens += [Token.new(kind: "integer", text: text, leading_space: leading)]
+      tokens << Token.new(kind: "integer", text: text, leading_space: leading)
       next
     end
     if name_start?(character)
       mutable text = ""
       while index < characters.length && name_character?(characters[index])
-        text += characters[index]
+        text << characters[index]
         index += 1
       end
       if index < characters.length && (characters[index] == "?" || characters[index] == "!")
         followed_by_equal = index + 1 < characters.length && characters[index + 1] == "="
         unless followed_by_equal
-          text += characters[index]
+          text << characters[index]
           index += 1
         end
       end
@@ -183,20 +183,20 @@ def lex(source)
       else
         "identifier"
       end
-      tokens += [Token.new(kind: kind, text: text, leading_space: leading)]
+      tokens << Token.new(kind: kind, text: text, leading_space: leading)
       next
     end
     if index + 1 < characters.length && two_character_operator?(character + characters[index + 1])
-      tokens += [Token.new(kind: "operator", text: character + characters[index + 1], leading_space: leading)]
+      tokens << Token.new(kind: "operator", text: character + characters[index + 1], leading_space: leading)
       index += 2
       next
     end
     if one_character_operator?(character)
-      tokens += [Token.new(kind: "operator", text: character, leading_space: leading)]
+      tokens << Token.new(kind: "operator", text: character, leading_space: leading)
       index += 1
       next
     end
-    tokens += [Token.new(kind: "error", text: character, leading_space: leading)]
+    tokens << Token.new(kind: "error", text: character, leading_space: leading)
     index += 1
   end
   tokens

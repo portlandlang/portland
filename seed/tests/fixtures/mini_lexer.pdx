@@ -24,25 +24,25 @@ def lex(source)
       next
     end
     if punctuation?(character)
-      tokens += [Token.new(kind: "punctuation", text: character)]
+      tokens << Token.new(kind: "punctuation", text: character)
       index += 1
       next
     end
     if digit?(character)
       mutable text = ""
       while index < source.length && digit?(source[index])
-        text += source[index]
+        text << source[index]
         index += 1
       end
-      tokens += [Token.new(kind: "integer", text: text)]
+      tokens << Token.new(kind: "integer", text: text)
       next
     end
     mutable text = ""
     while index < source.length && source[index] != " " && !punctuation?(source[index])
-      text += source[index]
+      text << source[index]
       index += 1
     end
-    tokens += [Token.new(kind: "identifier", text: text)]
+    tokens << Token.new(kind: "identifier", text: text)
   end
   tokens
 end

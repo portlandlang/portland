@@ -40,8 +40,18 @@ the tests are the spec until a real one exists.
   errors, `Boolean?` never-guess, dead right sides) is structurally out of
   a tree-walker's reach — those panic at runtime here and refuse at
   compile time in real Portland.
-- **Variables** — bare assignment `x = 1`, reassignment allowed, compound
-  assignment (`+= -= *= /= %=`). No declarations.
+- **Bindings** (ADRs 0001 + 0015, enforced) — bare assignment `x = 1`
+  creates an *immutable* binding; `mutable x = 1` declares the one
+  rebindable kind of name, fused to its first assignment. Compound
+  assignment (`+= -= *= /= %=`), the rebinding append (`line << word` —
+  strings concatenate, arrays gain one element), and index assignment
+  (`hash[k] = v` / `array[i] = v`, functional updates rebound on the
+  name) all gate on `mutable` and cannot spook aliases. Parameters are
+  binding sites too: `def f(mutable position)`. Closure rules: blocks
+  rebind outer mutables (the accumulator pattern), refuse outer
+  immutables with the fix named, and their fresh locals die at `end` —
+  and loop iterations are fresh scopes for their own locals, the same
+  rule applied to `while`.
 - **Control** — `if` / `elsif` / `else` / `end` (an *expression*, per the
   expression-orientation principle), `unless`, `case/when` (equality matching,
   aligned `when x then y` one-liners), `while ... end`, and postfix guards
@@ -125,8 +135,9 @@ the tests are the spec until a real one exists.
 - Classes/objects, modules, constants; methods inside `struct` bodies.
 - Splats (`*args`, `**kwargs`) — deferred, ADR 0014.
 - `together` / concurrency (#11), macros (#14).
-- Mutating methods (`push`, `upcase!`) — mutable-values semantics are
-  #10; the seed stays read-only rather than prejudging them.
+- Mutating methods (`push`, `upcase!`) — permanently, by design: values
+  never mutate; names do (ADR 0015). `<<` and `[]=` are rebinding sugar,
+  not mutation.
 - Hash patterns and the find pattern (`in [*, x, *]`) — deferred (ADR 0013).
 - Command calls nested in expressions (`x = foo bar`) — statement position only.
 - Types — the seed is dynamically checked at runtime; inference is the real
