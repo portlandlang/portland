@@ -77,7 +77,7 @@ the tests are the spec until a real one exists.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops *and blocks*; `break` and
   `next` control the enclosing `while` or block iteration. A call broken out
-  of produces no value (where Ruby would say nil).
+  of produces nil (ADR 0012).
 - **Blocks** — `do |item| ... end` on `each` (arrays, and hashes with
   `|key, value|`), `each_with_index`, `map`, `select`, `reject`,
   `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures over the
@@ -141,7 +141,9 @@ actual compiler, not the seed.
 ## Where nil would have been
 
 Ruby returns `nil` from: `if` with no taken branch, `puts`, out-of-range
-index, `first`/`last` on empty. The last two now genuinely return Portland's
-`nil` (ADR 0010). The first two still produce *nothing* (an expression with
-no value) — the value of a branchless `if` and of a broken-out-of call is an
-explicitly undecided design question, noted in ADR 0010.
+index, `first`/`last` on empty. All but `puts` now genuinely return
+Portland's `nil` — lookups by ADR 0010, branchless `if`/finished
+`while`/broken-out calls by ADR 0012. `puts` alone still produces
+*nothing*: it could never have had an answer, so using its result stays an
+error (ADR 0012's dividing rule). The ledger this section tracked is
+closed.

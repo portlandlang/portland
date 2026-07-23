@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0012 (#22): a branch that doesn't happen produces nil — branchless `if`, finished `while`, and broken-out calls are maybes (Ruby-match, typed); `puts` stays valueless by the could-it-ever rule. Built in seed + trio, differentially pinned; STAGE0's "where nil would have been" ledger closes.
+
 - ROADMAP.md: Zed v0 above the line — zed-portland shipped and verified; #24's remainder is the grammar fork and registry.
 
 - ROADMAP.md: Tooling section (next up) — Zed extension (#24, escalated: .pdx is un-highlighted today) and benchmarks (#25).

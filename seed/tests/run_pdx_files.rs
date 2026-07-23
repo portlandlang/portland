@@ -436,6 +436,14 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_branchless_branches() {
+    assert_evaluator_matches_seed(
+        "evaluator_branchless.pdx",
+        "x = if false\n  5\nend\np x\ny = if true\nelse\n  5\nend\np y\ngreeting = if false\n  \"gm\"\nend\nputs greeting or \"hello\"\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.

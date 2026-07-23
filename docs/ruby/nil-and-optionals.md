@@ -46,6 +46,12 @@ end
 user = find_user(id) or return   # bind-or-bail; user is a plain User below
 ```
 
+A branch that doesn't happen is also nil (ADR 0012, Ruby's rule, typed):
+a branchless `if` whose condition is false, a finished `while`, and a
+call ended by `break` all produce maybes. The dividing rule: could the
+expression have produced a value? Then the absence of one is nil. Could
+it never (`puts`)? Then using it is a compile error.
+
 Absent is not empty: `""` and `[]` are *present* values with nothing in
 them. `empty?` answers emptiness, `nil?` answers absence, never each
 other's question. (Rails' `blank?`/`present?` conflation is deliberately

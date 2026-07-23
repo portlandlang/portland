@@ -101,7 +101,8 @@ def evaluate_while(node, bindings)
     break if body.signal == "break"
     return signal_outcome("return", body.value, bindings) if body.signal == "return"
   end
-  outcome([], bindings)
+  # A finished while is nil, always (ADR 0012).
+  outcome([nil], bindings)
 end
 
 def evaluate_if(node, bindings)
@@ -111,8 +112,8 @@ def evaluate_if(node, bindings)
   else
     node.else_body
   end
-  # An absent branch (Exhibit B: nil, not an empty list) produces no value.
-  return outcome([], condition.bindings) if body.nil?
+  # A branch that doesn't happen produces nil (ADR 0012).
+  return outcome([nil], condition.bindings) if body.nil?
   run_body(body, condition.bindings)
 end
 

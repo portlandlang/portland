@@ -176,10 +176,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         Some(Pending::Next) => self.pending = None,
                         // A return keeps unwinding to the enclosing method.
-                        Some(Pending::Return(_)) => break,
+                        Some(Pending::Return(_)) => return None,
                     }
                 }
-                None
+                // A finished while is nil, always (ADR 0012, Ruby's rule).
+                Some(Value::Nil)
             }
         }
     }
@@ -289,6 +290,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     panic!("if condition must be true or false, got {condition:?}")
                 };
                 let body = if condition { then_body } else { else_body };
+                if body.is_empty() {
+                    // A branch that doesn't happen produces nil (ADR 0012).
+                    return Some(Value::Nil);
+                }
                 self.run_body(body)
             }
             Expression::Integer(value) => Some(Value::Integer(*value)),
@@ -845,14 +850,14 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// After a block ran: `Some(outcome)` when the iteration must stop now.
-    /// A `break` is consumed here and the call produces no value (Ruby's nil);
+    /// A `break` is consumed here and the call produces nil (ADR 0012);
     /// a `return` stays pending and unwinds to the enclosing method.
     fn block_interrupt(&mut self) -> Option<Option<Value>> {
         match self.pending {
             None => None,
             Some(Pending::Break) => {
                 self.pending = None;
-                Some(None)
+                Some(Some(Value::Nil))
             }
             _ => Some(None),
         }
@@ -1275,8 +1280,11 @@ mod tests {
     }
 
     #[test]
-    fn a_broken_call_produces_no_value() {
-        assert_eq!(evaluate("[1, 2].each do |number|\n  break\nend\n"), None);
+    fn a_broken_call_produces_nil() {
+        assert_eq!(
+            evaluate("[1, 2].each do |number|\n  break\nend\n"),
+            Some(Value::Nil)
+        );
     }
 
     #[test]
@@ -1308,7 +1316,7 @@ mod tests {
     #[test]
     fn break_stops_select() {
         let source = "[1, 2, 3].select do |number|\n  break\n  true\nend\n";
-        assert_eq!(evaluate(source), None);
+        assert_eq!(evaluate(source), Some(Value::Nil));
     }
 
     #[test]
@@ -2030,8 +2038,8 @@ mod tests {
     }
 
     #[test]
-    fn if_without_else_produces_nothing_when_false() {
-        assert_eq!(evaluate("if false\n  1\nend\n"), None);
+    fn if_without_else_produces_nil_when_false() {
+        assert_eq!(evaluate("if false\n  1\nend\n"), Some(Value::Nil));
     }
 
     #[test]
@@ -2603,6 +2611,37 @@ mod tests {
     #[test]
     fn p_renders_the_nested_case() {
         assert_eq!(output_of("p(some(nil))"), "some(nil)\n");
+    }
+
+    #[test]
+    fn branchless_if_produces_nil() {
+        assert_eq!(evaluate("if false\n  5\nend"), Some(Value::Nil));
+        assert_eq!(evaluate("x = if false\n  5\nend\nx"), Some(Value::Nil));
+        assert_eq!(evaluate("if true\n  5\nend"), Some(Value::Integer(5)));
+        // An else that exists but is empty is the same absence of an answer.
+        assert_eq!(evaluate("if true\nelse\n  5\nend"), Some(Value::Nil));
+    }
+
+    #[test]
+    fn branchless_if_composes_with_the_or_guard() {
+        assert_eq!(
+            evaluate("greeting = if false\n  \"gm\"\nend\ngreeting or \"hello\""),
+            Some(Value::String("hello".to_string()))
+        );
+    }
+
+    #[test]
+    fn while_produces_nil() {
+        assert_eq!(
+            evaluate("n = 0\nwhile n < 3\n  n += 1\nend"),
+            Some(Value::Nil)
+        );
+    }
+
+    #[test]
+    fn a_broken_out_call_produces_nil() {
+        let source = "found = [1, 2, 3].each do |number|\n  break\nend\nfound";
+        assert_eq!(evaluate(source), Some(Value::Nil));
     }
 
     #[test]
