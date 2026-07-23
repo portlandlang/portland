@@ -16,6 +16,10 @@ pub enum Value {
     /// falsy — the seed enforces both with runtime panics where the real
     /// compiler will refuse to build.
     Nil,
+    /// The nested case of the wrapper (ADR 0005): only ever wraps Nil or
+    /// another Some — a plain present value is never boxed (`some(5)` is
+    /// `5`). Built by `Value::present`; keeps `[nil].first` ≠ `[].first`.
+    Some(Box<Value>),
     String(String),
     /// Immutable named record; fields stay in definition order.
     Struct {
@@ -31,6 +35,16 @@ impl Value {
 
     pub fn hash(pairs: Vec<(Value, Value)>) -> Value {
         Value::Hash(std::rc::Rc::new(pairs))
+    }
+
+    /// Lift a found value out of a successful partial lookup: plain values
+    /// pass through untouched; only nil (and nested wrappers) gain a box,
+    /// so presence-of-absence stays distinguishable from absence.
+    pub fn present(value: Value) -> Value {
+        match value {
+            Value::Nil | Value::Some(_) => Value::Some(Box::new(value)),
+            other => other,
+        }
     }
 
     /// The developer-facing rendering: strings keep their quotes, like irb.
@@ -50,6 +64,7 @@ impl Value {
             }
             Value::Integer(value) => value.to_string(),
             Value::Nil => "nil".to_string(),
+            Value::Some(inner) => format!("some({})", inner.inspect()),
             Value::String(value) => format!("{value:?}"),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
@@ -88,6 +103,7 @@ impl fmt::Display for Value {
             }
             Value::Integer(value) => write!(formatter, "{value}"),
             Value::Nil => write!(formatter, "nil"),
+            Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),
             Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
         }

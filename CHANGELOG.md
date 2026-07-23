@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed, optionals rung 6: `some(x)` and the nested case (ADR 0005/0009) — identity on plain values, a real box only around nil/Some; lookups lift found values with it, so `[nil].first` ≠ `[].first` and a stored hash nil beats the or-guard default (fetch semantics, ADR 0010).
+
 - Seed, optionals rung 5: safe navigation `&.` (ADR 0008) — an absent receiver short-circuits to nil without evaluating arguments; chains compose with the or-guard (`hash["key"]&.upcase or "ROSE"`).
 
 - Seed, optionals rung 4: the panic frontier flips (ADR 0010) — `[].first`/`last`/`min`/`max`, out-of-range array and string indexing, and missing hash keys return nil instead of panicking; lookups compose with the or-guard (`config["theme"] or "teal"`).

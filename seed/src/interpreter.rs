@@ -257,7 +257,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         if position < 0 || position >= length {
                             return Some(Value::Nil);
                         }
-                        Some(elements[position as usize].clone())
+                        Some(Value::present(elements[position as usize].clone()))
                     }
                     (Value::String(text), Value::Integer(index)) => {
                         // Indexing a string yields a one-character string.
@@ -273,7 +273,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         pairs
                             .iter()
                             .find(|(existing, _)| existing == key)
-                            .map_or(Value::Nil, |(_, value)| value.clone()),
+                            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
                     ),
                     _ => panic!("cannot index {receiver:?} with {index:?}"),
                 }
@@ -403,6 +403,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 let left = self.value_of(left);
                 match (operator, left) {
                     (LogicalOperator::Or, Value::Nil) => self.expression(right),
+                    // Present-but-wrapped: unwrap one layer — a stored nil
+                    // beats the default, exactly fetch's rule (ADR 0010).
+                    (LogicalOperator::Or, Value::Some(inner)) => Some(*inner),
                     (LogicalOperator::Or, Value::Boolean(true)) => Some(Value::Boolean(true)),
                     (LogicalOperator::Or, Value::Boolean(false)) => {
                         Some(Value::Boolean(self.boolean_of(right, "|| operands")))
@@ -685,7 +688,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
             (Value::Array(elements), "first", []) => {
-                elements.first().cloned().unwrap_or(Value::Nil)
+                elements.first().cloned().map_or(Value::Nil, Value::present)
             }
             (Value::Array(elements), "join", [Value::String(separator)]) => Value::String(
                 elements
@@ -694,7 +697,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect::<Vec<_>>()
                     .join(separator),
             ),
-            (Value::Array(elements), "last", []) => elements.last().cloned().unwrap_or(Value::Nil),
+            (Value::Array(elements), "last", []) => {
+                elements.last().cloned().map_or(Value::Nil, Value::present)
+            }
             (Value::Array(elements), "length", []) => Value::Integer(elements.len() as i64),
             (Value::Hash(pairs), "empty?", []) => Value::Boolean(pairs.is_empty()),
             (Value::Hash(pairs), "key?", [key]) => {
@@ -787,7 +792,14 @@ impl<W: std::io::Write> Interpreter<W> {
     fn builtin_name(name: &str) -> bool {
         matches!(
             name,
-            "argv" | "p" | "panic" | "puts" | "read_file" | "require_relative" | "write_file"
+            "argv"
+                | "p"
+                | "panic"
+                | "puts"
+                | "read_file"
+                | "require_relative"
+                | "some"
+                | "write_file"
         )
     }
 
@@ -911,6 +923,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 writeln!(self.output, "{argument}").expect("failed to write output");
             }
             return None;
+        }
+        if !self.methods.contains_key(name) && name == "some" {
+            let mut arguments = arguments;
+            match arguments.len() {
+                1 => return Some(Value::present(arguments.remove(0))),
+                other => panic!("some takes one argument, got {other}"),
+            }
         }
         if !self.methods.contains_key(name) && name == "panic" {
             // The only crash is one you typed (ADR 0010).
@@ -2506,6 +2525,73 @@ mod tests {
     fn safe_navigation_chains_into_the_or_guard() {
         let source = "name = {\"a\" => \"pdx\"}[\"b\"]&.upcase or \"ROSE\"\nname";
         assert_eq!(evaluate(source), Some(Value::String("ROSE".to_string())));
+    }
+
+    #[test]
+    fn some_is_identity_on_plain_present_values() {
+        // Never ceremonial (ADR 0005): wrapping a plain value is a no-op.
+        assert_eq!(evaluate("some(5)"), Some(Value::Integer(5)));
+        assert_eq!(
+            evaluate("some(\"pdx\")"),
+            Some(Value::String("pdx".to_string()))
+        );
+    }
+
+    #[test]
+    fn some_wraps_only_where_nesting_is_load_bearing() {
+        assert_eq!(
+            evaluate("some(nil)"),
+            Some(Value::Some(Box::new(Value::Nil)))
+        );
+        assert_eq!(
+            evaluate("some(some(nil))"),
+            Some(Value::Some(Box::new(Value::Some(Box::new(Value::Nil)))))
+        );
+    }
+
+    #[test]
+    fn first_distinguishes_empty_from_containing_nil() {
+        // Exhibit A come home: [].first found nothing; [nil].first found
+        // an absent value. The wrapper keeps them apart (ADR 0005).
+        assert_eq!(evaluate("[].first"), Some(Value::Nil));
+        assert_eq!(
+            evaluate("[nil].first"),
+            Some(Value::Some(Box::new(Value::Nil)))
+        );
+    }
+
+    #[test]
+    fn hash_lookup_distinguishes_missing_key_from_stored_nil() {
+        assert_eq!(evaluate("{\"a\" => nil}[\"zzz\"]"), Some(Value::Nil));
+        assert_eq!(
+            evaluate("{\"a\" => nil}[\"a\"]"),
+            Some(Value::Some(Box::new(Value::Nil)))
+        );
+    }
+
+    #[test]
+    fn or_unwraps_one_layer_preserving_fetch_semantics() {
+        // A stored nil is present: the or-guard hands over the inner nil,
+        // not the default (ADR 0010's fetch table).
+        assert_eq!(
+            evaluate("{\"a\" => nil}[\"a\"] or \"default\""),
+            Some(Value::Nil)
+        );
+        assert_eq!(
+            evaluate("{\"a\" => nil}[\"zzz\"] or \"default\""),
+            Some(Value::String("default".to_string()))
+        );
+    }
+
+    #[test]
+    fn some_of_nil_is_present() {
+        assert_eq!(evaluate("some(nil).nil?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("some(nil).some?"), Some(Value::Boolean(true)));
+    }
+
+    #[test]
+    fn p_renders_the_nested_case() {
+        assert_eq!(output_of("p(some(nil))"), "some(nil)\n");
     }
 
     #[test]
