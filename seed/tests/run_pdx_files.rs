@@ -470,6 +470,14 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
 }
 
 #[test]
+fn portland_evaluator_matches_the_seed_on_one_line_patterns() {
+    assert_evaluator_matches_seed(
+        "evaluator_one_line_patterns.pdx",
+        "hit = 5 in 1 | 5\nputs hit\nputs 5 in nil\npair = [1, 2]\npair => [a, b]\nputs a + b\nstruct Token\n  kind\n  text\nend\ntoken = Token.new(kind: \"plus\", text: \"+\")\nif token in Token(kind: \"plus\")\n  puts \"plus\"\nend\n",
+    );
+}
+
+#[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland
     // evaluator, byte-identical to the seed.

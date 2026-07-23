@@ -168,6 +168,30 @@ def evaluate_case_in(node, bindings)
   run_body(node.else_body, bindings)
 end
 
+def evaluate_match_assert(node, bindings)
+  subject_step = evaluate_expression(node.subject, bindings)
+  bindings = subject_step.bindings
+  subject = slot_value(subject_step.value)
+  captures = match_pattern(node.pattern, subject, bindings)
+  panic("pattern mismatch — the => form panics when it can't destructure") if captures.nil?
+  captures.each do |capture|
+    bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+  end
+  outcome([nil], bindings)
+end
+
+def evaluate_match_test(node, bindings)
+  subject_step = evaluate_expression(node.subject, bindings)
+  bindings = subject_step.bindings
+  subject = slot_value(subject_step.value)
+  captures = match_pattern(node.pattern, subject, bindings)
+  return outcome([false], bindings) if captures.nil?
+  captures.each do |capture|
+    bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+  end
+  outcome([true], bindings)
+end
+
 # Try a pattern against a value: an array of [name, value] captures on a
 # match (empty for literals), nil on a miss. Crude gap: array and struct
 # patterns against wrong-shaped subjects panic instead of missing — the
@@ -269,6 +293,8 @@ def evaluate_expression(node, bindings)
   in IndexNode then evaluate_index(node, bindings)
   in IntegerNode(value:) then outcome([value.to_i], bindings)
   in LogicalNode then evaluate_logical(node, bindings)
+  in MatchAssertNode then evaluate_match_assert(node, bindings)
+  in MatchTestNode then evaluate_match_test(node, bindings)
   in MethodCallNode | SafeMethodCallNode then evaluate_method_call(node, bindings)
   in NilNode then outcome([nil], bindings)
   in StringNode(value:) then outcome([value], bindings)

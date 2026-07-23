@@ -158,6 +158,20 @@ struct LogicalNode
   right
 end
 
+# `expr => pattern` — match or panic (rightward destructuring).
+struct MatchAssertNode
+  kind
+  subject
+  pattern
+end
+
+# `expr in pattern` — a boolean test, binding captures on a hit.
+struct MatchTestNode
+  kind
+  subject
+  pattern
+end
+
 # Exhibit C, resolved: block is nil or a BlockNode — an honest maybe, no
 # longer the empty-array absence pattern.
 struct MethodCallNode
@@ -338,6 +352,14 @@ def logical_node(operator, left, right)
   LogicalNode.new(kind: "logical", operator: operator, left: left, right: right)
 end
 
+def match_assert_node(subject, pattern)
+  MatchAssertNode.new(kind: "match_assert", subject: subject, pattern: pattern)
+end
+
+def match_test_node(subject, pattern)
+  MatchTestNode.new(kind: "match_test", subject: subject, pattern: pattern)
+end
+
 def method_call_node(receiver, name, arguments, block)
   MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
 end
@@ -418,7 +440,12 @@ def statement_boundary?(tokens, position)
 end
 
 def parse_expression(tokens, position)
-  parse_logical_or(tokens, position)
+  step = parse_logical_or(tokens, position)
+  # One-line pattern test (ADR 0013 §4): `expr in pattern` is a boolean,
+  # binding its captures on a hit. Binds loosest of all.
+  return step unless keyword_at?(tokens, step.position, %w[in])
+  pattern = parse_pattern(tokens, step.position + 1)
+  Step.new(node: match_test_node(step.node, pattern.node), position: pattern.position)
 end
 
 # `or` is dead-identical to `||` (ADR 0007): word forms normalize to the
@@ -883,7 +910,14 @@ def parse_statement(tokens, position)
     desugared = binary_node(operator, identifier_node(token.text), value.node)
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
-  parse_expression(tokens, position)
+  step = parse_expression(tokens, position)
+  # Rightward destructuring (ADR 0013 §4): `expr => pattern` matches or
+  # panics — the pattern-grammar answer to multiple assignment.
+  if operator_at?(tokens, step.position, %w[=>])
+    pattern = parse_pattern(tokens, step.position + 1)
+    return Step.new(node: match_assert_node(step.node, pattern.node), position: pattern.position)
+  end
+  step
 end
 
 def parse_return(tokens, position)
@@ -1457,6 +1491,8 @@ def sexp(node)
   when "integer" then node.value
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
   when "keyword_parameter" then keyword_parameter_sexp(node)
+  when "match_assert" then "(=> #{sexp(node.subject)} #{sexp(node.pattern)})"
+  when "match_test" then "(in #{sexp(node.subject)} #{sexp(node.pattern)})"
   when "method_call" then method_call_sexp(node, ".")
   when "next" then "(next)"
   when "nil" then "nil"
