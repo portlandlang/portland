@@ -66,7 +66,8 @@ struct CallNode
   arguments
 end
 
-# block holds zero or one BlockNode — the empty-array absence pattern again.
+# Exhibit C, resolved: block is nil or a BlockNode — an honest maybe, no
+# longer the empty-array absence pattern.
 struct MethodCallNode
   kind
   receiver
@@ -476,10 +477,11 @@ def parse_dot(tokens, receiver, position, safe)
     arguments = argument_step.node
     position = argument_step.position
   end
-  block = []
+  # Exhibit C, resolved: an absent block is nil, not an empty array.
+  block = nil
   if keyword_at?(tokens, position, %w[do])
     block_step = parse_block(tokens, position + 1)
-    block = [block_step.node]
+    block = block_step.node
     position = block_step.position
   end
   node = if safe
@@ -729,7 +731,7 @@ def string_expression(lexeme)
       literal = ""
       inner = read_inner_source(characters, index + 2)
       inner_step = parse_expression(lex(inner.node), 0)
-      parts += [method_call_node(inner_step.node, "to_s", [], [])]
+      parts += [method_call_node(inner_step.node, "to_s", [], nil)]
       index = inner.position
       next
     end
@@ -1097,8 +1099,8 @@ end
 
 def method_call_sexp(node, head)
   plain = headed_sexp("#{head} #{sexp(node.receiver)} #{node.name}", node.arguments)
-  return plain if node.block.empty?
-  block = node.block.first
+  return plain if node.block.nil?
+  block = node.block
   head = "do"
   head += " |#{block.parameters.join(" ")}|" unless block.parameters.empty?
   inner = plain.slice(1, plain.length - 2)

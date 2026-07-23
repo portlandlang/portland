@@ -320,7 +320,7 @@ def evaluate_method_call(node, bindings)
     bindings = argument_step.bindings
     arguments += argument_step.value
   end
-  return evaluate_block_call(node, receiver, bindings) unless node.block.empty?
+  return evaluate_block_call(node, receiver, bindings) if node.block.some?
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
@@ -370,7 +370,7 @@ def run_guest_block(block, arguments, bindings)
 end
 
 def evaluate_block_call(node, receiver, bindings)
-  block = node.block.first
+  block = node.block
   case node.name
   when "each"
     if block.parameters.length == 2
