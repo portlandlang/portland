@@ -258,6 +258,23 @@ fn portland_parser_climbs_the_precedence_ladder() {
 }
 
 #[test]
+fn portland_parser_parses_the_optionals_surface() {
+    let sample = std::env::temp_dir().join("parse_optionals.pdx");
+    let source = "x = nil or 7\nuser&.upcase\nvalue = fetch() or return 0\ndone = fetch() or return\nflag = fetch() or break\ntotal = fetch() or next\nrow = fetch() or panic \"gone\"\nnot true\na and b\n";
+    std::fs::write(&sample, source).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success());
+    // Word forms render as their sigils — dead-identical spellings collapse
+    // in the tree itself (ADR 0007).
+    let expected = "(= x (|| nil 7))\n(&. user upcase)\n(= value (|| (call fetch) (return 0)))\n(= done (|| (call fetch) (return)))\n(= flag (|| (call fetch) (break)))\n(= total (|| (call fetch) (next)))\n(= row (|| (call fetch) (call panic \"gone\")))\n(! true)\n(&& a b)\n";
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+}
+
+#[test]
 fn portland_parser_handles_postfix_chains() {
     let sample = std::env::temp_dir().join("parse_postfix.pdx");
     let source = "name.upcase\nlist.push(1, 2)\ngreet()\ngreet(\"pdx\", 2)\nitems[0]\nmatrix[1][2]\n\"pdx\".upcase.reverse\n-5.abs\na.b + c.d\nshout(name).length\n\"x\"\n  .upcase\n";

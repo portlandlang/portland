@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Trio, optionals rung 2 (#21): parser.pdx parses the optionals surface — `nil` literal, `or`/`and`/`not` normalized to their sigils in the tree (dead-identical by construction), or-guard right sides (`return`/`break`/`next`/command-form `panic`), and `&.` as `SafeMethodCallNode`; still parses the whole compiler including itself.
+
 - Trio, optionals rung 1 (#21): lexer.pdx learns the optionals surface — `nil`/`and`/`or`/`not` keywords and the `&.` operator.
 
 - docs: STAGE0.md records the optionals runtime half as built; ledger statuses synced.

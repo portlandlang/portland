@@ -30,6 +30,11 @@ struct BooleanNode
   value
 end
 
+# Absence (ADR 0006): the literal has no payload, only its kind.
+struct NilNode
+  kind
+end
+
 struct StringNode
   kind
   value
@@ -63,6 +68,15 @@ end
 
 # block holds zero or one BlockNode — the empty-array absence pattern again.
 struct MethodCallNode
+  kind
+  receiver
+  name
+  arguments
+  block
+end
+
+# `&.` — same shape as MethodCallNode; an absent receiver short-circuits.
+struct SafeMethodCallNode
   kind
   receiver
   name
@@ -193,6 +207,10 @@ def boolean_node(value)
   BooleanNode.new(kind: "boolean", value: value)
 end
 
+def nil_node
+  NilNode.new(kind: "nil")
+end
+
 def string_node(value)
   StringNode.new(kind: "string", value: value)
 end
@@ -215,6 +233,10 @@ end
 
 def method_call_node(receiver, name, arguments, block)
   MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+end
+
+def safe_method_call_node(receiver, name, arguments, block)
+  SafeMethodCallNode.new(kind: "safe_method_call", receiver: receiver, name: name, arguments: arguments, block: block)
 end
 
 def block_node(parameters, body)
@@ -316,22 +338,50 @@ def parse_expression(tokens, position)
   parse_logical_or(tokens, position)
 end
 
+# `or` is dead-identical to `||` (ADR 0007): word forms normalize to the
+# sigil in the tree itself, so the two spellings cannot drift apart.
 def parse_logical_or(tokens, position)
   step = parse_logical_and(tokens, position)
-  while operator_at?(tokens, step.position, %w[||])
-    operator = tokens[step.position].text
-    right = parse_logical_and(tokens, step.position + 1)
-    step = Step.new(node: logical_node(operator, step.node, right.node), position: right.position)
+  while operator_at?(tokens, step.position, %w[||]) || keyword_at?(tokens, step.position, %w[or])
+    right = parse_or_right(tokens, step.position + 1)
+    step = Step.new(node: logical_node("||", step.node, right.node), position: right.position)
   end
   step
 end
 
+# The diverging right side of an or-guard (ADR 0007/0008): return/break/next
+# unwind past the binding, and command-form `panic "why"` is the one
+# paren-less command allowed off statement position — the blessed assertion.
+def parse_or_right(tokens, position)
+  return Step.new(node: break_node, position: position + 1) if keyword_at?(tokens, position, %w[break])
+  return Step.new(node: next_node, position: position + 1) if keyword_at?(tokens, position, %w[next])
+  if keyword_at?(tokens, position, %w[return])
+    after = position + 1
+    if statement_boundary?(tokens, after) || keyword_at?(tokens, after, %w[if unless])
+      return Step.new(node: return_bare_node, position: after)
+    end
+    value = parse_expression(tokens, after)
+    return Step.new(node: return_node(value.node), position: value.position)
+  end
+  if or_panic_command?(tokens, position)
+    message = parse_expression(tokens, position + 1)
+    return Step.new(node: call_node("panic", [message.node]), position: message.position)
+  end
+  parse_logical_and(tokens, position)
+end
+
+def or_panic_command?(tokens, position)
+  return false if position + 1 >= tokens.length
+  token = tokens[position]
+  message = tokens[position + 1]
+  token.kind == "identifier" && token.text == "panic" && message.kind == "string"
+end
+
 def parse_logical_and(tokens, position)
   step = parse_comparison(tokens, position)
-  while operator_at?(tokens, step.position, %w[&&])
-    operator = tokens[step.position].text
+  while operator_at?(tokens, step.position, %w[&&]) || keyword_at?(tokens, step.position, %w[and])
     right = parse_comparison(tokens, step.position + 1)
-    step = Step.new(node: logical_node(operator, step.node, right.node), position: right.position)
+    step = Step.new(node: logical_node("&&", step.node, right.node), position: right.position)
   end
   step
 end
@@ -377,6 +427,11 @@ def parse_unary(tokens, position)
     operand = parse_unary(tokens, position + 1)
     return Step.new(node: unary_node(operator, operand.node), position: operand.position)
   end
+  # `not` is dead-identical to `!` (ADR 0007).
+  if keyword_at?(tokens, position, %w[not])
+    operand = parse_unary(tokens, position + 1)
+    return Step.new(node: unary_node("!", operand.node), position: operand.position)
+  end
   parse_postfix(tokens, position)
 end
 
@@ -390,7 +445,11 @@ def postfix_from(tokens, step)
   while true
     position = step.position
     if operator_at?(tokens, position, %w[.])
-      step = parse_dot(tokens, step.node, position + 1)
+      step = parse_dot(tokens, step.node, position + 1, false)
+      next
+    end
+    if operator_at?(tokens, position, %w[&.])
+      step = parse_dot(tokens, step.node, position + 1, true)
       next
     end
     if operator_at?(tokens, position, ["["])
@@ -406,7 +465,7 @@ def postfix_from(tokens, step)
   step
 end
 
-def parse_dot(tokens, receiver, position)
+def parse_dot(tokens, receiver, position, safe)
   if position >= tokens.length
     return Step.new(node: error_node("expected method name after dot"), position: position)
   end
@@ -427,7 +486,12 @@ def parse_dot(tokens, receiver, position)
     block = [block_step.node]
     position = block_step.position
   end
-  Step.new(node: method_call_node(receiver, token.text, arguments, block), position: position)
+  node = if safe
+    safe_method_call_node(receiver, token.text, arguments, block)
+  else
+    method_call_node(receiver, token.text, arguments, block)
+  end
+  Step.new(node: node, position: position)
 end
 
 # `do |params| ... end`, position already past the `do`.
@@ -568,6 +632,7 @@ def parse_primary(tokens, position)
   when "keyword"
     case token.text
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
+    when "nil" then Step.new(node: nil_node, position: after)
     when "if" then parse_if(tokens, after)
     when "unless" then parse_unless(tokens, after)
     when "case" then parse_case(tokens, after)
@@ -752,7 +817,7 @@ def command_start?(tokens, position)
   token = tokens[position]
   case token.kind
   when "integer", "string", "word_array", "identifier" then true
-  when "keyword" then token.text == "true" || token.text == "false"
+  when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   when "operator" then token.text == "!"
   else
     false
@@ -1034,8 +1099,8 @@ def headed_sexp(head, arguments)
   "(#{head} #{sexp_list(arguments)})"
 end
 
-def method_call_sexp(node)
-  plain = headed_sexp(". #{sexp(node.receiver)} #{node.name}", node.arguments)
+def method_call_sexp(node, head)
+  plain = headed_sexp("#{head} #{sexp(node.receiver)} #{node.name}", node.arguments)
   return plain if node.block.empty?
   block = node.block.first
   head = "do"
@@ -1070,11 +1135,13 @@ def sexp(node)
   when "integer" then node.value
   when "identifier" then node.name
   when "boolean" then node.value
+  when "nil" then "nil"
   when "string" then encode_string(node.value)
   when "binary", "logical" then "(#{node.operator} #{sexp(node.left)} #{sexp(node.right)})"
   when "unary" then "(#{node.operator} #{sexp(node.operand)})"
   when "call" then headed_sexp("call #{node.name}", node.arguments)
-  when "method_call" then method_call_sexp(node)
+  when "method_call" then method_call_sexp(node, ".")
+  when "safe_method_call" then method_call_sexp(node, "&.")
   when "keyword_argument" then "(: #{node.label} #{sexp(node.value)})"
   when "def" then def_sexp(node)
   when "struct_def" then "(struct #{node.name} #{node.fields.join(" ")})"
