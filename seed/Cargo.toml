@@ -10,3 +10,4 @@ name = "pdx"
 path = "src/main.rs"
 
 [dependencies]
+rustyline = "18.0.1"

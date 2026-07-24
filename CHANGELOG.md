@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- REPL: line editing, history, and Ctrl-C, via rustyline 18 — the seed's first dependency, taken knowingly because the REPL is where the language gets played with and the seed is disposable anyway. Arrow-key history persists to `~/.pdx_history` between sessions; Ctrl-C abandons the entry in progress instead of killing the process; left/right arrows edit rather than emitting escape sequences. Piped stdin keeps the plain line-reading path untouched, so scripts, `echo | pdx`, and every REPL test work exactly as before.
+
 - REPL: `:cancel`, `:show`, `:help`, `:quit`, and `_`. The important one is `:cancel` — an unfinished entry was previously **inescapable**, since every further line just extended it and only typing `end` or leaving the REPL got you out. `:show` prints what is buffered, `_` holds the last printed value (REPL-only; it stays undefined in files), and commands live in a `:` namespace that cannot collide with Portland code.
 
 - REPL: heredocs and multi-line brace blocks no longer break it. The REPL decides whether to keep reading by matching the parse error, and today's two new multi-line constructs were not in that list — so `x = <<~SQL` gave up after one line and reported four cascading errors. Unterminated interpolation joins the list too.

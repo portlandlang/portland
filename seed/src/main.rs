@@ -40,24 +40,95 @@ fn run_file(path: &str) {
     interpreter.program(&program);
 }
 
+/// Where the interactive REPL remembers previous entries between sessions.
+fn history_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".pdx_history"))
+}
+
+/// Lines come from rustyline when a human is typing (history, editing,
+/// Ctrl-C) and from plain stdin when piped, so scripts and tests keep
+/// working unchanged.
+enum Source {
+    Piped(std::io::Lines<std::io::StdinLock<'static>>),
+    Typed(Box<rustyline::DefaultEditor>),
+}
+
+/// One line, or why there isn't one.
+enum Input {
+    Line(String),
+    /// Ctrl-C — abandon the entry in progress, stay in the REPL.
+    Interrupt,
+    /// Ctrl-D or end of piped input.
+    Done,
+}
+
+impl Source {
+    fn read(&mut self, buffer: &str) -> Input {
+        match self {
+            Source::Piped(lines) => match lines.next() {
+                Some(line) => Input::Line(line.expect("failed to read stdin")),
+                None => Input::Done,
+            },
+            Source::Typed(editor) => {
+                let prompt = if buffer.is_empty() { "pdx> " } else { "...> " };
+                match editor.readline(prompt) {
+                    Ok(line) => {
+                        // Only whole entries are worth recalling.
+                        if buffer.is_empty() && !line.trim().is_empty() {
+                            let _ = editor.add_history_entry(line.as_str());
+                        }
+                        Input::Line(line)
+                    }
+                    Err(rustyline::error::ReadlineError::Interrupted) => Input::Interrupt,
+                    Err(_) => Input::Done,
+                }
+            }
+        }
+    }
+}
+
 fn repl() {
     let interactive = std::io::stdin().is_terminal();
-    if interactive {
+    let mut source = if interactive {
         println!("Portland seed REPL — :help for commands, :quit or Ctrl-D to exit");
-    }
+        match rustyline::DefaultEditor::new() {
+            Ok(mut editor) => {
+                if let Some(path) = history_path() {
+                    let _ = editor.load_history(&path);
+                }
+                Source::Typed(Box::new(editor))
+            }
+            // No terminal to drive: fall back rather than refuse to start.
+            Err(_) => Source::Piped(std::io::stdin().lock().lines()),
+        }
+    } else {
+        Source::Piped(std::io::stdin().lock().lines())
+    };
     // The seed reports errors by panicking; the REPL catches them and carries on.
     std::panic::set_hook(Box::new(|_| {}));
 
+    // rustyline draws its own prompt; only the piped path needs ours.
+    let piped = matches!(source, Source::Piped(_));
     let mut interpreter = Interpreter::new();
     let mut buffer = String::new();
-    prompt(interactive, &buffer);
-    for line in std::io::stdin().lock().lines() {
-        let line = line.expect("failed to read stdin");
+    prompt(piped && interactive, &buffer);
+    loop {
+        let line = match source.read(&buffer) {
+            Input::Line(line) => line,
+            Input::Interrupt => {
+                if !buffer.is_empty() {
+                    println!("cancelled {} line(s)", buffer.lines().count());
+                    buffer.clear();
+                }
+                continue;
+            }
+            Input::Done => break,
+        };
         match repl_command(line.trim()) {
-            Some(Command::Quit) => return,
+            Some(Command::Quit) => break,
             Some(Command::Help) => {
                 println!("{HELP}");
-                prompt(interactive, &buffer);
+                prompt(piped && interactive, &buffer);
                 continue;
             }
             // An unfinished entry is otherwise inescapable: every further
@@ -69,7 +140,7 @@ fn repl() {
                     println!("cancelled {} line(s)", buffer.lines().count());
                     buffer.clear();
                 }
-                prompt(interactive, &buffer);
+                prompt(piped && interactive, &buffer);
                 continue;
             }
             Some(Command::Show) => {
@@ -78,15 +149,15 @@ fn repl() {
                 } else {
                     print!("{buffer}");
                 }
-                prompt(interactive, &buffer);
+                prompt(piped && interactive, &buffer);
                 continue;
             }
             None => {}
         }
         buffer.push_str(&line);
         buffer.push('\n');
-        let source = buffer.clone();
-        match catch_unwind(|| parser::parse(&source)) {
+        let entry = buffer.clone();
+        match catch_unwind(|| parser::parse(&entry)) {
             Ok(program) => {
                 buffer.clear();
                 match catch_unwind(AssertUnwindSafe(|| interpreter.program(&program))) {
@@ -115,7 +186,12 @@ fn repl() {
                 }
             }
         }
-        prompt(interactive, &buffer);
+        prompt(piped && interactive, &buffer);
+    }
+    if let Source::Typed(editor) = &mut source
+        && let Some(path) = history_path()
+    {
+        let _ = editor.save_history(&path);
     }
 }
 
