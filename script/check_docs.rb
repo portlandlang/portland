@@ -44,9 +44,18 @@ markdown_files.each do |path|
   fenced_lines(path).each do |line, number|
     # A block may deliberately show the wrong form to name it as wrong.
     next if line.match?(/#.*(error|wrong|instead)/i)
-    next unless line.match?(/\b[A-Z]\w*(::\w+)*::[a-z_]\w*\(/)
 
-    failures << "#{relative(path)}:#{number}  `::` used to invoke — `.` invokes:\n    #{line.strip}"
+    found = line.match(/\b([A-Z]\w*(?:::\w+)*)::([a-z_]\w*)\(/)
+    next unless found
+
+    namespace, method = found.captures
+    failures << <<~REPORT
+      #{relative(path)}:#{number}
+        #{line.strip}
+
+        `::` names, `.` invokes (ADR 0021). This calls #{method}, so it needs
+        a dot — write #{namespace}.#{method}(...) instead.
+    REPORT
   end
 end
 
@@ -65,7 +74,14 @@ Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort.each do |path|
   next if File.read(path).match?(/non-difference/i)
   next if changelog.match?(/ADR #{number}\b[^\n]*non-difference/i)
 
-  failures << "#{relative(path)}  no ledger entry in docs/ruby/, and no 'non-difference' note"
+  failures << <<~REPORT
+    #{relative(path)}
+
+      No entry in docs/ruby/ cites this ADR, so a migrating Rubyist has
+      nowhere to read what changed. Either add a ledger file linking
+      ../adr/#{number}-…, or — if this decision matches Ruby exactly —
+      say "non-difference" in the ADR to opt out.
+  REPORT
 end
 
 # 3. Internal doc links resolve.
@@ -77,7 +93,12 @@ markdown_files.each do |path|
       resolved = File.expand_path(target.split("#").first, File.dirname(path))
       next if File.exist?(resolved)
 
-      failures << "#{relative(path)}:#{index + 1}  broken link -> #{target}"
+      failures << <<~REPORT
+        #{relative(path)}:#{index + 1}
+
+          Link to #{target} goes nowhere — expected a file at
+          #{relative(resolved)}. Fix the path, or create the file.
+      REPORT
     end
   end
 end
