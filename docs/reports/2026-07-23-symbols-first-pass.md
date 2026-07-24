@@ -110,6 +110,28 @@ first.
    specifically `{:ok, ...}`-style tagging, which feeds the #28 error
    session too.
 
+## Where the implementation actually stands (verified 2026-07-23)
+
+Tested against the seed, so the next pass starts from facts:
+
+| form | status |
+|---|---|
+| `p(:foo)` | parse error — `:` lexes as a bare `Colon`; no symbol literal exists |
+| `{:name => "pdx"}` | parse error, same reason |
+| `{name: "pdx"}` | parse error — "expected => in hash literal" |
+| `{"name" => "pdx"}` | works — string keys, `=>` required |
+| `greet(name: "pdx")` | works |
+
+Symbols do not exist anywhere in Portland today. Keyword arguments work but
+involve no symbol: `name:` parses as an identifier plus a `Colon` token and
+becomes a label at parse time.
+
+**`{name: "pdx"}` hash shorthand is a parse error today**, which is
+arguably a larger migration issue than symbols — it is the most common hash
+literal form in modern Ruby. It has to be built either way; whether it means
+*symbol* keys (if symbols exist) or *string* keys (if they don't) is
+downstream of this decision.
+
 ## Open sub-questions for the next pass
 
 - If symbols go: does `{name: "x"}` hash shorthand arrive, meaning *string*
