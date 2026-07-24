@@ -753,9 +753,16 @@ impl<'source> Parser<'source> {
         }
     }
 
-    /// Parse a `do |params| ... end` block.
+    /// Whether a block opens here — `do ... end` or `{ ... }` (ADR 0016).
+    /// The two forms are dead-identical; there is no precedence split.
+    fn block_opens(&self) -> bool {
+        self.peek_is_keyword("do") || self.peek_kind() == Some(TokenKind::LeftBrace)
+    }
+
+    /// Parse a `do |params| ... end` or `{ |params| ... }` block (ADR 0016).
     fn block(&mut self) -> Block {
-        self.position += 1; // the `do`
+        let braced = self.peek_kind() == Some(TokenKind::LeftBrace);
+        self.position += 1; // the `do` or `{`
         let mut parameters = Vec::new();
         if self.peek_kind() == Some(TokenKind::Pipe) {
             self.position += 1; // the opening `|`
@@ -781,11 +788,38 @@ impl<'source> Parser<'source> {
                 }
             }
         }
+        if braced {
+            let body = self.braced_body();
+            self.position += 1; // the `}`
+            return Block { body, parameters };
+        }
         self.expect_statement_boundary();
         self.skip_newlines();
         let body = self.body_until(&["end"], "do");
         self.position += 1; // the `end`
         Block { body, parameters }
+    }
+
+    /// Statements inside `{ ... }`, up to (not consuming) the closing brace.
+    /// Unlike `do ... end`, a one-liner needs no statement boundary, so the
+    /// brace itself is what ends the last statement.
+    fn braced_body(&mut self) -> Vec<Statement> {
+        let mut body = Vec::new();
+        self.skip_newlines();
+        loop {
+            if self.peek_kind() == Some(TokenKind::RightBrace) {
+                return body;
+            }
+            if self.position >= self.tokens.len() {
+                panic!("expected }} to close {{");
+            }
+            body.push(self.statement());
+            if self.peek_kind() == Some(TokenKind::RightBrace) {
+                return body;
+            }
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
     }
 
     /// Parse statements up to (not consuming) one of the terminator keywords.
@@ -1142,7 +1176,7 @@ impl<'source> Parser<'source> {
                         } else {
                             (Vec::new(), Vec::new())
                         };
-                    let block = if self.peek_is_keyword("do") {
+                    let block = if self.block_opens() {
                         Some(self.block())
                     } else {
                         None

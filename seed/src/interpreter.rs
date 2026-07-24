@@ -1878,6 +1878,45 @@ mod tests {
         assert_eq!(evaluate(source), Some(Value::Integer(3)));
     }
 
+    /// ADR 0016: `{ ... }` and `do ... end` are dead-identical.
+    #[test]
+    fn brace_blocks_match_do_end_blocks() {
+        assert_eq!(
+            evaluate("[1, 2, 3].map { |number| number * 2 }"),
+            evaluate("[1, 2, 3].map do |number|\n  number * 2\nend\n")
+        );
+    }
+
+    #[test]
+    fn brace_blocks_chain_and_nest() {
+        assert_eq!(
+            evaluate(r#"["a", "b"].map { |word| word.upcase }.join("-")"#),
+            Some(Value::String("A-B".to_string()))
+        );
+        assert_eq!(
+            evaluate("[[1, 2], [3]].map { |pair| pair.map { |number| number * 2 } }.length"),
+            Some(Value::Integer(2))
+        );
+    }
+
+    #[test]
+    fn brace_blocks_hold_several_statements() {
+        let source = "[1, 2].map { |number|\n  doubled = number * 2\n  doubled + 1\n}\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::Array(std::rc::Rc::new(vec![
+                Value::Integer(3),
+                Value::Integer(5)
+            ])))
+        );
+    }
+
+    /// A `{` in expression position is still a hash literal, not a block.
+    #[test]
+    fn brace_blocks_do_not_shadow_hash_literals() {
+        assert_eq!(evaluate(r#"{"a" => 1}.length"#), Some(Value::Integer(1)));
+    }
+
     #[test]
     fn a_broken_call_produces_nil() {
         assert_eq!(
