@@ -12,6 +12,9 @@ pub enum TokenKind {
     Colon,
     Comma,
     Dot,
+    /// `..` inclusive and `...` exclusive (ADR 0019).
+    DotDot,
+    DotDotDot,
     Equal,
     EqualEqual,
     FatArrow,
@@ -124,6 +127,23 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     leading_space: false,
                     kind,
                     text: &source[start..end],
+                });
+            }
+            // `..` and `...` before the single `.` (ADR 0019).
+            '.' if source[start..].starts_with("..") => {
+                let exclusive = source[start..].starts_with("...");
+                let length = if exclusive { 3 } else { 2 };
+                for _ in 0..length {
+                    chars.next();
+                }
+                tokens.push(Token {
+                    leading_space: false,
+                    kind: if exclusive {
+                        TokenKind::DotDotDot
+                    } else {
+                        TokenKind::DotDot
+                    },
+                    text: &source[start..start + length],
                 });
             }
             '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | ':' => {

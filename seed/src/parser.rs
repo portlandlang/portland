@@ -646,10 +646,27 @@ impl<'source> Parser<'source> {
     }
 
     fn pattern_primary(&mut self) -> Pattern {
+        // Beginless range pattern: `in ..0`.
+        if let Some(exclusive) = self.range_operator_here() {
+            self.position += 1;
+            return Pattern::Range {
+                end: Some(self.pattern_range_bound()),
+                exclusive,
+                start: None,
+            };
+        }
         let token = self.advance();
         match token.kind {
             TokenKind::Integer => {
-                let value = token.text.parse().expect("integer literal out of range");
+                let value: i64 = token.text.parse().expect("integer literal out of range");
+                if let Some(exclusive) = self.range_operator_here() {
+                    self.position += 1;
+                    return Pattern::Range {
+                        end: self.pattern_range_end(),
+                        exclusive,
+                        start: Some(value),
+                    };
+                }
                 Pattern::Literal(Box::new(Expression::Integer(value)))
             }
             TokenKind::Float => {
@@ -1070,7 +1087,7 @@ impl<'source> Parser<'source> {
         if self.depth > MAXIMUM_NESTING {
             panic!("expression nesting deeper than {MAXIMUM_NESTING} levels");
         }
-        let mut expression = self.logical_or();
+        let mut expression = self.range();
         // One-line pattern test (ADR 0013 §4): `expr in pattern` is a
         // boolean, binding its captures on a hit. Binds loosest of all.
         if self.peek_is_keyword("in") {
@@ -1082,6 +1099,116 @@ impl<'source> Parser<'source> {
         }
         self.depth -= 1;
         expression
+    }
+
+    /// `1..5` and `1...5`, plus the endless (`1..`) and beginless (`..5`)
+    /// forms (ADR 0019). Binds looser than everything but `in`.
+    fn range(&mut self) -> Expression {
+        // Beginless: the `..` leads, so there is nothing to parse first.
+        if let Some(exclusive) = self.range_operator_here() {
+            self.position += 1;
+            return Expression::Range {
+                end: Some(Box::new(self.logical_or())),
+                exclusive,
+                start: None,
+            };
+        }
+        let left = self.logical_or();
+        let Some(exclusive) = self.range_operator_here() else {
+            return left;
+        };
+        self.position += 1;
+        // Endless unless something that can start an expression follows.
+        // Where one could, the reading is genuinely ambiguous and
+        // `range_end` refuses rather than guessing (ADR 0019 §3).
+        let end = self.range_end();
+        Expression::Range {
+            end,
+            exclusive,
+            start: Some(Box::new(left)),
+        }
+    }
+
+    /// One integer bound of a range pattern, negative allowed.
+    fn pattern_range_bound(&mut self) -> i64 {
+        let negative = self.peek_kind() == Some(TokenKind::Minus);
+        if negative {
+            self.position += 1;
+        }
+        let token = self.advance();
+        if token.kind != TokenKind::Integer {
+            panic!("range patterns take integer bounds, got {token:?}");
+        }
+        let value: i64 = token.text.parse().expect("integer literal out of range");
+        if negative { -value } else { value }
+    }
+
+    /// The end of a range pattern, absent for `in 10..`. Patterns always
+    /// sit before a token that can't continue them (`then`, a newline, a
+    /// `|`), so there is no ambiguity to resolve here.
+    fn pattern_range_end(&mut self) -> Option<i64> {
+        let has_end = self.peek_kind() == Some(TokenKind::Integer)
+            || (self.peek_kind() == Some(TokenKind::Minus)
+                && self.peek_kind_at(1) == Some(TokenKind::Integer));
+        has_end.then(|| self.pattern_range_bound())
+    }
+
+    /// `Some(exclusive)` when a range operator sits at the cursor.
+    fn range_operator_here(&self) -> Option<bool> {
+        match self.peek_kind() {
+            Some(TokenKind::DotDot) => Some(false),
+            Some(TokenKind::DotDotDot) => Some(true),
+            _ => None,
+        }
+    }
+
+    /// The end of a range, or `None` for the endless form. A range closes
+    /// when the next meaningful token cannot continue an expression; where
+    /// it could, both readings exist and we name them (ADR 0019 §3).
+    fn range_end(&mut self) -> Option<Box<Expression>> {
+        let closes = matches!(
+            self.peek_kind(),
+            None | Some(TokenKind::RightBracket)
+                | Some(TokenKind::RightParen)
+                | Some(TokenKind::RightBrace)
+                | Some(TokenKind::Comma)
+        ) || self.peek_is_keyword("then")
+            || self.peek_is_keyword("end")
+            || self.peek_is_keyword("else")
+            || self.peek_is_keyword("in")
+            || self.peek_is_keyword("when")
+            || self.peek_is_keyword("if")
+            || self.peek_is_keyword("unless");
+        if closes {
+            return None;
+        }
+        if self.peek_kind() == Some(TokenKind::Newline) {
+            // Look past the newline: only a token that could be an operand
+            // makes this ambiguous.
+            let mut index = self.position;
+            while self.tokens.get(index).map(|token| token.kind) == Some(TokenKind::Newline) {
+                index += 1;
+            }
+            let continues = match self.tokens.get(index) {
+                None => false,
+                Some(token) => {
+                    !matches!(
+                        token.kind,
+                        TokenKind::RightBracket | TokenKind::RightParen | TokenKind::RightBrace
+                    ) && !(token.kind == TokenKind::Keyword
+                        && matches!(token.text, "end" | "else" | "elsif" | "in" | "when"))
+                }
+            };
+            if !continues {
+                return None;
+            }
+            panic!(
+                "endless range at end of line — does it continue? \
+                 parenthesize the one you mean: `(start..)` to close it here, \
+                 or put the end on this line"
+            );
+        }
+        Some(Box::new(self.logical_or()))
     }
 
     fn logical_or(&mut self) -> Expression {

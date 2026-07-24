@@ -17,6 +17,51 @@ pub fn evaluate(source: &str) -> Option<Value> {
     interpreter.program(&program)
 }
 
+/// The integers a range covers. Endless and beginless ranges have no
+/// element list, so asking for one is an error rather than a hang.
+fn range_elements(range: &Value) -> Vec<Value> {
+    let Value::Range {
+        end,
+        exclusive,
+        start,
+    } = range
+    else {
+        unreachable!("called with a range")
+    };
+    let (Some(start), Some(end)) = (start, end) else {
+        panic!("a range without both ends has no elements to walk — give it a start and an end");
+    };
+    let last = if *exclusive { end - 1 } else { *end };
+    (*start..=last).map(Value::Integer).collect()
+}
+
+/// Resolve a range against a collection length into clamped `[from, to)`
+/// offsets (ADR 0019 §2). Negative bounds count from the end; everything
+/// out of range clamps, so a slice is always a collection.
+fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
+    let Value::Range {
+        end,
+        exclusive,
+        start,
+    } = range
+    else {
+        unreachable!("called with a range")
+    };
+    let length = length as i64;
+    let resolve = |bound: i64| if bound < 0 { length + bound } else { bound };
+    let from = start.map(resolve).unwrap_or(0).clamp(0, length);
+    let to = match end {
+        None => length,
+        Some(bound) => {
+            let bound = resolve(*bound);
+            let bound = if *exclusive { bound } else { bound + 1 };
+            bound.clamp(0, length)
+        }
+    };
+    // A reversed or inverted range is empty, not an error.
+    (from as usize, to.max(from) as usize)
+}
+
 /// Widen a numeric value for mixed arithmetic (ADR 0018).
 fn as_float(value: &Value) -> f64 {
     match value {
@@ -293,6 +338,26 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Float(value) => Some(Value::Float(*value)),
+            Expression::Range {
+                end,
+                exclusive,
+                start,
+            } => {
+                let mut bound = |side: &Option<Box<Expression>>| {
+                    side.as_ref().map(|side| match self.value_of(side) {
+                        Value::Integer(number) => number,
+                        other => panic!("range bounds must be integers so far, got {other:?}"),
+                    })
+                };
+                // Evaluated left to right, like every other binary form.
+                let start = bound(start);
+                let end = bound(end);
+                Some(Value::Range {
+                    end,
+                    exclusive: *exclusive,
+                    start,
+                })
+            }
             Expression::Nil => Some(Value::Nil),
             Expression::SelfValue => {
                 let (_, receiver) = self
@@ -493,6 +558,18 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let character = text.chars().nth(position as usize).unwrap();
                         Some(Value::String(character.to_string()))
+                    }
+                    // A slice is always a collection, never a maybe
+                    // (ADR 0019 §2): the start clamps the way Ruby already
+                    // clamps the end, so out of range is empty, not nil.
+                    (Value::Array(elements), Value::Range { .. }) => {
+                        let (from, to) = slice_bounds(&index, elements.len());
+                        Some(Value::array(elements[from..to].to_vec()))
+                    }
+                    (Value::String(text), Value::Range { .. }) => {
+                        let characters: Vec<char> = text.chars().collect();
+                        let (from, to) = slice_bounds(&index, characters.len());
+                        Some(Value::String(characters[from..to].iter().collect()))
                     }
                     (Value::Hash(pairs), key) => Some(
                         pairs
@@ -840,6 +917,42 @@ impl<W: std::io::Write> Interpreter<W> {
             // to_s and the maybe predicates fall through to the generic arms.
             if !matches!(name, "nil?" | "some?" | "to_s") {
                 panic!("{struct_name} has no field {name}");
+            }
+        }
+        // A range behaves as its elements do: `(1..n).each` is the counted
+        // loop (ADR 0019). `include?` answers without walking, so endless
+        // and beginless ranges can answer it too.
+        if let Value::Range {
+            end,
+            exclusive,
+            start,
+        } = &receiver
+        {
+            if name == "include?"
+                && let [Value::Integer(probe)] = arguments.as_slice()
+            {
+                let above = start.is_none_or(|start| *probe >= start);
+                let below = end.is_none_or(|end| {
+                    if *exclusive {
+                        *probe < end
+                    } else {
+                        *probe <= end
+                    }
+                });
+                return Some(Value::Boolean(above && below));
+            }
+            if name == "to_a" && arguments.is_empty() {
+                return Some(Value::array(range_elements(&receiver)));
+            }
+            if block.is_some() || matches!(name, "length" | "sum" | "first" | "last") {
+                let elements = range_elements(&receiver);
+                return self.method_call(
+                    Value::array(elements),
+                    name,
+                    arguments,
+                    Vec::new(),
+                    block,
+                );
             }
         }
         if let Some(block) = block {
@@ -1265,6 +1378,25 @@ impl<W: std::io::Write> Interpreter<W> {
             Pattern::Alternative(options) => options
                 .iter()
                 .find_map(|option| self.match_pattern(option, subject)),
+            // A range pattern tests membership, not equality (ADR 0019 §1).
+            Pattern::Range {
+                end,
+                exclusive,
+                start,
+            } => {
+                let Value::Integer(probe) = subject else {
+                    return None;
+                };
+                let above = start.is_none_or(|start| *probe >= start);
+                let below = end.is_none_or(|end| {
+                    if *exclusive {
+                        *probe < end
+                    } else {
+                        *probe <= end
+                    }
+                });
+                (above && below).then(Vec::new)
+            }
             Pattern::Array { elements, rest } => {
                 let Value::Array(values) = subject else {
                     return None;
@@ -2887,6 +3019,99 @@ mod tests {
     fn evaluates_division() {
         assert_eq!(evaluate("42 / 6"), Some(Value::Integer(7)));
         assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
+    }
+
+    /// ADR 0019: `..` inclusive, `...` exclusive, either end optional.
+    #[test]
+    fn evaluates_range_literals() {
+        assert_eq!(
+            evaluate("(1..5).to_s"),
+            Some(Value::String("1..5".to_string()))
+        );
+        assert_eq!(
+            evaluate("(1...5).to_s"),
+            Some(Value::String("1...5".to_string()))
+        );
+        assert_eq!(
+            evaluate("(1..).to_s"),
+            Some(Value::String("1..".to_string()))
+        );
+        assert_eq!(
+            evaluate("(..5).to_s"),
+            Some(Value::String("..5".to_string()))
+        );
+    }
+
+    /// A slice is always a collection, never a maybe (ADR 0019 §2). The
+    /// last two rows are the deliberate divergence: Ruby answers nil.
+    #[test]
+    fn range_slices_are_collections_not_maybes() {
+        assert_eq!(evaluate("[1, 2, 3][1..99].length"), Some(Value::Integer(2)));
+        assert_eq!(evaluate("[1, 2, 3][3..].length"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("[1, 2, 3][2..1].length"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("[1, 2, 3][..1].length"), Some(Value::Integer(2)));
+        assert_eq!(
+            evaluate(r#""hello"[1..3]"#),
+            Some(Value::String("ell".to_string()))
+        );
+        // Ruby: nil. Portland: empty — the start clamps like the end.
+        assert_eq!(evaluate("[1, 2, 3][4..].length"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("[1, 2, 3][-99..].length"), Some(Value::Integer(3)));
+        assert_eq!(
+            evaluate(r#""hello"[9..]"#),
+            Some(Value::String(String::new()))
+        );
+    }
+
+    /// `(1..n).each` is the counted loop — the main reason ranges are worth
+    /// having this early.
+    #[test]
+    fn ranges_iterate() {
+        assert_eq!(evaluate("(1..4).sum"), Some(Value::Integer(10)));
+        assert_eq!(evaluate("(1..3).to_a.length"), Some(Value::Integer(3)));
+        assert_eq!(evaluate("(1...5).to_a.length"), Some(Value::Integer(4)));
+        assert_eq!(
+            evaluate("mutable total = 0\n(1..4).each { total += it }\ntotal\n"),
+            Some(Value::Integer(10))
+        );
+    }
+
+    /// `include?` answers without walking, so the unbounded forms can too.
+    #[test]
+    fn ranges_answer_membership_without_walking() {
+        assert_eq!(evaluate("(1..5).include?(3)"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("(1...5).include?(5)"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("(1..).include?(999)"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("(..5).include?(-99)"), Some(Value::Boolean(true)));
+    }
+
+    /// Range patterns test membership, not equality (ADR 0019 §1) — and a
+    /// beginless-through-endless chain is the shape that will one day
+    /// prove exhaustive without an `else`.
+    #[test]
+    fn range_patterns_match_by_membership() {
+        let source = "def size(number)\n  case number\n  in ..0 then \"none\"\n  in 1..9 then \"some\"\n  in 10.. then \"lots\"\n  end\nend\nsize(-5) + size(3) + size(50)\n";
+        assert_eq!(
+            evaluate(source),
+            Some(Value::String("nonesomelots".to_string()))
+        );
+    }
+
+    /// ADR 0019 §3: a range spans a newline only where one reading exists.
+    #[test]
+    #[should_panic(expected = "endless range at end of line")]
+    fn panics_on_an_ambiguous_endless_range() {
+        evaluate("span = 1..\np span\n");
+    }
+
+    /// And the unambiguous positions need no parens at all.
+    #[test]
+    fn endless_ranges_close_on_a_token_that_cannot_continue_them() {
+        assert_eq!(evaluate("[1, 2, 3][1..].length"), Some(Value::Integer(2)));
+        assert_eq!(
+            evaluate("case 50\nin 10.. then \"big\"\nend\n"),
+            Some(Value::String("big".to_string()))
+        );
     }
 
     /// ADR 0018: IEEE doubles, Ruby's printing, mixed arithmetic promotes.

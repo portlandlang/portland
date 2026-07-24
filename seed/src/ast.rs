@@ -112,6 +112,13 @@ pub enum Pattern {
     /// `in ^name` — compare against the variable's value instead of
     /// capturing (ADR 0013 §4).
     Pin(String),
+    /// `in 1..5` — membership, not equality (ADR 0019 §1). Either end may
+    /// be absent, which is what lets a set of ranges cover the integers.
+    Range {
+        end: Option<i64>,
+        exclusive: bool,
+        start: Option<i64>,
+    },
     /// `in ReturnNode(value: nil)` — match by struct type, refine or bind by
     /// field. Keyword-only (ADR 0013 §5); a field with no sub-pattern binds
     /// under its own name (`in Token(kind:)` binds `kind`). Bare
@@ -207,6 +214,13 @@ pub enum Expression {
     /// IEEE 754 double (ADR 0018).
     Float(f64),
     Integer(i64),
+    /// `1..5` / `1...5`, with either end optional for the endless and
+    /// beginless forms (ADR 0019).
+    Range {
+        end: Option<Box<Expression>>,
+        exclusive: bool,
+        start: Option<Box<Expression>>,
+    },
     /// Kept apart from Binary because these short-circuit.
     Logical {
         left: Box<Expression>,

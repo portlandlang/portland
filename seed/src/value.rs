@@ -21,6 +21,14 @@ pub enum Value {
     /// falsy — the seed enforces both with runtime panics where the real
     /// compiler will refuse to build.
     Nil,
+    /// `1..5` inclusive, `1...5` exclusive; either end may be absent for
+    /// the endless and beginless forms (ADR 0019). Integer-only in the
+    /// seed — a documented crudeness.
+    Range {
+        end: Option<i64>,
+        exclusive: bool,
+        start: Option<i64>,
+    },
     /// The nested case of the wrapper (ADR 0005): only ever wraps Nil or
     /// another Some — a plain present value is never boxed (`some(5)` is
     /// `5`). Built by `Value::present`; keeps `[nil].first` ≠ `[].first`.
@@ -70,6 +78,7 @@ impl Value {
             }
             Value::Integer(value) => value.to_string(),
             Value::Nil => "nil".to_string(),
+            Value::Range { .. } => self.to_string(),
             Value::Some(inner) => format!("some({})", inner.inspect()),
             Value::String(value) => format!("{value:?}"),
             Value::Struct { fields, name } => {
@@ -126,6 +135,20 @@ impl fmt::Display for Value {
                 write!(formatter, "}}")
             }
             Value::Integer(value) => write!(formatter, "{value}"),
+            Value::Range {
+                end,
+                exclusive,
+                start,
+            } => {
+                if let Some(start) = start {
+                    write!(formatter, "{start}")?;
+                }
+                write!(formatter, "{}", if *exclusive { "..." } else { ".." })?;
+                if let Some(end) = end {
+                    write!(formatter, "{end}")?;
+                }
+                Ok(())
+            }
             Value::Nil => write!(formatter, "nil"),
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),
