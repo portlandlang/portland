@@ -13,6 +13,10 @@ struct Token
     kind == "identifier"
   end
 
+  def float?
+    kind == "float"
+  end
+
   def integer?
     kind == "integer"
   end
@@ -51,7 +55,12 @@ def keyword?(word)
 end
 
 def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= => &. <<].include?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &. << ..].include?(pair)
+end
+
+# `...` and `<<~` — the only three-character operators (ADRs 0019, 0020).
+def three_character_operator?(triple)
+  %w[... <<~].include?(triple)
 end
 
 def one_character_operator?(character)
@@ -186,7 +195,19 @@ def lex(source)
         text << characters[index]
         index += 1
       end
-      tokens << Token.new(kind: "integer", text: text, leading_space: leading)
+      # A dot makes this a float only when a digit follows (ADR 0018),
+      # which is what leaves `1..5` to ranges and `1.to_s` to method calls.
+      mutable kind = "integer"
+      if index + 1 < characters.length && characters[index] == "." && digit?(characters[index + 1])
+        text << characters[index]
+        index += 1
+        while index < characters.length && digit?(characters[index])
+          text << characters[index]
+          index += 1
+        end
+        kind = "float"
+      end
+      tokens << Token.new(kind: kind, text: text, leading_space: leading)
       next
     end
     if name_start?(character)
@@ -208,6 +229,11 @@ def lex(source)
         "identifier"
       end
       tokens << Token.new(kind: kind, text: text, leading_space: leading)
+      next
+    end
+    if index + 2 < characters.length && three_character_operator?(character + characters[index + 1] + characters[index + 2])
+      tokens << Token.new(kind: "operator", text: character + characters[index + 1] + characters[index + 2], leading_space: leading)
+      index += 3
       next
     end
     if index + 1 < characters.length && two_character_operator?(character + characters[index + 1])

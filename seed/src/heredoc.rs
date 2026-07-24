@@ -42,6 +42,17 @@ fn expand_line(lines: &[&str], index: usize) -> (String, usize) {
             position = end;
             continue;
         }
+        // `%w[...]` is a literal too, and its words can look like anything
+        // — including `<<~`, which lexer.pdx genuinely contains.
+        if line[position..].starts_with("%w[") {
+            let end = match line[position..].find(']') {
+                Some(offset) => position + offset + 1,
+                None => bytes.len(),
+            };
+            result.push_str(&line[position..end]);
+            position = end;
+            continue;
+        }
         if let Some((terminator, interpolating, opener_length)) = read_opener(line, position) {
             let (body, used) = read_body(lines, index + 1 + consumed, &terminator);
             consumed += used;

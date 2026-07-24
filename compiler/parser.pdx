@@ -227,12 +227,38 @@ struct IndexNode
   end
 end
 
+struct FloatNode
+  kind
+  value
+
+  def sexp
+    value
+  end
+end
+
 struct IntegerNode
   kind
   value
 
   def sexp
     value
+  end
+end
+
+# `1..5` / `1...5`; start or end is nil for the beginless and endless
+# forms (ADR 0019).
+struct RangeNode
+  kind
+  start
+  finish
+  exclusive
+
+  def sexp
+    mutable result = "(range"
+    result << " #{start.sexp}" if start.some?
+    result << " #{finish.sexp}" if finish.some?
+    result << " exclusive" if exclusive
+    result + ")"
   end
 end
 
@@ -556,8 +582,16 @@ def index_node(receiver, index)
   IndexNode.new(kind: "index", receiver: receiver, index: index)
 end
 
+def float_node(value)
+  FloatNode.new(kind: "float", value: value)
+end
+
 def integer_node(value)
   IntegerNode.new(kind: "integer", value: value)
+end
+
+def range_node(start, finish, exclusive)
+  RangeNode.new(kind: "range", start: start, finish: finish, exclusive: exclusive)
 end
 
 def keyword_argument_node(label, value)
@@ -664,12 +698,42 @@ def statement_boundary?(tokens, position)
 end
 
 def parse_expression(tokens, position)
-  step = parse_logical_or(tokens, position)
+  step = parse_range(tokens, position)
   # One-line pattern test (ADR 0013 §4): `expr in pattern` is a boolean,
   # binding its captures on a hit. Binds loosest of all.
   return step unless keyword_at?(tokens, step.position, %w[in])
   pattern = parse_pattern(tokens, step.position + 1)
   Step.new(node: match_test_node(step.node, pattern.node), position: pattern.position)
+end
+
+# `1..5` / `1...5`, plus endless and beginless (ADR 0019). Binds looser
+# than everything but `in`.
+def parse_range(tokens, position)
+  # Beginless: the operator leads, so there is nothing to parse first.
+  if operator_at?(tokens, position, %w[.. ...])
+    exclusive = tokens[position].text == "..."
+    finish = parse_logical_or(tokens, position + 1)
+    return Step.new(node: range_node(nil, finish.node, exclusive), position: finish.position)
+  end
+  step = parse_logical_or(tokens, position)
+  return step unless operator_at?(tokens, step.position, %w[.. ...])
+  exclusive = tokens[step.position].text == "..."
+  after = step.position + 1
+  return Step.new(node: range_node(step.node, nil, exclusive), position: after) if range_closes?(tokens, after)
+  finish = parse_logical_or(tokens, after)
+  Step.new(node: range_node(step.node, finish.node, exclusive), position: finish.position)
+end
+
+# A range closes when the next meaningful token cannot continue an
+# expression (ADR 0019 §3). The trio is the syntax half; the seed is the
+# oracle for the never-guess error, so an ambiguous line just closes here.
+def range_closes?(tokens, position)
+  return true if position >= tokens.length
+  token = tokens[position]
+  return true if token.newline?
+  return true if token.operator? && ["]", ")", "}", ","].include?(token.text)
+  return true if token.keyword? && %w[then end else elsif in when if unless].include?(token.text)
+  false
 end
 
 # `or` is dead-identical to `||` (ADR 0007): word forms normalize to the
@@ -955,6 +1019,7 @@ def parse_primary(tokens, position)
   after = position + 1
   case token.kind
   when "integer" then Step.new(node: integer_node(token.text), position: after)
+  when "float" then Step.new(node: float_node(token.text), position: after)
   when "identifier"
     if operator_at?(tokens, after, %w[(])
       arguments = parse_arguments(tokens, after + 1)

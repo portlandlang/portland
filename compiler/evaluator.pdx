@@ -315,6 +315,8 @@ def evaluate_expression(node, bindings)
   in IndexNode then evaluate_index(node, bindings)
   in IndexUpdateNode then evaluate_index_update(node, bindings)
   in IntegerNode(value:) then outcome([value.to_i], bindings)
+  in FloatNode(value:) then outcome([value.to_f], bindings)
+  in RangeNode then evaluate_range(node, bindings)
   in LogicalNode then evaluate_logical(node, bindings)
   in MatchAssertNode then evaluate_match_assert(node, bindings)
   in MatchTestNode then evaluate_match_test(node, bindings)
@@ -429,6 +431,38 @@ def evaluate_append(node, mutable bindings)
     current + [value]
   end
   outcome([appended], bindings)
+end
+
+# Guest ranges are host ranges (ADR 0019): the evaluator builds them with
+# the range syntax itself, so the seed's clamping and iteration come along
+# for free. Either bound may be nil for the endless and beginless forms.
+def build_range(start_value, finish_value, exclusive)
+  if start_value.nil?
+    return (...finish_value) if exclusive
+    return (..finish_value)
+  end
+  if finish_value.nil?
+    return (start_value...) if exclusive
+    return (start_value..)
+  end
+  return start_value...finish_value if exclusive
+  start_value..finish_value
+end
+
+def evaluate_range(node, mutable bindings)
+  mutable start_value = nil
+  if node.start.some?
+    start_step = evaluate_expression(node.start, bindings)
+    bindings = start_step.bindings
+    start_value = slot_value(start_step.value)
+  end
+  mutable finish_value = nil
+  if node.finish.some?
+    finish_step = evaluate_expression(node.finish, bindings)
+    bindings = finish_step.bindings
+    finish_value = slot_value(finish_step.value)
+  end
+  outcome([build_range(start_value, finish_value, node.exclusive)], bindings)
 end
 
 # Hash-only in the trio: array index assignment waits for type predicates
@@ -614,6 +648,8 @@ def evaluate_method_call(node, mutable bindings)
   when "sort" then receiver.sort
   when "min" then receiver.min
   when "max" then receiver.max
+  when "to_a" then receiver.to_a
+  when "to_f" then receiver.to_f
   when "join" then receiver.join(arguments.first)
   when "include?" then receiver.include?(arguments.first)
   when "split" then receiver.split(arguments.first)

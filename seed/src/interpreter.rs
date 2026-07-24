@@ -1182,6 +1182,16 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("to_i cannot parse {text:?} — no nil to return"));
                 Value::Integer(value)
             }
+            (Value::String(text), "to_f", []) => {
+                // Ruby's `to_f` never fails — unparseable text is 0.0.
+                Value::Float(text.trim().parse().unwrap_or(0.0))
+            }
+            (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
+            (Value::Float(number), "to_f", []) => Value::Float(*number),
+            // Ruby's Float#to_i truncates toward zero — it is not the
+            // floored division of ADR 0018.
+            (Value::Float(number), "to_i", []) => Value::Integer(*number as i64),
+            (Value::Float(number), "abs", []) => Value::Float(number.abs()),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
