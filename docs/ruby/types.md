@@ -1,6 +1,6 @@
 # Types
 
-_Static and inferred, written only at public boundaries; duck typing becomes structural._
+**Summary:** Static and inferred, written only at public boundaries; duck typing becomes structural.
 
 **Status:** locked direction (design brief); the inference design itself is open ([#9](https://github.com/portlandlang/portland/issues/9)).
 

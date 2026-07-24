@@ -1,6 +1,6 @@
 # Principles
 
-_For: anyone deciding something — a feature, a spelling, a diagnostic, a sentence of documentation._
+**For:** anyone deciding something — a feature, a spelling, a diagnostic, a sentence of documentation.
 
 These are the rules that settle arguments. They are not aspirations; each one has already overruled something we wanted to do, and several were written down only after we got them wrong once. Where two principles collide, the one earlier in this file wins.
 

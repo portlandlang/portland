@@ -19,18 +19,14 @@ all
 # allow long lines
 exclude_rule "MD013"
 
-# allow a fully-italic line as a subtitle under a heading
+# MD036 (emphasis used instead of a header) stays ON.
 #
-# Two conventions in this repo are exactly the shape MD036 forbids: the
-# `_For: …_` audience line every current doc carries, and the `_summary_`
-# line the index generators read out of each ledger and history file.
-# script/docs/checks/audience.rb *requires* the first of those, so the two
-# checks would contradict each other.
-#
-# Note this rule only fires when the line does not end in ".,;:!?" — every
-# audience line but ROADMAP's happens to end in a period, so the conflict
-# was latent rather than loud.
-exclude_rule "MD036"
+# It was briefly excluded: this repo's `**For:**` audience line and
+# `**Summary:**` index line both sit under a heading, and when they were
+# written as wholly-italic paragraphs — `_For: …_` — MD036 flagged them.
+# Writing them as a bold label plus plain text keeps them visually distinct
+# while putting them outside MD036's reach by construction, rather than by
+# the accident of ending in ".,;:!?" which is what the rule actually skips.
 
 # configure these rules (like .rubocop.yml)
 # any rule in with `params` is configurable

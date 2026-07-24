@@ -1,6 +1,6 @@
 # Architecture
 
-_For: anyone who wants to know how Portland is built, what runs what, and which parts are meant to be thrown away._
+**For:** anyone who wants to know how Portland is built, what runs what, and which parts are meant to be thrown away.
 
 What Portland _is_ — syntax, rules, style — lives in [language.md](language.md). This file is the machinery underneath it.
 

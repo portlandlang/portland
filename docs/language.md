@@ -1,6 +1,6 @@
 # The language
 
-_For: anyone reading or writing Portland — what it is, what the rules are, and how it's meant to be written._
+**For:** anyone reading or writing Portland — what it is, what the rules are, and how it's meant to be written.
 
 Everything here **runs today**, unless a section says otherwise. Run it with `script/console a_file.pdx`, or line by line with `script/console` and no arguments.
 

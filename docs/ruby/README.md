@@ -1,6 +1,6 @@
 # Portland, for Rubyists
 
-_For: Rubyists sizing up what moving a codebase would actually cost._
+**For:** Rubyists sizing up what moving a codebase would actually cost.
 
 Portland keeps Ruby's surface and replaces what's underneath. This folder is the ledger of differences — one file per difference, each with the Ruby behavior, the Portland behavior, why, and what happens to migrating code.
 

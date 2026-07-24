@@ -1,6 +1,6 @@
 # Truthiness
 
-_Conditions take booleans, and nothing else._
+**Summary:** Conditions take booleans, and nothing else.
 
 **Status:** locked by the design brief (strict booleans follow from no ambient nil); the rewrites below are the decided unwrap toolkit ([ADR 0008](../adr/0008-2026-07-22-unwrap-toolkit.md)).
 

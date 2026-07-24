@@ -1,6 +1,6 @@
 # Working brief
 
-_For: the coding agent working on Portland. Humans want [README](README.md)._
+**For:** the coding agent working on Portland. Humans want [README](README.md).
 
 This file is orientation and conventions only. It deliberately summarizes nothing — a summary is a second home for a fact, and the ones that used to live here went stale within days.
 
@@ -21,7 +21,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/docs/check` enforces the pair.
 
-**A new ledger file needs an H1 and an italic summary line under it**, then `script/docs/generate`. That summary is what the index is built from, so the index cannot drift from it — do not hand-edit between the `generated` markers.
+**A new ledger file needs an H1 and a `**Summary:**` line under it**, then `script/docs/generate`. That summary is what the index is built from, so the index cannot drift from it — do not hand-edit between the `generated` markers.
 
 **Never hard-wrap markdown prose.** One line per paragraph, bullet, or table row — let the editor wrap. Hard wrapping makes diffs lie: changing three words reflows every line after them, so a one-clause edit reads as a rewritten paragraph. Code blocks keep their own line breaks, since there the breaks are the content. Enforcement rides with [#31](https://github.com/portlandlang/portland/issues/31).
 
@@ -35,13 +35,13 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 ## Running things
 
-| | |
-|---|---|
-| `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks |
-| `script/console` | the REPL; `script/console file.pdx` runs a file |
-| `script/docs/check` | the doc checks in `script/docs/checks/`; name one to run it alone |
-| `script/docs/generate` | rewrite generated index sections; name one generator to run it alone |
-| `script/bootstrap` | first-time setup, installs the git hooks |
+|                        |                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks |
+| `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
+| `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
+| `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
+| `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.
 

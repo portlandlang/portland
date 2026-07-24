@@ -1,6 +1,6 @@
 # Report: the decisions ahead
 
-_A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each._
+**Summary:** A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each.
 
 Written 2026-07-22, at the close of the optionals arc (ADRs 0005–0011, seed rungs 1–6, trio rungs 1–6, #21 complete). This is a working map, not a spec: every open decision we know about, its options and tradeoffs, what deciding it unlocks, and a recommended order and answer for each.
 

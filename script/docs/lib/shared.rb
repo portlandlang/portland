@@ -93,14 +93,20 @@ def heading(path)
   found.delete_prefix("# ").strip
 end
 
-# The italic line under a doc's H1 — the same shape as the `_For: …_` audience
-# line, readable in the file itself rather than metadata that only an index
-# consumes.
+# The `**Summary:**` line under a doc's H1 — the same shape as the `**For:**`
+# audience line, readable in the file itself rather than metadata that only an
+# index consumes.
+#
+# A bold label followed by plain text, rather than a wholly-italic paragraph,
+# so mdl's MD036 (emphasis used instead of a header) cannot fire on it — by
+# construction, not by accident of trailing punctuation.
+SUMMARY_LABEL = "**Summary:** "
+
 def subtitle(path)
-  found = read_lines(path)[1..4].to_a.find { |line| line.start_with?("_") && line.strip.end_with?("_") }
+  found = read_lines(path)[1..4].to_a.find { |line| line.start_with?(SUMMARY_LABEL) }
   return nil unless found
 
-  found.strip.delete_prefix("_").delete_suffix("_")
+  found.strip.delete_prefix(SUMMARY_LABEL)
 end
 
 # Title — summary, for a directory whose files each carry their own summary.
@@ -110,7 +116,7 @@ def summary_index(directory)
      .sort
      .map do |path|
        title = heading(path) or abort "#{relative(path)}: no `# ` heading to index"
-       line = subtitle(path) or abort "#{relative(path)}: no italic summary line under the heading"
+       line = subtitle(path) or abort "#{relative(path)}: no `#{SUMMARY_LABEL}` line under the heading"
 
        "- [#{title}](#{File.basename(path)}) — #{line}"
      end.join("\n")

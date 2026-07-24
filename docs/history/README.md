@@ -1,6 +1,6 @@
 # History
 
-_For: anyone digging into how Portland got here._
+**For:** anyone digging into how Portland got here.
 
 **Nothing in this folder is current, and nothing in it is a source of truth.** Every file here is dated writing, frozen the day it was published, and never revised. Where one of these disagrees with an [ADR](../adr/), the ADR wins. Where one describes what is built, the [language](../language.md) and [architecture](../architecture.md) docs win. Where one describes what is planned, [ROADMAP](../../ROADMAP.md) and the [issues](https://github.com/portlandlang/portland/issues) win.
 

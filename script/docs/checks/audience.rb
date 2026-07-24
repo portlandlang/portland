@@ -18,16 +18,17 @@ required =
   Dir.glob("#{REPO}/docs/*.md") +
   Dir.glob("#{REPO}/docs/*/README.md")
 
+AUDIENCE_LABEL = "**For:** "
+
 required.sort.each do |path|
-  # The line may wrap, so only its opening is anchored.
-  next if read_lines(path).first(10).any? { |line| line.start_with?("_For: ") }
+  next if read_lines(path).first(10).any? { |line| line.start_with?(AUDIENCE_LABEL) }
 
   failures << <<~REPORT
     #{relative(path)}
 
       No reader named. Add a line near the top like:
 
-        _For: anyone deciding whether to try Portland._
+        #{AUDIENCE_LABEL}anyone deciding whether to try Portland.
 
       A doc written for everyone is written for nobody, and the ones
       without a stated reader are the ones that drift into summarizing

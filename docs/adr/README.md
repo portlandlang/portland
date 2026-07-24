@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-_For: anyone asking why Portland works the way it does._
+**For:** anyone asking why Portland works the way it does.
 
 One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each records Context → Decision → Consequences, with a Status of **Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
 

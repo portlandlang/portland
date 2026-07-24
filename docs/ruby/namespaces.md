@@ -1,6 +1,6 @@
 # Namespaces and modules
 
-_`module` is namespace-only; `::` names and `.` invokes; names are always fully qualified._
+**Summary:** `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 
 **Status:** decided ([ADR 0021](../adr/0021-2026-07-24-namespaces-and-modules.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#namespaces).
 

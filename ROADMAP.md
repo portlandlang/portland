@@ -1,6 +1,6 @@
 # Roadmap
 
-_For: anyone asking "how far along is this?"_
+**For:** anyone asking "how far along is this?"
 
 One page, one line per item. Details live behind the links — [ADRs](docs/adr/) decide, [the language](docs/language.md) records what is built, [the architecture](docs/architecture.md) records how, and the [issues](https://github.com/portlandlang/portland/issues) track what is in motion.
 
@@ -14,24 +14,24 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### The language
 
-| | Decided | Built |
-|---|---|---|
-| Optionals — no ambient nil, absence is a typed maybe | [0005](docs/adr/0005-2026-07-22-optionals-wrapper-model.md) [0006](docs/adr/0006-2026-07-22-absence-word-nil.md) [0008](docs/adr/0008-2026-07-22-unwrap-toolkit.md) [0009](docs/adr/0009-2026-07-22-presence-word-some.md) [0010](docs/adr/0010-2026-07-22-partial-operations-return-maybes.md) | ✅ runtime half |
-| `or`/`and`/`not` dead-identical to the sigils; `or` is typed | [0007](docs/adr/0007-2026-07-22-or-and-not-dead-identical.md) | ✅ |
-| A branch that doesn't happen is nil | [0012](docs/adr/0012-2026-07-22-branchless-if-is-nil.md) | ✅ |
-| Immutability — `mutable` gates names; values never mutate | [0001](docs/adr/0001-2026-07-20-mutable-keyword.md) [0015](docs/adr/0015-2026-07-23-values-never-mutate.md) | ✅ |
-| `case/in` pattern matching, exhaustive and static | [0013](docs/adr/0013-2026-07-22-case-in-spec.md) | ✅ runtime half |
-| Keyword arguments, Ruby 3 style; splats deferred | [0014](docs/adr/0014-2026-07-22-keyword-arguments.md) | ✅ |
-| Brace blocks, with the whose-block never-guess error | [0016](docs/adr/0016-2026-07-23-brace-blocks-never-guess-owner.md) | ✅ |
-| `it` as a normal binding under no-shadow | [0017](docs/adr/0017-2026-07-23-it-under-no-shadow.md) | ✅ |
-| Numbers — Ruby's floored division, floats | [0018](docs/adr/0018-2026-07-23-numbers-ruby-division.md) | ✅ |
-| Ranges — slices are collections, never-guess ends | [0019](docs/adr/0019-2026-07-23-ranges.md) | ✅ |
-| Heredocs — squiggly only | [0020](docs/adr/0020-2026-07-23-heredocs-squiggly-only.md) | ✅ |
-| Namespaces — `module`, `::` names and `.` invokes | [0021](docs/adr/0021-2026-07-24-namespaces-and-modules.md) | ✅ |
-| Concurrency vocabulary — `together`, `meanwhile`, `~` | [0002](docs/adr/0002-2026-07-20-together-task-sigil.md) [0004](docs/adr/0004-2026-07-20-together-meanwhile.md) [0011](docs/adr/0011-2026-07-22-together-single-register.md) _tentative_ | — |
-| Bitwise operators out; named methods instead | [0003](docs/adr/0003-2026-07-20-bitwise-operators-out.md) _tentative_ | ✅ |
-| Paren-less calls: command calls, no-shadow, never-guess | pre-log | ✅ |
-| Structs, methods in struct bodies, builtin type patterns | [#27](https://github.com/portlandlang/portland/issues/27) first increment | ✅ |
+|                                                              | Decided                                                                                                                                                                                                                                                                                         | Built           |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Optionals — no ambient nil, absence is a typed maybe         | [0005](docs/adr/0005-2026-07-22-optionals-wrapper-model.md) [0006](docs/adr/0006-2026-07-22-absence-word-nil.md) [0008](docs/adr/0008-2026-07-22-unwrap-toolkit.md) [0009](docs/adr/0009-2026-07-22-presence-word-some.md) [0010](docs/adr/0010-2026-07-22-partial-operations-return-maybes.md) | ✅ runtime half |
+| `or`/`and`/`not` dead-identical to the sigils; `or` is typed | [0007](docs/adr/0007-2026-07-22-or-and-not-dead-identical.md)                                                                                                                                                                                                                                   | ✅              |
+| A branch that doesn't happen is nil                          | [0012](docs/adr/0012-2026-07-22-branchless-if-is-nil.md)                                                                                                                                                                                                                                        | ✅              |
+| Immutability — `mutable` gates names; values never mutate    | [0001](docs/adr/0001-2026-07-20-mutable-keyword.md) [0015](docs/adr/0015-2026-07-23-values-never-mutate.md)                                                                                                                                                                                     | ✅              |
+| `case/in` pattern matching, exhaustive and static            | [0013](docs/adr/0013-2026-07-22-case-in-spec.md)                                                                                                                                                                                                                                                | ✅ runtime half |
+| Keyword arguments, Ruby 3 style; splats deferred             | [0014](docs/adr/0014-2026-07-22-keyword-arguments.md)                                                                                                                                                                                                                                           | ✅              |
+| Brace blocks, with the whose-block never-guess error         | [0016](docs/adr/0016-2026-07-23-brace-blocks-never-guess-owner.md)                                                                                                                                                                                                                              | ✅              |
+| `it` as a normal binding under no-shadow                     | [0017](docs/adr/0017-2026-07-23-it-under-no-shadow.md)                                                                                                                                                                                                                                          | ✅              |
+| Numbers — Ruby's floored division, floats                    | [0018](docs/adr/0018-2026-07-23-numbers-ruby-division.md)                                                                                                                                                                                                                                       | ✅              |
+| Ranges — slices are collections, never-guess ends            | [0019](docs/adr/0019-2026-07-23-ranges.md)                                                                                                                                                                                                                                                      | ✅              |
+| Heredocs — squiggly only                                     | [0020](docs/adr/0020-2026-07-23-heredocs-squiggly-only.md)                                                                                                                                                                                                                                      | ✅              |
+| Namespaces — `module`, `::` names and `.` invokes            | [0021](docs/adr/0021-2026-07-24-namespaces-and-modules.md)                                                                                                                                                                                                                                      | ✅              |
+| Concurrency vocabulary — `together`, `meanwhile`, `~`        | [0002](docs/adr/0002-2026-07-20-together-task-sigil.md) [0004](docs/adr/0004-2026-07-20-together-meanwhile.md) [0011](docs/adr/0011-2026-07-22-together-single-register.md) _tentative_                                                                                                         | —               |
+| Bitwise operators out; named methods instead                 | [0003](docs/adr/0003-2026-07-20-bitwise-operators-out.md) _tentative_                                                                                                                                                                                                                           | ✅              |
+| Paren-less calls: command calls, no-shadow, never-guess      | pre-log                                                                                                                                                                                                                                                                                         | ✅              |
+| Structs, methods in struct bodies, builtin type patterns     | [#27](https://github.com/portlandlang/portland/issues/27) first increment                                                                                                                                                                                                                       | ✅              |
 
 ### The implementation
 
