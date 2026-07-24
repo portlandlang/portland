@@ -4,7 +4,7 @@
 # was all it took. An index nobody verifies is worse than no index,
 # because it reads as complete.
 
-require_relative "shared"
+require_relative "lib/shared"
 
 failures = []
 
@@ -14,9 +14,11 @@ def entries_under(directory)
      .reject { |path| File.basename(path) == "README.md" }
 end
 
+# docs/ruby/ is deliberately absent: its index is generated from each file's
+# own summary line, so `generated.rb` checks it exactly rather than merely
+# checking that every filename appears somewhere.
 INDEXES = {
   "adr" => { entries: Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort, what: "ADRs" },
-  "ruby" => { entries: entries_under("ruby"), what: "ledger files" },
   "history" => { entries: entries_under("history"), what: "history files" }
 }.freeze
 
@@ -42,4 +44,4 @@ INDEXES.each do |directory, index|
   REPORT
 end
 
-finish("indexes", failures, "#{INDEXES.length} indexes")
+finish("indexes", failures, count(INDEXES.length, "index", "indexes"))

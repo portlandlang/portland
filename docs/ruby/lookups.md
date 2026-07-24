@@ -1,5 +1,7 @@
 # Lookups and `fetch`
 
+_Partial operations return maybes; the only crash is one you typed; `fetch` retires._
+
 **Status:** decided
 ([ADR 0010](../adr/0010-2026-07-22-partial-operations-return-maybes.md)).
 Built, runtime half — see [the language](../language.md#absence).

@@ -9,7 +9,7 @@
 # carry a Status line instead), and frozen history files (their folder's
 # README carries the contract for all of them).
 
-require_relative "shared"
+require_relative "lib/shared"
 
 failures = []
 
@@ -35,4 +35,4 @@ required.sort.each do |path|
   REPORT
 end
 
-finish("audience", failures, "#{required.length} docs")
+finish("audience", failures, count(required.length, "doc"))

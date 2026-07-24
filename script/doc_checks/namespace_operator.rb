@@ -4,7 +4,7 @@
 # exactly that an error. In a code block, a path segment followed by `(`
 # is an invocation written with the naming operator.
 
-require_relative "shared"
+require_relative "lib/shared"
 
 failures = []
 
@@ -27,4 +27,4 @@ markdown_files.each do |path|
   end
 end
 
-finish("namespace_operator", failures, "#{markdown_files.length} files")
+finish("namespace_operator", failures, count(markdown_files.length, "file"))

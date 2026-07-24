@@ -36,37 +36,33 @@ promises govern every difference here:
   interpreted VM; Portland is a native binary for one vendor's hardware,
   on purpose.
 
-## The differences
-
-- [nil and optionals](nil-and-optionals.md) — no ambient nil; absence is
-  an explicit maybe; the word is still `nil`
-- [truthiness](truthiness.md) — conditions take booleans, nothing else
-- [lookups and `fetch`](lookups.md) — partial operations return maybes;
-  the only crash is one you typed; `fetch` retires
-- [ranges](ranges.md) — slices are collections, never maybes; range
-  patterns prove exhaustiveness; endless ranges close loudly
-- [pattern matching](pattern-matching.md) — `case/in` compile-checked
-  exhaustive; `===` static; captures fenced
-- [word operators](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!`
-  are dead-identical; `or` is typed
-- [mutability](mutability.md) — immutable by default; `mutable` marks the
-  exception
-- [metaprogramming](metaprogramming.md) — the runtime kind is gone;
-  compile-time macros replace it
-- [types](types.md) — static and inferred; duck typing becomes structural
-- [concurrency](concurrency.md) — no GIL, no `Thread`; `together` /
-  `meanwhile` / `~`
-- [parentheses and ambiguity](parentheses.md) — command calls, the
-  no-shadow rule, never-guess errors; brace blocks and `it`
-- [namespaces and modules](namespaces.md) — `module` is namespace-only;
-  `::` names and `.` invokes; names are always qualified
-- [heredocs](heredocs.md) — squiggly `<<~` only, SCREAMING_CAPS
-  terminators; `<<` stays the append operator
-- [bitwise operators](bitwise-operators.md) — out of the grammar; named
-  methods instead
-- [removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the
-  other deliberate deletions; also what is merely *deferred*
-
 `../adr/` records the decisions behind these;
-[`../language.md`](../language.md) records what Portland speaks today. Where a difference is **Tentative** or
-merely **Sketched**, its file says so.
+[`../language.md`](../language.md) records what Portland speaks today.
+Where a difference is **Tentative** or merely **Sketched**, its file says
+so — check the Status line at its top before relying on it.
+
+## Every difference
+
+<!-- generated: do not edit by hand — script/generate_docs -->
+
+- [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
+- [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
+- [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
+- [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
+- [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
+- [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
+- [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
+- [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
+- [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
+- [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
+- [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
+- [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
+- [Truthiness](truthiness.md) — Conditions take booleans, and nothing else.
+- [Types](types.md) — Static and inferred, written only at public boundaries; duck typing becomes structural.
+- [Word operators: `or`, `and`, `not`](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed.
+
+<!-- /generated -->
+
+Each line is that file's own one-line summary, so the two cannot drift.
+Adding a ledger file means writing the file — `script/generate_docs`
+picks it up and `script/check_docs generated` fails until you run it.

@@ -1,5 +1,7 @@
 # Metaprogramming
 
+_The runtime kind is gone; compile-time macros replace it._
+
 **Status:** the cut is locked by the design brief; compile-time macros are
 planned, undesigned ([#14](https://github.com/portlandlang/portland/issues/14)).
 

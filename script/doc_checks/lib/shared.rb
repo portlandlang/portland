@@ -13,7 +13,7 @@
 # Adding a check: drop `something.rb` in here, require this file, and end
 # with `finish`. The runner picks it up with no wiring.
 
-REPO = File.expand_path("../..", __dir__)
+REPO = File.expand_path("../../..", __dir__)
 
 def relative(path) = path.delete_prefix("#{REPO}/")
 
@@ -45,6 +45,12 @@ def fenced_lines(path)
     end
     [line, index + 1] if inside
   end
+end
+
+# "1 file", "51 files", "2 indexes" — a summary that says "1 sections" reads
+# like a bug in the checker, which undermines the checker.
+def count(number, singular, plural = "#{singular}s")
+  "#{number} #{number == 1 ? singular : plural}"
 end
 
 # Every check ends the same way: say what passed, or report and fail.

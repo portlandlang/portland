@@ -1,5 +1,7 @@
 # Removed syntax
 
+_`for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred._
+
 **Status:** locked by the design brief's cut-list, except where noted.
 The principle: redundant forms and footguns are deleted; each survivor is
 the one Ruby's own style guides already preferred.

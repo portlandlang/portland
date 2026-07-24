@@ -1,6 +1,6 @@
 # Internal doc links resolve.
 
-require_relative "shared"
+require_relative "lib/shared"
 
 failures = []
 
@@ -22,4 +22,4 @@ markdown_files.each do |path|
   end
 end
 
-finish("links", failures, "#{markdown_files.length} files")
+finish("links", failures, count(markdown_files.length, "file"))

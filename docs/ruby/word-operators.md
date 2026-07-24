@@ -1,5 +1,7 @@
 # Word operators: `or`, `and`, `not`
 
+_`or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed._
+
 **Status:** decided ([ADR 0007](../adr/0007-2026-07-22-or-and-not-dead-identical.md)).
 Built in the seed and the trio — see
 [the language](../language.md#absence).

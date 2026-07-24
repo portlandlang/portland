@@ -1,5 +1,7 @@
 # Concurrency
 
+_No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`._
+
 **Status:** vocabulary decided-tentative
 ([ADR 0002](../adr/0002-2026-07-20-together-task-sigil.md),
 [ADR 0004](../adr/0004-2026-07-20-together-meanwhile.md)); semantics are

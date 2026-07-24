@@ -3,7 +3,7 @@
 # Splats were once documented nowhere: ADR 0014 matched Ruby so closely
 # that nobody noticed it *also* deferred something.
 
-require_relative "shared"
+require_relative "lib/shared"
 
 failures = []
 
@@ -29,4 +29,4 @@ adrs.each do |path|
   REPORT
 end
 
-finish("ledger_coverage", failures, "#{adrs.length} ADRs")
+finish("ledger_coverage", failures, count(adrs.length, "ADR"))

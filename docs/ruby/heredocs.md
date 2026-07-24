@@ -1,5 +1,7 @@
 # Heredocs
 
+_Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator._
+
 **Status:** decided
 ([ADR 0020](../adr/0020-2026-07-23-heredocs-squiggly-only.md)). Built in
 the seed and the trio, differentially pinned — see

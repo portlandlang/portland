@@ -35,6 +35,11 @@ breath — a file per difference, with the Ruby behavior, the Portland
 behavior, why, and what happens to migrating code. If a decision is a
 non-difference, say so explicitly; `script/check_docs` enforces the pair.
 
+**A new ledger file needs an H1 and an italic summary line under it**, then
+`script/generate_docs`. That summary is what the index is built from, so
+the index cannot drift from it — do not hand-edit between the `generated`
+markers.
+
 **Every commit gets a CHANGELOG entry.** `## Unreleased` is strictly
 newest-first: insert **directly under the `## Unreleased` header**, never
 anchored on a nearby existing bullet — that silently drifts as the file
@@ -57,6 +62,7 @@ readable without reading its comments.
 | `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then `check_docs` |
 | `script/console` | the REPL; `script/console file.pdx` runs a file |
 | `script/check_docs` | the doc checks in `script/doc_checks/`; name one to run it alone |
+| `script/generate_docs` | rewrite generated index sections; run it after adding a doc |
 | `script/bootstrap` | first-time setup, installs the git hooks |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`.

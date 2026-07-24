@@ -1,5 +1,7 @@
 # Ranges
 
+_Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly._
+
 **Status:** decided
 ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the
 trio, differentially pinned — see [the language](../language.md#values).

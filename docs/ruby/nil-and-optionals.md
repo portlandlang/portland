@@ -1,5 +1,7 @@
 # nil and optionals
 
+_No ambient nil; absence is an explicit maybe; the word is still `nil`._
+
 **Status:** decided — the model ([ADR 0005](../adr/0005-2026-07-22-optionals-wrapper-model.md)),
 both words ([ADR 0006](../adr/0006-2026-07-22-absence-word-nil.md),
 [ADR 0009](../adr/0009-2026-07-22-presence-word-some.md)), and the unwrap

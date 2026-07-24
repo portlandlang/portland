@@ -1,5 +1,7 @@
 # Mutability
 
+_Immutable by default; `mutable` marks the exception, and it governs names rather than values._
+
 **Status:** fully decided — the keyword and rebinding rules
 ([ADR 0001](../adr/0001-2026-07-20-mutable-keyword.md)) and the values
 question ([ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md):

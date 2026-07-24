@@ -48,15 +48,16 @@ fi
 
 # Named checks run alone — `script/check_docs links` — which is how you
 # iterate on one without waiting for the rest.
+# Every .rb here is a check; the libraries they share live in lib/.
 available() {
-  ls script/doc_checks/*.rb | sed 's|.*/||; s|\.rb$||' | grep -v '^shared$'
+  ls script/doc_checks/*.rb | sed 's|.*/||; s|\.rb$||'
 }
 
 if [ "$#" -gt 0 ]; then
   checks=""
   for name in "$@"; do
     name="${name%.rb}"
-    if [ "$name" = "shared" ] || [ ! -f "script/doc_checks/$name.rb" ]; then
+    if [ ! -f "script/doc_checks/$name.rb" ]; then
       echo "script/check_docs: no check named '$name'" >&2
       echo "  available: $(available | tr '\n' ' ')" >&2
       exit 1
@@ -64,7 +65,6 @@ if [ "$#" -gt 0 ]; then
     checks="$checks script/doc_checks/$name.rb"
   done
 else
-  # shared.rb is the library the checks require, not a check.
   checks="$(available | sed 's|^|script/doc_checks/|; s|$|.rb|')"
 fi
 

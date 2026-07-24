@@ -1,5 +1,7 @@
 # Parentheses and ambiguity
 
+_Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics._
+
 **Status:** decided and built — this is in the seed and the Portland trio
 today (see [the language](../language.md#methods-and-calls)).
 
