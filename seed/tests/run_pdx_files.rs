@@ -445,6 +445,25 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
+/// ADRs 0016 + 0017 threaded through the trio: brace blocks are
+/// dead-identical to `do ... end`, and `it` is the implicit parameter.
+#[test]
+fn portland_evaluator_matches_the_seed_on_brace_blocks_and_it() {
+    assert_evaluator_matches_seed(
+        "evaluator_brace_blocks.pdx",
+        "p([1, 2].map { |number| number * 2 })\np([\"a\", \"b\"].map { |word| word.upcase }.join(\"-\"))\np([1, 2].map { it * 2 })\np([\"a\", \"b\"].map { it.upcase }.join(\"-\"))\np([1, 2, 3].select { it.odd? })\np([[1, 2]].map { |pair| pair.map { it * 2 } })\np([1, 2].map do |number|\n  number * 2\nend)\np([1, 2, 3].select do\n  it.odd?\nend)\np({\"a\" => 1}.length)\np([1, 2].map { |number|\n  doubled = number * 2\n  doubled + 1\n})\n",
+    );
+}
+
+/// ADR 0020 threaded through the trio: every heredoc form, byte-identical.
+#[test]
+fn portland_evaluator_matches_the_seed_on_heredocs() {
+    assert_evaluator_matches_seed(
+        "evaluator_heredocs.pdx",
+        "db = <<~SQL\n  select *\n    from orders\nSQL\np(db)\nname = \"pdx\"\np(<<~TEXT)\n  hello, #{name}\nTEXT\np(<<~'TEXT')\n  literal #{name}\nTEXT\np(<<~TEXT.upcase)\n  shout\nTEXT\ndef show\n  inner = <<~TEXT\n    indented\n      deeper\n  TEXT\n  inner\nend\np(show)\nmutable list = [1]\nlist << 2\np(list)\n",
+    );
+}
+
 /// ADR 0018 + 0019 threaded through the trio: float and range literals
 /// lex, parse, and evaluate to the same host values the seed produces.
 #[test]
