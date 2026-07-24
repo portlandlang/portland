@@ -1,0 +1,19 @@
+#!/bin/sh
+# The fast gate — everything except the one slow test, ~4s warm.
+#
+# `parses_the_whole_compiler_including_itself` takes ~31s of the suite's
+# ~33s (it parses 1961 lines of Portland with the Portland parser, and
+# `<<` copies the array each time — see #12). It guards the self-hosting
+# property, which pre-push is the right place for. Everything else runs
+# here, at the moment you make the mistake.
+#
+# Escape hatch: `git commit --no-verify`.
+set -e
+cd "$(dirname "$0")/../.."
+
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace -- --skip parses_the_whole_compiler
+script/check_docs

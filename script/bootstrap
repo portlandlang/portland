@@ -14,3 +14,8 @@ export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 rustup default stable > /dev/null
 rustc --version
 cargo --version
+
+# Git hooks live in script/hooks/ so they are version-controlled; .git/hooks
+# is not. Pointing core.hooksPath there installs them for this clone.
+git config core.hooksPath script/hooks
+echo "git hooks: pre-commit (fast gate), pre-push (full suite)"

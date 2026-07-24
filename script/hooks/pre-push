@@ -1,0 +1,13 @@
+#!/bin/sh
+# The full gate — what CI runs, run before anything becomes public.
+#
+# The extra ~31s over pre-commit is the self-parse test: Portland parsing
+# the whole compiler including itself. That is the property the project
+# exists to hold, so it is worth a wait once per push rather than a red
+# CI badge minutes later.
+#
+# Escape hatch: `git push --no-verify`.
+set -e
+cd "$(dirname "$0")/../.."
+
+script/test
