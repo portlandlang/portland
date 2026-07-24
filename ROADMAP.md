@@ -75,3 +75,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - [ ] #24 — Zed, the rest: `tree-sitter-portland` fork as the grammars drift; registry publication
 - [ ] #25 — benchmarks: `script/bench` harness for seed/trio workloads; eventually compiled Portland vs Ruby with receipts
 - [ ] #30 — `portland report` (name TBD): a non-judgmental self-audit of the deliberately-singular scary constructs — `panic` (with its reasons), `mutable`, `parallel`. A mirror, never a linter; the harvest of "loud, one spelling per scary thing"
+- [ ] #31 — markdown linting (`mdl`), and whether to adopt `overcommit` for hooks
+- [ ] #32 — a coarse performance tripwire so a slow test can't hide (tune after #34)
+- [ ] #33 — audit the guidance docs (AGENT/DESIGN/ROADMAP/STAGE0): one source of truth per fact
+- [ ] #34 — make the self-parse test fast via RC-exact `<<` (root cause; ~200M array copies today)
