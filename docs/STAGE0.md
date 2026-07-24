@@ -175,9 +175,12 @@ the tests are the spec until a real one exists.
 
 ## Out (deliberately, for now)
 
-- Guest `it` collision rules, and the never-guess brace error — the trio
-  parses the happy path and the seed is the enforcement oracle, as with
-  `mutable`.
+- Guest `it` collision rules, the never-guess brace error, and the
+  namespace errors (`S::mean(...)`, modules inside structs, lowercase
+  module names) — the trio parses the happy path and the seed is the
+  enforcement oracle, as with `mutable`. The trio does *record* the
+  namespace errors as `ErrorNode`s carrying the seed's exact wording; its
+  evaluator just doesn't surface them yet.
 - Symbols and enums — undecided; symbols' core question is settled but the
   enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
