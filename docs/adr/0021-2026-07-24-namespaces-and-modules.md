@@ -1,6 +1,6 @@
 # 0021 — Namespaces: `module`, `::` for names, always qualified
 
-- **Status:** Accepted (not yet built)
+- **Status:** Accepted (built in the seed and the trio, 2026-07-24)
 - **Date:** 2026-07-24
 - **Issue:** [#27](https://github.com/portlandlang/portland/issues/27) (carved out of the object-model umbrella)
 
@@ -191,9 +191,14 @@ modules group things, a struct is a thing.
 
 ## Consequences
 
-- Build: `module` keyword, `::` as a two-character token, namespace
-  resolution in the seed, then threaded through the trio. The trio's own
-  ~40 node structs become the first real test.
+- **Built the same day, seed and trio, differentially pinned.** Namespaces
+  are flattened to qualified names at definition time in both, so the two
+  implementations agree by construction rather than by coincidence. Two
+  wrinkles worth recording: namespace constants must survive into a fresh
+  method scope (they are qualified; bare locals still drop), and a method
+  carries the namespace it was *written* in so its bare names resolve from
+  there rather than from the call site. Living fixture:
+  `seed/tests/fixtures/namespaces.pdx`, run direct and hosted.
 - `Statistics::mean(x)` and modules-inside-structs join the never-guess
   error family.
 - Unblocks the enum session, which unblocks symbols, which unblocks

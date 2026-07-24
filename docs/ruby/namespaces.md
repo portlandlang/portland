@@ -1,8 +1,8 @@
 # Namespaces and modules
 
 **Status:** decided
-([ADR 0021](../adr/0021-2026-07-24-namespaces-and-modules.md)), not yet
-built.
+([ADR 0021](../adr/0021-2026-07-24-namespaces-and-modules.md)). Built in
+the seed and the trio, differentially pinned — see [STAGE0](../STAGE0.md).
 
 ## Ruby
 

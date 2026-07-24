@@ -72,6 +72,16 @@ languages are forbidden to make.
   operations (`[].first`, `hash[missing]`, out-of-range indexing) return
   maybes and `fetch` retires; a branch that doesn't happen is nil. The
   only crash is one you typed.
+- **Namespaces** (ADR 0021 — designed _and_ built): `module` is a namespace
+  and nothing else, so mixins can get their own keyword later and
+  `include Comparable` can never be confused with `include Math`. `::`
+  names, `.` invokes — a rule, not Ruby's convention. Names are always
+  fully qualified: no import, no aliasing, no injection, with lexical
+  nesting the only shortening. `module A::B` and nested blocks are
+  semantically identical, dropping Ruby's `Module.nesting` trap. Types nest
+  in types; modules don't nest in structs. Constants needed no new concept —
+  immutability already made `MAX = 5` unrebindable, so all that was missing
+  was a place for the name to live.
 - **Immutable by default;** the mutability keyword is **`mutable`**
   (ADR 0001), fused to first assignment, gating rebinding only. The real
   line is immutable-when-shared, mutable-when-local; mutable _values_

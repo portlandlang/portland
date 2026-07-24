@@ -441,11 +441,38 @@ struct StructDefNode
   name
   fields
   methods
+  nested
 
   def sexp
     mutable result = "(struct #{name} #{fields.join(" ")}"
     result << " #{sexp_list(methods)}" unless methods.empty?
+    result << " #{sexp_list(nested)}" unless nested.empty?
     result + ")"
+  end
+end
+
+# `module Foo ... end` and `module Foo::Bar ... end` (ADR 0021) — both
+# spellings build the same path, so they mean the same thing.
+struct ModuleDefNode
+  kind
+  path
+  body
+
+  def sexp
+    mutable result = "(module #{path.join("::")}"
+    result << " #{sexp_list(body)}" unless body.empty?
+    result + ")"
+  end
+end
+
+# `Foo::Bar` — naming a name inside a namespace. Naming only; invoking is
+# a `.`, and `Foo::bar()` is a never-guess error.
+struct PathNode
+  kind
+  parts
+
+  def sexp
+    "(:: #{parts.join(" ")})"
   end
 end
 
@@ -654,8 +681,16 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, methods)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, methods: methods)
+def struct_def_node(name, fields, methods, nested)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, methods: methods, nested: nested)
+end
+
+def module_def_node(path, body)
+  ModuleDefNode.new(kind: "module_def", path: path, body: body)
+end
+
+def path_node(parts)
+  PathNode.new(kind: "path", parts: parts)
 end
 
 def struct_pattern_node(name, fields)
@@ -1073,7 +1108,9 @@ def parse_primary(tokens, position)
   when "integer" then Step.new(node: integer_node(token.text), position: after)
   when "float" then Step.new(node: float_node(token.text), position: after)
   when "identifier"
-    if operator_at?(tokens, after, %w[(])
+    if operator_at?(tokens, after, ["::"])
+      parse_path(tokens, token.text, after)
+    elsif operator_at?(tokens, after, %w[(])
       arguments = parse_arguments(tokens, after + 1)
       Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
     else
@@ -1234,6 +1271,7 @@ def parse_statement(tokens, position)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
+    when "module" then return parse_module(tokens, position + 1)
     end
   end
   if token.identifier? && command_start?(tokens, position + 1)
@@ -1625,10 +1663,70 @@ def parse_struct(tokens, mutable position)
     methods << method.node
     position = skip_newlines_at(tokens, method.position)
   end
+  # A type may nest in a type; a module may not (ADR 0021 §5).
+  mutable nested = []
+  while keyword_at?(tokens, position, %w[struct])
+    inner = parse_struct(tokens, position + 1)
+    nested << inner.node
+    position = skip_newlines_at(tokens, inner.position)
+  end
+  if keyword_at?(tokens, position, %w[module])
+    return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
+  end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: struct_def_node(name, fields, methods), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, methods, nested), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+# `Foo::Bar` in expression position (ADR 0021). `::` names, `.` invokes —
+# so a paren right after a path segment is a never-guess error.
+def parse_path(tokens, first, mutable position)
+  mutable parts = [first]
+  while operator_at?(tokens, position, ["::"])
+    position += 1
+    if position >= tokens.length || !tokens[position].identifier?
+      return Step.new(node: error_node("expected a name after ::"), position: position)
+    end
+    name = tokens[position].text
+    position += 1
+    if operator_at?(tokens, position, %w[(])
+      return Step.new(node: error_node("`::` names, `.` invokes — write #{parts.join("::")}.#{name}(...) to call it"), position: position)
+    end
+    parts << name
+  end
+  Step.new(node: path_node(parts), position: position)
+end
+
+# `module Foo ... end` / `module Foo::Bar ... end` (ADR 0021).
+def parse_module(tokens, mutable position)
+  path = parse_namespace_path(tokens, position)
+  return Step.new(node: path.node, position: path.position) if path.node in ErrorNode
+  body = parse_body(tokens, path.position, %w[end])
+  if keyword_at?(tokens, body.position, %w[end])
+    return Step.new(node: module_def_node(path.node, body.node), position: body.position + 1)
+  end
+  Step.new(node: error_node("expected end to close module"), position: body.position)
+end
+
+# A `::`-separated run of capitalized names. Answers an array of names,
+# or an ErrorNode.
+def parse_namespace_path(tokens, mutable position)
+  mutable parts = []
+  while true
+    if position >= tokens.length || !tokens[position].identifier?
+      return Step.new(node: error_node("expected a name after module"), position: position)
+    end
+    name = tokens[position].text
+    unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
+      return Step.new(node: error_node("module names start with a capital letter, got #{name}"), position: position + 1)
+    end
+    parts << name
+    position += 1
+    break unless operator_at?(tokens, position, ["::"])
+    position += 1
+  end
+  Step.new(node: parts, position: skip_newlines_at(tokens, position))
 end
 
 # — control flow —

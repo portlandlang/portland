@@ -1,0 +1,82 @@
+# Namespaces, as a living document (ADR 0021).
+#
+# `module` is a namespace and nothing else — mixins are a separate, later
+# decision and will get their own keyword, so `include Comparable` (real
+# behavior) can never be confused with `include Math` (typing convenience)
+# the way it is in Ruby.
+
+module Statistics
+  LIMIT = 10
+
+  struct Summary
+    mean
+    median
+  end
+
+  def mean(values)
+    values.sum / values.length
+  end
+
+  # A bare name resolves outward from where it was *written*: `Summary`
+  # and `mean` are found here without qualification.
+  def describe(values)
+    Summary.new(mean: mean(values), median: 0)
+  end
+end
+
+# `::` names, `.` invokes — a rule, not a convention. `Statistics::mean(x)`
+# is a compile error naming the fix.
+puts Statistics.mean([1, 2, 3])
+puts Statistics::LIMIT
+puts Statistics::Summary.new(mean: 2, median: 1).mean
+puts Statistics.describe([2, 4, 6]).mean
+
+# Namespaces nest, and lexical scope reaches every enclosing level.
+module Portland
+  SCALE = 2
+
+  module Compiler
+    def scaled
+      SCALE * 3
+    end
+  end
+end
+
+puts Portland::Compiler.scaled
+
+# The path form declares the same thing as nested blocks — including the
+# visibility of `Outer`'s names. Ruby's two forms differ here; ours don't.
+module Outer
+  BASE = 100
+end
+
+module Outer::Inner
+  struct Thing
+    value
+  end
+
+  def make
+    Thing.new(value: BASE + 7)
+  end
+end
+
+puts Outer::Inner.make.value
+
+# A type nests in a type. A module inside a struct is an error — a module
+# groups things, a struct is a thing.
+struct Invoice
+  total
+
+  struct Line
+    description
+    amount
+  end
+end
+
+line = Invoice::Line.new(description: "widget", amount: 9)
+puts "#{line.description} #{line.amount}"
+
+# Names are always fully qualified: there is no import, no aliasing, and
+# no way to inject a name into scope. Lexical nesting is the only
+# shortening — which is Ruby's answer too.
+puts Invoice.new(total: 42).total

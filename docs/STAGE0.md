@@ -103,7 +103,33 @@ the tests are the spec until a real one exists.
   `new`/`with`/`nil?`/`some?` reserved); `self` is the receiver, for the
   pass-myself-along case. And **builtin type patterns**: `in String` /
   `Integer` / `Array` / `Hash` / `Boolean` — the type predicate is a
-  pattern, not a reflection API (`is_a?`/`.class` stay dead).
+  pattern, not a reflection API (`is_a?`/`.class` stay dead). Types nest in
+  types (`Invoice::Line`); modules inside structs are an error.
+- **Namespaces** (ADR 0021) — `module Foo ... end`, and `module Foo::Bar`
+  as an identical alternative spelling:
+  ```ruby
+  module Statistics
+    LIMIT = 10
+
+    struct Summary
+      mean
+    end
+
+    def mean(values)
+      values.sum / values.length
+    end
+  end
+
+  Statistics.mean(readings)                  # invoking → .
+  Statistics::LIMIT                          # naming → ::
+  Statistics::Summary.new(mean: 2)           # both, in order
+  ```
+  `module` is a namespace **only** — mixins are deferred and will get a
+  different keyword. `::` names and `.` invokes as a rule, so
+  `Statistics::mean(x)` is a never-guess error. Names are always fully
+  qualified: no import, no aliasing, no injection. Bare names resolve
+  outward from where they were *written* — a method in a nested module
+  sees its enclosing constants, whichever spelling declared the namespace.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
   the enclosing method, unwinding through loops *and blocks*; `break` and
   `next` control the enclosing `while` or block iteration. A call broken out
@@ -156,8 +182,9 @@ the tests are the spec until a real one exists.
   enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
-- Classes/objects (if they exist at all), modules, constants, inheritance,
-  class-level methods — the full object-model session (#27).
+- Classes/objects (if they exist at all), mixins, inheritance, visibility,
+  `class << self` — the object-model session (#27). Namespacing and
+  constants are done (ADR 0021).
 - Splats (`*args`, `**kwargs`) — deferred, ADR 0014.
 - `together` / concurrency (#11), macros (#14).
 - Mutating methods (`push`, `upcase!`) — permanently, by design: values

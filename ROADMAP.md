@@ -24,6 +24,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 - ✅ **Object model, first increment** (#27): methods in struct bodies + builtin type patterns, seed + trio — and the taste payoff: the trio's AST prints itself (`node.sexp`), Token knows its kinds, guest `with` works
 - ✅ **Decided and built, seed + trio, differentially pinned** — brace blocks + the whose-block never-guess error (0016), `it` under no-shadow (0017), Ruby's floored `/` and `%` plus floats (0018), ranges with collection slices and membership patterns (0019), squiggly-only heredocs (0020)
+- ✅ **Namespaces** (0021, seed + trio, differentially pinned) — `module` as namespace-only with mixins deferred to a different keyword; `::` names and `.` invokes as a rule; always fully qualified, no import or aliasing; both declaration forms identical, dropping Ruby's `Module.nesting` trap; types nest in types. Unblocks the enum → symbol → hash-shorthand chain
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -44,8 +45,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - [ ] #29 — the `%` literal zoo: which of `%w %i %q %Q %r %s %x` survive, and one delimiter or many; corpus-informed. `%w[]`'s can't-contain-`]` bug rides along
 - [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
-- [ ] **Namespaces (ADR 0021 — decided; build)** — `module`, `::`, always-qualified names. Unblocks the enum → symbol → hash-shorthand chain
-- [ ] Enums / sum types — next after namespaces; unblocks symbols. Open: payloads (one feature or two?), and whether `enum` declares the field as well as the vocabulary (Rails-style)
+- [ ] **Enums / sum types — next up**, now that namespaces exist to hold them; unblocks symbols. Open: payloads (one feature or two?), and whether `enum` declares the field as well as the vocabulary (Rails-style)
 - [ ] #27 — the object model: mixins, inheritance, visibility, `class << self` (methods in struct bodies + type predicates already built; namespacing carved out to 0021). Wants the class-shape census
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first

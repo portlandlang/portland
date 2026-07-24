@@ -51,11 +51,11 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end false if in mutable next nil not or return self struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end false if in module mutable next nil not or return self struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= => &. << ..].include?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &. << .. ::].include?(pair)
 end
 
 # `...` and `<<~` — the only three-character operators (ADRs 0019, 0020).

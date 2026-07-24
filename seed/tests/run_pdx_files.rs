@@ -88,6 +88,16 @@ fn runs_patterns_pdx() {
 }
 
 #[test]
+fn runs_namespaces_pdx() {
+    let output = run_fixture("namespaces.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "2\n10\n2\n4\n6\n107\nwidget 9\n42\n"
+    );
+}
+
+#[test]
 fn runs_mini_lexer_pdx() {
     let output = run_fixture("mini_lexer.pdx");
     assert!(output.status.success());
@@ -445,6 +455,16 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
+/// ADR 0021 threaded through the trio: namespaces, `::` paths, lexical
+/// resolution outward, both declaration forms, and types nesting in types.
+#[test]
+fn portland_evaluator_matches_the_seed_on_namespaces() {
+    assert_evaluator_matches_seed(
+        "evaluator_namespaces.pdx",
+        "module Statistics\n  LIMIT = 10\n\n  struct Summary\n    mean\n    median\n  end\n\n  def mean(values)\n    values.sum / values.length\n  end\n\n  def describe(values)\n    Summary.new(mean: mean(values), median: 0)\n  end\nend\n\nmodule Portland\n  SCALE = 2\n\n  module Compiler\n    struct Token\n      kind\n    end\n\n    def scaled\n      SCALE * 3\n    end\n  end\nend\n\nmodule Outer::Inner\n  struct Thing\n    value\n  end\n\n  def make\n    Thing.new(value: 7)\n  end\nend\n\nstruct Invoice\n  total\n\n  struct Line\n    amount\n  end\nend\n\np(Statistics.mean([1, 2, 3]))\np(Statistics::LIMIT)\np(Statistics::Summary.new(mean: 2, median: 1).mean)\np(Statistics.describe([2, 4, 6]).mean)\np(Portland::Compiler::Token.new(kind: \"integer\").kind)\np(Portland::Compiler.scaled)\np(Outer::Inner::Thing.new(value: 3).value)\np(Outer::Inner.make.value)\np(Invoice::Line.new(amount: 9).amount)\n",
+    );
+}
+
 /// ADRs 0016 + 0017 threaded through the trio: brace blocks are
 /// dead-identical to `do ... end`, and `it` is the implicit parameter.
 #[test]
@@ -545,6 +565,7 @@ fn portland_evaluator_runs_the_fixture_suite() {
         "blocks",
         "tour",
         "patterns",
+        "namespaces",
     ] {
         let path = format!(
             "{}/tests/fixtures/{fixture}.pdx",

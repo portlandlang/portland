@@ -87,8 +87,8 @@ def evaluate_statement(node, bindings)
     return signal_outcome("return", [], bindings) if value.nil?
     step = evaluate_expression(value, bindings)
     signal_outcome("return", step.value, step.bindings)
-  in StructDefNode(name:, fields:, methods:)
-    outcome([], [[name, "struct", [fields, methods]]] + bindings)
+  in StructDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
+  in ModuleDefNode then evaluate_module(node, bindings)
   else
     evaluate_expression(node, bindings)
   end
@@ -301,6 +301,106 @@ def lookup(bindings, name)
   []
 end
 
+# — namespaces (ADR 0021) —
+#
+# Namespaces are flattened to qualified names at definition time, exactly
+# as the seed does; `__home__` carries the namespace a method was written
+# in so its bare names resolve outward.
+
+def home_of(bindings)
+  slot = lookup(bindings, "__home__")
+  return "" if slot.empty?
+  value_at(slot.first, 2)
+end
+
+def qualify(home, name)
+  return name if home.empty?
+  "#{home}::#{name}"
+end
+
+# Drop the last `::` segment of a path.
+def enclosing(home)
+  parts = home.split("::")
+  return "" if parts.length <= 1
+  kept = parts.slice(0, parts.length - 1)
+  kept.join("::")
+end
+
+# Resolve a name outward: own namespace first, then each enclosing level,
+# then the top. Lexical scope always includes every enclosing level,
+# however the namespace was declared.
+def resolve(bindings, name)
+  mutable home = home_of(bindings)
+  while true
+    slot = lookup(bindings, qualify(home, name))
+    return slot unless slot.empty?
+    break if home.empty?
+    home = enclosing(home)
+  end
+  []
+end
+
+# Does any binding live under this name? Tells `Statistics.mean(x)` from
+# an ordinary receiver.
+def namespace?(bindings, name)
+  prefix = "#{name}::"
+  mutable index = 0
+  while index < bindings.length
+    return true if bindings[index][0].start_with?(prefix)
+    index += 1
+  end
+  false
+end
+
+# The namespace a receiver names, resolved outward, or nil.
+def namespace_for(bindings, name)
+  mutable home = home_of(bindings)
+  while true
+    candidate = qualify(home, name)
+    return candidate if namespace?(bindings, candidate)
+    break if home.empty?
+    home = enclosing(home)
+  end
+  nil
+end
+
+def evaluate_module(node, mutable bindings)
+  outer = home_of(bindings)
+  home = qualify(outer, node.path.join("::"))
+  node.body.each do |statement|
+    bindings = register_in_namespace(statement, home, bindings)
+  end
+  outcome([], bindings)
+end
+
+# Register one declaration under a namespace, recursing for nesting.
+def register_in_namespace(statement, home, mutable bindings)
+  case statement
+  in DefNode(name:, parameters:, body:)
+    [[qualify(home, name), "method", [parameters, body, home]]] + bindings
+  in StructDefNode(name:, fields:, methods:, nested:)
+    inner_home = qualify(home, name)
+    mutable result = [[inner_home, "struct", [fields, methods]]] + bindings
+    nested.each do |inner|
+      result = register_in_namespace(inner, inner_home, result)
+    end
+    result
+  in ModuleDefNode(path:, body:)
+    inner_home = qualify(home, path.join("::"))
+    mutable result = bindings
+    body.each do |inner|
+      result = register_in_namespace(inner, inner_home, result)
+    end
+    result
+  in AssignmentNode(name:, value:)
+    step = evaluate_expression(value, bindings)
+    # "constant" rather than "local" so it survives a fresh method scope.
+    [[qualify(home, name), "constant", slot_value(step.value)]] + step.bindings
+  else
+    bindings
+  end
+end
+
 def evaluate_expression(node, bindings)
   case node
   in AppendNode then evaluate_append(node, bindings)
@@ -327,9 +427,19 @@ def evaluate_expression(node, bindings)
   in UnaryNode then evaluate_unary(node, bindings)
   in WordArrayNode(text:) then outcome([word_array_elements(text)], bindings)
   in IdentifierNode(name:)
-    slot = lookup(bindings, name)
+    mutable slot = lookup(bindings, name)
+    slot = resolve(bindings, name) if slot.empty?
     if slot.empty? || slot.first[1] == "method"
       evaluate_call(call_node(name, []), bindings)
+    else
+      outcome([value_at(slot.first, 2)], bindings)
+    end
+  in PathNode(parts:)
+    joined = parts.join("::")
+    slot = lookup(bindings, joined)
+    if slot.empty?
+      puts "evaluator: undefined name #{joined}"
+      outcome([], bindings)
     else
       outcome([value_at(slot.first, 2)], bindings)
     end
@@ -500,9 +610,19 @@ end
 
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 def evaluate_new(node, mutable bindings)
-  slot = lookup(bindings, node.receiver.name)
+  # A struct name is bare (resolved outward) or a `::` path (absolute).
+  written = if node.receiver in PathNode
+    node.receiver.parts.join("::")
+  else
+    node.receiver.name
+  end
+  slot = if node.receiver in PathNode
+    lookup(bindings, written)
+  else
+    resolve(bindings, written)
+  end
   if slot.empty?
-    puts "evaluator: undefined struct #{node.receiver.name}"
+    puts "evaluator: undefined struct #{written}"
     return outcome([], bindings)
   end
   fields = value_at(slot.first[2], 0)
@@ -520,7 +640,7 @@ def evaluate_new(node, mutable bindings)
       index += 1
     end
   end
-  outcome([["__struct__", node.receiver.name, ordered]], bindings)
+  outcome([["__struct__", slot.first[0], ordered]], bindings)
 end
 
 # `with` builds an updated copy of a guest struct (#27): the fields keep
@@ -596,8 +716,22 @@ end
 
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
-  if node.name == "new" && (node.receiver in IdentifierNode)
+  if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
     return evaluate_new(node, bindings)
+  end
+  # `Statistics.mean(x)` — the receiver names a namespace, so this invokes
+  # a function inside it rather than dispatching on a value (ADR 0021).
+  if (node.receiver in IdentifierNode) && lookup(bindings, node.receiver.name).empty?
+    found = namespace_for(bindings, node.receiver.name)
+    unless found.nil?
+      return evaluate_call(call_node("#{found}::#{node.name}", node.arguments), bindings)
+    end
+  end
+  if node.receiver in PathNode
+    written = node.receiver.parts.join("::")
+    if namespace?(bindings, written)
+      return evaluate_call(call_node("#{written}::#{node.name}", node.arguments), bindings)
+    end
   end
   step = evaluate_expression(node.receiver, bindings)
   receiver = slot_value(step.value)
@@ -766,6 +900,10 @@ def invoke(payload, arguments, keyword_values, bindings)
   mutable scope = bindings.reject do |triple|
     triple[1] == "local"
   end
+  # Bare names in the body resolve from where the method was written, not
+  # from where it was called (ADR 0021).
+  home = value_at(payload, 2)
+  scope = [["__home__", "home", home]] + scope unless home.nil?
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   outcome(result.value, bindings)
@@ -792,7 +930,8 @@ def evaluate_call(node, mutable bindings)
     own = struct_method_for(receiver, node.name, bindings)
     return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   end
-  slot = lookup(bindings, node.name)
+  mutable slot = lookup(bindings, node.name)
+  slot = resolve(bindings, node.name) if slot.empty?
   if !slot.empty? && slot.first[1] == "method"
     return invoke(slot.first[2], arguments, keyword_values, bindings)
   end
