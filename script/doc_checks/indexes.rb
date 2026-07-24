@@ -14,11 +14,14 @@ def entries_under(directory)
      .reject { |path| File.basename(path) == "README.md" }
 end
 
-# docs/ruby/ is deliberately absent: its index is generated from each file's
-# own summary line, so `generated.rb` checks it exactly rather than merely
-# checking that every filename appears somewhere.
+# docs/ruby/ and docs/adr/ are deliberately absent: their indexes are
+# generated from the files themselves, so `generated.rb` checks them exactly
+# rather than merely checking that every filename appears somewhere.
+#
+# docs/history/ stays here because its entries carry status notes that are
+# deliberately kept out of the frozen files, so nothing in a history file
+# could generate them.
 INDEXES = {
-  "adr" => { entries: Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort, what: "ADRs" },
   "history" => { entries: entries_under("history"), what: "history files" }
 }.freeze
 
