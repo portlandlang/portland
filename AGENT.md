@@ -1,77 +1,80 @@
-# Portland
+# Working brief
 
-A joyous programming language for Apple silicon.
+_For: the coding agent working on Portland. Humans want
+[README](README.md)._
 
-**Status:** Stage 0 seed built, Stage 1 begun. The Rust seed (`seed/`)
-lexes, parses, and interprets a real slice of Portland — including the
-headline optionals feature — with a `pdx` binary and REPL. The Portland
-trio (`compiler/lexer.pdx`, `parser.pdx`, `evaluator.pdx`) is Portland
-written in Portland: the parser parses the whole compiler including
-itself, and the evaluator runs the fixture suite byte-identical to the
-seed. See [ROADMAP.md](ROADMAP.md) for the one-page burn-down,
-[docs/language.md](docs/language.md) for exactly what's built, and the
-[issues](https://github.com/portlandlang/portland/issues) for what's
-next.
+This file is orientation and conventions only. It deliberately summarizes
+nothing — a summary is a second home for a fact, and the ones that used to
+live here went stale within days.
 
-## North star
+## Read in this order
 
-Programmer happiness first, like Ruby. Job one is the joy of reading and
-writing the code. Safety and performance are job 1.1 — not tradeoffs
-_against_ joy, but _contributors_ to it. The rule every feature must
-pass: does this make the beautiful line also the safe, fast line — or
-does it force a different, uglier line to get safe and fast? Reject the
-latter.
+1. **[docs/principles.md](docs/principles.md)** — the eleven rules that
+   settle arguments, in precedence order. Read before deciding anything.
+   Several exist because we broke them once, and the file says which.
+2. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
+3. **[docs/language.md](docs/language.md)** — what Portland speaks today.
+4. **[docs/architecture.md](docs/architecture.md)** — the seed, the trio,
+   and the contract between them.
+5. **[docs/adr/](docs/adr/)** — the decision log. ADRs beat everything
+   except a newer ADR.
+6. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
 
-The premise: a language that runs **only** on Apple silicon (A-series /
-M-series, macOS 26+), and is **not** Swift. Locking to one vendor's
-hardware is the feature — it lets us make assumptions general, portable
-languages are forbidden to make.
+[docs/history/](docs/history/) is frozen writing. Read it for reasoning,
+never for status.
 
-## How decisions get made
+## Conventions
 
-**[docs/principles.md](docs/principles.md) is the working method** — the
-eleven rules that settle arguments, in precedence order: the joy bar, tie
-goes to Ruby, never guess (in the language _and_ in the implementation),
-loud-never-silent plus the polyfill test, demand-driven, the seed as
-oracle, verify-don't-remember, recommend-don't-enumerate, prior art
-first, and communication as a feature.
+**Decisions become ADRs**, one file per decision,
+`NNNN-YYYY-MM-DD-slug.md`, never renumbered, Status of Accepted /
+Tentative / Superseded by NNNN. An issue comment is not a decision record.
+Issues discuss; ADRs decide.
 
-Read it before deciding anything. Several of those rules exist because we
-broke them once, and the file says which.
+**Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same
+breath — a file per difference, with the Ruby behavior, the Portland
+behavior, why, and what happens to migrating code. If a decision is a
+non-difference, say so explicitly; `script/check_docs` enforces the pair.
 
-## What's decided
+**Every commit gets a CHANGELOG entry.** `## Unreleased` is strictly
+newest-first: insert **directly under the `## Unreleased` header**, never
+anchored on a nearby existing bullet — that silently drifts as the file
+grows, and it has already scrambled the order once.
 
-**[docs/language.md](docs/language.md)** is what Portland speaks today —
-every section marked built unless it says otherwise, with the four
-governing rules up front (no shadowing, never guess, immutable by
-default, no truthiness or ambient nil), a style section, and honest
-"decided but unbuilt" and "not yet designed" lists at the end.
+**One small logical change per commit**, tests green at each. For work
+that can't stay green across a boundary, branch and merge when it's green
+again — no PR needed for solo work.
 
-[docs/adr/](docs/adr/) is the decision log, one file per decision;
-[docs/ruby/](docs/ruby/) is what each divergence costs a Rubyist. Neither
-gets summarized here — a summary is a second home for a fact, and it goes
-stale exactly this fast.
+**Never hand-write expected output.** The seed is the oracle; tests assert
+that the trio agrees with it.
 
-## How it's built
+**Tick issue-body checklists as parts land**, so an issue's state is
+readable without reading its comments.
 
-**[docs/architecture.md](docs/architecture.md)** — the seed and the trio
-and why they both exist, the direct-vs-hosted differential contract, the
-two kinds of Rust (disposable seed vs permanent floor), where the trio
-declines to check and why, the bootstrap ladder, and the undesigned parts:
-MLIR/LLVM (#5), the memory model (#12), inference (#9), heterogeneous
-dispatch (#13), and the honest Neural Engine limit.
+## Running things
 
-## Name & namespaces (done)
+| | |
+|---|---|
+| `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then `check_docs` |
+| `script/console` | the REPL; `script/console file.pdx` runs a file |
+| `script/check_docs` | the mechanical half of doc discipline, on its own |
+| `script/bootstrap` | first-time setup, installs the git hooks |
 
-**Portland**, extension **`.pdx`** — keep-it-weird craft ethos, the teal
-PDX-carpet identity, a faint Rose City → Ruby lineage echo. Repo:
-[portlandlang/portland](https://github.com/portlandlang/portland)
-(public; `pdxlang` org squatted; crates.io `portland` is a name squat
-only). Companions: `ruby_research` (evidence),
-`zed-portland` (`.pdx` editor support, shipped). Brand story is banked,
-not done (#1).
+Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`.
+`pre-commit` is the fast gate; `pre-push` runs everything. Both take
+`--no-verify`.
 
-See [docs/history/](docs/history/) for the original thinking behind the
-decisions above — frozen, never current — and the
-[issues](https://github.com/portlandlang/portland/issues) for everything
-in motion.
+Rust lives at `/opt/homebrew/opt/rustup/bin`, which is not on the default
+PATH. Repo layout is in
+[architecture.md](docs/architecture.md#repo-layout).
+
+## Standing cautions
+
+- **Verify Portland's behavior by running it.** Writing a plausible
+  Portland snippet from memory has already produced three constructs that
+  do not exist (endless methods, a one-line `if/then/else`, a ternary).
+- **The REPL's multi-line detection is a string match on the parse error
+  message.** Any new multi-line construct must be added there or the REPL
+  silently breaks. Heredocs and brace blocks both did.
+- **The crates.io `portland` crate is a name squat.** Do not suggest
+  publishing or maintaining it.
+- **Domains are the user's job.** Don't track them, don't nag.
