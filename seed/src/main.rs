@@ -204,10 +204,12 @@ enum Command {
     Show,
 }
 
-const HELP: &str = "  :cancel   discard the entry in progress
-  :show     print the entry in progress
-  :help     this
-  :quit     leave (Ctrl-D does too)
+const HELP: &str = "  :cancel        discard the entry in progress
+  :show          print the entry in progress
+  :help          this
+  quit / exit    leave (:quit and Ctrl-D do too)
+
+  Ctrl-C abandons the entry in progress; it never leaves.
 
   `_` holds the last value.";
 
@@ -215,8 +217,10 @@ fn repl_command(line: &str) -> Option<Command> {
     match line {
         ":cancel" => Some(Command::Cancel),
         ":help" => Some(Command::Help),
-        ":quit" | ":exit" => Some(Command::Quit),
         ":show" => Some(Command::Show),
+        // Bare `quit`/`exit` too: they are what hands actually type, and
+        // neither is a Portland builtin, so nothing is shadowed.
+        ":quit" | ":exit" | "quit" | "exit" | "quit()" | "exit()" => Some(Command::Quit),
         _ => None,
     }
 }

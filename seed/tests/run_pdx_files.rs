@@ -728,10 +728,18 @@ fn repl_cancels_an_entry_in_progress() {
     );
 }
 
+/// Every spelling a hand might reach for, since none of them is a
+/// Portland builtin and nothing is shadowed by claiming them.
 #[test]
 fn repl_quits_on_command() {
-    let output = run_repl(":quit\n1 + 1\n");
-    assert_eq!(String::from_utf8(output.stdout).unwrap(), "");
+    for spelling in ["quit", "exit", ":quit", ":exit", "quit()", "exit()"] {
+        let output = run_repl(&format!("{spelling}\n1 + 1\n"));
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "",
+            "{spelling} should quit before evaluating anything"
+        );
+    }
 }
 
 #[test]
