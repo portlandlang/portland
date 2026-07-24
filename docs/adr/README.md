@@ -2,14 +2,9 @@
 
 _For: anyone asking why Portland works the way it does._
 
-One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered.
-Each records Context → Decision → Consequences, with a Status of
-**Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
+One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each records Context → Decision → Consequences, with a Status of **Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
 
-[`docs/language.md`](../language.md) records what's _built_.
-ADRs record what's _decided_.
-Everything is revisable pre-1.0, but the burden is on the challenger,
-and revisions get a new ADR that supersedes the old one.
+[`docs/language.md`](../language.md) records what's _built_. ADRs record what's _decided_. Everything is revisable pre-1.0, but the burden is on the challenger, and revisions get a new ADR that supersedes the old one.
 
 ## Index
 
@@ -35,7 +30,4 @@ and revisions get a new ADR that supersedes the old one.
 - [0020](0020-2026-07-23-heredocs-squiggly-only.md) — heredocs: squiggly `<<~` only, SCREAMING_CAPS terminators
 - [0021](0021-2026-07-24-namespaces-and-modules.md) — namespaces: `module` is namespace-only, `::` names and `.` invokes, always qualified
 
-Decisions made before this log exist as-built documentation in
-[`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict
-booleans, structs, …) and may be backfilled as ADRs when they're next
-touched.
+Decisions made before this log exist as-built documentation in [`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict booleans, structs, …) and may be backfilled as ADRs when they're next touched.

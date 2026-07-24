@@ -2,22 +2,13 @@
 
 _For: anyone asking "how far along is this?"_
 
-One page, one line per item. Details live behind the links —
-[ADRs](docs/adr/) decide, [the language](docs/language.md) records what is
-built, [the architecture](docs/architecture.md) records how, and the
-[issues](https://github.com/portlandlang/portland/issues) track what is in
-motion.
+One page, one line per item. Details live behind the links — [ADRs](docs/adr/) decide, [the language](docs/language.md) records what is built, [the architecture](docs/architecture.md) records how, and the [issues](https://github.com/portlandlang/portland/issues) track what is in motion.
 
 ## Where we are
 
-**Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real
-slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` —
-is Portland written in Portland: the parser parses the whole compiler
-including itself, and the evaluator matches the seed byte-for-byte. There
-is no compiler emitting binaries yet.
+**Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
-**Next:** enums and sum types, now that namespaces exist to hold them.
-That unblocks symbols, which unblocks hash shorthand.
+**Next:** enums and sum types, now that namespaces exist to hold them. That unblocks symbols, which unblocks hash shorthand.
 
 ## Done 🎉
 

@@ -2,30 +2,16 @@
 
 _Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly._
 
-**Status:** decided
-([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the
-trio, differentially pinned — see [the language](../language.md#values).
-Ruby behavior below was verified against Ruby 4.0.6.
+**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
 
 ## Ruby
 
-`1..5` inclusive, `1...5` exclusive, first-class objects, usable as
-patterns and as slice indices. Two edges are sharper than their
-reputation:
+`1..5` inclusive, `1...5` exclusive, first-class objects, usable as patterns and as slice indices. Two edges are sharper than their reputation:
 
-- **Slicing is asymmetric.** The end clamps freely, the start does not:
-  `[1,2,3][1..99]` is `[2,3]`, but `[1,2,3][4..]` is `nil` and
-  `[1,2,3][-99..]` is `nil`. And `[1,2,3][3..]` is `[]` — start *equal*
-  to length is a valid boundary, start past it is not.
-- **Line-crossing is three unrelated accidents.** A trailing `..`
-  reaches *forward*: `x = 1..` followed by a line containing `5` is
-  `1..5`, indented or not. A leading `..` does *not* reach back: `1`
-  then `..4` is two separate expressions — even inside parentheses,
-  where `y = (1` / `..4)` binds `y` to `..4`. But a leading `.` *does*
-  reach back, so `1` then `.to_s` is `"1"`.
+- **Slicing is asymmetric.** The end clamps freely, the start does not: `[1,2,3][1..99]` is `[2,3]`, but `[1,2,3][4..]` is `nil` and `[1,2,3][-99..]` is `nil`. And `[1,2,3][3..]` is `[]` — start *equal* to length is a valid boundary, start past it is not.
+- **Line-crossing is three unrelated accidents.** A trailing `..` reaches *forward*: `x = 1..` followed by a line containing `5` is `1..5`, indented or not. A leading `..` does *not* reach back: `1` then `..4` is two separate expressions — even inside parentheses, where `y = (1` / `..4)` binds `y` to `..4`. But a leading `.` *does* reach back, so `1` then `.to_s` is `"1"`.
 
-Ruby does not check `case` exhaustiveness at all, so range arms carry no
-coverage obligation.
+Ruby does not check `case` exhaustiveness at all, so range arms carry no coverage obligation.
 
 ## Portland
 
@@ -37,14 +23,9 @@ words[99..]      # []
 "hello"[9..]     # ""
 ```
 
-The start clamps the way Ruby already clamps the end. `[4..]` and
-`[-99..]` yield empty rather than nil.
+The start clamps the way Ruby already clamps the end. `[4..]` and `[-99..]` yield empty rather than nil.
 
-**`array[1]` is unchanged — still `T?`** (see [lookups](lookups.md)).
-The two are different questions: one *element* has an honest absence
-answer; a *sub-collection* of nothing is `[]`, a perfectly good
-collection. Ruby's nil-for-out-of-range slice is the nil/empty
-conflation Portland exists to kill.
+**`array[1]` is unchanged — still `T?`** (see [lookups](lookups.md)). The two are different questions: one *element* has an honest absence answer; a *sub-collection* of nothing is `[]`, a perfectly good collection. Ruby's nil-for-out-of-range slice is the nil/empty conflation Portland exists to kill.
 
 ### Range patterns count toward exhaustiveness
 
@@ -56,20 +37,11 @@ in 10..   then "lots"
 end                      # proven total — no else needed
 ```
 
-The checker sorts the integer ranges and requires no gaps, a beginless
-first, an endless last. Gaps are compile errors. Overlap stays legal —
-first-match-wins is real semantics, and the cascading `..10 / ..100 /
-..1000` idiom depends on it — while an arm *entirely* covered by earlier
-arms is already an unreachable-arm error
-([pattern matching](pattern-matching.md)). Arm order carries no meaning
-when arms are disjoint, so it is a lint someday, never a compile error.
+The checker sorts the integer ranges and requires no gaps, a beginless first, an endless last. Gaps are compile errors. Overlap stays legal — first-match-wins is real semantics, and the cascading `..10 / ..100 / ..1000` idiom depends on it — while an arm *entirely* covered by earlier arms is already an unreachable-arm error ([pattern matching](pattern-matching.md)). Arm order carries no meaning when arms are disjoint, so it is a lint someday, never a compile error.
 
 ### A range spans a newline only where one reading exists
 
-`array[1..]`, `slice(1.., 2..)`, `in 10.. then`, `in ..10`, `array[..5]`
-all need no parens — each sits next to a token that settles it. The
-error fires only where two readings genuinely exist, in either
-direction:
+`array[1..]`, `slice(1.., 2..)`, `in 10.. then`, `in ..10`, `array[..5]` all need no parens — each sits next to a token that settles it. The error fires only where two readings genuinely exist, in either direction:
 
 ```ruby
 span = 1..
@@ -85,26 +57,13 @@ x = compute
 #   a separate beginless one: x = compute  /  ..4
 ```
 
-One rule replaces Ruby's three accidents (trailing reaches forward,
-leading `..` does not reach back, leading `.` does): **name both
-readings and ask.**
+One rule replaces Ruby's three accidents (trailing reaches forward, leading `..` does not reach back, leading `.` does): **name both readings and ask.**
 
 ## Migration
 
-- Range literals, range patterns, and in-bounds slices — compile
-  verbatim, same meaning.
-- Out-of-range slices change `nil` to empty. Loud where it matters: code
-  checking `slice.nil?` hits the never-absent-left-side error, `if
-  array[4..]` is already an error (no truthiness), and unchecked code
-  would have crashed in Ruby on `nil.each`.
-- A range split across a newline needs its parens, in either direction —
-  free-tier polyfill autocorrect, since `(1..)` is valid Ruby too. Note
-  the leading-`..` rewrite changes Ruby's meaning, so that one is an
-  **unsafe autocorrect**: Ruby read those as two expressions.
-- Exhaustiveness gains: `case` chains over ranges that were total in
-  Ruby lose their now-unnecessary `else` — optional cleanup, not a
-  requirement.
+- Range literals, range patterns, and in-bounds slices — compile verbatim, same meaning.
+- Out-of-range slices change `nil` to empty. Loud where it matters: code checking `slice.nil?` hits the never-absent-left-side error, `if array[4..]` is already an error (no truthiness), and unchecked code would have crashed in Ruby on `nil.each`.
+- A range split across a newline needs its parens, in either direction — free-tier polyfill autocorrect, since `(1..)` is valid Ruby too. Note the leading-`..` rewrite changes Ruby's meaning, so that one is an **unsafe autocorrect**: Ruby read those as two expressions.
+- Exhaustiveness gains: `case` chains over ranges that were total in Ruby lose their now-unnecessary `else` — optional cleanup, not a requirement.
 
-**Open to revision on evidence.** "Almost no real code relies on
-nil-from-slice" is a prior, not a measurement — a good ruby_research
-query when the full corpus lands.
+**Open to revision on evidence.** "Almost no real code relies on nil-from-slice" is a prior, not a measurement — a good ruby_research query when the full corpus lands.

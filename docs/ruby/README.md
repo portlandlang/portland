@@ -2,44 +2,20 @@
 
 _For: Rubyists sizing up what moving a codebase would actually cost._
 
-Portland keeps Ruby's surface and replaces what's underneath. This folder
-is the ledger of differences — one file per difference, each with the Ruby
-behavior, the Portland behavior, why, and what happens to migrating code.
+Portland keeps Ruby's surface and replaces what's underneath. This folder is the ledger of differences — one file per difference, each with the Ruby behavior, the Portland behavior, why, and what happens to migrating code.
 
-Smooth Ruby → Portland migration is a standing design criterion. Two
-promises govern every difference here:
+Smooth Ruby → Portland migration is a standing design criterion. Two promises govern every difference here:
 
-1. **Divergence is loud, never silent.** Where Ruby code compiles in
-   Portland, it means the same thing. Where the semantics differ, the code
-   fails to compile with an explanation and a suggested rewrite. No
-   spelling is reused with quietly different behavior.
-2. **The polyfill test.** A future gem + linter/autocorrector should be
-   able to teach Portland idioms inside valid Ruby before a codebase flips.
-   Differences are graded by tier: *free* (already valid Ruby, same
-   meaning), *gem-supplied* (valid Ruby grammar, gem adds the method or
-   lint), *locked-until-flip* (new grammar Ruby can't parse).
+1. **Divergence is loud, never silent.** Where Ruby code compiles in Portland, it means the same thing. Where the semantics differ, the code fails to compile with an explanation and a suggested rewrite. No spelling is reused with quietly different behavior.
+2. **The polyfill test.** A future gem + linter/autocorrector should be able to teach Portland idioms inside valid Ruby before a codebase flips. Differences are graded by tier: *free* (already valid Ruby, same meaning), *gem-supplied* (valid Ruby grammar, gem adds the method or lint), *locked-until-flip* (new grammar Ruby can't parse).
 
 ## The big picture
 
-- **Kept — the surface.** Blocks as prose (`.map`/`.each`/`yield`),
-  everything-is-an-expression, implicit returns, `?`/`!` method suffixes,
-  postfix guards, keyword arguments, Enumerable as one protocol, pattern
-  matching (promoted to load-bearing). ~90% of Ruby's felt joy is this
-  surface, and it survives static compilation.
-- **Cut — the runtime.** Monkeypatching, `method_missing`, runtime
-  `define_method`, `eval`, globals, truthiness, ambient nil, the GIL.
-  The cut-list and the "blocks static safety and speed" list are nearly
-  the same set.
-- **Changed — the ground it stands on.** Portland is ahead-of-time
-  compiled (MLIR/LLVM), statically typed with inferred-not-written types,
-  and runs only on Apple silicon (macOS 26+). Ruby is a portable
-  interpreted VM; Portland is a native binary for one vendor's hardware,
-  on purpose.
+- **Kept — the surface.** Blocks as prose (`.map`/`.each`/`yield`), everything-is-an-expression, implicit returns, `?`/`!` method suffixes, postfix guards, keyword arguments, Enumerable as one protocol, pattern matching (promoted to load-bearing). ~90% of Ruby's felt joy is this surface, and it survives static compilation.
+- **Cut — the runtime.** Monkeypatching, `method_missing`, runtime `define_method`, `eval`, globals, truthiness, ambient nil, the GIL. The cut-list and the "blocks static safety and speed" list are nearly the same set.
+- **Changed — the ground it stands on.** Portland is ahead-of-time compiled (MLIR/LLVM), statically typed with inferred-not-written types, and runs only on Apple silicon (macOS 26+). Ruby is a portable interpreted VM; Portland is a native binary for one vendor's hardware, on purpose.
 
-`../adr/` records the decisions behind these;
-[`../language.md`](../language.md) records what Portland speaks today.
-Where a difference is **Tentative** or merely **Sketched**, its file says
-so — check the Status line at its top before relying on it.
+`../adr/` records the decisions behind these; [`../language.md`](../language.md) records what Portland speaks today. Where a difference is **Tentative** or merely **Sketched**, its file says so — check the Status line at its top before relying on it.
 
 ## Every difference
 
@@ -63,6 +39,4 @@ so — check the Status line at its top before relying on it.
 
 <!-- /generated -->
 
-Each line is that file's own one-line summary, so the two cannot drift.
-Adding a ledger file means writing the file — `script/generate_docs`
-picks it up and `script/check_docs generated` fails until you run it.
+Each line is that file's own one-line summary, so the two cannot drift. Adding a ledger file means writing the file — `script/generate_docs` picks it up and `script/check_docs generated` fails until you run it.

@@ -6,8 +6,7 @@
 
 ## Context
 
-ADR 0004 locked the named-at-site form and left open whether a terse
-positional register also exists:
+ADR 0004 locked the named-at-site form and left open whether a terse positional register also exists:
 
 ```ruby
 user, orders = together do
@@ -27,19 +26,11 @@ together do
 end
 ```
 
-The positional form recouples results to task *order* — reorder the
-lines, silently swap the values — which is the exact fragile-counting
-bug named-at-site was invented to kill. It also can't interleave plain
-statements between task lines, and it smuggles in a dependency on
-destructuring assignment (`a, b = ...`), a feature Portland has not
-designed and which should be decided on its own merits, not as a side
-effect of concurrency syntax.
+The positional form recouples results to task *order* — reorder the lines, silently swap the values — which is the exact fragile-counting bug named-at-site was invented to kill. It also can't interleave plain statements between task lines, and it smuggles in a dependency on destructuring assignment (`a, b = ...`), a feature Portland has not designed and which should be decided on its own merits, not as a side effect of concurrency syntax.
 
 ## Consequences
 
-- One way to write a `together` block; nothing to choose between at the
-  call site.
+- One way to write a `together` block; nothing to choose between at the call site.
 - Destructuring assignment remains undecided and unentangled.
-- Everything on #3 is now resolved (sigil: 0002, bitwise: 0003,
-  vocabulary: 0004, register: here).
+- Everything on #3 is now resolved (sigil: 0002, bitwise: 0003, vocabulary: 0004, register: here).
 - Nothing implemented yet; `together` semantics remain #11.
