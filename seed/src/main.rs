@@ -43,7 +43,7 @@ fn run_file(path: &str) {
 fn repl() {
     let interactive = std::io::stdin().is_terminal();
     if interactive {
-        println!("Portland seed REPL — Ctrl-D to exit");
+        println!("Portland seed REPL — :help for commands, :quit or Ctrl-D to exit");
     }
     // The seed reports errors by panicking; the REPL catches them and carries on.
     std::panic::set_hook(Box::new(|_| {}));
@@ -53,6 +53,36 @@ fn repl() {
     prompt(interactive, &buffer);
     for line in std::io::stdin().lock().lines() {
         let line = line.expect("failed to read stdin");
+        match repl_command(line.trim()) {
+            Some(Command::Quit) => return,
+            Some(Command::Help) => {
+                println!("{HELP}");
+                prompt(interactive, &buffer);
+                continue;
+            }
+            // An unfinished entry is otherwise inescapable: every further
+            // line just extends it, and only `end` or exiting gets out.
+            Some(Command::Cancel) => {
+                if buffer.is_empty() {
+                    println!("nothing to cancel");
+                } else {
+                    println!("cancelled {} line(s)", buffer.lines().count());
+                    buffer.clear();
+                }
+                prompt(interactive, &buffer);
+                continue;
+            }
+            Some(Command::Show) => {
+                if buffer.is_empty() {
+                    println!("nothing buffered");
+                } else {
+                    print!("{buffer}");
+                }
+                prompt(interactive, &buffer);
+                continue;
+            }
+            None => {}
+        }
         buffer.push_str(&line);
         buffer.push('\n');
         let source = buffer.clone();
@@ -60,7 +90,10 @@ fn repl() {
             Ok(program) => {
                 buffer.clear();
                 match catch_unwind(AssertUnwindSafe(|| interpreter.program(&program))) {
-                    Ok(Some(value)) => println!("=> {}", value.inspect()),
+                    Ok(Some(value)) => {
+                        println!("=> {}", value.inspect());
+                        interpreter.set_last_value(value);
+                    }
                     Ok(None) => {}
                     Err(payload) => eprintln!("error: {}", panic_message(&*payload)),
                 }
@@ -83,6 +116,32 @@ fn repl() {
             }
         }
         prompt(interactive, &buffer);
+    }
+}
+
+/// REPL-only commands, kept in a `:` namespace so they can never collide
+/// with Portland code — the seed has no `:` prefix syntax.
+enum Command {
+    Cancel,
+    Help,
+    Quit,
+    Show,
+}
+
+const HELP: &str = "  :cancel   discard the entry in progress
+  :show     print the entry in progress
+  :help     this
+  :quit     leave (Ctrl-D does too)
+
+  `_` holds the last value.";
+
+fn repl_command(line: &str) -> Option<Command> {
+    match line {
+        ":cancel" => Some(Command::Cancel),
+        ":help" => Some(Command::Help),
+        ":quit" | ":exit" => Some(Command::Quit),
+        ":show" => Some(Command::Show),
+        _ => None,
     }
 }
 

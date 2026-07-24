@@ -687,6 +687,53 @@ fn repl_reports_errors_and_continues() {
     );
 }
 
+/// Every multi-line construct has to keep the REPL reading rather than
+/// giving up after the first line.
+#[test]
+fn repl_keeps_reading_through_multi_line_constructs() {
+    let heredoc = run_repl("x = <<~SQL\n  select 1\nSQL\n");
+    assert_eq!(
+        String::from_utf8(heredoc.stdout).unwrap(),
+        "=> \"select 1\\n\"\n"
+    );
+
+    let braced = run_repl("[1, 2].map { |n|\n  n * 2\n}\n");
+    assert_eq!(String::from_utf8(braced.stdout).unwrap(), "=> [2, 4]\n");
+
+    let definition = run_repl("def greet(name)\n  \"hi #{name}\"\nend\ngreet(\"pdx\")\n");
+    assert_eq!(
+        String::from_utf8(definition.stdout).unwrap(),
+        "=> \"hi pdx\"\n"
+    );
+}
+
+/// `_` is the last printed value — a REPL affordance, not a language one.
+#[test]
+fn repl_binds_the_last_value_to_underscore() {
+    let output = run_repl("40 + 2\n_ + 1\n_ * 2\n");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "=> 42\n=> 43\n=> 86\n"
+    );
+}
+
+/// An unfinished entry is otherwise inescapable — every further line just
+/// extends it.
+#[test]
+fn repl_cancels_an_entry_in_progress() {
+    let output = run_repl("def broken\n:cancel\n1 + 1\n");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "cancelled 1 line(s)\n=> 2\n"
+    );
+}
+
+#[test]
+fn repl_quits_on_command() {
+    let output = run_repl(":quit\n1 + 1\n");
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "");
+}
+
 #[test]
 fn fails_on_a_missing_file() {
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))

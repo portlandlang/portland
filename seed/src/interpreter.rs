@@ -176,6 +176,18 @@ impl<W: std::io::Write> Interpreter<W> {
         self.arguments = arguments;
     }
 
+    /// Bind `_` to the last value the REPL printed. Mutable, so re-binding
+    /// each entry is legal under ADR 0001 rather than an immutable clash.
+    pub fn set_last_value(&mut self, value: Value) {
+        self.variables.insert(
+            "_".to_string(),
+            Binding {
+                mutable: true,
+                value,
+            },
+        );
+    }
+
     pub fn program(&mut self, program: &Program) -> Option<Value> {
         // A caught panic (REPL) unwinds past the decrements; start fresh.
         self.call_depth = 0;

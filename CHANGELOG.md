@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- REPL: `:cancel`, `:show`, `:help`, `:quit`, and `_`. The important one is `:cancel` — an unfinished entry was previously **inescapable**, since every further line just extended it and only typing `end` or leaving the REPL got you out. `:show` prints what is buffered, `_` holds the last printed value (REPL-only; it stays undefined in files), and commands live in a `:` namespace that cannot collide with Portland code.
+
 - REPL: heredocs and multi-line brace blocks no longer break it. The REPL decides whether to keep reading by matching the parse error, and today's two new multi-line constructs were not in that list — so `x = <<~SQL` gave up after one line and reported four cascading errors. Unterminated interpolation joins the list too.
 
 - Issue #29 opened — the `%` literal zoo (`%w %i %q %Q %r %s %x`): which members survive, and whether one delimiter is enough, decided from corpus evidence rather than taste. The trigger is a real bug: `%w[]` cannot contain a `]` because the seed lexer scans to the first one, so `compiler/parser.pdx` writes `["]", ")", "}", ","]` at six sites. Ruby offers escaping, balanced nesting, and alternative delimiters; Portland supports none. Also records that **regex is entirely undecided** — one passing aside in ADR 0002 is the only mention in the repo — which blocks `%r`.
