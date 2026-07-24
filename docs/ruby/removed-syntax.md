@@ -24,14 +24,18 @@ the one Ruby's own style guides already preferred.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was
   invented to replace (ADR 0017). `it` covers one parameter; names cover
   the rest. The polyfill autocorrects `_1 → it` for free.
+- **Plain and dash heredocs (`<<EOS`, `<<-EOS`)** — squiggly `<<~EOS` is
+  the only opener (ADR 0020). Beyond one-way-to-do-it, this is what keeps
+  `<<` unambiguously the append operator, since Ruby's own rule for
+  telling them apart depends on local-vs-method guessing. The rewrite to
+  `<<~` is an **unsafe autocorrect**: it strips common indentation, so it
+  changes the string's value whenever the content was indented.
 
 ## Kept, to be clear
 
 Postfix guards, `unless`, `?`/`!` suffixes, `%w[]`, string interpolation,
-heredocs (planned — the lexer work is charted in
-[#6](https://github.com/portlandlang/portland/issues/6)), blocks, pattern
-matching. The joy surface is the point; only the footguns and the
-redundancies die.
+heredocs (squiggly only — ADR 0020), blocks, pattern matching. The joy
+surface is the point; only the footguns and the redundancies die.
 
 ## Migration
 

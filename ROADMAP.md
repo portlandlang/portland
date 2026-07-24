@@ -27,6 +27,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ Decided: `it` as a normal binding under no-shadow (0017) — nested `it` is a shadow, shadows are errors; build pending
 - ✅ Decided: numbers (0018) — Ruby's floored `/` and `%` (**built**: the seed's truncation retired); floats specced, build pending
 - ✅ Decided: ranges (0019) — slices are collections not maybes; range patterns prove exhaustiveness; endless ranges close loudly; build pending
+- ✅ Decided: heredocs (0020) — squiggly `<<~` only, which keeps `<<` unambiguously the append operator; build pending
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -45,7 +46,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 ### Language surface (decide, then build)
 
 - [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
-- [ ] Heredocs — the Prism-textbook lexer homework (build)
+- [ ] Heredocs — squiggly only (ADR 0020 — decided; build)
 - [ ] Symbols — tabled, [first pass](docs/reports/2026-07-23-symbols-first-pass.md); entangled with enums/sum types, wants corpus residue data
 - [ ] Enums / sum types — undecided and unlisted until now; the job symbols would do, and the natural next exhaustiveness citizen
 - [ ] Floats (ADR 0018) and ranges (ADR 0019) — both decided; build
