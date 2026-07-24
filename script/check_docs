@@ -1,0 +1,6 @@
+#!/bin/sh
+# Mechanical checks over the docs — see script/check_docs.rb for what and why.
+set -e
+cd "$(dirname "$0")/.."
+
+exec ruby script/check_docs.rb

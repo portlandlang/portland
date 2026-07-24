@@ -61,6 +61,12 @@ languages are forbidden to make.
   match it byte-identically. Never hand-write expected output. This now
   covers **error wording as well as output**: where the trio can diagnose
   at all, it must say exactly what the seed says, and a test pins it.
+- **`script/check_docs`** — the mechanically-checkable half of doc
+  discipline, run by `script/test`: `::` used to invoke inside a code
+  block, an ADR with no ledger entry and no non-difference note, broken
+  internal links. Each check exists because that mistake shipped once.
+  Judgment errors — a prediction used as a reason, a bullet that flattens
+  distinct cases — aren't detectable this way and stay the author's job.
 
 ## Decided (ADRs, in brief)
 
