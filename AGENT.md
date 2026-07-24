@@ -27,46 +27,17 @@ M-series, macOS 26+), and is **not** Swift. Locking to one vendor's
 hardware is the feature — it lets us make assumptions general, portable
 languages are forbidden to make.
 
-## How decisions get made (the working method)
+## How decisions get made
 
-- **ADRs** — every language decision is one file in
-  [docs/adr/](docs/adr/) (`NNNN-date-slug`, Accepted/Tentative/
-  Superseded). Issues discuss; ADRs decide. Twelve exist so far.
-- **The Ruby ledger** — every Ruby-divergent decision gets a file in
-  [docs/ruby/](docs/ruby/), updated alongside its ADR. Two promises
-  govern it: divergence is **loud, never silent** (agreements compile
-  verbatim; differences are compile errors with suggested rewrites), and
-  the **polyfill test** (a future gem + linter should be able to teach
-  each idiom inside valid Ruby before a codebase flips).
-- **The Ruby-match tiebreaker** — for anything end users type, matching
-  Ruby is the preferred answer unless it costs a design principle. Tie
-  goes to Ruby.
-- **Never guess** — where one spelling has two genuine readings
-  (`puts -1`, `Boolean?` with `or`), Portland errors and asks rather
-  than picking. No shadowing: a name is a local or a method, never both.
-- **Never guess, in the implementation too.** The trio often can't see
-  what the seed can — its parser is functional, so it holds no frames.
-  Where it can't tell, it **declines to check** rather than checking
-  wrongly: `mixed_it_error` skips any block body that opens a block of
-  its own, because a flat token scan can't tell whose `it` it is. A wrong
-  diagnostic is worse than a missing one — a gap leaves the trio
-  incomplete, a false positive makes it unusable — and the seed is the
-  oracle either way. Every such gap is recorded in
-  [STAGE0](docs/STAGE0.md) rather than left silent.
-- **Demand-driven** — features get built when a real Portland file pulls
-  for them; issues are commitments, not wishes. The evidence engine is
-  [portlandlang/ruby_research](https://github.com/portlandlang/ruby_research)
-  (corpus reports over rubygems.org).
-- **The differential harness** — the seed is the oracle; the trio must
-  match it byte-identically. Never hand-write expected output. This now
-  covers **error wording as well as output**: where the trio can diagnose
-  at all, it must say exactly what the seed says, and a test pins it.
-- **`script/check_docs`** — the mechanically-checkable half of doc
-  discipline, run by `script/test`: `::` used to invoke inside a code
-  block, an ADR with no ledger entry and no non-difference note, broken
-  internal links. Each check exists because that mistake shipped once.
-  Judgment errors — a prediction used as a reason, a bullet that flattens
-  distinct cases — aren't detectable this way and stay the author's job.
+**[docs/principles.md](docs/principles.md) is the working method** — the
+eleven rules that settle arguments, in precedence order: the joy bar, tie
+goes to Ruby, never guess (in the language _and_ in the implementation),
+loud-never-silent plus the polyfill test, demand-driven, the seed as
+oracle, verify-don't-remember, recommend-don't-enumerate, prior art
+first, and communication as a feature.
+
+Read it before deciding anything. Several of those rules exist because we
+broke them once, and the file says which.
 
 ## Decided (ADRs, in brief)
 
