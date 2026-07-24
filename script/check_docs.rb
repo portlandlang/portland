@@ -103,6 +103,94 @@ markdown_files.each do |path|
   end
 end
 
+# 4. Every current doc names its reader (docs/principles.md, #11).
+#
+# A doc written for everyone is written for nobody — AGENT.md spent two
+# weeks as the de-facto source of truth because nothing said it was for
+# the agent, so README was allowed to fall behind it.
+#
+# Exempt, deliberately: README.md (the front door's reader is "whoever
+# arrives"), CHANGELOG.md (a log), individual ADRs and ledger files (they
+# carry a Status line instead), and frozen history files (their folder's
+# README carries the contract for all of them).
+audience_required =
+  ["#{REPO}/AGENT.md", "#{REPO}/ROADMAP.md"] +
+  Dir.glob("#{REPO}/docs/*.md") +
+  Dir.glob("#{REPO}/docs/*/README.md")
+
+audience_required.sort.each do |path|
+  # The line may wrap, so only its opening is anchored.
+  next if File.readlines(path).first(10).any? { |line| line.start_with?("_For: ") }
+
+  failures << <<~REPORT
+    #{relative(path)}
+
+      No reader named. Add a line near the top like:
+
+        _For: anyone deciding whether to try Portland._
+
+      A doc written for everyone is written for nobody, and the ones
+      without a stated reader are the ones that drift into summarizing
+      every other doc.
+  REPORT
+end
+
+# 5. Hand-maintained indexes list every file they index.
+#
+# docs/adr/README.md sat at 0015 while six more ADRs shipped — four days
+# was all it took. An index nobody verifies is worse than no index,
+# because it reads as complete.
+def check_index(index_path, entries, failures, what)
+  return unless File.exist?(index_path)
+
+  index = File.read(index_path)
+  missing = entries.reject { |entry| index.include?(File.basename(entry)) }
+  return if missing.empty?
+
+  list = missing.map { |entry| "  #{File.basename(entry)}" }.join("\n")
+
+  failures << <<~REPORT
+    #{relative(index_path)}
+
+      #{missing.length} #{what} missing from the index:
+
+    #{list}
+
+      Add a line for each. An index that silently stops being complete
+      still reads as complete, which is how it misleads.
+  REPORT
+end
+
+check_index(
+  "#{REPO}/docs/adr/README.md",
+  Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort,
+  failures,
+  "ADRs"
+)
+
+check_index(
+  "#{REPO}/docs/ruby/README.md",
+  Dir.glob("#{REPO}/docs/ruby/*.md").sort.reject { |path| File.basename(path) == "README.md" },
+  failures,
+  "ledger files"
+)
+
+check_index(
+  "#{REPO}/docs/history/README.md",
+  Dir.glob("#{REPO}/docs/history/*.md").sort.reject { |path| File.basename(path) == "README.md" },
+  failures,
+  "history files"
+)
+
+# Deliberately absent: a check that doc code samples run.
+#
+# It would have caught three constructs invented for docs/language.md in
+# one sitting (endless methods, a one-line if/then/else, a ternary), so it
+# is worth having — but `pdx` has no parse-only mode, and telling a parse
+# failure from a runtime one by matching panic text would be a string
+# match on interpreter internals. That is precisely the fragility the REPL
+# already suffers from. It needs a `pdx --parse` flag first — issue #35.
+
 # Deliberately absent: a CHANGELOG newest-first check. The ordering is
 # chronological, and nothing in an entry's *content* reveals its date —
 # entries cite several ADRs or none, so ADR numbers do not descend even

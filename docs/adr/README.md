@@ -1,5 +1,7 @@
 # Architecture Decision Records
 
+_For: anyone asking why Portland works the way it does._
+
 One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered.
 Each records Context → Decision → Consequences, with a Status of
 **Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
@@ -26,6 +28,12 @@ and revisions get a new ADR that supersedes the old one.
 - [0013](0013-2026-07-22-case-in-spec.md) — the `case/in` spec: exhaustive, static, Ruby-shaped (edges tentative)
 - [0014](0014-2026-07-22-keyword-arguments.md) — keyword arguments are Ruby 3's; splats stay out
 - [0015](0015-2026-07-23-values-never-mutate.md) — values never mutate; names do (`<<` and `[]=` as rebinding sugar; `!` deferred)
+- [0016](0016-2026-07-23-brace-blocks-never-guess-owner.md) — brace blocks are `do`/`end` exactly, with the whose-block never-guess error
+- [0017](0017-2026-07-23-it-under-no-shadow.md) — `it` is a normal binding under no-shadow; `_1`–`_9` stay out
+- [0018](0018-2026-07-23-numbers-ruby-division.md) — numbers: Ruby's floored division, floats without ceremony
+- [0019](0019-2026-07-23-ranges.md) — ranges: total coverage proves exhaustiveness, slices are collections, never-guess ends
+- [0020](0020-2026-07-23-heredocs-squiggly-only.md) — heredocs: squiggly `<<~` only, SCREAMING_CAPS terminators
+- [0021](0021-2026-07-24-namespaces-and-modules.md) — namespaces: `module` is namespace-only, `::` names and `.` invokes, always qualified
 
 Decisions made before this log exist as-built documentation in
 [`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict

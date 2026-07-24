@@ -96,6 +96,7 @@ That unblocks symbols, which unblocks hash shorthand.
 - [ ] [#32](https://github.com/portlandlang/portland/issues/32) — a performance tripwire so a slow test can't hide
 - [ ] [#33](https://github.com/portlandlang/portland/issues/33) — the guidance-doc audit: one source of truth per fact
 - [ ] [#34](https://github.com/portlandlang/portland/issues/34) — RC-exact `<<`, killing ~200M array copies in the self-parse test
+- [ ] [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so `check_docs` can verify every code sample in the docs
 - [ ] The polyfill gem and migration linter — a wish, not yet a commitment
 
 ## Dropped ❌ — on purpose, forever
