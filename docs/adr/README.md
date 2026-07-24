@@ -8,6 +8,8 @@ One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each r
 
 ## Index
 
+Decisions made before this log exist as-built documentation in [`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict booleans, structs, …) and may be backfilled as ADRs when they're next touched.
+
 - [0001](0001-2026-07-20-mutable-keyword.md) — the mutability keyword is `mutable`
 - [0002](0002-2026-07-20-together-task-sigil.md) — the `together` task sigil is `~`
 - [0003](0003-2026-07-20-bitwise-operators-out.md) — bitwise operators out of the grammar (tentative: `<<` append TBD)
@@ -29,5 +31,3 @@ One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each r
 - [0019](0019-2026-07-23-ranges.md) — ranges: total coverage proves exhaustiveness, slices are collections, never-guess ends
 - [0020](0020-2026-07-23-heredocs-squiggly-only.md) — heredocs: squiggly `<<~` only, SCREAMING_CAPS terminators
 - [0021](0021-2026-07-24-namespaces-and-modules.md) — namespaces: `module` is namespace-only, `::` names and `.` invokes, always qualified
-
-Decisions made before this log exist as-built documentation in [`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict booleans, structs, …) and may be backfilled as ADRs when they're next touched.
