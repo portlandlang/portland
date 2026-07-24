@@ -44,12 +44,23 @@ languages are forbidden to make.
 - **Never guess** — where one spelling has two genuine readings
   (`puts -1`, `Boolean?` with `or`), Portland errors and asks rather
   than picking. No shadowing: a name is a local or a method, never both.
+- **Never guess, in the implementation too.** The trio often can't see
+  what the seed can — its parser is functional, so it holds no frames.
+  Where it can't tell, it **declines to check** rather than checking
+  wrongly: `mixed_it_error` skips any block body that opens a block of
+  its own, because a flat token scan can't tell whose `it` it is. A wrong
+  diagnostic is worse than a missing one — a gap leaves the trio
+  incomplete, a false positive makes it unusable — and the seed is the
+  oracle either way. Every such gap is recorded in
+  [STAGE0](docs/STAGE0.md) rather than left silent.
 - **Demand-driven** — features get built when a real Portland file pulls
   for them; issues are commitments, not wishes. The evidence engine is
   [portlandlang/ruby_research](https://github.com/portlandlang/ruby_research)
   (corpus reports over rubygems.org).
 - **The differential harness** — the seed is the oracle; the trio must
-  match it byte-identically. Never hand-write expected output.
+  match it byte-identically. Never hand-write expected output. This now
+  covers **error wording as well as output**: where the trio can diagnose
+  at all, it must say exactly what the seed says, and a test pins it.
 
 ## Decided (ADRs, in brief)
 
