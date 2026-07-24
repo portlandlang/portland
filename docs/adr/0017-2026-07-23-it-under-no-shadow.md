@@ -1,4 +1,4 @@
-# 0017 — `it` is a normal binding under no-shadow
+# 0017 — `it` is a normal binding under no-shadow; `_1`–`_9` stay out
 
 - **Status:** Accepted (not yet built)
 - **Date:** 2026-07-23

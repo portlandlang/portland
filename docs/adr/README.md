@@ -28,10 +28,10 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0014](0014-2026-07-22-keyword-arguments.md) — Keyword arguments are Ruby 3's; splats stay out
 - [0015](0015-2026-07-23-values-never-mutate.md) — Values never mutate; names do
 - [0016](0016-2026-07-23-brace-blocks-never-guess-owner.md) — Brace blocks, with the whose-block error
-- [0017](0017-2026-07-23-it-under-no-shadow.md) — `it` is a normal binding under no-shadow
+- [0017](0017-2026-07-23-it-under-no-shadow.md) — `it` is a normal binding under no-shadow; `_1`–`_9` stay out
 - [0018](0018-2026-07-23-numbers-ruby-division.md) — Numbers: Ruby's division, floats without ceremony
 - [0019](0019-2026-07-23-ranges.md) — Ranges: total coverage, slices are collections, never-guess ends
-- [0020](0020-2026-07-23-heredocs-squiggly-only.md) — Heredocs: squiggly only
+- [0020](0020-2026-07-23-heredocs-squiggly-only.md) — Heredocs: squiggly only, SCREAMING_CAPS terminators
 - [0021](0021-2026-07-24-namespaces-and-modules.md) — Namespaces: `module`, `::` for names, always qualified
 
 <!-- /generated -->

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR 0017's H1 gains "`_1`–`_9` stay out" and 0020's gains "SCREAMING_CAPS terminators", for the same reason as 0010 below: both are part of the decision rather than a note about it, and both were surviving only in a hand-written index line.
+
 - ADR 0010's H1 gains "`fetch` retires". The old hand-written index carried that clause and the title did not, which is backwards — retiring `fetch` is part of the decision, not a note about it. Promoting it makes the title the canonical one-liner and the index picks it up automatically. Editing an ADR's title is not revising its decision, the same carve-out that lets links be repointed inside frozen docs.
 
 - `docs/adr/`'s index is generated too, from each ADR's own H1 — no summary line added, because an ADR's H1 is already an index sentence (`# 0021 — Namespaces: …`) where a ledger file's is a bare noun (`# Ranges`). Adding a subtitle here would have been a second home for the same sentence, which is the thing this whole exercise is against. The tentative marker is read from the ADR's `- **Status:**` line rather than written into the description, so an ADR going Tentative → Accepted updates its own index entry; verified by flipping 0003 and watching the marker disappear and come back. `indexes.rb` now covers only `docs/history/`, whose status notes are deliberately kept out of the frozen files and so cannot be generated from them. One stale clause died in the conversion: the index still described 0003 as "`<<` append TBD", which ADR 0015 settled the next day.

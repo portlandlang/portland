@@ -1,4 +1,4 @@
-# 0020 — Heredocs: squiggly only
+# 0020 — Heredocs: squiggly only, SCREAMING_CAPS terminators
 
 - **Status:** Accepted (not yet built)
 - **Date:** 2026-07-23
