@@ -41,7 +41,7 @@ A wrong diagnostic is worse than a missing one: a gap leaves the trio incomplete
 Two promises govern the [Ruby ledger](ruby/):
 
 1. Where Ruby code compiles in Portland, it means the same thing. Where the semantics differ, it fails to compile, with an explanation and a suggested rewrite. **No spelling is reused with quietly different behavior.**
-2. **The polyfill test.** A future gem plus a linter should be able to teach each Portland idiom inside valid Ruby before a codebase flips. Differences are graded: _free_ (already valid Ruby, same meaning), _gem-supplied_ (valid grammar, the gem adds the method or lint), _locked-until-flip_ (new grammar Ruby cannot parse).
+1. **The polyfill test.** A future gem plus a linter should be able to teach each Portland idiom inside valid Ruby before a codebase flips. Differences are graded: _free_ (already valid Ruby, same meaning), _gem-supplied_ (valid grammar, the gem adds the method or lint), _locked-until-flip_ (new grammar Ruby cannot parse).
 
 The corollary that bites hardest is about documentation, not code: when recording a divergence, **do not flatten levels**. "Silently accepts" is materially worse than "detects but reports differently," and a bullet that merges them hides exactly the thing this principle exists to prevent. Learned by writing such a bullet, and by being asked about it.
 

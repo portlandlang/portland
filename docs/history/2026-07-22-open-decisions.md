@@ -109,15 +109,15 @@ Heredocs (#6 — the Prism-textbook homework), symbols, floats, ranges (surface 
 The principle: **surface before depth** — every decision that changes what programs look like should land before the machinery (#9, #5) that must analyze them; and each decision should feed evidence to the next.
 
 1. **#22** branchless-if value — smallest, closes an ADR 0010 loose end (one conversation).
-2. **#20** `case/in` spec — highest leverage per hour; unlocks idiomatic trio rewrites that generate evidence for everything else.
-3. **Kwargs on methods** — build, near-zero decisions.
-4. **Methods in struct bodies** (open the object-model issue; take just this increment).
-5. **#10** mutable values + `<<` — with the trio's accumulated pure-threading pain as the evidence file.
-6. **Error handling** (open the issue; design session) — before #11 and #9 need its answers.
-7. **#11** `together`, serial implementation.
-8. **The full object-model session.**
-9. **#9** inference → **#5** pipeline → **#12/#13** hardware. 🎉
-10. Heredocs/symbols/floats/ranges interleaved as palate cleansers.
+1. **#20** `case/in` spec — highest leverage per hour; unlocks idiomatic trio rewrites that generate evidence for everything else.
+1. **Kwargs on methods** — build, near-zero decisions.
+1. **Methods in struct bodies** (open the object-model issue; take just this increment).
+1. **#10** mutable values + `<<` — with the trio's accumulated pure-threading pain as the evidence file.
+1. **Error handling** (open the issue; design session) — before #11 and #9 need its answers.
+1. **#11** `together`, serial implementation.
+1. **The full object-model session.**
+1. **#9** inference → **#5** pipeline → **#12/#13** hardware. 🎉
+1. Heredocs/symbols/floats/ranges interleaved as palate cleansers.
 
 ## Recommended answers, one line each
 

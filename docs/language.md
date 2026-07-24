@@ -37,7 +37,7 @@ end
 puts tokens.first&.integer?
 ```
 
-```
+```text
 the word 42
 the word pdx
 false
@@ -48,9 +48,9 @@ false
 Four rules do most of the work. They are not features; they are the reasons other features look the way they do.
 
 1. **No shadowing.** A name is a local or a method, never both. Assigning `greet = 1` where a method `greet` exists is an error. This is what makes a bare name unambiguous, which is what makes paren-less calls safe.
-2. **Never guess.** Where one spelling has two genuine readings, Portland refuses and shows you both with their rewrites. It never picks.
-3. **Immutable by default.** Bare binding is immutable; `mutable` is the marked, rare case. Values never mutate at all — names do.
-4. **No truthiness, no ambient nil.** Conditions take booleans and nothing else. Absence is an explicit, typed maybe rather than a value's secret.
+1. **Never guess.** Where one spelling has two genuine readings, Portland refuses and shows you both with their rewrites. It never picks.
+1. **Immutable by default.** Bare binding is immutable; `mutable` is the marked, rare case. Values never mutate at all — names do.
+1. **No truthiness, no ambient nil.** Conditions take booleans and nothing else. Absence is an explicit, typed maybe rather than a value's secret.
 
 ## Values
 

@@ -21,8 +21,8 @@ end                   # inferred: takes an Integer, returns a User?
 Type names appear in exactly three places:
 
 1. **Error messages** — where they do their best work.
-2. **Public boundary annotations**, optional, as documentation.
-3. **Design conversations.**
+1. **Public boundary annotations**, optional, as documentation.
+1. **Design conversations.**
 
 Duck typing becomes **structural typing**: "responds to `quack`" is still the contract, but checked at compile time. No nominal-interface ceremony; the duck test just stops being administered in production.
 

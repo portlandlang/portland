@@ -8,7 +8,7 @@ Portland is being bootstrapped. That single fact explains most of the layout: th
 
 ## The shape today
 
-```
+```text
 compiler/*.pdx     the trio — Portland, written in Portland
        ↑ runs on
 seed/  (Rust)      the seed — lexer, parser, tree-walking interpreter, pdx binary

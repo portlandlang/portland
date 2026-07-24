@@ -16,7 +16,7 @@ Evidence from real Portland code (the #9 evidence file): the trio kept convergen
 Two migration criteria (2026-07-22) sharpened the choice:
 
 1. **Smooth Ruby→Portland migration** is a standing design goal.
-2. **The polyfill test:** a hypothetical gem + RuboCop-style autocorrector should be able to teach Portland idioms inside Ruby before the flip. Ruby's runtime is *natively collapsed* (`nil` cannot nest), so only the unnested surface is polyfillable — and the unnested surface is where the two models are spelling-identical.
+1. **The polyfill test:** a hypothetical gem + RuboCop-style autocorrector should be able to teach Portland idioms inside Ruby before the flip. Ruby's runtime is *natively collapsed* (`nil` cannot nest), so only the unnested surface is polyfillable — and the unnested surface is where the two models are spelling-identical.
 
 ## Decision
 

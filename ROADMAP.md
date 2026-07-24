@@ -53,42 +53,42 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [ ] **Enums and sum types** — next up; open: payloads, and whether `enum` declares the field
-- [ ] Symbols — core question decided, ADR waits on the enum shape ([notes](docs/history/2026-07-23-symbols-first-pass.md))
-- [ ] Hash shorthand `{name: "pdx"}` — table stakes; waits on symbols
-- [ ] [#27](https://github.com/portlandlang/portland/issues/27) — the object model: mixins, inheritance, visibility
-- [ ] [#28](https://github.com/portlandlang/portland/issues/28) — error handling: exceptions vs typed results; decides the deferred `!`
-- [ ] [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
-- [ ] [#11](https://github.com/portlandlang/portland/issues/11) — `together` semantics, serial implementation first
-- [ ] [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
-- [ ] Regex — undecided, and a real hole
-- [ ] String semantics — no ADR on Unicode, length, or normalization
+- **Enums and sum types** — next up; open: payloads, and whether `enum` declares the field
+- Symbols — core question decided, ADR waits on the enum shape ([notes](docs/history/2026-07-23-symbols-first-pass.md))
+- Hash shorthand `{name: "pdx"}` — table stakes; waits on symbols
+- [#27](https://github.com/portlandlang/portland/issues/27) — the object model: mixins, inheritance, visibility
+- [#28](https://github.com/portlandlang/portland/issues/28) — error handling: exceptions vs typed results; decides the deferred `!`
+- [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
+- [#11](https://github.com/portlandlang/portland/issues/11) — `together` semantics, serial implementation first
+- [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
+- Regex — undecided, and a real hole
+- String semantics — no ADR on Unicode, length, or normalization
 
 ### The real compiler
 
-- [ ] [#9](https://github.com/portlandlang/portland/issues/9) — type inference; the static half of optionals lives here
-- [ ] [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
-- [ ] **Stage 2** — the fixpoint; **the seed retires** and `architecture.md`'s seed section is deleted
-- [ ] **Stage 3** — the primitive boundary descends
+- [#9](https://github.com/portlandlang/portland/issues/9) — type inference; the static half of optionals lives here
+- [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
+- **Stage 2** — the fixpoint; **the seed retires** and `architecture.md`'s seed section is deleted
+- **Stage 3** — the primitive boundary descends
 
 ### Apple silicon
 
-- [ ] [#12](https://github.com/portlandlang/portland/issues/12) — memory model: RC, arenas, escape analysis; EMTE hardening
-- [ ] [#13](https://github.com/portlandlang/portland/issues/13) — heterogeneous dispatch: one `.map`, many execution units
+- [#12](https://github.com/portlandlang/portland/issues/12) — memory model: RC, arenas, escape analysis; EMTE hardening
+- [#13](https://github.com/portlandlang/portland/issues/13) — heterogeneous dispatch: one `.map`, many execution units
 
 ### Ecosystem and tooling
 
-- [ ] [#23](https://github.com/portlandlang/portland/issues/23) — a living ruby/spec fork as compatibility oracle
-- [ ] [#1](https://github.com/portlandlang/portland/issues/1) — brand story: voice, tagline, the teal carpet, the rose
-- [ ] [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
-- [ ] [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
-- [ ] [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
-- [ ] [#31](https://github.com/portlandlang/portland/issues/31) — markdown linting, and whether `overcommit` earns its keep
-- [ ] [#32](https://github.com/portlandlang/portland/issues/32) — a performance tripwire so a slow test can't hide
-- [ ] [#33](https://github.com/portlandlang/portland/issues/33) — the guidance-doc audit: one source of truth per fact
-- [ ] [#34](https://github.com/portlandlang/portland/issues/34) — RC-exact `<<`, killing ~200M array copies in the self-parse test
-- [ ] [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so the doc checks can verify every code sample in the docs
-- [ ] The polyfill gem and migration linter — a wish, not yet a commitment
+- [#23](https://github.com/portlandlang/portland/issues/23) — a living ruby/spec fork as compatibility oracle
+- [#1](https://github.com/portlandlang/portland/issues/1) — brand story: voice, tagline, the teal carpet, the rose
+- [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
+- [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
+- [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
+- [#31](https://github.com/portlandlang/portland/issues/31) — markdown linting, and whether `overcommit` earns its keep
+- [#32](https://github.com/portlandlang/portland/issues/32) — a performance tripwire so a slow test can't hide
+- [#33](https://github.com/portlandlang/portland/issues/33) — the guidance-doc audit: one source of truth per fact
+- [#34](https://github.com/portlandlang/portland/issues/34) — RC-exact `<<`, killing ~200M array copies in the self-parse test
+- [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so the doc checks can verify every code sample in the docs
+- The polyfill gem and migration linter — a wish, not yet a commitment
 
 ## Dropped ❌ — on purpose, forever
 

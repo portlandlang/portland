@@ -24,10 +24,10 @@ The reframe that unlocked this: **Ruby's problem with `status = :pending` was ne
 ### Tradeoffs accepted, explicitly
 
 1. **Two string-like types.** Portland will have both `String` and `Symbol`, so users must choose between them — the Ruby wart this session opened by trying to avoid. It is *mitigated, not eliminated*: static types turn the classic mismatch into a compile error instead of Ruby's silent nil, so `HashWithIndifferentAccess` has nothing to paper over. But the choice still exists at every hash-key site.
-2. **Open positions stay unchecked.** A symbol where no closed vocabulary is expected is not checked. `config[:nmae]` is a valid symbol that simply misses, yielding a maybe per ADR 0010. The uncheckedness is confined to exactly where Ruby is also unchecked, and ADR 0010 already forces the miss to be handled — but a typo there is still not a compile error.
-3. **Rails' indifferent-access habits do not port.** Code that writes a symbol key and reads a string one (or vice versa) becomes a compile error rather than working. Loud, and mechanically fixable, but real migration work for Rails-shaped codebases.
-4. **The "one job" purity is given up.** The audit below argued symbols would be a type with no unique remaining job. They now have two — enum case spelling and hash keys/labels — which is less pure and more Ruby. Deliberate.
-5. **Rejected alternative:** symbols existing *only* as enum members (option A), which buys total checking at the cost of `{name: "x"}` meaning string keys.
+1. **Open positions stay unchecked.** A symbol where no closed vocabulary is expected is not checked. `config[:nmae]` is a valid symbol that simply misses, yielding a maybe per ADR 0010. The uncheckedness is confined to exactly where Ruby is also unchecked, and ADR 0010 already forces the miss to be handled — but a typo there is still not a compile error.
+1. **Rails' indifferent-access habits do not port.** Code that writes a symbol key and reads a string one (or vice versa) becomes a compile error rather than working. Loud, and mechanically fixable, but real migration work for Rails-shaped codebases.
+1. **The "one job" purity is given up.** The audit below argued symbols would be a type with no unique remaining job. They now have two — enum case spelling and hash keys/labels — which is less pure and more Ruby. Deliberate.
+1. **Rejected alternative:** symbols existing *only* as enum members (option A), which buys total checking at the cost of `{name: "x"}` meaning string keys.
 
 ### The escape hatch, for later
 
@@ -105,10 +105,10 @@ Conversation.statuses        # => {"active" => 0, "archived" => 1}
 Four things that shaped this session:
 
 1. **Cases are declared as lowercase symbols** — `:active`, never `Active`. The Ruby-flavored spelling is lowercase, which is what killed the capitalized-case sketch.
-2. **You read back a String.** Rails writes symbols, reads strings, accepts either plus the integer — the indifferent-access fudge.
-3. **The dominant ergonomic is the generated predicate**, not case dispatch. Real Rails code branches on `conversation.active?`. Whether Portland generates predicates is a separate decision (user's call), but it is the part Rubyists actually love.
-4. **It is not a type.** It is a column with sugar — no payloads, nothing you can pass around. `Conversation.statuses` is a hash on the class.
-5. **It is scoped to the model.** A `Purchase` status and a `User` status coexist without collision. This killed the global `enum Status` sketch: "status" is exactly the kind of generic word many concepts want, and Portland's namespace is completely flat.
+1. **You read back a String.** Rails writes symbols, reads strings, accepts either plus the integer — the indifferent-access fudge.
+1. **The dominant ergonomic is the generated predicate**, not case dispatch. Real Rails code branches on `conversation.active?`. Whether Portland generates predicates is a separate decision (user's call), but it is the part Rubyists actually love.
+1. **It is not a type.** It is a column with sugar — no payloads, nothing you can pass around. `Conversation.statuses` is a hash on the class.
+1. **It is scoped to the model.** A `Purchase` status and a `User` status coexist without collision. This killed the global `enum Status` sketch: "status" is exactly the kind of generic word many concepts want, and Portland's namespace is completely flat.
 
 ## The reframe
 
@@ -129,11 +129,11 @@ This makes **#27's object model the keystone**: hash shorthand waits on symbols,
 Now that symbols are in, these affirm-or-overturn the priors rather than decide the question:
 
 1. **The residue** — symbol occurrences that are *not* hash keys, kwarg labels, metaprogramming DSL arguments, or `&:sym`. Sizes how much real code is doing the closed-vocabulary job that enums will now check.
-2. **`&:sym` prevalence** — sizes the `{ it.method }` rewrite (ADR 0017).
-3. **String-vs-symbol key mixing** — how often a codebase writes a symbol key and reads a string one (or vice versa). This directly sizes accepted tradeoff 3, since every such site becomes a compile error.
-4. **Hash-literal-then-literal-lookup shape** — how often a hash is built with visible literal keys and then read with literal keys. Sizes the lint in "The escape hatch," i.e. how much of tradeoff 2 is recoverable.
-5. **Bare symbols as arguments/returns** — the enum-shaped usage, specifically `{:ok, ...}`-style tagging, which feeds #28 too.
-6. **Enum-ish vocabularies per class** — how many distinct closed vocabularies a typical class carries, and whether they are payload-free (Rails-shaped) or payload-carrying. Decides the one-feature-or-two question above.
+1. **`&:sym` prevalence** — sizes the `{ it.method }` rewrite (ADR 0017).
+1. **String-vs-symbol key mixing** — how often a codebase writes a symbol key and reads a string one (or vice versa). This directly sizes accepted tradeoff 3, since every such site becomes a compile error.
+1. **Hash-literal-then-literal-lookup shape** — how often a hash is built with visible literal keys and then read with literal keys. Sizes the lint in "The escape hatch," i.e. how much of tradeoff 2 is recoverable.
+1. **Bare symbols as arguments/returns** — the enum-shaped usage, specifically `{:ok, ...}`-style tagging, which feeds #28 too.
+1. **Enum-ish vocabularies per class** — how many distinct closed vocabularies a typical class carries, and whether they are payload-free (Rails-shaped) or payload-carrying. Decides the one-feature-or-two question above.
 
 ## Where the implementation actually stands (verified 2026-07-23)
 

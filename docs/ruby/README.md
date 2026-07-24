@@ -7,7 +7,7 @@ Portland keeps Ruby's surface and replaces what's underneath. This folder is the
 Smooth Ruby → Portland migration is a standing design criterion. Two promises govern every difference here:
 
 1. **Divergence is loud, never silent.** Where Ruby code compiles in Portland, it means the same thing. Where the semantics differ, the code fails to compile with an explanation and a suggested rewrite. No spelling is reused with quietly different behavior.
-2. **The polyfill test.** A future gem + linter/autocorrector should be able to teach Portland idioms inside valid Ruby before a codebase flips. Differences are graded by tier: _free_ (already valid Ruby, same meaning), _gem-supplied_ (valid Ruby grammar, gem adds the method or lint), _locked-until-flip_ (new grammar Ruby can't parse).
+1. **The polyfill test.** A future gem + linter/autocorrector should be able to teach Portland idioms inside valid Ruby before a codebase flips. Differences are graded by tier: _free_ (already valid Ruby, same meaning), _gem-supplied_ (valid Ruby grammar, gem adds the method or lint), _locked-until-flip_ (new grammar Ruby can't parse).
 
 ## The big picture
 

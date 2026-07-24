@@ -14,11 +14,11 @@ With no truthiness in Portland (strict booleans, no ambient nil), Ruby's one-rul
 
 - **One operator, two spellings.** `or` ≡ `||`, `and` ≡ `&&`, `not` ≡ `!`. Same precedence, same semantics, everywhere. Ruby's precedence trap dies.
 - **`or` is typed:**
-  - On booleans — logical or, short-circuiting. (`and`, `not` likewise.)
-  - On a maybe (`T?`) — unwrap-or-else: the left side's value if present, otherwise the right side. The result is a plain `T`. The right side may instead diverge (`return` / `break` / `next` / `panic`), which makes the or-guard: bind-or-bail, and with `panic "why"` the escape hatch.
+    - On booleans — logical or, short-circuiting. (`and`, `not` likewise.)
+    - On a maybe (`T?`) — unwrap-or-else: the left side's value if present, otherwise the right side. The result is a plain `T`. The right side may instead diverge (`return` / `break` / `next` / `panic`), which makes the or-guard: bind-or-bail, and with `panic "why"` the escape hatch.
 - **Never-guess errors** where the idiom is genuinely ambiguous:
-  - `Boolean?` on the left is a compile error. It is the unique type with two different "no"s (`nil` and `false`); Ruby's reading steamrolls an explicit `false` into the default (the `@enabled ||= true` bug class), and the maybe-reading silently diverges from Ruby. The error names the three states and offers unambiguous spellings (`if x.nil? ...`, `x == true`).
-  - A left side that can never be absent is a compile error: the right side is unreachable.
+    - `Boolean?` on the left is a compile error. It is the unique type with two different "no"s (`nil` and `false`); Ruby's reading steamrolls an explicit `false` into the default (the `@enabled ||= true` bug class), and the maybe-reading silently diverges from Ruby. The error names the three states and offers unambiguous spellings (`if x.nil? ...`, `x == true`).
+    - A left side that can never be absent is a compile error: the right side is unreachable.
 
 ## Consequences
 

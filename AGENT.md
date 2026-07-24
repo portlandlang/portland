@@ -7,11 +7,11 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 ## Read in this order
 
 1. **[docs/principles.md](docs/principles.md)** — the eleven rules that settle arguments, in precedence order. Read before deciding anything. Several exist because we broke them once, and the file says which.
-2. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
-3. **[docs/language.md](docs/language.md)** — what Portland speaks today.
-4. **[docs/architecture.md](docs/architecture.md)** — the seed, the trio, and the contract between them.
-5. **[docs/adr/](docs/adr/)** — the decision log. ADRs beat everything except a newer ADR.
-6. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
+1. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
+1. **[docs/language.md](docs/language.md)** — what Portland speaks today.
+1. **[docs/architecture.md](docs/architecture.md)** — the seed, the trio, and the contract between them.
+1. **[docs/adr/](docs/adr/)** — the decision log. ADRs beat everything except a newer ADR.
+1. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
 
 [docs/history/](docs/history/) is frozen writing. Read it for reasoning, never for status.
 

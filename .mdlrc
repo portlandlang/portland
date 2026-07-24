@@ -1,0 +1,5 @@
+# see: https://github.com/markdownlint/markdownlint/blob/main/docs/configuration.md
+
+git_recurse true
+show_kramdown_warnings true
+style "#{File.dirname(__FILE__)}/script/docs/lib/markdownlint.rb"

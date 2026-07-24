@@ -25,9 +25,9 @@ Crockford's move was subtraction as design. Applied to Ruby, the finding is that
 - **Keep the entire surface.** Blocks, expression-orientation, implicit returns, `?`/`!` suffixes, postfix guards, keyword args, Enumerable-as-one-protocol, pattern matching. All syntactic, all free under static compilation.
 - **Cut the entire runtime.** Runtime monkeypatching, `method_missing`, runtime `define_method`, `eval`, globals, perlisms, footgun redundancies. Replace runtime metaprogramming with compile-time macros (the metaprogramming joy without the runtime mystery or cost). The dynamism we trade away (late-bound monkeypatching) is also Ruby's biggest pain at scale.
 - **Fix Ruby's actively un-joyous parts** — and the fix _is_ the safety story, sold as deleting pain, never as new constraints:
-  - **nil** → optionals + pattern matching. Kills `NoMethodError on nil`.
-  - **mutable-by-default** → immutable by default. Also the precondition that makes auto-parallel `.map` safe (immutable data can't race).
-  - **the GIL / threads** → redesign wholesale around P/E cores + structured concurrency.
+    - **nil** → optionals + pattern matching. Kills `NoMethodError on nil`.
+    - **mutable-by-default** → immutable by default. Also the precondition that makes auto-parallel `.map` safe (immutable data can't race).
+    - **the GIL / threads** → redesign wholesale around P/E cores + structured concurrency.
 
 Headline: **keep how it reads, replace what it does underneath.** The joy lives in the surface; the pain and the perf/safety blockers both live in the dynamic, mutable runtime.
 
@@ -88,8 +88,8 @@ Strategic reframe: Portland is **greenfield, not an alt-implementation**. Rubini
 ## Architecture, in three pictures (described, since the diagrams don't travel)
 
 1. **Existing pipelines we borrow from.** Every serious language has the same shape (source → parse → typed middle → lower to target). We take one proven piece from each: Prism's _lexer_, rustc's hand-written-RD _approach_ (and Rust as impl language), Swift/Apple's _LLVM/MLIR backend_.
-2. **Our layer cake.** Top to bottom: your code → standard library → the compiler → **[primitive boundary]** → primitive floor (Rust + MLIR) → LLVM/MLIR backend → Apple silicon (P/E cores · GPU · SME). Everything above the dashed boundary is written in Portland itself; the gray floor below is the only non-self-hosted part, and it's the thinnest layer. The design pressure is: push the boundary down.
-3. **Bootstrap timeline.** Stage 0 seed (all Rust) → Stage 1 first self-host → Stage 2 fixpoint (seed retired) → Stage 3 boundary descends. The teal (self-hosted) portion grows over time; the gray (Rust) shrinks — first by deleting the seed, then by whittling the floor.
+1. **Our layer cake.** Top to bottom: your code → standard library → the compiler → **\[primitive boundary\]** → primitive floor (Rust + MLIR) → LLVM/MLIR backend → Apple silicon (P/E cores · GPU · SME). Everything above the dashed boundary is written in Portland itself; the gray floor below is the only non-self-hosted part, and it's the thinnest layer. The design pressure is: push the boundary down.
+1. **Bootstrap timeline.** Stage 0 seed (all Rust) → Stage 1 first self-host → Stage 2 fixpoint (seed retired) → Stage 3 boundary descends. The teal (self-hosted) portion grows over time; the gray (Rust) shrinks — first by deleting the seed, then by whittling the floor.
 
 ## Branding (banked, not finished)
 

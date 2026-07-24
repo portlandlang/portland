@@ -13,7 +13,7 @@ The GIL serializes CPU work; `Thread` is a footgun museum; the "recommended way"
 One model, baked into the language, three tiers; you live almost entirely in tier 1:
 
 1. **Implicit — you type nothing.** `photos.map { it.thumbnail }` spreads across cores when it's worth it, safe *because* values are immutable (see [mutability](mutability.md)). No concurrency word appears.
-2. **`together` — declare independence.** Structured fork-join: each marked line is a task, the block's `end` is the join, results are named at the task site. `meanwhile` and `~` are dead-identical word/sigil forms:
+1. **`together` — declare independence.** Structured fork-join: each marked line is a task, the block's `end` is the join, results are named at the task site. `meanwhile` and `~` are dead-identical word/sigil forms:
 
    ```ruby
    together do
@@ -26,7 +26,7 @@ One model, baked into the language, three tiers; you live almost entirely in tie
    ```
 
    No handles, no futures, no `await`, no computer words anywhere. And one register only — results are always named at the task site; there is no positional `a, b = together do ... end` form ([ADR 0011](../adr/0011-2026-07-22-together-single-register.md)).
-3. **Explicit control — rare.** Cancellation, timeouts, racing.
+1. **Explicit control — rare.** Cancellation, timeouts, racing.
 
 The runtime places work on P/E cores (and, for data-parallel tier 1, GPU) — you declare *concurrency* (independence); the machine harvests *parallelism* when it pays.
 
