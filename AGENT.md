@@ -105,43 +105,14 @@ Three tiers; you live almost entirely in tier 1.
 
 3. **Explicit control — rare.** Cancellation, timeouts, racing.
 
-## Implementation strategy
+## How it's built
 
-- **Frontend in Rust. Backend on MLIR / LLVM** (#5, undesigned). MLIR
-  isn't cargo-cult: the heterogeneous-compute thesis (one program → CPU,
-  GPU, matrix unit) is what MLIR exists for, and on Apple silicon the
-  road to the metal _is_ LLVM.
-- **Parser: hand-written recursive descent** (built). Prism's C lexer is
-  the textbook for the hard lexical parts still to come (heredocs, #6).
-- **Memory model** (#12, plan proposed): the language is memory-safe by
-  semantics on every chip; reference counting is _exact_ under
-  immutability (immutable values can't form cycles) — no tracing GC, no
-  borrow-checker ceremony. EMTE/MIE (A19/M5+) is defense-in-depth for
-  the Rust floor, never the foundation.
-- **Self-host as early as possible** (Rubinius creed). Stage 0 seed
-  (built, disposable on purpose) → Stage 1 rewrite in Portland (the trio
-  is its beginning) → Stage 2 fixpoint, **seed retires** → Stage 3 the
-  primitive boundary descends. The three states are drawn in
-  [docs/architecture.svg](docs/architecture.svg) — now, next, and the
-  ideal future (Rust stays as a thin floor; the seed goes).
-- **Greenfield, NOT an alt-implementation.** No incumbent to displace —
-  dodges the social trap that sank Rubinius. The cost is cold-start
-  adoption, solved with joy + the killer niche. The migration story
-  (ledger, polyfill test, eventual ruby/spec fork — #23) is how Rubyists
-  get here.
-
-## Hardware bets (language semantics, not library calls)
-
-- **Unified memory:** no host/device distinction; the same `.map` line
-  is a GPU dispatch on a big array and one core on a small one (#13).
-- **Heterogeneous units:** P/E cores, Metal GPU, SME matrix — the
-  runtime _places_ work.
-- **Hardware safety:** MIE/EMTE as hardening (see #12); PAC for the
-  runtime floor.
-- **Honest limit:** the Neural Engine isn't openly programmable — the
-  only door is CoreML, and CoreML picks the units itself (Accelerate
-  is the CPU path, MPS the GPU one; neither reaches the ANE). Don't
-  pretend we compile straight to the NPU.
+**[docs/architecture.md](docs/architecture.md)** — the seed and the trio
+and why they both exist, the direct-vs-hosted differential contract, the
+two kinds of Rust (disposable seed vs permanent floor), where the trio
+declines to check and why, the bootstrap ladder, and the undesigned parts:
+MLIR/LLVM (#5), the memory model (#12), inference (#9), heterogeneous
+dispatch (#13), and the honest Neural Engine limit.
 
 ## Name & namespaces (done)
 
