@@ -455,6 +455,42 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
+/// Where the trio can diagnose, it must say exactly what the seed says.
+/// These four used to reach the evaluator as an unhelpful "cannot
+/// evaluate error yet"; now the message survives to stderr verbatim.
+#[test]
+fn portland_evaluator_reports_the_seed_wording_on_errors() {
+    let cases = [
+        (
+            "module S\n  def m(v)\n    1\n  end\nend\nputs S::m([1])\n",
+            "`::` names, `.` invokes",
+        ),
+        (
+            "struct Foo\n  bar\n  module H\n  end\nend\n",
+            "modules don't nest inside structs",
+        ),
+        (
+            "module stats\nend\n",
+            "module names start with a capital letter",
+        ),
+        ("p([\"a\"].map { |w| it.upcase })\n", "use one or the other"),
+    ];
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("trio_error_case.pdx");
+        std::fs::write(&sample, source).expect("failed to write probe file");
+        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        let stderr = String::from_utf8(hosted.stderr).unwrap();
+        assert!(
+            stderr.contains(expected),
+            "trio should report {expected:?}, got: {stderr}"
+        );
+    }
+}
+
 /// ADR 0021 threaded through the trio: namespaces, `::` paths, lexical
 /// resolution outward, both declaration forms, and types nesting in types.
 #[test]

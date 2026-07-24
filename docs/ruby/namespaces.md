@@ -6,7 +6,7 @@ the seed and the trio, differentially pinned — see [STAGE0](../STAGE0.md).
 
 ## Ruby
 
-`module` does **two unrelated jobs**: it is a namespace *and* a mixin. There
+`module` does **two unrelated jobs**: it is a namespace _and_ a mixin. There
 is no way to bring a name into scope without mixin machinery — `include
 Math` just to type `sqrt` instead of `Math.sqrt` recruits the ancestor chain
 to solve a naming problem, and `module_function` exists to paper over the
@@ -98,7 +98,7 @@ place to live.
 
 - **`Foo::Bar` and `Foo.bar()`** — compile verbatim wherever they follow
   Ruby's own convention, which is nearly everywhere. Free tier.
-- **`module Foo::Bar`** — compiles verbatim *and* behaves less surprisingly
+- **`module Foo::Bar`** — compiles verbatim _and_ behaves less surprisingly
   than in Ruby, since outer names stay visible. Free tier, and it silently
   fixes a bug class.
 - **`Foo::bar()` used to call** — compile error, fix is `Foo.bar()`. Free

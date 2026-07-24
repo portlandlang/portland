@@ -434,6 +434,11 @@ def evaluate_expression(node, bindings)
     else
       outcome([value_at(slot.first, 2)], bindings)
     end
+  # A parse error reaches the evaluator as a node carrying its message.
+  # Surfacing it here — where nested errors land too, since an ErrorNode
+  # can be an argument — means every parser diagnostic, present and
+  # future, stops the program instead of evaluating around the hole.
+  in ErrorNode(message:) then panic(message)
   in PathNode(parts:)
     joined = parts.join("::")
     slot = lookup(bindings, joined)

@@ -949,34 +949,75 @@ def parse_block(tokens, mutable position, braced)
   body_start = position
   if braced
     body = parse_braced_body(tokens, position)
+    # A diagnostic replaces the body rather than the block, so the outer
+    # parse stays in sync and the error surfaces when the block runs.
+    statements = diagnosed_body(body.node, parameters, tokens, body_start, body.position)
     parameters = implicit_parameters(parameters, tokens, body_start, body.position)
     if operator_at?(tokens, body.position, ["}"])
-      return Step.new(node: block_node(parameters, body.node), position: body.position + 1)
+      return Step.new(node: block_node(parameters, statements), position: body.position + 1)
     end
     return Step.new(node: error_node("expected } to close {"), position: body.position)
   end
   body = parse_body(tokens, position, %w[end])
+  statements = diagnosed_body(body.node, parameters, tokens, body_start, body.position)
   parameters = implicit_parameters(parameters, tokens, body_start, body.position)
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: block_node(parameters, body.node), position: body.position + 1)
+    return Step.new(node: block_node(parameters, statements), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close do"), position: body.position)
 end
 
-# ADR 0017: naming `it` declares the block's implicit parameter. Crude
-# divergence: the trio only builds the happy path, scanning the body's
-# tokens rather than tracking frames. The seed is the enforcement oracle
-# for the collision rules (mixing, nesting, a local of that name), which
-# cannot appear in a program the seed accepts.
-def implicit_parameters(parameters, tokens, start, finish)
-  return parameters unless parameters.empty?
+# The block's body, or a single diagnostic if the block breaks an `it`
+# rule the trio can check.
+def diagnosed_body(statements, parameters, tokens, start, finish)
+  mixed = mixed_it_error(parameters, tokens, start, finish)
+  return [mixed] if mixed.some?
+  statements
+end
+
+# Does this token range name `it` at all?
+def names_it?(tokens, start, finish)
   mutable index = start
-  mutable names_it = false
   while index < finish
-    names_it = true if tokens[index].identifier? && tokens[index].text == "it"
+    return true if tokens[index].identifier? && tokens[index].text == "it"
     index += 1
   end
-  return ["it"] if names_it
+  false
+end
+
+# Does this token range open a block of its own?
+def opens_a_block?(tokens, start, finish)
+  mutable index = start
+  while index < finish
+    token = tokens[index]
+    return true if token.keyword? && token.text == "do"
+    return true if token.operator? && token.text == "{"
+    index += 1
+  end
+  false
+end
+
+# ADR 0017: `it` alongside declared `|parameters|` is a shadow, and
+# shadows error. The trio catches this one — but only when the body opens
+# no block of its own, since a flat token scan cannot tell an `it` of
+# *this* block from one belonging to a nested block. Where it can't tell,
+# it declines to guess and leaves the seed as the oracle.
+def mixed_it_error(parameters, tokens, start, finish)
+  return nil if parameters.empty?
+  return nil if opens_a_block?(tokens, start, finish)
+  return nil unless names_it?(tokens, start, finish)
+  error_node("`it` in a block that declares |#{parameters.join(", ")}| — use one or the other")
+end
+
+# ADR 0017: naming `it` declares the block's implicit parameter. Crude
+# divergence: the trio scans the body's tokens rather than tracking
+# frames, so it catches the mixing rule (above) but not the two that need
+# frames — a nested `it`, or a local of that name. The seed is the
+# enforcement oracle for those, and they cannot appear in a program the
+# seed accepts.
+def implicit_parameters(parameters, tokens, start, finish)
+  return parameters unless parameters.empty?
+  return ["it"] if names_it?(tokens, start, finish)
   parameters
 end
 

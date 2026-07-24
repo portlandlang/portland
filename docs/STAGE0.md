@@ -2,7 +2,7 @@
 
 What the disposable Rust seed (`seed/`) actually speaks, as built. This is the
 language the Stage 1 compiler will be written in, so everything here earns its
-place by answering one question: *is it needed to write a compiler?*
+place by answering one question: _is it needed to write a compiler?_
 
 Reference semantics live in the tree-walking interpreter (`seed/src/interpreter.rs`);
 the tests are the spec until a real one exists.
@@ -21,7 +21,7 @@ the tests are the spec until a real one exists.
 - **Logical operators** — `&&` `||` (short-circuiting) and `!`, strict
   booleans — plus the word forms `and` `or` `not`, **dead-identical** to the
   sigils (ADR 0007): same precedence (`x = nil or 7` binds the `or` first,
-  unlike Ruby), same semantics. `||`/`or` is *typed*: booleans get logical
+  unlike Ruby), same semantics. `||`/`or` is _typed_: booleans get logical
   or; a maybe gets unwrap-or-else (below).
 - **Optionals, the runtime half** (ADRs 0005–0010) — `nil` is a keyword
   literal: no methods (`nil.upcase` panics "handle the nil case first"),
@@ -36,12 +36,12 @@ the tests are the spec until a real one exists.
   `some(x)` is identity on plain values and a real box only around
   nil/Some, lookups lift found values through it — so `[nil].first` ≠
   `[].first`, and a stored hash nil beats the or-guard default (fetch's
-  rule). The *static* half (flow narrowing, unhandled-maybe compile
+  rule). The _static_ half (flow narrowing, unhandled-maybe compile
   errors, `Boolean?` never-guess, dead right sides) is structurally out of
   a tree-walker's reach — those panic at runtime here and refuse at
   compile time in real Portland.
 - **Bindings** (ADRs 0001 + 0015, enforced) — bare assignment `x = 1`
-  creates an *immutable* binding; `mutable x = 1` declares the one
+  creates an _immutable_ binding; `mutable x = 1` declares the one
   rebindable kind of name, fused to its first assignment. Compound
   assignment (`+= -= *= /= %=`), the rebinding append (`line << word` —
   strings concatenate, arrays gain one element), and index assignment
@@ -52,7 +52,7 @@ the tests are the spec until a real one exists.
   immutables with the fix named, and their fresh locals die at `end` —
   and loop iterations are fresh scopes for their own locals, the same
   rule applied to `while`.
-- **Control** — `if` / `elsif` / `else` / `end` (an *expression*, per the
+- **Control** — `if` / `elsif` / `else` / `end` (an _expression_, per the
   expression-orientation principle), `unless`, `case/when` (equality matching,
   aligned `when x then y` one-liners), `while ... end`, and postfix guards
   (`return 0 if n < 0`, `puts(x) unless quiet`). Conditions are strict
@@ -74,15 +74,15 @@ the tests are the spec until a real one exists.
   separate from positionals, labels accepted on paren and command calls,
   missing/unknown labels are named errors. Method bodies get a fresh
   scope: no outer locals (Ruby's rule, kept).
-- **Paren-less calls, the Portland way** — *command calls* at statement
-  position (`puts "hello"`, `shout word, other`) and *bare zero-argument
-  calls* (`ready?`, `pdx`) anywhere. Two rules replace Ruby's guessing:
+- **Paren-less calls, the Portland way** — _command calls_ at statement
+  position (`puts "hello"`, `shout word, other`) and _bare zero-argument
+  calls_ (`ready?`, `pdx`) anywhere. Two rules replace Ruby's guessing:
   - **No shadowing.** A name is a local or a method, never both — assigning
     `greet = 1` where a method `greet` exists is an error. Bare names are
     therefore always unambiguous.
   - **Never guess.** Forms Ruby resolves by whitespace heuristics are clean
     errors instead: `puts -1`, `puts [1]`, `puts (1)` each say
-    *"ambiguous without parens"* and show both readings. `foo - 1` stays
+    _"ambiguous without parens"_ and show both readings. `foo - 1` stays
     subtraction. Blocks don't attach to command calls yet — and a `{` there
     is the ADR 0016 never-guess error rather than a guess.
 - **Structs** — immutable named records, the seed of the object model:
@@ -128,10 +128,10 @@ the tests are the spec until a real one exists.
   different keyword. `::` names and `.` invokes as a rule, so
   `Statistics::mean(x)` is a never-guess error. Names are always fully
   qualified: no import, no aliasing, no injection. Bare names resolve
-  outward from where they were *written* — a method in a nested module
+  outward from where they were _written_ — a method in a nested module
   sees its enclosing constants, whichever spelling declared the namespace.
 - **`return` / `break` / `next`** — `return` (with or without a value) exits
-  the enclosing method, unwinding through loops *and blocks*; `break` and
+  the enclosing method, unwinding through loops _and blocks_; `break` and
   `next` control the enclosing `while` or block iteration. A call broken out
   of produces nil (ADR 0012).
 - **Blocks** — `do |item| ... end` **and `{ |item| ... }`**, dead-identical
@@ -154,14 +154,14 @@ the tests are the spec until a real one exists.
   walking; range patterns match by membership. Integer bounds only, and
   compile-checked exhaustiveness over them waits on #9.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?
-  chars split include? start_with? end_with? to_i` plus `[index]`; integers:
+chars split include? start_with? end_with? to_i` plus `[index]`; integers:
   `abs zero? positive? negative? even? odd?`; arrays: `length first last empty?
-  join include? sum min max` plus `[index]` with negative indices; hashes:
+join include? sum min max` plus `[index]` with negative indices; hashes:
   `length empty? key? keys values` plus `[key]`; everything: `to_s`.
   `slice(start, length)` and `sort` (integers) round out arrays/strings. `*`
   repeats strings and arrays; `%w[rose city]` builds word arrays. Method
   chains may continue across newlines with a leading dot.
-- **IO** — `puts(...)`, one line per argument; `puts` produces *no value* —
+- **IO** — `puts(...)`, one line per argument; `puts` produces _no value_ —
   using its result is an error (seed-level preview of "no ambient nil").
   `p(...)` prints `inspect` renderings (strings keep quotes) and returns its
   argument, like Ruby. The REPL shows results via `inspect`.
@@ -175,12 +175,23 @@ the tests are the spec until a real one exists.
 
 ## Out (deliberately, for now)
 
-- Guest `it` collision rules, the never-guess brace error, and the
-  namespace errors (`S::mean(...)`, modules inside structs, lowercase
-  module names) — the trio parses the happy path and the seed is the
-  enforcement oracle, as with `mutable`. The trio does *record* the
-  namespace errors as `ErrorNode`s carrying the seed's exact wording; its
-  evaluator just doesn't surface them yet.
+- **Trio error fidelity** — the seed is the enforcement oracle, as with
+  `mutable`, but the shortfall is not uniform. Three levels, worth keeping
+  straight:
+  - **Verbatim** — the three namespace errors (`S::mean(...)`, modules
+    inside structs, lowercase module names) and `it` mixed with declared
+    `|parameters|`. The trio reports the seed's exact wording; pinned by
+    a differential test.
+  - **Detects, different wording** — the never-guess brace error. The trio
+    refuses the program but with a generic parse message rather than the
+    three-way reading list.
+  - **Silently accepts** — a nested `it`, and `it` colliding with a local
+    of that name. The trio runs programs the seed refuses. These need the
+    per-block frames the seed's parser has and the trio's functional one
+    does not; a flat token scan cannot tell an `it` of *this* block from
+    one belonging to a block inside it. The mixing rule above is checkable
+    only because the trio declines to guess when the body opens a block of
+    its own.
 - Symbols and enums — undecided; symbols' core question is settled but the
   enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
@@ -200,7 +211,7 @@ the tests are the spec until a real one exists.
 
 ## Depth limits (measured 2026-07-19)
 
-On the default 8 MB main stack the seed died — as a silent macOS *hang*, not a
+On the default 8 MB main stack the seed died — as a silent macOS _hang_, not a
 crash — at ~1,200 nested parens, ~1,500-term `1 + 1 + …` chains, and ~900
 Portland call frames. (Even a trivial Rust `fn f() { f() }` hangs on overflow
 under macOS 26, so the OS gives no clean failure.) Two fixes, both in:
@@ -223,6 +234,6 @@ Ruby returns `nil` from: `if` with no taken branch, `puts`, out-of-range
 index, `first`/`last` on empty. All but `puts` now genuinely return
 Portland's `nil` — lookups by ADR 0010, branchless `if`/finished
 `while`/broken-out calls by ADR 0012. `puts` alone still produces
-*nothing*: it could never have had an answer, so using its result stays an
+_nothing_: it could never have had an answer, so using its result stays an
 error (ADR 0012's dividing rule). The ledger this section tracked is
 closed.
