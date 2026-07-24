@@ -43,9 +43,10 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] #29 — the `%` literal zoo: which of `%w %i %q %Q %r %s %x` survive, and one delimiter or many; corpus-informed. `%w[]`'s can't-contain-`]` bug rides along
 - [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
-- [ ] Enums / sum types — in design; open: payloads (one feature or two?), where enums are declared, how their type is named from outside
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
-- [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
+- [ ] **Namespaces (ADR 0021 — decided; build)** — `module`, `::`, always-qualified names. Unblocks the enum → symbol → hash-shorthand chain
+- [ ] Enums / sum types — next after namespaces; unblocks symbols. Open: payloads (one feature or two?), and whether `enum` declares the field as well as the vocabulary (Rails-style)
+- [ ] #27 — the object model: mixins, inheritance, visibility, `class << self` (methods in struct bodies + type predicates already built; namespacing carved out to 0021). Wants the class-shape census
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first
 - [ ] #14 — compile-time macros

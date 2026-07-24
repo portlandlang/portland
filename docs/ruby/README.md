@@ -56,6 +56,8 @@ promises govern every difference here:
   `meanwhile` / `~`
 - [parentheses and ambiguity](parentheses.md) — command calls, the
   no-shadow rule, never-guess errors; brace blocks and `it`
+- [namespaces and modules](namespaces.md) — `module` is namespace-only;
+  `::` names and `.` invokes; names are always qualified
 - [heredocs](heredocs.md) — squiggly `<<~` only, SCREAMING_CAPS
   terminators; `<<` stays the append operator
 - [bitwise operators](bitwise-operators.md) — out of the grammar; named
