@@ -47,20 +47,25 @@ if ! ruby -e 'exit RUBY_VERSION.split(".").first.to_i >= 3' 2> /dev/null; then
 fi
 
 # Named checks run alone — `script/check_docs links` — which is how you
-# iterate on one without waiting for the rest. The checks are executables
-# too, but going through here is what guarantees the Ruby above.
+# iterate on one without waiting for the rest.
+available() {
+  ls script/doc_checks/*.rb | sed 's|.*/||; s|\.rb$||' | grep -v '^shared$'
+}
+
 if [ "$#" -gt 0 ]; then
   checks=""
   for name in "$@"; do
-    if [ ! -f "script/doc_checks/$name" ]; then
+    name="${name%.rb}"
+    if [ "$name" = "shared" ] || [ ! -f "script/doc_checks/$name.rb" ]; then
       echo "script/check_docs: no check named '$name'" >&2
-      echo "  available: $(ls script/doc_checks | grep -v '\.rb$' | tr '\n' ' ')" >&2
+      echo "  available: $(available | tr '\n' ' ')" >&2
       exit 1
     fi
-    checks="$checks script/doc_checks/$name"
+    checks="$checks script/doc_checks/$name.rb"
   done
 else
-  checks="$(ls script/doc_checks/* | grep -v '\.rb$')"
+  # shared.rb is the library the checks require, not a check.
+  checks="$(available | sed 's|^|script/doc_checks/|; s|$|.rb|')"
 fi
 
 # Run every check even when one fails: a docs pass should report everything

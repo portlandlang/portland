@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby
 # Every current doc names its reader (docs/principles.md, #11).
 #
 # A doc written for everyone is written for nobody — AGENT.md spent two

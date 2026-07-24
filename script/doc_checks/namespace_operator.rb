@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby
 # `::` names, `.` invokes (ADR 0021).
 #
 # A draft once wrote `Statistics::mean(data)` two messages after declaring

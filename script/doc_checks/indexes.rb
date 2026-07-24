@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby
 # Hand-maintained indexes list every file they index.
 #
 # docs/adr/README.md sat at 0015 while six more ADRs shipped — four days

@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby
 # Every ADR is reflected in the Ruby ledger, or says why not.
 #
 # Splats were once documented nowhere: ADR 0014 matched Ruby so closely

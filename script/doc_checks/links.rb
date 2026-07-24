@@ -1,4 +1,3 @@
-#!/usr/bin/env ruby
 # Internal doc links resolve.
 
 require_relative "shared"

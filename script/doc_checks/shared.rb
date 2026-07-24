@@ -1,13 +1,17 @@
 # Helpers shared by the checks in this directory.
 #
-# Each check is its own executable so it can be run alone while you iterate
-# on it, and so that adding one means adding a file rather than editing a
-# growing script. `script/check_docs` runs them all; `script/check_docs
-# links` runs one.
+# Each check is its own file, so adding one means adding a file rather than
+# editing a growing script, and so one can be run alone while you iterate:
+# `script/check_docs links`. `script/check_docs` with no arguments runs all
+# of them.
 #
-# Prefer the runner even for a single check: it selects a Ruby 3+, which
-# running the executable directly leaves to your PATH — and macOS's system
-# Ruby is 2.6, which cannot parse this file.
+# These are plain `.rb` libraries, not executables — no shebang, no exec
+# bit — because the runner is what selects a Ruby 3+, and macOS's system
+# Ruby is 2.6 and cannot parse this file. A shebang would advertise a way
+# to run them that quietly picks the wrong interpreter.
+#
+# Adding a check: drop `something.rb` in here, require this file, and end
+# with `finish`. The runner picks it up with no wiring.
 
 REPO = File.expand_path("../..", __dir__)
 
