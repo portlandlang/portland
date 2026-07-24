@@ -46,7 +46,9 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
 - [ ] Heredocs — the Prism-textbook lexer homework (build)
-- [ ] Symbols (a real session), floats (ADR 0018) and ranges (ADR 0019) — both decided; build
+- [ ] Symbols — tabled, [first pass](docs/reports/2026-07-23-symbols-first-pass.md); entangled with enums/sum types, wants corpus residue data
+- [ ] Enums / sum types — undecided and unlisted until now; the job symbols would do, and the natural next exhaustiveness citizen
+- [ ] Floats (ADR 0018) and ranges (ADR 0019) — both decided; build
 - [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first
