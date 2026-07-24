@@ -49,7 +49,7 @@ The user hasn't written much concurrency code — partly because Ruby makes it c
 
 One model, built into the language. Immutability is what lets it be this simple — the machine does the figuring-out instead of handing you manual tools.
 
-`together { }` shape note: a normal block returns only its last value, so `together` needs language support to treat each marked line as a task (the bit of "magic"). The per-line marker (`•`/`spawn`) makes it explicit and non-magical: a marked line is a task, an unmarked line is ordinary code.
+`together { }` shape note: a normal block returns only its last value, so `together` needs language support to treat each marked line as a task (the bit of "magic"). The per-line marker (`~`/`meanwhile`) makes it explicit and non-magical: a marked line is a task, an unmarked line is ordinary code.
 
 ## Implementation
 
