@@ -14,8 +14,12 @@ reputation:
   `[1,2,3][1..99]` is `[2,3]`, but `[1,2,3][4..]` is `nil` and
   `[1,2,3][-99..]` is `nil`. And `[1,2,3][3..]` is `[]` — start *equal*
   to length is a valid boundary, start past it is not.
-- **An endless range swallows the next line.** `x = 1..` followed by a
-  line containing `5` is `1..5`, indented or not.
+- **Line-crossing is three unrelated accidents.** A trailing `..`
+  reaches *forward*: `x = 1..` followed by a line containing `5` is
+  `1..5`, indented or not. A leading `..` does *not* reach back: `1`
+  then `..4` is two separate expressions — even inside parentheses,
+  where `y = (1` / `..4)` binds `y` to `..4`. But a leading `.` *does*
+  reach back, so `1` then `.to_s` is `"1"`.
 
 Ruby does not check `case` exhaustiveness at all, so range arms carry no
 coverage obligation.
@@ -57,10 +61,12 @@ arms is already an unreachable-arm error
 ([pattern matching](pattern-matching.md)). Arm order carries no meaning
 when arms are disjoint, so it is a lint someday, never a compile error.
 
-### Endless ranges close on a token that can't continue them
+### A range spans a newline only where one reading exists
 
-`array[1..]`, `slice(1.., 2..)`, and `in 10.. then` need no parens. Only
-where the next token could be an operand is there an error:
+`array[1..]`, `slice(1.., 2..)`, `in 10.. then`, `in ..10`, `array[..5]`
+all need no parens — each sits next to a token that settles it. The
+error fires only where two readings genuinely exist, in either
+direction:
 
 ```ruby
 span = 1..
@@ -68,10 +74,17 @@ p span
 # error: endless range at end of line — does it continue?
 #   the range, closed here:  span = (1..)
 #   a range up to p span:    span = 1..p(span)
+
+x = compute
+..4
+# error: `..` at the start of a line — does it continue the line above?
+#   a bounded range:          x = compute..4
+#   a separate beginless one: x = compute  /  ..4
 ```
 
-That is the one spot Ruby resolves by silently continuing — so the error
-lands exactly where Ruby is a footgun.
+One rule replaces Ruby's three accidents (trailing reaches forward,
+leading `..` does not reach back, leading `.` does): **name both
+readings and ask.**
 
 ## Migration
 
@@ -81,8 +94,10 @@ lands exactly where Ruby is a footgun.
   checking `slice.nil?` hits the never-absent-left-side error, `if
   array[4..]` is already an error (no truthiness), and unchecked code
   would have crashed in Ruby on `nil.each`.
-- A trailing endless range in an assignment needs its parens —
-  free-tier polyfill autocorrect, since `(1..)` is valid Ruby too.
+- A range split across a newline needs its parens, in either direction —
+  free-tier polyfill autocorrect, since `(1..)` is valid Ruby too. Note
+  the leading-`..` rewrite changes Ruby's meaning, so that one is an
+  **unsafe autocorrect**: Ruby read those as two expressions.
 - Exhaustiveness gains: `case` chains over ranges that were total in
   Ruby lose their now-unnecessary `else` — optional cleanup, not a
   requirement.
