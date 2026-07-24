@@ -503,63 +503,60 @@ impl<W: std::io::Write> Interpreter<W> {
                 Some(receiver.clone())
             }
             Expression::Append { name, value } => {
-                let current = self
-                    .variables
-                    .get(name)
-                    .unwrap_or_else(|| panic!("undefined variable {name}"))
-                    .value
-                    .clone();
+                // The right side runs first: it may read the name being
+                // appended to (`line << line.length`), and taking the binding
+                // below leaves nil in its place.
                 let value = self.value_of(value);
+                let current = self.take_for_update(name);
                 match (current, value) {
                     (Value::String(mut base), Value::String(suffix)) => {
                         base.push_str(&suffix);
                         Some(Value::String(base))
                     }
-                    (Value::Array(elements), element) => {
-                        let mut elements = elements.as_ref().clone();
-                        elements.push(element);
-                        Some(Value::array(elements))
+                    (Value::Array(mut elements), element) => {
+                        std::rc::Rc::make_mut(&mut elements).push(element);
+                        Some(Value::Array(elements))
                     }
                     (current, value) => {
-                        panic!(
+                        let message = format!(
                             "cannot append {value:?} to {current:?} — << takes a string or an array on the left"
-                        )
+                        );
+                        self.restore(name, current);
+                        panic!("{message}")
                     }
                 }
             }
             Expression::IndexUpdate { index, name, value } => {
-                let current = self
-                    .variables
-                    .get(name)
-                    .unwrap_or_else(|| panic!("undefined variable {name}"))
-                    .value
-                    .clone();
+                // Both sides first, for the same reason as Append above.
                 let index = self.value_of(index);
                 let value = self.value_of(value);
+                let current = self.take_for_update(name);
                 match (current, index) {
-                    (Value::Array(elements), Value::Integer(index)) => {
-                        let mut elements = elements.as_ref().clone();
+                    (Value::Array(mut elements), Value::Integer(index)) => {
                         let length = elements.len() as i64;
                         let position = if index < 0 { length + index } else { index };
                         if position == length {
-                            elements.push(value);
+                            std::rc::Rc::make_mut(&mut elements).push(value);
                         } else if position >= 0 && position < length {
-                            elements[position as usize] = value;
+                            std::rc::Rc::make_mut(&mut elements)[position as usize] = value;
                         } else {
+                            self.restore(name, Value::Array(elements));
                             panic!("index {index} out of range for assignment to {name}");
                         }
-                        Some(Value::array(elements))
+                        Some(Value::Array(elements))
                     }
-                    (Value::Hash(pairs), key) => {
-                        let mut pairs = pairs.as_ref().clone();
-                        match pairs.iter_mut().find(|(existing, _)| *existing == key) {
+                    (Value::Hash(mut pairs), key) => {
+                        let entries = std::rc::Rc::make_mut(&mut pairs);
+                        match entries.iter_mut().find(|(existing, _)| *existing == key) {
                             Some(pair) => pair.1 = value,
-                            None => pairs.push((key, value)),
+                            None => entries.push((key, value)),
                         }
-                        Some(Value::hash(pairs))
+                        Some(Value::Hash(pairs))
                     }
                     (current, index) => {
-                        panic!("cannot index-assign {current:?} with {index:?}")
+                        let message = format!("cannot index-assign {current:?} with {index:?}");
+                        self.restore(name, current);
+                        panic!("{message}")
                     }
                 }
             }
@@ -1481,6 +1478,43 @@ impl<W: std::io::Write> Interpreter<W> {
             };
         }
         result
+    }
+
+    /// Take a binding's value out for an in-place update, leaving nil behind.
+    ///
+    /// The caller is about to rebind the name, so the hole is temporary — but
+    /// taking rather than cloning is the whole point. Cloning a `Value` clones
+    /// its `Rc`, leaving a refcount of 2, so `Rc::make_mut` would copy the
+    /// entire collection on every append. That is what made `<<` quadratic:
+    /// `tokens << token` over 20,000 tokens copied ~200M elements (#34).
+    ///
+    /// Taking makes us the sole owner, so `make_mut` mutates in place — and
+    /// immutability is preserved *because* the refcount says nobody else can
+    /// see the value. Where the value is genuinely shared (`other = list`),
+    /// the refcount is 2 and `make_mut` copies, which is exactly right.
+    ///
+    /// Immutable bindings are cloned instead: `assign` is about to reject the
+    /// rebind, and the REPL keeps running after catching that panic, so the
+    /// binding has to survive intact.
+    fn take_for_update(&mut self, name: &str) -> Value {
+        let binding = self
+            .variables
+            .get_mut(name)
+            .unwrap_or_else(|| panic!("undefined variable {name}"));
+
+        if binding.mutable {
+            std::mem::replace(&mut binding.value, Value::Nil)
+        } else {
+            binding.value.clone()
+        }
+    }
+
+    /// Put a taken value back, on a path that is about to panic. The REPL
+    /// survives panics, so a failed append must not leave nil behind.
+    fn restore(&mut self, name: &str, value: Value) {
+        if let Some(binding) = self.variables.get_mut(name) {
+            binding.value = value;
+        }
     }
 
     /// Bind or rebind a name, enforcing ADR 0001: `mutable` declares a new
