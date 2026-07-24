@@ -6,7 +6,7 @@
 
 ## Context
 
-Tier-2 concurrency is structured fork-join: task lines are closures handed to the runtime scheduler (P/E-core thread pool); the block's `end` is the join barrier; tasks are lexically caged — no handles, no futures, no `await`. The programmer declares *concurrency* (independence); the runtime harvests *parallelism* when it pays. The vocabulary must therefore describe the declaration, not the machinery — which ruled out `spawn` (OS word, leaks implementation) and `launch` (owned by app launchers, on this exact platform).
+Tier-2 concurrency is structured fork-join: task lines are closures handed to the runtime scheduler (P/E-core thread pool); the block's `end` is the join barrier; tasks are lexically caged — no handles, no futures, no `await`. The programmer declares _concurrency_ (independence); the runtime harvests _parallelism_ when it pays. The vocabulary must therefore describe the declaration, not the machinery — which ruled out `spawn` (OS word, leaks implementation) and `launch` (owned by app launchers, on this exact platform).
 
 The pair must also read as one thought, the way "async/await" does.
 

@@ -8,8 +8,8 @@
 
 `1..5` inclusive, `1...5` exclusive, first-class objects, usable as patterns and as slice indices. Two edges are sharper than their reputation:
 
-- **Slicing is asymmetric.** The end clamps freely, the start does not: `[1,2,3][1..99]` is `[2,3]`, but `[1,2,3][4..]` is `nil` and `[1,2,3][-99..]` is `nil`. And `[1,2,3][3..]` is `[]` — start *equal* to length is a valid boundary, start past it is not.
-- **Line-crossing is three unrelated accidents.** A trailing `..` reaches *forward*: `x = 1..` followed by a line containing `5` is `1..5`, indented or not. A leading `..` does *not* reach back: `1` then `..4` is two separate expressions — even inside parentheses, where `y = (1` / `..4)` binds `y` to `..4`. But a leading `.` *does* reach back, so `1` then `.to_s` is `"1"`.
+- **Slicing is asymmetric.** The end clamps freely, the start does not: `[1,2,3][1..99]` is `[2,3]`, but `[1,2,3][4..]` is `nil` and `[1,2,3][-99..]` is `nil`. And `[1,2,3][3..]` is `[]` — start _equal_ to length is a valid boundary, start past it is not.
+- **Line-crossing is three unrelated accidents.** A trailing `..` reaches _forward_: `x = 1..` followed by a line containing `5` is `1..5`, indented or not. A leading `..` does _not_ reach back: `1` then `..4` is two separate expressions — even inside parentheses, where `y = (1` / `..4)` binds `y` to `..4`. But a leading `.` _does_ reach back, so `1` then `.to_s` is `"1"`.
 
 Ruby does not check `case` exhaustiveness at all, so range arms carry no coverage obligation.
 
@@ -25,7 +25,7 @@ words[99..]      # []
 
 The start clamps the way Ruby already clamps the end. `[4..]` and `[-99..]` yield empty rather than nil.
 
-**`array[1]` is unchanged — still `T?`** (see [lookups](lookups.md)). The two are different questions: one *element* has an honest absence answer; a *sub-collection* of nothing is `[]`, a perfectly good collection. Ruby's nil-for-out-of-range slice is the nil/empty conflation Portland exists to kill.
+**`array[1]` is unchanged — still `T?`** (see [lookups](lookups.md)). The two are different questions: one _element_ has an honest absence answer; a _sub-collection_ of nothing is `[]`, a perfectly good collection. Ruby's nil-for-out-of-range slice is the nil/empty conflation Portland exists to kill.
 
 ### Range patterns count toward exhaustiveness
 
@@ -37,7 +37,7 @@ in 10..   then "lots"
 end                      # proven total — no else needed
 ```
 
-The checker sorts the integer ranges and requires no gaps, a beginless first, an endless last. Gaps are compile errors. Overlap stays legal — first-match-wins is real semantics, and the cascading `..10 / ..100 / ..1000` idiom depends on it — while an arm *entirely* covered by earlier arms is already an unreachable-arm error ([pattern matching](pattern-matching.md)). Arm order carries no meaning when arms are disjoint, so it is a lint someday, never a compile error.
+The checker sorts the integer ranges and requires no gaps, a beginless first, an endless last. Gaps are compile errors. Overlap stays legal — first-match-wins is real semantics, and the cascading `..10 / ..100 / ..1000` idiom depends on it — while an arm _entirely_ covered by earlier arms is already an unreachable-arm error ([pattern matching](pattern-matching.md)). Arm order carries no meaning when arms are disjoint, so it is a lint someday, never a compile error.
 
 ### A range spans a newline only where one reading exists
 

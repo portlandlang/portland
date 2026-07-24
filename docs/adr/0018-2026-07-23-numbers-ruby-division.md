@@ -11,7 +11,7 @@ Python's answer reuses Ruby's spelling with a quietly different value — a stra
 
 ## Decision
 
-**Ruby's rule, permanently: integer `/` integer is integer division, and it is Ruby's *floored* division, not Rust's truncation.**
+**Ruby's rule, permanently: integer `/` integer is integer division, and it is Ruby's _floored_ division, not Rust's truncation.**
 
 ```ruby
 7 / 2      # 3

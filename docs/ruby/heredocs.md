@@ -41,9 +41,9 @@ SQL
 
 The rest follows Ruby: the terminator may be indented, `<<~'SQL'` suppresses interpolation (single quotes mean that everywhere), method calls attach to the heredoc (`<<~SQL.strip`), and multiple heredocs can open on one line. No space is permitted between `<<~` and the terminator — already a Ruby syntax error, so nothing diverges there.
 
-**Why only squiggly.** Beyond one-way-to-do-it, dropping the other two openers dissolves a collision. [ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md) made `<<` Portland's append operator, and Ruby's rule for separating the two depends on local-vs-method guessing — exactly what the [no-shadow rule](parentheses.md) exists to eliminate, so it cannot be inherited. With squiggly as the only opener, `<<` is *always* append and `<<~` is *always* a heredoc. No positional rule, no disambiguation error, nothing to learn.
+**Why only squiggly.** Beyond one-way-to-do-it, dropping the other two openers dissolves a collision. [ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md) made `<<` Portland's append operator, and Ruby's rule for separating the two depends on local-vs-method guessing — exactly what the [no-shadow rule](parentheses.md) exists to eliminate, so it cannot be inherited. With squiggly as the only opener, `<<` is _always_ append and `<<~` is _always_ a heredoc. No positional rule, no disambiguation error, nothing to learn.
 
-`<<~` also loses less than it appears: it strips only the *common* indentation, so relative structure survives. The one thing it cannot express is uniform absolute leading whitespace, which can be written explicitly.
+`<<~` also loses less than it appears: it strips only the _common_ indentation, so relative structure survives. The one thing it cannot express is uniform absolute leading whitespace, which can be written explicitly.
 
 **Why SCREAMING_CAPS.** The convention is already universal, and RuboCop encodes it as `Naming/HeredocDelimiterCase` with uppercase as the default enforced style — so conforming Ruby already complies. A delimiter is punctuation, not an identifier, and uppercase makes the closing line unmistakable at a glance. Corpus evidence may revisit this; it is a prior, not a closed book.
 
@@ -52,5 +52,5 @@ The rest follows Ruby: the terminator may be indented, `<<~'SQL'` suppresses int
 The two rewrites sit in different tiers, and the difference matters:
 
 - **`<<~` with an uppercase terminator** — compiles verbatim.
-- **Lowercase terminators** — *free-tier* autocorrect. Upcasing the opener and the closing line preserves the string's value exactly, and RuboCop already flags them.
-- **`<<` and `<<-`** — parse errors naming the fix, but the rewrite is an **unsafe autocorrect**. Switching the opener to `<<~` strips common indentation and therefore *changes the string's value* whenever the content was indented. It is safe only when the content has no common leading indentation; a linter must verify that before offering to apply it. For indented content the author has to decide whether the leading whitespace mattered.
+- **Lowercase terminators** — _free-tier_ autocorrect. Upcasing the opener and the closing line preserves the string's value exactly, and RuboCop already flags them.
+- **`<<` and `<<-`** — parse errors naming the fix, but the rewrite is an **unsafe autocorrect**. Switching the opener to `<<~` strips common indentation and therefore _changes the string's value_ whenever the content was indented. It is safe only when the content has no common leading indentation; a linter must verify that before offering to apply it. For indented content the author has to decide whether the leading whitespace mattered.

@@ -23,11 +23,11 @@ The reframe that unlocked this: **Ruby's problem with `status = :pending` was ne
 
 ### Tradeoffs accepted, explicitly
 
-1. **Two string-like types.** Portland will have both `String` and `Symbol`, so users must choose between them — the Ruby wart this session opened by trying to avoid. It is *mitigated, not eliminated*: static types turn the classic mismatch into a compile error instead of Ruby's silent nil, so `HashWithIndifferentAccess` has nothing to paper over. But the choice still exists at every hash-key site.
+1. **Two string-like types.** Portland will have both `String` and `Symbol`, so users must choose between them — the Ruby wart this session opened by trying to avoid. It is _mitigated, not eliminated_: static types turn the classic mismatch into a compile error instead of Ruby's silent nil, so `HashWithIndifferentAccess` has nothing to paper over. But the choice still exists at every hash-key site.
 1. **Open positions stay unchecked.** A symbol where no closed vocabulary is expected is not checked. `config[:nmae]` is a valid symbol that simply misses, yielding a maybe per ADR 0010. The uncheckedness is confined to exactly where Ruby is also unchecked, and ADR 0010 already forces the miss to be handled — but a typo there is still not a compile error.
 1. **Rails' indifferent-access habits do not port.** Code that writes a symbol key and reads a string one (or vice versa) becomes a compile error rather than working. Loud, and mechanically fixable, but real migration work for Rails-shaped codebases.
 1. **The "one job" purity is given up.** The audit below argued symbols would be a type with no unique remaining job. They now have two — enum case spelling and hash keys/labels — which is less pure and more Ruby. Deliberate.
-1. **Rejected alternative:** symbols existing *only* as enum members (option A), which buys total checking at the cost of `{name: "x"}` meaning string keys.
+1. **Rejected alternative:** symbols existing _only_ as enum members (option A), which buys total checking at the cost of `{name: "x"}` meaning string keys.
 
 ### The escape hatch, for later
 
@@ -43,7 +43,7 @@ That recovers most of option A's safety while keeping option B's syntax. Explici
 ### Rejected syntaxes for enum cases, and why
 
 - **Capitalized cases** (`in Pending`) — makes enum cases visually indistinguishable from structs (and later classes) at a glance, when capitalization should tell you what kind of thing you are looking at.
-- **Swift's leading dot** (`in .pending`) — rejected on a *technical* ground, not taste: Portland supports leading-dot method chaining across lines (verified: `"portland"` / `.upcase` / `.reverse` works today), so `.pending` occupies the same visual slot as a chained call whose receiver is on a previous line. Swift can afford that syntax because Swift has no leading-dot chaining.
+- **Swift's leading dot** (`in .pending`) — rejected on a _technical_ ground, not taste: Portland supports leading-dot method chaining across lines (verified: `"portland"` / `.upcase` / `.reverse` works today), so `.pending` occupies the same visual slot as a chained call whose receiver is on a previous line. Swift can afford that syntax because Swift has no leading-dot chaining.
 - **`:symbol` cases** — chosen. The sigil distinguishes them from captures (`in pending` binds anything), cannot be confused with a method call, and reads as Ruby because it is Ruby.
 
 ## Why this is hard
@@ -54,36 +54,36 @@ But that number counts every symbol use undifferentiated, and Portland's existin
 
 ## The audit: what job would a symbol still do?
 
-| symbol's job in Ruby | Portland status |
-|---|---|
-| kwarg labels — `foo(name: "x")` | ADR 0014: compile-time labels, no symbol |
-| struct pattern labels — `in Token(kind:)` | ADR 0013: compile-time |
-| `send`, `respond_to?`, `define_method`, `attr_accessor`, `alias_method` | dropped forever (runtime metaprogramming) |
-| `&:upcase` | deferred by ADRs 0016/0017 — `{ it.upcase }` covers it |
-| hash keys — `{name: "x"}` | Portland hashes are `{"key" => v}`; string keys already work |
-| **enum-ish values — `status = :pending`** | **unsolved** |
+| symbol's job in Ruby                                                    | Portland status                                              |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| kwarg labels — `foo(name: "x")`                                         | ADR 0014: compile-time labels, no symbol                     |
+| struct pattern labels — `in Token(kind:)`                               | ADR 0013: compile-time                                       |
+| `send`, `respond_to?`, `define_method`, `attr_accessor`, `alias_method` | dropped forever (runtime metaprogramming)                    |
+| `&:upcase`                                                              | deferred by ADRs 0016/0017 — `{ it.upcase }` covers it       |
+| hash keys — `{name: "x"}`                                               | Portland hashes are `{"key" => v}`; string keys already work |
+| **enum-ish values — `status = :pending`**                               | **unsolved**                                                 |
 
 Every row but the last is spoken for. The residue is the enum job.
 
 ## Why Ruby has symbols — two rationales, both dead in Portland
 
-**1. Symbols are the interpreter's identifier table, exposed as values.** A bare Ruby 4.0.6 interpreter has **3,599 symbols interned before any user code runs** (`Symbol.all_symbols.length`) — its own method, ivar, and constant names. `send(:foo)` works because `:foo` *is* the key in the method table. That is why symbols and metaprogramming are inseparable in Ruby. Portland has no runtime method table, so this rationale has no referent.
+**1. Symbols are the interpreter's identifier table, exposed as values.** A bare Ruby 4.0.6 interpreter has **3,599 symbols interned before any user code runs** (`Symbol.all_symbols.length`) — its own method, ivar, and constant names. `send(:foo)` works because `:foo` _is_ the key in the method table. That is why symbols and metaprogramming are inseparable in Ruby. Portland has no runtime method table, so this rationale has no referent.
 
 **2. Interning works around mutable strings.** Verified on 4.0.6: `:foo.object_id == :foo.object_id` is true; `"foo".object_id == "foo".object_id` is false; string literals are still not frozen by default. Symbols give identity comparison, one allocation, and a key that can't mutate after insertion. Portland's strings are already immutable (ADR 0015) and an AOT compiler interns literals invisibly, so this rationale is also gone.
 
-**3. What survives: the semantic rationale.** A symbol says *"this is a name, not data."* `"pending"` is text — it might be user input, displayed, concatenated. `:pending` is an identifier, a member of a closed vocabulary the program controls. This is the use–mention distinction, it's real, it's language-independent, and it is almost certainly the source of the affection.
+**3. What survives: the semantic rationale.** A symbol says _"this is a name, not data."_ `"pending"` is text — it might be user input, displayed, concatenated. `:pending` is an identifier, a member of a closed vocabulary the program controls. This is the use–mention distinction, it's real, it's language-independent, and it is almost certainly the source of the affection.
 
 ## Prior art
 
-- **Lisp/Scheme, Smalltalk** — foundational; symbols are what identifiers *are* in the AST / selector table. Ruby's lineage.
+- **Lisp/Scheme, Smalltalk** — foundational; symbols are what identifiers _are_ in the AST / selector table. Ruby's lineage.
 - **Erlang/Elixir atoms** — the closest sibling, and they carry exactly the job Portland has unsolved: `{:ok, value}` / `{:error, reason}` tagging is the core idiom. Note the cost of an open, untyped vocabulary: Erlang's atom table isn't garbage collected, making atom exhaustion a DoS vector.
 - **JavaScript `Symbol()`** — false cognate. Unique opaque property keys, not interned names.
-- **Rust, Swift, Haskell, OCaml, Go, Java, C#** — no symbols at all. Not an oversight: enums/sum types cover the closed-vocabulary job *and* add exhaustiveness, while interning becomes an invisible optimization.
+- **Rust, Swift, Haskell, OCaml, Go, Java, C#** — no symbols at all. Not an oversight: enums/sum types cover the closed-vocabulary job _and_ add exhaustiveness, while interning becomes an invisible optimization.
 
 **The middle ground worth studying:**
 
 - **Swift's leading dot** — `status = .pending`. Symbol ergonomics (terse, no ceremony, reads as a name), but a typed enum case with exhaustiveness; the type comes from context so you never write `Status.pending`.
-- **OCaml polymorphic variants** — `` `Pending ``, written with no prior declaration, and the type system *infers* the set. The closest existing thing to "symbols that typecheck."
+- **OCaml polymorphic variants** — `` `Pending ``, written with no prior declaration, and the type system _infers_ the set. The closest existing thing to "symbols that typecheck."
 
 OCaml's is the one to look hard at, because Portland already has inferred types (#9): `status = :pending` with no declaration, vocabulary inferred, exhaustiveness in `case/in` for free.
 
@@ -112,7 +112,7 @@ Four things that shaped this session:
 
 ## The reframe
 
-The session opened with the wrong question ("keep or kill symbols?"), found a better one ("what carries the semantic job?"), and then found that the framing itself was wrong. The error was treating *typed* as precluding symbol **syntax** — it does not. See the Decided section above.
+The session opened with the wrong question ("keep or kill symbols?"), found a better one ("what carries the semantic job?"), and then found that the framing itself was wrong. The error was treating _typed_ as precluding symbol **syntax** — it does not. See the Decided section above.
 
 ## Entanglement, and what is still open
 
@@ -120,7 +120,7 @@ The enum mechanism symbols lean on is **still being designed**. Open:
 
 - **Payloads.** Rails-style enums are payload-free named values. But `Ok(value)` / `Error(reason)` for #28 needs payloads, and `:paid` reads beautifully payload-free while `:active(since: "today")` starts looking like a method call. **One feature or two?** — the live question.
 - **Where enums are declared.** The Rails answer is "inside the concept that owns it," which for Portland means nested in a `struct`. That works for the common case, where every use site knows the expected type — but naming one from outside (`def notify(status:)` — what type?) needs namespacing, which Portland has none of (`::` does not parse, `module` is not a keyword, `MAX = 5` is an ordinary binding).
-- Enum case *scoping* needs no new machinery — it is member access, the same shape `token.kind` already has. Enum **type naming** does. That distinction was gotten wrong once in session and is worth keeping straight.
+- Enum case _scoping_ needs no new machinery — it is member access, the same shape `token.kind` already has. Enum **type naming** does. That distinction was gotten wrong once in session and is worth keeping straight.
 
 This makes **#27's object model the keystone**: hash shorthand waits on symbols, symbols wait on enums, and enums touch namespacing. Pointing the class-shape census at #27 unblocks the most.
 
@@ -128,7 +128,7 @@ This makes **#27's object model the keystone**: hash shorthand waits on symbols,
 
 Now that symbols are in, these affirm-or-overturn the priors rather than decide the question:
 
-1. **The residue** — symbol occurrences that are *not* hash keys, kwarg labels, metaprogramming DSL arguments, or `&:sym`. Sizes how much real code is doing the closed-vocabulary job that enums will now check.
+1. **The residue** — symbol occurrences that are _not_ hash keys, kwarg labels, metaprogramming DSL arguments, or `&:sym`. Sizes how much real code is doing the closed-vocabulary job that enums will now check.
 1. **`&:sym` prevalence** — sizes the `{ it.method }` rewrite (ADR 0017).
 1. **String-vs-symbol key mixing** — how often a codebase writes a symbol key and reads a string one (or vice versa). This directly sizes accepted tradeoff 3, since every such site becomes a compile error.
 1. **Hash-literal-then-literal-lookup shape** — how often a hash is built with visible literal keys and then read with literal keys. Sizes the lint in "The escape hatch," i.e. how much of tradeoff 2 is recoverable.
@@ -139,17 +139,17 @@ Now that symbols are in, these affirm-or-overturn the priors rather than decide 
 
 Tested against the seed, so the next pass starts from facts:
 
-| form | status |
-|---|---|
-| `p(:foo)` | parse error — `:` lexes as a bare `Colon`; no symbol literal exists |
-| `{:name => "pdx"}` | parse error, same reason |
-| `{name: "pdx"}` | parse error — "expected => in hash literal" |
-| `{"name" => "pdx"}` | works — string keys, `=>` required |
-| `greet(name: "pdx")` | works |
+| form                 | status                                                              |
+| -------------------- | ------------------------------------------------------------------- |
+| `p(:foo)`            | parse error — `:` lexes as a bare `Colon`; no symbol literal exists |
+| `{:name => "pdx"}`   | parse error, same reason                                            |
+| `{name: "pdx"}`      | parse error — "expected => in hash literal"                         |
+| `{"name" => "pdx"}`  | works — string keys, `=>` required                                  |
+| `greet(name: "pdx")` | works                                                               |
 
 Symbols do not exist anywhere in Portland today. Keyword arguments work but involve no symbol: `name:` parses as an identifier plus a `Colon` token and becomes a label at parse time.
 
-**`{name: "pdx"}` hash shorthand is a parse error today**, which is arguably a larger migration issue than symbols — it is the most common hash literal form in modern Ruby. It has to be built either way; whether it means *symbol* keys (if symbols exist) or *string* keys (if they don't) is downstream of this decision.
+**`{name: "pdx"}` hash shorthand is a parse error today**, which is arguably a larger migration issue than symbols — it is the most common hash literal form in modern Ruby. It has to be built either way; whether it means _symbol_ keys (if symbols exist) or _string_ keys (if they don't) is downstream of this decision.
 
 ## Open sub-questions for the next pass
 

@@ -4,7 +4,7 @@
 
 Written 2026-07-22, at the close of the optionals arc (ADRs 0005–0011, seed rungs 1–6, trio rungs 1–6, #21 complete). This is a working map, not a spec: every open decision we know about, its options and tradeoffs, what deciding it unlocks, and a recommended order and answer for each.
 
-**The governing tiebreaker** (user, 2026-07-22): for any decision that affects end users' usage, *matching Ruby is the preferred answer* unless it costs a penalty against Portland's design principles. Tie goes to Ruby. Each recommendation below says whether it's a Ruby-match, and if not, what penalty justified diverging.
+**The governing tiebreaker** (user, 2026-07-22): for any decision that affects end users' usage, _matching Ruby is the preferred answer_ unless it costs a penalty against Portland's design principles. Tie goes to Ruby. Each recommendation below says whether it's a Ruby-match, and if not, what penalty justified diverging.
 
 ---
 
@@ -29,13 +29,13 @@ Written 2026-07-22, at the close of the optionals arc (ADRs 0005–0011, seed ru
 
 **Unlocks.** The evaluator's `Outcome` conflation (empty slot vs nil) becomes principled; `while`/`break value` semantics; removes the seed's "produced no value" panic family.
 
-**Recommendation: A — Ruby-match.** No penalty: the maybe is typed, so no ambient nil sneaks back; the strictness B wanted arrives anyway via "unhandled maybe is a compile error." Keep `puts` as B-style (its result is *never* meaningful — that's not partiality, that's a statement).
+**Recommendation: A — Ruby-match.** No penalty: the maybe is typed, so no ambient nil sneaks back; the strictness B wanted arrives anyway via "unhandled maybe is a compile error." Keep `puts` as B-style (its result is _never_ meaningful — that's not partiality, that's a statement).
 
 ### 2. #20 — The `case/in` spec
 
 Five sub-decisions. Pattern matching is load-bearing (ADRs 0005/0008/0009 lean on it), so this is the highest-value session on the board.
 
-**2a. Exhaustiveness.** Options: compile-checked (a `case/in` over a maybe missing `in nil` refuses to build) vs Ruby's runtime `NoMatchingPatternError`. **Recommend: compile-checked.** Diverges from Ruby, justified: this *is* the optionals safety story, and the divergence is loud (compile error), never silent. The migration promise holds.
+**2a. Exhaustiveness.** Options: compile-checked (a `case/in` over a maybe missing `in nil` refuses to build) vs Ruby's runtime `NoMatchingPatternError`. **Recommend: compile-checked.** Diverges from Ruby, justified: this _is_ the optionals safety story, and the divergence is loud (compile error), never silent. The migration promise holds.
 
 **2b. `when` without `===`.** Ruby's `when` power is monkeypatchable `===`. Options: (i) `===` becomes an ordinary, statically resolved method — classes/structs define it, `when` calls it, no runtime magic; (ii) `when` is plain `==` plus grammar-special class/range forms; (iii) something new. **Recommend (i) — Ruby-match** in behavior, static in mechanism. `when Integer`, `when 1..9`, `when /re/` all keep working; the only thing lost is redefining `===` at runtime, which is cut-list territory anyway.
 
@@ -58,7 +58,7 @@ Not yet an issue — the seed supports kwargs only on `new`/`with`. Almost pure 
 **Options.**
 
 - **A — real in-place mutation**, frozen at share boundaries. Maximum Ruby familiarity; but reintroduces aliasing spookiness (two names, one buffer — Ruby's classic action-at-a-distance bug) and makes the share-boundary mechanics (freeze? copy? error?) load-bearing and intricate.
-- **B — values stay immutable; mutation is rebinding.** The accumulator idiom is `mutable list = []` + `list += [item]`. Semantically clean; cost is O(n²) copying *unless* the runtime is smart.
+- **B — values stay immutable; mutation is rebinding.** The accumulator idiom is `mutable list = []` + `list += [item]`. Semantically clean; cost is O(n²) copying _unless_ the runtime is smart.
 - **C — B, plus `<<` as a rebinding operator** (compound assignment, like `+=`):
 
   ```ruby
@@ -68,9 +68,9 @@ Not yet an issue — the seed supports kwargs only on `new`/`with`. Almost pure 
 
   Reads exactly like Ruby at the call site. Aliases can't be spooked — `other = line; line << "!"` leaves `other` untouched (in Ruby it doesn't!). And the performance story is the runtime's, not the semantics': the seed's values are already `Rc`-shared, and the classic refcount-1 trick (mutate in place when nobody else holds the value) makes rebuild-append O(1) amortized without any semantic mutation.
 
-**Tradeoffs.** C is the beautiful line being the safe line: Ruby fingers, functional soul. Its price: `<<` re-enters the grammar, and Ruby's lexer pileup (shift vs append vs heredoc opener) is exactly what ADR 0003 celebrated escaping — though as a *compound-assignment-shaped* operator it can live at statement/assignment level, which is a far smaller lexical footprint than Ruby's anywhere-operator. Divergence warning for the ledger: migrated code that *relied* on aliased mutation changes behavior — that must be a loud lint, not silent (the polyfill can detect many cases; the rest is the `docs/ruby/` ledger's job).
+**Tradeoffs.** C is the beautiful line being the safe line: Ruby fingers, functional soul. Its price: `<<` re-enters the grammar, and Ruby's lexer pileup (shift vs append vs heredoc opener) is exactly what ADR 0003 celebrated escaping — though as a _compound-assignment-shaped_ operator it can live at statement/assignment level, which is a far smaller lexical footprint than Ruby's anywhere-operator. Divergence warning for the ledger: migrated code that _relied_ on aliased mutation changes behavior — that must be a loud lint, not silent (the polyfill can detect many cases; the rest is the `docs/ruby/` ledger's job).
 
-**Recommendation: C.** Ruby-match at the reading level, divergence at the aliasing level justified by the tier-1 parallelism thesis (immutable values are *why* `.map` can spread across cores). Bang methods (`upcase!`) stay out — rebinding spells it (`word = word.upcase`).
+**Recommendation: C.** Ruby-match at the reading level, divergence at the aliasing level justified by the tier-1 parallelism thesis (immutable values are _why_ `.map` can spread across cores). Bang methods (`upcase!`) stay out — rebinding spells it (`word = word.upcase`).
 
 **Unlocks.** String/array building in the trio (the evaluator's pair-list hash workaround, guest hash indexing, mini_lexer's `text +=` patterns get honest); buffer-shaped Stage 1 compiler code; unblocks the `together`-capture story (ADR 0001's promised compile error needs the value-mutability line drawn).
 
@@ -78,7 +78,7 @@ Not yet an issue — the seed supports kwargs only on `new`/`with`. Almost pure 
 
 The biggest unnamed decision. STAGE0 deliberately has "no methods in struct bodies yet." Questions: methods in `struct ... end` bodies; is there a `class` at all or is Portland structs-all-the-way; modules as namespaces and/or mixins; `self`; visibility; constants.
 
-Too big for this report to answer responsibly. **Recommend:** open the issue, and take one increment *before* the full session: **methods in struct bodies** (Ruby-match in surface, obvious semantics, no inheritance questions), because Stage 1 compiler code is begging for `token.integer?` over `token_integer?(token)`. The full object-model session (inheritance? mixins? nothing?) comes later with that evidence in hand.
+Too big for this report to answer responsibly. **Recommend:** open the issue, and take one increment _before_ the full session: **methods in struct bodies** (Ruby-match in surface, obvious semantics, no inheritance questions), because Stage 1 compiler code is begging for `token.integer?` over `token_integer?(token)`. The full object-model session (inheritance? mixins? nothing?) comes later with that evidence in hand.
 
 ### 6. Error handling (needs an issue)
 
@@ -92,7 +92,7 @@ Five questions, all small, analyzed in-session 2026-07-22: task-line contents (r
 
 ### 8. #9 — Type inference (the real compiler's front door)
 
-The deep one. Sub-decisions: Hindley-Milner vs bidirectional/local inference (recommend leaning **bidirectional with local generalization** — better error messages, plays well with structural typing and future macros; HM purity is not a goal, joy of errors is); annotation syntax at public boundaries (undesigned; must feel like docs, not ceremony); structural typing mechanics; the formal narrowing rules (ADR 0008's list becomes a spec); where `Boolean?` never-guess lives. Everything in the optionals static half lands here. Should come *after* the surface decisions above so it type-checks the real language, not a draft.
+The deep one. Sub-decisions: Hindley-Milner vs bidirectional/local inference (recommend leaning **bidirectional with local generalization** — better error messages, plays well with structural typing and future macros; HM purity is not a goal, joy of errors is); annotation syntax at public boundaries (undesigned; must feel like docs, not ceremony); structural typing mechanics; the formal narrowing rules (ADR 0008's list becomes a spec); where `Boolean?` never-guess lives. Everything in the optionals static half lands here. Should come _after_ the surface decisions above so it type-checks the real language, not a draft.
 
 ### 9. #5 — The compile pipeline (with #12/#13 riding on it)
 
@@ -121,19 +121,19 @@ The principle: **surface before depth** — every decision that changes what pro
 
 ## Recommended answers, one line each
 
-| Decision | Recommendation | Ruby-match? |
-|---|---|---|
-| #22 branchless if | A maybe (`if` w/o else is `T?`) | ✅ yes |
-| #20 exhaustiveness | compile-checked | ❌ loud, justified |
-| #20 `when`/`===` | `===` as statically resolved method | ✅ behaviorally |
-| #20 captures | Ruby's, guarded by no-shadow + exhaustiveness | ✅ yes |
-| #20 edges | pin, guards, alternatives, one-line in; find later | ✅ yes |
-| kwargs | Ruby's, no splats for now | ✅ mostly |
-| #10 mutability | `<<` as rebinding append; no in-place mutators | ✅ reads-as, ❌ aliasing (justified by tier-1 parallelism) |
-| object model | methods in struct bodies first; rest later | ✅ (increment) |
-| errors | undecided — needs its own session | — |
-| #11 together | assignments-only tasks, banned outer writes, unspecified ordering, structured panics | — (new ground) |
-| #9 inference | lean bidirectional; decide in session | — |
+| Decision           | Recommendation                                                                       | Ruby-match?                                                |
+| ------------------ | ------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| #22 branchless if  | A maybe (`if` w/o else is `T?`)                                                      | ✅ yes                                                     |
+| #20 exhaustiveness | compile-checked                                                                      | ❌ loud, justified                                         |
+| #20 `when`/`===`   | `===` as statically resolved method                                                  | ✅ behaviorally                                            |
+| #20 captures       | Ruby's, guarded by no-shadow + exhaustiveness                                        | ✅ yes                                                     |
+| #20 edges          | pin, guards, alternatives, one-line in; find later                                   | ✅ yes                                                     |
+| kwargs             | Ruby's, no splats for now                                                            | ✅ mostly                                                  |
+| #10 mutability     | `<<` as rebinding append; no in-place mutators                                       | ✅ reads-as, ❌ aliasing (justified by tier-1 parallelism) |
+| object model       | methods in struct bodies first; rest later                                           | ✅ (increment)                                             |
+| errors             | undecided — needs its own session                                                    | —                                                          |
+| #11 together       | assignments-only tasks, banned outer writes, unspecified ordering, structured panics | — (new ground)                                             |
+| #9 inference       | lean bidirectional; decide in session                                                | —                                                          |
 
 ---
 
@@ -143,4 +143,4 @@ The companion repo ([portlandlang/ruby_research](https://github.com/portlandlang
 
 Report wishlist agreed 2026-07-22, in decision-order priority: accumulator-shape analysis of mutation sites (#10's deciding evidence), error-handling census, nil-idiom census (polyfill sizing, `fetch` arity split), `case` anatomy (#20), args/splat census (kwargs), class-shape census (object model), concurrency-shape census (#11). Known fix with ADR consequences: split `<<`-append out of the bitwise counter (currently inflates it to 56%, which would otherwise challenge ADR 0003's "rare" claim).
 
-*Everything here is a proposal. ADRs are where decisions become real.*
+_Everything here is a proposal. ADRs are where decisions become real._

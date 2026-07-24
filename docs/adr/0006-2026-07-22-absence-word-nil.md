@@ -8,9 +8,9 @@
 
 Candidates were `nil`, `none`, `empty`. Two criteria decided it (both 2026-07-22): smooth Ruby/Rails migration, and the polyfill test — can a gem teach the idiom inside valid Ruby before the flip?
 
-- **`empty`** — collides with `Array#empty?` / `String#empty?`; empty is a *present* value with nothing in it, the exact concept Portland keeps separate from absence.
-- **`none`** — squeezed from both grammatical directions: `Model.none` in Rails is a present, empty relation (the empty/absent cross-wire again), and `Enumerable#none?` already means "no elements match." Fatally: in a Ruby pattern, `in none` is a *capture* — it silently matches anything and binds a local named `none`. The polyfill cannot have it.
-- **`nil`** — the baggage was never the word; it was the *ambient-ness* (every value secretly haunted). Kill the ambient-ness, keep the word, and Ruby's good nil hygiene compiles verbatim: `return if x.nil?`, `x == nil`, and — decisively — `in nil`, the only absence *literal* Ruby's pattern grammar accepts.
+- **`empty`** — collides with `Array#empty?` / `String#empty?`; empty is a _present_ value with nothing in it, the exact concept Portland keeps separate from absence.
+- **`none`** — squeezed from both grammatical directions: `Model.none` in Rails is a present, empty relation (the empty/absent cross-wire again), and `Enumerable#none?` already means "no elements match." Fatally: in a Ruby pattern, `in none` is a _capture_ — it silently matches anything and binds a local named `none`. The polyfill cannot have it.
+- **`nil`** — the baggage was never the word; it was the _ambient-ness_ (every value secretly haunted). Kill the ambient-ness, keep the word, and Ruby's good nil hygiene compiles verbatim: `return if x.nil?`, `x == nil`, and — decisively — `in nil`, the only absence _literal_ Ruby's pattern grammar accepts.
 
 ## Decision
 

@@ -19,15 +19,6 @@ all
 # allow long lines
 exclude_rule "MD013"
 
-# MD036 (emphasis used instead of a header) stays ON.
-#
-# It was briefly excluded: this repo's `**For:**` audience line and
-# `**Summary:**` index line both sit under a heading, and when they were
-# written as wholly-italic paragraphs — `_For: …_` — MD036 flagged them.
-# Writing them as a bold label plus plain text keeps them visually distinct
-# while putting them outside MD036's reach by construction, rather than by
-# the accident of ending in ".,;:!?" which is what the rule actually skips.
-
 # configure these rules (like .rubocop.yml)
 # any rule in with `params` is configurable
 # search here for which rules have `params`:
@@ -44,7 +35,7 @@ rule "MD003", style: :atx
 rule "MD004", style: :dash
 
 # indent nested listed with four spaces
-rule "MD007", indent: 4
+rule "MD007", indent: 2
 
 # allow ending heading with question mark
 # default disallowed list is: ".,;:!?"

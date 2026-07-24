@@ -6,7 +6,7 @@
 
 ## Ruby
 
-`and`/`or`/`not` exist alongside `&&`/`||`/`!` with *lower precedence than assignment* — a secret second precedence responsible for a classic bug family (`x = a or b` assigns `a`, not `a or b`).
+`and`/`or`/`not` exist alongside `&&`/`||`/`!` with _lower precedence than assignment_ — a secret second precedence responsible for a classic bug family (`x = a or b` assigns `a`, not `a or b`).
 
 ## Portland
 
@@ -18,8 +18,8 @@ With no truthiness, `or` gets its meaning from types:
 - **Maybes** — unwrap-or-else: the value if present, otherwise the right side; the result is a plain unwrapped value. The right side may instead diverge, making the or-guard — and `or panic "why"` is the language's entire force-unwrap story:
 
 ```ruby
-name = nickname or "friend"                        # default
-user = find_user(id) or return                     # bind-or-bail
+name = nickname or "friend"                          # default
+user = find_user(id) or return                       # bind-or-bail
 row  = lookup(key) or panic "row #{key} must exist"  # assert, loudly
 ```
 

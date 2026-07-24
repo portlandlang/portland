@@ -59,7 +59,7 @@ Lexical nesting is the only shortening: inside `module Statistics`, its own name
 Rejected, and why:
 
 - **Namespace aliasing** (`import numpy as np`) — the abbreviation hides where a name lives.
-- **Wholesale injection** (`use Statistics` making `mean` bare) — recreates exactly the question never-guess exists to kill: *where did this name come from?* It also fights no-shadow, since injected names collide with locals.
+- **Wholesale injection** (`use Statistics` making `mean` bare) — recreates exactly the question never-guess exists to kill: _where did this name come from?_ It also fights no-shadow, since injected names collide with locals.
 - **Selective import** (`import Statistics::mean`) — same objection, smaller blast radius. Ruby has no equivalent at all.
 
 Evidence that qualified paths are not felt as painful: 44,284 `::` paths across 78% of gems, with `include`-for-convenience now dated style.
@@ -103,7 +103,7 @@ Portland allows both spellings and gives them **one behavior**: lexical scope al
 
 Keeping the path form matters because **namespace depth is forced, not chosen**. Every library must namespace under its own name or collide — `Nokogiri::XML::Document`, `Faraday::Adapter::NetHttp`, `Aws::S3::Client`, `RSpec::Core::ExampleGroup`. Two to three levels is the floor for ecosystem code. Block-form-only would cost three indents before any code in every file of such a library; the path form exists precisely to answer that, and the trap it carries in Ruby is separable from the syntax.
 
-(An earlier draft justified block-form-only by asserting Portland's namespaces would be shallow. That was a prediction used as a reason, and it was wrong: the flat examples were all *stdlib*, which is privileged to claim top-level names. Third-party packages never are.)
+(An earlier draft justified block-form-only by asserting Portland's namespaces would be shallow. That was a prediction used as a reason, and it was wrong: the flat examples were all _stdlib_, which is privileged to claim top-level names. Third-party packages never are.)
 
 ### 5. Types nest in types; modules do not nest in types
 
@@ -134,13 +134,13 @@ One rule, no carve-out — "only enums may nest" would be a special case to reme
 
 - **Files and modules are unrelated.** `require_relative` loads a file, exactly as in Ruby. No path-to-namespace convention — Rails only gets that from Zeitwerk, a library.
 - **No root module.** Top level is top level; there is no `Object` equivalent to reach through.
-- **Constants need no new concept.** In Ruby, constants exist as a distinct thing *because variables are mutable by default*. ADR 0001 made everything immutable by default, so `MAX = 5` is already unrebindable. What remained was only *where the name lives* — which is what this ADR answers.
+- **Constants need no new concept.** In Ruby, constants exist as a distinct thing _because variables are mutable by default_. ADR 0001 made everything immutable by default, so `MAX = 5` is already unrebindable. What remained was only _where the name lives_ — which is what this ADR answers.
 
 ## Consequences
 
-- **Built the same day, seed and trio, differentially pinned.** Namespaces are flattened to qualified names at definition time in both, so the two implementations agree by construction rather than by coincidence. Two wrinkles worth recording: namespace constants must survive into a fresh method scope (they are qualified; bare locals still drop), and a method carries the namespace it was *written* in so its bare names resolve from there rather than from the call site. Living fixture: `seed/tests/fixtures/namespaces.pdx`, run direct and hosted.
+- **Built the same day, seed and trio, differentially pinned.** Namespaces are flattened to qualified names at definition time in both, so the two implementations agree by construction rather than by coincidence. Two wrinkles worth recording: namespace constants must survive into a fresh method scope (they are qualified; bare locals still drop), and a method carries the namespace it was _written_ in so its bare names resolve from there rather than from the call site. Living fixture: `seed/tests/fixtures/namespaces.pdx`, run direct and hosted.
 - `Statistics::mean(x)` and modules-inside-structs join the never-guess error family.
 - Unblocks the enum session, which unblocks symbols, which unblocks `{name: "pdx"}`.
 - Deliberately **not** decided here: mixins, inheritance, visibility, `class << self`, classes-vs-structs (the object-model session, which wants the class-shape census), and generics.
-- Migration: `Foo::Bar` and `Foo.bar()` compile verbatim when they follow Ruby's own convention. `include Foo` for namespace convenience has no Portland equivalent — the fix is to qualify. `module Foo::Bar` compiles verbatim *and* behaves less surprisingly than it does in Ruby.
+- Migration: `Foo::Bar` and `Foo.bar()` compile verbatim when they follow Ruby's own convention. `include Foo` for namespace convenience has no Portland equivalent — the fix is to qualify. `module Foo::Bar` compiles verbatim _and_ behaves less surprisingly than it does in Ruby.
 - Ledger: `docs/ruby/namespaces.md`.

@@ -33,15 +33,15 @@ Almost all the Rust you can see today is the first kind. That is why its crudene
 
 `seed/` is the `portland-seed` crate, never published. One dependency, `rustyline`, for REPL line editing.
 
-| File | Job |
-|---|---|
-| `lexer.rs` | source → tokens |
-| `heredoc.rs` | expands `<<~` into string literals _before_ the lexer, because `Token.text` borrows the source and a dedented body is not a slice of it |
-| `parser.rs` | hand-written recursive descent → AST |
-| `ast.rs` | the node types |
-| `interpreter.rs` | tree-walking evaluation; the reference semantics live here |
-| `value.rs` | the runtime value representation |
-| `main.rs` | the `pdx` binary — runs a file, or opens the REPL |
+| File             | Job                                                                                                                                     |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `lexer.rs`       | source → tokens                                                                                                                         |
+| `heredoc.rs`     | expands `<<~` into string literals _before_ the lexer, because `Token.text` borrows the source and a dedented body is not a slice of it |
+| `parser.rs`      | hand-written recursive descent → AST                                                                                                    |
+| `ast.rs`         | the node types                                                                                                                          |
+| `interpreter.rs` | tree-walking evaluation; the reference semantics live here                                                                              |
+| `value.rs`       | the runtime value representation                                                                                                        |
+| `main.rs`        | the `pdx` binary — runs a file, or opens the REPL                                                                                       |
 
 The parser is hand-written recursive descent, which is what every language that cares about error messages does. Parser-generator and PEG libraries give worse errors and can silently misparse, and Ruby-shaped grammar is context-sensitive exactly where it matters. Prism's C lexer is the textbook for the hard lexical parts; `ruby_prism` itself is no help — it is parse-only, with no lexer API and no grammar hooks, so it can serve as a reference oracle during development and nothing more.
 
@@ -53,11 +53,11 @@ The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stac
 
 `compiler/` is Portland written in Portland — the beginning of Stage 1.
 
-| File | Lines | Job |
-|---|---|---|
-| `lexer.pdx` | 446 | source → tokens |
-| `parser.pdx` | 1,961 | tokens → AST, with `sexp` rendering |
-| `evaluator.pdx` | 963 | walks the AST |
+| File            | Lines | Job                                 |
+| --------------- | ----- | ----------------------------------- |
+| `lexer.pdx`     | 446   | source → tokens                     |
+| `parser.pdx`    | 1,961 | tokens → AST, with `sexp` rendering |
+| `evaluator.pdx` | 963   | walks the AST                       |
 
 Plus three small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `run.pdx` evaluates a file. Each is under ten lines, because each is one composed expression — `evaluate_program(parse_program(lex(read_file(argv.first))))`.
 
@@ -120,12 +120,12 @@ These are language semantics, not an SDK we call into. Issue #13 owns the dispat
 
 ## Repo layout
 
-| Path | What |
-|---|---|
-| `seed/` | the disposable Rust seed and its tests |
-| `compiler/` | the trio, in Portland |
-| `crate/` | the crates.io `portland` placeholder — a name squat, nothing more |
-| `script/` | Scripts to Rule Them All: `bootstrap`, `test`, `console`, `cibuild` |
-| `script/docs/` | `check` and `generate`, plus one file per check and per generator |
-| `script/hooks/` | tracked git hooks, installed by `bootstrap` via `core.hooksPath` |
-| `seed/tests/fixtures/` | `.pdx` programs that are both tests and living documentation |
+| Path                   | What                                                                |
+| ---------------------- | ------------------------------------------------------------------- |
+| `seed/`                | the disposable Rust seed and its tests                              |
+| `compiler/`            | the trio, in Portland                                               |
+| `crate/`               | the crates.io `portland` placeholder — a name squat, nothing more   |
+| `script/`              | Scripts to Rule Them All: `bootstrap`, `test`, `console`, `cibuild` |
+| `script/docs/`         | `check` and `generate`, plus one file per check and per generator   |
+| `script/hooks/`        | tracked git hooks, installed by `bootstrap` via `core.hooksPath`    |
+| `seed/tests/fixtures/` | `.pdx` programs that are both tests and living documentation        |

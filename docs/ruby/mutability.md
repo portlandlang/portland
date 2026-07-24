@@ -18,7 +18,7 @@ mutable bar = "xyz"  # rebindable, the marked exception
 bar += "123"
 ```
 
-`mutable` declares a rebindable *name*, fused to its first assignment (no standalone declaration, no uninitialized holes). Rebinding an unmarked name is a compile error.
+`mutable` declares a rebindable _name_, fused to its first assignment (no standalone declaration, no uninitialized holes). Rebinding an unmarked name is a compile error.
 
 The real line is **immutable when shared, mutable when local**: mutate freely in your own scope; a value is frozen the moment it crosses a boundary where it could race (handed to a parallel `.map`, sent across a `together` boundary). The compiler enforces it — a parallel block capturing a `mutable` binding is a compile error.
 
@@ -28,7 +28,7 @@ Closure rules kill Ruby's accidental-clobber footgun. Assigning `name = x` insid
 - outer immutable `name` → error, with the fix named
 - no outer `name` → fresh block-local, dies at `end`
 
-And the values question is answered (ADR 0015): **values never mutate; names do.** No `push`, no `map!`, no aliased buffers. `<<` and index assignment survive as *rebinding* sugar in the `+=` family:
+And the values question is answered (ADR 0015): **values never mutate; names do.** No `push`, no `map!`, no aliased buffers. `<<` and index assignment survive as _rebinding_ sugar in the `+=` family:
 
 ```ruby
 mutable line = ""

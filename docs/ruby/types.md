@@ -28,6 +28,6 @@ Duck typing becomes **structural typing**: "responds to `quack`" is still the co
 
 ## Migration
 
-- Idiomatic Ruby mostly *is* well-typed already — it compiles unchanged and gains the checking silently.
+- Idiomatic Ruby mostly _is_ well-typed already — it compiles unchanged and gains the checking silently.
 - Code that gives one variable two types over its life, or builds heterogeneous ad-hoc structures, gets loud inference errors asking for clarity it should have had anyway.
 - Sorbet/RBS annotations have no Portland equivalent to migrate to — delete them; the compiler infers what they declared.

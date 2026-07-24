@@ -5,7 +5,7 @@
 
 ## Context
 
-ADR 0016 brought brace blocks in and deliberately left the `it` implicit block parameter (Ruby 3.4) undecided. `it` is wanted — one-expression blocks are the whole point of braces — but Ruby ships it as a *soft keyword*: if a local, method, or parameter named `it` is in scope, `it` silently means that instead of the block parameter. Context-dependent meaning is exactly what the no-shadow rule exists to kill.
+ADR 0016 brought brace blocks in and deliberately left the `it` implicit block parameter (Ruby 3.4) undecided. `it` is wanted — one-expression blocks are the whole point of braces — but Ruby ships it as a _soft keyword_: if a local, method, or parameter named `it` is in scope, `it` silently means that instead of the block parameter. Context-dependent meaning is exactly what the no-shadow rule exists to kill.
 
 Ruby also ships numbered parameters (`_1`–`_9`), the line-noise predecessor `it` was added to replace.
 
@@ -40,7 +40,7 @@ Everything else falls out of "it's a binding":
 
 - **`def it` is legal but contested by every implicit block in reach** — the collision rule makes it extinct in practice without a special case.
 
-- **A zero-parameter block's bare `it` can never be a silent reference to an outer local** — that situation *is* the collision, so wherever `it` compiles it has exactly one possible meaning.
+- **A zero-parameter block's bare `it` can never be a silent reference to an outer local** — that situation _is_ the collision, so wherever `it` compiles it has exactly one possible meaning.
 
 **Numbered parameters `_1`–`_9` are out**, joining the perlisms. Named parameters and `it` cover the space.
 

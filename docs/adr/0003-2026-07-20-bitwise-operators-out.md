@@ -16,7 +16,7 @@ This frees `~` for `together` tasks (ADR 0002), keeps `|` purely for block param
 
 ## Explicitly TBD: `<<` as append
 
-`Array#<<` / `String#<<` *append* is common and beloved in Ruby, and is a separate question from bit-shift. It is **not ruled out**. Append implies in-place mutation, so it must be decided together with the mutable-values question deferred in ADR 0001 — the two travel as one future decision.
+`Array#<<` / `String#<<` _append_ is common and beloved in Ruby, and is a separate question from bit-shift. It is **not ruled out**. Append implies in-place mutation, so it must be decided together with the mutable-values question deferred in ADR 0001 — the two travel as one future decision.
 
 ## Consequences
 

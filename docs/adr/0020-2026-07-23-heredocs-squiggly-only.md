@@ -33,9 +33,9 @@ That is precisely the local-vs-method guessing the no-shadow rule exists to elim
 
 **Only `<<~` survives. `<<` and `<<-` are out.**
 
-This is the usual one-way-to-do-it call, but it also has a structural payoff: **the collision dissolves.** With squiggly as the only opener, `<<` is *always* the append operator and `<<~` is *always* a heredoc. No positional rule, no local-vs-method test, no never-guess error to write — ADR 0015's operator and heredocs stop competing for the same token.
+This is the usual one-way-to-do-it call, but it also has a structural payoff: **the collision dissolves.** With squiggly as the only opener, `<<` is _always_ the append operator and `<<~` is _always_ a heredoc. No positional rule, no local-vs-method test, no never-guess error to write — ADR 0015's operator and heredocs stop competing for the same token.
 
-`<<~` loses less than it appears: it strips only the *common* indentation, so relative structure survives. The single thing it cannot express is uniform absolute leading whitespace, which can be written explicitly.
+`<<~` loses less than it appears: it strips only the _common_ indentation, so relative structure survives. The single thing it cannot express is uniform absolute leading whitespace, which can be written explicitly.
 
 The rest follows Ruby, verified on 4.0.6:
 
@@ -80,8 +80,8 @@ The convention is already universal, and RuboCop encodes it as `Naming/HeredocDe
 
 ## Consequences
 
-- **No interaction with the `~` together sigil.** An earlier draft of this ADR worried about `list << ~task` versus `list <<~task` — but `~task` is not a Portland form. Per ADRs 0002/0004 and the concurrency ledger, `~` is a *statement-line marker* written with a following space (`~ orders = recent_orders(id)`), dead-identical to the word `meanwhile`; there is no `~expression` prefix. `~` appears only at statement start, `<<~` only after `=` or in argument position, so the two never meet. The uppercase-terminator rule would settle the common case structurally even if an expression form were ever added.
+- **No interaction with the `~` together sigil.** An earlier draft of this ADR worried about `list << ~task` versus `list <<~task` — but `~task` is not a Portland form. Per ADRs 0002/0004 and the concurrency ledger, `~` is a _statement-line marker_ written with a following space (`~ orders = recent_orders(id)`), dead-identical to the word `meanwhile`; there is no `~expression` prefix. `~` appears only at statement start, `<<~` only after `=` or in argument position, so the two never meet. The uppercase-terminator rule would settle the common case structurally even if an expression form were ever added.
 - **Lexer**: `<<~` is a three-character token, alongside `...` from ADR 0019. Interpolation, escapes, and terminator scanning reuse the existing string machinery.
-- **Migration**: `<<~` heredocs with uppercase terminators compile verbatim. `<<` and `<<-` become parse errors naming the fix, and that rewrite is an **unsafe autocorrect**, not a free one: switching the opener to `<<~` strips common indentation and therefore *changes the string's value* whenever the content was indented. It is safe only when the content has no common leading indentation; the linter must check before offering it. Lowercase terminators are a free-tier autocorrect by contrast — upcasing both the opener and the closing line preserves the value exactly, and RuboCop already flags them.
+- **Migration**: `<<~` heredocs with uppercase terminators compile verbatim. `<<` and `<<-` become parse errors naming the fix, and that rewrite is an **unsafe autocorrect**, not a free one: switching the opener to `<<~` strips common indentation and therefore _changes the string's value_ whenever the content was indented. It is safe only when the content has no common leading indentation; the linter must check before offering it. Lowercase terminators are a free-tier autocorrect by contrast — upcasing both the opener and the closing line preserves the value exactly, and RuboCop already flags them.
 - Issue #6's "all flavors" checkbox is superseded — only the squiggly flavor needs porting, which removes a chunk of the months-of-tedium list.
 - Ledger: `docs/ruby/heredocs.md`.

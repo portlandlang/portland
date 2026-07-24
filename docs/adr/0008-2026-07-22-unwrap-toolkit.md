@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR 0005 forbids the optional from being ceremonial; something still has to get values *out*. The design bar: one tool per intent, zero new grammar, every spelling either valid Ruby today or a loud error — never a silent shift (ADR 0006's migration property).
+ADR 0005 forbids the optional from being ceremonial; something still has to get values _out_. The design bar: one tool per intent, zero new grammar, every spelling either valid Ruby today or a loud error — never a silent shift (ADR 0006's migration property).
 
 ## Decision
 
@@ -25,5 +25,5 @@ Two deliberate absences:
 ## Consequences
 
 - Every tool is polyfill tier 1 or 2: `&.`, `|| default`, `f or return`, and `in nil` all run in Ruby today; the linter half fakes narrowing warnings pre-flip.
-- The `[].first` / `hash[key]` / indexing story (what actually *returns* a maybe) is the next decision, built on these tools.
+- The `[].first` / `hash[key]` / indexing story (what actually _returns_ a maybe) is the next decision, built on these tools.
 - Nothing implemented yet.

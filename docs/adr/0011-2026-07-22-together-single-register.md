@@ -26,7 +26,7 @@ together do
 end
 ```
 
-The positional form recouples results to task *order* — reorder the lines, silently swap the values — which is the exact fragile-counting bug named-at-site was invented to kill. It also can't interleave plain statements between task lines, and it smuggles in a dependency on destructuring assignment (`a, b = ...`), a feature Portland has not designed and which should be decided on its own merits, not as a side effect of concurrency syntax.
+The positional form recouples results to task _order_ — reorder the lines, silently swap the values — which is the exact fragile-counting bug named-at-site was invented to kill. It also can't interleave plain statements between task lines, and it smuggles in a dependency on destructuring assignment (`a, b = ...`), a feature Portland has not designed and which should be decided on its own merits, not as a side effect of concurrency syntax.
 
 ## Consequences
 

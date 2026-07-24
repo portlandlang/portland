@@ -250,14 +250,14 @@ Names are **always fully qualified**: no import, no aliasing, no injection, with
 
 Read-only, and small on purpose.
 
-| Type | Methods |
-|---|---|
-| String | `length upcase downcase reverse empty? chars split include? start_with? end_with? to_i to_f slice` and `[index]` |
-| Integer | `abs zero? positive? negative? even? odd? to_f` |
-| Float | `abs to_i` |
-| Array | `length first last empty? join include? sum min max sort slice` and `[index]`, negative indices included |
-| Hash | `length empty? key? keys values` and `[key]` |
-| Everything | `to_s`, `nil?`, `some?` |
+| Type       | Methods                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| String     | `length upcase downcase reverse empty? chars split include? start_with? end_with? to_i to_f slice` and `[index]` |
+| Integer    | `abs zero? positive? negative? even? odd? to_f`                                                                  |
+| Float      | `abs to_i`                                                                                                       |
+| Array      | `length first last empty? join include? sum min max sort slice` and `[index]`, negative indices included         |
+| Hash       | `length empty? key? keys values` and `[key]`                                                                     |
+| Everything | `to_s`, `nil?`, `some?`                                                                                          |
 
 Method chains continue across newlines with a leading dot.
 
@@ -290,6 +290,7 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
   ```
 
   Results are named at the task site — there is no positional register. Tier three is explicit control: cancellation, timeouts, racing. Rare. Semantics are #11.
+
 - **Symbols.** The core question is decided: `:foo` exists as a general type, checked for membership where a closed vocabulary is declared, and `{name: "pdx"}` is symbol-keyed and ships. The ADR waits on the enum shape.
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
 

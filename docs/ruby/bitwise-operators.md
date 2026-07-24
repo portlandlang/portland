@@ -2,7 +2,7 @@
 
 **Summary:** Out of the grammar; named methods instead.
 
-**Status:** tentative — leaning out ([ADR 0003](../adr/0003-2026-07-20-bitwise-operators-out.md)); `<<` as *append* is explicitly undecided and travels with the mutable-values question.
+**Status:** tentative — leaning out ([ADR 0003](../adr/0003-2026-07-20-bitwise-operators-out.md)); `<<` as _append_ is explicitly undecided and travels with the mutable-values question.
 
 ## Ruby
 

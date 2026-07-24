@@ -6,7 +6,7 @@
 
 ## Context
 
-Deferred by ADR 0010: what do a branchless `if` (condition false, no else), a finished `while`, and a broken-out-of call produce? Ruby says nil to all three. The seed said *nothing* — a distinct "no value" state that panics when used ("produced no value").
+Deferred by ADR 0010: what do a branchless `if` (condition false, no else), a finished `while`, and a broken-out-of call produce? Ruby says nil to all three. The seed said _nothing_ — a distinct "no value" state that panics when used ("produced no value").
 
 Option B ("no value" as a static condition — using a branchless `if` is a compile error) was rejected: it invents a second absence-like concept right after ADRs 0005–0010 unified absence into exactly one, it breaks working Ruby that option A accepts, and its every error message would tell you to write what A gives you for free.
 
@@ -23,7 +23,7 @@ Ruby-match, with Ruby's silent nil converted into a handled nil — the standing
 
 The dividing rule, stated once: **could the expression have produced a value? Then the absence of one is nil. Could it never? Then using it is an error.** `if`/`while`/broken-out calls are the first kind. `puts` is the second — its result stays unusable, as does a body whose final statement produces nothing (`x = if c then puts("hi") end` is still an error on the taken path).
 
-- `while` is nil *always* (Ruby's rule); `break value` waits for real demand.
+- `while` is nil _always_ (Ruby's rule); `break value` waits for real demand.
 - An `else` that exists but is empty also yields nil — same absence of an answer, same spelling.
 
 ## Consequences

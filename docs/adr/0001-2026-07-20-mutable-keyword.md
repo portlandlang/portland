@@ -19,11 +19,11 @@ bar += "123"
 ```
 
 - Declares a **rebindable name**. No standalone/uninitialized form (no nil-shaped holes). Declared once, reassigned freely after.
-- Gates **rebinding only** — in-place mutable *values* (`push!`-style) are a separate, possibly-never decision (see ADR 0003's `<<` question).
+- Gates **rebinding only** — in-place mutable _values_ (`push!`-style) are a separate, possibly-never decision (see ADR 0003's `<<` question).
 - Closure rules for `name = x` inside a block:
-    - outer `mutable name` → rebinds the outer (the accumulator pattern)
-    - outer immutable `name` → error: *"`name` is immutable — declare it `mutable name = …` if the block needs to update it"*
-    - no outer `name` → fresh block-local, dies at `end`
+  - outer `mutable name` → rebinds the outer (the accumulator pattern)
+  - outer immutable `name` → error: _"`name` is immutable — declare it `mutable name = …` if the block needs to update it"_
+  - no outer `name` → fresh block-local, dies at `end`
 
 ## Consequences
 

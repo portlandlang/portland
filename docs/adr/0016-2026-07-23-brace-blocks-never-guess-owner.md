@@ -17,7 +17,7 @@ end
 
 is a one-liner trapped in five lines. `do/end` is Portland's only block form; Ruby writes this `nodes.map { |node| node.sexp }.join(" ")`.
 
-Adopting braces verbatim imports Ruby's binding heuristic: after a paren-less command call, `render config { ... }` gives the block to the *nearest* call (`config`) while `do/end` gives it to the *farthest* (`render`) — a precedence guess readers get bitten by, and exactly the kind the never-guess rule exists to kill. Three candidate rules were considered: never-guess error at the ambiguous spot; Ruby's precedence verbatim (a silent guess); braces-never-blocks after command calls (a silent divergence from Ruby, which ADR 0006's promise forbids).
+Adopting braces verbatim imports Ruby's binding heuristic: after a paren-less command call, `render config { ... }` gives the block to the _nearest_ call (`config`) while `do/end` gives it to the _farthest_ (`render`) — a precedence guess readers get bitten by, and exactly the kind the never-guess rule exists to kill. Three candidate rules were considered: never-guess error at the ambiguous spot; Ruby's precedence verbatim (a silent guess); braces-never-blocks after command calls (a silent divergence from Ruby, which ADR 0006's promise forbids).
 
 ## Decision
 
@@ -56,7 +56,7 @@ Deliberately not decided here: the `it` implicit parameter (Ruby 3.4) and `&:sym
 
 ## Consequences
 
-- Peeking is not guessing: the parser already looks ahead (two-character operators, `newline_then_dot?`, `or panic`); never-guess constrains what the *reader* must disambiguate, not what the parser may read.
+- Peeking is not guessing: the parser already looks ahead (two-character operators, `newline_then_dot?`, `or panic`); never-guess constrains what the _reader_ must disambiguate, not what the parser may read.
 - Implementation slots into the existing `ambiguous_command?` / `ambiguity_message` machinery — one new trigger position, a one-token peek to pick the message; the substantive work is parsing brace blocks in the unambiguous positions, seed and trio.
 - Migration: Ruby code that follows community style (braces for one-liners on dot calls, `do/end` for command-position blocks) compiles verbatim with identical meaning. Code leaning on braces-bind-tight becomes a loud error with its rewrite attached — never a silent rebinding.
 - RuboCop's default styles (`Style/BlockDelimiters`, brace-vs-do-end) already steer Ruby away from the ambiguous form, so the polyfill tiers cleanly: the never-guess error is a free lint pre-flip.

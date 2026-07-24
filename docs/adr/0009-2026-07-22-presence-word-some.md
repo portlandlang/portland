@@ -11,7 +11,7 @@ ADR 0006 picked `nil`/`nil?` for absence and left the partner open, with a hard 
 Ecosystem scan (2026-07-22, verified against sources, not memory):
 
 - **Ruby core** — unclaimed. The Enumerable quantifier family is `any?`/`all?`/`one?`/`none?`; `some?` is a hole that was never filled.
-- **Rails** — unclaimed. (`present?` is claimed *and* means the nil/blank conflation — disqualified in ADR 0006.)
+- **Rails** — unclaimed. (`present?` is claimed _and_ means the nil/blank conflation — disqualified in ADR 0006.)
 - **Hanami** — unclaimed; the framework layers on dry-monads' Result side (`Success`/`Failure`), never `Some`/`None`.
 - **dry-monads** — claimed, **with exactly our meaning**: `def some? = is_a?(Some)` on its `Maybe`, constructed `Some(x)`/`None()`. Precedent, not conflict — the one place a Rubyist has met the word, it meant this.
 - Cross-language footnote: JavaScript's `array.some` means "any element matches"; Portland keeps `any?` for that job, so the misreading self-corrects at the first error message.
@@ -21,7 +21,7 @@ Ecosystem scan (2026-07-22, verified against sources, not memory):
 The presence partner to `nil`/`nil?` is **`some`** / **`some?`**.
 
 - **`some?`** — the predicate on a maybe: `if user.some?` (narrows, per ADR 0008).
-- **`some(x)`** — the wrap form. Auto-wrapping (ADR 0005) makes it almost never appear: you write it only when constructing or matching the rare *nested* case explicitly, where a bare `nil` is genuinely ambiguous — `{"digest" => some(nil)}` (key present, value absent) vs `{"digest" => nil}`, and `in some(nil)` vs `in nil` in patterns. A bare `nil` where the type is doubly-optional is a never-guess error naming both spellings.
+- **`some(x)`** — the wrap form. Auto-wrapping (ADR 0005) makes it almost never appear: you write it only when constructing or matching the rare _nested_ case explicitly, where a bare `nil` is genuinely ambiguous — `{"digest" => some(nil)}` (key present, value absent) vs `{"digest" => nil}`, and `in some(nil)` vs `in nil` in patterns. A bare `nil` where the type is doubly-optional is a never-guess error naming both spellings.
 
 ## Consequences
 

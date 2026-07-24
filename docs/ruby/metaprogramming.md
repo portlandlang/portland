@@ -18,6 +18,6 @@ This cut is not incidental — the cut-list and the "what blocks static safety a
 
 ## Migration
 
-- Code that *uses* metaprogrammed APIs (a `has_many`-style DSL) can look unchanged — the DSL words become macros.
-- Code that *does* runtime metaprogramming does not port; it gets redesigned (usually into macros or plain explicit code). The linter can inventory a codebase's metaprogramming surface ahead of the flip.
+- Code that _uses_ metaprogrammed APIs (a `has_many`-style DSL) can look unchanged — the DSL words become macros.
+- Code that _does_ runtime metaprogramming does not port; it gets redesigned (usually into macros or plain explicit code). The linter can inventory a codebase's metaprogramming surface ahead of the flip.
 - `define_method` in a loop, `const_get` dispatch, `respond_to_missing?` tricks: all loud, none silent.

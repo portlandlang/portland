@@ -63,16 +63,16 @@ end
 
 ## Where to go from here
 
-| | |
-|---|---|
-| [**The language**](docs/language.md) | what it is — syntax, rules, style |
+|                                          |                                                                 |
+| ---------------------------------------- | --------------------------------------------------------------- |
+| [**The language**](docs/language.md)     | what it is — syntax, rules, style                               |
 | [**Architecture**](docs/architecture.md) | how it's built: the seed, the trio, the road to a real compiler |
-| [**Principles**](docs/principles.md) | the rules that settle arguments |
-| [**Portland for Rubyists**](docs/ruby/) | every difference from Ruby, and what it costs to migrate |
-| [**ADRs**](docs/adr/) | the decision log, one file per decision |
-| [**ROADMAP**](ROADMAP.md) | what's done, what's dropped, what's coming |
-| [**CHANGELOG**](CHANGELOG.md) | what changed, newest first |
-| [**History**](docs/history/) | dated writing, frozen — never current, never a source of truth |
+| [**Principles**](docs/principles.md)     | the rules that settle arguments                                 |
+| [**Portland for Rubyists**](docs/ruby/)  | every difference from Ruby, and what it costs to migrate        |
+| [**ADRs**](docs/adr/)                    | the decision log, one file per decision                         |
+| [**ROADMAP**](ROADMAP.md)                | what's done, what's dropped, what's coming                      |
+| [**CHANGELOG**](CHANGELOG.md)            | what changed, newest first                                      |
+| [**History**](docs/history/)             | dated writing, frozen — never current, never a source of truth  |
 
 Try it with `script/console a_file.pdx`, or `script/console` alone for a REPL. Portland targets **macOS 26+ on Apple silicon** and nothing else, on purpose.
 
