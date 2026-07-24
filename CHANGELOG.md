@@ -4,9 +4,9 @@
 
 - Git hooks, tracked in `script/hooks/` and installed by `script/bootstrap` via `core.hooksPath` (so they survive a fresh clone, unlike `.git/hooks`). **pre-commit** runs the fast gate — fmt, clippy, 398 of 399 tests, and `check_docs` — in ~4s warm. **pre-push** runs the full `script/test`. The split exists because measurement showed one test is 31.5s of the suite's 33s: `parses_the_whole_compiler_including_itself` parses 1961 lines of Portland with the Portland parser, and `<<` clones the whole array per append (~200M element copies), so it is quadratic in file size. That is ADR 0015 implemented naively, and exactly what #12's RC-exactness fixes: at refcount 1 the old array is dead and can be mutated in place. Both hooks take `--no-verify`.
 
-- `script/check_docs` messages rewritten to the standard the language holds itself to. The first version said "`::` used to invoke — `.` invokes:" — a compressed fragment that assumed you already knew the rule. Each check now states the rule, cites its ADR, and hands you the fix with your own names substituted (`write Statistics.mean(...) instead`), the way the seed's own never-guess errors do. The ledger check also explains *why* it matters and names both escape routes; the link check reports the path it actually resolved to, which is usually where the mistake is.
+- `script/check_docs` messages rewritten to the standard the language holds itself to. The first version said "`::` used to invoke — `.` invokes:" — a compressed fragment that assumed you already knew the rule. Each check now states the rule, cites its ADR, and hands you the fix with your own names substituted (`write Statistics.mean(...) instead`), the way the seed's own never-guess errors do. The ledger check also explains _why_ it matters and names both escape routes; the link check reports the path it actually resolved to, which is usually where the mistake is.
 
-- `script/check_docs` — the mechanically-checkable half of doc discipline, run by `script/test`. Three checks, each from a mistake that actually shipped: `::` used to invoke inside a code block (ADR 0021), an ADR with no `docs/ruby/` ledger entry and no non-difference note (splats were documented nowhere), and broken internal links. Every check is verified to fire on a real violation *and* stay quiet on correct files — the `::` one looks only inside code fences, since prose legitimately quotes the wrong form to explain it. A CHANGELOG newest-first check is deliberately **absent**: ordering is chronological and nothing in an entry's content reveals its date, so the check would fire on correct files. Declining beats guessing.
+- `script/check_docs` — the mechanically-checkable half of doc discipline, run by `script/test`. Three checks, each from a mistake that actually shipped: `::` used to invoke inside a code block (ADR 0021), an ADR with no `docs/ruby/` ledger entry and no non-difference note (splats were documented nowhere), and broken internal links. Every check is verified to fire on a real violation _and_ stay quiet on correct files — the `::` one looks only inside code fences, since prose legitimately quotes the wrong form to explain it. A CHANGELOG newest-first check is deliberately **absent**: ordering is chronological and nothing in an entry's content reveals its date, so the check would fire on correct files. Declining beats guessing.
 
 - AGENT.md working method gains **"never guess, in the implementation too"** — the principle behind the `it`-mixing fix, which existed only as a code comment and a STAGE0 line rather than as a stated rule. Where the trio cannot tell (its parser is functional and holds no frames), it declines to check rather than checking wrongly: a gap leaves it incomplete, a false positive would make it unusable. The differential-harness bullet is also corrected — "match byte-identically" now explicitly covers **error wording**, not just output for valid programs.
 
@@ -50,7 +50,7 @@
 
 - Seed, brace blocks (ADR 0016): `{ |node| node.sexp }` parses and runs, dead-identical to `do ... end` — one-liners, chains, nesting, and multi-statement bodies. A `{` in expression position is still a hash literal. The one ambiguous position — a bare `{` after a paren-less command call — is a never-guess error that names every surviving reading with its rewrite, and the parser peeks to trim the menu exactly as specced: a `|` or a missing `=>` rules the hash out and only the two block owners are offered, otherwise all three.
 
-- Symbols: the core question is **decided** — `:foo` exists as a general type, checked for membership wherever a declared closed vocabulary is expected and free elsewhere; `{name: "pdx"}` is symbol-keyed and ships as table stakes. The reframe that unlocked it: Ruby's problem with `status = :pending` was never the syntax, it's that the set is *open*, so `:pendign` is a valid symbol — declaring the set fixes that without touching the spelling. Accepted tradeoffs are recorded explicitly in the [session notes](docs/reports/2026-07-23-symbols-first-pass.md), along with the lint that could later recover checking for hash keys. Capitalized cases were rejected for glance-ambiguity with structs; Swift's leading dot was rejected on technical grounds (Portland has leading-dot method chaining, so `.pending` collides with a chained call). ADR waits on the enum shape — payloads and enum-type naming are still open, and the latter makes #27's object model the keystone.
+- Symbols: the core question is **decided** — `:foo` exists as a general type, checked for membership wherever a declared closed vocabulary is expected and free elsewhere; `{name: "pdx"}` is symbol-keyed and ships as table stakes. The reframe that unlocked it: Ruby's problem with `status = :pending` was never the syntax, it's that the set is _open_, so `:pendign` is a valid symbol — declaring the set fixes that without touching the spelling. Accepted tradeoffs are recorded explicitly in the [session notes](docs/reports/2026-07-23-symbols-first-pass.md), along with the lint that could later recover checking for hash keys. Capitalized cases were rejected for glance-ambiguity with structs; Swift's leading dot was rejected on technical grounds (Portland has leading-dot method chaining, so `.pending` collides with a chained call). ADR waits on the enum shape — payloads and enum-type naming are still open, and the latter makes #27's object model the keystone.
 
 - `script/console`: the REPL gets a Script to Rule Them All — `script/console` opens it, `script/console file.pdx` runs a file, and it handles the rustup PATH itself. README's taste section points at it instead of a raw `cargo run` incantation.
 
@@ -60,7 +60,7 @@
 
 - ADR 0020: heredocs decided — **squiggly `<<~` only**; `<<EOS` and `<<-EOS` are out. Beyond one-way-to-do-it, this dissolves a collision: ADR 0015 made `<<` the append operator, and Ruby tells the two apart by asking whether the receiver is a local or a method (verified — `x << EOS` appends, `puts <<~EOS` opens a heredoc), which is exactly the guessing no-shadow exists to kill. With squiggly as the only opener, `<<` is always append and `<<~` is always a heredoc, so no disambiguation rule is needed at all. No space between `<<~` and the terminator (already a Ruby syntax error), and terminators must be **SCREAMING_CAPS** — Ruby accepts any identifier (`<<~sql`, `<<~_x`, even `<<~puts` parse), but the convention is universal and RuboCop's `Naming/HeredocDelimiterCase` already defaults to enforcing it, so the migration is free-tier. Indented terminators, `<<~'EOS'`, attached method calls, and multiple heredocs per line all work as in Ruby. The `<<`/`<<-` rewrite is an unsafe autocorrect — switching openers strips common indentation and changes the string's value. Supersedes issue #6's "all flavors" scope.
 
-- Symbols, first pass — ~~tabled, no decision~~ superseded by the entry above ([report](docs/reports/2026-07-23-symbols-first-pass.md)). The audit found that Portland's existing ADRs have already reassigned every job symbols do except one: kwarg and struct-pattern labels are compile-time (0013/0014), metaprogramming is dropped, `&:sym` becomes `{ it.upcase }` (0017), hashes take string keys. The residue is **enum-ish values** — so symbols are entangled with the undecided enum/sum-type question, now listed on the roadmap in its own right. Both of Ruby's *reasons* for symbols are already dead in Portland: they're the interpreter's identifier table exposed (a bare 4.0.6 interns 3,599 before user code runs), and a workaround for mutable strings (ADR 0015 made strings immutable). What survives is the semantic "this is a name, not data" — so the real question is what carries that: a distinct type, Swift-style typed enum cases, or OCaml-style inferred variants. Corpus queries to settle it are listed in the report.
+- Symbols, first pass — ~~tabled, no decision~~ superseded by the entry above ([report](docs/reports/2026-07-23-symbols-first-pass.md)). The audit found that Portland's existing ADRs have already reassigned every job symbols do except one: kwarg and struct-pattern labels are compile-time (0013/0014), metaprogramming is dropped, `&:sym` becomes `{ it.upcase }` (0017), hashes take string keys. The residue is **enum-ish values** — so symbols are entangled with the undecided enum/sum-type question, now listed on the roadmap in its own right. Both of Ruby's _reasons_ for symbols are already dead in Portland: they're the interpreter's identifier table exposed (a bare 4.0.6 interns 3,599 before user code runs), and a workaround for mutable strings (ADR 0015 made strings immutable). What survives is the semantic "this is a name, not data" — so the real question is what carries that: a distinct type, Swift-style typed enum cases, or OCaml-style inferred variants. Corpus queries to settle it are listed in the report.
 
 - ADR 0019: ranges decided — three answers. (1) Range patterns **count toward exhaustiveness**: sorted integer ranges with a beginless first, an endless last, and no gaps prove a `case` total with no `else`; gaps error, overlap stays legal (the cascading `..10 / ..100 / ..1000` idiom depends on first-match-wins), fully-shadowed arms were already errors, arm order is a lint someday. The rejected alternative would have forced `else panic "unreachable"` on total cases — corroding `grep panic` as a crash audit, since an empty `else` yields nil and infects the result type. (2) **Slices are collections, never maybes** — `words[99..]` is `[]`, not nil; the start clamps the way Ruby already clamps the end, while `array[1]` stays `T?` (ADR 0010 untouched: one element has an honest absence, a sub-collection of nothing is `[]`). (3) **A range spans a newline only where one reading exists** — slices and patterns stay paren-free (`array[1..]`, `in ..10`), while both ambiguous shapes error and name their readings: a trailing `1..` at end of line, and a line-initial `..4` after a complete expression. Ruby 4.0.6 verified throughout, and it is stranger than its reputation: slicing is asymmetric (`[4..]` nil but `[3..]` empty), a trailing `..` reaches forward across a newline, a leading `..` does not reach back — even inside parens, where `y = (1` / `..4)` binds `y` to `..4` — yet a leading `.` does. Three parser accidents, replaced by one rule. Ledger: ranges.md.
 
@@ -212,46 +212,85 @@
 - parser.pdx rung 0 (#18): Step-threaded recursive descent skeleton, sexp printer, parse.pdx driver — integers parse, unknown tokens become error nodes.
 
 - `require_relative`: multi-file Portland programs, Ruby-style (resolved against the requiring file, `.pdx` implied, loads once). `compiler/lexer.pdx` is now a library; `compiler/tokenize.pdx` is the command-line driver.
+
 - Paren-less calls, the Portland way: command calls at statement position (`puts "hello"`) and bare zero-argument calls (`ready?`) — powered by two new rules instead of Ruby's whitespace guessing: shadowing a method with a local is an error, and ambiguous forms (`puts -1`, `puts [1]`, `puts (1)`) are clean parse errors that show both readings. The lexer now records leading whitespace to detect them.
+
 - `return`/`break`/`next` now work inside blocks with Ruby semantics: `next` skips the iteration, `break` stops it (the call produces no value), `return` unwinds through the block to the enclosing method — guard-search idioms like `return number if number.even?` inside `each` work.
+
 - Single-character variable names renamed away everywhere (`character` not `c`, `index` not `i`), per style.
+
 - MIT license (`LICENSE.md`); the crate's dual-license placeholder becomes plain MIT on its next publish.
+
 - `compiler/lexer.pdx`: Portland's lexer, written in Portland — tokenizes the full token set (strings with escapes and interpolation, `%w[]`, two-character operators, `?`/`!` names) and lexes its own source with zero error tokens. Step one of Stage 1.
+
 - Recursion depths measured (and the macOS-26 hang-on-overflow discovered): the seed now runs on a 512 MB-stack thread with explicit depth guards that fail as clean Portland errors instead of hanging.
+
 - Structs: `struct Name ... end` immutable records with kwargs-only construction (`Token.new(kind: ...)`), field access, `.with(...)` updated copies, and value equality. First user: `mini_lexer.pdx`, now hash-free.
 
 - Design docs, todos, and namespace squats (GitHub orgs `portlandlang` + `pdxlang`, crates.io `portland` v0.0.0).
-- Todos migrated to GitHub issues #1–#17; `todos/` now holds only the mapping.
-- Cargo workspace: `crate/` (the published placeholder, eventually the real compiler) + `seed/` (Stage 0, never published), with `script/test` (fmt + clippy + tests).
-- Seed lexer: integer literals, identifiers with `?`/`!` suffixes, double-quoted strings (no escapes/interpolation yet), newline tokens, space/tab skipping.
-- Seed lexer: `def`/`do`/`end` keywords (lookalikes like `def?`/`ending` stay identifiers) and single-character punctuation (`(` `)` `,` `.` `=` `+`).
-- Seed AST + recursive descent parser: integer and string literals, left-associative `+`, parenthesized grouping. `1 + 2` now means something.
-- Seed parser, statement level: newline-separated programs, variable references, assignment, method calls with parenthesized arguments, and `def ... end` with parameters and body.
-- Seed interpreter (tree-walking reference semantics): literals, arithmetic (`+ - * / %`, unary minus), string concatenation, comparisons, strict-boolean `if`/`elsif`/`else` expressions, `while` loops, assignment, and user-defined methods with fresh scopes.
-- `puts` builtin with pluggable output; builtins produce no value (a seed-level preview of "no ambient nil").
-- `pdx` binary: runs `.pdx` files (fixture-tested end to end, fizzbuzz included) and opens a REPL when run bare — multi-line definitions buffer, errors report and continue.
-- Comments (`#` to end of line).
-- String escape sequences (`\n` `\t` `\"` `\\`), decoded in the parser.
-- Dot method calls, chainable, with read-only builtin value methods: `length`, `upcase`, `downcase`, `reverse`, `empty?` on strings; `abs`, `zero?`, `positive?`, `negative?` on integers; `to_s` on everything. `-5` is a negative literal, so `-5.abs == 5`.
-- Arrays: literals, indexing (negative indices; out of range panics — no nil), `+` concatenation, `length`/`first`/`last`/`empty?`/`join`.
-- Blocks: `do |x| ... end` on `each`, `map`, and `times`. Blocks are closures over the enclosing scope; parameters are block-local.
-- `return` (exits the enclosing method, unwinding through loops) and `break` (exits the enclosing `while`); misuse panics, unsupported-in-blocks stated honestly.
-- `docs/STAGE0.md`: the seed subset documented as built, including what's deliberately out.
-- Hashes: `{"key" => value}` literals (insertion-ordered, duplicate keys last-wins), lookup by any value (missing key panics — no nil), `length`/`empty?`/`key?`/`keys`/`values`.
-- Stdlib breadth: string `chars`/`split`/`include?`/`start_with?`/`end_with?` and `[index]`; integer `even?`/`odd?`; array `include?`/`sum`/`min`/`max`.
-- `unless` (block and postfix) and postfix `if` — guard clauses (`return 0 if n < 0`) work.
-- Short-circuiting `&&`/`||` and `!`, strict booleans.
-- String interpolation `"#{...}"`, desugared to concatenation with auto-`to_s`; lexer keeps token boundaries honest through nested strings and braces.
-- Compound assignment (`+= -= *= /= %=`), `next` in `while` loops, `hash.each do |key, value|`.
-- `case/when` with equality matching, multiple values per `when`, and aligned `when x then y` one-liners.
-- `tour.pdx` fixture: the full Stage 0 surface through the real binary.
-- `p` builtin and `inspect` rendering (strings keep quotes; the REPL uses it, like irb).
-- Single-quoted literal strings, `%w[]` word arrays, `*` repetition for strings and arrays.
-- Default parameter values (trailing only, bound left to right so defaults can reference earlier parameters).
-- `select`/`reject`/`reduce(initial)` blocks and `String#to_i`.
-- Crude IO builtins (`argv()`, `read_file`, `write_file`) — names are placeholders; unblocks real programs. `word_count.pdx` fixture is a working `wc`.
-- `each_with_index`, `sort` (integer arrays), `slice(start, length)` on strings and arrays; bare `puts()` prints a blank line.
-- `mini_lexer.pdx` fixture: a lexer written in Portland, tokenizing Portland-ish source — first compiler work in the language itself.
-- `each_with_index`, `upto`/`downto`, leading-dot method chains across newlines, duplicate-parameter rejection, REPL buffers multi-line strings.
-- `script/bootstrap` and `script/cibuild`; `todos/018` gap analysis toward Stage 1 self-hosting.
 
+- Todos migrated to GitHub issues #1–#17; `todos/` now holds only the mapping.
+
+- Cargo workspace: `crate/` (the published placeholder, eventually the real compiler) + `seed/` (Stage 0, never published), with `script/test` (fmt + clippy + tests).
+
+- Seed lexer: integer literals, identifiers with `?`/`!` suffixes, double-quoted strings (no escapes/interpolation yet), newline tokens, space/tab skipping.
+
+- Seed lexer: `def`/`do`/`end` keywords (lookalikes like `def?`/`ending` stay identifiers) and single-character punctuation (`(` `)` `,` `.` `=` `+`).
+
+- Seed AST + recursive descent parser: integer and string literals, left-associative `+`, parenthesized grouping. `1 + 2` now means something.
+
+- Seed parser, statement level: newline-separated programs, variable references, assignment, method calls with parenthesized arguments, and `def ... end` with parameters and body.
+
+- Seed interpreter (tree-walking reference semantics): literals, arithmetic (`+ - * / %`, unary minus), string concatenation, comparisons, strict-boolean `if`/`elsif`/`else` expressions, `while` loops, assignment, and user-defined methods with fresh scopes.
+
+- `puts` builtin with pluggable output; builtins produce no value (a seed-level preview of "no ambient nil").
+
+- `pdx` binary: runs `.pdx` files (fixture-tested end to end, fizzbuzz included) and opens a REPL when run bare — multi-line definitions buffer, errors report and continue.
+
+- Comments (`#` to end of line).
+
+- String escape sequences (`\n` `\t` `\"` `\\`), decoded in the parser.
+
+- Dot method calls, chainable, with read-only builtin value methods: `length`, `upcase`, `downcase`, `reverse`, `empty?` on strings; `abs`, `zero?`, `positive?`, `negative?` on integers; `to_s` on everything. `-5` is a negative literal, so `-5.abs == 5`.
+
+- Arrays: literals, indexing (negative indices; out of range panics — no nil), `+` concatenation, `length`/`first`/`last`/`empty?`/`join`.
+
+- Blocks: `do |x| ... end` on `each`, `map`, and `times`. Blocks are closures over the enclosing scope; parameters are block-local.
+
+- `return` (exits the enclosing method, unwinding through loops) and `break` (exits the enclosing `while`); misuse panics, unsupported-in-blocks stated honestly.
+
+- `docs/STAGE0.md`: the seed subset documented as built, including what's deliberately out.
+
+- Hashes: `{"key" => value}` literals (insertion-ordered, duplicate keys last-wins), lookup by any value (missing key panics — no nil), `length`/`empty?`/`key?`/`keys`/`values`.
+
+- Stdlib breadth: string `chars`/`split`/`include?`/`start_with?`/`end_with?` and `[index]`; integer `even?`/`odd?`; array `include?`/`sum`/`min`/`max`.
+
+- `unless` (block and postfix) and postfix `if` — guard clauses (`return 0 if n < 0`) work.
+
+- Short-circuiting `&&`/`||` and `!`, strict booleans.
+
+- String interpolation `"#{...}"`, desugared to concatenation with auto-`to_s`; lexer keeps token boundaries honest through nested strings and braces.
+
+- Compound assignment (`+= -= *= /= %=`), `next` in `while` loops, `hash.each do |key, value|`.
+
+- `case/when` with equality matching, multiple values per `when`, and aligned `when x then y` one-liners.
+
+- `tour.pdx` fixture: the full Stage 0 surface through the real binary.
+
+- `p` builtin and `inspect` rendering (strings keep quotes; the REPL uses it, like irb).
+
+- Single-quoted literal strings, `%w[]` word arrays, `*` repetition for strings and arrays.
+
+- Default parameter values (trailing only, bound left to right so defaults can reference earlier parameters).
+
+- `select`/`reject`/`reduce(initial)` blocks and `String#to_i`.
+
+- Crude IO builtins (`argv()`, `read_file`, `write_file`) — names are placeholders; unblocks real programs. `word_count.pdx` fixture is a working `wc`.
+
+- `each_with_index`, `sort` (integer arrays), `slice(start, length)` on strings and arrays; bare `puts()` prints a blank line.
+
+- `mini_lexer.pdx` fixture: a lexer written in Portland, tokenizing Portland-ish source — first compiler work in the language itself.
+
+- `each_with_index`, `upto`/`downto`, leading-dot method chains across newlines, duplicate-parameter rejection, REPL buffers multi-line strings.
+
+- `script/bootstrap` and `script/cibuild`; `todos/018` gap analysis toward Stage 1 self-hosting.
