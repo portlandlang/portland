@@ -47,8 +47,9 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 - [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
 - [ ] Heredocs — squiggly only (ADR 0020 — decided; build)
-- [ ] Symbols — tabled, [first pass](docs/reports/2026-07-23-symbols-first-pass.md); entangled with enums/sum types, wants corpus residue data
-- [ ] Enums / sum types — undecided and unlisted until now; the job symbols would do, and the natural next exhaustiveness citizen
+- [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
+- [ ] Enums / sum types — in design; open: payloads (one feature or two?), where enums are declared, how their type is named from outside
+- [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
 - [ ] Floats (ADR 0018) and ranges (ADR 0019) — both decided; build
 - [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
