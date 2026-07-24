@@ -11,6 +11,7 @@ pub fn parse(source: &str) -> Program {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
         depth: 0,
+        it_frames: Vec::new(),
         position: 0,
         tokens,
     };
@@ -25,8 +26,18 @@ const MAXIMUM_NESTING: usize = 10_000;
 
 struct Parser<'source> {
     depth: usize,
+    /// One frame per open block, tracking `it` for ADR 0017: whether this
+    /// block names `it` directly, and whether a block nested inside it
+    /// already claimed the name.
+    it_frames: Vec<ItFrame>,
     position: usize,
     tokens: Vec<Token<'source>>,
+}
+
+#[derive(Default)]
+struct ItFrame {
+    claimed_by_child: bool,
+    named_here: bool,
 }
 
 /// Decode a raw string token (quotes included) into an expression:
@@ -128,6 +139,7 @@ fn expression_from(source: &str) -> Expression {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
         depth: 0,
+        it_frames: Vec::new(),
         position: 0,
         tokens,
     };
@@ -815,6 +827,7 @@ impl<'source> Parser<'source> {
     fn block(&mut self) -> Block {
         let braced = self.peek_kind() == Some(TokenKind::LeftBrace);
         self.position += 1; // the `do` or `{`
+        self.it_frames.push(ItFrame::default());
         let mut parameters = Vec::new();
         if self.peek_kind() == Some(TokenKind::Pipe) {
             self.position += 1; // the opening `|`
@@ -840,16 +853,41 @@ impl<'source> Parser<'source> {
                 }
             }
         }
-        if braced {
+        let body = if braced {
             let body = self.braced_body();
             self.position += 1; // the `}`
-            return Block { body, parameters };
-        }
-        self.expect_statement_boundary();
-        self.skip_newlines();
-        let body = self.body_until(&["end"], "do");
-        self.position += 1; // the `end`
+            body
+        } else {
+            self.expect_statement_boundary();
+            self.skip_newlines();
+            let body = self.body_until(&["end"], "do");
+            self.position += 1; // the `end`
+            body
+        };
+        self.close_it_frame(&mut parameters);
         Block { body, parameters }
+    }
+
+    /// Settle this block's `it` (ADR 0017). Naming `it` declares the
+    /// implicit parameter; every collision is a shadow, and shadows error.
+    fn close_it_frame(&mut self, parameters: &mut Vec<String>) {
+        let frame = self.it_frames.pop().expect("an open block frame");
+        if !frame.named_here {
+            return;
+        }
+        if !parameters.is_empty() {
+            panic!(
+                "`it` in a block that declares |{}| — use one or the other",
+                parameters.join(", ")
+            );
+        }
+        if frame.claimed_by_child {
+            panic!("`it` is already a nested block's parameter — name your parameters");
+        }
+        if let Some(parent) = self.it_frames.last_mut() {
+            parent.claimed_by_child = true;
+        }
+        parameters.push("it".to_string());
     }
 
     /// Statements inside `{ ... }`, up to (not consuming) the closing brace.
@@ -1289,6 +1327,13 @@ impl<'source> Parser<'source> {
                         name: token.text.to_string(),
                     }
                 } else {
+                    // ADR 0017: naming `it` inside a block declares that
+                    // block's implicit parameter.
+                    if token.text == "it"
+                        && let Some(frame) = self.it_frames.last_mut()
+                    {
+                        frame.named_here = true;
+                    }
                     Expression::Variable(token.text.to_string())
                 }
             }

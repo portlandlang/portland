@@ -1128,6 +1128,12 @@ impl<W: std::io::Write> Interpreter<W> {
             if self.methods.contains_key(parameter) || Self::builtin_name(parameter) {
                 panic!("block parameter {parameter} shadows method {parameter} — rename one");
             }
+            // ADR 0017: `it` is implicit, so a collision with an existing
+            // local is confusing rather than merely shadowing. Named
+            // parameters keep the ordinary shadow-and-restore rule.
+            if parameter == "it" && self.variables.contains_key("it") {
+                panic!("`it` is a local here and a block parameter there — rename one");
+            }
             self.variables.insert(
                 parameter.clone(),
                 Binding {
@@ -1915,6 +1921,55 @@ mod tests {
     #[test]
     fn brace_blocks_do_not_shadow_hash_literals() {
         assert_eq!(evaluate(r#"{"a" => 1}.length"#), Some(Value::Integer(1)));
+    }
+
+    /// ADR 0017: naming `it` declares the block's implicit parameter.
+    #[test]
+    fn it_is_the_implicit_block_parameter() {
+        assert_eq!(
+            evaluate(r#"["a", "b"].map { it.upcase }.join("-")"#),
+            Some(Value::String("A-B".to_string()))
+        );
+        // Same rule in a do/end block — the forms are dead-identical.
+        assert_eq!(
+            evaluate("[1, 2, 3].select do\n  it.odd?\nend.length\n"),
+            Some(Value::Integer(2))
+        );
+    }
+
+    /// An enclosing block with named parameters puts no `it` in scope, so
+    /// the inner block may claim it.
+    #[test]
+    fn it_nests_under_a_named_outer_block() {
+        assert_eq!(
+            evaluate("[[1, 2]].map { |pair| pair.map { it * 2 } }.length"),
+            Some(Value::Integer(1))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "use one or the other")]
+    fn panics_when_it_mixes_with_declared_parameters() {
+        evaluate(r#"["a"].map { |word| it.upcase }"#);
+    }
+
+    /// Nesting is shadowing, and shadows are errors.
+    #[test]
+    #[should_panic(expected = "already a nested block's parameter")]
+    fn panics_on_nested_it() {
+        evaluate("[[1]].map { it.map { it } }");
+    }
+
+    #[test]
+    #[should_panic(expected = "`it` is a local here and a block parameter there")]
+    fn panics_when_it_collides_with_a_local() {
+        evaluate("it = 5\n[\"a\"].map { it.upcase }\n");
+    }
+
+    /// But an uncontested local named `it` is perfectly fine.
+    #[test]
+    fn a_local_named_it_is_allowed_when_no_block_claims_it() {
+        assert_eq!(evaluate("it = 5\nit + 1\n"), Some(Value::Integer(6)));
     }
 
     /// ADR 0016: the one ambiguous position names every reading. With a
