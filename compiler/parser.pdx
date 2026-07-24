@@ -880,8 +880,10 @@ def parse_dot(tokens, receiver, mutable position, safe)
   end
   # Exhibit C, resolved: an absent block is nil, not an empty array.
   mutable block = nil
-  if keyword_at?(tokens, position, %w[do])
-    block_step = parse_block(tokens, position + 1)
+  # `do ... end` and `{ ... }` are dead-identical (ADR 0016).
+  if keyword_at?(tokens, position, %w[do]) || operator_at?(tokens, position, %w[{])
+    braced = operator_at?(tokens, position, %w[{])
+    block_step = parse_block(tokens, position + 1, braced)
     block = block_step.node
     position = block_step.position
   end
@@ -894,7 +896,7 @@ def parse_dot(tokens, receiver, mutable position, safe)
 end
 
 # `do |params| ... end`, position already past the `do`.
-def parse_block(tokens, mutable position)
+def parse_block(tokens, mutable position, braced)
   mutable parameters = []
   if operator_at?(tokens, position, %w[|])
     position += 1
@@ -909,11 +911,61 @@ def parse_block(tokens, mutable position)
       return Step.new(node: error_node("expected | to close block parameters"), position: position)
     end
   end
+  body_start = position
+  if braced
+    body = parse_braced_body(tokens, position)
+    parameters = implicit_parameters(parameters, tokens, body_start, body.position)
+    if operator_at?(tokens, body.position, ["}"])
+      return Step.new(node: block_node(parameters, body.node), position: body.position + 1)
+    end
+    return Step.new(node: error_node("expected } to close {"), position: body.position)
+  end
   body = parse_body(tokens, position, %w[end])
+  parameters = implicit_parameters(parameters, tokens, body_start, body.position)
   if keyword_at?(tokens, body.position, %w[end])
     return Step.new(node: block_node(parameters, body.node), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close do"), position: body.position)
+end
+
+# ADR 0017: naming `it` declares the block's implicit parameter. Crude
+# divergence: the trio only builds the happy path, scanning the body's
+# tokens rather than tracking frames. The seed is the enforcement oracle
+# for the collision rules (mixing, nesting, a local of that name), which
+# cannot appear in a program the seed accepts.
+def implicit_parameters(parameters, tokens, start, finish)
+  return parameters unless parameters.empty?
+  mutable index = start
+  mutable names_it = false
+  while index < finish
+    names_it = true if tokens[index].identifier? && tokens[index].text == "it"
+    index += 1
+  end
+  return ["it"] if names_it
+  parameters
+end
+
+# Statements inside `{ ... }`, up to the closing brace. A one-liner needs
+# no statement boundary — the brace itself ends the last statement.
+def parse_braced_body(tokens, mutable position)
+  mutable nodes = []
+  position = skip_newlines_at(tokens, position)
+  while true
+    if position >= tokens.length || operator_at?(tokens, position, ["}"])
+      return Step.new(node: nodes, position: position)
+    end
+    step = parse_statement_with_guard(tokens, position)
+    nodes << step.node
+    position = step.position
+    return Step.new(node: nodes, position: position) if operator_at?(tokens, position, ["}"])
+    unless statement_boundary?(tokens, position)
+      nodes << error_node("expected newline after statement, got #{tokens[position].text}")
+      while position < tokens.length && !tokens[position].newline?
+        position += 1
+      end
+    end
+    position = skip_newlines_at(tokens, position)
+  end
 end
 
 def parse_index(tokens, receiver, position)
@@ -1722,7 +1774,5 @@ def method_call_sexp(node, dot)
 end
 
 def sexp_list(nodes)
-  nodes.map do |node|
-    node.sexp
-  end.join(" ")
+  nodes.map { it.sexp }.join(" ")
 end

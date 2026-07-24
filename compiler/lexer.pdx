@@ -147,7 +147,199 @@ def read_word_array(characters, start)
   text
 end
 
-def lex(source)
+# — heredocs (ADR 0020) —
+#
+# Squiggly `<<~SQL` only, expanded into an ordinary string literal before
+# the scan, mirroring the seed. Structurally different from the seed's
+# implementation on purpose; only in/out equivalence matters.
+
+struct HeredocLine
+  text
+  consumed
+end
+
+def leading_spaces(line)
+  characters = line.chars
+  mutable count = 0
+  while count < characters.length && characters[count] == " "
+    count += 1
+  end
+  count
+end
+
+def trimmed(line)
+  characters = line.chars
+  mutable start = 0
+  while start < characters.length && characters[start] == " "
+    start += 1
+  end
+  mutable finish = characters.length
+  while finish > start && characters[finish - 1] == " "
+    finish -= 1
+  end
+  mutable result = ""
+  mutable index = start
+  while index < finish
+    result << characters[index]
+    index += 1
+  end
+  result
+end
+
+# The terminator name right after `<<~`, or "" when this is not an opener.
+def heredoc_terminator(line, start)
+  characters = line.chars
+  return "" unless characters[start] == "<" && characters[start + 1] == "<" && characters[start + 2] == "~"
+  mutable index = start + 3
+  mutable quoted = false
+  if characters[index] == "'"
+    quoted = true
+    index += 1
+  end
+  mutable name = ""
+  while index < characters.length && name_character?(characters[index])
+    name << characters[index]
+    index += 1
+  end
+  return "" if name.empty?
+  return name + "'" if quoted
+  name
+end
+
+# Body lines up to the terminator, dedented and encoded as a literal.
+def read_heredoc_body(lines, start, terminator, interpolating)
+  mutable body = []
+  mutable index = start
+  while index < lines.length && trimmed(lines[index]) != terminator
+    body << lines[index]
+    index += 1
+  end
+  common = heredoc_indentation(body)
+  mutable encoded = ""
+  body.each do |line|
+    encoded << encode_heredoc_line(line, common, interpolating)
+  end
+  literal = if interpolating
+    "\"" + encoded + "\""
+  else
+    "'" + encoded + "'"
+  end
+  HeredocLine.new(text: literal, consumed: index - start + 1)
+end
+
+def heredoc_indentation(body)
+  mutable common = 1000000
+  body.each do |line|
+    unless trimmed(line).empty?
+      spaces = leading_spaces(line)
+      common = spaces if spaces < common
+    end
+  end
+  return 0 if common == 1000000
+  common
+end
+
+def encode_heredoc_line(line, common, interpolating)
+  stripped = if line.length > common
+    line[common..]
+  else
+    ""
+  end
+  mutable encoded = ""
+  stripped.chars.each do |character|
+    if interpolating && character == "\""
+      encoded << "\\\""
+    elsif !interpolating && character == "\\"
+      encoded << "\\\\"
+    elsif !interpolating && character == "'"
+      encoded << "\\'"
+    else
+      encoded << character
+    end
+  end
+  if interpolating
+    encoded << "\\n"
+  else
+    encoded << "\n"
+  end
+  encoded
+end
+
+# Rewrite one line, returning it plus how many body lines it swallowed.
+def expand_heredoc_line(lines, line_index)
+  line = lines[line_index]
+  characters = line.chars
+  mutable result = ""
+  mutable consumed = 0
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "#"
+      result << line[index..]
+      return HeredocLine.new(text: result, consumed: consumed)
+    end
+    if character == "\"" || character == "'"
+      closing = skip_literal(characters, index)
+      mutable inner = index
+      while inner < closing
+        result << characters[inner]
+        inner += 1
+      end
+      index = closing
+      next
+    end
+    terminator = heredoc_terminator(line, index)
+    if terminator.empty?
+      result << character
+      index += 1
+      next
+    end
+    interpolating = !terminator.end_with?("'")
+    name = if interpolating
+      terminator
+    else
+      terminator[..(terminator.length - 2)]
+    end
+    body = read_heredoc_body(lines, line_index + 1 + consumed, name, interpolating)
+    consumed += body.consumed
+    result << body.text
+    index += 3 + name.length
+    index += 2 unless interpolating
+  end
+  HeredocLine.new(text: result, consumed: consumed)
+end
+
+# Past a quoted literal, so its contents can't be mistaken for code.
+def skip_literal(characters, start)
+  quote = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    if characters[index] == "\\"
+      index += 2
+      next
+    end
+    if characters[index] == quote
+      return index + 1
+    end
+    index += 1
+  end
+  characters.length
+end
+
+def expand_heredocs(source)
+  lines = source.split("\n")
+  mutable output = []
+  mutable index = 0
+  while index < lines.length
+    expanded = expand_heredoc_line(lines, index)
+    output << expanded.text
+    index += 1 + expanded.consumed
+  end
+  output.join("\n")
+end
+
+def lex(raw_source)
+  source = expand_heredocs(raw_source)
   characters = source.chars
   mutable tokens = []
   mutable index = 0
