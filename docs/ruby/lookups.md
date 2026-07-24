@@ -2,7 +2,7 @@
 
 **Status:** decided
 ([ADR 0010](../adr/0010-2026-07-22-partial-operations-return-maybes.md)).
-Built in the seed (runtime half), 2026-07-22 — see `../STAGE0.md`.
+Built, runtime half — see [the language](../language.md#absence).
 
 ## Ruby
 

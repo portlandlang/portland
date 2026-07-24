@@ -4,7 +4,7 @@ One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered.
 Each records Context → Decision → Consequences, with a Status of
 **Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
 
-`docs/STAGE0.md` records what's _built_.
+[`docs/language.md`](../language.md) records what's _built_.
 ADRs record what's _decided_.
 Everything is revisable pre-1.0, but the burden is on the challenger,
 and revisions get a new ADR that supersedes the old one.
@@ -27,6 +27,7 @@ and revisions get a new ADR that supersedes the old one.
 - [0014](0014-2026-07-22-keyword-arguments.md) — keyword arguments are Ruby 3's; splats stay out
 - [0015](0015-2026-07-23-values-never-mutate.md) — values never mutate; names do (`<<` and `[]=` as rebinding sugar; `!` deferred)
 
-Decisions made before this log exists as-built documentation in
-`docs/STAGE0.md` (paren-less rules, no-shadow, strict booleans, structs, …)
-and may be backfilled as ADRs when they're next touched.
+Decisions made before this log exist as-built documentation in
+[`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict
+booleans, structs, …) and may be backfilled as ADRs when they're next
+touched.

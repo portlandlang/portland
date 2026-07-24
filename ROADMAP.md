@@ -1,12 +1,12 @@
 # Roadmap
 
-One page: where Portland is going and how close it is. Above the line is done 🎉; below the line is coming (not necessarily in this order). Details live in [ADRs](docs/adr/), [STAGE0](docs/STAGE0.md), the [Ruby ledger](docs/ruby/), the [issues](https://github.com/portlandlang/portland/issues), and — for the original thinking, frozen as written — [docs/history/](docs/history/).
+One page: where Portland is going and how close it is. Above the line is done 🎉; below the line is coming (not necessarily in this order). Details live in [ADRs](docs/adr/), [the language](docs/language.md), [the architecture](docs/architecture.md), the [Ruby ledger](docs/ruby/), the [issues](https://github.com/portlandlang/portland/issues), and — for the original thinking, frozen as written — [docs/history/](docs/history/).
 
 ## Done 🎉
 
 - ✅ The premise, designed: Apple-silicon-only, Ruby's joy, not Swift ([AGENT.md](AGENT.md), [the first brainstorm](docs/history/2026-06-28-first-brainstorm.md))
 - ✅ Namespaces squatted, repo public, CI green on macos-26
-- ✅ **Stage 0 seed**: Rust lexer + parser + tree-walking interpreter + `pdx` binary and REPL, running a real slice of Portland ([STAGE0](docs/STAGE0.md))
+- ✅ **Stage 0 seed**: Rust lexer + parser + tree-walking interpreter + `pdx` binary and REPL, running a real slice of Portland ([architecture](docs/architecture.md))
 - ✅ Paren-less calls the Portland way: command calls, no-shadow, never-guess errors
 - ✅ Structs, blocks, `case/when`, guards, interpolation, `%w[]`, `require_relative`, depth-guarded deep stacks
 - ✅ **Portland-on-Portland**: `parser.pdx` parses the whole compiler including itself (#18); `evaluator.pdx` runs the fixture suite byte-identical to the seed (#19)

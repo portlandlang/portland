@@ -65,6 +65,6 @@ promises govern every difference here:
 - [removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the
   other deliberate deletions; also what is merely *deferred*
 
-`../adr/` records the decisions behind these; `../STAGE0.md` records what
-the seed actually speaks today. Where a difference is **Tentative** or
+`../adr/` records the decisions behind these;
+[`../language.md`](../language.md) records what Portland speaks today. Where a difference is **Tentative** or
 merely **Sketched**, its file says so.

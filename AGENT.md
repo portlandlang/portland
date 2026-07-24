@@ -9,7 +9,7 @@ trio (`compiler/lexer.pdx`, `parser.pdx`, `evaluator.pdx`) is Portland
 written in Portland: the parser parses the whole compiler including
 itself, and the evaluator runs the fixture suite byte-identical to the
 seed. See [ROADMAP.md](ROADMAP.md) for the one-page burn-down,
-[docs/STAGE0.md](docs/STAGE0.md) for exactly what's built, and the
+[docs/language.md](docs/language.md) for exactly what's built, and the
 [issues](https://github.com/portlandlang/portland/issues) for what's
 next.
 
@@ -39,71 +39,18 @@ first, and communication as a feature.
 Read it before deciding anything. Several of those rules exist because we
 broke them once, and the file says which.
 
-## Decided (ADRs, in brief)
+## What's decided
 
-- **Ruby's good parts, kept (the surface):** blocks-as-prose,
-  everything-is-an-expression, implicit returns, `?`/`!` suffixes,
-  postfix guards, keyword args, Enumerable as one protocol, pattern
-  matching (promoted to load-bearing).
-- **Ruby's bad parts, cut (the runtime):** monkeypatching / open
-  classes, `method_missing`, runtime `define_method`, `eval`, globals,
-  truthiness, perlisms (`for`, the `and`/`or` secret precedence, …).
-  Runtime metaprogramming's replacement is **compile-time macros**
-  (undesigned, #14).
-- **Optionals** (ADRs 0005–0010, 0012 — designed _and_ built, runtime
-  half): no ambient nil; absence is one explicit case of a maybe. The
-  wrapper model with a collapsed-feeling surface; the words are
-  `nil`/`nil?` and `some`/`some?`; `or`/`and`/`not` are dead-identical
-  to their sigils and `or` is typed (unwrap-or-else, with `or return` /
-  `or panic "why"` as the or-guard); the unwrap toolkit is narrowing,
-  or-guard, `&.`, `case/in` — no `if let`, no force-unwrap; partial
-  operations (`[].first`, `hash[missing]`, out-of-range indexing) return
-  maybes and `fetch` retires; a branch that doesn't happen is nil. The
-  only crash is one you typed.
-- **Namespaces** (ADR 0021 — designed _and_ built): `module` is a namespace
-  and nothing else, so mixins can get their own keyword later and
-  `include Comparable` can never be confused with `include Math`. `::`
-  names, `.` invokes — a rule, not Ruby's convention. Names are always
-  fully qualified: no import, no aliasing, no injection, with lexical
-  nesting the only shortening. `module A::B` and nested blocks are
-  semantically identical, dropping Ruby's `Module.nesting` trap. Types nest
-  in types; modules don't nest in structs. Constants needed no new concept —
-  immutability already made `MAX = 5` unrebindable, so all that was missing
-  was a place for the name to live.
-- **Immutable by default;** the mutability keyword is **`mutable`**
-  (ADR 0001), fused to first assignment, gating rebinding only. The real
-  line is immutable-when-shared, mutable-when-local; mutable _values_
-  (`push!`, `<<`) are deliberately undecided (#10).
-- **Concurrency vocabulary** (ADRs 0002, 0004, 0011 — tentative,
-  unimplemented): `together` blocks with `meanwhile`/`~` dead-identical
-  task markers, named-at-site as the only register. Semantics are #11.
-- **Bitwise operators out** (ADR 0003, tentative) — named methods
-  instead; `<<` append travels with the mutable-values decision.
-- **Types inferred, not written** — design open (#9). The lean is
-  **bidirectional inference with local generalization**, not
-  Hindley-Milner purity: better errors, and it plays well with
-  structural typing and future macros. Annotations only at public
-  boundaries, as docs. Duck typing becomes structural. The optionals
-  _static_ half (narrowing, unhandled-maybe errors, exhaustiveness)
-  lives there.
+**[docs/language.md](docs/language.md)** is what Portland speaks today —
+every section marked built unless it says otherwise, with the four
+governing rules up front (no shadowing, never guess, immutable by
+default, no truthiness or ambient nil), a style section, and honest
+"decided but unbuilt" and "not yet designed" lists at the end.
 
-## Concurrency (one model, baked in — never a library that gets deprecated)
-
-Three tiers; you live almost entirely in tier 1.
-
-1. **Implicit — you do nothing.** `photos.map { it.thumbnail }` spreads
-   across cores when worth it, safe _because_ values are immutable.
-2. **`together` — say "these are independent."**
-
-   ```ruby
-   together do
-     meanwhile user = fetch_user(id)
-     ~ orders = recent_orders(id)      # ~ and meanwhile are dead-identical
-   end
-   render(user, orders)                # plain values after end
-   ```
-
-3. **Explicit control — rare.** Cancellation, timeouts, racing.
+[docs/adr/](docs/adr/) is the decision log, one file per decision;
+[docs/ruby/](docs/ruby/) is what each divergence costs a Rubyist. Neither
+gets summarized here — a summary is a second home for a fact, and it goes
+stale exactly this fast.
 
 ## How it's built
 

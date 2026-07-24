@@ -1,7 +1,7 @@
 # Parentheses and ambiguity
 
 **Status:** decided and built — this is in the seed and the Portland trio
-today (see [STAGE0](../STAGE0.md)).
+today (see [the language](../language.md#methods-and-calls)).
 
 ## Ruby
 

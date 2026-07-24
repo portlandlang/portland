@@ -5,7 +5,7 @@ A joyous programming language for Apple silicon.
 Close to the metal, on Metal.
 
 > **Status: Stage 0 seed, Stage 1 begun.** A tiny Rust interpreter (`seed/`) runs a
-> real slice of Portland — see [`docs/STAGE0.md`](docs/STAGE0.md) for exactly what.
+> real slice of Portland — see [`docs/language.md`](docs/language.md) for exactly what.
 > The first self-hosted piece exists: [`compiler/lexer.pdx`](compiler/lexer.pdx) is
 > Portland's lexer, written in Portland, and it tokenizes its own source.
 > See [`ROADMAP.md`](ROADMAP.md) for where this is going and how close it is,
