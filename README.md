@@ -15,7 +15,8 @@ Close to the metal, on Metal.
 
 ## A taste
 
-This runs today, via `cargo run --bin pdx` (or line by line in its REPL):
+This runs today, via `script/console the_file.pdx` (or line by line in the REPL,
+`script/console` with no arguments):
 
 ```ruby
 def greeting(name)

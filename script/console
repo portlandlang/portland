@@ -1,0 +1,8 @@
+#!/bin/sh
+# Open the Portland REPL. Pass a .pdx file to run it instead.
+set -e
+cd "$(dirname "$0")/.."
+
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+
+cargo run --quiet --package portland-seed --bin pdx -- "$@"
