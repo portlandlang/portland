@@ -11,7 +11,7 @@ if [ -f "$CHRUBY" ]; then
   chruby "$(cat "$HOME/.ruby-version" 2> /dev/null)" 2> /dev/null || chruby ruby 2> /dev/null || true
 fi
 
-if ! ruby -e 'exit RUBY_VERSION.split(".").first.to_i >= 3' 2> /dev/null; then
+if ! ruby -e 'exit RUBY_VERSION.split(".").first.to_i >= 4' 2> /dev/null; then
   echo "needs Ruby 4+, found $(ruby -v 2>&1 | cut -d' ' -f2)" >&2
   echo "  install one with chruby, or put a modern ruby on PATH" >&2
   exit 1
