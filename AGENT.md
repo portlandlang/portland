@@ -1,6 +1,6 @@
 # Working brief
 
-**For:** the coding agent working on Portland. Humans want [README](README.md).
+**For:** any contributor working on this Portland project, whether a coding agent or a human. See also: [README](README.md).
 
 This file is orientation and conventions only. It deliberately summarizes nothing — a summary is a second home for a fact, and the ones that used to live here went stale within days.
 
@@ -20,8 +20,6 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 **Decisions become ADRs**, one file per decision, `NNNN-YYYY-MM-DD-slug.md`, never renumbered, Status of Accepted / Tentative / Superseded by NNNN. An issue comment is not a decision record. Issues discuss; ADRs decide.
 
 **Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/docs/check` enforces the pair.
-
-**A new ledger file needs an H1 and a `**Summary:**` line under it**, then `script/docs/generate`. That summary is what the index is built from, so the index cannot drift from it — do not hand-edit between the `generated` markers.
 
 **Never hard-wrap markdown prose.** One line per paragraph, bullet, or table row — let the editor wrap. Hard wrapping makes diffs lie: changing three words reflows every line after them, so a one-clause edit reads as a rewritten paragraph. Code blocks keep their own line breaks, since there the breaks are the content. Enforcement rides with [#31](https://github.com/portlandlang/portland/issues/31).
 
