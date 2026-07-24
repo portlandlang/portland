@@ -1,11 +1,11 @@
 //! Portland's AST — grown fresh, with Prism's node shapes as inspiration.
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Assignment {
         /// `mutable name = ...` declares a rebindable name (ADR 0001);
@@ -71,20 +71,20 @@ pub enum UnaryOperator {
 
 /// What an or-guard does when the left side is absent (ADR 0007/0008):
 /// `user = find_user(id) or return`.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum GuardAction {
     Break,
     Next,
     Return(Option<Box<Expression>>),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Block {
     pub body: Vec<Statement>,
     pub parameters: Vec<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CaseBranch {
     pub body: Vec<Statement>,
     pub values: Vec<Expression>,
@@ -92,7 +92,7 @@ pub struct CaseBranch {
 
 /// A `case/in` pattern (ADR 0013). Grows by rung: literals, captures, and
 /// alternatives first; struct/array patterns, pin, and guards follow.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
     /// `in 1 | 2 | 3` — first matching alternative wins.
     Alternative(Vec<Pattern>),
@@ -122,7 +122,7 @@ pub enum Pattern {
     },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct InBranch {
     pub body: Vec<Statement>,
     /// `in pattern if condition` — evaluated after the pattern binds; a
@@ -132,7 +132,7 @@ pub struct InBranch {
     pub pattern: Pattern,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Parameter {
     pub default: Option<Expression>,
     /// `def f(mutable position)` — a parameter is a binding site, so the
@@ -141,7 +141,9 @@ pub struct Parameter {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// No `Eq`: float literals are expressions now (ADR 0018), and IEEE
+/// equality is only partial.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     ArrayLiteral(Vec<Expression>),
     Binary {
@@ -202,6 +204,8 @@ pub enum Expression {
         keyword_arguments: Vec<(String, Expression)>,
         name: String,
     },
+    /// IEEE 754 double (ADR 0018).
+    Float(f64),
     Integer(i64),
     /// Kept apart from Binary because these short-circuit.
     Logical {

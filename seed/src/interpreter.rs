@@ -17,6 +17,15 @@ pub fn evaluate(source: &str) -> Option<Value> {
     interpreter.program(&program)
 }
 
+/// Widen a numeric value for mixed arithmetic (ADR 0018).
+fn as_float(value: &Value) -> f64 {
+    match value {
+        Value::Float(number) => *number,
+        Value::Integer(number) => *number as f64,
+        other => panic!("expected a number, got {other:?}"),
+    }
+}
+
 /// Integer division, floored — Ruby's rule, not Rust's truncation
 /// (ADR 0018): `-7 / 2` is `-4`, because the quotient rounds toward
 /// negative infinity rather than toward zero.
@@ -283,6 +292,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect(),
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
+            Expression::Float(value) => Some(Value::Float(*value)),
             Expression::Nil => Some(Value::Nil),
             Expression::SelfValue => {
                 let (_, receiver) = self
@@ -534,6 +544,35 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
                         Some(Value::Integer(left - right))
+                    }
+                    // Mixed arithmetic promotes to float, Ruby's rule
+                    // (ADR 0018). `/` is real division once a float is
+                    // involved — only integer `/` integer floors. Equality
+                    // compares across the two numeric types, so `1.0 == 1`.
+                    (ref left_value, _, ref right_value)
+                        if matches!(
+                            (left_value, right_value),
+                            (Value::Float(_), Value::Float(_))
+                                | (Value::Float(_), Value::Integer(_))
+                                | (Value::Integer(_), Value::Float(_))
+                        ) =>
+                    {
+                        let (left, right) = (as_float(left_value), as_float(right_value));
+                        Some(match operator {
+                            BinaryOperator::Add => Value::Float(left + right),
+                            BinaryOperator::Divide => Value::Float(left / right),
+                            BinaryOperator::Modulo => {
+                                Value::Float(left - right * (left / right).floor())
+                            }
+                            BinaryOperator::Multiply => Value::Float(left * right),
+                            BinaryOperator::Subtract => Value::Float(left - right),
+                            BinaryOperator::Greater => Value::Boolean(left > right),
+                            BinaryOperator::GreaterOrEqual => Value::Boolean(left >= right),
+                            BinaryOperator::Less => Value::Boolean(left < right),
+                            BinaryOperator::LessOrEqual => Value::Boolean(left <= right),
+                            BinaryOperator::Equals => Value::Boolean(left == right),
+                            BinaryOperator::NotEquals => Value::Boolean(left != right),
+                        })
                     }
                     (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
                         Some(Value::String(left + &right))
@@ -2848,6 +2887,56 @@ mod tests {
     fn evaluates_division() {
         assert_eq!(evaluate("42 / 6"), Some(Value::Integer(7)));
         assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
+    }
+
+    /// ADR 0018: IEEE doubles, Ruby's printing, mixed arithmetic promotes.
+    /// Every expectation below was checked against Ruby 4.0.6.
+    #[test]
+    fn evaluates_floats() {
+        assert_eq!(evaluate("2.75"), Some(Value::Float(2.75)));
+        assert_eq!(evaluate("-1.5"), Some(Value::Float(-1.5)));
+        assert_eq!(evaluate("1.5.to_s"), Some(Value::String("1.5".to_string())));
+    }
+
+    /// A float always shows its point, so `1.0` never renders as `1`.
+    #[test]
+    fn floats_keep_their_point_when_printed() {
+        assert_eq!(Value::Float(1.0).inspect(), "1.0");
+        assert_eq!(Value::Float(1.0).to_string(), "1.0");
+        assert_eq!(Value::Float(2.75).inspect(), "2.75");
+    }
+
+    #[test]
+    fn mixed_arithmetic_promotes_to_float() {
+        assert_eq!(evaluate("7 / 2.0"), Some(Value::Float(3.5)));
+        assert_eq!(evaluate("7.0 / 2"), Some(Value::Float(3.5)));
+        assert_eq!(evaluate("2.5 + 1"), Some(Value::Float(3.5)));
+        assert_eq!(evaluate("1 + 2.5"), Some(Value::Float(3.5)));
+        assert_eq!(evaluate("2.5 * 2"), Some(Value::Float(5.0)));
+        // Integer division still floors — only a float makes `/` real.
+        assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
+    }
+
+    /// Float modulo takes the sign of the divisor, like the integer one.
+    #[test]
+    fn float_modulo_matches_ruby() {
+        assert_eq!(evaluate("7.5 % 2"), Some(Value::Float(1.5)));
+        assert_eq!(evaluate("-7.5 % 2"), Some(Value::Float(0.5)));
+        assert_eq!(evaluate("7.5 % -2"), Some(Value::Float(-0.5)));
+    }
+
+    #[test]
+    fn floats_compare_across_the_numeric_types() {
+        assert_eq!(evaluate("1.0 == 1"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("1.5 < 2"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("2.5 > 3"), Some(Value::Boolean(false)));
+    }
+
+    /// The lexer only makes a float when a digit follows the dot, which is
+    /// what leaves `1..5` available to ranges (ADR 0019).
+    #[test]
+    fn a_dot_without_a_digit_is_not_a_float() {
+        assert_eq!(evaluate("1.to_s"), Some(Value::String("1".to_string())));
     }
 
     /// Ruby floors; Rust truncates. ADR 0018 picks Ruby, so the two

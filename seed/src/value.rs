@@ -2,12 +2,17 @@
 
 use std::fmt;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// No `Eq`: floats are values now (ADR 0018), and IEEE equality is only
+/// partial. Nothing keys a std collection by `Value`, so `PartialEq` is
+/// all the seed needs.
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     /// Rc because Portland values are immutable: sharing is invisible, and
     /// cloning a value must never mean copying a whole collection.
     Array(std::rc::Rc<Vec<Value>>),
     Boolean(bool),
+    /// IEEE 754 double (ADR 0018). Ruby's printing: always shows a point.
+    Float(f64),
     /// Insertion-ordered pairs; lookup is linear. Note: derived equality is
     /// order-sensitive, unlike Ruby's — acceptable crudeness for the seed.
     Hash(std::rc::Rc<Vec<(Value, Value)>>),
@@ -55,6 +60,7 @@ impl Value {
                 format!("[{}]", inner.join(", "))
             }
             Value::Boolean(value) => value.to_string(),
+            Value::Float(value) => format_float(*value),
             Value::Hash(pairs) => {
                 let inner: Vec<String> = pairs
                     .iter()
@@ -77,6 +83,23 @@ impl Value {
     }
 }
 
+/// Ruby's float rendering: a float always shows its point (`1.0`, never
+/// `1`), and the infinities spell out (ADR 0018).
+fn format_float(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".to_string();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_negative() {
+            "-Infinity".to_string()
+        } else {
+            "Infinity".to_string()
+        };
+    }
+    // Rust's Debug for f64 already keeps the point on whole numbers.
+    format!("{value:?}")
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -91,6 +114,7 @@ impl fmt::Display for Value {
                 write!(formatter, "]")
             }
             Value::Boolean(value) => write!(formatter, "{value}"),
+            Value::Float(value) => write!(formatter, "{}", format_float(*value)),
             Value::Hash(pairs) => {
                 write!(formatter, "{{")?;
                 for (index, (key, value)) in pairs.iter().enumerate() {

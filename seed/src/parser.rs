@@ -309,6 +309,7 @@ impl<'source> Parser<'source> {
         let next = *self.tokens.get(self.position + 1)?;
         let starts_command = match next.kind {
             TokenKind::Bang
+            | TokenKind::Float
             | TokenKind::Identifier
             | TokenKind::Integer
             | TokenKind::String
@@ -650,6 +651,10 @@ impl<'source> Parser<'source> {
             TokenKind::Integer => {
                 let value = token.text.parse().expect("integer literal out of range");
                 Pattern::Literal(Box::new(Expression::Integer(value)))
+            }
+            TokenKind::Float => {
+                let value = token.text.parse().expect("float literal out of range");
+                Pattern::Literal(Box::new(Expression::Float(value)))
             }
             TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
                 let value: i64 = self
@@ -1227,6 +1232,11 @@ impl<'source> Parser<'source> {
                 let value: i64 = token.text.parse().expect("integer literal out of range");
                 return self.postfix_from(Expression::Integer(-value));
             }
+            if self.peek_kind() == Some(TokenKind::Float) {
+                let token = self.advance();
+                let value: f64 = token.text.parse().expect("float literal out of range");
+                return self.postfix_from(Expression::Float(-value));
+            }
             return Expression::Unary {
                 operand: Box::new(self.unary()),
                 operator: UnaryOperator::Negate,
@@ -1319,6 +1329,10 @@ impl<'source> Parser<'source> {
             TokenKind::Integer => {
                 let value = token.text.parse().expect("integer literal out of range");
                 Expression::Integer(value)
+            }
+            TokenKind::Float => {
+                let value = token.text.parse().expect("float literal out of range");
+                Expression::Float(value)
             }
             TokenKind::Identifier => {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {

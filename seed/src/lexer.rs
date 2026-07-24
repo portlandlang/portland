@@ -15,6 +15,7 @@ pub enum TokenKind {
     Equal,
     EqualEqual,
     FatArrow,
+    Float,
     Greater,
     GreaterEqual,
     Identifier,
@@ -107,10 +108,21 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 });
             }
             '0'..='9' => {
-                let end = scan_while(&mut chars, |character| character.is_ascii_digit());
+                let mut end = scan_while(&mut chars, |character| character.is_ascii_digit());
+                // A `.` makes this a float only when a digit follows it
+                // (ADR 0018). That keeps `1.upto` a method call and leaves
+                // `1..5` for ranges (ADR 0019) — neither has a digit next.
+                let mut kind = TokenKind::Integer;
+                if source[end..].starts_with('.')
+                    && source[end + 1..].starts_with(|character: char| character.is_ascii_digit())
+                {
+                    chars.next(); // the `.`
+                    end = scan_while(&mut chars, |character| character.is_ascii_digit());
+                    kind = TokenKind::Float;
+                }
                 tokens.push(Token {
                     leading_space: false,
-                    kind: TokenKind::Integer,
+                    kind,
                     text: &source[start..end],
                 });
             }
