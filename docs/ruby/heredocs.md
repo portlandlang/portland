@@ -1,8 +1,10 @@
 # Heredocs
 
 **Status:** decided
-([ADR 0020](../adr/0020-2026-07-23-heredocs-squiggly-only.md)), not yet
-built. Ruby behavior below was verified against Ruby 4.0.6.
+([ADR 0020](../adr/0020-2026-07-23-heredocs-squiggly-only.md)). Built in
+the seed and the trio, differentially pinned — see
+[the language](../language.md#values). Ruby behavior below was verified
+against Ruby 4.0.6.
 
 ## Ruby
 

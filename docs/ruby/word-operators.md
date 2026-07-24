@@ -1,7 +1,8 @@
 # Word operators: `or`, `and`, `not`
 
 **Status:** decided ([ADR 0007](../adr/0007-2026-07-22-or-and-not-dead-identical.md)).
-Not yet implemented.
+Built in the seed and the trio — see
+[the language](../language.md#absence).
 
 ## Ruby
 

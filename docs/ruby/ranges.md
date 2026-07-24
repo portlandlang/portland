@@ -1,8 +1,9 @@
 # Ranges
 
 **Status:** decided
-([ADR 0019](../adr/0019-2026-07-23-ranges.md)), not yet built. Ruby
-behavior below was verified against Ruby 4.0.6.
+([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the
+trio, differentially pinned — see [the language](../language.md#values).
+Ruby behavior below was verified against Ruby 4.0.6.
 
 ## Ruby
 
