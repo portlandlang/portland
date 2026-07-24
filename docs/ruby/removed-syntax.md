@@ -39,8 +39,27 @@ the one Ruby's own style guides already preferred.
 ## Kept, to be clear
 
 Postfix guards, `unless`, `?`/`!` suffixes, `%w[]`, string interpolation,
-heredocs (squiggly only — ADR 0020), blocks, pattern matching. The joy
-surface is the point; only the footguns and the redundancies die.
+heredocs (squiggly only — ADR 0020), blocks, pattern matching. Keyword
+arguments keep Ruby 3 semantics exactly — labels, defaults referencing
+earlier parameters, strict positional/keyword separation, and no Ruby 2
+hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)).
+The joy surface is the point; only the footguns and the redundancies die.
+
+## Deferred, not removed
+
+Not yet buildable is different from ruled out. These currently give parse
+errors and are expected to arrive:
+
+- **Splats (`*args`, `**kwargs`)** — deferred by ADR 0014, which shipped
+  the rest of Ruby 3's keyword-argument story. Ruby code using them gets a
+  clean parse error until they land.
+- **Floats** and **ranges** — decided (ADRs 0018, 0019, and
+  [ranges](ranges.md)), not yet built.
+- **Brace blocks** and **`it`** — decided (ADRs 0016, 0017, and
+  [parentheses](parentheses.md)), not yet built.
+- **Symbols** — genuinely undecided and
+  [tabled](../reports/2026-07-23-symbols-first-pass.md), entangled with the
+  enum/sum-type question.
 
 ## Migration
 

@@ -55,11 +55,11 @@ promises govern every difference here:
 - [concurrency](concurrency.md) — no GIL, no `Thread`; `together` /
   `meanwhile` / `~`
 - [parentheses and ambiguity](parentheses.md) — command calls, the
-  no-shadow rule, never-guess errors
+  no-shadow rule, never-guess errors; brace blocks and `it`
 - [bitwise operators](bitwise-operators.md) — out of the grammar; named
   methods instead
 - [removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the
-  other deliberate deletions
+  other deliberate deletions; also what is merely *deferred*
 
 `../adr/` records the decisions behind these; `../STAGE0.md` records what
 the seed actually speaks today. Where a difference is **Tentative** or
