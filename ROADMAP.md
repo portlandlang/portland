@@ -23,7 +23,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ A branch that doesn't happen is nil (#22, ADR 0012) — branchless `if`, finished `while`, broken-out calls; built in seed + trio
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 - ✅ **Object model, first increment** (#27): methods in struct bodies + builtin type patterns, seed + trio — and the taste payoff: the trio's AST prints itself (`node.sexp`), Token knows its kinds, guest `with` works
-- ✅ **Decided and built in the seed** — brace blocks + the whose-block never-guess error (0016), `it` under no-shadow (0017), Ruby's floored `/` and `%` plus floats (0018), ranges with collection slices and membership patterns (0019), squiggly-only heredocs (0020). Trio threading is the open half.
+- ✅ **Decided and built, seed + trio, differentially pinned** — brace blocks + the whose-block never-guess error (0016), `it` under no-shadow (0017), Ruby's floored `/` and `%` plus floats (0018), ranges with collection slices and membership patterns (0019), squiggly-only heredocs (0020)
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -41,7 +41,6 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Language surface (decide, then build)
 
-- [ ] Thread the 0016–0020 batch through the trio — brace blocks, `it`, heredocs, floats, ranges are **built in the seed**; the trio can't use them until its own lexer/parser/evaluator learn them
 - [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
 - [ ] Enums / sum types — in design; open: payloads (one feature or two?), where enums are declared, how their type is named from outside
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape

@@ -149,9 +149,9 @@ the tests are the spec until a real one exists.
 
 ## Out (deliberately, for now)
 
-- Nothing from the 0016–0020 batch: brace blocks, `it`, heredocs, floats,
-  and ranges are **built in the seed** but not yet threaded through the
-  trio, so trio sources can't use them yet.
+- Guest `it` collision rules, and the never-guess brace error — the trio
+  parses the happy path and the seed is the enforcement oracle, as with
+  `mutable`.
 - Symbols and enums — undecided; symbols' core question is settled but the
   enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
