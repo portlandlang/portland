@@ -353,6 +353,28 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("do") {
             panic!("blocks on paren-less calls aren't supported yet — write {name}(...) do");
         }
+        // ADR 0016: a bare `{` here has two or three genuine readings. Name
+        // them all and let the author pick with a paren — never guess.
+        if self.peek_kind() == Some(TokenKind::LeftBrace) {
+            let inner = match arguments.last() {
+                Some(Expression::Call { name, .. }) => name.clone(),
+                Some(Expression::Variable(name)) => name.clone(),
+                _ => "the last argument".to_string(),
+            };
+            if self.braces_could_be_a_hash() {
+                panic!(
+                    "`{{` after a command call could be three things — parenthesize the one you mean:\n  \
+                     a hash argument to {inner}:  {name} {inner}({{ ... }})\n  \
+                     a block for {inner}:         {name}({inner} {{ ... }})\n  \
+                     a block for {name}:         {name}({inner}) {{ ... }}"
+                );
+            }
+            panic!(
+                "`{{` after a command call is a block — but whose? parenthesize the one you mean:\n  \
+                 a block for {inner}:  {name}({inner} {{ ... }})\n  \
+                 a block for {name}:  {name}({inner}) {{ ... }}"
+            );
+        }
         Some(Statement::Expression(Expression::Call {
             arguments,
             keyword_arguments,
@@ -751,6 +773,36 @@ impl<'source> Parser<'source> {
             else_body: unless_body,
             then_body: else_body,
         }
+    }
+
+    /// Could the braces starting at the current `{` be a hash literal?
+    /// A `|` right after opens block parameters, and a hash needs a `=>` at
+    /// its own depth — so this trims the never-guess menu without ever
+    /// picking a winner (ADR 0016).
+    fn braces_could_be_a_hash(&self) -> bool {
+        if self.peek_kind_at(1) == Some(TokenKind::Pipe) {
+            return false;
+        }
+        if self.peek_kind_at(1) == Some(TokenKind::RightBrace) {
+            return true; // `{}` — an empty hash or an empty block
+        }
+        let mut depth = 0;
+        let mut index = self.position;
+        while let Some(token) = self.tokens.get(index) {
+            match token.kind {
+                TokenKind::LeftBrace => depth += 1,
+                TokenKind::RightBrace => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return false;
+                    }
+                }
+                TokenKind::FatArrow if depth == 1 => return true,
+                _ => {}
+            }
+            index += 1;
+        }
+        false
     }
 
     /// Whether a block opens here — `do ... end` or `{ ... }` (ADR 0016).

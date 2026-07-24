@@ -1917,6 +1917,39 @@ mod tests {
         assert_eq!(evaluate(r#"{"a" => 1}.length"#), Some(Value::Integer(1)));
     }
 
+    /// ADR 0016: the one ambiguous position names every reading. With a
+    /// `=>` inside, the hash reading survives, so all three are offered.
+    #[test]
+    #[should_panic(expected = "could be three things")]
+    fn panics_on_a_brace_after_a_command_call() {
+        evaluate("def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { \"a\" => 1 }\n");
+    }
+
+    /// A `|` rules the hash out, so only the two block owners are offered.
+    #[test]
+    #[should_panic(expected = "is a block — but whose?")]
+    fn panics_on_a_block_brace_after_a_command_call() {
+        evaluate("def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { |item| item }\n");
+    }
+
+    /// No `=>` rules the hash out too, even without block parameters.
+    #[test]
+    #[should_panic(expected = "is a block — but whose?")]
+    fn panics_on_a_parameterless_block_brace_after_a_command_call() {
+        evaluate("def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { config }\n");
+    }
+
+    /// And the parens the error suggests do resolve it.
+    #[test]
+    fn parens_resolve_the_brace_ambiguity() {
+        let source = "def render(x)\n  x\nend\nputs render({\"a\" => 1}).length\n";
+        assert_eq!(evaluate(source), None);
+        assert_eq!(
+            evaluate(r#"["a"].map { |word| word.upcase }.join("-")"#),
+            Some(Value::String("A".to_string()))
+        );
+    }
+
     #[test]
     fn a_broken_call_produces_nil() {
         assert_eq!(
