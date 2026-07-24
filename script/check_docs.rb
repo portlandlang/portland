@@ -8,6 +8,12 @@
 # A check that cries wolf is worse than no check, so each one declines
 # where it cannot tell (AGENT.md: never guess, in the implementation too).
 
+# The docs are UTF-8 and say so nowhere else. Without this, a caller with no
+# LANG set — a git hook, a bare CI shell — gets US-ASCII, and the first em
+# dash in our own prose raises instead of failing a check.
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+
 REPO = File.expand_path("..", __dir__)
 
 def markdown_files
