@@ -8,12 +8,6 @@
 # A check that cries wolf is worse than no check, so each one declines
 # where it cannot tell (AGENT.md: never guess, in the implementation too).
 
-# The docs are UTF-8 and say so nowhere else. Without this, a caller with no
-# LANG set — a git hook, a bare CI shell — gets US-ASCII, and the first em
-# dash in our own prose raises instead of failing a check.
-Encoding.default_external = Encoding::UTF_8
-Encoding.default_internal = Encoding::UTF_8
-
 REPO = File.expand_path("..", __dir__)
 
 def markdown_files
@@ -24,13 +18,22 @@ end
 
 def relative(path) = path.delete_prefix("#{REPO}/")
 
+# The docs are UTF-8; a caller's locale is not our business. Ruby reads files
+# as Encoding.default_external, which is US-ASCII whenever LANG is unset — a
+# git hook, a bare CI shell — and then the first em dash in our own prose
+# raises `invalid byte sequence` before any check can run. (Source encoding
+# is UTF-8 regardless since Ruby 2.0; this is the external half.)
+def read(path) = File.read(path, encoding: "UTF-8")
+
+def read_lines(path) = File.readlines(path, encoding: "UTF-8")
+
 # Lines inside ``` fences, as [line, one_indexed_number] pairs.
 #
 # Prose *discusses* wrong forms ("`Foo::bar()` is an error"); code blocks
 # *demonstrate* usage. Only the second is checkable without guessing.
 def fenced_lines(path)
   inside = false
-  File.readlines(path).each_with_index.filter_map do |line, index|
+  read_lines(path).each_with_index.filter_map do |line, index|
     if line.lstrip.start_with?("```")
       inside = !inside
       next
@@ -69,15 +72,15 @@ end
 #
 # Splats were once documented nowhere: ADR 0014 matched Ruby so closely
 # that nobody noticed it *also* deferred something.
-ledger = Dir.glob("#{REPO}/docs/ruby/*.md").map { |path| File.read(path) }.join
-changelog = File.read("#{REPO}/CHANGELOG.md")
+ledger = Dir.glob("#{REPO}/docs/ruby/*.md").map { |path| read(path) }.join
+changelog = read("#{REPO}/CHANGELOG.md")
 
 Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort.each do |path|
   number = File.basename(path)[0, 4]
   next if ledger.match?(/adr\/#{number}-/) || ledger.match?(/ADR #{number}\b/)
   # An ADR may opt out by saying, in itself or the changelog, that it is a
   # deliberate non-difference from Ruby.
-  next if File.read(path).match?(/non-difference/i)
+  next if read(path).match?(/non-difference/i)
   next if changelog.match?(/ADR #{number}\b[^\n]*non-difference/i)
 
   failures << <<~REPORT
@@ -92,7 +95,7 @@ end
 
 # 3. Internal doc links resolve.
 markdown_files.each do |path|
-  File.readlines(path).each_with_index do |line, index|
+  read_lines(path).each_with_index do |line, index|
     line.scan(/\]\(([^)#][^)]*)\)/) do |target,|
       next if target.start_with?("http")
 
@@ -126,7 +129,7 @@ audience_required =
 
 audience_required.sort.each do |path|
   # The line may wrap, so only its opening is anchored.
-  next if File.readlines(path).first(10).any? { |line| line.start_with?("_For: ") }
+  next if read_lines(path).first(10).any? { |line| line.start_with?("_For: ") }
 
   failures << <<~REPORT
     #{relative(path)}
@@ -149,7 +152,7 @@ end
 def check_index(index_path, entries, failures, what)
   return unless File.exist?(index_path)
 
-  index = File.read(index_path)
+  index = read(index_path)
   missing = entries.reject { |entry| index.include?(File.basename(entry)) }
   return if missing.empty?
 
