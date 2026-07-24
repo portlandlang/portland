@@ -6,7 +6,7 @@
 # `script/docs/check links`, `script/docs/generate adr`.
 #
 # These are plain `.rb` libraries, not executables — no shebang, no exec bit —
-# because the wrapper scripts are what select a Ruby 3+, and macOS's system
+# because the wrapper scripts are what select a Ruby 4+, and macOS's system
 # Ruby is 2.6 and cannot parse this file. A shebang would advertise a way to
 # run them that quietly picks the wrong interpreter.
 #
