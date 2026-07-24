@@ -10,7 +10,7 @@ Close to the metal, on Metal.
 > Portland's lexer, written in Portland, and it tokenizes its own source.
 > See [`ROADMAP.md`](ROADMAP.md) for where this is going and how close it is,
 > [`AGENT.md`](AGENT.md) for the working brief,
-> [`docs/DESIGN.md`](docs/DESIGN.md) for the full design rationale,
+> [`docs/history/`](docs/history/) for the original thinking, frozen as written,
 > and the [issues](https://github.com/portlandlang/portland/issues) for what's next.
 
 ## A taste

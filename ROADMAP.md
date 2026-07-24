@@ -1,10 +1,10 @@
 # Roadmap
 
-One page: where Portland is going and how close it is. Above the line is done 🎉; below the line is coming (not necessarily in this order). Details live in [ADRs](docs/adr/), [STAGE0](docs/STAGE0.md), the [Ruby ledger](docs/ruby/), the [open-decisions report](docs/reports/2026-07-22-open-decisions.md), and the [issues](https://github.com/portlandlang/portland/issues).
+One page: where Portland is going and how close it is. Above the line is done 🎉; below the line is coming (not necessarily in this order). Details live in [ADRs](docs/adr/), [STAGE0](docs/STAGE0.md), the [Ruby ledger](docs/ruby/), the [issues](https://github.com/portlandlang/portland/issues), and — for the original thinking, frozen as written — [docs/history/](docs/history/).
 
 ## Done 🎉
 
-- ✅ The premise, designed: Apple-silicon-only, Ruby's joy, not Swift ([AGENT.md](AGENT.md), [DESIGN](docs/DESIGN.md))
+- ✅ The premise, designed: Apple-silicon-only, Ruby's joy, not Swift ([AGENT.md](AGENT.md), [the first brainstorm](docs/history/2026-06-28-first-brainstorm.md))
 - ✅ Namespaces squatted, repo public, CI green on macos-26
 - ✅ **Stage 0 seed**: Rust lexer + parser + tree-walking interpreter + `pdx` binary and REPL, running a real slice of Portland ([STAGE0](docs/STAGE0.md))
 - ✅ Paren-less calls the Portland way: command calls, no-shadow, never-guess errors
@@ -43,7 +43,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 ### Language surface (decide, then build)
 
 - [ ] #29 — the `%` literal zoo: which of `%w %i %q %Q %r %s %x` survive, and one delimiter or many; corpus-informed. `%w[]`'s can't-contain-`]` bug rides along
-- [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
+- [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/history/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
 - [ ] **Enums / sum types — next up**, now that namespaces exist to hold them; unblocks symbols. Open: payloads (one feature or two?), and whether `enum` declares the field as well as the vocabulary (Rails-style)
 - [ ] #27 — the object model: mixins, inheritance, visibility, `class << self` (methods in struct bodies + type predicates already built; namespacing carved out to 0021). Wants the class-shape census

@@ -9,9 +9,9 @@ trio (`compiler/lexer.pdx`, `parser.pdx`, `evaluator.pdx`) is Portland
 written in Portland: the parser parses the whole compiler including
 itself, and the evaluator runs the fixture suite byte-identical to the
 seed. See [ROADMAP.md](ROADMAP.md) for the one-page burn-down,
-[docs/STAGE0.md](docs/STAGE0.md) for exactly what's built, and
-[docs/reports/2026-07-22-open-decisions.md](docs/reports/2026-07-22-open-decisions.md)
-for what's next.
+[docs/STAGE0.md](docs/STAGE0.md) for exactly what's built, and the
+[issues](https://github.com/portlandlang/portland/issues) for what's
+next.
 
 ## North star
 
@@ -182,6 +182,7 @@ only). Companions: `ruby_research` (evidence),
 `zed-portland` (`.pdx` editor support, shipped). Brand story is banked,
 not done (#1).
 
-See [docs/DESIGN.md](docs/DESIGN.md) for the original rationale behind
-every decision above, and the [issues](https://github.com/portlandlang/portland/issues)
-for everything in motion.
+See [docs/history/](docs/history/) for the original thinking behind the
+decisions above — frozen, never current — and the
+[issues](https://github.com/portlandlang/portland/issues) for everything
+in motion.

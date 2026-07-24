@@ -50,7 +50,7 @@ errors and are expected to arrive:
 - **Brace blocks** and **`it`** — decided (ADRs 0016, 0017, and
   [parentheses](parentheses.md)), not yet built.
 - **Symbols** — genuinely undecided and
-  [tabled](../reports/2026-07-23-symbols-first-pass.md), entangled with the
+  [tabled](../history/2026-07-23-symbols-first-pass.md), entangled with the
   enum/sum-type question.
 
 ## Migration
