@@ -8,7 +8,10 @@ use crate::ast::{
 use crate::lexer::{self, Token, TokenKind};
 
 pub fn parse(source: &str) -> Program {
-    let tokens = lexer::lex(source);
+    // Heredocs are rewritten into ordinary string literals first (ADR 0020):
+    // a dedented body is not a slice of the source, and tokens borrow it.
+    let expanded = crate::heredoc::expand(source);
+    let tokens = lexer::lex(&expanded);
     let mut parser = Parser {
         depth: 0,
         it_frames: Vec::new(),
