@@ -62,7 +62,7 @@ languages are forbidden to make.
   truthiness, perlisms (`for`, the `and`/`or` secret precedence, …).
   Runtime metaprogramming's replacement is **compile-time macros**
   (undesigned, #14).
-- **Optionals** (ADRs 0005–0010, 0012 — designed *and* built, runtime
+- **Optionals** (ADRs 0005–0010, 0012 — designed _and_ built, runtime
   half): no ambient nil; absence is one explicit case of a maybe. The
   wrapper model with a collapsed-feeling surface; the words are
   `nil`/`nil?` and `some`/`some?`; `or`/`and`/`not` are dead-identical
@@ -74,17 +74,20 @@ languages are forbidden to make.
   only crash is one you typed.
 - **Immutable by default;** the mutability keyword is **`mutable`**
   (ADR 0001), fused to first assignment, gating rebinding only. The real
-  line is immutable-when-shared, mutable-when-local; mutable *values*
+  line is immutable-when-shared, mutable-when-local; mutable _values_
   (`push!`, `<<`) are deliberately undecided (#10).
 - **Concurrency vocabulary** (ADRs 0002, 0004, 0011 — tentative,
   unimplemented): `together` blocks with `meanwhile`/`~` dead-identical
   task markers, named-at-site as the only register. Semantics are #11.
 - **Bitwise operators out** (ADR 0003, tentative) — named methods
   instead; `<<` append travels with the mutable-values decision.
-- **Types inferred, not written** — Hindley-Milner-ish direction, design
-  open (#9). Annotations only at public boundaries, as docs. Duck typing
-  becomes structural. The optionals *static* half (narrowing,
-  unhandled-maybe errors, exhaustiveness) lives there.
+- **Types inferred, not written** — design open (#9). The lean is
+  **bidirectional inference with local generalization**, not
+  Hindley-Milner purity: better errors, and it plays well with
+  structural typing and future macros. Annotations only at public
+  boundaries, as docs. Duck typing becomes structural. The optionals
+  _static_ half (narrowing, unhandled-maybe errors, exhaustiveness)
+  lives there.
 
 ## Concurrency (one model, baked in — never a library that gets deprecated)
 
@@ -113,7 +116,7 @@ Three tiers; you live almost entirely in tier 1.
 - **Parser: hand-written recursive descent** (built). Prism's C lexer is
   the textbook for the hard lexical parts still to come (heredocs, #6).
 - **Memory model** (#12, plan proposed): the language is memory-safe by
-  semantics on every chip; reference counting is *exact* under
+  semantics on every chip; reference counting is _exact_ under
   immutability (immutable values can't form cycles) — no tracing GC, no
   borrow-checker ceremony. EMTE/MIE (A19/M5+) is defense-in-depth for
   the Rust floor, never the foundation.
@@ -137,9 +140,10 @@ Three tiers; you live almost entirely in tier 1.
   runtime _places_ work.
 - **Hardware safety:** MIE/EMTE as hardening (see #12); PAC for the
   runtime floor.
-- **Honest limit:** the Neural Engine isn't openly programmable — reach
-  it via CoreML/Accelerate/MPS. Don't pretend we compile straight to the
-  NPU.
+- **Honest limit:** the Neural Engine isn't openly programmable — the
+  only door is CoreML, and CoreML picks the units itself (Accelerate
+  is the CPU path, MPS the GPU one; neither reaches the ANE). Don't
+  pretend we compile straight to the NPU.
 
 ## Name & namespaces (done)
 

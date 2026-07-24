@@ -12,9 +12,10 @@ page for ceremony.
 
 ## Portland
 
-Statically typed, **inferred, not written** — Hindley-Milner-style. Types
-are present (the safety) but invisible (the joy). The page looks like
-Ruby; the compiler knows everything anyway.
+Statically typed, **inferred, not written** — the lean is bidirectional
+inference with local generalization (#9), not Hindley-Milner purity.
+Types are present (the safety) but invisible (the joy). The page looks
+like Ruby; the compiler knows everything anyway.
 
 ```ruby
 def find_user(id)     # no annotations anywhere

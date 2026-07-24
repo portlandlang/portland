@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Two drifted claims corrected in the briefs. **The Neural Engine**: AGENT.md said to reach it "via CoreML/Accelerate/MPS", which quietly conflates three different execution units — Accelerate is the CPU path, MPS (Metal Performance Shaders) runs on the GPU, and only CoreML can dispatch to the ANE at all. Stated correctly the honest limit is _stronger_ than it read: not merely that Portland cannot compile to the NPU, but that CoreML picks the units itself, so the placement decision belongs to Apple rather than to our runtime. **Type inference**: AGENT.md and docs/ruby/types.md both named Hindley-Milner as the direction, while the open-decisions report had already recommended leaning **bidirectional with local generalization** — better errors, and it plays well with structural typing and future macros ("HM purity is not a goal, joy of errors is"). Both files now state the lean and name HM only to disclaim it. #9 still owns the decision; nothing here is an ADR.
+
 - docs/architecture.svg — a layered diagram of the three architecture states: NOW (fat Rust seed, the trio interpreted on top of it), NEXT (seed retired, Portland compiler → LLVM → native, thin Rust floor), and IDEAL FUTURE (inference, heterogeneous dispatch across P/E-cores · SME · Metal GPU, FFI + Apple-framework bridges — Rust floor stays thin and shrinking). Linked from AGENT.md.
 
 - REPL: bare `quit` and `exit` leave, alongside `:quit`, `:exit`, `quit()`, `exit()`, and Ctrl-D — those are what hands actually type, and neither word is a Portland builtin, so nothing is shadowed. Help text corrected: Ctrl-C abandons the entry in progress and never leaves, so a reflexive Ctrl-C cannot lose a session.
