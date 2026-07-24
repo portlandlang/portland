@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Issue #29 opened — the `%` literal zoo (`%w %i %q %Q %r %s %x`): which members survive, and whether one delimiter is enough, decided from corpus evidence rather than taste. The trigger is a real bug: `%w[]` cannot contain a `]` because the seed lexer scans to the first one, so `compiler/parser.pdx` writes `["]", ")", "}", ","]` at six sites. Ruby offers escaping, balanced nesting, and alternative delimiters; Portland supports none. Also records that **regex is entirely undecided** — one passing aside in ADR 0002 is the only mention in the repo — which blocks `%r`.
+
 - Differential coverage for the whole 0016–0020 batch: three new hosted tests pin brace blocks and `it`, every heredoc form, and floats/ranges against the seed. These are the tests whose absence let the trio gap go unnoticed — the suite was green because it never exercised the new syntax.
 
 - Trio, brace blocks + `it` + heredocs (ADRs 0016, 0017, 0020): the batch is fully threaded. parser.pdx parses `{ ... }` block bodies and attaches them wherever `do ... end` attaches; `it` becomes the implicit parameter by scanning the block's own token range (the trio's parser is functional with no mutable state, so the seed's frame trick does not port — the seed stays the enforcement oracle for the collision rules, which cannot appear in a program it accepts). lexer.pdx expands squiggly heredocs ahead of its scan, dedenting and re-encoding as a literal, and all forms match the seed byte-for-byte: interpolating, `<<~'TEXT'`, attached method calls, indented terminators. **The payoff finally lands**: `sexp_list` is `nodes.map { it.sexp }.join(" ")` in parser.pdx, which parses itself.

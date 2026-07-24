@@ -41,6 +41,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Language surface (decide, then build)
 
+- [ ] #29 — the `%` literal zoo: which of `%w %i %q %Q %r %s %x` survive, and one delimiter or many; corpus-informed. `%w[]`'s can't-contain-`]` bug rides along
 - [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
 - [ ] Enums / sum types — in design; open: payloads (one feature or two?), where enums are declared, how their type is named from outside
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
