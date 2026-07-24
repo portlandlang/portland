@@ -1433,7 +1433,51 @@ def parse_command(tokens, mutable position)
   if keyword_at?(tokens, position, %w[do])
     return Step.new(node: error_node("blocks on paren-less calls aren't supported yet — write #{name}(...) do"), position: skip_line_at(tokens, position))
   end
+  # ADR 0016: a bare `{` here has two or three genuine readings. Name them
+  # all and let the author pick with a paren — never guess.
+  if operator_at?(tokens, position, %w[{])
+    message = brace_ambiguity_message(name, arguments.last, tokens, position)
+    return Step.new(node: error_node(message), position: skip_line_at(tokens, position))
+  end
   Step.new(node: call_node(name, arguments), position: position)
+end
+
+# The name of the inner call the braces might belong to.
+def inner_receiver_name(argument)
+  return argument.name if argument in CallNode
+  return argument.name if argument in IdentifierNode
+  "the last argument"
+end
+
+# Could the braces starting here be a hash literal? A `|` right after
+# opens block parameters, and a hash needs a `=>` at its own depth — so
+# this trims the menu without ever picking a winner (ADR 0016).
+def braces_could_be_a_hash?(tokens, position)
+  return false if operator_at?(tokens, position + 1, %w[|])
+  return true if operator_at?(tokens, position + 1, ["}"])
+  mutable depth = 0
+  mutable index = position
+  while index < tokens.length
+    token = tokens[index]
+    if token.operator? && token.text == "{"
+      depth += 1
+    elsif token.operator? && token.text == "}"
+      depth -= 1
+      return false if depth == 0
+    elsif token.operator? && token.text == "=>" && depth == 1
+      return true
+    end
+    index += 1
+  end
+  false
+end
+
+def brace_ambiguity_message(name, argument, tokens, position)
+  inner = inner_receiver_name(argument)
+  if braces_could_be_a_hash?(tokens, position)
+    return "`{` after a command call could be three things — parenthesize the one you mean:\n  a hash argument to #{inner}:  #{name} #{inner}({ ... })\n  a block for #{inner}:         #{name}(#{inner} { ... })\n  a block for #{name}:         #{name}(#{inner}) { ... }"
+  end
+  "`{` after a command call is a block — but whose? parenthesize the one you mean:\n  a block for #{inner}:  #{name}(#{inner} { ... })\n  a block for #{name}:  #{name}(#{inner}) { ... }"
 end
 
 # Ruby's postfix guards: `puts(x) if ready`, `return unless valid`.

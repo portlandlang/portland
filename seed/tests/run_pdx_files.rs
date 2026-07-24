@@ -474,6 +474,16 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "module names start with a capital letter",
         ),
         ("p([\"a\"].map { |w| it.upcase })\n", "use one or the other"),
+        // The brace menu, both widths — the peek that drops the hash
+        // reading has to agree too.
+        (
+            "def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { \"a\" => 1 }\n",
+            "could be three things",
+        ),
+        (
+            "def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { |item| item }\n",
+            "is a block — but whose?",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");

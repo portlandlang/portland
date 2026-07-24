@@ -179,19 +179,18 @@ join include? sum min max` plus `[index]` with negative indices; hashes:
   `mutable`, but the shortfall is not uniform. Three levels, worth keeping
   straight:
   - **Verbatim** — the three namespace errors (`S::mean(...)`, modules
-    inside structs, lowercase module names) and `it` mixed with declared
-    `|parameters|`. The trio reports the seed's exact wording; pinned by
-    a differential test.
-  - **Detects, different wording** — the never-guess brace error. The trio
-    refuses the program but with a generic parse message rather than the
-    three-way reading list.
+    inside structs, lowercase module names), `it` mixed with declared
+    `|parameters|`, and the never-guess brace menu (both widths, including
+    the peek that drops the hash reading). The trio reports the seed's
+    exact wording; pinned by a differential test.
   - **Silently accepts** — a nested `it`, and `it` colliding with a local
-    of that name. The trio runs programs the seed refuses. These need the
-    per-block frames the seed's parser has and the trio's functional one
-    does not; a flat token scan cannot tell an `it` of *this* block from
-    one belonging to a block inside it. The mixing rule above is checkable
-    only because the trio declines to guess when the body opens a block of
-    its own.
+    of that name. The trio runs programs the seed refuses. These are the
+    only two left, and they are the only ones that are *structurally*
+    hard: they need the per-block frames the seed's parser has and the
+    trio's functional one does not, since a flat token scan cannot tell an
+    `it` of *this* block from one belonging to a block inside it. The
+    mixing rule above is checkable only because the trio declines to guess
+    when the body opens a block of its own.
 - Symbols and enums — undecided; symbols' core question is settled but the
   enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
