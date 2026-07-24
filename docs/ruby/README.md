@@ -56,6 +56,8 @@ promises govern every difference here:
   `meanwhile` / `~`
 - [parentheses and ambiguity](parentheses.md) — command calls, the
   no-shadow rule, never-guess errors; brace blocks and `it`
+- [heredocs](heredocs.md) — squiggly `<<~` only, SCREAMING_CAPS
+  terminators; `<<` stays the append operator
 - [bitwise operators](bitwise-operators.md) — out of the grammar; named
   methods instead
 - [removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the

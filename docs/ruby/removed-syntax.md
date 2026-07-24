@@ -24,22 +24,14 @@ the one Ruby's own style guides already preferred.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was
   invented to replace (ADR 0017). `it` covers one parameter; names cover
   the rest. The polyfill autocorrects `_1 → it` for free.
-- **Plain and dash heredocs (`<<EOS`, `<<-EOS`)** — squiggly `<<~EOS` is
-  the only opener (ADR 0020). Beyond one-way-to-do-it, this is what keeps
-  `<<` unambiguously the append operator, since Ruby's own rule for
-  telling them apart depends on local-vs-method guessing. The rewrite to
-  `<<~` is an **unsafe autocorrect**: it strips common indentation, so it
-  changes the string's value whenever the content was indented.
-- **Lowercase heredoc terminators** — Ruby accepts any identifier
-  (`<<~sql`, `<<~_x`, even `<<~puts`); Portland requires SCREAMING_CAPS,
-  matching RuboCop's default `Naming/HeredocDelimiterCase`. A delimiter is
-  punctuation, not an identifier. Free-tier autocorrect — upcasing the
-  opener and closing line preserves the value exactly.
+- **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase
+  terminators** — squiggly `<<~SQL` is the only opener and terminators are
+  SCREAMING_CAPS; see [heredocs](heredocs.md).
 
 ## Kept, to be clear
 
 Postfix guards, `unless`, `?`/`!` suffixes, `%w[]`, string interpolation,
-heredocs (squiggly only — ADR 0020), blocks, pattern matching. Keyword
+heredocs ([squiggly only](heredocs.md)), blocks, pattern matching. Keyword
 arguments keep Ruby 3 semantics exactly — labels, defaults referencing
 earlier parameters, strict positional/keyword separation, and no Ruby 2
 hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)).

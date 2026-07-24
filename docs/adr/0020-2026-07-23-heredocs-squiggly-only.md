@@ -124,3 +124,4 @@ glance. Corpus evidence may revisit this; it is a prior, not a closed book.
   and RuboCop already flags them.
 - Issue #6's "all flavors" checkbox is superseded — only the squiggly
   flavor needs porting, which removes a chunk of the months-of-tedium list.
+- Ledger: `docs/ruby/heredocs.md`.
