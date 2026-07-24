@@ -97,6 +97,9 @@ fn floored_modulo(left: i64, right: i64) -> i64 {
 #[derive(Clone)]
 struct Method {
     body: Vec<Statement>,
+    /// The namespace this method was written in (ADR 0021). Bare names in
+    /// its body resolve outward from here.
+    home: Vec<String>,
     keyword_parameters: Vec<Parameter>,
     parameters: Vec<Parameter>,
 }
@@ -122,6 +125,8 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     expression_depth: usize,
     loaded: std::collections::HashSet<std::path::PathBuf>,
     methods: HashMap<String, std::rc::Rc<Method>>,
+    /// The namespace currently being defined or executed (ADR 0021).
+    module_path: Vec<String>,
     output: W,
     pending: Option<Pending>,
     /// The receiver while a struct method runs: `(struct name, instance)`.
@@ -158,6 +163,7 @@ impl<W: std::io::Write> Interpreter<W> {
             loaded: std::collections::HashSet::new(),
             expression_depth: 0,
             methods: HashMap::new(),
+            module_path: Vec::new(),
             output,
             pending: None,
             self_receiver: None,
@@ -174,6 +180,77 @@ impl<W: std::io::Write> Interpreter<W> {
 
     pub fn set_arguments(&mut self, arguments: Vec<String>) {
         self.arguments = arguments;
+    }
+
+    /// A bare name qualified by the namespace being defined (ADR 0021).
+    fn qualified(&self, name: &str) -> String {
+        if self.module_path.is_empty() {
+            return name.to_string();
+        }
+        format!("{}::{name}", self.module_path.join("::"))
+    }
+
+    /// Resolve a name outward from a namespace: innermost first, then each
+    /// enclosing level, then the top (ADR 0021). Lexical scope always
+    /// includes every enclosing level, however the namespace was declared —
+    /// which is what makes `module A::B` and nested blocks identical.
+    fn resolve<'a, T>(
+        home: &[String],
+        name: &str,
+        table: &'a HashMap<String, T>,
+    ) -> Option<(String, &'a T)> {
+        for depth in (0..=home.len()).rev() {
+            let candidate = if depth == 0 {
+                name.to_string()
+            } else {
+                format!("{}::{name}", home[..depth].join("::"))
+            };
+            if let Some(found) = table.get(&candidate) {
+                return Some((candidate, found));
+            }
+        }
+        None
+    }
+
+    /// A method reachable from where we stand — own namespace first, then
+    /// outward, then the top level (ADR 0021).
+    fn lookup_method(&self, name: &str) -> Option<std::rc::Rc<Method>> {
+        Self::resolve(&self.module_path, name, &self.methods).map(|(_, found)| found.clone())
+    }
+
+    /// Is this name (or path) a namespace rather than a value? Used to tell
+    /// `Statistics.mean(x)` from `receiver.method(x)`.
+    fn is_namespace(&self, path: &str) -> bool {
+        let prefix = format!("{path}::");
+        self.methods.keys().any(|name| name.starts_with(&prefix))
+            || self.structs.keys().any(|name| name.starts_with(&prefix))
+            || self.variables.keys().any(|name| name.starts_with(&prefix))
+    }
+
+    /// The namespace a receiver expression names, if it names one. A local
+    /// of the same name wins — values beat namespaces.
+    fn namespace_receiver(&self, receiver: &Expression) -> Option<String> {
+        let written = match receiver {
+            Expression::Variable(name) => {
+                if self.variables.contains_key(name) {
+                    return None;
+                }
+                name.clone()
+            }
+            Expression::Path(path) => path.join("::"),
+            _ => return None,
+        };
+        for depth in (0..=self.module_path.len()).rev() {
+            let candidate = if depth == 0 {
+                written.clone()
+            } else {
+                format!("{}::{written}", self.module_path[..depth].join("::"))
+            };
+            if self.is_namespace(&candidate) {
+                return Some(candidate);
+            }
+        }
+        None
     }
 
     /// Bind `_` to the last value the REPL printed. Mutable, so re-binding
@@ -228,7 +305,21 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     panic!("assignment to {name} produced no value");
                 };
-                self.assign(name, value.clone(), *mutable);
+                // A binding written directly in a module body is a constant
+                // of that namespace (ADR 0021): `Foo::LIMIT`. Inside a
+                // method the module path is the method's home, but locals
+                // there are ordinary — only top-of-body bindings qualify.
+                if self.module_path.is_empty() || self.call_depth > 0 {
+                    self.assign(name, value.clone(), *mutable);
+                } else {
+                    self.variables.insert(
+                        self.qualified(name),
+                        Binding {
+                            mutable: *mutable,
+                            value: value.clone(),
+                        },
+                    );
+                }
                 Some(value)
             }
             Statement::Expression(expression) => self.expression(expression),
@@ -243,10 +334,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 let method = Method {
                     body: body.clone(),
+                    home: self.module_path.clone(),
                     keyword_parameters: keyword_parameters.clone(),
                     parameters: parameters.clone(),
                 };
-                self.methods.insert(name.clone(), std::rc::Rc::new(method));
+                self.methods
+                    .insert(self.qualified(name), std::rc::Rc::new(method));
                 None
             }
             Statement::Break => {
@@ -262,10 +355,21 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.pending = Some(Pending::Return(value));
                 None
             }
+            // Namespaces are flattened at definition time into qualified
+            // names (ADR 0021): `module Foo` holding `struct Bar` registers
+            // `Foo::Bar`. Both declaration spellings land here identically.
+            Statement::ModuleDefinition { body, path } => {
+                let depth = self.module_path.len();
+                self.module_path.extend(path.iter().cloned());
+                self.run_body(body);
+                self.module_path.truncate(depth);
+                None
+            }
             Statement::StructDefinition {
                 fields,
                 methods,
                 name,
+                nested,
             } => {
                 let mut method_table = HashMap::new();
                 for method in methods {
@@ -282,18 +386,25 @@ impl<W: std::io::Write> Interpreter<W> {
                         method_name.clone(),
                         std::rc::Rc::new(Method {
                             body: body.clone(),
+                            home: self.module_path.clone(),
                             keyword_parameters: keyword_parameters.clone(),
                             parameters: parameters.clone(),
                         }),
                     );
                 }
                 self.structs.insert(
-                    name.clone(),
+                    self.qualified(name),
                     StructInfo {
                         fields: fields.clone(),
                         methods: method_table,
                     },
                 );
+                // A type nested in a type lives under it: `Outer::Inner`.
+                if !nested.is_empty() {
+                    self.module_path.push(name.clone());
+                    self.run_body(nested);
+                    self.module_path.pop();
+                }
                 None
             }
             Statement::While { body, condition } => {
@@ -350,6 +461,19 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Float(value) => Some(Value::Float(*value)),
+            // `Foo::BAR` names a constant; `Foo::Bar` names a type and is
+            // only meaningful as a receiver, which is handled before we get
+            // here (ADR 0021).
+            Expression::Path(path) => {
+                let joined = path.join("::");
+                if let Some(binding) = self.variables.get(&joined) {
+                    return Some(binding.value.clone());
+                }
+                if self.structs.contains_key(&joined) {
+                    panic!("{joined} is a type, not a value");
+                }
+                panic!("undefined name {joined}");
+            }
             Expression::Range {
                 end,
                 exclusive,
@@ -719,6 +843,24 @@ impl<W: std::io::Write> Interpreter<W> {
                 if name == "new" {
                     return Some(self.construct_struct(receiver, arguments, keyword_arguments));
                 }
+                // `Statistics.mean(x)` — the receiver names a namespace, so
+                // this invokes a function inside it rather than dispatching
+                // on a value (ADR 0021).
+                if let Some(namespace) = self.namespace_receiver(receiver) {
+                    let qualified = format!("{namespace}::{name}");
+                    if self.methods.contains_key(&qualified) {
+                        let arguments: Vec<Value> = arguments
+                            .iter()
+                            .map(|argument| self.value_of(argument))
+                            .collect();
+                        let keyword_arguments: Vec<(String, Value)> = keyword_arguments
+                            .iter()
+                            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                            .collect();
+                        return self.call(&qualified, arguments, keyword_arguments);
+                    }
+                    panic!("{namespace} has no {name}");
+                }
                 let receiver = self.value_of(receiver);
                 // `&.`: an absent receiver short-circuits — arguments never run.
                 if *safe && matches!(receiver, Value::Nil) {
@@ -778,11 +920,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 // zero-argument call — unambiguous because shadowing is an error.
                 if let Some(binding) = self.variables.get(name) {
                     Some(binding.value.clone())
+                } else if let Some((_, binding)) =
+                    Self::resolve(&self.module_path, name, &self.variables)
+                {
+                    // A constant of an enclosing namespace (ADR 0021).
+                    Some(binding.value.clone())
                 } else if let Some(method) = self.own_struct_method(name) {
                     // Bare own-method calls inside a struct method (#27).
                     let (struct_name, receiver) = self.self_receiver.clone().unwrap();
                     self.call_struct_method(struct_name, receiver, method, Vec::new(), Vec::new())
-                } else if self.methods.contains_key(name) || Self::builtin_name(name) {
+                } else if self.lookup_method(name).is_some() || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
                 } else {
                     panic!("undefined variable or method {name}")
@@ -814,15 +961,18 @@ impl<W: std::io::Write> Interpreter<W> {
         arguments: &[Expression],
         keyword_arguments: &[(String, Expression)],
     ) -> Value {
-        let Expression::Variable(struct_name) = receiver else {
-            panic!("new needs a struct name receiver, got {receiver:?}")
+        // A struct name is either bare (resolved outward from where we
+        // stand) or a `::` path (already absolute) — ADR 0021.
+        let written = match receiver {
+            Expression::Variable(name) => name.clone(),
+            Expression::Path(path) => path.join("::"),
+            other => panic!("new needs a struct name receiver, got {other:?}"),
         };
-        let fields = self
-            .structs
-            .get(struct_name)
-            .unwrap_or_else(|| panic!("undefined struct {struct_name}"))
-            .fields
-            .clone();
+        let (struct_name, info) = Self::resolve(&self.module_path, &written, &self.structs)
+            .map(|(found, info)| (found, info.clone()))
+            .unwrap_or_else(|| panic!("undefined struct {written}"));
+        let struct_name = &struct_name;
+        let fields = info.fields.clone();
         if !arguments.is_empty() {
             panic!("{struct_name}.new takes keyword arguments, not positional ones");
         }
@@ -1338,7 +1488,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// binding or rebinds an existing mutable one.
     fn assign(&mut self, name: &str, value: Value, declare_mutable: bool) {
         // The no-shadow rule: a name is a local or a method, never both.
-        if self.methods.contains_key(name) || Self::builtin_name(name) {
+        if self.lookup_method(name).is_some() || Self::builtin_name(name) {
             panic!("local {name} shadows method {name} — rename one");
         }
         if declare_mutable {
@@ -1567,7 +1717,14 @@ impl<W: std::io::Write> Interpreter<W> {
         if self.call_depth > MAXIMUM_CALL_DEPTH {
             panic!("call stack deeper than {MAXIMUM_CALL_DEPTH} frames (infinite recursion?)");
         }
-        let mut scope: HashMap<String, Binding> = HashMap::new();
+        // Namespace constants (qualified names) survive into a fresh
+        // scope; bare locals do not (ADR 0021).
+        let mut scope: HashMap<String, Binding> = self
+            .variables
+            .iter()
+            .filter(|(name, _)| name.contains("::"))
+            .map(|(name, binding)| (name.clone(), binding.clone()))
+            .collect();
         std::mem::swap(&mut self.variables, &mut scope);
         let field_names: Vec<String> = if let Value::Struct { fields, .. } = &receiver {
             for (field, value) in fields {
@@ -1639,7 +1796,9 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("{struct_name} method got unknown keyword argument {label}");
         }
         let previous_self = self.self_receiver.replace((struct_name, receiver));
+        let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
         let mut result = self.run_body(&method.body);
+        self.module_path = caller_module;
         self.call_depth -= 1;
         self.self_receiver = previous_self;
         std::mem::swap(&mut self.variables, &mut scope);
@@ -1669,10 +1828,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 keyword_arguments,
             );
         }
-        if !self.methods.contains_key(name) && !keyword_arguments.is_empty() {
+        if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() {
             panic!("{name} takes no keyword arguments");
         }
-        if !self.methods.contains_key(name) && name == "puts" {
+        if self.lookup_method(name).is_none() && name == "puts" {
             // Like Ruby: bare puts() prints a blank line.
             if arguments.is_empty() {
                 writeln!(self.output).expect("failed to write output");
@@ -1688,21 +1847,21 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             return None;
         }
-        if !self.methods.contains_key(name) && name == "some" {
+        if self.lookup_method(name).is_none() && name == "some" {
             let mut arguments = arguments;
             match arguments.len() {
                 1 => return Some(Value::present(arguments.remove(0))),
                 other => panic!("some takes one argument, got {other}"),
             }
         }
-        if !self.methods.contains_key(name) && name == "panic" {
+        if self.lookup_method(name).is_none() && name == "panic" {
             // The only crash is one you typed (ADR 0010).
             match arguments.as_slice() {
                 [Value::String(message)] => panic!("{message}"),
                 _ => panic!("panic needs one string message"),
             }
         }
-        if !self.methods.contains_key(name) && name == "p" {
+        if self.lookup_method(name).is_none() && name == "p" {
             for argument in &arguments {
                 let inspected = argument.inspect();
                 writeln!(self.output, "{inspected}").expect("failed to write output");
@@ -1718,7 +1877,7 @@ impl<W: std::io::Write> Interpreter<W> {
 
         // Crude IO builtins so real programs are possible before the object
         // model exists; names and shapes are placeholders, not decisions.
-        if !self.methods.contains_key(name) {
+        if self.lookup_method(name).is_none() {
             match (name, arguments.as_slice()) {
                 ("argv", []) => {
                     let arguments = self
@@ -1746,10 +1905,8 @@ impl<W: std::io::Write> Interpreter<W> {
         }
 
         let method = self
-            .methods
-            .get(name)
-            .unwrap_or_else(|| panic!("undefined method {name}"))
-            .clone();
+            .lookup_method(name)
+            .unwrap_or_else(|| panic!("undefined method {name}"));
         let required = method
             .parameters
             .iter()
@@ -1763,7 +1920,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 format!("{required} to {total}")
             };
             panic!(
-                "{name} expects {expected} argument(word), got {}",
+                "{name} expects {expected} argument(s), got {}",
                 arguments.len()
             );
         }
@@ -1774,7 +1931,14 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // Methods get a fresh scope: parameters only, no outer locals.
         // Bind left to right so a default can reference earlier parameters.
-        let mut scope: HashMap<String, Binding> = HashMap::new();
+        // Namespace constants (qualified names) survive into a fresh
+        // scope; bare locals do not (ADR 0021).
+        let mut scope: HashMap<String, Binding> = self
+            .variables
+            .iter()
+            .filter(|(name, _)| name.contains("::"))
+            .map(|(name, binding)| (name.clone(), binding.clone()))
+            .collect();
         std::mem::swap(&mut self.variables, &mut scope);
         let mut supplied = arguments.into_iter();
         for parameter in &method.parameters {
@@ -1833,7 +1997,10 @@ impl<W: std::io::Write> Interpreter<W> {
         // A top-level method body has no receiver, even when called from
         // inside a struct method.
         let previous_self = self.self_receiver.take();
+        // Bare names resolve from where the method was written (ADR 0021).
+        let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
         let mut result = self.run_body(&method.body);
+        self.module_path = caller_module;
         self.call_depth -= 1;
         self.self_receiver = previous_self;
         std::mem::swap(&mut self.variables, &mut scope);
@@ -3043,6 +3210,56 @@ mod tests {
         assert_eq!(evaluate("7 / 2"), Some(Value::Integer(3)));
     }
 
+    /// ADR 0021: `module` namespaces; `::` names, `.` invokes.
+    #[test]
+    fn modules_namespace_their_contents() {
+        let source = "module Statistics\n  LIMIT = 10\n\n  struct Summary\n    mean\n  end\n\n  def mean(values)\n    values.sum / values.length\n  end\nend\nStatistics.mean([1, 2, 3]) + Statistics::LIMIT + Statistics::Summary.new(mean: 5).mean\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(17)));
+    }
+
+    /// The two declaration spellings are identical — including lexical
+    /// visibility of enclosing names, which is where Ruby differs.
+    #[test]
+    fn both_module_forms_mean_the_same_thing() {
+        let nested = "module Outer\n  LIMIT = 4\n  module Inner\n    def reach\n      LIMIT\n    end\n  end\nend\nOuter::Inner.reach\n";
+        let path = "module Outer\n  LIMIT = 4\nend\nmodule Outer::Inner\n  def reach\n    LIMIT\n  end\nend\nOuter::Inner.reach\n";
+        assert_eq!(evaluate(nested), Some(Value::Integer(4)));
+        // Ruby raises NameError for the path form here; Portland does not.
+        assert_eq!(evaluate(path), Some(Value::Integer(4)));
+    }
+
+    /// Bare names resolve outward from where a method was *written*.
+    #[test]
+    fn names_resolve_outward_from_their_home() {
+        let source = "module Shapes\n  struct Circle\n    radius\n  end\n\n  def unit\n    Circle.new(radius: 1)\n  end\nend\nShapes.unit.radius\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(1)));
+    }
+
+    /// ADR 0021 §5: a type nests in a type.
+    #[test]
+    fn types_nest_in_types() {
+        let source = "struct Invoice\n  total\n\n  struct Line\n    amount\n  end\nend\nInvoice::Line.new(amount: 9).amount\n";
+        assert_eq!(evaluate(source), Some(Value::Integer(9)));
+    }
+
+    #[test]
+    #[should_panic(expected = "`::` names, `.` invokes")]
+    fn panics_when_a_path_is_used_to_invoke() {
+        evaluate("module S\n  def mean(v)\n    1\n  end\nend\nS::mean([1])\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "modules don't nest inside structs")]
+    fn panics_on_a_module_inside_a_struct() {
+        evaluate("struct Foo\n  bar\n  module Helpers\n  end\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "module names start with a capital letter")]
+    fn panics_on_a_lowercase_module_name() {
+        evaluate("module stats\nend\n");
+    }
+
     /// ADR 0019: `..` inclusive, `...` exclusive, either end optional.
     #[test]
     fn evaluates_range_literals() {
@@ -3411,7 +3628,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "expects 1 to 2 argument(word)")]
+    #[should_panic(expected = "expects 1 to 2 argument(s)")]
     fn panics_when_over_the_optional_arity() {
         evaluate("def f(required, extra = 1)\n  required\nend\nf(1, 2, 3)\n");
     }

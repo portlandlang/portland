@@ -29,12 +29,22 @@ pub enum Statement {
     Return {
         value: Option<Expression>,
     },
+    /// `module Foo ... end` or `module Foo::Bar ... end` (ADR 0021).
+    /// Both spellings produce the same path, so they mean the same thing —
+    /// Ruby's `Module.nesting` asymmetry is deliberately not reproduced.
+    ModuleDefinition {
+        body: Vec<Statement>,
+        path: Vec<String>,
+    },
     StructDefinition {
         fields: Vec<String>,
         /// Methods defined in the struct body (each a `MethodDefinition`
         /// statement), dispatched on instances (#27).
         methods: Vec<Statement>,
         name: String,
+        /// Types declared inside this one (ADR 0021 §5) — reached as
+        /// `Outer::Inner`. Modules may not nest here.
+        nested: Vec<Statement>,
     },
     While {
         body: Vec<Statement>,
@@ -240,6 +250,9 @@ pub enum Expression {
     /// no methods and is not falsy; the seed panics where the real compiler
     /// will reject at compile time.
     Nil,
+    /// `Foo::Bar` — reaching a name inside a namespace (ADR 0021). Naming
+    /// only; invoking is a `.` and `Foo::bar()` is a never-guess error.
+    Path(Vec<String>),
     /// `self` — the receiver, inside a struct method; its whole job is the
     /// pass-myself-along case.
     SelfValue,

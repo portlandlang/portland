@@ -167,6 +167,9 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("def") {
             return self.method_definition();
         }
+        if self.peek_is_keyword("module") {
+            return self.module_definition();
+        }
         if self.peek_is_keyword("struct") {
             return self.struct_definition();
         }
@@ -465,9 +468,21 @@ impl<'source> Parser<'source> {
         self.skip_newlines();
         let mut fields: Vec<String> = Vec::new();
         let mut methods: Vec<Statement> = Vec::new();
+        let mut nested: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
             if self.position >= self.tokens.len() {
                 panic!("expected end to close struct {name}");
+            }
+            // A type may nest in a type; a module may not (ADR 0021 §5).
+            if self.peek_is_keyword("module") {
+                panic!(
+                    "modules don't nest inside structs — a module groups things, a struct is a thing"
+                );
+            }
+            if self.peek_is_keyword("struct") {
+                nested.push(self.struct_definition());
+                self.skip_newlines();
+                continue;
             }
             // Fields first, then methods (#27).
             if self.peek_is_keyword("def") {
@@ -517,6 +532,41 @@ impl<'source> Parser<'source> {
             fields,
             methods,
             name,
+            nested,
+        }
+    }
+
+    /// `module Foo ... end` and `module Foo::Bar ... end` (ADR 0021). Both
+    /// spellings build the same path, so they mean the same thing.
+    fn module_definition(&mut self) -> Statement {
+        self.position += 1; // the `module`
+        let path = self.namespace_path("module");
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let body = self.body_until(&["end"], "module");
+        self.position += 1; // the `end`
+        Statement::ModuleDefinition { body, path }
+    }
+
+    /// A `::`-separated run of capitalized names.
+    fn namespace_path(&mut self, context: &str) -> Vec<String> {
+        let mut path = Vec::new();
+        loop {
+            let token = self.advance();
+            if token.kind != TokenKind::Identifier {
+                panic!("expected a name after {context}, got {token:?}");
+            }
+            if !token.text.chars().next().unwrap().is_ascii_uppercase() {
+                panic!(
+                    "{context} names start with a capital letter, got {}",
+                    token.text
+                );
+            }
+            path.push(token.text.to_string());
+            if self.peek_kind() != Some(TokenKind::ColonColon) {
+                return path;
+            }
+            self.position += 1; // the `::`
         }
     }
 
@@ -1460,6 +1510,30 @@ impl<'source> Parser<'source> {
             TokenKind::Float => {
                 let value = token.text.parse().expect("float literal out of range");
                 Expression::Float(value)
+            }
+            // `Foo::Bar` — naming a name inside a namespace (ADR 0021).
+            TokenKind::Identifier if self.peek_kind() == Some(TokenKind::ColonColon) => {
+                if !token.text.chars().next().unwrap().is_ascii_uppercase() {
+                    panic!("only namespaces have `::` names, got {}", token.text);
+                }
+                let mut path = vec![token.text.to_string()];
+                while self.peek_kind() == Some(TokenKind::ColonColon) {
+                    self.position += 1; // the `::`
+                    let part = self.advance();
+                    if part.kind != TokenKind::Identifier {
+                        panic!("expected a name after ::, got {part:?}");
+                    }
+                    // `::` names, `.` invokes — the rule, not a convention.
+                    if self.peek_kind() == Some(TokenKind::LeftParen) {
+                        panic!(
+                            "`::` names, `.` invokes — write {}.{}(...) to call it",
+                            path.join("::"),
+                            part.text
+                        );
+                    }
+                    path.push(part.text.to_string());
+                }
+                Expression::Path(path)
             }
             TokenKind::Identifier => {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {

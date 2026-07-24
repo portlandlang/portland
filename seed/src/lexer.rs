@@ -10,6 +10,8 @@ pub enum TokenKind {
     Bang,
     Caret,
     Colon,
+    /// `::` — reaches a name inside a namespace (ADR 0021).
+    ColonColon,
     Comma,
     Dot,
     /// `..` inclusive and `...` exclusive (ADR 0019).
@@ -53,7 +55,7 @@ pub enum TokenKind {
 
 /// The Stage 0 keyword set — grows as the subset does.
 #[rustfmt::skip]
-const KEYWORDS: [&str; 24] = [
+const KEYWORDS: [&str; 25] = [
     "and",
     "break",
     "case",
@@ -65,6 +67,7 @@ const KEYWORDS: [&str; 24] = [
     "false",
     "if",
     "in",
+    "module",
     "mutable",
     "next",
     "nil",
@@ -144,6 +147,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         TokenKind::DotDot
                     },
                     text: &source[start..start + length],
+                });
+            }
+            // `::` before the single `:` (ADR 0021).
+            ':' if source[start..].starts_with("::") => {
+                chars.next();
+                chars.next();
+                tokens.push(Token {
+                    leading_space: false,
+                    kind: TokenKind::ColonColon,
+                    text: &source[start..start + 2],
                 });
             }
             '(' | ')' | '{' | '}' | '[' | ']' | ',' | '.' | ':' => {
