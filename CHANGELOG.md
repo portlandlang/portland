@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- docs/architecture.svg — a layered diagram of the three architecture states: NOW (fat Rust seed, the trio interpreted on top of it), NEXT (seed retired, Portland compiler → LLVM → native, thin Rust floor), and IDEAL FUTURE (inference, heterogeneous dispatch across P/E-cores · SME · Metal GPU, FFI + Apple-framework bridges — Rust floor stays thin and shrinking). Linked from AGENT.md.
+
 - REPL: bare `quit` and `exit` leave, alongside `:quit`, `:exit`, `quit()`, `exit()`, and Ctrl-D — those are what hands actually type, and neither word is a Portland builtin, so nothing is shadowed. Help text corrected: Ctrl-C abandons the entry in progress and never leaves, so a reflexive Ctrl-C cannot lose a session.
 
 - REPL: line editing, history, and Ctrl-C, via rustyline 18 — the seed's first dependency, taken knowingly because the REPL is where the language gets played with and the seed is disposable anyway. Arrow-key history persists to `~/.pdx_history` between sessions; Ctrl-C abandons the entry in progress instead of killing the process; left/right arrows edit rather than emitting escape sequences. Piped stdin keeps the plain line-reading path untouched, so scripts, `echo | pdx`, and every REPL test work exactly as before.

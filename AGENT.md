@@ -120,7 +120,9 @@ Three tiers; you live almost entirely in tier 1.
 - **Self-host as early as possible** (Rubinius creed). Stage 0 seed
   (built, disposable on purpose) → Stage 1 rewrite in Portland (the trio
   is its beginning) → Stage 2 fixpoint, **seed retires** → Stage 3 the
-  primitive boundary descends.
+  primitive boundary descends. The three states are drawn in
+  [docs/architecture.svg](docs/architecture.svg) — now, next, and the
+  ideal future (Rust stays as a thin floor; the seed goes).
 - **Greenfield, NOT an alt-implementation.** No incumbent to displace —
   dodges the social trap that sank Rubinius. The cost is cold-start
   adoption, solved with joy + the killer niche. The migration story

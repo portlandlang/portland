@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1210 760" font-family="-apple-system, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1210" height="760" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="40" y="44" font-size="26" font-weight="700" fill="#1f2937">Portland — three architectures</text>
+  <text x="40" y="68" font-size="14" fill="#6b7280">now → next → ideal future.  The seed goes; Rust stays as a thin floor.</text>
+
+  <!-- legend -->
+  <g font-size="11" fill="#374151">
+    <rect x="40"  y="88" width="14" height="14" rx="3" fill="#1c6f46"/><text x="60"  y="99">Portland (.pdx)</text>
+    <rect x="210" y="88" width="14" height="14" rx="3" fill="#b5532c"/><text x="230" y="99">Rust</text>
+    <rect x="320" y="88" width="14" height="14" rx="3" fill="#3b5ba9"/><text x="340" y="99">LLVM</text>
+    <rect x="430" y="88" width="14" height="14" rx="3" fill="#e6c15c"/><text x="450" y="99">Dispatch</text>
+    <rect x="560" y="88" width="14" height="14" rx="3" fill="#566072"/><text x="580" y="99">Apple frameworks / OS</text>
+    <rect x="790" y="88" width="14" height="14" rx="3" fill="#263243"/><text x="810" y="99">Silicon</text>
+    <rect x="910" y="88" width="14" height="14" rx="3" fill="#eef2f7" stroke="#cbd5e1"/><text x="930" y="99">your program</text>
+  </g>
+
+  <!-- column headers -->
+  <g text-anchor="middle">
+    <text x="215" y="150" font-size="18" font-weight="700" fill="#111827">NOW</text>
+    <text x="215" y="168" font-size="11" fill="#6b7280">Stage 1 · today</text>
+    <text x="605" y="150" font-size="18" font-weight="700" fill="#111827">NEXT</text>
+    <text x="605" y="168" font-size="11" fill="#6b7280">Stage 2 · seed retired</text>
+    <text x="995" y="150" font-size="18" font-weight="700" fill="#111827">IDEAL FUTURE</text>
+    <text x="995" y="168" font-size="11" fill="#6b7280">Rust floor stays</text>
+  </g>
+
+  <!-- transition labels, vertical in the gaps -->
+  <g fill="#94a3b8" font-size="12" font-weight="600" text-anchor="middle">
+    <text transform="translate(410,430) rotate(-90)">self-host  ·  retire seed  →</text>
+    <text transform="translate(800,440) rotate(-90)">+ inference · GPU · Apple bridges  →</text>
+  </g>
+
+  <!-- ============ COLUMN 1: NOW ============ -->
+  <g text-anchor="middle">
+    <!-- your .pdx -->
+    <rect x="54" y="190" width="322" height="60" rx="9" fill="#eef2f7" stroke="#cbd5e1"/>
+    <text x="215" y="215" font-size="14" font-weight="700" fill="#1f2937">your .pdx file</text>
+    <text x="215" y="233" font-size="10.5" fill="#4b5563">run directly — or via the trio</text>
+    <!-- trio -->
+    <rect x="54" y="262" width="322" height="60" rx="9" fill="#1c6f46"/>
+    <text x="215" y="284" font-size="14" font-weight="700" fill="#ffffff">The Trio — in Portland</text>
+    <text x="215" y="299" font-size="10.5" fill="#cdeadd">lexer.pdx · parser.pdx · evaluator.pdx</text>
+    <text x="215" y="313" font-size="10.5" fill="#cdeadd">a Portland interpreter (self-host proof)</text>
+    <!-- rust seed -->
+    <rect x="54" y="334" width="322" height="60" rx="9" fill="#b5532c"/>
+    <text x="215" y="356" font-size="14" font-weight="700" fill="#ffffff">Rust seed — fat</text>
+    <text x="215" y="371" font-size="10.5" fill="#f4d9cc">lexer · parser · tree-walking interpreter</text>
+    <text x="215" y="385" font-size="10.5" fill="#f4d9cc">runs everything · the differential oracle</text>
+    <!-- libsystem -->
+    <rect x="54" y="406" width="322" height="60" rx="9" fill="#566072"/>
+    <text x="215" y="441" font-size="14" font-weight="700" fill="#ffffff">Rust std  +  macOS libSystem</text>
+    <!-- silicon -->
+    <rect x="54" y="478" width="322" height="60" rx="9" fill="#263243"/>
+    <text x="215" y="500" font-size="14" font-weight="700" fill="#ffffff">Apple silicon — CPU</text>
+    <text x="215" y="518" font-size="10.5" fill="#b6c2d4">no LLVM · no native code · no GPU</text>
+    <!-- caption -->
+    <text x="215" y="562" font-size="11" fill="#6b7280">Everything interpreted.</text>
+    <text x="215" y="577" font-size="11" fill="#6b7280">A tree-walker on a tree-walker.</text>
+  </g>
+
+  <!-- ============ COLUMN 2: NEXT ============ -->
+  <g text-anchor="middle">
+    <rect x="444" y="190" width="322" height="60" rx="9" fill="#eef2f7" stroke="#cbd5e1"/>
+    <text x="605" y="215" font-size="14" font-weight="700" fill="#1f2937">your .pdx file</text>
+    <text x="605" y="233" font-size="10.5" fill="#4b5563">same source</text>
+
+    <rect x="444" y="262" width="322" height="60" rx="9" fill="#1c6f46"/>
+    <text x="605" y="284" font-size="14" font-weight="700" fill="#ffffff">Portland compiler — in Portland</text>
+    <text x="605" y="299" font-size="10.5" fill="#cdeadd">lexer · parser · codegen.pdx</text>
+    <text x="605" y="313" font-size="10.5" fill="#cdeadd">emits LLVM IR (text)</text>
+
+    <rect x="444" y="334" width="322" height="60" rx="9" fill="#3b5ba9"/>
+    <text x="605" y="369" font-size="14" font-weight="700" fill="#ffffff">LLVM   —   llc · lld → native code</text>
+
+    <rect x="444" y="406" width="322" height="60" rx="9" fill="#b5532c"/>
+    <text x="605" y="428" font-size="14" font-weight="700" fill="#ffffff">Thin Rust floor</text>
+    <text x="605" y="446" font-size="10.5" fill="#f4d9cc">allocator · RC · IO · panic</text>
+
+    <rect x="444" y="478" width="322" height="60" rx="9" fill="#566072"/>
+    <text x="605" y="513" font-size="14" font-weight="700" fill="#ffffff">macOS libSystem</text>
+
+    <rect x="444" y="550" width="322" height="60" rx="9" fill="#263243"/>
+    <text x="605" y="572" font-size="14" font-weight="700" fill="#ffffff">Apple silicon — CPU</text>
+    <text x="605" y="590" font-size="10.5" fill="#b6c2d4">self-hosting native · boxed · CPU-only</text>
+
+    <text x="605" y="634" font-size="11" fill="#6b7280">Self-hosting &amp; native. The seed bootstraps</text>
+    <text x="605" y="649" font-size="11" fill="#6b7280">it once, then is deleted. Crude/boxed.</text>
+  </g>
+
+  <!-- ============ COLUMN 3: IDEAL FUTURE ============ -->
+  <g text-anchor="middle">
+    <rect x="834" y="190" width="322" height="60" rx="9" fill="#eef2f7" stroke="#cbd5e1"/>
+    <text x="995" y="212" font-size="13.5" font-weight="700" fill="#1f2937">your .pdx</text>
+    <text x="995" y="230" font-size="10.5" fill="#4b5563">+ import CoreImage · Metal · Accelerate (opt-in)</text>
+
+    <rect x="834" y="262" width="322" height="60" rx="9" fill="#1c6f46"/>
+    <text x="995" y="284" font-size="14" font-weight="700" fill="#ffffff">Portland compiler</text>
+    <text x="995" y="302" font-size="10.5" fill="#cdeadd">lexer · parser · inference · typed IR · codegen</text>
+
+    <rect x="834" y="334" width="322" height="60" rx="9" fill="#3b5ba9"/>
+    <text x="995" y="356" font-size="14" font-weight="700" fill="#ffffff">LLVM → optimized native</text>
+    <text x="995" y="374" font-size="10.5" fill="#d6e0f5">unboxed · monomorphized</text>
+
+    <rect x="834" y="406" width="322" height="60" rx="9" fill="#e6c15c"/>
+    <text x="995" y="428" font-size="14" font-weight="700" fill="#3a2f08">Heterogeneous dispatch</text>
+    <text x="995" y="446" font-size="10.5" fill="#4a3c10">P-cores · E-cores · SME · Metal GPU</text>
+
+    <rect x="834" y="478" width="322" height="60" rx="9" fill="#b5532c"/>
+    <text x="995" y="500" font-size="14" font-weight="700" fill="#ffffff">Thin Rust floor (stays)</text>
+    <text x="995" y="518" font-size="10.5" fill="#f4d9cc">alloc · RC · IO · FFI + Apple bridges · Metal bridge</text>
+
+    <rect x="834" y="550" width="322" height="60" rx="9" fill="#566072"/>
+    <text x="995" y="585" font-size="12.5" font-weight="700" fill="#ffffff">macOS libSystem · Metal · Core* frameworks</text>
+
+    <rect x="834" y="622" width="322" height="60" rx="9" fill="#263243"/>
+    <text x="995" y="644" font-size="14" font-weight="700" fill="#ffffff">Apple silicon</text>
+    <text x="995" y="662" font-size="10.5" fill="#b6c2d4">CPU · GPU · SME · unified memory · MTE/MIE</text>
+
+    <text x="995" y="706" font-size="11" fill="#6b7280">Rust floor stays — thin &amp; shrinking.</text>
+    <text x="995" y="721" font-size="11" fill="#6b7280">MTE/MIE backstops the FFI &amp; unsafe seams.</text>
+  </g>
+</svg>
