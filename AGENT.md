@@ -56,7 +56,7 @@ readable without reading its comments.
 |---|---|
 | `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then `check_docs` |
 | `script/console` | the REPL; `script/console file.pdx` runs a file |
-| `script/check_docs` | the mechanical half of doc discipline, on its own |
+| `script/check_docs` | the doc checks in `script/doc_checks/`; name one to run it alone |
 | `script/bootstrap` | first-time setup, installs the git hooks |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`.

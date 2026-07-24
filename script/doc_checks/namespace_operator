@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# `::` names, `.` invokes (ADR 0021).
+#
+# A draft once wrote `Statistics::mean(data)` two messages after declaring
+# exactly that an error. In a code block, a path segment followed by `(`
+# is an invocation written with the naming operator.
+
+require_relative "shared"
+
+failures = []
+
+markdown_files.each do |path|
+  fenced_lines(path).each do |line, number|
+    # A block may deliberately show the wrong form to name it as wrong.
+    next if line.match?(/#.*(error|wrong|instead)/i)
+
+    found = line.match(/\b([A-Z]\w*(?:::\w+)*)::([a-z_]\w*)\(/)
+    next unless found
+
+    namespace, method = found.captures
+    failures << <<~REPORT
+      #{relative(path)}:#{number}
+        #{line.strip}
+
+        `::` names, `.` invokes (ADR 0021). This calls #{method}, so it needs
+        a dot — write #{namespace}.#{method}(...) instead.
+    REPORT
+  end
+end
+
+finish("namespace_operator", failures, "#{markdown_files.length} files")

@@ -1,12 +1,39 @@
 #!/bin/sh
-# Mechanical checks over the docs — see script/check_docs.rb for what and why.
+# Run every check in script/doc_checks/. Each is its own executable and can
+# be run alone while you iterate on it; this runs them all, and is what
+# script/test, CI, and the git hooks call.
+#
+# Each check exists because a real mistake got shipped and was caught by a
+# human reading, not by a tool. Only the mechanically-checkable class lives
+# here — judgment errors, like a prediction used as a reason or a bullet
+# that flattens distinct cases, are not detectable this way and stay the
+# author's job. A check that cries wolf is worse than no check, so each one
+# declines where it cannot tell (docs/principles.md: never guess, in the
+# implementation too).
+#
+# Two checks are deliberately absent, and stay documented here so the
+# reasoning is not rediscovered:
+#
+#   Doc code samples run. It would have caught three constructs invented
+#   for docs/language.md in one sitting — endless methods, a one-line
+#   if/then/else, a ternary — so it is worth having. But `pdx` has no
+#   parse-only mode, and telling a parse failure from a runtime one by
+#   matching panic text would be a string match on interpreter internals,
+#   which is precisely the fragility the REPL already suffers from.
+#   Needs `pdx --parse` first — issue #35.
+#
+#   CHANGELOG is newest-first. The ordering is chronological, and nothing
+#   in an entry's content reveals its date — entries cite several ADRs or
+#   none, so ADR numbers do not descend even when the order is correct.
+#   Rather than ship a check that fires on correct files, the rule stays in
+#   AGENT.md for a human to hold.
 set -e
 cd "$(dirname "$0")/.."
 
 # Select a Ruby the way script/test selects a Rust: the script's job, not the
 # caller's. Git hooks do not inherit an interactive shell, so without this the
-# pre-commit hook runs macOS's system Ruby 2.6, which cannot even parse
-# check_docs.rb — a failure that reads as a docs error and is not one.
+# pre-commit hook runs macOS's system Ruby 2.6, which cannot even parse the
+# checks — a failure that reads as a docs error and is not one.
 CHRUBY=/opt/homebrew/opt/chruby/share/chruby/chruby.sh
 if [ -f "$CHRUBY" ]; then
   . "$CHRUBY"
@@ -19,4 +46,43 @@ if ! ruby -e 'exit RUBY_VERSION.split(".").first.to_i >= 3' 2> /dev/null; then
   exit 1
 fi
 
-exec ruby script/check_docs.rb
+# Named checks run alone — `script/check_docs links` — which is how you
+# iterate on one without waiting for the rest. The checks are executables
+# too, but going through here is what guarantees the Ruby above.
+if [ "$#" -gt 0 ]; then
+  checks=""
+  for name in "$@"; do
+    if [ ! -f "script/doc_checks/$name" ]; then
+      echo "script/check_docs: no check named '$name'" >&2
+      echo "  available: $(ls script/doc_checks | grep -v '\.rb$' | tr '\n' ' ')" >&2
+      exit 1
+    fi
+    checks="$checks script/doc_checks/$name"
+  done
+else
+  checks="$(ls script/doc_checks/* | grep -v '\.rb$')"
+fi
+
+# Run every check even when one fails: a docs pass should report everything
+# wrong in one go, not one thing per run.
+total=0
+failed=0
+
+for check in $checks; do
+  total=$((total + 1))
+  ruby "$check" || failed=$((failed + 1))
+done
+
+if [ "$total" -eq 1 ]; then
+  label="check"
+else
+  label="checks"
+fi
+
+if [ "$failed" -eq 0 ]; then
+  echo "docs ok — $total $label"
+  exit 0
+fi
+
+echo "docs check failed — $failed of $total $label" >&2
+exit 1
