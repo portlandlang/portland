@@ -82,23 +82,45 @@ B
 already a syntax error in Ruby, so this codifies existing behavior rather
 than diverging.
 
+**Terminators are SCREAMING_CAPS.** Ruby permits any identifier —
+`<<~sql`, `<<~Sql`, `<<~_x`, `<<~q1`, even `<<~puts` all parse (verified on
+4.0.6), with the closing line required to match exactly. Portland requires
+uppercase, optionally with digits and underscores:
+
+```ruby
+db = <<~SQL
+  select 1
+SQL
+```
+
+The convention is already universal, and RuboCop encodes it as
+`Naming/HeredocDelimiterCase` with uppercase as the default enforced style —
+so conforming Ruby already complies and the migration is free-tier. The
+delimiter is punctuation, not an identifier, and reads that way at a
+glance. Corpus evidence may revisit this; it is a prior, not a closed book.
+
 ## Consequences
 
-- **Interaction with the `~` together sigil** (ADRs 0002/0004, Tentative):
-  `list << ~task` (spaced) is append-a-task, while `list <<~task` (unspaced)
-  lexes as a heredoc opener. The no-space rule is what separates them, and
-  Portland's lexer already tracks `leading_space` per token for exactly this
-  class of rule. The failure mode is safe: an unspaced `<<~task` meant as
-  append finds no `task` terminator and fails as an unterminated heredoc —
-  loud, not a silently different program. Revisit when `~` is built.
+- **No interaction with the `~` together sigil.** An earlier draft of this
+  ADR worried about `list << ~task` versus `list <<~task` — but `~task` is
+  not a Portland form. Per ADRs 0002/0004 and the concurrency ledger, `~` is
+  a *statement-line marker* written with a following space
+  (`~ orders = recent_orders(id)`), dead-identical to the word `meanwhile`;
+  there is no `~expression` prefix. `~` appears only at statement start,
+  `<<~` only after `=` or in argument position, so the two never meet. The
+  uppercase-terminator rule would settle the common case structurally even
+  if an expression form were ever added.
 - **Lexer**: `<<~` is a three-character token, alongside `...` from
   ADR 0019. Interpolation, escapes, and terminator scanning reuse the
   existing string machinery.
-- **Migration**: `<<~` heredocs compile verbatim. `<<` and `<<-` become
-  parse errors naming the fix. The rewrite is an **unsafe autocorrect**, not
-  a free one: switching the opener to `<<~` strips common indentation and
-  therefore *changes the string's value* whenever the content was indented.
-  It is safe only when the content has no common leading indentation; the
-  linter must check that before offering to apply it.
+- **Migration**: `<<~` heredocs with uppercase terminators compile
+  verbatim. `<<` and `<<-` become parse errors naming the fix, and that
+  rewrite is an **unsafe autocorrect**, not a free one: switching the opener
+  to `<<~` strips common indentation and therefore *changes the string's
+  value* whenever the content was indented. It is safe only when the content
+  has no common leading indentation; the linter must check before offering
+  it. Lowercase terminators are a free-tier autocorrect by contrast —
+  upcasing both the opener and the closing line preserves the value exactly,
+  and RuboCop already flags them.
 - Issue #6's "all flavors" checkbox is superseded — only the squiggly
   flavor needs porting, which removes a chunk of the months-of-tedium list.

@@ -30,6 +30,11 @@ the one Ruby's own style guides already preferred.
   telling them apart depends on local-vs-method guessing. The rewrite to
   `<<~` is an **unsafe autocorrect**: it strips common indentation, so it
   changes the string's value whenever the content was indented.
+- **Lowercase heredoc terminators** — Ruby accepts any identifier
+  (`<<~sql`, `<<~_x`, even `<<~puts`); Portland requires SCREAMING_CAPS,
+  matching RuboCop's default `Naming/HeredocDelimiterCase`. A delimiter is
+  punctuation, not an identifier. Free-tier autocorrect — upcasing the
+  opener and closing line preserves the value exactly.
 
 ## Kept, to be clear
 
