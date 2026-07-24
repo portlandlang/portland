@@ -21,7 +21,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0007](0007-2026-07-22-or-and-not-dead-identical.md) — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical; `or` is typed
 - [0008](0008-2026-07-22-unwrap-toolkit.md) — The unwrap toolkit: narrowing, or-guard, `&.`, `case/in` — and nothing else
 - [0009](0009-2026-07-22-presence-word-some.md) — The presence word is `some` / `some?`
-- [0010](0010-2026-07-22-partial-operations-return-maybes.md) — Partial operations return maybes; the only crash is one you typed
+- [0010](0010-2026-07-22-partial-operations-return-maybes.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires
 - [0011](0011-2026-07-22-together-single-register.md) — `together` has one register: named-at-site
 - [0012](0012-2026-07-22-branchless-if-is-nil.md) — A branch that doesn't happen produces nil
 - [0013](0013-2026-07-22-case-in-spec.md) — The `case/in` spec: exhaustive, static, Ruby-shaped

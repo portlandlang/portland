@@ -1,4 +1,4 @@
-# 0010 — Partial operations return maybes; the only crash is one you typed
+# 0010 — Partial operations return maybes; the only crash is one you typed; `fetch` retires
 
 - **Status:** Accepted
 - **Date:** 2026-07-22
