@@ -10,7 +10,7 @@ One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each r
 
 Decisions made before this log exist as-built documentation in [`docs/language.md`](../language.md) (paren-less rules, no-shadow, strict booleans, structs, …) and may be backfilled as ADRs when they're next touched.
 
-<!-- generated: do not edit by hand — script/generate_docs -->
+<!-- generated: do not edit by hand — script/docs/generate -->
 
 - [0001](0001-2026-07-20-mutable-keyword.md) — The mutability keyword is `mutable`
 - [0002](0002-2026-07-20-together-task-sigil.md) — The `together` task sigil is `~`
@@ -36,4 +36,4 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 
 <!-- /generated -->
 
-Each line is that ADR's own H1, and the tentative marker is read from its Status, so neither can drift from the file. Adding an ADR means writing it — `script/generate_docs` picks it up.
+Each line is that ADR's own H1, and the tentative marker is read from its Status, so neither can drift from the file. Adding an ADR means writing it — `script/docs/generate` picks it up.

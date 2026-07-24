@@ -10,7 +10,7 @@ Nothing here records what has happened since it was written — not in the files
 
 ## The record
 
-<!-- generated: do not edit by hand — script/generate_docs -->
+<!-- generated: do not edit by hand — script/docs/generate -->
 
 - [Portland — design notes](2026-06-28-first-brainstorm.md) — The session that started Portland: the seed question, joy-first, "Ruby, the good parts", the bootstrap ladder, and the branding bank.
 - [Report: the decisions ahead](2026-07-22-open-decisions.md) — A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each.

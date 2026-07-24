@@ -1,0 +1,76 @@
+#!/bin/sh
+# Run every check in script/docs/checks/. Name one or more to run only those:
+# `script/docs/check links`. This is what script/test, CI, and the git hooks
+# call.
+#
+# Each check exists because a real mistake got shipped and was caught by a
+# human reading, not by a tool. Only the mechanically-checkable class lives
+# here — judgment errors, like a prediction used as a reason or a bullet that
+# flattens distinct cases, are not detectable this way and stay the author's
+# job. A check that cries wolf is worse than no check, so each one declines
+# where it cannot tell (docs/principles.md: never guess, in the implementation
+# too).
+#
+# Two checks are deliberately absent, and stay documented here so the
+# reasoning is not rediscovered:
+#
+#   Doc code samples run. It would have caught three constructs invented for
+#   docs/language.md in one sitting — endless methods, a one-line
+#   if/then/else, a ternary — so it is worth having. But `pdx` has no
+#   parse-only mode, and telling a parse failure from a runtime one by
+#   matching panic text would be a string match on interpreter internals,
+#   which is precisely the fragility the REPL already suffers from. Needs
+#   `pdx --parse` first — issue #35.
+#
+#   CHANGELOG is newest-first. The ordering is chronological, and nothing in
+#   an entry's content reveals its date — entries cite several ADRs or none,
+#   so ADR numbers do not descend even when the order is correct. Rather than
+#   ship a check that fires on correct files, the rule stays in AGENT.md for a
+#   human to hold.
+set -e
+cd "$(dirname "$0")/../.."
+
+. script/docs/lib/ruby.sh
+
+available() {
+  ls script/docs/checks/*.rb | sed 's|.*/||; s|\.rb$||'
+}
+
+if [ "$#" -gt 0 ]; then
+  checks=""
+  for name in "$@"; do
+    name="${name%.rb}"
+    if [ ! -f "script/docs/checks/$name.rb" ]; then
+      echo "script/docs/check: no check named '$name'" >&2
+      echo "  available: $(available | tr '\n' ' ')" >&2
+      exit 1
+    fi
+    checks="$checks script/docs/checks/$name.rb"
+  done
+else
+  checks="$(available | sed 's|^|script/docs/checks/|; s|$|.rb|')"
+fi
+
+# Run every check even when one fails: a docs pass should report everything
+# wrong in one go, not one thing per run.
+total=0
+failed=0
+
+for check in $checks; do
+  total=$((total + 1))
+  ruby "$check" || failed=$((failed + 1))
+done
+
+if [ "$total" -eq 1 ]; then
+  label="check"
+else
+  label="checks"
+fi
+
+if [ "$failed" -eq 0 ]; then
+  echo "docs ok — $total $label"
+  exit 0
+fi
+
+echo "docs check failed — $failed of $total $label" >&2
+exit 1

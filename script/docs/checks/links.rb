@@ -1,6 +1,6 @@
 # Internal doc links resolve.
 
-require_relative "lib/shared"
+require_relative "../lib/shared"
 
 failures = []
 

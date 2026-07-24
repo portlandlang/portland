@@ -47,7 +47,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - ✅ Decision log as [ADRs](docs/adr/); the [Ruby ledger](docs/ruby/) and its two migration promises
 - ✅ Evidence engine — [ruby_research](https://github.com/portlandlang/ruby_research) corpus reports
 - ✅ Zed support v0 — [zed-portland](https://github.com/portlandlang/zed-portland) ([#24](https://github.com/portlandlang/portland/issues/24))
-- ✅ Git hooks tracked in `script/hooks`; `script/check_docs` gating doc discipline
+- ✅ Git hooks tracked in `script/hooks`; `script/docs/check` gating doc discipline, `script/docs/generate` building every index
 
 ## Coming ⬜
 
@@ -87,7 +87,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [ ] [#32](https://github.com/portlandlang/portland/issues/32) — a performance tripwire so a slow test can't hide
 - [ ] [#33](https://github.com/portlandlang/portland/issues/33) — the guidance-doc audit: one source of truth per fact
 - [ ] [#34](https://github.com/portlandlang/portland/issues/34) — RC-exact `<<`, killing ~200M array copies in the self-parse test
-- [ ] [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so `check_docs` can verify every code sample in the docs
+- [ ] [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so the doc checks can verify every code sample in the docs
 - [ ] The polyfill gem and migration linter — a wish, not yet a commitment
 
 ## Dropped ❌ — on purpose, forever

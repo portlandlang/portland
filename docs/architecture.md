@@ -125,6 +125,7 @@ These are language semantics, not an SDK we call into. Issue #13 owns the dispat
 | `seed/` | the disposable Rust seed and its tests |
 | `compiler/` | the trio, in Portland |
 | `crate/` | the crates.io `portland` placeholder — a name squat, nothing more |
-| `script/` | Scripts to Rule Them All: `bootstrap`, `test`, `console`, `cibuild`, `check_docs` |
+| `script/` | Scripts to Rule Them All: `bootstrap`, `test`, `console`, `cibuild` |
+| `script/docs/` | `check` and `generate`, plus one file per check and per generator |
 | `script/hooks/` | tracked git hooks, installed by `bootstrap` via `core.hooksPath` |
 | `seed/tests/fixtures/` | `.pdx` programs that are both tests and living documentation |

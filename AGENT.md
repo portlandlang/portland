@@ -19,9 +19,9 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Decisions become ADRs**, one file per decision, `NNNN-YYYY-MM-DD-slug.md`, never renumbered, Status of Accepted / Tentative / Superseded by NNNN. An issue comment is not a decision record. Issues discuss; ADRs decide.
 
-**Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/check_docs` enforces the pair.
+**Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/docs/check` enforces the pair.
 
-**A new ledger file needs an H1 and an italic summary line under it**, then `script/generate_docs`. That summary is what the index is built from, so the index cannot drift from it — do not hand-edit between the `generated` markers.
+**A new ledger file needs an H1 and an italic summary line under it**, then `script/docs/generate`. That summary is what the index is built from, so the index cannot drift from it — do not hand-edit between the `generated` markers.
 
 **Never hard-wrap markdown prose.** One line per paragraph, bullet, or table row — let the editor wrap. Hard wrapping makes diffs lie: changing three words reflows every line after them, so a one-clause edit reads as a rewritten paragraph. Code blocks keep their own line breaks, since there the breaks are the content. Enforcement rides with [#31](https://github.com/portlandlang/portland/issues/31).
 
@@ -37,10 +37,10 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 | | |
 |---|---|
-| `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then `check_docs` |
+| `script/test` | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks |
 | `script/console` | the REPL; `script/console file.pdx` runs a file |
-| `script/check_docs` | the doc checks in `script/doc_checks/`; name one to run it alone |
-| `script/generate_docs` | rewrite generated index sections; run it after adding a doc |
+| `script/docs/check` | the doc checks in `script/docs/checks/`; name one to run it alone |
+| `script/docs/generate` | rewrite generated index sections; name one generator to run it alone |
 | `script/bootstrap` | first-time setup, installs the git hooks |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.

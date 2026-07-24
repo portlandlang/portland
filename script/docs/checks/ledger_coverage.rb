@@ -3,7 +3,7 @@
 # Splats were once documented nowhere: ADR 0014 matched Ruby so closely
 # that nobody noticed it *also* deferred something.
 
-require_relative "lib/shared"
+require_relative "../lib/shared"
 
 failures = []
 

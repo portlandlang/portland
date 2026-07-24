@@ -19,9 +19,9 @@ Smooth Ruby → Portland migration is a standing design criterion. Two promises 
 
 ## Every difference
 
-Each line is that file's own one-line summary, so the two cannot drift. Adding a ledger file means writing the file — `script/generate_docs` picks it up and `script/check_docs generated` fails until you run it.
+Each line is that file's own one-line summary, so the two cannot drift. Adding a ledger file means writing the file — `script/docs/generate` picks it up and `script/docs/check generated` fails until you run it.
 
-<!-- generated: do not edit by hand — script/generate_docs -->
+<!-- generated: do not edit by hand — script/docs/generate -->
 
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.

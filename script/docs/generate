@@ -1,0 +1,17 @@
+#!/bin/sh
+# Rewrite generated doc sections in place. Name one or more generators to run
+# only those: `script/docs/generate adr`.
+#
+# What is generated is deliberately small: index lists, whose content is
+# entirely derivable from the files they index. Everything editorial stays
+# hand-written, because a generator flattens judgment into whatever field it
+# reads from.
+#
+# `script/docs/check generated` fails when these are out of date, so this is a
+# thing you run after adding a doc, not a build step.
+set -e
+cd "$(dirname "$0")/../.."
+
+. script/docs/lib/ruby.sh
+
+exec ruby script/docs/lib/generate.rb "$@"

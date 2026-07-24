@@ -9,7 +9,7 @@
 # carry a Status line instead), and frozen history files (their folder's
 # README carries the contract for all of them).
 
-require_relative "lib/shared"
+require_relative "../lib/shared"
 
 failures = []
 

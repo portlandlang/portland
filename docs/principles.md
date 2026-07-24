@@ -88,4 +88,4 @@ Decisions get an ADR, not a paragraph in a brief. Issues discuss; ADRs decide. C
 
 ## Revising these
 
-Everything here is revisable before 1.0, but the burden is on the challenger, and a revision that touches a decision gets a new ADR that supersedes the old one. The mechanically-checkable half of these rules lives in `script/check_docs`, which runs in `script/test`; the judgment half — a prediction used as a reason, a bullet that flattens distinct cases — stays the author's job, which is why it is written down here.
+Everything here is revisable before 1.0, but the burden is on the challenger, and a revision that touches a decision gets a new ADR that supersedes the old one. The mechanically-checkable half of these rules lives in `script/docs/check`, which runs in `script/test`; the judgment half — a prediction used as a reason, a bullet that flattens distinct cases — stays the author's job, which is why it is written down here.
