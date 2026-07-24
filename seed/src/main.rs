@@ -70,7 +70,10 @@ fn repl() {
                 let incomplete = message.contains("unexpected end of input")
                     || message.contains("expected end to close")
                     || message.contains("unterminated string")
-                    || message.contains("unterminated %w");
+                    || message.contains("unterminated %w")
+                    || message.contains("unterminated heredoc")
+                    || message.contains("unterminated interpolation")
+                    || message.contains("expected } to close {");
                 if incomplete {
                     // Mid-entry (an open def, if, or while) — keep reading lines.
                 } else {
