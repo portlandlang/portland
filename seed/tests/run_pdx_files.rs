@@ -2,6 +2,36 @@
 
 use std::process::Command;
 
+/// A coarse wall-clock tripwire (#32), not a benchmark (#25 is that).
+///
+/// `parses_the_whole_compiler_including_itself` once grew to 31.5s of a 33s
+/// suite without anything noticing: `parser.pdx` got longer, `<<` was
+/// quadratic, and no single commit looked slow. Nothing in the suite carried
+/// a performance signal, so a test could get 10× slower and stay green.
+///
+/// The ceiling is deliberately loose. It exists to catch the *next* accidental
+/// quadratic — which announces itself in multiples, not percentages — and a
+/// tripwire that flakes gets deleted, at which point there is no signal at all.
+///
+/// Calibration, measured rather than guessed: this case runs in ~6s locally
+/// and took 32.7s on the `macos-26` runner *before* the RC-exact append fix
+/// (#34), when it cost 29.7s locally. So CI is within ~10% of a dev machine
+/// here, and a 20s ceiling is roughly 3× headroom that still would have fired
+/// on the regression that prompted this.
+fn within_seconds<T>(limit: u64, label: &str, work: impl FnOnce() -> T) -> T {
+    let started = std::time::Instant::now();
+    let result = work();
+    let elapsed = started.elapsed();
+
+    assert!(
+        elapsed.as_secs() < limit,
+        "{label} took {elapsed:.1?}, over the {limit}s tripwire.\n\
+         This is a coarse ceiling, so being near it means something got much \
+         slower — look for an accidental quadratic before raising the number."
+    );
+    result
+}
+
 fn run_fixture(name: &str) -> std::process::Output {
     let fixture = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
     Command::new(env!("CARGO_BIN_EXE_pdx"))
@@ -384,14 +414,17 @@ fn portland_parser_handles_commands_and_literals() {
 
 #[test]
 fn portland_parser_parses_the_whole_compiler_including_itself() {
-    // The summit of #18: Portland parsing Portland, all of it.
+    // The summit of #18: Portland parsing Portland, all of it. Also the
+    // slowest thing in the suite by a wide margin, so it carries the tripwire.
     for file in ["lexer.pdx", "tokenize.pdx", "parse.pdx", "parser.pdx"] {
         let target = format!("{}/../compiler/{file}", env!("CARGO_MANIFEST_DIR"));
-        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(portland_parse())
-            .arg(&target)
-            .output()
-            .expect("failed to run pdx");
+        let output = within_seconds(20, &format!("parsing {file}"), || {
+            Command::new(env!("CARGO_BIN_EXE_pdx"))
+                .arg(portland_parse())
+                .arg(&target)
+                .output()
+                .expect("failed to run pdx")
+        });
         assert!(output.status.success(), "{file} did not parse");
         let stdout = String::from_utf8(output.stdout).unwrap();
         // `"(error` is the sexp printer's own string literal; a real error
@@ -431,11 +464,15 @@ fn assert_evaluator_matches_seed(name: &str, source: &str) {
         .arg(&sample)
         .output()
         .expect("failed to run pdx");
-    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
-        .arg(portland_run())
-        .arg(&sample)
-        .output()
-        .expect("failed to run pdx");
+    // Hosted runs pay the trio's cost on top of the seed's, so this is where
+    // a quadratic shows up first.
+    let hosted = within_seconds(20, name, || {
+        Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx")
+    });
     assert!(
         direct.status.success() && hosted.status.success(),
         "{name} failed to run"

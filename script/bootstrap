@@ -15,6 +15,11 @@ rustup default stable > /dev/null
 rustc --version
 cargo --version
 
+# Ruby gems for the doc tooling (mdl). The interpreter itself comes from
+# chruby per .ruby-version — see script/docs/lib/ruby.sh.
+bundle install --quiet
+echo "gems: $(bundle exec mdl --version 2> /dev/null || echo 'mdl missing')"
+
 # Git hooks live in script/hooks/ so they are version-controlled; .git/hooks
 # is not. Pointing core.hooksPath there installs them for this clone.
 git config core.hooksPath script/hooks
