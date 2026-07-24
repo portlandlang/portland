@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `docs/history/`'s index is generated, which makes all three indexes generated and lets `doc_checks/indexes.rb` be deleted — it had nothing left to check, and keeping an empty check that reads as coverage is worse than not having it. One thing was deliberately dropped rather than moved: the old entries carried running commentary like "its first half has shipped: #22, #20, kwargs…", and that cannot live in a frozen file, because it changes as more ships. The summaries now describe what a document _is_ — stable, true forever — and status defers to ROADMAP and the issues, which is what the folder's contract said all along. That contract also had to be corrected: it claimed "status notes live in the index below", which stopped being true the moment the index was generated from the files.
+
 - ADR 0017's H1 gains "`_1`–`_9` stay out" and 0020's gains "SCREAMING_CAPS terminators", for the same reason as 0010 below: both are part of the decision rather than a note about it, and both were surviving only in a hand-written index line.
 
 - ADR 0010's H1 gains "`fetch` retires". The old hand-written index carried that clause and the title did not, which is backwards — retiring `fetch` is part of the decision, not a note about it. Promoting it makes the title the canonical one-liner and the index picks it up automatically. Editing an ADR's title is not revising its decision, the same carve-out that lets links be repointed inside frozen docs.

@@ -1,5 +1,7 @@
 # Report: the decisions ahead
 
+_A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each._
+
 Written 2026-07-22, at the close of the optionals arc (ADRs 0005–0011, seed rungs 1–6, trio rungs 1–6, #21 complete). This is a working map, not a spec: every open decision we know about, its options and tradeoffs, what deciding it unlocks, and a recommended order and answer for each.
 
 **The governing tiebreaker** (user, 2026-07-22): for any decision that affects end users' usage, *matching Ruby is the preferred answer* unless it costs a penalty against Portland's design principles. Tie goes to Ruby. Each recommendation below says whether it's a Ruby-match, and if not, what penalty justified diverging.

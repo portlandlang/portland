@@ -6,12 +6,16 @@ _For: anyone digging into how Portland got here._
 
 That is the whole contract, and it is what makes these files safe to keep: they can never be wrong, only old. Read them for reasoning, context, and the shape of an argument at a moment in time — never for status.
 
-Status notes live in the index below rather than in the files themselves, so the writing stays frozen.
+Nothing here records what has happened since it was written — not in the files, and not in the index. That is the same rule stated twice: a note like "half of this has shipped" would have to change as more ships, and there is no place in a frozen folder for a line that changes.
 
 ## The record
 
-- [2026-06-28 — the first brainstorm](2026-06-28-first-brainstorm.md) The session that started Portland: the seed question, joy-first, "Ruby, the good parts", the bootstrap ladder, and the branding bank. Its living argument now lives in the [README](../../README.md) and [architecture](../architecture.md); the decisions it bikeshedded (the mutability keyword, the absence word, the task sigil) are all settled in ADRs 0001–0021.
+<!-- generated: do not edit by hand — script/generate_docs -->
 
-- [2026-07-22 — the decisions ahead](2026-07-22-open-decisions.md) A map of every open decision at the close of the optionals arc, with options, recommendations, and a suggested order. Its first half has shipped: #22 (ADR 0012), #20 (0013), keyword arguments (0014), methods in struct bodies, and #10 (0015). Its second half — error handling, `together` semantics, the full object model, type inference, the compile pipeline — is still live, and tracked on the ROADMAP and the issues rather than here.
+- [Portland — design notes](2026-06-28-first-brainstorm.md) — The session that started Portland: the seed question, joy-first, "Ruby, the good parts", the bootstrap ladder, and the branding bank.
+- [Report: the decisions ahead](2026-07-22-open-decisions.md) — A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each.
+- [Symbols: first pass](2026-07-23-symbols-first-pass.md) — The audit that tabled symbols: which of their jobs Portland's ADRs had already reassigned, and why the residue is enum-shaped.
 
-- [2026-07-23 — symbols, first pass](2026-07-23-symbols-first-pass.md) The audit that tabled symbols: what jobs Ruby's symbols do, which of them Portland's existing ADRs had already reassigned, and why the residue is enum-shaped. The core question has since been decided — `:foo` exists as a general type, checked for membership where a closed vocabulary is declared — but the ADR still waits on the enum shape, so the corpus questions listed here remain the homework.
+<!-- /generated -->
+
+Each line is that file's own summary. They describe what a document _is_, and deliberately not what has happened since — a frozen file cannot host a line like "half of this has shipped" without becoming a file that changes. For what is current, the contract above already points you at ROADMAP and the issues.

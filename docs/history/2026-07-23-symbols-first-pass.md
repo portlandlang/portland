@@ -1,5 +1,7 @@
 # Symbols: first pass
 
+_The audit that tabled symbols: which of their jobs Portland's ADRs had already reassigned, and why the residue is enum-shaped._
+
 **Status:** the core question is **decided** (symbols exist — see below); the enum mechanism they lean on is still being designed, so no ADR yet. Corpus evidence is still wanted to affirm or overturn the priors marked as such. This file is the session record.
 
 ## Decided 2026-07-23: symbols exist, as a general type

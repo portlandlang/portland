@@ -27,8 +27,9 @@ def heading(path)
   found.delete_prefix("# ").strip
 end
 
-def ledger_index
-  entries = Dir.glob("#{REPO}/docs/ruby/*.md")
+# Title — summary, for a directory whose files each carry their own summary.
+def summary_index(directory)
+  entries = Dir.glob("#{REPO}/docs/#{directory}/*.md")
                .reject { |path| File.basename(path) == "README.md" }
                .sort
 
@@ -40,6 +41,14 @@ def ledger_index
     "- [#{title}](#{name}) — #{line}"
   end.join("\n")
 end
+
+def ledger_index = summary_index("ruby")
+
+# History summaries have to be *stable* — a frozen file cannot host a line
+# like "half of this has shipped", which changes as more ships. What is
+# current lives in ROADMAP and the issues, exactly as this folder's contract
+# already says.
+def history_index = summary_index("history")
 
 # An ADR's H1 is already an index line — `# 0021 — Namespaces: …` — so unlike
 # the ledger files it needs no separate summary. Adding one would be a second
@@ -74,7 +83,8 @@ end
 
 GENERATED_SECTIONS = [
   { index: "docs/ruby/README.md", build: method(:ledger_index) },
-  { index: "docs/adr/README.md", build: method(:adr_index) }
+  { index: "docs/adr/README.md", build: method(:adr_index) },
+  { index: "docs/history/README.md", build: method(:history_index) }
 ].freeze
 
 # The text between the markers, or nil when they are absent.
