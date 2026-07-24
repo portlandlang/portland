@@ -23,11 +23,7 @@ One page: where Portland is going and how close it is. Above the line is done �
 - ✅ A branch that doesn't happen is nil (#22, ADR 0012) — branchless `if`, finished `while`, broken-out calls; built in seed + trio
 - ✅ Zed support, v0 (#24): [zed-portland](https://github.com/portlandlang/zed-portland) — `.pdx` detected as Portland, highlighted via tree-sitter-ruby
 - ✅ **Object model, first increment** (#27): methods in struct bodies + builtin type patterns, seed + trio — and the taste payoff: the trio's AST prints itself (`node.sexp`), Token knows its kinds, guest `with` works
-- ✅ Decided: brace blocks with the whose-block never-guess error (0016) — no precedence split from `do/end`; build pending
-- ✅ Decided: `it` as a normal binding under no-shadow (0017) — nested `it` is a shadow, shadows are errors; build pending
-- ✅ Decided: numbers (0018) — Ruby's floored `/` and `%` (**built**: the seed's truncation retired); floats specced, build pending
-- ✅ Decided: ranges (0019) — slices are collections not maybes; range patterns prove exhaustiveness; endless ranges close loudly; build pending
-- ✅ Decided: heredocs (0020) — squiggly `<<~` only, which keeps `<<` unambiguously the append operator; build pending
+- ✅ **Decided and built in the seed** — brace blocks + the whose-block never-guess error (0016), `it` under no-shadow (0017), Ruby's floored `/` and `%` plus floats (0018), ranges with collection slices and membership patterns (0019), squiggly-only heredocs (0020). Trio threading is the open half.
 
 ## Dropped ❌ (on purpose, forever)
 
@@ -45,12 +41,10 @@ One page: where Portland is going and how close it is. Above the line is done �
 
 ### Language surface (decide, then build)
 
-- [ ] Brace blocks + `it` (ADRs 0016 + 0017 — decided; build)
-- [ ] Heredocs — squiggly only (ADR 0020 — decided; build)
+- [ ] Thread the 0016–0020 batch through the trio — brace blocks, `it`, heredocs, floats, ranges are **built in the seed**; the trio can't use them until its own lexer/parser/evaluator learn them
 - [ ] Symbols — **core question decided**, ADR pending ([session notes](docs/reports/2026-07-23-symbols-first-pass.md)): `:foo` exists as a general type, checked for membership where a closed vocabulary is declared; `{name: "pdx"}` is symbol-keyed and ships
 - [ ] Enums / sum types — in design; open: payloads (one feature or two?), where enums are declared, how their type is named from outside
 - [ ] Hash shorthand `{name: "pdx"}` — table stakes, waits on the enum/symbol shape
-- [ ] Floats (ADR 0018) and ranges (ADR 0019) — both decided; build
 - [ ] #27 — the object model: the full session (methods in struct bodies + type predicates already built)
 - [ ] #28 — error handling: exceptions vs typed results (decides the deferred `!` with it)
 - [ ] #11 — `together` semantics, serial implementation first

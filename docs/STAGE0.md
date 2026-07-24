@@ -83,7 +83,8 @@ the tests are the spec until a real one exists.
   - **Never guess.** Forms Ruby resolves by whitespace heuristics are clean
     errors instead: `puts -1`, `puts [1]`, `puts (1)` each say
     *"ambiguous without parens"* and show both readings. `foo - 1` stays
-    subtraction. Blocks don't attach to command calls yet.
+    subtraction. Blocks don't attach to command calls yet — and a `{` there
+    is the ADR 0016 never-guess error rather than a guess.
 - **Structs** — immutable named records, the seed of the object model:
   ```ruby
   struct Token
@@ -107,10 +108,25 @@ the tests are the spec until a real one exists.
   the enclosing method, unwinding through loops *and blocks*; `break` and
   `next` control the enclosing `while` or block iteration. A call broken out
   of produces nil (ADR 0012).
-- **Blocks** — `do |item| ... end` on `each` (arrays, and hashes with
-  `|key, value|`), `each_with_index`, `map`, `select`, `reject`,
-  `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures over the
-  enclosing scope; parameters are block-local.
+- **Blocks** — `do |item| ... end` **and `{ |item| ... }`**, dead-identical
+  (ADR 0016), on `each` (arrays, and hashes with `|key, value|`),
+  `each_with_index`, `map`, `select`, `reject`, `reduce(initial)`, `times`,
+  `upto`, `downto`. Blocks are closures over the enclosing scope; parameters
+  are block-local. Naming **`it`** declares the implicit parameter
+  (ADR 0017); every collision with it — declared parameters, a nested `it`,
+  a local of that name — is a shadow, and shadows error. A bare `{` after a
+  paren-less command call is a never-guess error naming each reading.
+- **Heredocs** — squiggly `<<~SQL` only (ADR 0020), SCREAMING_CAPS
+  terminators, `<<~'SQL'` to suppress interpolation, attached method calls,
+  indented terminators, several per line. `<<` stays the append operator.
+- **Floats** — `3.14` IEEE doubles (ADR 0018): Ruby's printing, mixed
+  arithmetic promoting, comparison across the numeric types. Integer `/`
+  integer still floors.
+- **Ranges** — `1..5` / `1...5` with endless and beginless forms
+  (ADR 0019). Slices are collections, never maybes (`list[4..]` is `[]`);
+  `(1..n).each`/`map`/`sum`/`to_a` iterate; `include?` answers without
+  walking; range patterns match by membership. Integer bounds only, and
+  compile-checked exhaustiveness over them waits on #9.
 - **Value methods** (read-only) — strings: `length upcase downcase reverse empty?
   chars split include? start_with? end_with? to_i` plus `[index]`; integers:
   `abs zero? positive? negative? even? odd?`; arrays: `length first last empty?
@@ -133,10 +149,11 @@ the tests are the spec until a real one exists.
 
 ## Out (deliberately, for now)
 
-- Heredocs — squiggly `<<~` only (ADR 0020), decided but not built;
-  interpolation, `%w[]`, and single-quoted strings are already in.
-- Symbols; floats (ADR 0018) and ranges (ADR 0019) — both decided, not yet built.
-- Brace blocks and `it` — decided (ADRs 0016, 0017), not yet built.
+- Nothing from the 0016–0020 batch: brace blocks, `it`, heredocs, floats,
+  and ranges are **built in the seed** but not yet threaded through the
+  trio, so trio sources can't use them yet.
+- Symbols and enums — undecided; symbols' core question is settled but the
+  enum shape it leans on is still in design.
 - The static half of optionals (narrowing, exhaustiveness, compile-time
   maybe tracking) — the tree-walker previews those errors as panics.
 - Classes/objects (if they exist at all), modules, constants, inheritance,
