@@ -27,10 +27,21 @@ def read(path) = File.read(path, encoding: "UTF-8")
 
 def read_lines(path) = File.readlines(path, encoding: "UTF-8")
 
+# Git-tracked markdown, which is the same set `.mdlrc`'s `git_recurse` gives
+# mdl — one definition of "the docs" rather than two that drift apart.
+#
+# A filesystem glob was the first version, with a reject list for `target/`
+# and `_scratch/`. CI found the flaw: `bundler-cache` vendors gems into
+# `vendor/bundle/`, so the link check started reporting broken links in
+# concurrent-ruby's README. Every such directory would have to be added to
+# the list, one CI failure at a time; asking git instead needs no list.
+#
+# The tradeoff, same as mdl's: a brand-new file is invisible until `git add`.
 def markdown_files
-  Dir.glob("#{REPO}/**/*.md").reject do |path|
-    path.include?("/target/") || path.include?("/_scratch/")
-  end
+  paths = Dir.chdir(REPO) { `git ls-files -z -- "*.md"`.split("\0") }
+  abort "no tracked markdown found — is #{REPO} a git checkout?" if paths.empty?
+
+  paths.map { |path| "#{REPO}/#{path}" }
 end
 
 # Lines inside ``` fences, as [line, one_indexed_number] pairs.

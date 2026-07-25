@@ -1,2 +1,6 @@
 target/
 .DS_Store
+
+# `bundler-cache: true` in CI installs gems here; keep it out of the repo.
+vendor/
+.bundle/
