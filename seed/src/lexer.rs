@@ -50,6 +50,8 @@ pub enum TokenKind {
     Star,
     StarEqual,
     String,
+    /// `:name` — a symbol literal (ADR 0023). Its `text` includes the colon.
+    Symbol,
     WordArray,
 }
 
@@ -146,6 +148,29 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     } else {
                         TokenKind::DotDot
                     },
+                    text: &source[start..start + length],
+                });
+            }
+            // `:name` — a symbol literal (ADR 0023), before the single `:`.
+            //
+            // The colon binds **left** when it directly follows a name, and
+            // **right** otherwise. That one rule separates a keyword-argument
+            // label from a symbol without a never-guess error, and it gives
+            // `name:"pdx"` Ruby's own reading — a label and a string, not a
+            // name and a quoted symbol.
+            ':' if !source[start..].starts_with("::")
+                && !attached_to_a_name_on_the_left(source, start)
+                && starts_a_symbol(&source[start + 1..]) =>
+            {
+                chars.next(); // the colon
+                let length = 1 + symbol_length(&source[start + 1..]);
+                for _ in 1..length {
+                    chars.next();
+                }
+                tokens.push(Token {
+                    leading_space: start > 0
+                        && matches!(source.as_bytes()[start - 1], b' ' | b'\t'),
+                    kind: TokenKind::Symbol,
                     text: &source[start..start + length],
                 });
             }
@@ -337,6 +362,46 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
 /// Consume a `#{...}` interpolation body (opening brace already eaten),
 /// tracking brace depth and nested string literals so the enclosing string
 /// token ends at the right quote.
+/// Is this colon glued to a name on its left, making it a label rather than
+/// the head of a symbol? `name:` is a label; `{`, `(`, `,` or a space before
+/// the colon means the name that follows belongs to it (ADR 0023).
+fn attached_to_a_name_on_the_left(source: &str, colon: usize) -> bool {
+    colon > 0
+        && matches!(source.as_bytes()[colon - 1],
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'?' | b'!')
+}
+
+/// `:name` and `:"quoted"` only. Operator symbols (`:+`, `:[]`) are out —
+/// `send`, `define_method` and `&:` were their whole job, and all three are
+/// gone (ADR 0023 §2).
+fn starts_a_symbol(after_colon: &str) -> bool {
+    matches!(
+        after_colon.as_bytes().first(),
+        Some(b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'"')
+    )
+}
+
+/// The characters after the colon, including a closing quote when quoted.
+fn symbol_length(after_colon: &str) -> usize {
+    if let Some(quoted) = after_colon.strip_prefix('"') {
+        // No interpolation inside a symbol (ADR 0023 §2), so the first
+        // closing quote ends it.
+        return match quoted.find('"') {
+            Some(end) => end + 2,
+            None => panic!("unterminated quoted symbol"),
+        };
+    }
+
+    let name = after_colon
+        .find(|character: char| !character.is_alphanumeric() && character != '_')
+        .unwrap_or(after_colon.len());
+    // `?` and `!` are part of a name, so they are part of the symbol.
+    match after_colon.as_bytes().get(name) {
+        Some(b'?' | b'!') => name + 1,
+        _ => name,
+    }
+}
+
 fn skip_interpolation(chars: &mut std::iter::Peekable<std::str::CharIndices>, start: usize) {
     let mut depth = 1;
     while depth > 0 {
@@ -502,6 +567,43 @@ mod tests {
         assert_eq!(
             kinds("kind: 1"),
             vec![TokenKind::Identifier, TokenKind::Colon, TokenKind::Integer]
+        );
+    }
+
+    #[test]
+    fn lexes_symbol_literals() {
+        assert_eq!(kinds(":paid"), vec![TokenKind::Symbol]);
+        // `?` and `!` are part of a name, so they are part of the symbol.
+        assert_eq!(kinds(":paid? :ship!"), vec![TokenKind::Symbol; 2]);
+        assert_eq!(kinds(":\"odd key\""), vec![TokenKind::Symbol]);
+        assert_eq!(texts(":paid"), vec![":paid"]);
+    }
+
+    #[test]
+    fn tells_a_symbol_from_a_keyword_argument_label() {
+        // The colon binds left when it follows a name, right otherwise. That
+        // one rule covers every real case without a never-guess error.
+        assert_eq!(
+            kinds("{name: :paid}"),
+            vec![
+                TokenKind::LeftBrace,
+                TokenKind::Identifier,
+                TokenKind::Colon,
+                TokenKind::Symbol,
+                TokenKind::RightBrace
+            ]
+        );
+        // Ruby reads `name:"x"` as a label plus a string, and so do we:
+        // the colon is attached to the name on its left.
+        assert_eq!(
+            kinds("{name:\"pdx\"}"),
+            vec![
+                TokenKind::LeftBrace,
+                TokenKind::Identifier,
+                TokenKind::Colon,
+                TokenKind::String,
+                TokenKind::RightBrace
+            ]
         );
     }
 
