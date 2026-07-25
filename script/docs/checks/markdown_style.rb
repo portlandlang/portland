@@ -20,7 +20,14 @@ require_relative "../lib/shared"
 output = IO.popen(%w[bundle exec mdl .], chdir: REPO, err: [:child, :out], &:read)
 clean = $?.success?
 
-version = read("#{REPO}/Gemfile.lock")[/^ {4}mdl \(([^)]+)\)/, 1] || "unknown"
+# Ask the tool what it is, rather than grepping Gemfile.lock for it: that
+# would be a regex over someone else's file format, and it reports the
+# *pinned* version rather than the one that just ran. `MarkdownLint::VERSION`
+# would be cheaper still, but only if we loaded the gem — and we drive the
+# CLI, which is the supported interface and the thing that knows about
+# `.mdlrc`, the style file, and `git_recurse`.
+version = IO.popen(%w[bundle exec mdl --version], chdir: REPO, err: [:child, :out], &:read).strip
+version = "unknown" unless version.match?(/\A\d+\.\d+/)
 
 failures = []
 
