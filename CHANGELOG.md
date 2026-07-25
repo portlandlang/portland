@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Six ADR statuses corrected. Five said **"not yet built"** for things that have run since 2026-07-23 — brace blocks and `it` (0016, 0017), floats (0018), ranges (0019), heredocs (0020) — and 0006 said the partner word was "still open" when ADR 0009 settled it as `some`. Each was verified by running it rather than by reading the changelog: `[1, 2, 3].map { it * it }`, `3.14 + 1.0`, `(1..3).to_a`, `<<~SQL`, `some(5).some?`. The wording now matches 0021's, naming seed and trio and the date.
+
+- That drift matters more than it did a week ago, because the Status line stopped being prose: the generated ADR index reads it for the _(tentative)_ marker, so it feeds a machine now. These six happened not to move the index — all were Accepted before and after — but a stale `Tentative` would have shown up in a published list. No check can catch this one, and that is worth stating rather than filing: "decided but unbuilt" and "decided and built" are both well-formed sentences, and only running the language distinguishes them. It stays the author's job, alongside the other judgment errors named in `docs/principles.md`.
+
 - ROADMAP moves [#35](https://github.com/portlandlang/portland/issues/35) to Done, and its task list is ticked with a close-out.
 
 - `script/docs/check code_samples` — every ```` ```ruby ```` block in the docs now has to parse as Portland ([#35](https://github.com/portlandlang/portland/issues/35) complete). 45 blocks checked in 0.4s, 25 exempt with a stated reason. Verified by planting a ternary in `docs/language.md` and watching it fail with the file, line, and lexer message.

@@ -1,6 +1,6 @@
 # 0017 — `it` is a normal binding under no-shadow; `_1`–`_9` stay out
 
-- **Status:** Accepted (not yet built)
+- **Status:** Accepted (built in the seed and the trio, 2026-07-23)
 - **Date:** 2026-07-23
 
 ## Context

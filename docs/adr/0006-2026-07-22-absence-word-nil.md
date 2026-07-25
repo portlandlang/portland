@@ -1,6 +1,6 @@
 # 0006 — The absence word is `nil`
 
-- **Status:** Accepted (partner word still open)
+- **Status:** Accepted (partner word settled by [ADR 0009](0009-2026-07-22-presence-word-some.md): `some`)
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4)
 

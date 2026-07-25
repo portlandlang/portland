@@ -1,6 +1,6 @@
 # 0018 — Numbers: Ruby's division, floats without ceremony
 
-- **Status:** Accepted (floats not yet built; division fix lands now)
+- **Status:** Accepted (built in the seed and the trio, 2026-07-23)
 - **Date:** 2026-07-23
 
 ## Context

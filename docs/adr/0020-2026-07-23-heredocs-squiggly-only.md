@@ -1,6 +1,6 @@
 # 0020 — Heredocs: squiggly only, SCREAMING_CAPS terminators
 
-- **Status:** Accepted (not yet built)
+- **Status:** Accepted (built in the seed and the trio, 2026-07-23)
 - **Date:** 2026-07-23
 
 ## Context
