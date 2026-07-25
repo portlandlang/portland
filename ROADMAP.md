@@ -45,9 +45,13 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 - ✅ Repo public, CI green on `macos-26`, namespaces squatted
 - ✅ Decision log as [ADRs](docs/adr/); the [Ruby ledger](docs/ruby/) and its two migration promises
+- ✅ **Docs restructured** — one home per fact, split Now / Decided / Happened; every index generated from the files it indexes ([#33](https://github.com/portlandlang/portland/issues/33))
 - ✅ Evidence engine — [ruby_research](https://github.com/portlandlang/ruby_research) corpus reports
 - ✅ Zed support v0 — [zed-portland](https://github.com/portlandlang/zed-portland) ([#24](https://github.com/portlandlang/portland/issues/24))
 - ✅ Git hooks tracked in `script/hooks`; `script/docs/check` gating doc discipline, `script/docs/generate` building every index
+- ✅ Markdown linting via `mdl`, rules in `script/docs/lib/markdownlint.rb` ([#31](https://github.com/portlandlang/portland/issues/31); `overcommit` declined on the merits)
+- ✅ **RC-exact `<<`** — appends update in place when unshared; the self-parse test went 32.7s → 7.2s on CI ([#34](https://github.com/portlandlang/portland/issues/34))
+- ✅ A 20s wall-clock tripwire on every test that shells out to `pdx` ([#32](https://github.com/portlandlang/portland/issues/32))
 
 ## Coming ⬜
 
@@ -83,10 +87,6 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
 - [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
-- [#31](https://github.com/portlandlang/portland/issues/31) — markdown linting, and whether `overcommit` earns its keep
-- [#32](https://github.com/portlandlang/portland/issues/32) — a performance tripwire so a slow test can't hide
-- [#33](https://github.com/portlandlang/portland/issues/33) — the guidance-doc audit: one source of truth per fact
-- [#34](https://github.com/portlandlang/portland/issues/34) — RC-exact `<<`, killing ~200M array copies in the self-parse test
 - [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so the doc checks can verify every code sample in the docs
 - The polyfill gem and migration linter — a wish, not yet a commitment
 
