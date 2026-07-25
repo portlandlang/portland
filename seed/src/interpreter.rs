@@ -2111,6 +2111,38 @@ mod tests {
     }
 
     #[test]
+    fn hash_shorthand_makes_symbol_keys() {
+        let hash = evaluate(r#"{name: "pdx", port: 8080}"#).unwrap();
+        // Written back the way it would be typed — the shorthand, because
+        // that is the only symbol-key spelling (ADR 0023 §1).
+        assert_eq!(hash.inspect(), r#"{name: "pdx", port: 8080}"#);
+        assert_eq!(
+            evaluate(r#"{name: "pdx"}[:name]"#),
+            Some(Value::String("pdx".to_string()))
+        );
+    }
+
+    #[test]
+    fn the_rocket_survives_for_keys_the_shorthand_cannot_say() {
+        // Non-identifier symbol keys, and every non-symbol key. Note this
+        // parts company with Ruby, which prints `{"odd key": 1}`.
+        assert_eq!(
+            evaluate(r#"{:"odd key" => 1}"#).unwrap().inspect(),
+            r#"{:"odd key" => 1}"#
+        );
+        assert_eq!(
+            evaluate(r#"{"string" => 1, sym: 2}"#).unwrap().inspect(),
+            r#"{"string" => 1, sym: 2}"#
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "write name: instead of :name =>")]
+    fn refuses_the_rocket_for_a_shorthand_expressible_symbol_key() {
+        evaluate(r#"{:name => "pdx"}"#);
+    }
+
+    #[test]
     fn matches_symbols_in_patterns() {
         let source = "case :paid\nin :pending then 1\nin :paid then 2\nend";
         assert_eq!(evaluate(source), Some(Value::Integer(2)));

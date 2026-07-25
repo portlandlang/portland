@@ -1585,14 +1585,43 @@ impl<'source> Parser<'source> {
                 let mut pairs = Vec::new();
                 if self.peek_kind() != Some(TokenKind::RightBrace) {
                     loop {
-                        let key = self.expression();
-                        if self.peek_kind() != Some(TokenKind::FatArrow) {
-                            panic!(
-                                "expected => in hash literal, got {:?}",
-                                self.tokens.get(self.position)
-                            );
-                        }
-                        self.position += 1; // the `=>`
+                        // `{name: "pdx"}` — shorthand for a symbol key, and
+                        // the only spelling of one (ADR 0023 §1). The lexer
+                        // hands us `name` then `:` because the colon binds to
+                        // the name on its left.
+                        let key = if self.peek_kind() == Some(TokenKind::Identifier)
+                            && self.peek_kind_at(1) == Some(TokenKind::Colon)
+                        {
+                            let name = self.advance().text.to_string();
+                            self.position += 1; // the `:`
+                            Expression::Symbol(name)
+                        } else {
+                            let rocketed = self.tokens.get(self.position).copied();
+                            let key = self.expression();
+                            if self.peek_kind() != Some(TokenKind::FatArrow) {
+                                panic!(
+                                    "expected => in hash literal, got {:?}",
+                                    self.tokens.get(self.position)
+                                );
+                            }
+                            // One spelling per symbol key (ADR 0023 §1). The
+                            // rocket stays for keys the shorthand cannot say.
+                            if let Some(token) = rocketed
+                                && token.kind == TokenKind::Symbol
+                                && let Expression::Symbol(name) = &key
+                                && !name.is_empty()
+                                && name.chars().all(|character| {
+                                    character.is_alphanumeric() || character == '_'
+                                })
+                            {
+                                panic!(
+                                    "write {name}: instead of {} => — the shorthand is the only symbol-key spelling",
+                                    token.text
+                                );
+                            }
+                            self.position += 1; // the `=>`
+                            key
+                        };
                         let value = self.expression();
                         pairs.push((key, value));
                         if self.peek_kind() != Some(TokenKind::Comma) {

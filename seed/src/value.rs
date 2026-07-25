@@ -54,6 +54,22 @@ impl Value {
         Value::Hash(std::rc::Rc::new(pairs))
     }
 
+    /// One hash pair, written the way it would be typed.
+    ///
+    /// A symbol key takes the shorthand — `{name: "pdx"}` — because that is
+    /// the only spelling of one (ADR 0023 §1). Keys the shorthand cannot
+    /// express keep the rocket, which is where this parts company with Ruby:
+    /// Ruby prints `{"odd key": 1}`, Portland prints `{:"odd key" => 1}`,
+    /// because Portland's quoted-label form does not exist.
+    fn pair_source(key: &Value, value: &Value) -> String {
+        match key {
+            Value::Symbol(name) if Value::symbol_source(name) == format!(":{name}") => {
+                format!("{name}: {}", value.inspect())
+            }
+            other => format!("{} => {}", other.inspect(), value.inspect()),
+        }
+    }
+
     /// How a symbol is written back out: `:paid`, or `:"odd key"` when the
     /// name is not identifier-shaped.
     fn symbol_source(name: &str) -> String {
@@ -93,7 +109,7 @@ impl Value {
             Value::Hash(pairs) => {
                 let inner: Vec<String> = pairs
                     .iter()
-                    .map(|(key, value)| format!("{} => {}", key.inspect(), value.inspect()))
+                    .map(|(key, value)| Value::pair_source(key, value))
                     .collect();
                 format!("{{{}}}", inner.join(", "))
             }
