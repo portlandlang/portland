@@ -18,6 +18,8 @@ Written 2026-07-22, at the close of the optionals arc (ADRs 0005–0011, seed ru
 
 - **A — it's a maybe.** No else → the expression is `Integer?`; using it means handling the nil case with the normal toolkit.
 
+  <!-- not-portland: Ruby one-line `if/then/end`; the point is the value, not the spelling -->
+
   ```ruby
   greeting = if morning? then "gm" end   # String?
   puts greeting or "hello"               # the toolkit just works

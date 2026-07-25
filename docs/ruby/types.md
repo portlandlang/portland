@@ -12,6 +12,8 @@ Dynamically typed; every check happens at runtime or never. Duck typing — "if 
 
 Statically typed, **inferred, not written** — the lean is bidirectional inference with local generalization (#9), not Hindley-Milner purity. Types are present (the safety) but invisible (the joy). The page looks like Ruby; the compiler knows everything anyway.
 
+<!-- not-portland: `...` is a placeholder body, not Portland -->
+
 ```ruby
 def find_user(id)     # no annotations anywhere
   ...

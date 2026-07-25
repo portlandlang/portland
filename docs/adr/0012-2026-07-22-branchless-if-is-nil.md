@@ -14,6 +14,8 @@ Option B ("no value" as a static condition — using a branchless `if` is a comp
 
 **They're maybes.** An `if` with no taken branch, a normally-finished `while`, and a call ended by `break` all produce `nil`, typed as maybes where the compiler exists to type them:
 
+<!-- not-portland: Ruby one-line `if/then/end`; the point is the value, not the spelling -->
+
 ```ruby
 greeting = if morning? then "gm" end   # String? — nil when not morning
 puts greeting or "hello"               # handled with the ADR 0008 toolkit

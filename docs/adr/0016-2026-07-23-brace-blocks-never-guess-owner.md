@@ -25,6 +25,8 @@ Adopting braces verbatim imports Ruby's binding heuristic: after a paren-less co
 
 A bare `{` immediately after a paren-less command call's arguments is the only spot where readings genuinely collide, and there are at most three of them:
 
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
 ```ruby
 render config { "a" => 1 }
 # error: `{` after a command call could be three things — parenthesize the one you mean:
@@ -42,6 +44,8 @@ The parser peeks past the `{` to trim the menu — never to pick a winner:
 Whichever rewrite the author copies, the parens answer hash-vs-block and whose-block in the same stroke; the error is one round, never a dialogue.
 
 Everywhere else, braces mean what they look like, with no error:
+
+<!-- not-portland: a menu of forms, several of which Portland refuses in that position -->
 
 ```ruby
 nodes.map { |node| node.sexp }.join(" ")   # dot call: block

@@ -281,6 +281,8 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
 - **Concurrency** (ADRs 0002, 0004, 0011 — tentative). Three tiers, and you live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` spreads across cores when it is worth it and you never asked. Tier two declares independence:
 
+  <!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+
   ```ruby
   together do
     meanwhile user = fetch_user(id)

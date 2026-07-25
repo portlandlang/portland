@@ -15,6 +15,8 @@ One model, baked into the language, three tiers; you live almost entirely in tie
 1. **Implicit — you type nothing.** `photos.map { it.thumbnail }` spreads across cores when it's worth it, safe _because_ values are immutable (see [mutability](mutability.md)). No concurrency word appears.
 1. **`together` — declare independence.** Structured fork-join: each marked line is a task, the block's `end` is the join, results are named at the task site. `meanwhile` and `~` are dead-identical word/sigil forms:
 
+   <!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+
    ```ruby
    together do
      meanwhile user = fetch_user(id)

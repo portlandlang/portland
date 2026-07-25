@@ -24,6 +24,8 @@ The language never panics implicitly. `or panic "why"` is the sole crash spellin
 
 `fetch` retires — all three arities are the or-guard:
 
+<!-- not-portland: symbols are decided but unbuilt — `:foo` does not lex yet -->
+
 ```ruby
 h.fetch(:key)                       # ⇒ h[:key] or panic 'key not found: :key'
 h.fetch(:key, :default)             # ⇒ h[:key] or :default

@@ -107,6 +107,8 @@ Keeping the path form matters because **namespace depth is forced, not chosen**.
 
 ### 5. Types nest in types; modules do not nest in types
 
+<!-- not-portland: `enum` sketch — enums are undesigned -->
+
 ```ruby
 struct Purchase
   status

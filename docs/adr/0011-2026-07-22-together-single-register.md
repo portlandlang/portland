@@ -8,6 +8,8 @@
 
 ADR 0004 locked the named-at-site form and left open whether a terse positional register also exists:
 
+<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+
 ```ruby
 user, orders = together do
   ~ fetch_user(id)
@@ -18,6 +20,8 @@ end
 ## Decision
 
 **No positional register.** Named-at-site is the only form:
+
+<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
 
 ```ruby
 together do

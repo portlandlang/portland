@@ -12,6 +12,8 @@ The pair must also read as one thought, the way "async/await" does.
 
 ## Decision
 
+<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+
 ```ruby
 together do
   meanwhile user = fetch_user(id)

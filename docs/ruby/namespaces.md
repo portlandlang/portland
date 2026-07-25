@@ -55,6 +55,8 @@ Shapes::Circle.new(radius: 5)    # both, in order
 
 **Types nest in types; modules do not nest in types.**
 
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
 ```ruby
 struct Invoice
   lines

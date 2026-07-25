@@ -43,6 +43,8 @@ The checker sorts the integer ranges and requires no gaps, a beginless first, an
 
 `array[1..]`, `slice(1.., 2..)`, `in 10.. then`, `in ..10`, `array[..5]` all need no parens — each sits next to a token that settles it. The error fires only where two readings genuinely exist, in either direction:
 
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
 ```ruby
 span = 1..
 p span

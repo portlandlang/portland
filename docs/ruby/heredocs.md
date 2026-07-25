@@ -8,6 +8,8 @@
 
 Three openers, differing in what happens to indentation:
 
+<!-- not-portland: Ruby, shown for contrast -->
+
 ```ruby
 <<EOS      # terminator must sit at column 0; content indentation kept
 <<-EOS     # terminator may be indented; content indentation still kept

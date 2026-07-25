@@ -12,6 +12,8 @@ Inside `together` blocks, each concurrent task line carries a per-line marker (w
 
 **`~`** marks a task line:
 
+<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+
 ```ruby
 together do
   ~ user = fetch_user(id)

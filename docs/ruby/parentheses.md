@@ -24,6 +24,8 @@ Ruby gives `{ ... }` and `do ... end` different binding strength: after `render 
 
 Portland takes brace blocks with no precedence split: the two forms mean exactly the same thing, and the one position where readings collide — a bare `{` right after a paren-less command call — is a compile error naming each reading with its rewrite:
 
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
 ```ruby
 render config { "a" => 1 }
 # error: `{` after a command call could be three things — parenthesize the one you mean:

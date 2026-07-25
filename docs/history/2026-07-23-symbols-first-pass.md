@@ -8,6 +8,8 @@
 
 `:foo` is an ordinary symbol literal. Where a **declared closed vocabulary** is expected, the compiler checks membership; everywhere else it is just a symbol value:
 
+<!-- not-portland: symbols are decided but unbuilt — `:foo` does not lex yet -->
+
 ```ruby
 purchase.with(status: :paid)         # checked — must be a case of that enum
 purchase.with(status: :pendign)      # compile error
@@ -32,6 +34,8 @@ The reframe that unlocked this: **Ruby's problem with `status = :pending` was ne
 ### The escape hatch, for later
 
 Tradeoff 2 looks recoverable for the common case without giving up ergonomics. Where a hash literal's keys are statically visible, a lint (or later, a type refinement in the TypeScript-object-type direction) could flag a literal-key lookup that cannot match any key the hash was built with:
+
+<!-- not-portland: symbols are decided but unbuilt — `:foo` does not lex yet -->
 
 ```ruby
 config = {name: "pdx", port: 8080}
@@ -88,6 +92,8 @@ Every row but the last is spoken for. The residue is the enum job.
 OCaml's is the one to look hard at, because Portland already has inferred types (#9): `status = :pending` with no declaration, vocabulary inferred, exhaustiveness in `case/in` for free.
 
 ## How Rails does enums (ActiveRecord 8.1.3, read from source)
+
+<!-- not-portland: Ruby on Rails, shown for contrast -->
 
 ```ruby
 class Conversation < ApplicationRecord

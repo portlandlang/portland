@@ -28,6 +28,8 @@ Everything else falls out of "it's a binding":
 
 - **Nesting is shadowing, so it's an error** (strict). `it` in a block whose enclosing block also uses `it` is one binding shadowing another:
 
+  <!-- not-portland: shows the error this rule produces, so it must not parse -->
+
   ```ruby
   nodes.each { it.children.each { puts it } }
   # error: `it` is already the outer block's parameter — name your parameters
