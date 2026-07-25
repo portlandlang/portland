@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ROADMAP moves [#35](https://github.com/portlandlang/portland/issues/35) to Done, and its task list is ticked with a close-out.
+
 - `script/docs/check code_samples` — every ```` ```ruby ```` block in the docs now has to parse as Portland ([#35](https://github.com/portlandlang/portland/issues/35) complete). 45 blocks checked in 0.4s, 25 exempt with a stated reason. Verified by planting a ternary in `docs/language.md` and watching it fail with the file, line, and lexer message.
 
 - The exemptions needed a **required reason**, not a bare marker, because the 25 have three different causes and flattening them would repeat the mistake the trio's divergence note once made: Ruby quoted for contrast (the `docs/ruby/` ledger, ADR 0020's `<<EOS`), Portland that is decided but unbuilt (`together` in six places, symbols in four), and deliberately invalid Portland that exists to be refused (the never-guess menus, the endless-range boundary error). Written `<!-- not-portland: why -->` above the fence.

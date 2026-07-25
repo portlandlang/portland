@@ -52,6 +52,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - ✅ Markdown linting via `mdl`, rules in `script/docs/lib/markdownlint.rb` ([#31](https://github.com/portlandlang/portland/issues/31); `overcommit` declined on the merits)
 - ✅ **RC-exact `<<`** — appends update in place when unshared; the self-parse test went 32.7s → 7.2s on CI ([#34](https://github.com/portlandlang/portland/issues/34))
 - ✅ A 20s wall-clock tripwire on every test that shells out to `pdx` ([#32](https://github.com/portlandlang/portland/issues/32))
+- ✅ `pdx --parse`, and a doc check that every code sample parses as Portland ([#35](https://github.com/portlandlang/portland/issues/35))
 
 ## Coming ⬜
 
@@ -87,7 +88,6 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
 - [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
-- [#35](https://github.com/portlandlang/portland/issues/35) — `pdx --parse`, so the doc checks can verify every code sample in the docs
 - The polyfill gem and migration linter — a wish, not yet a commitment
 
 ## Dropped ❌ — on purpose, forever
