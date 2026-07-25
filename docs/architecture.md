@@ -84,11 +84,11 @@ At that point, for a non-exhaustive `case/in`, the seed runs the program and pan
 
 So the contract has three states, not two, and only the first two exist today:
 
-| | seed | trio | harness |
-|---|---|---|---|
-| Both accept | runs | runs | byte-identical, forever — this is the fixture suite |
-| Trio cannot tell | refuses | accepts silently | recorded as a gap, below |
-| **Trio refuses, seed runs** | runs | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
+|                             | seed    | trio             | harness                                                                  |
+| --------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |
+| Both accept                 | runs    | runs             | byte-identical, forever — this is the fixture suite                      |
+| Trio cannot tell            | refuses | accepts silently | recorded as a gap, below                                                 |
+| **Trio refuses, seed runs** | runs    | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
 
 The third row is progress, not drift. When it appears, the answer is not to weaken the trio: it is that the seed's runtime behavior has stopped being evidence about a program the compiler has correctly rejected. The harness narrows to programs both accept, which stays the overwhelming majority.
 
