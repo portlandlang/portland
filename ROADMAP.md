@@ -88,7 +88,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
 - [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
-- The polyfill gem and migration linter — a wish, not yet a commitment
+- [#36](https://github.com/portlandlang/portland/issues/36) — the polyfill shim gem and migration linter; a placeholder holding the tier inventory, not a commitment
 
 ## Dropped ❌ — on purpose, forever
 
