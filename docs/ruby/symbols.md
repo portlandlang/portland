@@ -2,7 +2,7 @@
 
 **Summary:** `:foo` survives with its spelling intact, but the set can be declared and checked; no `to_sym`, and hash shorthand is the only symbol-key form.
 
-**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md)), not yet built — `:foo` does not lex today.
+**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md)). Built in the seed; the trio waits — see [the language](../language.md#symbols-and-enums).
 
 ## Ruby
 
@@ -26,8 +26,6 @@ status = :pendign          # equally valid; fails later, or never
 ## Portland
 
 The spelling is unchanged. What changes is that the **set can be closed**, and that a symbol can no longer be conjured from a string.
-
-<!-- not-portland: symbols are decided but unbuilt — `:foo` does not lex yet -->
 
 ```ruby
 purchase.with(status: :paid)      # checked against Purchase::Status

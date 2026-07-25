@@ -131,6 +131,7 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     pending: Option<Pending>,
     /// The receiver while a struct method runs: `(struct name, instance)`.
     self_receiver: Option<(String, Value)>,
+    enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     variables: HashMap<String, Binding>,
 }
@@ -139,6 +140,16 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
 struct StructInfo {
     fields: Vec<String>,
     methods: HashMap<String, std::rc::Rc<Method>>,
+}
+
+/// A closed vocabulary (ADR 0022): each case name with its payload labels.
+///
+/// Membership checking and exhaustiveness are *static* and belong to #9, so
+/// the seed records the declaration and checks only what a value can answer
+/// for itself — that a payload names the labels its case declared.
+#[derive(Clone)]
+struct EnumInfo {
+    cases: Vec<(String, Vec<String>)>,
 }
 
 /// A named binding: immutable unless declared `mutable` (ADR 0001).
@@ -167,6 +178,7 @@ impl<W: std::io::Write> Interpreter<W> {
             output,
             pending: None,
             self_receiver: None,
+            enums: HashMap::new(),
             structs: HashMap::new(),
             variables: HashMap::new(),
         }
@@ -363,6 +375,19 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.module_path.extend(path.iter().cloned());
                 self.run_body(body);
                 self.module_path.truncate(depth);
+                None
+            }
+            // Flattened to a qualified name at definition time, exactly as
+            // structs and modules are (ADR 0021), so `Purchase::Status` and a
+            // top-level `Ordering` need no separate lookup path.
+            Statement::EnumDefinition { cases, name } => {
+                let qualified = self.qualified(name);
+                self.enums.insert(
+                    qualified,
+                    EnumInfo {
+                        cases: cases.clone(),
+                    },
+                );
                 None
             }
             Statement::StructDefinition {
@@ -733,6 +758,17 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
             Expression::Symbol(name) => Some(Value::Symbol(name.clone())),
+            Expression::EnumCase { name, payload } => {
+                let values: Vec<(String, Value)> = payload
+                    .iter()
+                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                    .collect();
+                self.check_payload_labels(name, &values);
+                Some(Value::EnumCase {
+                    name: name.clone(),
+                    payload: values,
+                })
+            }
             Expression::Binary {
                 left,
                 operator,
@@ -1481,6 +1517,51 @@ impl<W: std::io::Write> Interpreter<W> {
         result
     }
 
+    /// The one enum check a *runtime* can make: a payload names the labels
+    /// its case declared.
+    ///
+    /// Membership ("is `:pendign` a case of this enum?") and exhaustiveness
+    /// are static — they need to know which enum a position expects, and the
+    /// seed has no types. Both wait for #9. This one is answerable because
+    /// the value carries its own case name.
+    ///
+    /// Enums are looked up by case name across every declaration, since a
+    /// bare `:paid` says nothing about which vocabulary it came from. Two
+    /// enums may share a case name; they must then agree on its labels, or
+    /// the seed cannot tell which was meant.
+    fn check_payload_labels(&self, case: &str, payload: &[(String, Value)]) {
+        let declarations: Vec<&Vec<String>> = self
+            .enums
+            .values()
+            .filter_map(|info| {
+                info.cases
+                    .iter()
+                    .find(|(name, _)| name == case)
+                    .map(|(_, labels)| labels)
+            })
+            .collect();
+
+        let Some(labels) = declarations.first() else {
+            panic!("no enum declares a case :{case}");
+        };
+        if declarations.iter().any(|other| other != labels) {
+            panic!(
+                "two enums declare :{case} with different payloads — the seed cannot tell them apart"
+            );
+        }
+
+        let given: Vec<&String> = payload.iter().map(|(label, _)| label).collect();
+        let expected: Vec<&String> = labels.iter().collect();
+        if given != expected {
+            let wanted = expected
+                .iter()
+                .map(|label| format!("{label}:"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            panic!("`:{case}` takes ({wanted})");
+        }
+    }
+
     /// Take a binding's value out for an in-place update, leaving nil behind.
     ///
     /// The caller is about to rebind the name, so the hole is temporary — but
@@ -1585,6 +1666,33 @@ impl<W: std::io::Write> Interpreter<W> {
             Pattern::Alternative(options) => options
                 .iter()
                 .find_map(|option| self.match_pattern(option, subject)),
+            // `in :paid(on:)` — the case name must match, then each named
+            // label binds or matches deeper (ADR 0022 §1).
+            Pattern::EnumCase { name, payload } => {
+                let Value::EnumCase {
+                    name: case,
+                    payload: values,
+                } = subject
+                else {
+                    return None;
+                };
+                if case != name {
+                    return None;
+                }
+                let mut captures = Vec::new();
+                for (label, inner) in payload {
+                    let value = values
+                        .iter()
+                        .find(|(given, _)| given == label)
+                        .map(|(_, value)| value)?;
+                    match inner {
+                        // `on:` alone binds a name of the same name.
+                        None => captures.push((label.clone(), value.clone())),
+                        Some(pattern) => captures.extend(self.match_pattern(pattern, value)?),
+                    }
+                }
+                Some(captures)
+            }
             // A range pattern tests membership, not equality (ADR 0019 §1).
             Pattern::Range {
                 end,
@@ -2140,6 +2248,83 @@ mod tests {
     #[should_panic(expected = "write name: instead of :name =>")]
     fn refuses_the_rocket_for_a_shorthand_expressible_symbol_key() {
         evaluate(r#"{:name => "pdx"}"#);
+    }
+
+    /// The worked example from ADR 0022, so the ADR and the seed cannot
+    /// drift apart on the headline shape.
+    const PURCHASE: &str = "\
+struct Purchase
+  amount
+  status
+
+  enum Status
+    :pending
+    :paid(on:)
+    :refunded(on:, reason:)
+  end
+end
+";
+
+    #[test]
+    fn declares_enums_nested_and_top_level() {
+        // A vocabulary owned by one concept nests; one owned by nobody does
+        // not (ADR 0022 §2). Both are just declarations at runtime.
+        let source = format!("{PURCHASE}\nenum Ordering\n  :less\n  :equal\nend\n:pending");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::Symbol("pending".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_payload_free_case_is_a_plain_symbol() {
+        // Nothing about `:pending` needs to survive to runtime — the
+        // declaration is compile-time information.
+        let source = format!("{PURCHASE}\n:pending");
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::Symbol("pending".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_payload_carrying_case_writes_itself_back_as_source() {
+        let source = format!("{PURCHASE}\n:refunded(on: \"friday\", reason: \"damaged\")");
+        assert_eq!(
+            evaluate(&source).unwrap().inspect(),
+            r#":refunded(on: "friday", reason: "damaged")"#
+        );
+    }
+
+    #[test]
+    fn destructures_an_enum_payload_in_a_pattern() {
+        let source = format!(
+            "{PURCHASE}\ncase :paid(on: \"tuesday\")\nin :pending then \"no\"\nin :paid(on:) then on\nend"
+        );
+        assert_eq!(
+            evaluate(&source),
+            Some(Value::String("tuesday".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "`:paid` takes (on:)")]
+    fn a_payload_must_name_the_labels_its_case_declared() {
+        // The one enum check a runtime can make: membership and
+        // exhaustiveness are static and wait for #9.
+        evaluate(&format!("{PURCHASE}\n:paid(wrong: 1)"));
+    }
+
+    #[test]
+    #[should_panic(expected = "no enum declares a case :nope")]
+    fn a_payload_carrying_case_must_belong_to_some_enum() {
+        evaluate(&format!("{PURCHASE}\n:nope(on: 1)"));
+    }
+
+    #[test]
+    #[should_panic(expected = "enum cases are symbols")]
+    fn enum_cases_are_symbols() {
+        evaluate("enum Bad\n  pending\nend");
     }
 
     #[test]

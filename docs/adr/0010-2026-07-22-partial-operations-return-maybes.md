@@ -16,8 +16,6 @@ One rule: **partial operations return maybes. Asserting certainty is always spel
 
 `fetch` retires. All three of its arities are the or-guard, and the eager-default gotcha (`fetch(key, default)` evaluates `default` even on a hit — the reason Ruby needed the block arity at all) never exists, because `or` is born lazy:
 
-<!-- not-portland: symbols are decided but unbuilt — `:foo` does not lex yet -->
-
 ```ruby
 h.fetch(:key)                       # ⇒ h[:key] or panic 'key not found: :key'
 h.fetch(:key, :default)             # ⇒ h[:key] or :default   (lazy, for free)

@@ -11,6 +11,14 @@ pub enum Value {
     /// cloning a value must never mean copying a whole collection.
     Array(std::rc::Rc<Vec<Value>>),
     Boolean(bool),
+    /// `:paid(on: "tuesday")` — an enum case carrying a keyword payload
+    /// (ADR 0022). A payload-free case is a plain `Symbol`: the enum
+    /// declaration is compile-time information, and nothing about `:pending`
+    /// needs to survive to runtime.
+    EnumCase {
+        name: String,
+        payload: Vec<(String, Value)>,
+    },
     /// IEEE 754 double (ADR 0018). Ruby's printing: always shows a point.
     Float(f64),
     /// Insertion-ordered pairs; lookup is linear. Note: derived equality is
@@ -105,6 +113,13 @@ impl Value {
                 format!("[{}]", inner.join(", "))
             }
             Value::Boolean(value) => value.to_string(),
+            Value::EnumCase { name, payload } => {
+                let inner: Vec<String> = payload
+                    .iter()
+                    .map(|(label, value)| format!("{label}: {}", value.inspect()))
+                    .collect();
+                format!("{}({})", Value::symbol_source(name), inner.join(", "))
+            }
             Value::Float(value) => format_float(*value),
             Value::Hash(pairs) => {
                 let inner: Vec<String> = pairs
@@ -161,6 +176,7 @@ impl fmt::Display for Value {
                 write!(formatter, "]")
             }
             Value::Boolean(value) => write!(formatter, "{value}"),
+            Value::EnumCase { .. } => write!(formatter, "{}", self.inspect()),
             Value::Float(value) => write!(formatter, "{}", format_float(*value)),
             Value::Hash(pairs) => {
                 write!(formatter, "{{")?;

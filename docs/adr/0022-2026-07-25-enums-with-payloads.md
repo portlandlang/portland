@@ -1,6 +1,6 @@
 # 0022 — Enums: closed vocabularies of symbol cases, with keyword payloads
 
-- **Status:** Accepted (not yet built)
+- **Status:** Accepted (built in the seed, 2026-07-25; the trio waits)
 - **Date:** 2026-07-25
 
 ## Context
@@ -19,8 +19,6 @@ Portland's own compiler shows both shapes, which is what settled the nesting que
 ## Decision
 
 **`enum` declares a closed vocabulary. Its cases are lowercase symbols, and a case may carry a keyword-only payload.**
-
-<!-- not-portland: enums are decided but unbuilt — `:foo` does not lex yet -->
 
 ```ruby
 enum Ordering              # top-level: owned by no type

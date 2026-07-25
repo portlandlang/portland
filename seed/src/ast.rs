@@ -36,6 +36,12 @@ pub enum Statement {
         body: Vec<Statement>,
         path: Vec<String>,
     },
+    /// `enum Name ... end` — a closed vocabulary (ADR 0022). Each case is
+    /// a name with an optional list of keyword payload labels.
+    EnumDefinition {
+        cases: Vec<(String, Vec<String>)>,
+        name: String,
+    },
     StructDefinition {
         fields: Vec<String>,
         /// Methods defined in the struct body (each a `MethodDefinition`
@@ -136,6 +142,12 @@ pub enum Pattern {
     Struct {
         fields: Vec<(String, Option<Pattern>)>,
         name: String,
+    },
+    /// `in :paid(on:)` — an enum case with its payload destructured
+    /// (ADR 0022). Keyword-only, exactly like a struct pattern.
+    EnumCase {
+        name: String,
+        payload: Vec<(String, Option<Pattern>)>,
     },
 }
 
@@ -259,6 +271,11 @@ pub enum Expression {
     String(String),
     /// `:name` — the name without its colon (ADR 0023).
     Symbol(String),
+    /// `:paid(on: expr)` — an enum case with a keyword payload (ADR 0022).
+    EnumCase {
+        name: String,
+        payload: Vec<(String, Expression)>,
+    },
     Unary {
         operand: Box<Expression>,
         operator: UnaryOperator,

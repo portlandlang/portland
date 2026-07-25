@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
-**Next: build symbols, hash shorthand, and enums** — decided in [0022](docs/adr/0022-2026-07-25-enums-with-payloads.md) and [0023](docs/adr/0023-2026-07-25-symbols.md), and they land together because `:foo` does not lex today, so nothing above it can exist yet.
+**Next: thread symbols, hash shorthand, and enums through the trio** — all three run in the seed as of 2026-07-25 ([0022](docs/adr/0022-2026-07-25-enums-with-payloads.md), [0023](docs/adr/0023-2026-07-25-symbols.md)); the trio has to match it byte-for-byte before the arc is done.
 
 ## Done 🎉
 
@@ -29,8 +29,8 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 | Heredocs — squiggly only                                     | [0020](docs/adr/0020-2026-07-23-heredocs-squiggly-only.md)                                                                                                                                                                                                                                      | ✅              |
 | Namespaces — `module`, `::` names and `.` invokes            | [0021](docs/adr/0021-2026-07-24-namespaces-and-modules.md)                                                                                                                                                                                                                                      | ✅              |
 | Concurrency vocabulary — `together`, `meanwhile`, `~`        | [0002](docs/adr/0002-2026-07-20-together-task-sigil.md) [0004](docs/adr/0004-2026-07-20-together-meanwhile.md) [0011](docs/adr/0011-2026-07-22-together-single-register.md) _tentative_                                                                                                         | —               |
-| Enums — closed vocabularies, symbol cases, keyword payloads  | [0022](docs/adr/0022-2026-07-25-enums-with-payloads.md)                                                                                                                                                                                                                                         | —               |
-| Symbols — a general type, checked against declared sets      | [0023](docs/adr/0023-2026-07-25-symbols.md)                                                                                                                                                                                                                                                     | —               |
+| Enums — closed vocabularies, symbol cases, keyword payloads  | [0022](docs/adr/0022-2026-07-25-enums-with-payloads.md)                                                                                                                                                                                                                                         | ✅ seed          |
+| Symbols, and `{name: "pdx"}` hash shorthand                  | [0023](docs/adr/0023-2026-07-25-symbols.md)                                                                                                                                                                                                                                                     | ✅ seed          |
 | Bitwise operators out; named methods instead                 | [0003](docs/adr/0003-2026-07-20-bitwise-operators-out.md) _tentative_                                                                                                                                                                                                                           | ✅              |
 | Paren-less calls: command calls, no-shadow, never-guess      | pre-log                                                                                                                                                                                                                                                                                         | ✅              |
 | Structs, methods in struct bodies, builtin type patterns     | [#27](https://github.com/portlandlang/portland/issues/27) first increment                                                                                                                                                                                                                       | ✅              |
@@ -60,7 +60,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- **Build symbols, hash shorthand, and enums** — all three decided; `:foo` does not lex today, so they land as one arc
+- **Thread symbols, hash shorthand, and enums through the trio** — built in the seed; the differential harness closes the arc
 - [#27](https://github.com/portlandlang/portland/issues/27) — the object model: mixins, inheritance, visibility
 - [#28](https://github.com/portlandlang/portland/issues/28) — error handling: exceptions vs typed results; decides the deferred `!`
 - [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug

@@ -178,6 +178,9 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("def") {
             return self.method_definition();
         }
+        if self.peek_is_keyword("enum") {
+            return self.enum_definition();
+        }
         if self.peek_is_keyword("module") {
             return self.module_definition();
         }
@@ -463,6 +466,87 @@ impl<'source> Parser<'source> {
     }
 
     /// `struct Name` then one field name per line, closed by `end`.
+    /// `enum Name ... end` — a closed vocabulary (ADR 0022). Each line is one
+    /// case: a symbol, optionally with keyword-only payload labels.
+    ///
+    /// ```text
+    /// enum Status
+    ///   :pending
+    ///   :paid(on:)
+    ///   :refunded(on:, reason:)
+    /// end
+    /// ```
+    fn enum_definition(&mut self) -> Statement {
+        self.position += 1; // the `enum`
+        let token = self.advance();
+        if token.kind != TokenKind::Identifier {
+            panic!("expected enum name after enum, got {token:?}");
+        }
+        if !token.text.chars().next().unwrap().is_ascii_uppercase() {
+            panic!("enum names start with a capital letter, got {}", token.text);
+        }
+        let name = token.text.to_string();
+        self.expect_statement_boundary();
+        self.skip_newlines();
+
+        let mut cases: Vec<(String, Vec<String>)> = Vec::new();
+        while !self.peek_is_keyword("end") {
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close enum {name}");
+            }
+            let token = self.advance();
+            if token.kind != TokenKind::Symbol {
+                panic!(
+                    "enum cases are symbols — write :{} instead of {}",
+                    token.text.trim_start_matches(':'),
+                    token.text
+                );
+            }
+            let case = symbol_name(token.text);
+            if cases.iter().any(|(existing, _)| *existing == case) {
+                panic!("enum {name} already has a case :{case}");
+            }
+
+            // Payload labels are keyword-only, matching struct construction
+            // and struct patterns (ADR 0022 §1).
+            let mut labels = Vec::new();
+            if self.peek_kind() == Some(TokenKind::LeftParen) {
+                self.position += 1; // the `(`
+                loop {
+                    let label = self.advance();
+                    if label.kind != TokenKind::Identifier {
+                        panic!("expected a payload label in :{case}, got {label:?}");
+                    }
+                    if self.peek_kind() != Some(TokenKind::Colon) {
+                        panic!(
+                            "enum payloads are keyword-only — write {}: in :{case}",
+                            label.text
+                        );
+                    }
+                    self.position += 1; // the `:`
+                    labels.push(label.text.to_string());
+                    if self.peek_kind() != Some(TokenKind::Comma) {
+                        break;
+                    }
+                    self.position += 1; // the `,`
+                }
+                if self.peek_kind() != Some(TokenKind::RightParen) {
+                    panic!("expected ) to close the payload of :{case}");
+                }
+                self.position += 1;
+            }
+
+            cases.push((case, labels));
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+        self.position += 1; // the `end`
+        if cases.is_empty() {
+            panic!("enum {name} has no cases — a vocabulary needs words");
+        }
+        Statement::EnumDefinition { cases, name }
+    }
+
     fn struct_definition(&mut self) -> Statement {
         self.position += 1; // the `struct`
         let token = self.advance();
@@ -493,6 +577,13 @@ impl<'source> Parser<'source> {
             }
             if self.peek_is_keyword("struct") {
                 nested.push(self.struct_definition());
+                self.skip_newlines();
+                continue;
+            }
+            // An enum nests the same way a type does — a vocabulary owned by
+            // one concept lives inside it (ADR 0022 §2).
+            if self.peek_is_keyword("enum") {
+                nested.push(self.enum_definition());
                 self.skip_newlines();
                 continue;
             }
@@ -744,6 +835,43 @@ impl<'source> Parser<'source> {
                 Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
             TokenKind::String => Pattern::Literal(Box::new(string_expression(token.text))),
+            // `in :paid(on:)` destructures a payload; `in :paid` matches a
+            // payload-free case (ADR 0022 §1).
+            TokenKind::Symbol if self.peek_kind() == Some(TokenKind::LeftParen) => {
+                self.position += 1; // the `(`
+                let mut payload = Vec::new();
+                loop {
+                    let label = self.advance();
+                    if label.kind != TokenKind::Identifier
+                        || self.peek_kind() != Some(TokenKind::Colon)
+                    {
+                        panic!("enum payload patterns are keyword-only, got {label:?}");
+                    }
+                    self.position += 1; // the `:`
+                    // `on:` alone binds `on`; `on: pattern` matches deeper.
+                    let inner = if matches!(
+                        self.peek_kind(),
+                        Some(TokenKind::Comma) | Some(TokenKind::RightParen)
+                    ) {
+                        None
+                    } else {
+                        Some(self.pattern())
+                    };
+                    payload.push((label.text.to_string(), inner));
+                    if self.peek_kind() != Some(TokenKind::Comma) {
+                        break;
+                    }
+                    self.position += 1; // the `,`
+                }
+                if self.peek_kind() != Some(TokenKind::RightParen) {
+                    panic!("expected ) to close the payload pattern");
+                }
+                self.position += 1;
+                Pattern::EnumCase {
+                    name: symbol_name(token.text),
+                    payload,
+                }
+            }
             TokenKind::Symbol => {
                 Pattern::Literal(Box::new(Expression::Symbol(symbol_name(token.text))))
             }
@@ -1571,6 +1699,41 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => string_expression(token.text),
+            // `:paid` alone is a symbol; `:paid(on: expr)` is an enum case
+            // carrying a payload (ADR 0022). The paren must be attached —
+            // `foo :paid (x)` is two things, not one.
+            TokenKind::Symbol
+                if self.peek_kind() == Some(TokenKind::LeftParen)
+                    && !self.tokens[self.position].leading_space =>
+            {
+                self.position += 1; // the `(`
+                let mut payload = Vec::new();
+                loop {
+                    let label = self.advance();
+                    if label.kind != TokenKind::Identifier
+                        || self.peek_kind() != Some(TokenKind::Colon)
+                    {
+                        panic!(
+                            "enum payloads are keyword-only — write {}: in {}",
+                            label.text, token.text
+                        );
+                    }
+                    self.position += 1; // the `:`
+                    payload.push((label.text.to_string(), self.expression()));
+                    if self.peek_kind() != Some(TokenKind::Comma) {
+                        break;
+                    }
+                    self.position += 1; // the `,`
+                }
+                if self.peek_kind() != Some(TokenKind::RightParen) {
+                    panic!("expected ) to close the payload of {}", token.text);
+                }
+                self.position += 1;
+                Expression::EnumCase {
+                    name: symbol_name(token.text),
+                    payload,
+                }
+            }
             TokenKind::Symbol => Expression::Symbol(symbol_name(token.text)),
             TokenKind::WordArray => {
                 let words = &token.text[3..token.text.len() - 1];

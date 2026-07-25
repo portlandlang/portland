@@ -242,6 +242,55 @@ Statistics::Summary.new(mean: 2)       # both, in order
 
 Names are **always fully qualified**: no import, no aliasing, no injection, with lexical nesting the only shortening. `module A::B` and nested blocks are semantically identical, which drops Ruby's `Module.nesting` trap. Bare names resolve outward from where they were _written_, not from where they are called.
 
+## Symbols and enums
+
+A symbol is a name rather than data (ADR 0023). `:paid`, `:paid?`, and `:"odd key"` when the name is not identifier-shaped. Comparison is equality only; a symbol is not a String, and `:paid == "paid"` is `false` here where the real compiler will refuse it.
+
+Hash keys use the shorthand, and it is the only spelling of a symbol key:
+
+```ruby
+config = {name: "pdx", port: 8080}
+config[:name]                        # => "pdx"
+mixed = {"string" => 1, sym: 2}      # the rocket stays for other keys
+```
+
+`{:name => "pdx"}` is refused with the rewrite named. **There is no `String#to_sym`** — a symbol built from a string at runtime could never be checked against a vocabulary, so cutting it is what makes checking possible at all. Operator symbols (`:+`, `:[]`) went with the `send` and `&:` family that needed them.
+
+An **enum** declares a closed vocabulary of symbol cases, and a case may carry a keyword-only payload (ADR 0022):
+
+```ruby
+enum Ordering            # top-level: owned by no type
+  :less
+  :equal
+  :greater
+end
+
+struct Purchase
+  amount
+  status
+
+  enum Status            # nested: owned by Purchase
+    :pending
+    :paid(on:)
+    :refunded(on:, reason:)
+  end
+end
+
+purchase = Purchase.new(amount: 40, status: :paid(on: "tuesday"))
+
+case purchase.status
+in :pending           then "not paid yet"
+in :paid(on:)         then "paid #{on}"
+in :refunded(reason:) then "refunded — #{reason}"
+end
+```
+
+Nesting follows the rule that nests types in types, so `Purchase::Status` names the type while `purchase.status` reads the value. A payload-free case is simply a symbol — nothing about `:pending` needs to exist at runtime. A payload-carrying one destructures in `case/in` by label, exactly as a struct pattern does.
+
+There are no generated predicates and no `Status.all`: an enum is a type, not a lookup table.
+
+**What the seed does not do yet.** Membership (`:pendign` is not a case of that enum) and exhaustiveness over cases are *static* — they need to know which enum a position expects, and the seed has no types. Both wait for [#9](https://github.com/portlandlang/portland/issues/9). The one check a runtime can make is here: a payload must name the labels its case declared, so `:paid(wrong: 1)` says `` `:paid` takes (on:) ``.
+
 ## Multi-file programs
 
 `require_relative "lexer"` — resolved against the requiring file's directory, `.pdx` implied, loaded once and returning false on a repeat.
@@ -293,32 +342,6 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
   Results are named at the task site — there is no positional register. Tier three is explicit control: cancellation, timeouts, racing. Rare. Semantics are #11.
 
-- **Enums** (ADR 0022). A closed vocabulary whose cases are lowercase symbols, and a case may carry a keyword-only payload:
-
-  <!-- not-portland: enums are decided but unbuilt — `:foo` does not lex yet -->
-
-  ```ruby
-  struct Purchase
-    amount
-    status
-
-    enum Status
-      :pending
-      :paid(on:)
-      :refunded(on:, reason:)
-    end
-  end
-
-  case purchase.status
-  in :pending           then "not paid yet"
-  in :paid(on:)         then "paid #{on}"
-  in :refunded(reason:) then "refunded — #{reason}"
-  end
-  ```
-
-  Nested when the vocabulary is owned by one concept, top-level when it is not (`enum Ordering`), under the same rule that nests types in types. Membership is checked, so a typo is a compile error; the set is closed, so `case/in` over it is exhaustive. No generated predicates and no `Status.all` — it is a type, not a lookup table.
-
-- **Symbols** (ADR 0023). `:foo` is a general type, checked for membership where a closed vocabulary is declared and free everywhere else. `{name: "pdx"}` is symbol-keyed and ships — it is a parse error today, so it is a gain rather than a divergence — and it is the *only* symbol-key spelling, with `{:name => "pdx"}` a compile error naming the shorthand. There is no `String#to_sym`: a symbol built from a string at runtime could never be checked against a vocabulary, so cutting it is what makes checking possible at all. Operator symbols (`:+`, `:[]`) go with the `send`/`&:` family that needed them.
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
 
 ## Not yet designed
