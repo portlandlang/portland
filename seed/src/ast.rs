@@ -257,6 +257,8 @@ pub enum Expression {
     /// pass-myself-along case.
     SelfValue,
     String(String),
+    /// `:name` — the name without its colon (ADR 0023).
+    Symbol(String),
     Unary {
         operand: Box<Expression>,
         operator: UnaryOperator,

@@ -34,6 +34,10 @@ pub enum Value {
     /// `5`). Built by `Value::present`; keeps `[nil].first` ≠ `[].first`.
     Some(Box<Value>),
     String(String),
+    /// `:name` — a name rather than data (ADR 0023). Holds the name without
+    /// its colon. Interning is an optimisation the seed does not need: there
+    /// is no `to_sym`, so every symbol in a program is written literally.
+    Symbol(String),
     /// Immutable named record; fields stay in definition order.
     Struct {
         fields: Vec<(String, Value)>,
@@ -48,6 +52,23 @@ impl Value {
 
     pub fn hash(pairs: Vec<(Value, Value)>) -> Value {
         Value::Hash(std::rc::Rc::new(pairs))
+    }
+
+    /// How a symbol is written back out: `:paid`, or `:"odd key"` when the
+    /// name is not identifier-shaped.
+    fn symbol_source(name: &str) -> String {
+        let plain = !name.is_empty()
+            && name.chars().enumerate().all(|(index, character)| {
+                character.is_alphanumeric()
+                    || character == '_'
+                    || (index + 1 == name.len() && matches!(character, '?' | '!'))
+            });
+
+        if plain {
+            format!(":{name}")
+        } else {
+            format!(":{name:?}")
+        }
     }
 
     /// Lift a found value out of a successful partial lookup: plain values
@@ -81,6 +102,7 @@ impl Value {
             Value::Range { .. } => self.to_string(),
             Value::Some(inner) => format!("some({})", inner.inspect()),
             Value::String(value) => format!("{value:?}"),
+            Value::Symbol(name) => Value::symbol_source(name),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
                     .iter()
@@ -152,6 +174,8 @@ impl fmt::Display for Value {
             Value::Nil => write!(formatter, "nil"),
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),
+            // `puts :paid` shows the name; `p :paid` shows the literal.
+            Value::Symbol(name) => write!(formatter, "{name}"),
             Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
         }
     }

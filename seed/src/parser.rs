@@ -44,6 +44,17 @@ struct ItFrame {
 }
 
 /// Decode a raw string token (quotes included) into an expression:
+/// The name inside a symbol token: `:paid` → `paid`, `:"odd key"` → `odd key`.
+/// No interpolation, so the quoted form needs no escape handling beyond the
+/// surrounding quotes (ADR 0023 §2).
+fn symbol_name(text: &str) -> String {
+    let after_colon = &text[1..];
+    match after_colon.strip_prefix('"') {
+        Some(quoted) => quoted.trim_end_matches('"').to_string(),
+        None => after_colon.to_string(),
+    }
+}
+
 /// a plain literal, or — when it contains `#{...}` — a `+` chain with
 /// each interpolation wrapped in `.to_s`.
 fn string_expression(text: &str) -> Expression {
@@ -316,6 +327,7 @@ impl<'source> Parser<'source> {
             | TokenKind::Identifier
             | TokenKind::Integer
             | TokenKind::String
+            | TokenKind::Symbol
             | TokenKind::WordArray => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             TokenKind::Minus if next.leading_space => {
@@ -732,6 +744,9 @@ impl<'source> Parser<'source> {
                 Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
             TokenKind::String => Pattern::Literal(Box::new(string_expression(token.text))),
+            TokenKind::Symbol => {
+                Pattern::Literal(Box::new(Expression::Symbol(symbol_name(token.text))))
+            }
             TokenKind::Keyword => match token.text {
                 "false" => Pattern::Literal(Box::new(Expression::Boolean(false))),
                 "nil" => Pattern::Literal(Box::new(Expression::Nil)),
@@ -1556,6 +1571,7 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => string_expression(token.text),
+            TokenKind::Symbol => Expression::Symbol(symbol_name(token.text)),
             TokenKind::WordArray => {
                 let words = &token.text[3..token.text.len() - 1];
                 Expression::ArrayLiteral(

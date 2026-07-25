@@ -732,6 +732,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
+            Expression::Symbol(name) => Some(Value::Symbol(name.clone())),
             Expression::Binary {
                 left,
                 operator,
@@ -2066,6 +2067,53 @@ mod tests {
     #[test]
     fn evaluates_integer_addition() {
         assert_eq!(evaluate("1 + 2 + 3"), Some(Value::Integer(6)));
+    }
+
+    #[test]
+    fn evaluates_symbol_literals() {
+        assert_eq!(evaluate(":paid"), Some(Value::Symbol("paid".to_string())));
+        assert_eq!(evaluate(":ship!"), Some(Value::Symbol("ship!".to_string())));
+        assert_eq!(
+            evaluate(r#":"odd key""#),
+            Some(Value::Symbol("odd key".to_string()))
+        );
+    }
+
+    #[test]
+    fn symbols_compare_by_equality_and_are_not_strings() {
+        assert_eq!(evaluate(":paid == :paid"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate(":paid == :pending"), Some(Value::Boolean(false)));
+        // ADR 0023: a Symbol is not a String, and saying so is the point —
+        // Ruby answers `false` here and moves on.
+        assert_eq!(evaluate(r#":paid == "paid""#), Some(Value::Boolean(false)));
+    }
+
+    #[test]
+    fn a_symbol_writes_itself_back_as_source() {
+        assert_eq!(evaluate(":paid").unwrap().inspect(), ":paid");
+        assert_eq!(
+            evaluate(r#":"odd key""#).unwrap().inspect(),
+            r#":"odd key""#
+        );
+        // `to_s` drops the colon: the name, as text.
+        assert_eq!(
+            evaluate(":paid.to_s"),
+            Some(Value::String("paid".to_string()))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined method to_sym")]
+    fn there_is_no_to_sym() {
+        // The load-bearing omission (ADR 0023 §3): a symbol built from a
+        // string at runtime could never be checked against a vocabulary.
+        evaluate(r#""paid".to_sym"#);
+    }
+
+    #[test]
+    fn matches_symbols_in_patterns() {
+        let source = "case :paid\nin :pending then 1\nin :paid then 2\nend";
+        assert_eq!(evaluate(source), Some(Value::Integer(2)));
     }
 
     #[test]
