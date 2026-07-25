@@ -436,6 +436,49 @@ struct StringNode
   end
 end
 
+# `:name` — a symbol literal (ADR 0023). `value` holds the name without
+# its colon, matching the seed.
+struct SymbolNode
+  kind
+  value
+
+  def sexp
+    "(symbol " + value + ")"
+  end
+end
+
+# `:paid(on: expr)` — an enum case carrying a keyword payload (ADR 0022).
+struct EnumCaseNode
+  kind
+  name
+  payload
+
+  def sexp
+    "(enum_case " + name + " " + sexp_list(payload) + ")"
+  end
+end
+
+# `enum Name ... end` — a closed vocabulary. Cases are `EnumCaseDeclNode`s.
+struct EnumDefNode
+  cases
+  kind
+  name
+
+  def sexp
+    "(enum " + name + " " + sexp_list(cases) + ")"
+  end
+end
+
+struct EnumCaseDeclNode
+  kind
+  labels
+  name
+
+  def sexp
+    "(case " + name + " " + labels.join(" ") + ")"
+  end
+end
+
 struct StructDefNode
   kind
   name
@@ -478,6 +521,21 @@ end
 
 # `in ReturnNode(value: nil)` — keyword-only; fields are [label, pattern]
 # pairs (the `field:` bind-shorthand desugars to a capture at parse time).
+# `in :paid(on:)` — an enum case pattern (ADR 0022).
+struct EnumCasePatternNode
+  kind
+  name
+  payload
+
+  def sexp
+    parts = payload.map do |entry|
+      "(: #{entry[0]} #{entry[1].sexp})"
+    end
+    return "(enum_pattern #{name})" if parts.empty?
+    "(enum_pattern #{name} #{parts.join(" ")})"
+  end
+end
+
 struct StructPatternNode
   kind
   name
@@ -677,6 +735,30 @@ def string_node(value)
   StringNode.new(kind: "string", value: value)
 end
 
+def symbol_node(value)
+  SymbolNode.new(kind: "symbol", value: value)
+end
+
+def enum_case_node(name, payload)
+  EnumCaseNode.new(kind: "enum_case", name: name, payload: payload)
+end
+
+def enum_def_node(name, cases)
+  EnumDefNode.new(cases: cases, kind: "enum_def", name: name)
+end
+
+def enum_case_decl_node(name, labels)
+  EnumCaseDeclNode.new(kind: "enum_case_decl", labels: labels, name: name)
+end
+
+# The name inside a symbol token: `:paid` -> `paid`, `:"odd key"` -> `odd key`.
+def symbol_name(text)
+  inner = text.slice(1, text.length - 1)
+  return inner.slice(1, inner.length - 2) if inner.start_with?("\"")
+
+  inner
+end
+
 def self_node
   SelfNode.new(kind: "self")
 end
@@ -695,6 +777,10 @@ end
 
 def struct_pattern_node(name, fields)
   StructPatternNode.new(kind: "struct_pattern", name: name, fields: fields)
+end
+
+def enum_case_pattern_node(name, payload)
+  EnumCasePatternNode.new(kind: "enum_case_pattern", name: name, payload: payload)
 end
 
 def unary_node(operator, operand)
@@ -1094,12 +1180,49 @@ def parse_array(tokens, mutable position)
 end
 
 # `{key => value, ...}` — position already past the opening brace.
+# `:paid(on: expr)` — keyword-only payload arguments (ADR 0022 §1).
+def parse_enum_case(tokens, name, mutable position)
+  mutable payload = []
+  while true
+    label = tokens[position]
+    unless label.identifier? && operator_at?(tokens, position + 1, %w[:])
+      return Step.new(node: error_node("enum payloads are keyword-only"), position: position)
+    end
+    value = parse_expression(tokens, position + 2)
+    payload << keyword_argument_node(label.text, value.node)
+    position = value.position
+    if operator_at?(tokens, position, %w[,])
+      position += 1
+      next
+    end
+    if operator_at?(tokens, position, [")"])
+      return Step.new(node: enum_case_node(name, payload), position: position + 1)
+    end
+    return Step.new(node: error_node("expected ) to close an enum payload"), position: position)
+  end
+end
+
 def parse_hash(tokens, mutable position)
   mutable pairs = []
   if operator_at?(tokens, position, ["}"])
     return Step.new(node: hash_node(pairs), position: position + 1)
   end
   while true
+    # `{name: "pdx"}` — shorthand, and the only symbol-key spelling
+    # (ADR 0023 §1). The lexer hands back `name` then `:`.
+    if tokens[position].identifier? && operator_at?(tokens, position + 1, %w[:])
+      shorthand = parse_expression(tokens, position + 2)
+      pairs << pair_node(symbol_node(tokens[position].text), shorthand.node)
+      position = shorthand.position
+      if operator_at?(tokens, position, %w[,])
+        position += 1
+        next
+      end
+      if operator_at?(tokens, position, ["}"])
+        return Step.new(node: hash_node(pairs), position: position + 1)
+      end
+      return Step.new(node: error_node("expected closing brace in hash"), position: position)
+    end
     key = parse_expression(tokens, position)
     unless operator_at?(tokens, key.position, %w[=>])
       return Step.new(node: error_node("expected => in hash literal"), position: key.position)
@@ -1148,6 +1271,14 @@ def parse_primary(tokens, position)
   case token.kind
   when "integer" then Step.new(node: integer_node(token.text), position: after)
   when "float" then Step.new(node: float_node(token.text), position: after)
+  when "symbol"
+    # `:paid` alone is a symbol; `:paid(on: expr)` carries a payload
+    # (ADR 0022). The paren must be attached, or it is a separate thing.
+    if operator_at?(tokens, after, %w[(]) && !tokens[after].leading_space
+      parse_enum_case(tokens, symbol_name(token.text), after + 1)
+    else
+      Step.new(node: symbol_node(symbol_name(token.text)), position: after)
+    end
   when "identifier"
     if operator_at?(tokens, after, ["::"])
       parse_path(tokens, token.text, after)
@@ -1312,6 +1443,7 @@ def parse_statement(tokens, position)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
+    when "enum" then return parse_enum(tokens, position + 1)
     when "module" then return parse_module(tokens, position + 1)
     end
   end
@@ -1380,7 +1512,7 @@ def command_start?(tokens, position)
   return false if position >= tokens.length
   token = tokens[position]
   case token.kind
-  when "integer", "string", "word_array", "identifier" then true
+  when "integer", "string", "symbol", "word_array", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   when "operator" then token.text == "!"
   else
@@ -1639,6 +1771,14 @@ def parse_pattern_primary(tokens, position)
   if token.string?
     return Step.new(node: string_expression(token.text), position: position + 1)
   end
+  # `in :paid(on:)` destructures a payload; `in :paid` matches a bare case.
+  if token.symbol?
+    name = symbol_name(token.text)
+    unless operator_at?(tokens, position + 1, %w[(])
+      return Step.new(node: symbol_node(name), position: position + 1)
+    end
+    return parse_enum_case_pattern(tokens, name, position + 2)
+  end
   if token.keyword?
     if token.text == "true" || token.text == "false"
       return Step.new(node: boolean_node(token.text), position: position + 1)
@@ -1695,6 +1835,33 @@ def parse_array_pattern(tokens, mutable position)
 end
 
 # `Name(field: pattern, other:)` — keyword-only; bare `Name` matches by type.
+# `in :paid(on:)` — the same keyword-only shape as a struct pattern, so
+# `on:` alone binds a name of the same name (ADR 0022 §1).
+def parse_enum_case_pattern(tokens, name, mutable position)
+  mutable payload = []
+  while true
+    token = tokens[position]
+    unless token.identifier? && operator_at?(tokens, position + 1, %w[:])
+      return Step.new(node: error_node("enum payload patterns are keyword-only"), position: position + 1)
+    end
+    label = token.text
+    position += 2
+    if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
+      payload << [label, identifier_node(label)]
+    else
+      inner = parse_pattern(tokens, position)
+      payload << [label, inner.node]
+      position = inner.position
+    end
+    break unless operator_at?(tokens, position, %w[,])
+    position += 1
+  end
+  unless operator_at?(tokens, position, %w[)])
+    return Step.new(node: error_node("expected ) to close an enum payload pattern"), position: position)
+  end
+  Step.new(node: enum_case_pattern_node(name, payload), position: position + 1)
+end
+
 def parse_struct_pattern(tokens, name, mutable position)
   unless operator_at?(tokens, position, %w[(])
     return Step.new(node: struct_pattern_node(name, []), position: position)
@@ -1727,6 +1894,50 @@ def parse_struct_pattern(tokens, name, mutable position)
   Step.new(node: struct_pattern_node(name, fields), position: position + 1)
 end
 
+# `enum Name ... end` — a closed vocabulary (ADR 0022). Each line is one
+# case: a symbol, optionally with keyword-only payload labels.
+def parse_enum(tokens, mutable position)
+  if position >= tokens.length || !tokens[position].identifier?
+    return Step.new(node: error_node("expected enum name after enum"), position: position)
+  end
+  name = tokens[position].text
+  unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
+    return Step.new(node: error_node("enum names start with a capital letter, got #{name}"), position: position + 1)
+  end
+  position = skip_newlines_at(tokens, position + 1)
+  mutable cases = []
+  while position < tokens.length && tokens[position].symbol?
+    case_name = symbol_name(tokens[position].text)
+    position += 1
+    mutable labels = []
+    if operator_at?(tokens, position, %w[(])
+      position += 1
+      while true
+        label = tokens[position]
+        unless label.identifier? && operator_at?(tokens, position + 1, %w[:])
+          return Step.new(node: error_node("enum payloads are keyword-only"), position: position)
+        end
+        labels << label.text
+        position += 2
+        break unless operator_at?(tokens, position, %w[,])
+        position += 1
+      end
+      unless operator_at?(tokens, position, [")"])
+        return Step.new(node: error_node("expected ) to close the payload of :#{case_name}"), position: position)
+      end
+      position += 1
+    end
+    cases << enum_case_decl_node(case_name, labels)
+    position = skip_newlines_at(tokens, position)
+  end
+  unless keyword_at?(tokens, position, %w[end])
+    return Step.new(node: error_node("expected end to close enum #{name}"), position: position)
+  end
+  return Step.new(node: error_node("enum #{name} has no cases — a vocabulary needs words"), position: position + 1) if cases.empty?
+
+  Step.new(node: enum_def_node(name, cases), position: position + 1)
+end
+
 def parse_struct(tokens, mutable position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected struct name after struct"), position: position)
@@ -1750,8 +1961,12 @@ def parse_struct(tokens, mutable position)
   end
   # A type may nest in a type; a module may not (ADR 0021 §5).
   mutable nested = []
-  while keyword_at?(tokens, position, %w[struct])
-    inner = parse_struct(tokens, position + 1)
+  while keyword_at?(tokens, position, %w[struct enum])
+    inner = if keyword_at?(tokens, position, %w[enum])
+      parse_enum(tokens, position + 1)
+    else
+      parse_struct(tokens, position + 1)
+    end
     nested << inner.node
     position = skip_newlines_at(tokens, inner.position)
   end

@@ -88,6 +88,9 @@ def evaluate_statement(node, bindings)
     step = evaluate_expression(value, bindings)
     signal_outcome("return", step.value, step.bindings)
   in StructDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
+  # A declaration only: membership and exhaustiveness are static (#9), and
+  # a payload-free case is just a symbol, so nothing needs registering.
+  in EnumDefNode then outcome([], bindings)
   in ModuleDefNode then evaluate_module(node, bindings)
   else
     evaluate_expression(node, bindings)
@@ -203,9 +206,43 @@ def match_pattern(pattern, subject, bindings)
   in IdentifierNode(name:) then [[name, subject]]
   in PinNode then match_pin(pattern, subject, bindings)
   in StructPatternNode then match_struct(pattern, subject, bindings)
+  in EnumCasePatternNode then match_enum_case(pattern, subject, bindings)
   else
     match_literal(pattern, subject, bindings)
   end
+end
+
+# `in :paid(on:)` — the case name must match, then each label binds or
+# matches deeper (ADR 0022 §1).
+def match_enum_case(pattern, subject, bindings)
+  return nil unless subject in ["__enum_case__", *]
+  return nil unless value_at(subject, 1) == pattern.name
+
+  payload = value_at(subject, 2)
+  mutable captures = []
+  mutable index = 0
+  while index < pattern.payload.length
+    entry = pattern.payload[index]
+    value = enum_payload_value(payload, entry[0])
+    return nil if value.nil?
+
+    sub_captures = match_pattern(entry[1], value, bindings)
+    return nil if sub_captures.nil?
+
+    sub_captures.each do |capture|
+      captures << capture
+    end
+    index += 1
+  end
+  captures
+end
+
+def enum_payload_value(payload, label)
+  mutable found = nil
+  payload.each do |entry|
+    found = entry[1] if entry[0] == label
+  end
+  found
 end
 
 def match_literal(pattern, subject, bindings)
@@ -424,6 +461,12 @@ def evaluate_expression(node, bindings)
   in NilNode then outcome([nil], bindings)
   in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
+  # Guest symbols are tagged arrays, like guest structs — the trio cannot
+  # manufacture a host symbol, because ADR 0023 removed `to_sym` and there
+  # is deliberately no way to build one from a name at runtime. That is the
+  # decision working as intended, felt by its own compiler.
+  in SymbolNode(value:) then outcome([["__symbol__", value]], bindings)
+  in EnumCaseNode then evaluate_enum_case(node, bindings)
   in UnaryNode then evaluate_unary(node, bindings)
   in WordArrayNode(text:) then outcome([word_array_elements(text)], bindings)
   in IdentifierNode(name:)
@@ -646,6 +689,17 @@ def evaluate_new(node, mutable bindings)
     end
   end
   outcome([["__struct__", slot.first[0], ordered]], bindings)
+end
+
+# `:paid(on: "tuesday")` — a guest enum case, tagged like a guest struct.
+def evaluate_enum_case(node, mutable bindings)
+  mutable payload = []
+  node.payload.each do |argument|
+    step = evaluate_expression(argument.value, bindings)
+    bindings = step.bindings
+    payload << [argument.label, slot_value(step.value)]
+  end
+  outcome([["__enum_case__", node.name, payload]], bindings)
 end
 
 # `with` builds an updated copy of a guest struct (#27): the fields keep

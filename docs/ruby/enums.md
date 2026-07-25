@@ -2,7 +2,7 @@
 
 **Summary:** Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 
-**Status:** decided ([ADR 0022](../adr/0022-2026-07-25-enums-with-payloads.md)). Built in the seed; the trio waits. Membership and exhaustiveness are static and wait for [#9](https://github.com/portlandlang/portland/issues/9) — see [the language](../language.md#enums).
+**Status:** decided ([ADR 0022](../adr/0022-2026-07-25-enums-with-payloads.md)). Built in the seed and the trio, differentially pinned. Membership and exhaustiveness are static and wait for [#9](https://github.com/portlandlang/portland/issues/9) — see [the language](../language.md#enums).
 
 ## Ruby
 

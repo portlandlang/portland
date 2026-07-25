@@ -36,6 +36,10 @@ struct Token
   def string?
     kind == "string"
   end
+
+  def symbol?
+    kind == "symbol"
+  end
 end
 
 def digit?(character)
@@ -51,7 +55,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end false if in module mutable next nil not or return self struct then true unless when while].include?(word)
+  %w[and break case def do else elsif end enum false if in module mutable next nil not or return self struct then true unless when while].include?(word)
 end
 
 def two_character_operator?(pair)
@@ -65,6 +69,21 @@ end
 
 def one_character_operator?(character)
   "(){}[],.:+-*/%<>=!|&^".include?(character)
+end
+
+# Does the colon at `index` open a symbol (ADR 0023)?
+#
+# Not when it is `::`, and not when it is glued to a name on its left —
+# `name:` is a keyword-argument label. That one rule gives `name:"pdx"`
+# Ruby's own reading, a label and a string.
+def symbol_start?(characters, index)
+  return false if characters[index + 1] == ":"
+  return false if index > 0 && (name_character?(characters[index - 1]) || characters[index - 1] == "?" || characters[index - 1] == "!")
+
+  after = characters[index + 1]
+  return false if after.nil?
+
+  name_start?(after) || after == "\""
 end
 
 # Read a plain quoted lexeme (single-quoted, or a string nested inside an
@@ -421,6 +440,35 @@ def lex(raw_source)
         "identifier"
       end
       tokens << Token.new(kind: kind, text: text, leading_space: leading)
+      next
+    end
+    # `:name` and `:"quoted"` — a symbol literal (ADR 0023), before `::` and
+    # the bare colon. The colon binds LEFT when it directly follows a name,
+    # and RIGHT otherwise, which separates a keyword-argument label from a
+    # symbol without a never-guess error.
+    if character == ":" && symbol_start?(characters, index)
+      mutable text = ":"
+      index += 1
+      if characters[index] == "\""
+        text << characters[index]
+        index += 1
+        while index < characters.length && characters[index] != "\""
+          text << characters[index]
+          index += 1
+        end
+        text << "\""
+        index += 1
+      else
+        while index < characters.length && name_character?(characters[index])
+          text << characters[index]
+          index += 1
+        end
+        if index < characters.length && (characters[index] == "?" || characters[index] == "!")
+          text << characters[index]
+          index += 1
+        end
+      end
+      tokens << Token.new(kind: "symbol", text: text, leading_space: leading)
       next
     end
     if index + 2 < characters.length && three_character_operator?(character + characters[index + 1] + characters[index + 2])

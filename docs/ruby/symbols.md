@@ -2,7 +2,7 @@
 
 **Summary:** `:foo` survives with its spelling intact, but the set can be declared and checked; no `to_sym`, and hash shorthand is the only symbol-key form.
 
-**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md)). Built in the seed; the trio waits — see [the language](../language.md#symbols-and-enums).
+**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#symbols-and-enums).
 
 ## Ruby
 

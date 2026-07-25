@@ -1,0 +1,68 @@
+# Living documentation for ADRs 0022 and 0023: symbols, hash shorthand,
+# and enums. Runs direct and hosted, byte-identical.
+#
+# Note what this file avoids printing: a bare symbol or enum case. The trio
+# represents those as tagged arrays, exactly as it already does for guest
+# structs, because it cannot manufacture a host symbol — ADR 0023 removed
+# `to_sym`, so nothing can build one from a name at runtime. The decision
+# working as intended, felt by its own compiler.
+
+enum Ordering
+  :less
+  :equal
+  :greater
+end
+
+struct Purchase
+  amount
+  status
+
+  enum Status
+    :pending
+    :paid(on:)
+    :refunded(on:, reason:)
+  end
+end
+
+def summarize(purchase)
+  case purchase.status
+  in :pending           then "#{purchase.amount} — not paid yet"
+  in :paid(on:)         then "#{purchase.amount} — paid #{on}"
+  in :refunded(reason:) then "#{purchase.amount} — refunded, #{reason}"
+  end
+end
+
+puts summarize(Purchase.new(amount: 40, status: :pending))
+puts summarize(Purchase.new(amount: 40, status: :paid(on: "tuesday")))
+puts summarize(Purchase.new(amount: 12, status: :refunded(on: "friday", reason: "damaged")))
+
+# A payload-free case is just a symbol, so equality is ordinary.
+matched = :pending == :pending
+differed = :pending == :paid
+puts "#{matched} #{differed}"
+
+# Hash shorthand is symbol-keyed, and the rocket stays for other keys.
+config = {name: "pdx", port: 8080}
+puts config[:name]
+puts config[:port].to_s
+
+mixed = {"string" => 1, sym: 2}
+puts mixed["string"].to_s
+puts mixed[:sym].to_s
+
+# A missing symbol key is a maybe, per ADR 0010 — not a crash.
+absent = config[:nope] or "absent"
+puts absent
+
+# Symbols carry `?` and `!`, since those are part of a name.
+def ordering_word(ordering)
+  case ordering
+  in :less    then "before"
+  in :equal   then "same"
+  in :greater then "after"
+  end
+end
+
+puts ordering_word(:less)
+puts ordering_word(:equal)
+puts ordering_word(:greater)

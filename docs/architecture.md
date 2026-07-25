@@ -102,6 +102,14 @@ Two rules are currently accepted silently by the trio and refused by the seed: a
 
 The related check that _is_ possible — `it` mixed with declared `|parameters|` — works only because it declines to guess whenever the block body opens a block of its own. That is the whole principle in miniature: a gap leaves the trio incomplete, a false positive would make it unusable, and the seed catches it either way.
 
+### Guest values the trio cannot spell
+
+The trio represents some guest values as **tagged arrays** — `["__struct__", name, pairs]`, `["__symbol__", name]`, `["__enum_case__", name, payload]` — because it cannot construct the host equivalent. They compare and match correctly; they only _print_ differently, so a program that displays one raw diverges from the seed while everything computed from it agrees.
+
+For structs that is ordinary crudeness. For symbols it is something better: **`String#to_sym` does not exist** (ADR 0023 §3), and it was cut precisely so that no symbol can be conjured from a name at runtime — that is what makes membership checking possible rather than best-effort. The trio holds a symbol's name as text and therefore cannot build one either. The decision is being felt by its own compiler, which is the right outcome rather than an oversight, and the alternative — a privileged builtin the trio alone may call — would be `to_sym` wearing a hat.
+
+The fixtures work within it: `seed/tests/fixtures/enums.pdx` exercises equality, dispatch, payload destructuring, and hash lookup, and deliberately never prints a bare symbol. Closing the gap means teaching the trio to render values the way the seed's `inspect` does, which would fix structs at the same time and is worth doing when something needs it.
+
 ## One known cost
 
 `<<` is rebinding sugar (ADR 0015), and the seed implements it by cloning: appending to an array copies the whole array. Parsing 1,961 lines of Portland with the Portland parser therefore costs on the order of 200 million element copies, and that single test is 31.5 seconds of a 33-second suite. It is why the git hooks split — `pre-commit` runs the fast gate, `pre-push` runs everything.

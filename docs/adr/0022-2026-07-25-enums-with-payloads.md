@@ -1,6 +1,6 @@
 # 0022 — Enums: closed vocabularies of symbol cases, with keyword payloads
 
-- **Status:** Accepted (built in the seed, 2026-07-25; the trio waits)
+- **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-25)
 - **Date:** 2026-07-25
 
 ## Context
