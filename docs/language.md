@@ -293,12 +293,37 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
   Results are named at the task site — there is no positional register. Tier three is explicit control: cancellation, timeouts, racing. Rare. Semantics are #11.
 
-- **Symbols.** The core question is decided: `:foo` exists as a general type, checked for membership where a closed vocabulary is declared, and `{name: "pdx"}` is symbol-keyed and ships. The ADR waits on the enum shape.
+- **Enums** (ADR 0022). A closed vocabulary whose cases are lowercase symbols, and a case may carry a keyword-only payload:
+
+  <!-- not-portland: enums are decided but unbuilt — `:foo` does not lex yet -->
+
+  ```ruby
+  struct Purchase
+    amount
+    status
+
+    enum Status
+      :pending
+      :paid(on:)
+      :refunded(on:, reason:)
+    end
+  end
+
+  case purchase.status
+  in :pending           then "not paid yet"
+  in :paid(on:)         then "paid #{on}"
+  in :refunded(reason:) then "refunded — #{reason}"
+  end
+  ```
+
+  Nested when the vocabulary is owned by one concept, top-level when it is not (`enum Ordering`), under the same rule that nests types in types. Membership is checked, so a typo is a compile error; the set is closed, so `case/in` over it is exhaustive. No generated predicates and no `Status.all` — it is a type, not a lookup table.
+
+- **Symbols.** The core question is decided: `:foo` exists as a general type, checked for membership where a closed vocabulary is declared, and `{name: "pdx"}` is symbol-keyed and ships. The ADR is unblocked by 0022 and comes next.
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
 
 ## Not yet designed
 
-Enums and sum types (next up, now that namespaces exist to hold them), the rest of the object model — mixins, inheritance, visibility (#27), error handling and the deferred `!` (#28), compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9).
+The rest of the object model — mixins, inheritance, visibility (#27), error handling and the deferred `!` (#28), compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9).
 
 ## Gone, on purpose, forever
 

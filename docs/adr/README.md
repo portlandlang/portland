@@ -33,6 +33,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0019](0019-2026-07-23-ranges.md) — Ranges: total coverage, slices are collections, never-guess ends
 - [0020](0020-2026-07-23-heredocs-squiggly-only.md) — Heredocs: squiggly only, SCREAMING_CAPS terminators
 - [0021](0021-2026-07-24-namespaces-and-modules.md) — Namespaces: `module`, `::` for names, always qualified
+- [0022](0022-2026-07-25-enums-with-payloads.md) — Enums: closed vocabularies of symbol cases, with keyword payloads
 
 <!-- /generated -->
 
