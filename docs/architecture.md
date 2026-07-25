@@ -74,6 +74,26 @@ The two stdouts are compared byte-for-byte. **Expected output is never hand-writ
 
 The failure mode this harness has already shown: it stayed green through an entire batch of new syntax the trio did not understand, because no fixture used it. Green is not covered — see [principles](principles.md#7-the-seed-is-the-oracle).
 
+### The oracle relationship is asymmetric, and dated
+
+"The seed is the oracle" is true today and will stop being true, per check, in a predictable way. It is worth writing down before it happens, because the first time it does it will look like a regression.
+
+The trio is not a second implementation kept around for comparison — **it is the compiler**, at an early stage. Stage 1 grows into Stage 2, and the seed is deleted. So the trio is expected to overtake the seed, and the first place it does is static analysis: a tree-walking interpreter structurally cannot check exhaustiveness, and a compiler must ([#9](https://github.com/portlandlang/portland/issues/9) inventories the seven deferred checks).
+
+At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the trio refuses to build it. Byte-equivalence breaks — **because the trio got better**.
+
+So the contract has three states, not two, and only the first two exist today:
+
+| | seed | trio | harness |
+|---|---|---|---|
+| Both accept | runs | runs | byte-identical, forever — this is the fixture suite |
+| Trio cannot tell | refuses | accepts silently | recorded as a gap, below |
+| **Trio refuses, seed runs** | runs | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
+
+The third row is progress, not drift. When it appears, the answer is not to weaken the trio: it is that the seed's runtime behavior has stopped being evidence about a program the compiler has correctly rejected. The harness narrows to programs both accept, which stays the overwhelming majority.
+
+Note the overlap window is real rather than theoretical — the order is #9, then #5, then Stage 2 — so the trio gains static checks while the seed still exists.
+
 ## Where the trio falls short, on purpose
 
 The trio's parser is **functional** — it holds no mutable per-block state — where the seed's is not. So there are checks the seed can make that the trio structurally cannot, and where it cannot tell, it **declines to check** rather than checking wrongly.
