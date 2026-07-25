@@ -859,3 +859,75 @@ fn fails_on_a_missing_file() {
             .contains("cannot read")
     );
 }
+
+/// `pdx --parse <file>` — parse and exit, without evaluating (#35).
+///
+/// Exists so `script/docs/check` can verify that every code sample in the
+/// docs is at least syntactically real. Parsing is the right depth: it
+/// catches invented syntax without caring that a sample references
+/// `lookup(id)` or `article` without defining them, which running would.
+fn parse_only(source: &str, name: &str) -> std::process::Output {
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--parse")
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx")
+}
+
+#[test]
+fn parse_only_accepts_valid_portland() {
+    let output = parse_only("x = 1 + 2\nputs x\n", "parse_only_valid.pdx");
+    assert!(output.status.success());
+}
+
+#[test]
+fn parse_only_does_not_evaluate() {
+    // The whole point: a sample may reference names it never defines, and
+    // may print. Neither should happen.
+    let output = parse_only(
+        "puts \"should not run\"\nundefined_call(missing_name)\n",
+        "parse_only_no_eval.pdx",
+    );
+    assert!(
+        output.status.success(),
+        "parsing should not run the program"
+    );
+    assert!(
+        String::from_utf8(output.stdout).unwrap().is_empty(),
+        "--parse printed something, so it evaluated"
+    );
+}
+
+#[test]
+fn parse_only_rejects_invented_syntax() {
+    // Each of these was written into docs/language.md from memory and does
+    // not exist: an endless method, a one-line if/then/else, a ternary.
+    let cases = [
+        ("def integer? = kind == \"x\"\n", "endless method"),
+        ("y = if true then 1 else 2 end\n", "one-line if/then/else"),
+        ("y = true ? 1 : 2\n", "ternary"),
+    ];
+    for (source, what) in cases {
+        let output = parse_only(source, "parse_only_invalid.pdx");
+        assert!(
+            !output.status.success(),
+            "--parse accepted {what}, which is not Portland"
+        );
+    }
+}
+
+#[test]
+fn parse_only_needs_a_file() {
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--parse")
+        .output()
+        .expect("failed to run pdx");
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("needs a file")
+    );
+}

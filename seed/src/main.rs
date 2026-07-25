@@ -22,17 +22,45 @@ fn main() {
 }
 
 fn run() {
-    match std::env::args().nth(1) {
-        Some(path) => run_file(&path),
+    let mut arguments = std::env::args().skip(1);
+    let first = arguments.next();
+    match first.as_deref() {
+        Some("--parse") => match arguments.next() {
+            Some(path) => parse_file(&path),
+            None => {
+                eprintln!("pdx --parse: needs a file to parse");
+                process::exit(64);
+            }
+        },
+        Some(path) => run_file(path),
         None => repl(),
     }
 }
 
-fn run_file(path: &str) {
-    let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
+/// Parse and stop, without evaluating (#35).
+///
+/// The doc checks use this to prove every code sample in the documentation is
+/// real Portland. Parsing is the right depth: it catches syntax that does not
+/// exist — endless methods, a one-line `if/then/else`, a ternary, all of which
+/// were written into `docs/language.md` from memory — without caring that a
+/// sample references `lookup(id)` or `article` and never defines them, which
+/// running it would.
+///
+/// A parse error panics, and `main`'s thread join turns that into exit 1, so
+/// the caller only has to look at the status.
+fn parse_file(path: &str) {
+    parser::parse(&read_source(path));
+}
+
+fn read_source(path: &str) -> String {
+    std::fs::read_to_string(path).unwrap_or_else(|error| {
         eprintln!("pdx: cannot read {path}: {error}");
         process::exit(66);
-    });
+    })
+}
+
+fn run_file(path: &str) {
+    let source = read_source(path);
     let program = parser::parse(&source);
     let mut interpreter = Interpreter::new();
     interpreter.set_arguments(std::env::args().skip(2).collect());
