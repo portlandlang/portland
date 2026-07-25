@@ -318,7 +318,7 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
   Nested when the vocabulary is owned by one concept, top-level when it is not (`enum Ordering`), under the same rule that nests types in types. Membership is checked, so a typo is a compile error; the set is closed, so `case/in` over it is exhaustive. No generated predicates and no `Status.all` — it is a type, not a lookup table.
 
-- **Symbols.** The core question is decided: `:foo` exists as a general type, checked for membership where a closed vocabulary is declared, and `{name: "pdx"}` is symbol-keyed and ships. The ADR is unblocked by 0022 and comes next.
+- **Symbols** (ADR 0023). `:foo` is a general type, checked for membership where a closed vocabulary is declared and free everywhere else. `{name: "pdx"}` is symbol-keyed and ships — it is a parse error today, so it is a gain rather than a divergence — and it is the *only* symbol-key spelling, with `{:name => "pdx"}` a compile error naming the shorthand. There is no `String#to_sym`: a symbol built from a string at runtime could never be checked against a vocabulary, so cutting it is what makes checking possible at all. Operator symbols (`:+`, `:[]`) go with the `send`/`&:` family that needed them.
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
 
 ## Not yet designed

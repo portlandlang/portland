@@ -36,6 +36,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
+- [Symbols](symbols.md) — `:foo` survives with its spelling intact, but the set can be declared and checked; no `to_sym`, and hash shorthand is the only symbol-key form.
 - [Truthiness](truthiness.md) — Conditions take booleans, and nothing else.
 - [Types](types.md) — Static and inferred, written only at public boundaries; duck typing becomes structural.
 - [Word operators: `or`, `and`, `not`](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed.
