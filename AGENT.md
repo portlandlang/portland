@@ -39,6 +39,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
+| `script/spec`          | the language spec in `spec/`, on both oracles — seed and trio                   |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.

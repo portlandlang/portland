@@ -1,0 +1,18 @@
+#!/bin/sh
+# Run Portland's language spec — the ADRs' promises, executable.
+#
+# Twice: once on the seed, once hosted on the trio. The differential harness
+# already proves those two agree with each other; this proves they agree with
+# what was decided. A spec that only ran one way would miss half the point.
+set -e
+cd "$(dirname "$0")/.."
+
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+cargo build --quiet --package portland-seed --bin pdx
+
+for spec in spec/*_spec.pdx; do
+  echo "$spec — direct"
+  ./target/debug/pdx "$spec"
+  echo "$spec — hosted"
+  ./target/debug/pdx compiler/run.pdx "$spec"
+done

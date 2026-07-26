@@ -1,0 +1,103 @@
+# Portland's language spec: the ADRs' promises, executable.
+#
+# This is the third oracle. The differential harness proves the seed and the
+# trio agree with each other; nothing until now proved either agrees with
+# what was decided. Every example here cites the ADR it pins.
+
+#
+# Deliberately tiny, and deliberately built only from what the language has
+# today: no classes, no exceptions, no instance variables, and no blocks on
+# user-defined methods — none of which exist yet. An example is a value, not
+# a callback, which is what lets this run at all.
+#
+# The shape it is reaching for is rubyspec's `describe`/`it`, and the one
+# thing standing between here and there is `yield`. Until then, examples are
+# collected into an array and handed to `report`.
+#
+# Note what this file avoids: accumulating into a `mutable` from inside a
+# block. The trio discards a block's bindings, so a counter incremented that
+# way would be right under the seed and wrong under the trio — and the point
+# of a language spec is that both must agree.
+
+struct Example
+  description
+  detail
+  ok
+end
+
+# One example. Returns a value rather than raising, because `panic` is the
+# only crash Portland has (ADR 0010) and a spec run wants every failure, not
+# the first one.
+def spec(description, actual, expected)
+  return Example.new(description: description, detail: "", ok: true) if actual == expected
+
+  # One line because the seed cannot parse a multi-line argument list yet —
+  # a newline anywhere inside the parens is a parse error.
+  Example.new(description: description, detail: "expected #{expected}, got #{actual}", ok: false)
+end
+
+def report(examples)
+  failures = examples.reject { it.ok }
+  failures.each do |failure|
+    puts "FAIL  #{failure.description}"
+    puts "      #{failure.detail}"
+  end
+  puts "#{examples.length} examples, #{failures.length} failures"
+  panic "language spec failed" unless failures.empty?
+end
+
+mutable examples = []
+
+# ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's.
+negative = 0 - 7
+examples << spec("integer division floors toward negative infinity", negative / 2, 0 - 4)
+examples << spec("modulo takes the sign of the divisor", negative % 2, 1)
+
+# ADR 0010 — partial operations return maybes; the only crash is one you typed.
+examples << spec("first on an empty array is nil", [].first, nil)
+examples << spec("an out-of-range index is nil", [1, 2][9], nil)
+examples << spec("a missing hash key is nil", {name: "pdx"}[:nope], nil)
+
+# ADR 0019 — a slice is a collection, never a maybe.
+words = %w[rose city]
+examples << spec("a slice past the end is empty, not nil", words[9..].length, 0)
+
+# ADR 0012 — a branch that doesn't happen produces nil.
+branchless = if false
+  "taken"
+end
+examples << spec("a branchless if is nil", branchless, nil)
+
+# ADR 0015 — values never mutate; names do. An alias cannot be spooked.
+mutable numbers = [1]
+alias_of = numbers
+numbers << 2
+examples << spec("appending rebinds the name, leaving aliases alone", alias_of.length, 1)
+examples << spec("and the name itself sees the append", numbers.length, 2)
+
+# ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
+examples << spec("a symbol equals itself", :paid == :paid, true)
+examples << spec("a symbol is not the string of its name", :paid == "paid", false)
+examples << spec("hash shorthand builds symbol keys", {name: "pdx"}[:name], "pdx")
+
+# ADR 0022 — an enum case carries a keyword payload, destructured by label.
+enum Status
+  :pending
+  :paid(on:)
+end
+
+paid = :paid(on: "tuesday")
+day = case paid
+in :pending   then "never"
+in :paid(on:) then on
+end
+examples << spec("an enum payload destructures by label", day, "tuesday")
+
+# ADR 0005 — the wrapper keeps a stored nil distinguishable from a missing one.
+# This pair is the whole point: both look like nil in Ruby, and must not here.
+stored = [nil]
+missing = []
+examples << spec("a stored nil comes back present", stored.first.nil?, false)
+examples << spec("a missing one comes back absent", missing.first.nil?, true)
+
+report(examples)

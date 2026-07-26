@@ -1032,3 +1032,50 @@ fn every_builtin_appears_in_a_hosted_fixture() {
         untested.join(", ")
     );
 }
+
+/// Portland's language spec runs, on both oracles (`spec/`).
+///
+/// The differential harness proves the seed and the trio agree with each
+/// other. It cannot prove either agrees with what was *decided* — a shared
+/// misreading of an ADR passes it. So the spec runs twice, and its own
+/// `report` panics when any example fails, which is how a failure reaches
+/// this test.
+#[test]
+fn the_language_spec_passes_on_both_oracles() {
+    for spec in std::fs::read_dir(format!("{}/../spec", env!("CARGO_MANIFEST_DIR")))
+        .expect("failed to read spec/")
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            (path.extension()? == "pdx").then_some(path)
+        })
+    {
+        let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&spec)
+            .output()
+            .expect("failed to run pdx");
+        let hosted = within_seconds(20, "language spec, hosted", || {
+            Command::new(env!("CARGO_BIN_EXE_pdx"))
+                .arg(portland_run())
+                .arg(&spec)
+                .output()
+                .expect("failed to run pdx")
+        });
+
+        for (label, output) in [("direct", &direct), ("hosted", &hosted)] {
+            assert!(
+                output.status.success(),
+                "{} failed {label}:\n{}{}",
+                spec.display(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        // Same spec, same oracles, same answers.
+        assert_eq!(
+            String::from_utf8(direct.stdout).unwrap(),
+            String::from_utf8(hosted.stdout).unwrap(),
+            "{} diverged between the seed and the trio",
+            spec.display()
+        );
+    }
+}
