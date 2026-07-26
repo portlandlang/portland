@@ -717,6 +717,107 @@ def plain_array?(value)
   true
 end
 
+# — rendering (#39) —
+#
+# The seed prints tagged guest shapes raw — `{[__symbol__, name] => 1}` for
+# any hash with symbol keys — because the host's Display cannot know what the
+# tags stand for. These two walkers are the seed's Display and inspect,
+# rewritten in Portland, so `puts`, `p`, `to_s`, `join`, and interpolation
+# say exactly what the seed says. Anything untagged leans on the host, which
+# is the seed itself.
+
+# The shorthand-eligible names: identifier characters throughout, with ? or !
+# allowed last. The seed asks Unicode's is_alphanumeric here and this asks an
+# ASCII table, a divergence no literally-written symbol has met yet. The
+# table sits inside the method because a method scope sees no top-level
+# locals, and a top-level constant is one.
+def identifier_shaped?(name)
+  return false if name.empty?
+  table = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+  characters = name.chars
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    suffix = index + 1 == characters.length && (character == "?" || character == "!")
+    return false unless table.include?(character) || suffix
+    index += 1
+  end
+  true
+end
+
+# How a symbol is written back out: `:paid`, or `:"odd key"` when the name
+# is not identifier-shaped (ADR 0023).
+def symbol_source(name)
+  return ":" + name if identifier_shaped?(name)
+  ":" + encode_string(name)
+end
+
+# The seed's Display: what `puts`, `to_s`, `join`, and interpolation show.
+# Symbols shed the colon; structs, enum cases, and maybes keep their inspect
+# form, which is the seed's rule too.
+def render(value)
+  return "nil" if value.nil?
+  return value_at(value, 1) if value in ["__symbol__", *]
+  return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *]
+  if plain_array?(value)
+    rendered = value.map { render(it) }
+    return "[" + rendered.join(", ") + "]"
+  end
+  if value in Hash
+    mutable pairs = []
+    value.each do |key, entry|
+      pairs << "#{render(key)} => #{render(entry)}"
+    end
+    return "{" + pairs.join(", ") + "}"
+  end
+  "#{value}"
+end
+
+# The seed's inspect: what `p` shows — strings with their quotes, symbols
+# with their colons, and hash pairs written the way they would be typed,
+# shorthand for identifier-shaped symbol keys and the rocket for the rest.
+def render_inspect(value)
+  return "nil" if value.nil?
+  return symbol_source(value_at(value, 1)) if value in ["__symbol__", *]
+  if value in ["__enum_case__", *]
+    labels = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
+    return "#{symbol_source(value_at(value, 1))}(#{labels.join(", ")})"
+  end
+  if value in ["__struct__", *]
+    fields = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
+    return "#{value_at(value, 1)}(#{fields.join(", ")})"
+  end
+  if plain_array?(value)
+    rendered = value.map { render_inspect(it) }
+    return "[" + rendered.join(", ") + "]"
+  end
+  if value in Hash
+    mutable pairs = []
+    value.each do |key, entry|
+      pairs << rendered_pair(key, entry)
+    end
+    return "{" + pairs.join(", ") + "}"
+  end
+  return encode_string(value) if value in String
+  "#{value}"
+end
+
+# `to_s`, rendering: nil keeps the host's refusal — absence has no methods,
+# `to_s` included (ADR 0006) — and everything else takes the seed's Display.
+def rendered_to_s(receiver)
+  return receiver.to_s if receiver.nil?
+  render(receiver)
+end
+
+# One hash pair, written the way it would be typed (ADR 0023 §1).
+def rendered_pair(key, entry)
+  if key in ["__symbol__", *]
+    name = value_at(key, 1)
+    return "#{name}: #{render_inspect(entry)}" if identifier_shaped?(name)
+  end
+  "#{render_inspect(key)} => #{render_inspect(entry)}"
+end
+
 # The seed's array rule: a negative index counts from the end, the position
 # one past the end appends, and anything further out refuses — the original
 # index in the message, not the normalized one.
@@ -922,7 +1023,9 @@ def evaluate_method_call(node, mutable bindings)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
-  when "to_s" then receiver.to_s
+  # `to_s` renders (#39); the nil refusal stays the host's, reached below
+  # when a tagless receiver has no `to_s` of its own.
+  when "to_s" then rendered_to_s(receiver)
   when "to_i" then receiver.to_i
   when "length" then receiver.length
   when "empty?" then receiver.empty?
@@ -947,7 +1050,10 @@ def evaluate_method_call(node, mutable bindings)
   when "max" then receiver.max
   when "to_a" then receiver.to_a
   when "to_f" then receiver.to_f
-  when "join" then receiver.join(arguments.first)
+  # `join` shows each element the way `to_s` would (#39), the seed's rule.
+  when "join"
+    rendered = receiver.map { render(it) }
+    rendered.join(arguments.first)
   when "include?" then receiver.include?(arguments.first)
   when "split" then receiver.split(arguments.first)
   when "start_with?" then receiver.start_with?(arguments.first)
@@ -1351,12 +1457,14 @@ def evaluate_call(node, mutable bindings)
   when "puts"
     puts "" if arguments.empty?
     arguments.each do |argument|
-      puts argument
+      # The refusal comes before the rendering, with the seed's wording.
+      panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
+      puts render(argument)
     end
     outcome([], bindings)
   when "p"
     arguments.each do |argument|
-      p argument
+      puts render_inspect(argument)
     end
     outcome(arguments, bindings)
   when "some"

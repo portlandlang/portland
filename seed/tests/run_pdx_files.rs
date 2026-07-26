@@ -651,6 +651,19 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
     );
 }
 
+/// Rendering parity (#39): the trio's tagged guest shapes — symbols,
+/// structs, enum cases — used to print raw (`{[__symbol__, name] => 1}`),
+/// so any program that displayed a symbol-keyed hash diverged. The trio now
+/// carries the seed's Display and inspect rules, so every printing path —
+/// `p`, `puts`, `to_s`, `join`, interpolation — agrees byte for byte.
+#[test]
+fn portland_evaluator_matches_the_seed_on_rendering() {
+    assert_evaluator_matches_seed(
+        "evaluator_rendering.pdx",
+        "enum Status\n  :pending\n  :paid(on:)\nend\nstruct Token\n  kind\n  text\nend\nconfig = {name: \"pdx\", port: 8080}\np config\nputs config\nodd = {:\"odd key\" => 1, \"plain\" => 2, 3 => :three}\np odd\nputs odd\np :paid\nputs :paid\nputs :paid.to_s\npaid = :paid(on: \"tuesday\")\np paid\nputs paid\ntoken = Token.new(kind: \"integer\", text: \"42\")\np token\nputs token\np([:paid, token, {a: 1}])\nputs([:paid, 1, \"two\"])\nputs([:paid, :pending].join(\"-\"))\nputs \"#{:paid} and #{config}\"\np some(nil)\nputs \"#{some(nil)}\"\nnested = {outer: {inner: :deep}}\np nested\np([1, [2, [3]]])\np \"quotes \\\" and \\\\ and\\nnewline\"\np({sym: nil})\np 1..5\nputs 1..5\n",
+    );
+}
+
 /// Block interrupts, through the trio (#41, #42): `break` stops the
 /// iteration and the call answers nil (ADR 0012); `return` unwinds on to the
 /// enclosing method — through a builtin's block and through `yield` alike,
