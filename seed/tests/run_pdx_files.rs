@@ -613,7 +613,7 @@ fn portland_evaluator_matches_the_seed_on_heredocs() {
 fn portland_evaluator_matches_the_seed_on_floats_and_ranges() {
     assert_evaluator_matches_seed(
         "evaluator_floats_ranges.pdx",
-        "p(2.5)\np(1.0)\np(2.5 + 1)\np(7 / 2.0)\np(7 / 2)\np(1.0 == 1)\np(2.9.to_i)\np(\"2.5\".to_f)\np(1..3)\np(1...3)\np((1..3).to_a)\np((1...4).to_a)\np((1..5).include?(3))\np((1..4).sum)\np([1, 2, 3][1..])\np([1, 2, 3][4..])\np([1, 2, 3][..1])\np(\"hello\"[1..3])\np((1..3).map do |number|\n  number * 2\nend)\n",
+        "p 2.5\np 2.5.to_s\nputs 2.5.to_i\np(2.5)\np(1.0)\np(2.5 + 1)\np(7 / 2.0)\np(7 / 2)\np(1.0 == 1)\np(2.9.to_i)\np(\"2.5\".to_f)\np(1..3)\np(1...3)\np((1..3).to_a)\np((1...4).to_a)\np((1..5).include?(3))\np((1..4).sum)\np([1, 2, 3][1..])\np([1, 2, 3][4..])\np([1, 2, 3][..1])\np(\"hello\"[1..3])\np((1..3).map do |number|\n  number * 2\nend)\n",
     );
 }
 

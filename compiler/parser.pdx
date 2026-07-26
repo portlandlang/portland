@@ -1563,7 +1563,10 @@ def command_start?(tokens, position)
   return false if position >= tokens.length
   token = tokens[position]
   case token.kind
-  when "integer", "string", "symbol", "word_array", "identifier" then true
+  # "float" earned its place the hard way: its absence meant `p 2.5` never
+  # became a command call at all, and the statement boundary reported the
+  # leftover token instead (#46).
+  when "float", "integer", "string", "symbol", "word_array", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   when "operator" then token.text == "!"
   else
