@@ -812,7 +812,7 @@ def evaluate_method_call(node, mutable bindings)
       arguments += argument_step.value
     end
   end
-  return evaluate_block_call(node, receiver, bindings) if node.block.some?
+  return evaluate_block_call(node, receiver, arguments, bindings) if node.block.some?
   # `with` copies-and-updates before any dispatch, like the seed (#27).
   if node.name == "with" && (receiver in ["__struct__", *])
     return outcome([struct_with(receiver, keyword_values)], bindings)
@@ -835,6 +835,11 @@ def evaluate_method_call(node, mutable bindings)
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?
+  when "positive?" then receiver.positive?
+  when "negative?" then receiver.negative?
+  when "keys" then receiver.keys
+  when "values" then receiver.values
+  when "key?" then receiver.key?(arguments.first)
   when "first" then receiver.first
   when "last" then receiver.last
   when "sum" then receiver.sum
@@ -870,7 +875,7 @@ def run_guest_block(block, arguments, bindings)
   run_body(block.body, scope)
 end
 
-def evaluate_block_call(node, receiver, bindings)
+def evaluate_block_call(node, receiver, arguments, bindings)
   block = node.block
   case node.name
   when "each"
@@ -902,6 +907,26 @@ def evaluate_block_call(node, receiver, bindings)
   when "times"
     receiver.times do |index|
       run_guest_block(block, [index], bindings)
+    end
+    outcome([receiver], bindings)
+  when "each_with_index"
+    receiver.each_with_index do |element, index|
+      run_guest_block(block, [element, index], bindings)
+    end
+    outcome([receiver], bindings)
+  when "reduce"
+    results = receiver.reduce(arguments.first) do |running, element|
+      slot_value(run_guest_block(block, [running, element], bindings).value)
+    end
+    outcome([results], bindings)
+  when "upto"
+    receiver.upto(arguments.first) do |number|
+      run_guest_block(block, [number], bindings)
+    end
+    outcome([receiver], bindings)
+  when "downto"
+    receiver.downto(arguments.first) do |number|
+      run_guest_block(block, [number], bindings)
     end
     outcome([receiver], bindings)
   else

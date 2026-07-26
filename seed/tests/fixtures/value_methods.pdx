@@ -1,0 +1,68 @@
+# Differential coverage for the value methods and block forms in
+# docs/language.md's library table.
+#
+# Written because an audit found 21 of 42 documented methods had never run
+# through the trio — the harness was green over a surface it had never
+# exercised, which is the failure mode that already bit once during the
+# 0016–0020 batch. Everything here runs direct and hosted, byte-identical.
+
+# — strings —
+word = "Portland"
+puts word.downcase
+puts word.reverse
+puts word.chars.length.to_s
+puts word.start_with?("Port").to_s
+puts word.end_with?("land").to_s
+puts word.slice(0, 4)
+puts "rose city pdx".split(" ").join("-")
+
+# — integers —
+puts 0.zero?.to_s
+puts 7.positive?.to_s
+negative = 0 - 3
+puts negative.negative?.to_s
+
+# — arrays —
+numbers = [3, 1, 2]
+puts numbers.last.to_s
+puts numbers.max.to_s
+puts numbers.sort.join(",")
+puts numbers.slice(1, 2).join(",")
+
+# — hashes —
+config = {"name" => "pdx", "port" => "8080"}
+puts config.key?("name").to_s
+puts config.key?("missing").to_s
+puts config.keys.join(",")
+puts config.values.join(",")
+
+# — block forms —
+%w[a b c].each_with_index do |letter, index|
+  puts letter + index.to_s
+end
+
+counting = [1, 2, 3, 4]
+puts counting.reject { it.even? }.join(",")
+
+total = counting.reduce(0) do |running, number|
+  running + number
+end
+puts total.to_s
+
+3.times do |index|
+  puts index.to_s
+end
+
+1.upto(3) do |number|
+  puts number.to_s
+end
+
+3.downto(1) do |number|
+  puts number.to_s
+end
+
+# Note what this file does NOT do: accumulate into a `mutable` outside a
+# block. That is the accumulator pattern ADR 0001 licenses, and the trio
+# discards a block's bindings, so it silently computes a different answer.
+# A documented crude divergence, and the reason this fixture prints from
+# inside its blocks instead.
