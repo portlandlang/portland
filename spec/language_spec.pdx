@@ -9,51 +9,16 @@
 # today: no classes, no exceptions, and no instance variables — none of which
 # exist yet.
 #
-# Two shapes live here at once, because the file is mid-migration. The shape
-# it is reaching for is rubyspec's `describe`/`it`, which `yield` now makes
-# possible; the rest of the examples are still values collected into an array
-# and handed to `report`.
-#
-# What keeps the two shapes apart is no longer the trio: a block's rebindings
-# now survive the block on both oracles, so accumulating into an outer
-# `mutable` is safe here. What is left is narrower, and it lives in the
-# language rather than in the trio — a tally has to be kept somewhere, and
-# only a block can reach an outer `mutable`. A method body gets a fresh scope,
-# and there are no instance variables, no class variables, and no globals, so
-# `specify` and `expect` — being methods — cannot count anything. Hiding the
-# bookkeeping the way rubyspec does needs state a method can reach.
+# The shape is rubyspec's, which `yield` is what made possible: `describe`
+# names a subject, `specify` an example, `expect` compares. Nothing here counts
+# and nothing here panics — a tally has to be kept somewhere, and only a block
+# can reach an outer `mutable`, so `specify` and `expect`, being methods, can
+# never count. `script/spec` counts the printed lines instead, which is also
+# how mspec separates examples from formatters, and it is what lets a run
+# report every failure rather than stopping at the first.
 
-struct Example
-  description
-  detail
-  ok
-end
-
-# One example. Returns a value rather than raising, because `panic` is the
-# only crash Portland has (ADR 0010) and a spec run wants every failure, not
-# the first one.
-def spec(description, actual, expected)
-  return Example.new(description: description, detail: "", ok: true) if actual == expected
-
-  # One line because the seed cannot parse a multi-line argument list yet —
-  # a newline anywhere inside the parens is a parse error.
-  Example.new(description: description, detail: "expected #{expected}, got #{actual}", ok: false)
-end
-
-# Prints in the same shape `specify` does, so the runner's count covers both
-# harnesses and there is exactly one tally rather than one per shape. Counts
-# nothing itself, and no longer panics: the runner decides the exit status.
-def report(examples)
-  examples.each do |example|
-    puts "- #{example.description}"
-    puts "  FAIL #{example.detail}" unless example.ok
-  end
-end
-
-# The shape this file is migrating toward. `describe` and `specify` print their
-# own name and run the block they were handed; `expect` reports a mismatch and
-# keeps going. Nothing here counts, and nothing here panics — see the note above
-# on why a method cannot hold a tally, and `script/spec` for who does instead.
+# `describe` and `specify` print their own name and run the block they were
+# handed. That is the whole harness.
 #
 # `specify` rather than rubyspec's more familiar `it`, and not by taste. `it`
 # is an ordinary binding under the no-shadow rule (ADR 0017), so a file that
@@ -84,19 +49,32 @@ def specify(behavior)
   yield
 end
 
+# Absence has no methods, `to_s` included (ADR 0005/0006), so a value that may
+# be nil cannot go straight into an interpolation. Four examples below expect
+# nil, and without this a regression in any of them would panic with `nil has
+# no method to_s` — a message pointing at the harness rather than the example,
+# and a panic stopping the run at the first failure, which is the property this
+# harness exists to keep. Found by inverting `expect` to check every example
+# still fails when it should; the probe crashed instead of reporting.
+def shown(value)
+  return "nil" if value.nil?
+
+  "#{value}"
+end
+
 # One countable line per failure, indented under the example it belongs to, so
 # the runner can find it and a reader can see which example it came from
 # without the message having to repeat the description.
 def expect(actual, expected)
   return if actual == expected
 
-  puts "  FAIL expected #{expected}, got #{actual}"
+  puts "  FAIL expected #{shown(expected)}, got #{shown(actual)}"
 end
 
 # ADR 0019 — a slice is a collection, never a maybe.
-words = %w[rose city]
-
 describe("Array#[] with a range") do
+  words = %w[rose city]
+
   specify("returns an empty collection past the end, never nil") do
     expect(words[9..].length, 0)
   end
@@ -107,53 +85,108 @@ end
 # `def it` in this file the two would contest the name and the seed would
 # refuse, making 0017 the one ADR this suite could not pin.
 describe("a block's implicit `it`") do
+  words = %w[rose city]
+
   specify("is the single parameter, never declared") do
     expect(words.map { it.upcase }, ["ROSE", "CITY"])
   end
 end
 
-mutable examples = []
+# ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's. Both
+# examples show the same divergence from Rust, which truncates toward zero.
+describe("Integer#/") do
+  specify("floors toward negative infinity") do
+    expect((0 - 7) / 2, 0 - 4)
+  end
+end
 
-# ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's.
-negative = 0 - 7
-examples << spec("integer division floors toward negative infinity", negative / 2, 0 - 4)
-examples << spec("modulo takes the sign of the divisor", negative % 2, 1)
+describe("Integer#%") do
+  specify("takes the sign of the divisor") do
+    expect((0 - 7) % 2, 1)
+  end
+end
 
 # ADR 0010 — partial operations return maybes; the only crash is one you typed.
-examples << spec("first on an empty array is nil", [].first, nil)
-examples << spec("an out-of-range index is nil", [1, 2][9], nil)
-examples << spec("a missing hash key is nil", {name: "pdx"}[:nope], nil)
+# The subject is the rule rather than a method, because it spans three of them.
+describe("a partial operation") do
+  specify("answers nil for first on an empty array") do
+    expect([].first, nil)
+  end
+
+  specify("answers nil for an out-of-range index") do
+    expect([1, 2][9], nil)
+  end
+
+  specify("answers nil for a missing hash key") do
+    expect({name: "pdx"}[:nope], nil)
+  end
+end
 
 # ADR 0012 — a branch that doesn't happen produces nil.
-branchless = if false
-  "taken"
+describe("if without a matching branch") do
+  branchless = if false
+    "taken"
+  end
+
+  specify("produces nil") do
+    expect(branchless, nil)
+  end
 end
-examples << spec("a branchless if is nil", branchless, nil)
 
 # ADR 0015 — values never mutate; names do. An alias cannot be spooked.
-mutable numbers = [1]
-alias_of = numbers
-numbers << 2
-examples << spec("appending rebinds the name, leaving aliases alone", alias_of.length, 1)
-examples << spec("and the name itself sees the append", numbers.length, 2)
+#
+# The `mutable` here is safe at `describe` level, against the caveat above,
+# because the append happens in the setup rather than in an example: neither
+# example rebinds anything, so they stay independent of each other.
+describe("appending to an array") do
+  mutable numbers = [1]
+  alias_of = numbers
+  numbers << 2
+
+  specify("rebinds the name, leaving aliases alone") do
+    expect(alias_of.length, 1)
+  end
+
+  specify("and the name itself sees the append") do
+    expect(numbers.length, 2)
+  end
+end
 
 # ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
-examples << spec("a symbol equals itself", :paid == :paid, true)
-examples << spec("a symbol is not the string of its name", :paid == "paid", false)
-examples << spec("hash shorthand builds symbol keys", {name: "pdx"}[:name], "pdx")
+describe("a symbol") do
+  specify("equals itself") do
+    expect(:paid == :paid, true)
+  end
+
+  specify("is not the string of its name") do
+    expect(:paid == "paid", false)
+  end
+end
+
+describe("hash shorthand") do
+  specify("builds symbol keys") do
+    expect({name: "pdx"}[:name], "pdx")
+  end
+end
 
 # ADR 0022 — an enum case carries a keyword payload, destructured by label.
+# The declaration stays at the top level: it is compile-time information, and
+# nothing about a `describe` block is the right home for it.
 enum Status
   :pending
   :paid(on:)
 end
 
-paid = :paid(on: "tuesday")
-day = case paid
-in :pending   then "never"
-in :paid(on:) then on
+describe("an enum case carrying a payload") do
+  specify("destructures by label") do
+    paid = :paid(on: "tuesday")
+    day = case paid
+    in :pending   then "never"
+    in :paid(on:) then on
+    end
+    expect(day, "tuesday")
+  end
 end
-examples << spec("an enum payload destructures by label", day, "tuesday")
 
 # ADR 0005 — the wrapper keeps a stored nil distinguishable from a missing one.
 # This pair is the whole point: both look like nil in Ruby, and must not here.
@@ -169,5 +202,3 @@ describe("Array#first") do
     expect(missing.first.nil?, true)
   end
 end
-
-report(examples)

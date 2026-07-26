@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The language spec is all `describe`/`specify` now** — the flat harness is gone, `struct Example`, `spec()` and `report()` with it, and the file is one shape instead of two. Still 16 examples, which is the check that they migrated rather than evaporated. Ten `describe` groups, each naming a subject and carrying its own fixtures.
+
+- Subjects name methods where an ADR is about one — `Integer#/`, `Integer#%`, `Array#first`, `Array#[] with a range` — and name the rule where it spans several, since ADR 0010's three examples are `Array#first`, `Array#[]` and `Hash#[]` and no single method is the subject. Descriptions were rewritten rather than moved: a `spec()` description had to stand alone, while a `specify` only finishes the sentence its `describe` started.
+
+- **A latent harness bug, found by a probe that failed in the right way.** To check every example was still live rather than merely parsing, `expect` was inverted so that passing examples report — and the run *panicked* instead: `nil has no method to_s`. Absence has no methods (ADR 0005/0006), so `"expected #{expected}"` cannot render a nil, and four examples expect nil. A regression in any of those four would have panicked with a message pointing at the harness rather than the example, and stopped the run at the first failure — reintroducing exactly the property the runner-side tally exists to remove, in the four places hardest to notice. Fixed with a `shown` helper. The old flat `spec()` had the same bug and never hit it, because every failure ever hand-tested happened to be non-nil.
+
+- With that fixed, the inversion probe does what it was for: **16 examples, 16 failures** on both oracles, so every example genuinely fails when it should. Parsing was never the question.
+
 - **Fixtures live inside the `describe` that uses them**, which is where `stored` and `missing` moved (user's call, and the better one — the first placement was the shortest move from the flat layout rather than a decision). A `specify` block closes over where it was written, so it sees them, and they stop being visible to twelve unrelated examples below.
 
 - There is **no `before`, and for an immutable fixture there is nothing for one to do**: the setup runs once, both examples share the value, and no example can corrupt it for the next, because values never mutate (ADR 0015). Immutability is doing the job `before` exists to do in Ruby.
