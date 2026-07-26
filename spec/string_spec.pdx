@@ -70,6 +70,19 @@ describe "the string library" do
   end
 end
 
+# `to_s` is universal — it is what interpolation calls, and every value has
+# an answer. Every value except nil, which has no methods at all (ADR 0006);
+# its absence from this list is the point of that ADR.
+describe "to_s" do
+  specify "renders numbers, booleans, and collections" do
+    expect([42.to_s, 2.5.to_s, true.to_s, [1, "two"].to_s], ["42", "2.5", "true", "[1, two]"])
+  end
+
+  specify "is identity on a string" do
+    expect("already".to_s, "already")
+  end
+end
+
 # ADR 0010 — string indexing is a partial operation, so it answers a maybe.
 describe "String#[]" do
   city = "portland"

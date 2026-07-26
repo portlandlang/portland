@@ -12,6 +12,18 @@ describe "a symbol" do
   specify "is not the string of its name" do
     expect(:paid == "paid", false)
   end
+
+  specify "is not any other symbol" do
+    expect(:paid == :pending, false)
+  end
+
+  specify "may end in a question mark, the suffix part of the name" do
+    expect([:paid? == :paid?, :paid == :paid?], [true, false])
+  end
+
+  specify "takes the quoted spelling when the name is not identifier-shaped" do
+    expect(:"odd key" == :"odd key", true)
+  end
 end
 
 describe "hash shorthand" do

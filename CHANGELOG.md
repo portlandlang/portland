@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec rounds out symbols and `to_s`** (ADRs 0006, 0023) — `symbol_spec` gains distinct symbols unequal, the `?` suffix as part of the name, and the quoted `:"odd key"` spelling; `string_spec` gains the universal `to_s`, with a comment naming nil's absence from the list as ADR 0006's point. Found alongside: `p 2.5.to_s` parses in the seed but not the trio — a float literal taking a method call in command-argument position is one more hosted parser gap.
+
 - **The language spec deepens mutability and enums** (ADRs 0001, 0015, 0022) — `mutable_spec` gains index assignment on hashes with the alias left alone, all five compound operators, the string `<<`, a `mutable` parameter that never touches the caller's binding, and the licensed accumulator; `enum_spec` gains multi-label payloads destructured by any subset, the one-line `in`, the payload-free-case-is-a-symbol rule, and an enum nested in a struct.
 
 - **Three more oracle divergences surfaced while writing those** — `list[0] = 9` runs in the seed and crashes the trio's evaluator with an internal `block expects 2 argument(s), got 1`; a struct holding both an enum and a method parses in the seed and not in the trio (`expected end to close struct Purchase`); and the seed's runtime payload checks are absent hosted — `:paid(on: 1)` with no enum declaring `:paid` is refused by the seed and accepted by the trio, as is rebinding a case capture the seed fences with no-shadow. Each has a note in the spec file whose example it displaced.
