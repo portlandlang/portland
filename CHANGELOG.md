@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixtures live inside the `describe` that uses them**, which is where `stored` and `missing` moved (user's call, and the better one — the first placement was the shortest move from the flat layout rather than a decision). A `specify` block closes over where it was written, so it sees them, and they stop being visible to twelve unrelated examples below.
+
+- There is **no `before`, and for an immutable fixture there is nothing for one to do**: the setup runs once, both examples share the value, and no example can corrupt it for the next, because values never mutate (ADR 0015). Immutability is doing the job `before` exists to do in Ruby.
+
+- **A `mutable` fixture is the exception, and this only became true today.** A block rebinding an outer `mutable` now works on both oracles, so a `mutable` declared at `describe` level and rebound by one example is visible to the next — the examples stop being independent and their order starts to matter. Before this morning the same shape was *divergent* rather than leaky, which is a nastier bug wearing a quieter face. Such a fixture belongs inside the single `specify` that needs it, and since nothing in the language will stop you, a comment in the spec file is the only guard. Worth knowing before the ADR 0015 alias/append pair migrates, since that group mutates as part of what it tests.
+
 - **The ADR 0005 pair migrated to `describe`/`specify`** — one `describe("Array#first")` holding both halves, since the pair *is* the point: one call, two inputs, a stored nil that comes back present and a missing one that comes back absent. Split across two `describe`s they would read as unrelated facts rather than the contrast the ADR exists to draw. The tally is unmoved at 16, which is the check that the examples migrated rather than vanished — and the output shape being identical across both harnesses is what let two examples change form without changing a byte of the total.
 
 - Their descriptions got rewritten rather than copied across, because a `spec()` description had to stand alone and a `specify` does not: with a subject naming the method, "a stored nil comes back present" repeats what `Array#first` already said. Under a `describe`, the example only finishes the sentence.

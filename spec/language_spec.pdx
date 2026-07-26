@@ -61,6 +61,19 @@ end
 # which would make ADR 0017 the one ADR this suite structurally cannot pin,
 # a blind spot in the file whose whole job is to have none. `specify` is
 # mspec's own alias for `it`, so this borrows prior art rather than inventing.
+#
+# Fixtures belong inside the `describe` that uses them — a `specify` block
+# closes over where it was written, so it sees them. There is no `before`, and
+# for an immutable fixture there is nothing for one to do: the setup runs once,
+# both examples share the value, and no example can corrupt it for the next,
+# because values never mutate (ADR 0015).
+#
+# A `mutable` fixture is the exception, and it must go inside the one `specify`
+# that needs it. A block rebinding an outer `mutable` is the accumulator pattern
+# ADR 0001 licenses, and it now works on both oracles — which means a `mutable`
+# declared at `describe` level and rebound by one example is visible to the
+# next, so the examples stop being independent and their order starts to matter.
+# Nothing in the language will stop you; this comment is the only guard.
 def describe(subject)
   puts subject
   yield
@@ -144,10 +157,10 @@ examples << spec("an enum payload destructures by label", day, "tuesday")
 
 # ADR 0005 — the wrapper keeps a stored nil distinguishable from a missing one.
 # This pair is the whole point: both look like nil in Ruby, and must not here.
-stored = [nil]
-missing = []
-
 describe("Array#first") do
+  stored = [nil]
+  missing = []
+
   specify("comes back present when a nil was stored") do
     expect(stored.first.nil?, false)
   end
