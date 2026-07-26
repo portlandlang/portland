@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Brace blocks attach wherever `do` blocks do** ([ADR 0024](docs/adr/0024-2026-07-26-brace-after-a-call-name.md), built in the seed and the trio, differentially pinned). The line that drove it now runs: `repeat { greet name: "pdx" }`. So does `repeat() { ... }`, and `render(config) { ... }`, and `render(config() { ... })` — none of which parsed before, in any spelling. Until today a brace block could only be given to a *dot* call.
+
+- **Two of ADR 0016's three suggested rewrites did not parse**, which is the part that turned a nicety into a repair. Its worked example has been telling authors to write `render(config { ... })` and `render(config) { ... }` since the day it landed, and both were syntax errors — so the never-guess menu, whose whole promise is "one round, never a dialogue", sent you to a second unrelated error. Measured rather than reasoned, and the fix is what makes the menu true.
+
+- A third flaw in the same menu, subtler: `render(config { ... })` would still have been **ambiguous if it had parsed** — is the brace config's hash argument or its block? Both menus now say `render(config() { ... })`, which parses and has one reading. ADR 0016's text and the ledger are corrected in place, since a rewrite that does not work is not a rewrite.
+
+- What stays refused is what genuinely has two readings: `{}` (empty hash or empty block), `{name: 1}`, `{ "a" => 1 }`. `foo {}` is the one residual Ruby divergence — valid there, refused here with both rewrites named — and it is in the ledger.
+
+- The oracles reach it differently, again. The seed extends its `command_arguments` flag from `do` to `{`; the trio, holding no parser state, finds the opener up front and parses the arguments against a token list that stops there. That needed two exclusions the seed gets for free: a `{` after a **comma** is a hash literal argument, not an opener (`render one, {name: 1}` still parses), and a `{` after a **dot call** was never ambiguous (`puts counting.reject { it.even? }` — which is in `value_methods.pdx`, and is how the too-broad first attempt got caught).
+
 - **The brace peek reads the first pair position, not the whole body.** `twice { greet name: "pdx" }` was called ambiguous because the peek saw `name:` *somewhere* inside and concluded the braces might be a hash. They cannot be: a hash's first element has to be `label: value` or `value => value`, and this one starts with `greet` followed by an identifier. `config = { greet name: "pdx" }` is `expected => in hash literal`, so the parser already knew — the peek just was not asking in the right place. Now it asks at the front, and stops at the first comma or newline, since a hash literal cannot span lines either.
 
 - This was the peek trimming the menu **wrongly**, which is the failure principle 3 names: peek to shorten the question, never to answer it. Yesterday's fix taught it about shorthand keys and made it too eager in the process; both halves are now pinned, the shorthand one and this one, on both oracles.

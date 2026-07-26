@@ -365,6 +365,11 @@ impl<'source> Parser<'source> {
             // No `leading_space` guard, unlike `[` below: `foo{...}` has no
             // indexing reading to be told apart from a block, so the spacing
             // changes nothing about what it could mean.
+            //
+            // ADR 0024: with no argument in between there is no inner call to
+            // own the block, so the menu is two long — and where the peek rules
+            // the hash out it is one long, which is not an ambiguity at all.
+            // Then the braces are this call's block, the same as `do`.
             TokenKind::LeftBrace => {
                 if self.braces_at_could_be_a_hash(self.position + 1) {
                     panic!(
@@ -373,13 +378,14 @@ impl<'source> Parser<'source> {
                          a hash argument to {name}:  {name}({{ ... }})"
                     );
                 }
-                // Trimmed to one reading, so the error stops asking and starts
-                // telling: a `|` or a body with no `=>` and no label rules the
-                // hash out, and with no argument in between there is no inner
-                // call to own the block either.
-                panic!(
-                    "`{{` after a paren-less call is this call's block — write {name}() {{ ... }} or {name} do ... end"
-                );
+                let name = name.to_string();
+                self.position += 1; // the name; `block` starts at the `{`
+                return Some(Statement::Expression(Expression::Call {
+                    arguments: Vec::new(),
+                    block: Some(self.block()),
+                    keyword_arguments: Vec::new(),
+                    name,
+                }));
             }
             TokenKind::LeftBracket if next.leading_space => {
                 panic!(
@@ -441,13 +447,13 @@ impl<'source> Parser<'source> {
                 panic!(
                     "`{{` after a command call could be three things — parenthesize the one you mean:\n  \
                      a hash argument to {inner}:  {name} {inner}({{ ... }})\n  \
-                     a block for {inner}:         {name}({inner} {{ ... }})\n  \
+                     a block for {inner}:         {name}({inner}() {{ ... }})\n  \
                      a block for {name}:         {name}({inner}) {{ ... }}"
                 );
             }
             panic!(
                 "`{{` after a command call is a block — but whose? parenthesize the one you mean:\n  \
-                 a block for {inner}:  {name}({inner} {{ ... }})\n  \
+                 a block for {inner}:  {name}({inner}() {{ ... }})\n  \
                  a block for {name}:  {name}({inner}) {{ ... }}"
             );
         }
@@ -1749,10 +1755,14 @@ impl<'source> Parser<'source> {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
-                    // Not while inside a command call's arguments: there the
-                    // `do` belongs to the outer call (`outer inner(1) do`).
-                    let block = (!self.command_arguments && self.peek_is_keyword("do"))
-                        .then(|| self.block());
+                    // ADR 0024: parens closed the argument list, so a block
+                    // opening here has one owner and `{` is as good as `do`.
+                    //
+                    // Not while inside a command call's arguments, though:
+                    // there a `do` belongs to the outer call (`outer inner(1)
+                    // do`) and a `{` is the three-way position ADR 0016 refuses.
+                    let block =
+                        (!self.command_arguments && self.block_opens()).then(|| self.block());
                     Expression::Call {
                         arguments,
                         block,
@@ -1762,7 +1772,15 @@ impl<'source> Parser<'source> {
                 // A bare name followed by `do` is a call handed a block,
                 // which `yield` reaches from inside the method. Same exception:
                 // as an argument, the name does not claim the outer call's do.
-                } else if !self.command_arguments && self.peek_is_keyword("do") {
+                //
+                // ADR 0024 lets `{` in here too, but only where the peek rules
+                // the hash out — `config { "a" => 1 }` could be handing config a
+                // hash instead, so that one stays for the never-guess menu.
+                } else if !self.command_arguments
+                    && (self.peek_is_keyword("do")
+                        || (self.peek_kind() == Some(TokenKind::LeftBrace)
+                            && !self.braces_could_be_a_hash()))
+                {
                     Expression::Call {
                         arguments: Vec::new(),
                         block: Some(self.block()),

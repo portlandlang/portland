@@ -39,3 +39,19 @@ end
 hosting inner_value do
   puts("still the outer call's block")
 end
+
+# ADR 0024 — a brace block attaches wherever a `do` block does. One reading is
+# not an ambiguity, and the peek reads only the first pair position, so a
+# keyword argument in the body is not mistaken for a hash key.
+def greet_with(name:)
+  puts("hi #{name}")
+end
+
+def repeat
+  yield
+  yield
+end
+
+repeat { puts("brace on a paren-less call") }
+repeat() { puts("brace on a parenthesized call") }
+repeat { greet_with name: "pdx" }

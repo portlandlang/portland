@@ -82,7 +82,10 @@ fn runs_blocks_pdx() {
         String::from_utf8(output.stdout).unwrap(),
         "PORTLAND\nSALEM\nEUGENE\n8, 5, 6\nGO! BLAZERS!\n\
          a string argument\nthe block ran\n\
-         an argument\nstill the outer call's block\n"
+         an argument\nstill the outer call's block\n\
+         brace on a paren-less call\nbrace on a paren-less call\n\
+         brace on a parenthesized call\nbrace on a parenthesized call\n\
+         hi pdx\nhi pdx\n"
     );
 }
 
@@ -538,16 +541,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n",
             "could be two things",
         ),
+        // ADR 0024 accepts the one-reading forms, so the refusals that remain
+        // are the genuinely two-reading ones. `{}` is the empty pair.
         (
-            "def expecting(v)\n  v\nend\nexpecting { |item| item }\n",
-            "is this call's block",
-        ),
-        // The peek reads the first pair position only, so a keyword argument
-        // inside a block body is not mistaken for a hash key. Both oracles
-        // used to scan the whole body and call this ambiguous.
-        (
-            "def greet(name:)\n  name\nend\ndef twice\n  yield\nend\ntwice { greet name: \"pdx\" }\n",
-            "is this call's block",
+            "def expecting(v)\n  v\nend\nexpecting {}\n",
+            "could be two things",
         ),
     ];
     for (source, expected) in cases {

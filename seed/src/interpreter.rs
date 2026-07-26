@@ -2705,30 +2705,44 @@ end
         evaluate("def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n");
     }
 
-    /// Trimmed to one reading, so the error tells rather than asks: no `=>` and
-    /// no label rules the hash out, and with no argument in between there is no
-    /// inner call to own the block either.
+    /// ADR 0024: one reading is not an ambiguity, so the braces are this call's
+    /// block — no `=>` and no leading label rules the hash out, and with no
+    /// argument in between there is no inner call to own it either.
     #[test]
-    #[should_panic(expected = "`{` after a paren-less call is this call's block")]
-    fn a_brace_after_a_call_name_trims_to_one_reading() {
-        evaluate("def expecting(value)\n  value\nend\nexpecting { 1 }\n");
+    fn a_brace_block_attaches_to_a_paren_less_call() {
+        let source = "def twice\n  yield\n  yield\nend\ntwice { puts(\"again\") }\n";
+        assert_eq!(output_of(source), "again\nagain\n");
     }
 
-    /// The peek reads only the first pair position, so a keyword argument in a
-    /// block body is not mistaken for a hash key.
+    /// The line that drove ADR 0024. The peek reads the first pair position
+    /// only, so a keyword argument in a block body is not a hash key, and
+    /// `twice() { ... }` — which does not even parse — is not demanded of it.
     #[test]
-    #[should_panic(expected = "is this call's block")]
     fn a_keyword_argument_in_a_block_body_is_not_a_hash() {
-        evaluate(
-            "def greet(name:)\n  name\nend\ndef twice\n  yield\nend\ntwice { greet name: \"pdx\" }\n",
-        );
+        let source = "def greet(name:)\n  puts(name)\nend\ndef twice\n  yield\nend\ntwice { greet name: \"pdx\" }\n";
+        assert_eq!(output_of(source), "pdx\n");
     }
 
     /// A `|` rules the hash out the same way.
+    ///
+    /// Pinned by the *arity* error rather than by output, and deliberately: a
+    /// parameterised block cannot run on a user-defined call yet, because
+    /// `yield` takes no arguments. Reaching "block expects 1 argument(s)" is
+    /// itself the proof that the `{ |item|` parsed and attached to `each_one` —
+    /// before ADR 0024 this was a parse error instead.
     #[test]
-    #[should_panic(expected = "`{` after a paren-less call is this call's block")]
-    fn block_parameters_trim_the_brace_menu_to_one_reading() {
-        evaluate("def expecting(value)\n  value\nend\nexpecting { |item| item }\n");
+    #[should_panic(expected = "block expects 1 argument(s), got 0")]
+    fn a_brace_block_with_parameters_attaches_to_a_paren_less_call() {
+        evaluate("def each_one\n  yield\nend\neach_one { |item| puts(item) }\n");
+    }
+
+    /// Parens closed the arguments, so a brace block has one owner there too —
+    /// the position ADR 0016's own menu suggested as a rewrite while it did not
+    /// parse.
+    #[test]
+    fn a_brace_block_attaches_to_a_parenthesized_call() {
+        let source = "def twice\n  yield\n  yield\nend\ntwice() { puts(\"again\") }\n";
+        assert_eq!(output_of(source), "again\nagain\n");
     }
 
     /// The hash reading survives a shorthand key after an argument too.

@@ -1,6 +1,6 @@
 # 0024 — Brace blocks attach wherever `do` blocks do
 
-- **Status:** Accepted (decided 2026-07-26, not yet built)
+- **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-26)
 - **Date:** 2026-07-26
 
 ## Context

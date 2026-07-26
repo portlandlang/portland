@@ -1302,8 +1302,13 @@ def parse_primary(tokens, position)
       parse_path(tokens, token.text, after)
     elsif operator_at?(tokens, after, %w[(])
       arguments = parse_arguments(tokens, after + 1)
+      # ADR 0024: parens closed the argument list, so a block opening here has
+      # one owner and `{` is as good as `do`.
       if keyword_at?(tokens, arguments.position, %w[do])
         block = parse_block(tokens, arguments.position + 1, false)
+        Step.new(node: call_with_block_node(token.text, arguments.node, block.node), position: block.position)
+      elsif operator_at?(tokens, arguments.position, %w[{])
+        block = parse_block(tokens, arguments.position + 1, true)
         Step.new(node: call_with_block_node(token.text, arguments.node, block.node), position: block.position)
       else
         Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
@@ -1312,6 +1317,12 @@ def parse_primary(tokens, position)
       # A bare name followed by `do` is a call handed a block, which
       # `yield` reaches from inside the method.
       block = parse_block(tokens, after + 1, false)
+      Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
+    elsif operator_at?(tokens, after, %w[{]) && !braces_could_be_a_hash?(tokens, after)
+      # ADR 0024, in expression position: a `{` the peek has ruled out as a
+      # hash is this call's block. Where it could be a hash the never-guess
+      # menu still owns it, so this branch declines and the caller reports.
+      block = parse_block(tokens, after + 1, true)
       Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
     else
       Step.new(node: identifier_node(token.text), position: after)
@@ -1484,8 +1495,13 @@ def parse_statement(tokens, position)
   end
   # ADR 0016 one position earlier than the usual spot: a bare `{` directly
   # after a call's name, where there is no argument for the block to belong to
-  # instead. Two readings, or one when the braces cannot be a hash.
+  # instead. Two readings — or one, and then ADR 0024 says it is this call's
+  # block, since one reading was never an ambiguity to refuse.
   if token.identifier? && operator_at?(tokens, position + 1, %w[{])
+    unless braces_could_be_a_hash?(tokens, position + 1)
+      block = parse_block(tokens, position + 2, true)
+      return Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
+    end
     return Step.new(node: error_node(brace_after_name_message(token.text, tokens, position + 1)), position: skip_line_at(tokens, position))
   end
   if token.identifier? && operator_at?(tokens, position + 1, %w[=])
@@ -1587,34 +1603,90 @@ def skip_line_at(tokens, mutable position)
   position
 end
 
-# The index of the `do` opening this command call's block, or -1 for none.
+# The index where this command call's arguments stop being arguments, or -1.
 #
-# Depth guards it: a `do` inside parentheses or brackets belongs to whatever
-# is in there, not to this call. The scan stops at the newline ending the
-# statement, which is safe because an argument list cannot span lines.
-def command_block_at(tokens, start)
+# Two openers qualify. A `do` always does: it cannot be part of an argument
+# expression, so one at this level opens this call's block. A `{` qualifies only
+# when it directly follows an identifier or a `)` — that is the never-guess
+# position, where the braces might be the inner call's block. A `{` after a
+# comma is a hash literal argument and stays one, which is why `render one,
+# {name: 1}` still parses while `render one, two { |x| x }` reports the menu.
+#
+# The seed says this with a `command_arguments` flag on its parser. This parser
+# is functional and holds no state, so it finds the spot up front and parses the
+# arguments against a token list that stops there.
+#
+# Depth guards both: an opener inside parentheses or brackets belongs to
+# whatever is in there. The scan stops at the newline ending the statement,
+# which is safe because an argument list cannot span lines.
+def command_opener_at(tokens, start)
   mutable depth = 0
   mutable index = start
   while index < tokens.length && !tokens[index].newline?
     token = tokens[index]
+    if depth == 0
+      return index if token.keyword? && token.text == "do"
+      return index if token.operator? && token.text == "{" && closes_a_callable?(tokens, index - 1)
+    end
     depth += 1 if token.operator? && ["(", "[", "{"].include?(token.text)
     depth -= 1 if token.operator? && [")", "]", "}"].include?(token.text)
-    return index if depth == 0 && token.keyword? && token.text == "do"
     index += 1
+  end
+  0 - 1
+end
+
+# Could a block belong to whatever ends here? Only a call can take one, and a
+# call ends in its name or its closing paren — but a *dot* call is excluded,
+# because its braces were never ambiguous. `puts counting.reject { it.even? }`
+# has one reading and always has; the seed attaches dot-call blocks without
+# consulting its `command_arguments` flag at all.
+def closes_a_callable?(tokens, position)
+  return false if position < 0
+  return false if dot_call_ends_at?(tokens, position)
+  token = tokens[position]
+  return true if token.identifier?
+  token.operator? && token.text == ")"
+end
+
+def dot_call_ends_at?(tokens, position)
+  token = tokens[position]
+  name = if token.operator? && token.text == ")"
+    opening = matching_paren_before(tokens, position)
+    opening - 1
+  else
+    position
+  end
+  return false if name < 1
+  return false unless tokens[name].identifier?
+  operator_at?(tokens, name - 1, %w[.])
+end
+
+# The `(` matching the `)` at `position`, or -1. Walks back, so nested parens
+# inside the arguments do not fool it.
+def matching_paren_before(tokens, position)
+  mutable depth = 0
+  mutable index = position
+  while index >= 0
+    token = tokens[index]
+    if token.operator? && token.text == ")"
+      depth += 1
+    elsif token.operator? && token.text == "("
+      depth -= 1
+      return index if depth == 0
+    end
+    index -= 1
   end
   0 - 1
 end
 
 def parse_command(tokens, mutable position)
   name = tokens[position].text
-  # A `do` past these arguments is this call's, never an argument's — Ruby's
-  # rule, and the reason `do` needs no never-guess menu the way a bare `{`
-  # does (ADR 0016). The seed carries a parser flag saying "an argument may
-  # not claim a block"; this parser is functional and holds no such state, so
-  # it hides the `do` instead — arguments are parsed against a token list
-  # that stops short of it, and the block is parsed from the full one after.
-  # Truncated only when a `do` is really there, since the copy is not free.
-  opener = command_block_at(tokens, position + 1)
+  # An opener past these arguments belongs to this call, never to an argument.
+  # For `do` that is Ruby's rule; for `{` it is the position ADR 0016 refuses,
+  # and either way the arguments must not see it — so they are parsed against a
+  # token list that stops there. Truncated only when an opener is really
+  # present, since the copy is not free.
+  opener = command_opener_at(tokens, position + 1)
   argument_tokens = if opener < 0
     tokens
   else
@@ -1629,14 +1701,14 @@ def parse_command(tokens, mutable position)
     position = step.position
   end
   unless opener < 0
-    block = parse_block(tokens, opener + 1, false)
-    return Step.new(node: call_with_block_node(name, arguments, block.node), position: block.position)
-  end
-  # ADR 0016: a bare `{` here has two or three genuine readings. Name them
-  # all and let the author pick with a paren — never guess.
-  if operator_at?(tokens, position, %w[{])
-    message = brace_ambiguity_message(name, arguments.last, tokens, position)
-    return Step.new(node: error_node(message), position: skip_line_at(tokens, position))
+    if keyword_at?(tokens, opener, %w[do])
+      block = parse_block(tokens, opener + 1, false)
+      return Step.new(node: call_with_block_node(name, arguments, block.node), position: block.position)
+    end
+    # ADR 0016: a bare `{` here has two or three genuine readings. Name them
+    # all and let the author pick with a paren — never guess.
+    message = brace_ambiguity_message(name, arguments.last, tokens, opener)
+    return Step.new(node: error_node(message), position: skip_line_at(tokens, opener))
   end
   Step.new(node: call_node(name, arguments), position: position)
 end

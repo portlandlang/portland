@@ -18,7 +18,7 @@ Paren-less survives — it's load-bearing Ruby joy — but two rules replace the
 
 The never-guess principle generalizes past parens: wherever one spelling has two genuine readings ([`Boolean?` with `or`](word-operators.md), for instance), Portland errors and asks, rather than picking for you.
 
-## Brace blocks (ADR 0016 — decided, not yet built)
+## Brace blocks (ADR 0016 — decided and built)
 
 Ruby gives `{ ... }` and `do ... end` different binding strength: after `render config`, a brace block belongs to `config` (nearest call) while a `do/end` block belongs to `render` (farthest). That's a precedence guess the reader has to know.
 
@@ -30,13 +30,13 @@ Portland takes brace blocks with no precedence split: the two forms mean exactly
 render config { "a" => 1 }
 # error: `{` after a command call could be three things — parenthesize the one you mean:
 #   a hash argument to config:  render config({ "a" => 1 })
-#   a block for config:         render(config { "a" => 1 })
+#   a block for config:         render(config() { "a" => 1 })
 #   a block for render:         render(config) { "a" => 1 }
 ```
 
 (The parser peeks to shrink the menu — `{ |item| ...` can't be a hash, so only the two owners are offered — but never to pick a winner.)
 
-### A brace right after the name (ADR 0024 — decided, not yet built)
+### A brace right after the name (ADR 0024 — decided and built)
 
 With no argument in between there is no inner call to own the block, so the menu is shorter, and for most spellings it collapses to one reading and Portland agrees with Ruby: `twice { puts "again" }` and `expecting { |item| item }` are that call's block, exactly as in Ruby.
 

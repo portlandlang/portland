@@ -31,7 +31,7 @@ A bare `{` immediately after a paren-less command call's arguments is the only s
 render config { "a" => 1 }
 # error: `{` after a command call could be three things — parenthesize the one you mean:
 #   a hash argument to config:  render config({ "a" => 1 })
-#   a block for config:         render(config { "a" => 1 })
+#   a block for config:         render(config() { "a" => 1 })
 #   a block for render:         render(config) { "a" => 1 }
 ```
 

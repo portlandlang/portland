@@ -226,7 +226,13 @@ end
 
 `do ... end` there belongs to the **outermost** call, always — `outer inner do ... end` hands the block to `outer` — which is Ruby's rule and needs no menu, because there is only one reading to have.
 
-A bare `{` in that same position is where the readings genuinely collide, so it is a never-guess error naming each one — hash argument, the inner call's block, the outer call's block — and the parser peeks to _trim_ that menu when a `|` rules the hash out, never to pick. `do` and `{` are otherwise dead-identical; this is the one position where Ruby's two forms disagree, and the one where Portland refuses the ambiguous half rather than guessing.
+**`{ ... }` attaches wherever `do ... end` does** (ADR 0024) — dot calls, parenthesized calls, and paren-less calls alike:
+
+```ruby
+repeat { greet name: "pdx" }
+```
+
+A bare `{` is refused only where the readings genuinely collide. After an argument there are three — hash argument, the inner call's block, the outer call's block — and directly after a name there are two, hash argument or block. The parser peeks at the **first pair position** to trim that menu: a hash's first element is `label: value` or `value => value`, so `{ greet name: "pdx" }` cannot be a hash however hash-like it looks further in. Where the menu trims to one reading there is nothing to guess and the braces are simply that call's block; where two survive — `{}`, `{name: 1}`, `{ "a" => 1 }` — the error names each with a rewrite that parses.
 
 ## Namespaces
 
