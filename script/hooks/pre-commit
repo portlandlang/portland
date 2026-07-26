@@ -15,5 +15,5 @@ export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace -- --skip parses_the_whole_compiler
+cargo test --workspace --quiet -- --skip parses_the_whole_compiler
 script/docs/check
