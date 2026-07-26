@@ -108,9 +108,19 @@ struct CallNode
   kind
   name
   arguments
+  block
 
   def sexp
     headed_sexp("call #{name}", arguments)
+  end
+end
+
+# `yield` — run the block the enclosing method was handed.
+struct YieldNode
+  kind
+
+  def sexp
+    "(yield)"
   end
 end
 
@@ -624,7 +634,15 @@ def break_node
 end
 
 def call_node(name, arguments)
-  CallNode.new(kind: "call", name: name, arguments: arguments)
+  CallNode.new(kind: "call", name: name, arguments: arguments, block: nil)
+end
+
+def call_with_block_node(name, arguments, block)
+  CallNode.new(kind: "call", name: name, arguments: arguments, block: block)
+end
+
+def yield_node
+  YieldNode.new(kind: "yield")
 end
 
 def case_in_node(subject, branches, else_body)
@@ -1284,7 +1302,17 @@ def parse_primary(tokens, position)
       parse_path(tokens, token.text, after)
     elsif operator_at?(tokens, after, %w[(])
       arguments = parse_arguments(tokens, after + 1)
-      Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
+      if keyword_at?(tokens, arguments.position, %w[do])
+        block = parse_block(tokens, arguments.position + 1, false)
+        Step.new(node: call_with_block_node(token.text, arguments.node, block.node), position: block.position)
+      else
+        Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
+      end
+    elsif keyword_at?(tokens, after, %w[do])
+      # A bare name followed by `do` is a call handed a block, which
+      # `yield` reaches from inside the method.
+      block = parse_block(tokens, after + 1, false)
+      Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
     else
       Step.new(node: identifier_node(token.text), position: after)
     end
@@ -1295,6 +1323,7 @@ def parse_primary(tokens, position)
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
     when "nil" then Step.new(node: nil_node, position: after)
     when "self" then Step.new(node: self_node, position: after)
+    when "yield" then Step.new(node: yield_node, position: after)
     when "if" then parse_if(tokens, after)
     when "unless" then parse_unless(tokens, after)
     when "case" then parse_case(tokens, after)

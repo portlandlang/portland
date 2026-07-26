@@ -445,6 +445,7 @@ def evaluate_expression(node, bindings)
   in BinaryNode then evaluate_binary(node, bindings)
   in BooleanNode(value:) then outcome([value == "true"], bindings)
   in CallNode then evaluate_call(node, bindings)
+  in YieldNode then evaluate_yield(bindings)
   in CaseInNode then evaluate_case_in(node, bindings)
   in CaseNode then evaluate_case(node, bindings)
   in HashNode then evaluate_hash(node, bindings)
@@ -983,6 +984,10 @@ end
 # Run a user method: fresh scope of methods only (no outer locals). The
 # caller's bindings come back untouched — callee scope is discarded.
 def invoke(payload, arguments, keyword_values, bindings)
+  invoke_with_block(payload, arguments, keyword_values, nil, bindings)
+end
+
+def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   parameters = payload[0]
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop.
@@ -993,8 +998,28 @@ def invoke(payload, arguments, keyword_values, bindings)
   # from where it was called (ADR 0021).
   home = value_at(payload, 2)
   scope = [["__home__", "home", home]] + scope unless home.nil?
+  # A `yield` inside the body reaches this. The caller's bindings travel with
+  # it, because a block closes over where it was *written*: the method's own
+  # scope has dropped every local, so yielding into it would hide them.
+  scope = [["__block__", "block", [block, bindings]]] + scope unless block.nil?
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
+  outcome(result.value, bindings)
+end
+
+# `yield` — run the block the enclosing method was handed.
+def evaluate_yield(bindings)
+  slot = lookup(bindings, "__block__")
+  panic("yield without a block — this method was called without one") if slot.empty?
+
+  handed = slot.first[2]
+  block = value_at(handed, 0)
+  written_in = value_at(handed, 1)
+  result = run_guest_block(block, [], written_in)
+  # Keep the method's own bindings: returning the block's would drop
+  # `__block__` itself, so a second `yield` in the same method would report
+  # that no block was handed over. Assignments the block made are discarded,
+  # which is the trio's existing block-scope divergence, not a new one.
   outcome(result.value, bindings)
 end
 
@@ -1022,7 +1047,7 @@ def evaluate_call(node, mutable bindings)
   mutable slot = lookup(bindings, node.name)
   slot = resolve(bindings, node.name) if slot.empty?
   if !slot.empty? && slot.first[1] == "method"
-    return invoke(slot.first[2], arguments, keyword_values, bindings)
+    return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, bindings)
   end
   case node.name
   when "puts"

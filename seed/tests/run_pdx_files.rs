@@ -648,6 +648,19 @@ fn portland_evaluator_matches_the_seed_on_symbols_and_enums() {
     );
 }
 
+/// `yield`, through the trio.
+///
+/// The block prints rather than accumulating into an outer `mutable`: the
+/// trio discards a block's bindings, so an accumulator would diverge here
+/// for a reason that has nothing to do with `yield`.
+#[test]
+fn portland_evaluator_matches_the_seed_on_yield() {
+    assert_evaluator_matches_seed(
+        "evaluator_yield.pdx",
+        "def twice\n  yield\n  yield\nend\n\ndef around\n  puts(\"before\")\n  yield\n  puts(\"after\")\nend\n\ntwice do\n  puts(\"body\")\nend\n\naround do\n  puts(\"inside\")\nend\n",
+    );
+}
+
 #[test]
 fn portland_evaluator_runs_the_fixture_suite() {
     // The summit of #19: Portland programs running on the Portland

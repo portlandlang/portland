@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `yield` threaded through the trio and differentially pinned, closing the gap the same day it opened. `lexer.pdx` gained the keyword, `parser.pdx` gained `YieldNode` and a block on `CallNode`, and `evaluator.pdx` carries the block in the bindings as `__block__` — the same trick already used for `__self__` and `__home__` — paired with the scope it was written in, so a block still closes over its definition site rather than the method's fresh scope.
+
+- One bug worth recording because the symptom pointed away from the cause: the **second** `yield` in a method reported "yield without a block". `evaluate_yield` was returning the block's bindings as the method's, which dropped `__block__` itself, so the next `yield` genuinely could not find it. The first `yield` always worked, which made it read like a block-passing failure rather than a scope-threading one.
+
+- The differential test has its block **print** rather than accumulate into an outer `mutable`, deliberately: the trio discards a block's bindings, so an accumulator would diverge for a reason that has nothing to do with `yield`. Same choice, and same reason, as `value_methods.pdx`. That gap is now the most conspicuous thing standing between the seed and the trio.
+
 - **`yield` works in the seed**: a user-defined method can be handed a `do ... end` block and run it. One test drove it — `def twice; yield; yield; end` incrementing a counter twice — and that one test was enough to surface the design question, which is the point of starting there.
 
 - The question it surfaced: **a block closes over where it was written, not where it runs.** A method body gets a fresh scope with no outer locals (Ruby's rule, kept), so yielding into the method's own scope would hide the caller's `count` entirely. `yield` therefore carries the scope the block was written in, swaps it in for the duration, and swaps back — and whatever the block rebound flows back to the caller after the call returns, because blocks rebind outer mutables and that is the accumulator pattern ADR 0001 licenses. Getting that wrong is silent: the first attempt ran the block fine and simply lost every assignment it made.
