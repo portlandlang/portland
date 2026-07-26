@@ -36,6 +36,23 @@ render config { "a" => 1 }
 
 (The parser peeks to shrink the menu — `{ |item| ...` can't be a hash, so only the two owners are offered — but never to pick a winner.)
 
+### A brace right after the name (ADR 0024 — decided, not yet built)
+
+With no argument in between there is no inner call to own the block, so the menu is shorter, and for most spellings it collapses to one reading and Portland agrees with Ruby: `twice { puts "again" }` and `expecting { |item| item }` are that call's block, exactly as in Ruby.
+
+**The difference is `foo {}`.** Ruby reads it as a call handed an empty block; Portland refuses it, because `{}` is equally an empty hash argument and neither reading wins:
+
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
+```ruby
+expecting {}
+# error: `{` after a paren-less call could be two things — parenthesize the one you mean:
+#   a block for expecting:         expecting() { ... }
+#   a hash argument to expecting:  expecting({ ... })
+```
+
+Migrating code: `foo {}` fails to compile with the rewrite named, never changes meaning. The polyfill can autocorrect it to `foo() {}` mechanically — the block is empty, so there is nothing for the rewrite to alter.
+
 ## `it` (ADR 0017 — decided, not yet built)
 
 Ruby 3.4's `it` is a soft keyword: a local or method named `it` silently wins over the block parameter. Portland makes `it` an ordinary binding under the no-shadow rule — `nodes.map { it.sexp }` just works; naming anything else `it` in the same reach is a rename-one compile error; `it` nested under a block that also uses `it` is shadowing, so it errors ("name your parameters"); `it` alongside declared `|parameters|` errors (Ruby agrees). Wherever `it` compiles, it has exactly one possible meaning.

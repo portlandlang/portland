@@ -35,6 +35,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0021](0021-2026-07-24-namespaces-and-modules.md) — Namespaces: `module`, `::` for names, always qualified
 - [0022](0022-2026-07-25-enums-with-payloads.md) — Enums: closed vocabularies of symbol cases, with keyword payloads
 - [0023](0023-2026-07-25-symbols.md) — Symbols: a general type, checked against declared vocabularies
+- [0024](0024-2026-07-26-brace-after-a-call-name.md) — Brace blocks attach wherever `do` blocks do
 
 <!-- /generated -->
 
