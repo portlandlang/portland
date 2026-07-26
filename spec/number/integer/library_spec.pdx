@@ -1,0 +1,27 @@
+# The integer library: small, read-only, and question-shaped.
+
+# Up one, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+describe "the integer library" do
+  specify "abs drops the sign" do
+    expect((0 - 5).abs, 5)
+  end
+
+  specify "zero? answers only for zero" do
+    expect([0.zero?, 1.zero?], [true, false])
+  end
+
+  specify "positive? and negative? split around it" do
+    expect([5.positive?, (0 - 5).negative?, 0.positive?], [true, true, false])
+  end
+
+  specify "even? and odd? partition" do
+    expect([4.even?, 3.odd?, 4.odd?], [true, true, false])
+  end
+
+  specify "to_f promotes" do
+    expect(2.to_f, 2.0)
+  end
+end

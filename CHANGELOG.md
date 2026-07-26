@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec covers the value library** — `string_spec`, `array_spec`, and three files under `spec/number/`: the read-only method tables from [language.md](docs/language.md#the-library-so-far), the literals' rules (interpolation nests and auto-`to_s`es, `%w`, mixed-key hashes), `+`/`*` on strings and arrays, and ADR 0018's floored rules reaching floats — `-7.0 % 2` is `1.0` while `to_i` truncates toward zero, both Ruby's choices.
+
 - **The language spec pins the unwrap toolkit and `some()`** (ADRs 0006, 0008, 0009) — the or-guard's both edges, `&.` on present and absent receivers, `nil?`/`some?` as the one universal dispatch, `some` as identity on plain values and a real box around nil, and the stored-hash-nil-beats-a-default rule that is `fetch` kept without `fetch`.
 
 - **The language spec pins ADR 0007** — `spec/word_operators_spec.pdx`: the words are the sigils, `x = nil or 7` binds the `or` first, and typed `or` is logical on booleans and unwrap-or-else on maybes. The laziness example leans on `or panic` being the only crash you can write: if the right side of a hit ever ran eagerly, the probe would not fail politely, it would take the file down.

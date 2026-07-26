@@ -1,0 +1,77 @@
+# Arrays: the literal, the word-array shorthand, and the read-only library.
+
+require_relative "spec_helper"
+
+describe "an array literal" do
+  specify "holds any mix of types, nesting included" do
+    expect([1, "two", [3]].length, 3)
+  end
+
+  specify "has a %w shorthand for words" do
+    expect(%w[rose city], ["rose", "city"])
+  end
+end
+
+describe "array operators" do
+  specify "+ concatenates" do
+    expect([1, 2] + [3], [1, 2, 3])
+  end
+
+  specify "* repeats" do
+    expect([0] * 3, [0, 0, 0])
+  end
+end
+
+describe "the array library" do
+  numbers = [3, 1, 2]
+
+  specify "measures length" do
+    expect(numbers.length, 3)
+  end
+
+  specify "answers empty? only for the empty array" do
+    expect(numbers.empty?, false)
+  end
+
+  specify "joins on a separator" do
+    expect(numbers.join("-"), "3-1-2")
+  end
+
+  specify "answers include?" do
+    expect(numbers.include?(2), true)
+  end
+
+  specify "sums" do
+    expect(numbers.sum, 6)
+  end
+
+  specify "sorts into a new array, leaving the original alone" do
+    expect(numbers.sort, [1, 2, 3])
+  end
+
+  specify "slices by start and length" do
+    expect(numbers.slice(0, 2), [3, 1])
+  end
+end
+
+# ADR 0010 — first, last, min, and max are partial, so each answers a maybe.
+# The empty-array halves live in optionals_spec; these are the present halves.
+describe "the partial array methods, on a present value" do
+  numbers = [3, 1, 2]
+
+  specify "first and last answer the ends" do
+    expect([numbers.first, numbers.last], [3, 2])
+  end
+
+  specify "min and max answer the extremes" do
+    expect([numbers.min, numbers.max], [1, 3])
+  end
+end
+
+describe "Array#[]" do
+  numbers = [3, 1, 2]
+
+  specify "counts negative indices from the end" do
+    expect(numbers[0 - 1], 2)
+  end
+end

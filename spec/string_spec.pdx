@@ -1,0 +1,88 @@
+# Strings: the library's read-only slice of them, and the literal's rules.
+
+require_relative "spec_helper"
+
+describe "a string literal" do
+  specify "interpolates, auto-to_s-ing the value" do
+    expect("port#{"land"} #{503}", "portland 503")
+  end
+
+  specify "nests interpolations" do
+    expect("#{"outer #{"inner"}"}", "outer inner")
+  end
+
+  specify "escapes the newline, tab, quote, and backslash" do
+    expect("\n\t\"\\".length, 4)
+  end
+
+  specify "escapes the interpolation hash" do
+    expect("\#{not run}".length, 10)
+  end
+end
+
+describe "string operators" do
+  specify "+ concatenates" do
+    expect("rose" + " city", "rose city")
+  end
+
+  specify "* repeats" do
+    expect("ab" * 3, "ababab")
+  end
+end
+
+describe "the string library" do
+  city = "portland"
+
+  specify "measures length" do
+    expect(city.length, 8)
+  end
+
+  specify "upcases and downcases" do
+    expect(city.upcase.downcase, "portland")
+  end
+
+  specify "reverses" do
+    expect("drawer".reverse, "reward")
+  end
+
+  specify "answers empty? only for the empty string" do
+    expect("".empty?, true)
+  end
+
+  specify "splits into chars" do
+    expect("pdx".chars, ["p", "d", "x"])
+  end
+
+  specify "splits on a separator" do
+    expect("a,b,c".split(","), ["a", "b", "c"])
+  end
+
+  specify "answers include?, start_with?, and end_with?" do
+    expect(city.include?("tla") and city.start_with?("port") and city.end_with?("land"), true)
+  end
+
+  specify "converts to_i and to_f" do
+    expect("42".to_i + "0.5".to_f, 42.5)
+  end
+
+  specify "slices by start and length" do
+    expect(city.slice(0, 4), "port")
+  end
+end
+
+# ADR 0010 — string indexing is a partial operation, so it answers a maybe.
+describe "String#[]" do
+  city = "portland"
+
+  specify "answers the character at an index" do
+    expect(city[0], "p")
+  end
+
+  specify "counts negative indices from the end" do
+    expect(city[0 - 1], "d")
+  end
+
+  specify "answers nil past the end" do
+    expect(city[99], nil)
+  end
+end
