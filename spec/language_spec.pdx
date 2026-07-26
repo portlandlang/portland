@@ -87,6 +87,16 @@ describe("Array#[] with a range") do
   end
 end
 
+# ADR 0017 — `it` is an ordinary binding, so a one-parameter block can leave it
+# undeclared. This example is the reason the DSL above says `specify`: with a
+# `def it` in this file the two would contest the name and the seed would
+# refuse, making 0017 the one ADR this suite could not pin.
+describe("a block's implicit `it`") do
+  specify("is the single parameter, never declared") do
+    expect(words.map { it.upcase }, ["ROSE", "CITY"])
+  end
+end
+
 mutable examples = []
 
 # ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's.
