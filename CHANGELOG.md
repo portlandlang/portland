@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec covers blocks** (ADRs 0016, 0024) — `spec/block/` gains `brace_spec` and `iteration_spec`: the two spellings dead-identical, ADR 0024's driving line `repeat { greet name: "pdx" }` pinned as a passing example, `{{name: 1}}` as a block holding a hash, `do` belonging to the outermost call with the block itself as the witness, and the whole block-taking library — `each` over arrays and hashes, `each_with_index`, the transformers, `reduce`, and the number loops.
+
 - **The language spec covers methods and calls** (ADR 0014) — `method_spec`: implicit return of the last expression, required and defaulted keywords, arguments in any order, a default referencing an earlier parameter, and `yield` running either block spelling handed to the call.
 
 - **The language spec covers control flow** (ADR 0012 in part) — `control_flow_spec`: `if`/`unless`/`case-when` as expressions, postfix guards on `return`, `while` with `break` and `next`, a finished loop answering nil, and `next` skipping a block iteration.
