@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The language spec covers control flow** (ADR 0012 in part) — `control_flow_spec`: `if`/`unless`/`case-when` as expressions, postfix guards on `return`, `while` with `break` and `next`, a finished loop answering nil, and `next` skipping a block iteration.
+
+- **Two more promises the trio does not keep, found the same way as the range patterns.** `return` inside a block should unwind the enclosing method (language.md's rule; the seed's behavior) — hosted, the method runs on past the block as if the `return` were a `next`. And a call broken out of should answer nil (ADR 0012) — hosted, `[1, 2].each do break end` answers `[1, 2]`. Both examples are noted in the spec file and wait on the trio; both are silent divergences, since no fixture exercised either shape.
+
 - **The language spec covers pattern matching** (ADR 0013) — `pattern_matching_spec`: keyword-only struct patterns with shorthand binding, head/rest array splits, alternation, pins, guards, `nil`, the five builtin type patterns, first-match-wins overlap, captures outliving their `case`, and both one-line forms.
 
 - **Writing it found a real oracle divergence: the trio does not match range patterns.** `case 5 in 1..9` answers the match in the seed; the trio parses the same pattern and silently misses it, falling to `else` — and one-line `in` with a range does not parse there at all (`expected newline after statement, got ..`). Silent, because an `else` swallows the miss; the differential harness never caught it because no fixture matched on a range. The spec file records the hole in place of the example it displaced; the example goes back when the trio learns range patterns.
