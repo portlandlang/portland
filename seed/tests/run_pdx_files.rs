@@ -680,7 +680,7 @@ fn portland_evaluator_matches_the_seed_on_append_and_index_assignment() {
     // Guest hashes are host hashes now, so whole-hash rendering matches too.
     assert_evaluator_matches_seed(
         "evaluator_rebinding_sugar.pdx",
-        "mutable config = {\"theme\" => \"teal\"}\nconfig[\"digest\"] = nil\nconfig[\"theme\"] = \"grey\"\np config\np config[\"theme\"]\np config[\"digest\"]\np config[\"missing\"]\nmutable line = \"port\"\nline << \"land\"\nputs line\nmutable list = [1]\nlist << 2\np list.length\nconfig.each do |key, value|\n  puts key\nend\n",
+        "mutable config = {\"theme\" => \"teal\"}\nconfig[\"digest\"] = nil\nconfig[\"theme\"] = \"grey\"\np config\np config[\"theme\"]\np config[\"digest\"]\np config[\"missing\"]\nmutable line = \"port\"\nline << \"land\"\nputs line\nmutable list = [1]\nlist << 2\np list.length\nconfig.each do |key, value|\n  puts key\nend\nmutable spots = [1, 2, 3]\naliased = spots\nspots[0] = 9\nspots[0 - 1] = 7\nspots[3] = 4\np spots\np aliased\n",
     );
 }
 

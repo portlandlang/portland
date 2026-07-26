@@ -638,8 +638,10 @@ def evaluate_range(node, mutable bindings)
   outcome([build_range(start_value, finish_value, node.exclusive)], bindings)
 end
 
-# Hash-only in the trio: array index assignment waits for type predicates
-# (object-model territory); the seed is the full oracle.
+# `name[index] = value` — a functional update rebound onto the name
+# (ADR 0015): arrays replace in range or append at the end, hashes replace
+# or add the pair. The array half used to fall into the hash rebuild and
+# crash on the two-parameter block (#43).
 def evaluate_index_update(node, mutable bindings)
   slot = lookup(bindings, node.name)
   panic("undefined variable #{node.name}") if slot.empty?
@@ -650,12 +652,47 @@ def evaluate_index_update(node, mutable bindings)
   value_step = evaluate_expression(node.value, bindings)
   bindings = value_step.bindings
   value = slot_value(value_step.value)
+  if plain_array?(current)
+    return outcome([updated_array(current, key, value, node.name)], bindings)
+  end
   mutable rebuilt = {}
   current.each do |existing_key, existing_value|
     rebuilt[existing_key] = existing_value
   end
   rebuilt[key] = value
   outcome([rebuilt], bindings)
+end
+
+# A host array that is a guest array — not one of the tagged shapes standing
+# in for values the trio cannot spell.
+def plain_array?(value)
+  return false unless value in Array
+  return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *]
+  true
+end
+
+# The seed's array rule: a negative index counts from the end, the position
+# one past the end appends, and anything further out refuses — the original
+# index in the message, not the normalized one.
+def updated_array(current, index, value, name)
+  position = if index < 0
+    current.length + index
+  else
+    index
+  end
+  return current + [value] if position == current.length
+  panic("index #{index} out of range for assignment to #{name}") if position < 0 || position > current.length
+  mutable rebuilt = []
+  mutable cursor = 0
+  current.each do |element|
+    rebuilt << if cursor == position
+      value
+    else
+      element
+    end
+    cursor += 1
+  end
+  rebuilt
 end
 
 def word_array_elements(lexeme)

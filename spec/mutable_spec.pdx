@@ -22,9 +22,8 @@ describe "appending to an array" do
 end
 
 # ADR 0015 — index assignment is the same rebinding sugar, so the alias rule
-# holds there too. The hash spelling only, for now: `list[0] = 9` runs in the
-# seed and crashes the trio's evaluator, a gap recorded the day this file
-# grew; the array example goes in when the trio can run it.
+# holds there too. The array half crashed the trio's evaluator the day this
+# file grew (#43).
 describe "index assignment on a hash" do
   mutable scores = {home: 1}
   frozen_view = scores
@@ -36,6 +35,29 @@ describe "index assignment on a hash" do
 
   specify "and the name itself sees the entry" do
     expect(scores[:away], 2)
+  end
+end
+
+# Each example carries its own `mutable`, per the helper's caveat: these
+# rebind inside the specify, and a shared fixture would chain them.
+describe "index assignment on an array" do
+  specify "rebinds the name, leaving aliases alone" do
+    mutable list = [1, 2, 3]
+    snapshot = list
+    list[0] = 9
+    expect([snapshot, list], [[1, 2, 3], [9, 2, 3]])
+  end
+
+  specify "replaces in range, counting negatives from the end" do
+    mutable list = [1, 2, 3]
+    list[0 - 1] = 7
+    expect(list, [1, 2, 7])
+  end
+
+  specify "appends at the position one past the end" do
+    mutable list = [1, 2]
+    list[2] = 3
+    expect(list, [1, 2, 3])
   end
 end
 
