@@ -29,9 +29,24 @@ failed=0
 tally() {
   examples=$(grep -c '^- ' "$transcript" || true)
   failures=$(grep -c '^  FAIL ' "$transcript" || true)
-  echo "$examples examples, $failures failures"
+  echo "$(counted "$examples" example), $(counted "$failures" failure)"
+  total_examples=$((total_examples + examples))
+  total_failures=$((total_failures + failures))
   [ "$failures" -eq 0 ] || failed=1
 }
+
+# "1 example", "2 examples" — a tally that misconjugates reads like a tool,
+# and this one is read by people (#37 named the gap).
+counted() {
+  if [ "$1" -eq 1 ]; then
+    echo "$1 $2"
+  else
+    echo "$1 ${2}s"
+  fi
+}
+
+total_examples=0
+total_failures=0
 
 # `find` rather than a glob, so a spec nested in a subdirectory is picked up
 # too — `spec/numbers/integers_spec.pdx` is not matched by `spec/*_spec.pdx`,
@@ -57,5 +72,10 @@ for spec in $specs; do
   cat "$transcript"
   tally
 done
+
+# The grand total counts runs, not examples: every spec runs twice, once per
+# oracle, and both halves count — agreeing with the seed is half the job.
+echo ""
+echo "total: $(counted "$total_examples" "example run"), $(counted "$total_failures" failure)"
 
 [ "$failed" -eq 0 ] || { echo "language spec failed"; exit 1; }
