@@ -41,6 +41,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - ✅ **`parser.pdx` parses the whole compiler including itself** ([#18](https://github.com/portlandlang/portland/issues/18))
 - ✅ **`evaluator.pdx` matches the seed byte-for-byte on the fixture suite** ([#19](https://github.com/portlandlang/portland/issues/19))
 - ✅ Trio error fidelity — the seed's exact wording, or an honest recorded gap
+- ✅ **The language spec, a third oracle** — `spec/` pins the ADRs' promises as ~190 executable examples, each run on both oracles by `script/spec`; writing it surfaced nine oracle divergences, all closed ([#39](https://github.com/portlandlang/portland/issues/39)–[#47](https://github.com/portlandlang/portland/issues/47))
 - ✅ Memory-model direction — RC is exact under immutability, no tracing GC ([#12](https://github.com/portlandlang/portland/issues/12))
 
 ### The project
