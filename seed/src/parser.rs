@@ -79,8 +79,12 @@ fn symbol_name(text: &str) -> String {
 }
 
 /// a plain literal, or — when it contains `#{...}` — a `+` chain with
-/// each interpolation wrapped in `.to_s`.
-fn string_expression(text: &str) -> Expression {
+/// each interpolation wrapped in `.to_s`. The enclosing parser's block
+/// frames come along for the ride: an `it` inside an interpolation declares
+/// the implicit parameter exactly as one outside would (#47). A fresh
+/// sub-parser used to swallow it, so `{ "x #{it}" }` was `undefined
+/// variable or method it` at runtime.
+fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
     let content = &text[1..text.len() - 1];
     if text.starts_with('\'') {
         // Single-quoted: everything is literal except \' and \\.
@@ -141,7 +145,7 @@ fn string_expression(text: &str) -> Expression {
                 if !literal.is_empty() {
                     parts.push(Expression::String(std::mem::take(&mut literal)));
                 }
-                let inner = expression_from(&content[inner_start..inner_end]);
+                let inner = expression_from(&content[inner_start..inner_end], it_frames);
                 parts.push(Expression::MethodCall {
                     arguments: Vec::new(),
                     block: None,
@@ -172,17 +176,21 @@ fn string_expression(text: &str) -> Expression {
 }
 
 /// Parse a standalone expression source (used for interpolation innards).
-fn expression_from(source: &str) -> Expression {
+/// The caller's block frames move into the sub-parser and back out, so a
+/// block opened *inside* the interpolation still nests correctly under the
+/// enclosing one, and an `it` reaches the frame it belongs to (#47).
+fn expression_from(source: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
         command_arguments: false,
         depth: 0,
-        it_frames: Vec::new(),
+        it_frames: std::mem::take(it_frames),
         position: 0,
         tokens,
     };
     let expression = parser.expression();
     parser.expect_end();
+    *it_frames = std::mem::take(&mut parser.it_frames);
     expression
 }
 
@@ -904,7 +912,9 @@ impl<'source> Parser<'source> {
                     .expect("integer literal out of range");
                 Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
-            TokenKind::String => Pattern::Literal(Box::new(string_expression(token.text))),
+            TokenKind::String => {
+                Pattern::Literal(Box::new(string_expression(token.text, &mut self.it_frames)))
+            }
             // `in :paid(on:)` destructures a payload; `in :paid` matches a
             // payload-free case (ADR 0022 §1).
             TokenKind::Symbol if self.peek_kind() == Some(TokenKind::LeftParen) => {
@@ -1836,7 +1846,7 @@ impl<'source> Parser<'source> {
                     Expression::Variable(token.text.to_string())
                 }
             }
-            TokenKind::String => string_expression(token.text),
+            TokenKind::String => string_expression(token.text, &mut self.it_frames),
             // `:paid` alone is a symbol; `:paid(on: expr)` is an enum case
             // carrying a payload (ADR 0022). The paren must be attached —
             // `foo :paid (x)` is two things, not one.

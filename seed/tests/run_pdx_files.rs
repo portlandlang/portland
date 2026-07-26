@@ -594,7 +594,7 @@ fn portland_evaluator_matches_the_seed_on_namespaces() {
 fn portland_evaluator_matches_the_seed_on_brace_blocks_and_it() {
     assert_evaluator_matches_seed(
         "evaluator_brace_blocks.pdx",
-        "p([1, 2].map { |number| number * 2 })\np([\"a\", \"b\"].map { |word| word.upcase }.join(\"-\"))\np([1, 2].map { it * 2 })\np([\"a\", \"b\"].map { it.upcase }.join(\"-\"))\np([1, 2, 3].select { it.odd? })\np([[1, 2]].map { |pair| pair.map { it * 2 } })\np([1, 2].map do |number|\n  number * 2\nend)\np([1, 2, 3].select do\n  it.odd?\nend)\np({\"a\" => 1}.length)\np([1, 2].map { |number|\n  doubled = number * 2\n  doubled + 1\n})\n",
+        "p([\"a\", \"b\"].map { \"x #{it}\" })\np([1].map { \"#{\"deep #{it}\"}\" })\np([1, 2].map { |number| number * 2 })\np([\"a\", \"b\"].map { |word| word.upcase }.join(\"-\"))\np([1, 2].map { it * 2 })\np([\"a\", \"b\"].map { it.upcase }.join(\"-\"))\np([1, 2, 3].select { it.odd? })\np([[1, 2]].map { |pair| pair.map { it * 2 } })\np([1, 2].map do |number|\n  number * 2\nend)\np([1, 2, 3].select do\n  it.odd?\nend)\np({\"a\" => 1}.length)\np([1, 2].map { |number|\n  doubled = number * 2\n  doubled + 1\n})\n",
     );
 }
 

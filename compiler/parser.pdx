@@ -1079,11 +1079,39 @@ def diagnosed_body(statements, parameters, tokens, start, finish)
   statements
 end
 
-# Does this token range name `it` at all?
+# Does this token range name `it` at all? Interpolations count (#47): the
+# `it` of `{ "x #{it}" }` sits inside a string token, so the scan lexes each
+# interpolation and asks the same question of what comes out.
 def names_it?(tokens, start, finish)
   mutable index = start
   while index < finish
-    return true if tokens[index].identifier? && tokens[index].text == "it"
+    token = tokens[index]
+    return true if token.identifier? && token.text == "it"
+    return true if token.string? && interpolation_names_it?(token.text)
+    index += 1
+  end
+  false
+end
+
+# The interpolations of a double-quoted lexeme, each lexed and scanned as a
+# token range of its own — which recurses through a string inside a string.
+def interpolation_names_it?(lexeme)
+  return false if lexeme.slice(0, 1) == "'"
+  characters = lexeme.slice(1, lexeme.length - 2).chars
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_inner_source(characters, index + 2)
+      inner_tokens = lex(inner.node)
+      return true if names_it?(inner_tokens, 0, inner_tokens.length)
+      index = inner.position
+      next
+    end
     index += 1
   end
   false

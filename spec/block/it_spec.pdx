@@ -12,4 +12,10 @@ describe "a block's implicit `it`" do
   specify "is the single parameter, never declared" do
     expect(words.map { it.upcase }, ["ROSE", "CITY"])
   end
+
+  # An `it` whose only appearance is inside an interpolation counts (#47) —
+  # both oracles used to miss it there, each in its own way.
+  specify "declares itself from inside an interpolation" do
+    expect(words.map { "#{it}!" }, ["rose!", "city!"])
+  end
 end
