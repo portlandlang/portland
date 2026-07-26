@@ -33,7 +33,20 @@ tally() {
   [ "$failures" -eq 0 ] || failed=1
 }
 
-for spec in spec/*_spec.pdx; do
+# `find` rather than a glob, so a spec nested in a subdirectory is picked up
+# too — `spec/numbers/integers_spec.pdx` is not matched by `spec/*_spec.pdx`,
+# and a spec silently not running is the worst way to be green. Sorted because
+# directory order is not stable across filesystems, and a run whose output
+# reorders itself is a run whose diffs lie.
+#
+# The unquoted expansion below splits on whitespace, which is fine here and
+# would not be if a spec path ever contained a space. Kept in the parent shell
+# rather than piped into `while read`, because a pipeline gets a subshell and
+# `failed` would be set in it and lost.
+specs=$(find spec -name "*_spec.pdx" | sort)
+[ -n "$specs" ] || { echo "no *_spec.pdx files under spec/"; exit 1; }
+
+for spec in $specs; do
   echo "$spec — direct"
   ./target/debug/pdx "$spec" > "$transcript"
   cat "$transcript"

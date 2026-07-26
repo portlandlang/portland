@@ -1078,26 +1078,39 @@ fn every_builtin_appears_in_a_hosted_fixture() {
 /// Portland method cannot hold a tally, so counting lives in `script/spec`
 /// instead. A zero exit status alone would therefore pass a spec that failed
 /// every example — the same shape of hole as "green is not covered."
+/// Every `*_spec.pdx` under a directory, recursively.
+///
+/// Recursive because specs nest: `spec/numbers/integers_spec.pdx` groups by
+/// subject, and a spec that silently never runs is the worst way to be green.
+/// Named rather than extension-matched so `spec_helper.pdx` is left alone —
+/// running a library as a spec reports zero examples and passes, which is noise
+/// dressed as coverage.
+fn spec_files(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+    for entry in std::fs::read_dir(directory).expect("failed to read a spec directory") {
+        let path = entry.expect("failed to read a spec directory entry").path();
+        if path.is_dir() {
+            spec_files(&path, found);
+        } else if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with("_spec.pdx"))
+        {
+            found.push(path);
+        }
+    }
+}
+
 #[test]
 fn the_language_spec_passes_on_both_oracles() {
-    let mut specs: Vec<std::path::PathBuf> =
-        std::fs::read_dir(format!("{}/../spec", env!("CARGO_MANIFEST_DIR")))
-            .expect("failed to read spec/")
-            .filter_map(|entry| {
-                let path = entry.ok()?.path();
-                // `_spec.pdx`, the same glob `script/spec` uses — `spec_helper.pdx`
-                // is a library, and running it as a spec would report zero examples
-                // and pass, which is noise dressed as coverage.
-                path.file_name()?
-                    .to_str()?
-                    .ends_with("_spec.pdx")
-                    .then_some(path)
-            })
-            .collect();
+    let mut specs = Vec::new();
+    spec_files(
+        std::path::Path::new(&format!("{}/../spec", env!("CARGO_MANIFEST_DIR"))),
+        &mut specs,
+    );
     // Directory order is not stable across filesystems, and a failure message
     // naming a different file each run is a worse failure message.
     specs.sort();
-    assert!(!specs.is_empty(), "no *_spec.pdx files found in spec/");
+    assert!(!specs.is_empty(), "no *_spec.pdx files found under spec/");
 
     for spec in specs {
         let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
