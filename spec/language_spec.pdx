@@ -6,18 +6,21 @@
 
 #
 # Deliberately tiny, and deliberately built only from what the language has
-# today: no classes, no exceptions, no instance variables, and no blocks on
-# user-defined methods — none of which exist yet. An example is a value, not
-# a callback, which is what lets this run at all.
+# today: no classes, no exceptions, and no instance variables — none of which
+# exist yet.
 #
-# The shape it is reaching for is rubyspec's `describe`/`it`, and the one
-# thing standing between here and there is `yield`. Until then, examples are
-# collected into an array and handed to `report`.
+# Two shapes live here at once, because the file is mid-migration. The shape
+# it is reaching for is rubyspec's `describe`/`it`, which `yield` now makes
+# possible; the rest of the examples are still values collected into an array
+# and handed to `report`.
 #
 # Note what this file avoids: accumulating into a `mutable` from inside a
 # block. The trio discards a block's bindings, so a counter incremented that
 # way would be right under the seed and wrong under the trio — and the point
-# of a language spec is that both must agree.
+# of a language spec is that both must agree. That gap is what keeps the two
+# shapes apart: `report` counts, so it needs every example to be a value it
+# can hold, while `describe`/`it` can only run examples and print. Closing it
+# is what lets the second shape grow a tally and absorb the first.
 
 struct Example
   description
@@ -37,13 +40,50 @@ def spec(description, actual, expected)
 end
 
 def report(examples)
-  failures = examples.reject { it.ok }
+  # Named parameter rather than the implicit `it`, and not by taste: this file
+  # defines a method called `it`, and ADR 0017 makes `it` an ordinary binding
+  # under the no-shadow rule, so the two contest the name and the seed refuses.
+  # The whole file therefore gives up implicit `it` — the price of spelling the
+  # spec DSL the way rubyspec does. Ruby 4.0.6 resolves the pair silently in
+  # favour of the block parameter; that silence is what ADR 0017 rejected.
+  failures = examples.reject { |example| example.ok }
   failures.each do |failure|
     puts "FAIL  #{failure.description}"
     puts "      #{failure.detail}"
   end
   puts "#{examples.length} examples, #{failures.length} failures"
   panic "language spec failed" unless failures.empty?
+end
+
+# The shape this file is migrating toward. `describe` and `it` do nothing but
+# print their own name and run the block they were handed, which is all they
+# can do until the trio stops discarding a block's bindings — with no way to
+# accumulate, there is nothing to report at the end, so `expect` panics on the
+# spot. That costs the every-failure property `report` has, and is the reason
+# this section runs first: a failure here never gets to hide `report`'s list.
+def describe(subject)
+  puts subject
+  yield
+end
+
+def it(behavior)
+  puts "  #{behavior}"
+  yield
+end
+
+def expect(actual, expected)
+  return if actual == expected
+
+  panic "expected #{expected}, got #{actual}"
+end
+
+# ADR 0019 — a slice is a collection, never a maybe.
+words = %w[rose city]
+
+describe("Array#[] with a range") do
+  it("returns an empty collection past the end, never nil") do
+    expect(words[9..].length, 0)
+  end
 end
 
 mutable examples = []
@@ -57,10 +97,6 @@ examples << spec("modulo takes the sign of the divisor", negative % 2, 1)
 examples << spec("first on an empty array is nil", [].first, nil)
 examples << spec("an out-of-range index is nil", [1, 2][9], nil)
 examples << spec("a missing hash key is nil", {name: "pdx"}[:nope], nil)
-
-# ADR 0019 — a slice is a collection, never a maybe.
-words = %w[rose city]
-examples << spec("a slice past the end is empty, not nil", words[9..].length, 0)
 
 # ADR 0012 — a branch that doesn't happen produces nil.
 branchless = if false
