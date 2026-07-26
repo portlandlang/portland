@@ -523,6 +523,25 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { |item| item }\n",
             "is a block — but whose?",
         ),
+        // A shorthand key is a hash too (ADR 0023), so the menu keeps all
+        // three readings. Both oracles' peeks looked only for `=>` and dropped
+        // one, which is picking rather than trimming.
+        (
+            "def render(x)\n  x\nend\ndef config\n  1\nend\nrender config {name: 1}\n",
+            "could be three things",
+        ),
+        // A `{` directly after the name, where there is no argument for the
+        // block to belong to instead: two readings, or one when the braces
+        // cannot be a hash. The trio used to crash on this rather than
+        // diagnose it — `IdentifierNode has no field value`.
+        (
+            "def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n",
+            "could be two things",
+        ),
+        (
+            "def expecting(v)\n  v\nend\nexpecting { |item| item }\n",
+            "is this call's block",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");

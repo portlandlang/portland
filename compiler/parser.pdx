@@ -1482,6 +1482,12 @@ def parse_statement(tokens, position)
   if token.identifier? && ambiguous_command?(tokens, position + 1)
     return Step.new(node: error_node(ambiguity_message(tokens, position)), position: skip_line_at(tokens, position))
   end
+  # ADR 0016 one position earlier than the usual spot: a bare `{` directly
+  # after a call's name, where there is no argument for the block to belong to
+  # instead. Two readings, or one when the braces cannot be a hash.
+  if token.identifier? && operator_at?(tokens, position + 1, %w[{])
+    return Step.new(node: error_node(brace_after_name_message(token.text, tokens, position + 1)), position: skip_line_at(tokens, position))
+  end
   if token.identifier? && operator_at?(tokens, position + 1, %w[=])
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, value.node), position: value.position)
@@ -1659,10 +1665,32 @@ def braces_could_be_a_hash?(tokens, position)
       return false if depth == 0
     elsif token.operator? && token.text == "=>" && depth == 1
       return true
+    elsif token.identifier? && depth == 1 && operator_at?(tokens, index + 1, %w[:])
+      # ADR 0023's shorthand: `{name: "pdx"}` is every bit as much a hash as
+      # `{"name" => "pdx"}`, and this peek predated it — so `render config
+      # {name: 1}` was told its braces could only be a block, dropping a real
+      # reading. A keyword argument inside a block body trips this too and
+      # widens the menu by one line, which is the safe direction: the peek
+      # exists to trim the menu, never to pick (ADR 0016).
+      return true
     end
     index += 1
   end
   false
+end
+
+# The seed's wording for a `{` sitting directly after a call's name, where the
+# menu is two long — or one, when the braces cannot be a hash, and then the
+# error stops asking and starts telling.
+def brace_after_name_message(name, tokens, position)
+  unless braces_could_be_a_hash?(tokens, position)
+    return "`{` after a paren-less call is this call's block — write #{name}() { ... } or #{name} do ... end"
+  end
+
+  head = "`{` after a paren-less call could be two things — parenthesize the one you mean:"
+  block_line = "  a block for #{name}:         #{name}() { ... }"
+  hash_line = "  a hash argument to #{name}:  #{name}({ ... })"
+  "#{head}\n#{block_line}\n#{hash_line}"
 end
 
 def brace_ambiguity_message(name, argument, tokens, position)

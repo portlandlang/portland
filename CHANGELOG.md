@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **A bare `{` right after a call's name says what it could mean.** It used to report `expected a newline after statement, got Some(Token { leading_space: true, kind: LeftBrace, text: "{" })` — a token dump in a never-guess position, which is the one place the language promises a menu with rewrites. `starts_command` simply had no `LeftBrace` arm, so the call never became a command call and the statement-boundary check picked up the pieces. It now names both readings, a block for the call or a hash argument to it, exactly as the position one token later has always done.
+
+- **And it trims that menu honestly, which turned out to matter.** With no argument in between there is no inner call to own the block, so `expecting { |item| item }` has *one* reading, not two — a `|` rules the hash out. The first draft said "could be two things" for it, which is the peek picking a winner by omission in reverse: claiming an ambiguity that is not there. Where the menu is one long the error stops asking and starts telling: `` `{` after a paren-less call is this call's block — write expecting() { ... } or expecting do ... end ``.
+
+- **A pre-existing bug found on the way, and it was the more serious one.** `braces_could_be_a_hash` looked only for `=>`, so it predated ADR 0023's shorthand — `render config {name: 1}` was reported as "a block — but whose?", **dropping the hash reading entirely** when `{name: 1}` is as much a hash as `{"name" => 1}`. That is the peek answering the question instead of shortening it, which principle 3 names specifically. Both oracles had it; both are fixed. A keyword argument inside a block body now widens the menu by one line, which is the safe direction of wrong.
+
+- The trio did not merely word this differently, it **crashed**: `IdentifierNode has no field value`, an internal error where the seed had a diagnostic. Both wordings now agree on all four shapes, pinned in `portland_evaluator_reports_the_seed_wording_on_errors` rather than left to a manual diff.
+
+- Left undecided on purpose, and it is a real question: with one reading, a `{` after a paren-less name could just as well be **accepted** as that call's block instead of refused with instructions — Ruby reads it that way, and ADR 0016 says braces mean what they look like wherever readings do not collide. That is a decision, not a diagnostic, so it wants an ADR rather than a quiet parser change.
+
 - **`describe "subject" do` parses** — a `do` block on a paren-less call, seed and trio, differentially pinned. The spec suite dropped its parens throughout, which is the whole reason to want it: `describe "Array#first" do` reads like rubyspec, and `describe("Array#first") do` never did.
 
 - No new decision was needed, only the deferred half of an old one. ADR 0016 already analysed this position and said `do/end` is unchanged: a bare `{` has three genuine readings and gets a menu, while `do` has exactly one owner in Ruby — the **outermost** call. The seed's `blocks on paren-less calls aren't supported yet` was a "not built", not a "not allowed", and it is gone.

@@ -2688,6 +2688,50 @@ end
         evaluate("def render(x)\n  x\nend\ndef config\n  1\nend\nrender config { \"a\" => 1 }\n");
     }
 
+    /// A bare `{` directly after a paren-less call's name is the same
+    /// never-guess position as one after its arguments, minus the inner-call
+    /// reading — so it names both rewrites rather than reporting a raw token
+    /// mismatch from the statement-boundary check.
+    #[test]
+    #[should_panic(expected = "`{` after a paren-less call could be two things")]
+    fn a_brace_after_a_call_name_names_both_readings() {
+        evaluate("def expecting(value)\n  value\nend\nexpecting {\"a\" => 1}\n");
+    }
+
+    /// The shape that found this: a hash argument that looks like a block body.
+    #[test]
+    #[should_panic(expected = "`{` after a paren-less call could be two things")]
+    fn a_hash_shorthand_argument_without_parens_names_both_readings() {
+        evaluate("def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n");
+    }
+
+    /// Trimmed to one reading, so the error tells rather than asks: no `=>` and
+    /// no label rules the hash out, and with no argument in between there is no
+    /// inner call to own the block either.
+    #[test]
+    #[should_panic(expected = "`{` after a paren-less call is this call's block")]
+    fn a_brace_after_a_call_name_trims_to_one_reading() {
+        evaluate("def expecting(value)\n  value\nend\nexpecting { 1 }\n");
+    }
+
+    /// A `|` rules the hash out the same way.
+    #[test]
+    #[should_panic(expected = "`{` after a paren-less call is this call's block")]
+    fn block_parameters_trim_the_brace_menu_to_one_reading() {
+        evaluate("def expecting(value)\n  value\nend\nexpecting { |item| item }\n");
+    }
+
+    /// The hash reading survives a shorthand key after an argument too.
+    ///
+    /// It did not before: the peek looked only for `=>`, so ADR 0023's
+    /// `{name: 1}` was reported as "a block — but whose?", dropping a genuine
+    /// reading. Trimming the menu is the point; picking a winner is not.
+    #[test]
+    #[should_panic(expected = "could be three things")]
+    fn a_shorthand_hash_keeps_its_reading_in_the_three_way_menu() {
+        evaluate("def render(x)\n  x\nend\ndef config\n  1\nend\nrender config {name: 1}\n");
+    }
+
     /// A `|` rules the hash out, so only the two block owners are offered.
     #[test]
     #[should_panic(expected = "is a block — but whose?")]

@@ -356,6 +356,31 @@ impl<'source> Parser<'source> {
                     after.text, after.text
                 );
             }
+            // ADR 0016 again, one position earlier. After an argument a bare
+            // `{` has three readings; directly after the name there are two,
+            // since there is no inner call to own the block. Without this the
+            // statement-boundary check reported a raw token mismatch — a
+            // never-guess position whose error named neither reading.
+            //
+            // No `leading_space` guard, unlike `[` below: `foo{...}` has no
+            // indexing reading to be told apart from a block, so the spacing
+            // changes nothing about what it could mean.
+            TokenKind::LeftBrace => {
+                if self.braces_at_could_be_a_hash(self.position + 1) {
+                    panic!(
+                        "`{{` after a paren-less call could be two things — parenthesize the one you mean:\n  \
+                         a block for {name}:         {name}() {{ ... }}\n  \
+                         a hash argument to {name}:  {name}({{ ... }})"
+                    );
+                }
+                // Trimmed to one reading, so the error stops asking and starts
+                // telling: a `|` or a body with no `=>` and no label rules the
+                // hash out, and with no argument in between there is no inner
+                // call to own the block either.
+                panic!(
+                    "`{{` after a paren-less call is this call's block — write {name}() {{ ... }} or {name} do ... end"
+                );
+            }
             TokenKind::LeftBracket if next.leading_space => {
                 panic!(
                     "ambiguous without parens — write {name}([...]) to pass an array or {name}[...] to index"
@@ -1028,14 +1053,27 @@ impl<'source> Parser<'source> {
     /// its own depth — so this trims the never-guess menu without ever
     /// picking a winner (ADR 0016).
     fn braces_could_be_a_hash(&self) -> bool {
-        if self.peek_kind_at(1) == Some(TokenKind::Pipe) {
+        self.braces_at_could_be_a_hash(self.position)
+    }
+
+    /// The same question about the `{` at `brace`, which is not always the
+    /// token the parser is sitting on — directly after a call's name it is one
+    /// ahead.
+    ///
+    /// Wrong answers are not symmetric here, which is what sets the bias. This
+    /// peek exists to *trim* the menu, never to pick (ADR 0016), so keeping a
+    /// reading that turns out to be impossible only makes the error longer,
+    /// while dropping a genuine one makes the parser silently choose.
+    fn braces_at_could_be_a_hash(&self, brace: usize) -> bool {
+        let kind_at = |offset: usize| self.tokens.get(brace + offset).map(|token| token.kind);
+        if kind_at(1) == Some(TokenKind::Pipe) {
             return false;
         }
-        if self.peek_kind_at(1) == Some(TokenKind::RightBrace) {
+        if kind_at(1) == Some(TokenKind::RightBrace) {
             return true; // `{}` — an empty hash or an empty block
         }
         let mut depth = 0;
-        let mut index = self.position;
+        let mut index = brace;
         while let Some(token) = self.tokens.get(index) {
             match token.kind {
                 TokenKind::LeftBrace => depth += 1,
@@ -1046,6 +1084,19 @@ impl<'source> Parser<'source> {
                     }
                 }
                 TokenKind::FatArrow if depth == 1 => return true,
+                // ADR 0023's shorthand: `{name: "pdx"}` is every bit as much a
+                // hash as `{"name" => "pdx"}`, and this peek predated it — so
+                // `render config {name: 1}` was told its braces could only be a
+                // block, dropping a real reading. A keyword argument inside a
+                // block body (`{ send label: 1 }`) trips this too and widens
+                // the menu by one line, which is the safe direction.
+                TokenKind::Identifier
+                    if depth == 1
+                        && self.tokens.get(index + 1).map(|token| token.kind)
+                            == Some(TokenKind::Colon) =>
+                {
+                    return true;
+                }
                 _ => {}
             }
             index += 1;
