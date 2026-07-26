@@ -54,3 +54,11 @@ Everything else falls out of "it's a binding":
 - Error quality: the collision message should eventually cite both sites' line numbers ("a local at line 12, a block parameter at line 61") — waits on the seed growing line tracking; the rule doesn't.
 - Migration: Ruby 3.4 `it` blocks compile verbatim, same meaning, when the name is uncontested — and where Ruby would have silently preferred a local named `it`, Portland errors loudly instead (promise 1 held).
 - Polyfill: `_1 → it` is a free-tier autocorrect (both already valid Ruby); multi-parameter `_2` sites autocorrect to named parameters. The no-shadow collision is lintable in plain Ruby pre-flip.
+
+### The one `def it` that does not go extinct (2026-07-25)
+
+"Extinct in practice" above holds everywhere except the place it matters most: **a spec DSL**, where `it` is the single most established method name in Ruby. `spec/language_spec.pdx` hit this the moment it grew `describe`/`it`, and the collision is not a nuisance but a coverage hole — a file that defines `def it` gives up implicit `it` throughout, so the language spec could never write an example *about* `it`, making this the one ADR the third oracle structurally cannot pin.
+
+Resolved by renaming the DSL, not the binding, and not with a special case. Portland's spec DSL says **`specify`** — mspec's own alias for `it` (`lib/mspec/runner/object.rb`), so it is borrowed vocabulary rather than invented. The general rule it follows: **the spec DSL occupies no name the language reserves for user code**, or the suite acquires a blind spot shaped exactly like that name. `it` is the only such name in Portland, since `_1`–`_9` are out, so this does not recur.
+
+The cost lands on the eventual ruby/spec fork, which is spelled `it(...)` throughout and needs a Prism pass — `CallNode`, `name == :it`, nil receiver, block present — rather than a find/replace, which would corrupt `it_behaves_like` and every "it" inside a description string. That pass is required regardless for `should`/`should_not`, `raise_error`, truthiness, and maybes, so this adds one rule with no semantics to it. Descriptions are untouched: `specify "upcases"` prints what `it "upcases"` printed. Machine-transformed code pays; hand-written specs do not.

@@ -40,13 +40,7 @@ def spec(description, actual, expected)
 end
 
 def report(examples)
-  # Named parameter rather than the implicit `it`, and not by taste: this file
-  # defines a method called `it`, and ADR 0017 makes `it` an ordinary binding
-  # under the no-shadow rule, so the two contest the name and the seed refuses.
-  # The whole file therefore gives up implicit `it` — the price of spelling the
-  # spec DSL the way rubyspec does. Ruby 4.0.6 resolves the pair silently in
-  # favour of the block parameter; that silence is what ADR 0017 rejected.
-  failures = examples.reject { |example| example.ok }
+  failures = examples.reject { it.ok }
   failures.each do |failure|
     puts "FAIL  #{failure.description}"
     puts "      #{failure.detail}"
@@ -55,18 +49,25 @@ def report(examples)
   panic "language spec failed" unless failures.empty?
 end
 
-# The shape this file is migrating toward. `describe` and `it` do nothing but
-# print their own name and run the block they were handed, which is all they
-# can do until the trio stops discarding a block's bindings — with no way to
-# accumulate, there is nothing to report at the end, so `expect` panics on the
-# spot. That costs the every-failure property `report` has, and is the reason
-# this section runs first: a failure here never gets to hide `report`'s list.
+# The shape this file is migrating toward. `describe` and `specify` do nothing
+# but print their own name and run the block they were handed, which is all
+# they can do until the trio stops discarding a block's bindings — with no way
+# to accumulate, there is nothing to report at the end, so `expect` panics on
+# the spot. That costs the every-failure property `report` has, and is the
+# reason this section runs first: a failure here never hides `report`'s list.
+#
+# `specify` rather than rubyspec's more familiar `it`, and not by taste. `it`
+# is an ordinary binding under the no-shadow rule (ADR 0017), so a file that
+# defines `def it` contests the name with every implicit-`it` block in it —
+# which would make ADR 0017 the one ADR this suite structurally cannot pin,
+# a blind spot in the file whose whole job is to have none. `specify` is
+# mspec's own alias for `it`, so this borrows prior art rather than inventing.
 def describe(subject)
   puts subject
   yield
 end
 
-def it(behavior)
+def specify(behavior)
   puts "  #{behavior}"
   yield
 end
@@ -81,7 +82,7 @@ end
 words = %w[rose city]
 
 describe("Array#[] with a range") do
-  it("returns an empty collection past the end, never nil") do
+  specify("returns an empty collection past the end, never nil") do
     expect(words[9..].length, 0)
   end
 end
