@@ -2,49 +2,6 @@
 
 require_relative "spec_helper"
 
-describe "if as an expression" do
-  specify "answers the taken branch" do
-    greeting = if false
-      "morning"
-    elsif true
-      "afternoon"
-    else
-      "hello"
-    end
-    expect(greeting, "afternoon")
-  end
-end
-
-describe "unless as an expression" do
-  specify "answers when the condition is false" do
-    quiet = unless false
-      "quiet"
-    end
-    expect(quiet, "quiet")
-  end
-end
-
-describe "case/when as an expression" do
-  specify "answers the matching branch" do
-    label = case 2
-    when 1 then "one"
-    when 2 then "two"
-    else
-      "many"
-    end
-    expect(label, "two")
-  end
-
-  specify "falls to else when nothing matches" do
-    label = case 9
-    when 1 then "one"
-    else
-      "else branch"
-    end
-    expect(label, "else branch")
-  end
-end
-
 def guarded(flag)
   return "early" if flag
   "late"
@@ -55,41 +12,8 @@ def negated_guard(flag)
   "went on"
 end
 
-describe "postfix guards" do
-  specify "return early on a hit" do
-    expect([guarded(true), guarded(false)], ["early", "late"])
-  end
-
-  specify "and unless inverts the test" do
-    expect([negated_guard(false), negated_guard(true)], ["stopped", "went on"])
-  end
-end
-
-describe "while" do
-  specify "loops until its condition turns" do
-    mutable count = 0
-    while count < 3
-      count += 1
-    end
-    expect(count, 3)
-  end
-
-  specify "break stops it and next skips an iteration" do
-    mutable sum = 0
-    mutable i = 0
-    while i < 10
-      i += 1
-      next if i.even?
-      break if i > 7
-      sum += i
-    end
-    expect(sum, 16)
-  end
-end
-
 # ADR 0012 — a loop that never produced a value answers nil, typed, and so
-# does a call broken out of. The broken-out example lived as a comment until
-# the trio kept the promise too (#42).
+# does a call broken out of.
 def finished_loop
   while false
   end
@@ -101,21 +25,8 @@ def broken_out
   end
 end
 
-describe "a finished while" do
-  specify "produces nil" do
-    expect(finished_loop, nil)
-  end
-end
-
-describe "a call broken out of" do
-  specify "produces nil, not the collection" do
-    expect(broken_out, nil)
-  end
-end
-
 # `return` exits the enclosing method, unwinding through blocks — the
-# or-guard's load-bearing half, and the other promise the trio dropped until
-# #41.
+# or-guard's load-bearing half, and a promise the trio dropped until #41.
 def through_blocks
   [1, 2, 3].each do
     return "unwound"
@@ -123,19 +34,112 @@ def through_blocks
   "never reached"
 end
 
-describe "return inside a block" do
-  specify "unwinds the enclosing method" do
-    expect(through_blocks, "unwound")
+context "conditionals as expressions" do
+  describe "if" do
+    specify "answers the taken branch" do
+      greeting = if false
+        "morning"
+      elsif true
+        "afternoon"
+      else
+        "hello"
+      end
+      expect(greeting, "afternoon")
+    end
+  end
+
+  describe "unless" do
+    specify "answers when the condition is false" do
+      quiet = unless false
+        "quiet"
+      end
+      expect(quiet, "quiet")
+    end
+  end
+
+  describe "case/when" do
+    specify "answers the matching branch" do
+      label = case 2
+      when 1 then "one"
+      when 2 then "two"
+      else
+        "many"
+      end
+      expect(label, "two")
+    end
+
+    specify "falls to else when nothing matches" do
+      label = case 9
+      when 1 then "one"
+      else
+        "else branch"
+      end
+      expect(label, "else branch")
+    end
+  end
+
+  describe "postfix guards" do
+    specify "return early on a hit" do
+      expect([guarded(true), guarded(false)], ["early", "late"])
+    end
+
+    specify "and unless inverts the test" do
+      expect([negated_guard(false), negated_guard(true)], ["stopped", "went on"])
+    end
   end
 end
 
-describe "next inside a block" do
-  specify "skips just that iteration" do
-    mutable collected = []
-    [1, 2, 3, 4].each do |n|
-      next if n.even?
-      collected << n
+context "loops" do
+  describe "while" do
+    specify "loops until its condition turns" do
+      mutable count = 0
+      while count < 3
+        count += 1
+      end
+      expect(count, 3)
     end
-    expect(collected, [1, 3])
+
+    specify "break stops it and next skips an iteration" do
+      mutable sum = 0
+      mutable i = 0
+      while i < 10
+        i += 1
+        next if i.even?
+        break if i > 7
+        sum += i
+      end
+      expect(sum, 16)
+    end
+  end
+
+  describe "a finished while" do
+    specify "produces nil" do
+      expect(finished_loop, nil)
+    end
+  end
+
+  describe "next inside a block" do
+    specify "skips just that iteration" do
+      mutable collected = []
+      [1, 2, 3, 4].each do |n|
+        next if n.even?
+        collected << n
+      end
+      expect(collected, [1, 3])
+    end
+  end
+end
+
+context "unwinding" do
+  describe "a call broken out of" do
+    specify "produces nil, not the collection" do
+      expect(broken_out, nil)
+    end
+  end
+
+  describe "return inside a block" do
+    specify "unwinds the enclosing method" do
+      expect(through_blocks, "unwound")
+    end
   end
 end

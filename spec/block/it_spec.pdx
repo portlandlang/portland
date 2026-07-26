@@ -2,20 +2,22 @@
 
 require_relative "../spec_helper"
 
-# ADR 0017 — `it` is an ordinary binding, so a one-parameter block can leave it
-# undeclared. This example is the reason the DSL says `specify`: with a `def it`
-# in scope the two would contest the name and the seed would refuse, making 0017
-# the one ADR this suite could not pin.
-describe "a block's implicit `it`" do
+# ADR 0017 — `it` is an ordinary binding, so a one-parameter block can leave
+# it undeclared. This example is the reason the DSL says `specify`: with a
+# `def it` in scope the two would contest the name and the seed would refuse,
+# making 0017 the one ADR this suite could not pin.
+context "a block's implicit `it`" do
   words = %w[rose city]
 
-  specify "is the single parameter, never declared" do
-    expect(words.map { it.upcase }, ["ROSE", "CITY"])
-  end
+  describe "declaration by use" do
+    specify "is the single parameter, never declared" do
+      expect(words.map { it.upcase }, ["ROSE", "CITY"])
+    end
 
-  # An `it` whose only appearance is inside an interpolation counts (#47) —
-  # both oracles used to miss it there, each in its own way.
-  specify "declares itself from inside an interpolation" do
-    expect(words.map { "#{it}!" }, ["rose!", "city!"])
+    # An `it` whose only appearance is inside an interpolation counts (#47)
+    # — both oracles used to miss it there, each in its own way.
+    specify "declares itself from inside an interpolation" do
+      expect(words.map { "#{it}!" }, ["rose!", "city!"])
+    end
   end
 end

@@ -6,12 +6,6 @@ def implicit
   "the last expression"
 end
 
-describe "a method body" do
-  specify "returns its last expression" do
-    expect(implicit, "the last expression")
-  end
-end
-
 # ADR 0014 — Ruby 3 keywords: `label:` required, `label: default` optional,
 # strictly separate from positionals.
 def tag(name:, level: 1)
@@ -22,35 +16,44 @@ def box(width, height: width)
   width * height
 end
 
-describe "keyword parameters" do
-  specify "fill in a declared default" do
-    expect(tag(name: "pdx"), "pdx@1")
-  end
-
-  specify "take arguments in any order" do
-    expect(tag(level: 3, name: "swap"), "swap@3")
-  end
-
-  specify "may default to an earlier parameter" do
-    expect([box(3), box(3, height: 2)], [9, 6])
-  end
-end
-
-# `yield` runs the block the method was handed, and both block spellings —
-# `do` on a command call, braces on a parenthesized one — arrive the same way.
 def apply
   yield
 end
 
-describe "yield" do
-  specify "runs a do block handed to a paren-less call" do
-    handed = apply do
-      "from the block"
+context "a method" do
+  describe "its body" do
+    specify "returns its last expression" do
+      expect(implicit, "the last expression")
     end
-    expect(handed, "from the block")
   end
 
-  specify "runs a brace block the same way" do
-    expect(apply() { "from braces" }, "from braces")
+  describe "keyword parameters" do
+    specify "fill in a declared default" do
+      expect(tag(name: "pdx"), "pdx@1")
+    end
+
+    specify "take arguments in any order" do
+      expect(tag(level: 3, name: "swap"), "swap@3")
+    end
+
+    specify "may default to an earlier parameter" do
+      expect([box(3), box(3, height: 2)], [9, 6])
+    end
+  end
+
+  # `yield` runs the block the method was handed, and both block spellings —
+  # `do` on a command call, braces on a parenthesized one — arrive the same
+  # way.
+  describe "yield" do
+    specify "runs a do block handed to a paren-less call" do
+      handed = apply do
+        "from the block"
+      end
+      expect(handed, "from the block")
+    end
+
+    specify "runs a brace block the same way" do
+      expect(apply() { "from braces" }, "from braces")
+    end
   end
 end

@@ -26,51 +26,56 @@ def unwrap
   handed[:name]
 end
 
-# ADR 0016 — `do |x| ... end` and `{ |x| ... }` are dead-identical; Ruby's
-# braces-bind-tighter rule is gone.
-describe "the two block spellings" do
-  braced = repeat { "brace" }
-  donned = repeat do
-    "do"
+context "a brace block" do
+  # ADR 0016 — `do |x| ... end` and `{ |x| ... }` are dead-identical;
+  # Ruby's braces-bind-tighter rule is gone.
+  describe "against do" do
+    braced = repeat { "brace" }
+    donned = repeat do
+      "do"
+    end
+
+    specify "calls the same way" do
+      expect([braced, donned], ["brace brace", "do do"])
+    end
   end
 
-  specify "call the same way" do
-    expect([braced, donned], ["brace brace", "do do"])
+  # ADR 0024 — `{` attaches wherever `do` does, paren-less calls included,
+  # and the peek at the first pair position is what clears this one: a body
+  # starting `greet name:` cannot be a hash, however hash-like it looks
+  # further in.
+  describe "on a paren-less call" do
+    greeted = repeat { greet name: "pdx" }
+
+    specify "is that call's block" do
+      expect(greeted, "hello, pdx hello, pdx")
+    end
+  end
+
+  # ADR 0024 — `{{name: 1}}` is a block holding a hash: the inner `{` cannot
+  # start a pair, so the outer braces have one reading.
+  describe "holding a hash literal" do
+    unwrapped = unwrap {{name: 1}}
+
+    specify "hands the hash through" do
+      expect(unwrapped, 1)
+    end
   end
 end
 
-# ADR 0024 — `{` attaches wherever `do` does, paren-less calls included, and
-# the peek at the first pair position is what clears this one: a body starting
-# `greet name:` cannot be a hash, however hash-like it looks further in.
-describe "a brace block on a paren-less call" do
-  greeted = repeat { greet name: "pdx" }
+context "a do block" do
+  # `do ... end` belongs to the outermost call, always — Ruby's rule, kept
+  # because it is the one reading to have. Only the block can testify: if
+  # `inner` had been handed it instead, nothing would run it, and the record
+  # would come back empty.
+  describe "after a command call's argument" do
+    mutable record = []
+    outer inner do
+      record << "ran under outer"
+    end
 
-  specify "is that call's block" do
-    expect(greeted, "hello, pdx hello, pdx")
-  end
-end
-
-# ADR 0024 — `{{name: 1}}` is a block holding a hash: the inner `{` cannot
-# start a pair, so the outer braces have one reading.
-describe "a brace block holding a hash literal" do
-  unwrapped = unwrap {{name: 1}}
-
-  specify "hands the hash through" do
-    expect(unwrapped, 1)
-  end
-end
-
-# `do ... end` belongs to the outermost call, always — Ruby's rule, kept
-# because it is the one reading to have. Only the block can testify: if
-# `inner` had been handed it instead, nothing would run it, and the record
-# would come back empty.
-describe "a do block after a command call's argument" do
-  mutable record = []
-  outer inner do
-    record << "ran under outer"
-  end
-
-  specify "belongs to the outermost call" do
-    expect(record, ["ran under outer"])
+    specify "belongs to the outermost call" do
+      expect(record, ["ran under outer"])
+    end
   end
 end

@@ -3,40 +3,42 @@
 
 require_relative "spec_helper"
 
-# ADR 0020 — `<<~` strips the common indentation, keeps the line breaks, and
-# interpolates like any double-quoted string.
-describe "a squiggly heredoc" do
-  city = "portland"
+context "a heredoc" do
+  # ADR 0020 — `<<~` strips the common indentation, keeps the line breaks,
+  # and interpolates like any double-quoted string.
+  describe "the squiggly form" do
+    city = "portland"
 
-  specify "dedents to the shallowest line" do
-    sql = <<~SQL
-      select *
-        from roses
-    SQL
-    expect(sql, "select *\n  from roses\n")
+    specify "dedents to the shallowest line" do
+      sql = <<~SQL
+        select *
+          from roses
+      SQL
+      expect(sql, "select *\n  from roses\n")
+    end
+
+    specify "interpolates" do
+      line = <<~LINE
+        hello from #{city}
+      LINE
+      expect(line, "hello from portland\n")
+    end
+
+    specify "takes a method call on the opener" do
+      shouted = <<~TEXT.upcase
+        rose city
+      TEXT
+      expect(shouted, "ROSE CITY\n")
+    end
   end
 
-  specify "interpolates" do
-    line = <<~LINE
-      hello from #{city}
-    LINE
-    expect(line, "hello from portland\n")
-  end
-
-  specify "takes a method call on the opener" do
-    shouted = <<~TEXT.upcase
-      rose city
-    TEXT
-    expect(shouted, "ROSE CITY\n")
-  end
-end
-
-# ADR 0020 — the quoted terminator suppresses interpolation entirely.
-describe "a quoted squiggly heredoc" do
-  specify "keeps the interpolation spelling as text" do
-    raw = <<~'TEXT'
-      no #{interpolation} here
-    TEXT
-    expect(raw.include?("\#{interpolation}"), true)
+  # ADR 0020 — the quoted terminator suppresses interpolation entirely.
+  describe "the quoted terminator" do
+    specify "keeps the interpolation spelling as text" do
+      raw = <<~'TEXT'
+        no #{interpolation} here
+      TEXT
+      expect(raw.include?("\#{interpolation}"), true)
+    end
   end
 end

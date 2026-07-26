@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The rest of the spec suite nests** — control flow groups into `conditionals as expressions` / `loops` / `unwinding`, pattern matching into `case/in` and `the one-line forms`, and methods, namespaces, heredocs, and the block files each sit under one `context`. Every file runs on both oracles; the tally is unchanged at 186 examples, because this reorganization moved homes, not behavior.
+
 - **The type and rule specs nest** — structs, enums, symbols, optionals, the word operators, and mutability now group under `context`: `context "a struct" → describe "#with"`, optionals split into `context "absence"` and `context "the unwrap toolkit"`, and symbol equality reads apart from its spellings. Declarations and defs stay at the top level, where they live.
 
 - **The spec harness grows `context`, and the value-type specs nest under it** — `context` is `describe`'s twin letter for letter (an alias would be metaprogramming), and nesting needed nothing new: blocks are closures, so an inner describe's examples see the context's fixtures, and sibling scopes reuse names because block locals die at `end`. `Array`, `String`, `Hash`, `Range`, and the number files now read `context "Array" → describe "#[]" → specify`. The transcript stays flat — a method cannot know its depth, for the same no-state reason the tally lives in the runner.
