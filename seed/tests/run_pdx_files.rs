@@ -80,7 +80,9 @@ fn runs_blocks_pdx() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "PORTLAND\nSALEM\nEUGENE\n8, 5, 6\nGO! BLAZERS!\n"
+        "PORTLAND\nSALEM\nEUGENE\n8, 5, 6\nGO! BLAZERS!\n\
+         a string argument\nthe block ran\n\
+         an argument\nstill the outer call's block\n"
     );
 }
 

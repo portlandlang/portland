@@ -214,7 +214,19 @@ squares = numbers.map { it * it }
 
 `it` is an ordinary binding under no-shadow, not a soft keyword. Every collision is a shadow and every shadow is an error: declared parameters, a nested `it`, or a local of that name. `_1`–`_9` do not exist; `it` and named parameters cover the space.
 
-A bare `{` after a paren-less command call is a never-guess error that names each reading — hash argument, the inner call's block, the outer call's block — and the parser peeks to _trim_ that menu when a `|` rules the hash out, never to pick.
+A user-defined method takes a block too, reached with `yield`, and a paren-less call may be handed one:
+
+```ruby
+describe "Array#first" do
+  specify "comes back absent when the array was empty" do
+    expect([].first.nil?, true)
+  end
+end
+```
+
+`do ... end` there belongs to the **outermost** call, always — `outer inner do ... end` hands the block to `outer` — which is Ruby's rule and needs no menu, because there is only one reading to have.
+
+A bare `{` in that same position is where the readings genuinely collide, so it is a never-guess error naming each one — hash argument, the inner call's block, the outer call's block — and the parser peeks to _trim_ that menu when a `|` rules the hash out, never to pick. `do` and `{` are otherwise dead-identical; this is the one position where Ruby's two forms disagree, and the one where Portland refuses the ambiguous half rather than guessing.
 
 ## Namespaces
 

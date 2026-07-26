@@ -4,8 +4,8 @@
 require_relative "spec_helper"
 
 # ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
-describe("hash shorthand") do
-  specify("builds symbol keys") do
+describe "hash shorthand" do
+  specify "builds symbol keys" do
     expect({name: "pdx"}[:name], "pdx")
   end
 end

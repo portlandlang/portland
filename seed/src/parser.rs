@@ -13,6 +13,7 @@ pub fn parse(source: &str) -> Program {
     let expanded = crate::heredoc::expand(source);
     let tokens = lexer::lex(&expanded);
     let mut parser = Parser {
+        command_arguments: false,
         depth: 0,
         it_frames: Vec::new(),
         position: 0,
@@ -28,6 +29,16 @@ pub fn parse(source: &str) -> Program {
 const MAXIMUM_NESTING: usize = 10_000;
 
 struct Parser<'source> {
+    /// True while parsing a paren-less call's arguments, where a following
+    /// `do` belongs to that call and not to the argument being parsed.
+    ///
+    /// This is Ruby's rule and the reason `do` needs no never-guess error the
+    /// way a bare `{` does (ADR 0016): `outer inner do ... end` hands the block
+    /// to `outer`, the farthest call, always. Without the flag the argument
+    /// `inner` would claim it — which is what `{` means, not what `do` means.
+    /// Cleared inside parentheses and inside a block body, since each opens a
+    /// context of its own.
+    command_arguments: bool,
     depth: usize,
     /// One frame per open block, tracking `it` for ADR 0017: whether this
     /// block names `it` directly, and whether a block nested inside it
@@ -152,6 +163,7 @@ fn string_expression(text: &str) -> Expression {
 fn expression_from(source: &str) -> Expression {
     let tokens = lexer::lex(source);
     let mut parser = Parser {
+        command_arguments: false,
         depth: 0,
         it_frames: Vec::new(),
         position: 0,
@@ -360,6 +372,8 @@ impl<'source> Parser<'source> {
         let name = self.advance().text.to_string();
         let mut arguments = Vec::new();
         let mut keyword_arguments: Vec<(String, Expression)> = Vec::new();
+        // A `do` past these arguments is this call's, not an argument's.
+        let outer_command = std::mem::replace(&mut self.command_arguments, true);
         loop {
             if self.peek_kind() == Some(TokenKind::Identifier)
                 && self.peek_kind_at(1) == Some(TokenKind::Colon)
@@ -384,12 +398,15 @@ impl<'source> Parser<'source> {
             }
             self.position += 1; // the `,`
         }
-        if self.peek_is_keyword("do") {
-            panic!("blocks on paren-less calls aren't supported yet — write {name}(...) do");
-        }
+        self.command_arguments = outer_command;
+        // ADR 0016: `do ... end` has exactly one owner in Ruby — the outermost
+        // call, which is this one — so unlike a bare `{` there is nothing to
+        // guess here and nothing to refuse. This is what lets a spec read
+        // `describe "subject" do`.
+        let block = self.peek_is_keyword("do").then(|| self.block());
         // ADR 0016: a bare `{` here has two or three genuine readings. Name
         // them all and let the author pick with a paren — never guess.
-        if self.peek_kind() == Some(TokenKind::LeftBrace) {
+        if block.is_none() && self.peek_kind() == Some(TokenKind::LeftBrace) {
             let inner = match arguments.last() {
                 Some(Expression::Call { name, .. }) => name.clone(),
                 Some(Expression::Variable(name)) => name.clone(),
@@ -411,7 +428,7 @@ impl<'source> Parser<'source> {
         }
         Some(Statement::Expression(Expression::Call {
             arguments,
-            block: None,
+            block,
             keyword_arguments,
             name,
         }))
@@ -1044,6 +1061,9 @@ impl<'source> Parser<'source> {
 
     /// Parse a `do |params| ... end` or `{ |params| ... }` block (ADR 0016).
     fn block(&mut self) -> Block {
+        // A block body is its own context: statements inside it are not the
+        // arguments of whatever call the block was handed to.
+        let enclosing_command = std::mem::replace(&mut self.command_arguments, false);
         let braced = self.peek_kind() == Some(TokenKind::LeftBrace);
         self.position += 1; // the `do` or `{`
         self.it_frames.push(ItFrame::default());
@@ -1084,6 +1104,7 @@ impl<'source> Parser<'source> {
             body
         };
         self.close_it_frame(&mut parameters);
+        self.command_arguments = enclosing_command;
         Block { body, parameters }
     }
 
@@ -1684,7 +1705,10 @@ impl<'source> Parser<'source> {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
-                    let block = self.peek_is_keyword("do").then(|| self.block());
+                    // Not while inside a command call's arguments: there the
+                    // `do` belongs to the outer call (`outer inner(1) do`).
+                    let block = (!self.command_arguments && self.peek_is_keyword("do"))
+                        .then(|| self.block());
                     Expression::Call {
                         arguments,
                         block,
@@ -1692,8 +1716,9 @@ impl<'source> Parser<'source> {
                         name: token.text.to_string(),
                     }
                 // A bare name followed by `do` is a call handed a block,
-                // which `yield` reaches from inside the method.
-                } else if self.peek_is_keyword("do") {
+                // which `yield` reaches from inside the method. Same exception:
+                // as an argument, the name does not claim the outer call's do.
+                } else if !self.command_arguments && self.peek_is_keyword("do") {
                     Expression::Call {
                         arguments: Vec::new(),
                         block: Some(self.block()),
@@ -1863,6 +1888,9 @@ impl<'source> Parser<'source> {
     /// Parse a comma-separated argument list, consuming the closing paren.
     /// Keyword arguments (`label: value`) may only follow positional ones.
     fn call_arguments(&mut self) -> (Vec<Expression>, Vec<(String, Expression)>) {
+        // Parentheses open a context of their own: inside them a `do` is
+        // claimable again, so `outer(inner do ... end)` says what it looks like.
+        let enclosing_command = std::mem::replace(&mut self.command_arguments, false);
         let mut positional = Vec::new();
         let mut keyword: Vec<(String, Expression)> = Vec::new();
         if self.peek_kind() != Some(TokenKind::RightParen) {
@@ -1895,6 +1923,7 @@ impl<'source> Parser<'source> {
             );
         }
         self.position += 1;
+        self.command_arguments = enclosing_command;
         (positional, keyword)
     }
 

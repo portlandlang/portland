@@ -18,3 +18,24 @@ def shout(words)
 end
 
 puts(shout(["go", "blazers"]).join(" "))
+
+# A `do` block on a paren-less call. Ruby hands it to the outermost call, so
+# `hosting inner` gives the block to `hosting` and never to `inner` — which is
+# where `do` and `{` part ways, and why `{` in this position is a compile error
+# with a menu (ADR 0016) while `do` needs none.
+def hosting(label)
+  puts(label)
+  yield
+end
+
+def inner_value
+  "an argument"
+end
+
+hosting "a string argument" do
+  puts("the block ran")
+end
+
+hosting inner_value do
+  puts("still the outer call's block")
+end

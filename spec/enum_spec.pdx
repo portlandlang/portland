@@ -11,8 +11,8 @@ enum Status
   :paid(on:)
 end
 
-describe("an enum case carrying a payload") do
-  specify("destructures by label") do
+describe "an enum case carrying a payload" do
+  specify "destructures by label" do
     paid = :paid(on: "tuesday")
     day = case paid
     in :pending   then "never"

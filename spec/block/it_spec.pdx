@@ -6,10 +6,10 @@ require_relative "../spec_helper"
 # undeclared. This example is the reason the DSL says `specify`: with a `def it`
 # in scope the two would contest the name and the seed would refuse, making 0017
 # the one ADR this suite could not pin.
-describe("a block's implicit `it`") do
+describe "a block's implicit `it`" do
   words = %w[rose city]
 
-  specify("is the single parameter, never declared") do
+  specify "is the single parameter, never declared" do
     expect(words.map { it.upcase }, ["ROSE", "CITY"])
   end
 end

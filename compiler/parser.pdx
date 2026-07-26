@@ -1581,18 +1581,50 @@ def skip_line_at(tokens, mutable position)
   position
 end
 
+# The index of the `do` opening this command call's block, or -1 for none.
+#
+# Depth guards it: a `do` inside parentheses or brackets belongs to whatever
+# is in there, not to this call. The scan stops at the newline ending the
+# statement, which is safe because an argument list cannot span lines.
+def command_block_at(tokens, start)
+  mutable depth = 0
+  mutable index = start
+  while index < tokens.length && !tokens[index].newline?
+    token = tokens[index]
+    depth += 1 if token.operator? && ["(", "[", "{"].include?(token.text)
+    depth -= 1 if token.operator? && [")", "]", "}"].include?(token.text)
+    return index if depth == 0 && token.keyword? && token.text == "do"
+    index += 1
+  end
+  0 - 1
+end
+
 def parse_command(tokens, mutable position)
   name = tokens[position].text
-  mutable step = parse_argument(tokens, position + 1)
+  # A `do` past these arguments is this call's, never an argument's — Ruby's
+  # rule, and the reason `do` needs no never-guess menu the way a bare `{`
+  # does (ADR 0016). The seed carries a parser flag saying "an argument may
+  # not claim a block"; this parser is functional and holds no such state, so
+  # it hides the `do` instead — arguments are parsed against a token list
+  # that stops short of it, and the block is parsed from the full one after.
+  # Truncated only when a `do` is really there, since the copy is not free.
+  opener = command_block_at(tokens, position + 1)
+  argument_tokens = if opener < 0
+    tokens
+  else
+    tokens[0..opener - 1]
+  end
+  mutable step = parse_argument(argument_tokens, position + 1)
   mutable arguments = [step.node]
   position = step.position
-  while operator_at?(tokens, position, %w[,])
-    step = parse_argument(tokens, position + 1)
+  while operator_at?(argument_tokens, position, %w[,])
+    step = parse_argument(argument_tokens, position + 1)
     arguments << step.node
     position = step.position
   end
-  if keyword_at?(tokens, position, %w[do])
-    return Step.new(node: error_node("blocks on paren-less calls aren't supported yet — write #{name}(...) do"), position: skip_line_at(tokens, position))
+  unless opener < 0
+    block = parse_block(tokens, opener + 1, false)
+    return Step.new(node: call_with_block_node(name, arguments, block.node), position: block.position)
   end
   # ADR 0016: a bare `{` here has two or three genuine readings. Name them
   # all and let the author pick with a paren — never guess.

@@ -4,18 +4,18 @@
 require_relative "spec_helper"
 
 # ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
-describe("a symbol") do
-  specify("equals itself") do
+describe "a symbol" do
+  specify "equals itself" do
     expect(:paid == :paid, true)
   end
 
-  specify("is not the string of its name") do
+  specify "is not the string of its name" do
     expect(:paid == "paid", false)
   end
 end
 
-describe("hash shorthand") do
-  specify("builds symbol keys") do
+describe "hash shorthand" do
+  specify "builds symbol keys" do
     expect({name: "pdx"}[:name], "pdx")
   end
 end

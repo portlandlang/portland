@@ -3860,10 +3860,23 @@ end
         evaluate("puts (1)");
     }
 
+    /// `describe "subject" do ... end` — the spec DSL's shape.
+    ///
+    /// A `do` block after a paren-less call's arguments has exactly one owner
+    /// in Ruby, the outermost call, so unlike a bare `{` there is nothing to
+    /// guess (ADR 0016). The block belongs to the command call.
     #[test]
-    #[should_panic(expected = "blocks on paren-less calls")]
-    fn panics_on_a_block_after_a_command_call() {
-        evaluate("puts \"x\" do\n  1\nend\n");
+    fn a_do_block_attaches_to_a_command_call() {
+        let source = "def around(label)\n  puts(label)\n  yield\nend\n\naround \"subject\" do\n  puts(\"body\")\nend\n";
+        assert_eq!(output_of(source), "subject\nbody\n");
+    }
+
+    /// The block is the command call's, not the last argument's — the case
+    /// where Ruby's `do`/`{` rules disagree, and `do` picks the farthest.
+    #[test]
+    fn a_do_block_belongs_to_the_outermost_call() {
+        let source = "def inner\n  \"argument\"\nend\n\ndef outer(value)\n  puts(value)\n  yield\nend\n\nouter inner do\n  puts(\"outer's block\")\nend\n";
+        assert_eq!(output_of(source), "argument\nouter's block\n");
     }
 
     #[test]

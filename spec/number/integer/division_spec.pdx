@@ -6,8 +6,8 @@ require_relative "../../spec_helper"
 
 # ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's. Both
 # examples show the same divergence from Rust, which truncates toward zero.
-describe("Integer#/") do
-  specify("floors toward negative infinity") do
+describe "Integer#/" do
+  specify "floors toward negative infinity" do
     expect((0 - 7) / 2, -4)
   end
 end

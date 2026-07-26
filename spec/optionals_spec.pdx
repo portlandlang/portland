@@ -7,52 +7,52 @@
 require_relative "spec_helper"
 
 # ADR 0019 — a slice is a collection, never a maybe.
-describe("Array#[] with a range") do
+describe "Array#[] with a range" do
   words = %w[rose city]
 
-  specify("returns an empty collection past the end, never nil") do
+  specify "returns an empty collection past the end, never nil" do
     expect(words[9..].length, 0)
   end
 end
 
 # ADR 0010 — partial operations return maybes; the only crash is one you typed.
 # The subject is the rule rather than a method, because it spans three of them.
-describe("a partial operation") do
-  specify("answers nil for first on an empty array") do
+describe "a partial operation" do
+  specify "answers nil for first on an empty array" do
     expect([].first, nil)
   end
 
-  specify("answers nil for an out-of-range index") do
+  specify "answers nil for an out-of-range index" do
     expect([1, 2][9], nil)
   end
 
-  specify("answers nil for a missing hash key") do
+  specify "answers nil for a missing hash key" do
     expect({name: "pdx"}[:nope], nil)
   end
 end
 
 # ADR 0012 — a branch that doesn't happen produces nil.
-describe("if without a matching branch") do
+describe "if without a matching branch" do
   branchless = if false
     "taken"
   end
 
-  specify("produces nil") do
+  specify "produces nil" do
     expect(branchless, nil)
   end
 end
 
 # ADR 0005 — the wrapper keeps a stored nil distinguishable from a missing one.
 # This pair is the whole point: both look like nil in Ruby, and must not here.
-describe("Array#first") do
+describe "Array#first" do
   stored = [nil]
   missing = []
 
-  specify("comes back present when a nil was stored") do
+  specify "comes back present when a nil was stored" do
     expect(stored.first.nil?, false)
   end
 
-  specify("comes back absent when the array was empty") do
+  specify "comes back absent when the array was empty" do
     expect(missing.first.nil?, true)
   end
 end

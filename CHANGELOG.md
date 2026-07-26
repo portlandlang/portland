@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`describe "subject" do` parses** — a `do` block on a paren-less call, seed and trio, differentially pinned. The spec suite dropped its parens throughout, which is the whole reason to want it: `describe "Array#first" do` reads like rubyspec, and `describe("Array#first") do` never did.
+
+- No new decision was needed, only the deferred half of an old one. ADR 0016 already analysed this position and said `do/end` is unchanged: a bare `{` has three genuine readings and gets a menu, while `do` has exactly one owner in Ruby — the **outermost** call. The seed's `blocks on paren-less calls aren't supported yet` was a "not built", not a "not allowed", and it is gone.
+
+- **The subtlety, and it cost the second test:** `outer inner do ... end` must hand the block to `outer`, and the naive change hands it to `inner`, because the argument's own expression parser reaches the `do` first and claims it. That is precisely Ruby's `{` rule showing up where its `do` rule belongs — the exact confusion ADR 0016 exists to prevent, reproduced by accident inside the parser. Both spellings are now pinned: `hosting "a string argument" do` and `hosting inner_value do`, where only the second can catch this.
+
+- The two oracles solve it differently, and the difference is structural rather than stylistic. The seed carries a `command_arguments` flag saying "an argument may not claim a block", cleared inside parens and inside a block body so each opens a context of its own — which is why `outer(inner do ... end)` still gives the block to `inner`. The trio's parser is functional and holds no such state, so it **hides the `do` instead**: it scans for the opener at depth zero, parses the arguments against a token list truncated before it, then parses the block from the full one. Truncated only when a `do` is actually present, since the copy is not free.
+
+- The REPL needed nothing, which is worth recording because it usually does: `expected end to close do` was already in its continuation list, so a multi-line `around "x" do` keeps reading. `AGENT.md` warns that any new multi-line construct must be added there — this one reuses `do`, so it was covered.
+
 - **Nested specs run** — `spec/numbers/integers_spec.pdx` (user's rename) was silently skipped by both gates, which globbed one directory deep. `script/spec` uses `find` now, and the Rust gate walks recursively. A spec that never runs is the worst way to be green, and it looks exactly like a passing suite.
 
 - Two things about *how* this was fixed, since neither is obvious from the diff. `script/spec` keeps its `find` result in a variable rather than piping into `while read`, because a pipeline gets a subshell and `failed=1` would be set inside it and lost — the aggregate exit status would have silently stopped working. And the recursive Rust walk was verified by breaking the nested example and confirming the gate named `spec/numbers/integers_spec.pdx` specifically. It passed before that check too, which is the point: a gate that skips a file passes identically to one that runs it.
