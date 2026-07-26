@@ -10,13 +10,6 @@ use crate::ast::{
 use crate::parser;
 use crate::value::Value;
 
-/// Parse and evaluate a source string, returning the last statement's value.
-pub fn evaluate(source: &str) -> Option<Value> {
-    let program = parser::parse(source);
-    let mut interpreter = Interpreter::new();
-    interpreter.program(&program)
-}
-
 /// The integers a range covers. Endless and beginless ranges have no
 /// element list, so asking for one is an error rather than a hang.
 fn range_elements(range: &Value) -> Vec<Value> {
@@ -4022,11 +4015,12 @@ end
 
     /// Run a source for its value, sending output to a buffer nobody reads.
     ///
-    /// Shadows the crate's `evaluate`, which writes to `std::io::stdout()`.
-    /// libtest's capture only intercepts `print!` and friends, so a direct
-    /// stdout handle escapes it — and the tests that evaluate a printing
-    /// program were spraying bare `42`, `1` and `value` across the suite's
-    /// progress dots. Every test below gets this one instead.
+    /// Output goes to a buffer rather than `std::io::stdout()` because
+    /// libtest's capture only intercepts `print!` and friends: a direct stdout
+    /// handle escapes it, and the tests that evaluate a *printing* program were
+    /// spraying bare `42`, `1` and `value` across the suite's progress dots.
+    /// `Interpreter::new()` is the stdout-backed constructor, and `main.rs` is
+    /// the right place for it.
     fn evaluate(source: &str) -> Option<Value> {
         let program = parser::parse(source);
         let mut interpreter = Interpreter::with_output(Vec::new());
