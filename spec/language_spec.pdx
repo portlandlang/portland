@@ -146,7 +146,15 @@ examples << spec("an enum payload destructures by label", day, "tuesday")
 # This pair is the whole point: both look like nil in Ruby, and must not here.
 stored = [nil]
 missing = []
-examples << spec("a stored nil comes back present", stored.first.nil?, false)
-examples << spec("a missing one comes back absent", missing.first.nil?, true)
+
+describe("Array#first") do
+  specify("comes back present when a nil was stored") do
+    expect(stored.first.nil?, false)
+  end
+
+  specify("comes back absent when the array was empty") do
+    expect(missing.first.nil?, true)
+  end
+end
 
 report(examples)

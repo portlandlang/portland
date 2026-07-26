@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The ADR 0005 pair migrated to `describe`/`specify`** — one `describe("Array#first")` holding both halves, since the pair *is* the point: one call, two inputs, a stored nil that comes back present and a missing one that comes back absent. Split across two `describe`s they would read as unrelated facts rather than the contrast the ADR exists to draw. The tally is unmoved at 16, which is the check that the examples migrated rather than vanished — and the output shape being identical across both harnesses is what let two examples change form without changing a byte of the total.
+
+- Their descriptions got rewritten rather than copied across, because a `spec()` description had to stand alone and a `specify` does not: with a subject naming the method, "a stored nil comes back present" repeats what `Array#first` already said. Under a `describe`, the example only finishes the sentence.
+
 - **The spec runner has a tally, and it reports every failure instead of the first** — `16 examples, 0 failures`, on both oracles. `expect` prints an indented `FAIL` line and keeps going where it used to `panic`, so a run says everything that is wrong in one pass rather than stopping at the earliest.
 
 - **The tally lives in `script/spec`, not in the spec file**, because a Portland method cannot hold one. Only a block can reach an outer `mutable`; a method body gets a fresh scope, and there are no instance variables, class variables, or globals — so `specify` and `expect`, being methods, can never count. That is the wall the whole block-scope fix did not move, and moving the counting out is what gets around it rather than waiting on the object model. Also how mspec separates examples from formatters, so it is prior art rather than a workaround.
