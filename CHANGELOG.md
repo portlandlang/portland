@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The language spec deepens mutability and enums** (ADRs 0001, 0015, 0022) — `mutable_spec` gains index assignment on hashes with the alias left alone, all five compound operators, the string `<<`, a `mutable` parameter that never touches the caller's binding, and the licensed accumulator; `enum_spec` gains multi-label payloads destructured by any subset, the one-line `in`, the payload-free-case-is-a-symbol rule, and an enum nested in a struct.
+
+- **Three more oracle divergences surfaced while writing those** — `list[0] = 9` runs in the seed and crashes the trio's evaluator with an internal `block expects 2 argument(s), got 1`; a struct holding both an enum and a method parses in the seed and not in the trio (`expected end to close struct Purchase`); and the seed's runtime payload checks are absent hosted — `:paid(on: 1)` with no enum declaring `:paid` is refused by the seed and accepted by the trio, as is rebinding a case capture the seed fences with no-shadow. Each has a note in the spec file whose example it displaced.
+
 - **The language spec covers namespaces and heredocs** (ADRs 0020, 0021) — `namespace_spec`: `::` names while `.` invokes, constants top-level and nested, and bare names resolving outward from where they were written, `module A::B` included; `heredoc_spec`: squiggly dedent, interpolation and its quoted suppression, and a method call riding the opener.
 
 - **The language spec covers blocks** (ADRs 0016, 0024) — `spec/block/` gains `brace_spec` and `iteration_spec`: the two spellings dead-identical, ADR 0024's driving line `repeat { greet name: "pdx" }` pinned as a passing example, `{{name: 1}}` as a block holding a hash, `do` belonging to the outermost call with the block itself as the witness, and the whole block-taking library — `each` over arrays and hashes, `each_with_index`, the transformers, `reduce`, and the number loops.
