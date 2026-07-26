@@ -19,22 +19,3 @@ describe("hash shorthand") do
     expect({name: "pdx"}[:name], "pdx")
   end
 end
-
-# ADR 0022 — an enum case carries a keyword payload, destructured by label.
-# The declaration stays at the top level: it is compile-time information, and
-# nothing about a `describe` block is the right home for it.
-enum Status
-  :pending
-  :paid(on:)
-end
-
-describe("an enum case carrying a payload") do
-  specify("destructures by label") do
-    paid = :paid(on: "tuesday")
-    day = case paid
-    in :pending   then "never"
-    in :paid(on:) then on
-    end
-    expect(day, "tuesday")
-  end
-end

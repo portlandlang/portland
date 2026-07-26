@@ -1,6 +1,6 @@
 # Blocks and their parameters.
 
-require_relative "spec_helper"
+require_relative "../spec_helper"
 
 # ADR 0017 — `it` is an ordinary binding, so a one-parameter block can leave it
 # undeclared. This example is the reason the DSL says `specify`: with a `def it`
