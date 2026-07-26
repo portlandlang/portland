@@ -1336,6 +1336,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
             }
             (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
+            // Raw `%` here, not `floored_modulo` — deliberately, and safely.
+            // Portland's `%` is floored (ADR 0018) while Rust's truncates, so
+            // `-7 % 2` is 1 there and -1 here. The two differ only in *sign*,
+            // never in zero-ness, and these arms only ever compare against
+            // zero. Verified against Ruby 4.0.6 on negatives. Anywhere the
+            // sign is observable, use `floored_modulo`.
             (Value::Integer(number), "even?", []) => Value::Boolean(number % 2 == 0),
             (Value::Integer(number), "negative?", []) => Value::Boolean(*number < 0),
             (Value::Integer(number), "odd?", []) => Value::Boolean(number % 2 != 0),
@@ -3039,6 +3045,12 @@ end
         );
         assert_eq!(evaluate("4.even?"), Some(Value::Boolean(true)));
         assert_eq!(evaluate("4.odd?"), Some(Value::Boolean(false)));
+        // Negatives pin the claim above the implementation: these use Rust's
+        // truncating `%` rather than ADR 0018's floored one, which is safe
+        // only because they compare against zero. Matches Ruby 4.0.6.
+        assert_eq!(evaluate("(0 - 7).odd?"), Some(Value::Boolean(true)));
+        assert_eq!(evaluate("(0 - 7).even?"), Some(Value::Boolean(false)));
+        assert_eq!(evaluate("(0 - 8).even?"), Some(Value::Boolean(true)));
         assert_eq!(evaluate("[1, 2, 3].sum"), Some(Value::Integer(6)));
         assert_eq!(evaluate("[3, 1, 2].max"), Some(Value::Integer(3)));
         assert_eq!(evaluate("[3, 1, 2].min"), Some(Value::Integer(1)));

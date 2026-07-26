@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `even?` and `odd?` say why they use Rust's raw `%` instead of `floored_modulo`, and a test now pins it. Portland's `%` is floored (ADR 0018) while Rust's truncates, so `-7 % 2` is 1 there and -1 here — but the two differ only in *sign*, never in zero-ness, and these arms only ever compare against zero. Correct by reasoning rather than luck, and the reasoning was invisible sitting six lines below a `floored_modulo` that exists for exactly this ADR. Someone could reasonably have "fixed" it, or copied the pattern somewhere the sign is observable. Negatives are now asserted against Ruby 4.0.6's answers, so the comment is enforced rather than hoped.
+
 - **Two tests that read the implementations instead of trusting anyone to remember.** Relying on somebody adding a fixture is exactly what failed — nine methods were missing from the trio and twenty-one of forty-two had never run through it, with the harness green throughout. So: `the_trio_implements_every_builtin_the_seed_does` extracts the seed's dispatch arms and requires a matching `when` in `evaluator.pdx`, and `every_builtin_appears_in_a_hosted_fixture` requires each to appear in some `.pdx` fixture. Both read the source of truth, so **a method added to the seed tomorrow is picked up without anyone deciding to look**. Verified against yesterday's evaluator, where the parity check names all nine.
 
 - The coverage check found four more on its first run that the parity check structurally could not see — `odd?`, `select`, `to_f`, `to_i` were implemented in both and exercised by neither. Now in `value_methods.pdx`.
