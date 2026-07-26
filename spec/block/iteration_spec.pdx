@@ -83,4 +83,14 @@ context "a block's scope" do
       expect([1, 2].map { it * factor }, [10, 20])
     end
   end
+
+  # Parameters are block-local: shadowed for the call, restored at `end` —
+  # the one shadowing the no-shadow rule licenses.
+  describe "a named parameter" do
+    specify "shadows an outer local and restores it" do
+      word = "outer"
+      seen = %w[inner].map { |word| word }
+      expect([seen, word], [["inner"], "outer"])
+    end
+  end
 end

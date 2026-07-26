@@ -83,7 +83,7 @@ def evaluate_statement(node, bindings)
     # An or-guard diverted (`x = f() or return`): skip the binding, unwind.
     return step unless step.signal == "none"
     bound = slot_value(step.value)
-    outcome([bound], [[name, "local", bound]] + step.bindings)
+    outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
   in DefNode(name:, parameters:, body:)
     outcome([], [[name, "method", [parameters, body]]] + bindings)
   in ReturnNode(value:)
@@ -107,7 +107,11 @@ def evaluate_while(node, mutable bindings)
     bindings = condition.bindings
     break unless condition.value.first
     body = run_body(node.body, bindings)
-    bindings = body.bindings
+    # Loop iterations are fresh scopes for their own locals — the block rule
+    # applied to `while` (ADR 0001). Names first bound in the body die here,
+    # so the next iteration binds them fresh; rebindings of names that
+    # existed before the body flow through, which is what flow_back keeps.
+    bindings = flow_back(bindings, bindings, body.bindings)
     break if body.signal == "break"
     return signal_outcome("return", body.value, bindings) if body.signal == "return"
   end
@@ -155,17 +159,21 @@ def evaluate_case_in(node, mutable bindings)
     branch = node.branches[branch_index]
     captures = match_pattern(branch.pattern, subject, bindings)
     unless captures.nil?
-      # Captures bind before the guard runs, and persist (Ruby's rule).
+      # Captures bind before the guard runs, and persist (Ruby's rule) —
+      # but into a trial scope, so a failed guard discards them: the branch
+      # never happened, and the next branch may bind the same names fresh.
+      # The bind itself enforces no-shadow (#45), the seed's rule.
+      mutable trial = bindings
       captures.each do |capture|
-        bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+        trial = assigned(capture[0], value_at(capture, 1), false, trial)
       end
       mutable guard_ok = true
       unless branch.guard.nil?
-        guard_step = evaluate_expression(branch.guard, bindings)
-        bindings = guard_step.bindings
+        guard_step = evaluate_expression(branch.guard, trial)
+        trial = guard_step.bindings
         guard_ok = slot_value(guard_step.value)
       end
-      return run_body(branch.body, bindings) if guard_ok
+      return run_body(branch.body, trial) if guard_ok
     end
     branch_index += 1
   end
@@ -182,7 +190,7 @@ def evaluate_match_assert(node, mutable bindings)
   captures = match_pattern(node.pattern, subject, bindings)
   panic("pattern mismatch — the => form panics when it can't destructure") if captures.nil?
   captures.each do |capture|
-    bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+    bindings = assigned(capture[0], value_at(capture, 1), false, bindings)
   end
   outcome([nil], bindings)
 end
@@ -194,15 +202,39 @@ def evaluate_match_test(node, mutable bindings)
   captures = match_pattern(node.pattern, subject, bindings)
   return outcome([false], bindings) if captures.nil?
   captures.each do |capture|
-    bindings = [[capture[0], "local", value_at(capture, 1)]] + bindings
+    bindings = assigned(capture[0], value_at(capture, 1), false, bindings)
   end
   outcome([true], bindings)
 end
 
+# Bind or rebind a name, enforcing ADR 0001 (#45): `mutable` declares a new
+# rebindable name exactly once; a bare assignment creates an immutable
+# binding or rebinds an existing mutable one. Captures take the same rules.
+# Every wording is the seed's.
+def assigned(name, value, rebindable, bindings)
+  slot = lookup(bindings, name)
+  kind = if slot.empty?
+    "unbound"
+  else
+    slot.first[1]
+  end
+  panic("local #{name} shadows method #{name} — rename one") if kind == "method" || builtin_method?(name)
+  if rebindable
+    panic("#{name} is already declared — mutable declares a new name once") if kind == "local" || kind == "mutable"
+    return [[name, "mutable", value]] + bindings
+  end
+  panic("#{name} is immutable — declare it `mutable #{name} = ...` if it needs to change") if kind == "local"
+  return [[name, "mutable", value]] + bindings if kind == "mutable"
+  [[name, "local", value]] + bindings
+end
+
+# The seed's builtin_name: names a local may never take.
+def builtin_method?(name)
+  %w[argv p panic puts read_file require_relative some write_file].include?(name)
+end
+
 # Try a pattern against a value: an array of [name, value] captures on a
-# match (empty for literals), nil on a miss. Crude gap: array and struct
-# patterns against wrong-shaped subjects panic instead of missing — the
-# trio has no type predicates yet (object-model territory).
+# match (empty for literals), nil on a miss.
 def match_pattern(pattern, subject, bindings)
   case pattern
   in AlternativePatternNode then match_alternative(pattern, subject, bindings)
@@ -284,7 +316,10 @@ def match_alternative(pattern, subject, bindings)
 end
 
 def match_array(pattern, subject, bindings)
-  return nil if subject.nil?
+  # A wrong-shaped subject misses rather than crashing — the seed's rule.
+  # This used to be a recorded crude gap, from before the tagged-shape
+  # predicates existed.
+  return nil unless plain_array?(subject)
   return nil if pattern.splat == false && subject.length != pattern.elements.length
   return nil if subject.length < pattern.elements.length
   mutable captures = []
@@ -324,8 +359,8 @@ def match_struct(pattern, subject, bindings)
   if %w[Array Boolean Hash Integer String].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
-  return nil if subject.nil?
-  return nil unless value_at(subject, 0) == "__struct__"
+  # A wrong-shaped subject misses rather than crashing — the seed's rule.
+  return nil unless subject in ["__struct__", *]
   return nil unless value_at(subject, 1) == pattern.name
   mutable captures = []
   mutable index = 0
@@ -958,7 +993,7 @@ end
 # parameters (#27).
 def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
   mutable scope = bindings.reject do |triple|
-    triple[1] == "local"
+    triple[1] == "local" || triple[1] == "mutable"
   end
   scope = [["__self__", "local", receiver]] + scope
   mutable pair_index = 0
@@ -1103,7 +1138,18 @@ def run_guest_block(block, arguments, bindings)
   mutable scope = bindings
   mutable index = 0
   block.parameters.each do |parameter|
-    scope = [[parameter, "local", value_at(arguments, index)]] + scope if index < arguments.length
+    if index < arguments.length
+      # Named parameters shadow-and-restore, which is legal; a method's name
+      # is not shadowable, and `it` colliding with a local is confusing
+      # rather than merely shadowing (ADR 0017). The seed's wordings (#45).
+      slot = lookup(scope, parameter)
+      taken_by_method = (!slot.empty? && slot.first[1] == "method") || builtin_method?(parameter)
+      panic("block parameter #{parameter} shadows method #{parameter} — rename one") if taken_by_method
+      if parameter == "it" && !slot.empty? && (slot.first[1] == "local" || slot.first[1] == "mutable")
+        panic("`it` is a local here and a block parameter there — rename one")
+      end
+      scope = [[parameter, "local", value_at(arguments, index)]] + scope
+    end
     index += 1
   end
   result = run_body(block.body, scope)
@@ -1297,7 +1343,14 @@ def bind_parameters(parameters, arguments, keyword_values, mutable scope)
         default = evaluate_expression(parameter.value, scope)
         slot_value(default.value)
       end
-      scope = [[parameter.name, "local", value]] + scope
+      # A parameter is a binding site (ADR 0001): `def f(mutable position)`
+      # binds a rebindable name, everything else an immutable one (#45).
+      kind = if (parameter in AssignmentNode) && parameter.rebindable
+        "mutable"
+      else
+        "local"
+      end
+      scope = [[parameter.name, kind, value]] + scope
       index += 1
     end
   end
@@ -1313,9 +1366,10 @@ end
 def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   parameters = payload[0]
   body = payload[1]
-  # Everything global survives into the fresh scope; only locals drop.
+  # Everything global survives into the fresh scope; only locals drop —
+  # the rebindable kind included, since a mutable is a local that moves.
   mutable scope = bindings.reject do |triple|
-    triple[1] == "local"
+    triple[1] == "local" || triple[1] == "mutable"
   end
   # Bare names in the body resolve from where the method was written, not
   # from where it was called (ADR 0021).

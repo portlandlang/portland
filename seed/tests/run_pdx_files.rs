@@ -561,6 +561,28 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "enum A\n  :hit(x:)\nend\nenum B\n  :hit(y:)\nend\nv = :hit(x: 1)\n",
             "two enums declare :hit with different payloads",
         ),
+        // ADR 0001's refusals (#45): the trio used to run all six of these.
+        (
+            "x = 1\nx = 2\n",
+            "x is immutable — declare it `mutable x = ...`",
+        ),
+        (
+            "mutable x = 1\nmutable x = 2\n",
+            "x is already declared — mutable declares a new name once",
+        ),
+        (
+            "def foo\n  1\nend\nfoo = 1\n",
+            "local foo shadows method foo — rename one",
+        ),
+        ("puts = 1\n", "local puts shadows method puts — rename one"),
+        (
+            "hit = 5 in first\nagain = 6 in first\n",
+            "first is immutable",
+        ),
+        (
+            "it = 1\n[2].each { puts it }\n",
+            "`it` is a local here and a block parameter there — rename one",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");
@@ -648,6 +670,21 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
     assert_evaluator_matches_seed(
         "evaluator_case_in.pdx",
         "struct ReturnNode\n  value\nend\nstruct BreakNode\n  label\nend\nnode = ReturnNode.new(value: nil)\ncase node\nin ReturnNode(value: nil) then puts \"(return)\"\nin ReturnNode(value:) then puts value\nend\nother = ReturnNode.new(value: 7)\ncase other\nin ReturnNode(value: nil) then puts \"(return)\"\nin ReturnNode(value:) then puts value\nend\ncase BreakNode.new(label: \"b\")\nin ReturnNode then puts \"return\"\nin BreakNode(label:) then puts label\nend\ncase 2\nin 1 | 2 then puts \"few\"\nelse\n  puts \"many\"\nend\nexpected = 5\ncase 5\nin ^expected then puts \"pinned\"\nelse\n  puts \"no\"\nend\ncase 50\nin score if score > 10 then puts \"big\"\nin score then puts \"small\"\nend\ncase [1, 2, 3]\nin [first, *rest] then puts first + rest.length\nend\ncase [].first\nin nil then puts \"empty\"\nin x then puts x\nend\n",
+    );
+}
+
+/// The legal side of ADR 0001's line, through the trio (#45): everything
+/// here must RUN, because enforcement that over-refuses is worse than none.
+/// A failed guard discards its captures so the next branch binds them fresh;
+/// while-loop iterations are fresh scopes for their own locals; a block
+/// parameter shadow-and-restores an outer local; a capture rebinds an outer
+/// mutable; and a wrong-shaped subject misses an array or struct pattern
+/// rather than crashing.
+#[test]
+fn portland_evaluator_matches_the_seed_on_binding_rules() {
+    assert_evaluator_matches_seed(
+        "evaluator_binding_rules.pdx",
+        "answer = case 5\nin score if score > 10 then \"big\"\nin score then \"small #{score}\"\nend\nputs answer\nmutable i = 0\nwhile i < 3\n  doubled = i * 2\n  i += 1\nend\nputs i\nx = 1\n[2].each do |x|\n  puts x\nend\nputs x\nmutable found = 0\ncase 5\nin found then puts found\nend\nputs found\n[1].each do\n  temp = 2\nend\ntemp = 3\nputs temp\nstruct Node\n  kind\nend\nshape = case 7\nin [inner] then \"array\"\nin Node(kind:) then \"node\"\nin other then \"other #{other}\"\nend\nputs shape\n",
     );
 }
 

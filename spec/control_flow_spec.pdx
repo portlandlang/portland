@@ -110,6 +110,17 @@ context "loops" do
       end
       expect(sum, 16)
     end
+
+    # ADR 0001 — the block rule applied to `while`: a name first bound in
+    # the body dies each iteration, so binding it again is not a rebinding.
+    specify "gives each iteration a fresh scope for its own locals" do
+      mutable index = 0
+      while index < 3
+        fresh = index * 2
+        index += 1
+      end
+      expect(index, 3)
+    end
   end
 
   describe "a finished while" do

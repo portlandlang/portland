@@ -64,8 +64,13 @@ struct AssignmentNode
   kind
   name
   value
+  rebindable
 
+  # A value-less node is a `mutable` parameter with no default; only the
+  # mutable spelling can be value-less, so the plain arm never sees nil.
   def sexp
+    return "(mutable= #{name})" if value.nil?
+    return "(mutable= #{name} #{value.sexp})" if rebindable
     "(= #{name} #{value.sexp})"
   end
 end
@@ -614,7 +619,12 @@ def array_pattern_node(elements, splat, rest_name)
 end
 
 def assignment_node(name, value)
-  AssignmentNode.new(kind: "assignment", name: name, value: value)
+  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: false)
+end
+
+# `mutable name = expr`, and a `mutable name` parameter (value nil there).
+def mutable_assignment_node(name, value)
+  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: true)
 end
 
 def binary_node(operator, left, right)
@@ -1571,8 +1581,9 @@ def parse_return(tokens, position)
   Step.new(node: return_node(value.node), position: value.position)
 end
 
-# `mutable name = expr` (ADR 0001) — syntax-only in the trio: the flag is
-# dropped and the seed is the oracle for enforcement (crude divergence).
+# `mutable name = expr` (ADR 0001). The flag rides the node now (#45): the
+# evaluator enforces rebinding rules with the seed's wordings, and this used
+# to be the recorded syntax-only divergence.
 def parse_mutable(tokens, position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected a name after mutable"), position: position)
@@ -1582,7 +1593,7 @@ def parse_mutable(tokens, position)
     return Step.new(node: error_node("mutable is fused to the first assignment — write `mutable #{name} = ...`"), position: position + 1)
   end
   value = parse_expression(tokens, position + 2)
-  Step.new(node: assignment_node(name, value.node), position: value.position)
+  Step.new(node: mutable_assignment_node(name, value.node), position: value.position)
 end
 
 # Paren-less command calls, statement position only: `puts "hello"`.
@@ -1895,8 +1906,11 @@ end
 def parse_parameters(tokens, mutable position)
   mutable parameters = []
   while position < tokens.length && (tokens[position].identifier? || keyword_at?(tokens, position, %w[mutable]))
-    # A `mutable` marker on a parameter is syntax-only here, like the statement.
-    position += 1 if keyword_at?(tokens, position, %w[mutable])
+    # A parameter is a binding site (ADR 0001), so `mutable` marks it
+    # rebindable — carried on the node since #45. A `mutable` before a
+    # keyword parameter is still dropped, a recorded gap.
+    rebindable = keyword_at?(tokens, position, %w[mutable])
+    position += 1 if rebindable
     name = tokens[position].text
     position += 1
     if operator_at?(tokens, position, %w[:])
@@ -1910,8 +1924,14 @@ def parse_parameters(tokens, mutable position)
       end
     elsif operator_at?(tokens, position, %w[=])
       default = parse_expression(tokens, position + 1)
-      parameters << assignment_node(name, default.node)
+      parameters << if rebindable
+        mutable_assignment_node(name, default.node)
+      else
+        assignment_node(name, default.node)
+      end
       position = default.position
+    elsif rebindable
+      parameters << mutable_assignment_node(name, nil)
     else
       parameters << identifier_node(name)
     end

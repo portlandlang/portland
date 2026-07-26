@@ -98,7 +98,7 @@ Note the overlap window is real rather than theoretical — the order is #9, the
 
 The trio's parser is **functional** — it holds no mutable per-block state — where the seed's is not. So there are checks the seed can make that the trio structurally cannot, and where it cannot tell, it **declines to check** rather than checking wrongly.
 
-Two rules are currently accepted silently by the trio and refused by the seed: a nested `it`, and an `it` colliding with a local of that name. Both need per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
+One rule is currently accepted silently by the trio and refused by the seed: a nested `it`, which needs the per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. (`it` colliding with a local used to sit beside it, but that one is a *binding* question, and the evaluator catches it at bind time since [#45](https://github.com/portlandlang/portland/issues/45) brought ADR 0001 enforcement hosted — rebinding immutables, double `mutable` declarations, and method shadows all refuse with the seed's wording now.) Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
 
 The related check that _is_ possible — `it` mixed with declared `|parameters|` — works only because it declines to guess whenever the block body opens a block of its own. That is the whole principle in miniature: a gap leaves the trio incomplete, a false positive would make it unusable, and the seed catches it either way.
 

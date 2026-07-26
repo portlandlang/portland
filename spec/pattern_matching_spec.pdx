@@ -68,6 +68,16 @@ context "case/in" do
       expect(answer, "many")
     end
 
+    # A vetoed branch never happened, so its captures die with it — the next
+    # branch binds the same name fresh instead of tripping no-shadow.
+    specify "a failed guard discards its captures" do
+      answer = case 5
+      in count if count > 10 then "many"
+      in count               then "few — #{count}"
+      end
+      expect(answer, "few — 5")
+    end
+
     specify "nil matches only absence" do
       expect([(nil in nil), (5 in nil)], [true, false])
     end
