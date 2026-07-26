@@ -411,6 +411,7 @@ impl<'source> Parser<'source> {
         }
         Some(Statement::Expression(Expression::Call {
             arguments,
+            block: None,
             keyword_arguments,
             name,
         }))
@@ -1455,6 +1456,7 @@ impl<'source> Parser<'source> {
             let message = self.expression();
             return Some(Expression::Call {
                 arguments: vec![message],
+                block: None,
                 keyword_arguments: Vec::new(),
                 name: "panic".to_string(),
             });
@@ -1682,9 +1684,20 @@ impl<'source> Parser<'source> {
                 if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
+                    let block = self.peek_is_keyword("do").then(|| self.block());
                     Expression::Call {
                         arguments,
+                        block,
                         keyword_arguments,
+                        name: token.text.to_string(),
+                    }
+                // A bare name followed by `do` is a call handed a block,
+                // which `yield` reaches from inside the method.
+                } else if self.peek_is_keyword("do") {
+                    Expression::Call {
+                        arguments: Vec::new(),
+                        block: Some(self.block()),
+                        keyword_arguments: Vec::new(),
                         name: token.text.to_string(),
                     }
                 } else {
@@ -1836,6 +1849,8 @@ impl<'source> Parser<'source> {
                 "false" => Expression::Boolean(false),
                 "nil" => Expression::Nil,
                 "self" => Expression::SelfValue,
+                // `yield` runs the block the enclosing method was handed.
+                "yield" => Expression::Yield(Vec::new()),
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
                 "unless" => self.unless_expression(),
@@ -1979,6 +1994,7 @@ mod tests {
                     Expression::String("world".to_string()),
                     Expression::Integer(2),
                 ],
+                block: None,
                 keyword_arguments: vec![],
                 name: "greet".to_string(),
             }
@@ -1991,6 +2007,7 @@ mod tests {
             expression("greet()"),
             Expression::Call {
                 arguments: vec![],
+                block: None,
                 keyword_arguments: vec![],
                 name: "greet".to_string(),
             }
@@ -2006,11 +2023,13 @@ mod tests {
                     operator: BinaryOperator::Add,
                     left: Box::new(Expression::Call {
                         arguments: vec![Expression::Integer(1)],
+                        block: None,
                         keyword_arguments: vec![],
                         name: "inner".to_string(),
                     }),
                     right: Box::new(Expression::Integer(2)),
                 }],
+                block: None,
                 keyword_arguments: vec![],
                 name: "outer".to_string(),
             }

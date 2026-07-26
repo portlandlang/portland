@@ -230,6 +230,8 @@ pub enum Expression {
     },
     Call {
         arguments: Vec<Expression>,
+        /// A `do ... end` handed to a user-defined method, reached by `yield`.
+        block: Option<Block>,
         keyword_arguments: Vec<(String, Expression)>,
         name: String,
     },
@@ -249,6 +251,8 @@ pub enum Expression {
         operator: LogicalOperator,
         right: Box<Expression>,
     },
+    /// `yield` — run the block handed to the enclosing method.
+    Yield(Vec<Expression>),
     MethodCall {
         arguments: Vec<Expression>,
         block: Option<Block>,

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`yield` works in the seed**: a user-defined method can be handed a `do ... end` block and run it. One test drove it — `def twice; yield; yield; end` incrementing a counter twice — and that one test was enough to surface the design question, which is the point of starting there.
+
+- The question it surfaced: **a block closes over where it was written, not where it runs.** A method body gets a fresh scope with no outer locals (Ruby's rule, kept), so yielding into the method's own scope would hide the caller's `count` entirely. `yield` therefore carries the scope the block was written in, swaps it in for the duration, and swaps back — and whatever the block rebound flows back to the caller after the call returns, because blocks rebind outer mutables and that is the accumulator pattern ADR 0001 licenses. Getting that wrong is silent: the first attempt ran the block fine and simply lost every assignment it made.
+
+- Only the bare form so far — `twice do ... end` — plus blocks on parenthesised calls. Paren-less calls *with arguments* still refuse a block with the existing never-guess error, `yield` takes no arguments yet, and the trio does not know about any of it. Deliberately left; each is its own small step.
+
 - **A Portland language spec, written in Portland, running on both oracles** — `spec/language_spec.pdx`, 15 examples, `script/spec`, and a test that gates it. This is the **third oracle**: the differential harness proves the seed and the trio agree with *each other*, and cannot prove either agrees with what was *decided*, since a shared misreading of an ADR passes it. Every example cites the ADR it pins — floored division (0018), partial operations returning maybes (0010), slices never being maybes (0019), branchless `if` (0012), alias-proof append (0015), symbols not being strings (0023), enum payload destructuring (0022), and the stored-nil/missing-nil pair that is the whole point of the wrapper (0005). Verified to fail loudly by flipping one expectation.
 
 - It is deliberately built from **only what the language has today** — no classes, no exceptions, no instance variables, no blocks on user-defined methods, none of which exist. An example is a *value* rather than a callback, which is what lets it run at all: `spec(...)` returns an `Example` struct instead of raising, because `panic` is the only crash Portland has and a spec run wants every failure rather than the first. The shape it is reaching for is rubyspec's `describe`/`it`, and the single thing between here and there is **`yield`**.

@@ -131,6 +131,12 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     pending: Option<Pending>,
     /// The receiver while a struct method runs: `(struct name, instance)`.
     self_receiver: Option<(String, Value)>,
+    /// The block handed to the method currently running, reached by `yield`,
+    /// together with the scope it was *written* in. A method body gets a
+    /// fresh scope, so yielding into the method's own scope would hide the
+    /// caller's locals — a block closes over where it was written, not where
+    /// it is run. Saved and restored around each call, like `self_receiver`.
+    current_block: Option<(Block, HashMap<String, Binding>)>,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     variables: HashMap<String, Binding>,
@@ -178,6 +184,7 @@ impl<W: std::io::Write> Interpreter<W> {
             output,
             pending: None,
             self_receiver: None,
+            current_block: None,
             enums: HashMap::new(),
             structs: HashMap::new(),
             variables: HashMap::new(),
@@ -971,6 +978,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             Expression::Call {
                 arguments,
+                block,
                 keyword_arguments,
                 name,
             } => {
@@ -982,7 +990,39 @@ impl<W: std::io::Write> Interpreter<W> {
                     .iter()
                     .map(|(label, expression)| (label.clone(), self.value_of(expression)))
                     .collect();
-                self.call(name, arguments, keyword_arguments)
+                // The block belongs to the call being made, so it is swapped
+                // in for the duration and put back after — the same shape as
+                // `self_receiver`, and for the same reason: a nested call
+                // must not see its caller's block.
+                let handed = block.clone().map(|block| (block, self.variables.clone()));
+                let handed_one = handed.is_some();
+                let outer = std::mem::replace(&mut self.current_block, handed);
+                let result = self.call(name, arguments, keyword_arguments);
+                // What the block rebound belongs to the caller, not to the
+                // method that yielded — `call` has just restored the caller's
+                // scope, so the block's version of it goes back on top. That
+                // is the accumulator pattern working through `yield`.
+                if handed_one && let Some((_, scope)) = self.current_block.take() {
+                    self.variables = scope;
+                }
+                self.current_block = outer;
+                result
+            }
+            // `yield` — run the block this method was handed, in the scope
+            // that block was written in.
+            Expression::Yield(_) => {
+                let Some((block, written_in)) = self.current_block.clone() else {
+                    panic!("yield without a block — this method was called without one");
+                };
+                let here = std::mem::replace(&mut self.variables, written_in);
+                let result = self.run_block(&block, Vec::new());
+                // Whatever the block rebound stays rebound: blocks rebind
+                // outer mutables, which is the accumulator pattern (ADR 0001).
+                let after = std::mem::replace(&mut self.variables, here);
+                if let Some((_, scope)) = self.current_block.as_mut() {
+                    *scope = after;
+                }
+                result
             }
         }
     }
@@ -2181,6 +2221,16 @@ mod tests {
     #[test]
     fn evaluates_integer_addition() {
         assert_eq!(evaluate("1 + 2 + 3"), Some(Value::Integer(6)));
+    }
+
+    #[test]
+    fn a_method_can_yield_to_a_block() {
+        assert_eq!(
+            evaluate(
+                "def twice\n  yield\n  yield\nend\n\nmutable count = 0\ntwice do\n  count += 1\nend\ncount\n"
+            ),
+            Some(Value::Integer(2))
+        );
     }
 
     #[test]
