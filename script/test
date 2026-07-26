@@ -7,5 +7,5 @@ export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo test --workspace --quiet
 script/docs/check

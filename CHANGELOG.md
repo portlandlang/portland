@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `script/test` runs `cargo test --quiet`, so the suite reports as progress dots — `............ 261/360` — the way `rspec --format progress` does. 469 lines of output to 47, measured both ways. Failures still print in full, with the test name and the assertion diff; quiet drops the per-test roll call, not the diagnostics. Rust has no `F`-versus-`E` distinction to lose, since a panic *is* the failure.
+
 - **The block-scope gap is closed** — the builtin block methods thread bindings too, so `each`, `map`, `select`, `reject`, `times`, `each_with_index`, `reduce`, `upto` and `downto` all carry an accumulator now. `3.times` with a `count += 1` block was 3 direct against 0 hosted; it agrees. That was the most conspicuous divergence left between the oracles, and it is the one that broke a pattern ADR 0001 explicitly licenses while staying green.
 
 - The twelve call sites collapsed to one line each by moving `flow_back` **inside** `run_guest_block`, so it hands back bindings already at the caller's level and no arm has to know which names belonged to the block. Each arm then just threads `scope` across its iterations — which means the trio's own host blocks are relying on the accumulator pattern one level down, in the seed, to fix the accumulator pattern one level up. No measurable cost: the hosted suite runs in the same time it did.
