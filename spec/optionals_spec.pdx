@@ -56,3 +56,71 @@ describe "Array#first" do
     expect(missing.first.nil?, true)
   end
 end
+
+# ADR 0006/0009 — `nil?` and `some?` are the one dispatch every value allows.
+describe "nil? and some?" do
+  specify "call a plain value present" do
+    expect(42.some?, true)
+  end
+
+  specify "and not absent" do
+    expect(42.nil?, false)
+  end
+end
+
+# ADR 0008 — the or-guard: `or return` hands the early exit to the caller.
+# The guard must sit inside a method, since `return` exits one; the pair of
+# calls shows both edges — the guard taken, and the guard passed through.
+def first_or_bail(values)
+  found = values.first or return "bailed"
+  found
+end
+
+describe "the or-guard" do
+  specify "returns early on an absent maybe" do
+    expect(first_or_bail([]), "bailed")
+  end
+
+  specify "passes a present value straight through" do
+    expect(first_or_bail([5]), 5)
+  end
+end
+
+# ADR 0008 — `&.` short-circuits an absent receiver instead of crashing, and
+# leaves a present one alone. The whole chain answers nil, typed, on a miss.
+describe "the safe-navigation operator" do
+  words = %w[rose city]
+  empty = []
+
+  specify "forwards to a present receiver" do
+    expect(words.first&.upcase, "ROSE")
+  end
+
+  specify "answers nil for an absent one" do
+    expect(empty.first&.upcase, nil)
+  end
+end
+
+# ADR 0009 — `some` is identity on plain values and a real box only around
+# nil. The stored-nil row is Ruby's `fetch` rule kept without `fetch`: a hash
+# holding an honest nil beats an or-guard default, because the miss and the
+# stored nothing are different answers.
+describe "some()" do
+  specify "is identity on a plain value" do
+    expect(some(5), 5)
+  end
+
+  specify "boxes a nil into a present value" do
+    expect(some(nil).some?, true)
+  end
+
+  specify "lets a stored hash nil beat an or-guard default" do
+    notes = {note: nil}
+    expect((notes[:note] or "default"), nil)
+  end
+
+  specify "while a genuinely missing key takes the default" do
+    notes = {note: nil}
+    expect((notes[:nope] or "default"), "default")
+  end
+end
