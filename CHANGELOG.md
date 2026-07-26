@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec pins ADR 0007** — `spec/word_operators_spec.pdx`: the words are the sigils, `x = nil or 7` binds the `or` first, and typed `or` is logical on booleans and unwrap-or-else on maybes. The laziness example leans on `or panic` being the only crash you can write: if the right side of a hit ever ran eagerly, the probe would not fail politely, it would take the file down.
+
 - **The brace peek answers three ways, not two**, because "could be a hash" was hiding a distinction that matters. `twice {name: 1}` was reported as two readings — and it has one: a label cannot start a statement, so there is no block body to read `{name: 1}` as. The menu invented an ambiguity and then offered `twice() {name: 1}` as the rewrite, **which does not parse**. That is the third time in two days that a never-guess menu named a dead end, and the second in code I had just written; it was caught by being asked "what are the multiple readings of this example?" rather than by a test.
 
 - The three answers are *block*, *hash*, *either*, and each row was settled by asking the seed whether the body is a statement rather than by reasoning: `name: 1` is not, `{name: 1}` is, `"a" => 1` is (a one-line match assertion, ADR 0013), `"a" => 1, "b" => 2` is not. So `{name: 1}` and `{"a" => 1, "b" => 2}` are hashes only; `{}` and `{"a" => 1}` are genuinely either; everything else is a block. Every rewrite the three messages name was then run, which is the check that was missing all along.
