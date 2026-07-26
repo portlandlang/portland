@@ -1,0 +1,120 @@
+# Structs: immutable named records, and the resolution rules inside them.
+#
+# Declarations sit at the top level, like the enum in enum_spec: a type is
+# compile-time information, and a `describe` block is not the right home.
+
+require_relative "spec_helper"
+
+def frame(text)
+  "[#{text}]"
+end
+
+struct Token
+  kind
+  text
+
+  def integer?
+    kind == "integer"
+  end
+
+  def framed
+    frame(shown_kind)
+  end
+
+  def shown_kind
+    kind.upcase
+  end
+
+  def renamed(new_text)
+    self.with(text: new_text)
+  end
+
+  def handed_to(other)
+    other.text
+  end
+
+  def paired
+    handed_off(self)
+  end
+end
+
+def handed_off(token)
+  token.kind
+end
+
+struct Invoice
+  total
+
+  struct Line
+    amount
+  end
+end
+
+describe "constructing a struct" do
+  token = Token.new(kind: "integer", text: "42")
+
+  specify "answers its fields" do
+    expect([token.kind, token.text], ["integer", "42"])
+  end
+end
+
+# The record is immutable; `with` is the only way forward, and it copies.
+describe "Struct#with" do
+  token = Token.new(kind: "integer", text: "42")
+  copy = token.with(text: "43")
+
+  specify "answers an updated copy" do
+    expect(copy.text, "43")
+  end
+
+  specify "leaves the original untouched" do
+    expect(token.text, "42")
+  end
+end
+
+describe "struct equality" do
+  token = Token.new(kind: "integer", text: "42")
+
+  specify "is by value" do
+    expect(token == Token.new(kind: "integer", text: "42"), true)
+  end
+
+  specify "and any differing field breaks it" do
+    expect(token == token.with(text: "43"), false)
+  end
+end
+
+# Inside a method, bare names resolve locals → fields → own methods →
+# top-level methods; `self` is the receiver, for the pass-myself-along case.
+describe "a struct's methods" do
+  token = Token.new(kind: "integer", text: "42")
+
+  specify "reach fields bare" do
+    expect(token.integer?, true)
+  end
+
+  specify "reach their own methods and top-level methods bare" do
+    expect(token.framed, "[INTEGER]")
+  end
+
+  specify "reach `with` through self" do
+    expect(token.renamed("43").text, "43")
+  end
+
+  specify "take other structs as arguments" do
+    expect(token.handed_to(Token.new(kind: "word", text: "pdx")), "pdx")
+  end
+
+  specify "hand self along" do
+    expect(token.paired, "integer")
+  end
+end
+
+# Types nest in types, `::` naming the way in (ADR 0021's operator split).
+describe "a nested struct" do
+  line = Invoice::Line.new(amount: 5)
+
+  specify "is named through its owner" do
+    expect(line.amount, 5)
+  end
+end
