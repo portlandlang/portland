@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The language spec covers pattern matching** (ADR 0013) — `pattern_matching_spec`: keyword-only struct patterns with shorthand binding, head/rest array splits, alternation, pins, guards, `nil`, the five builtin type patterns, first-match-wins overlap, captures outliving their `case`, and both one-line forms.
+
+- **Writing it found a real oracle divergence: the trio does not match range patterns.** `case 5 in 1..9` answers the match in the seed; the trio parses the same pattern and silently misses it, falling to `else` — and one-line `in` with a range does not parse there at all (`expected newline after statement, got ..`). Silent, because an `else` swallows the miss; the differential harness never caught it because no fixture matched on a range. The spec file records the hole in place of the example it displaced; the example goes back when the trio learns range patterns.
+
 - **The language spec covers structs** — `struct_spec`: kwargs-only construction, `with` as an updated copy that leaves the original alone, value equality broken by any field, the bare-name resolution ladder inside methods (locals → fields → own methods → top-level), `self` for the pass-myself-along case, and `Invoice::Line` nesting.
 
 - **The language spec pins ADR 0019's ranges** — `range_spec`: inclusive and exclusive ends, iteration and `sum`, `include?` answering without walking (endless and beginless forms included), and range indexing as a slice that comes back a collection — arrays and strings both, with the past-the-end string answering `""` rather than nil.

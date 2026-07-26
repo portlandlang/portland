@@ -1,0 +1,112 @@
+# Pattern matching: load-bearing, not a corner feature — the trio dispatches
+# on its own AST with it.
+
+require_relative "spec_helper"
+
+struct Node
+  kind
+  text
+end
+
+# ADR 0013 — struct patterns are keyword-only, and a bare `text:` binds a name
+# of the same name.
+describe "a struct pattern" do
+  node = Node.new(kind: "integer", text: "42")
+
+  specify "matches on fields and binds the shorthand" do
+    answer = case node
+    in Node(kind: "word", text:)    then "the word #{text}"
+    in Node(kind: "integer", text:) then "the number #{text}"
+    end
+    expect(answer, "the number 42")
+  end
+end
+
+describe "an array pattern" do
+  specify "splits head from rest" do
+    answer = case [9, 8, 7]
+    in []              then "empty"
+    in [first, *rest]  then [first, rest.length]
+    end
+    expect(answer, [9, 2])
+  end
+end
+
+describe "the smaller patterns" do
+  specify "alternation takes any branch" do
+    expect((2 in 1 | 2 | 3), true)
+  end
+
+  # A range-pattern example belongs here — `case 5 in 1..9` matching by
+  # membership — and writing it is what found that the trio cannot run it: the
+  # seed answers the match, the trio parses the pattern and then misses it,
+  # silently taking the `else`. One-line `in` with a range does not even parse
+  # there. Restore the example when the trio learns range patterns; a spec
+  # that only one oracle can run pins nothing, and hiding the miss behind an
+  # `else` would be worse than the gap.
+
+  specify "a pin matches the named value instead of binding it" do
+    expected = 5
+    expect((5 in ^expected), true)
+  end
+
+  specify "a guard vetoes a structural hit" do
+    answer = case 15
+    in count if count > 10 then "many"
+    else
+      "few"
+    end
+    expect(answer, "many")
+  end
+
+  specify "nil matches only absence" do
+    expect([(nil in nil), (5 in nil)], [true, false])
+  end
+end
+
+# ADR 0013 — the type predicate is a pattern, not a reflection API: these five
+# are what exists where `is_a?` and `.class` do not.
+describe "a builtin type pattern" do
+  specify "answers for all five types" do
+    hits = [(1 in Integer), ("x" in String), ([1] in Array), ({a: 1} in Hash), (true in Boolean)]
+    expect(hits, [true, true, true, true, true])
+  end
+
+  specify "and a miss is just false" do
+    expect(("x" in Integer), false)
+  end
+end
+
+describe "overlapping branches" do
+  specify "give it to the first match" do
+    answer = case 5
+    in 1 | 5 then "the alternation, written first"
+    in 5     then "the literal, written second"
+    end
+    expect(answer, "the alternation, written first")
+  end
+end
+
+# ADR 0013 — captures persist past the match, as in Ruby, fenced by no-shadow.
+describe "a capture" do
+  case [1, 2]
+  in [head, tail] then head
+  end
+
+  specify "outlives its case" do
+    expect([head, tail], [1, 2])
+  end
+end
+
+describe "the one-line forms" do
+  specify "`in` is a boolean that binds on a hit" do
+    scores = [70, 80]
+    hit = scores in [low, high]
+    expect([hit, low + high], [true, 150])
+  end
+
+  specify "`=>` destructures rightward" do
+    [1, 2, 3] => [first, *rest]
+    expect([first, rest], [1, [2, 3]])
+  end
+end
