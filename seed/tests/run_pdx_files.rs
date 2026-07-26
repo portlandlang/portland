@@ -550,6 +550,17 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def expecting(v)\n  v\nend\nexpecting {name: 1}\n",
             "is a hash, not a block",
         ),
+        // ADR 0022's runtime refusals (#45): the trio used to construct all
+        // three of these happily where the seed refuses.
+        ("paid = :paid(on: 1)\n", "no enum declares a case :paid"),
+        (
+            "enum Status\n  :paid(on:)\nend\npaid = :paid(wrong: 1)\n",
+            "`:paid` takes (on:)",
+        ),
+        (
+            "enum A\n  :hit(x:)\nend\nenum B\n  :hit(y:)\nend\nv = :hit(x: 1)\n",
+            "two enums declare :hit with different payloads",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");

@@ -91,9 +91,10 @@ def evaluate_statement(node, bindings)
     step = evaluate_expression(value, bindings)
     signal_outcome("return", step.value, step.bindings)
   in StructDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
-  # A declaration only: membership and exhaustiveness are static (#9), and
-  # a payload-free case is just a symbol, so nothing needs registering.
-  in EnumDefNode then outcome([], bindings)
+  # Membership and exhaustiveness are static (#9) and a payload-free case is
+  # just a symbol — but the declared labels register, because the one check
+  # a runtime can make needs them (ADR 0022, #45).
+  in EnumDefNode then outcome([], register_enum(node, bindings))
   in ModuleDefNode then evaluate_module(node, bindings)
   else
     evaluate_expression(node, bindings)
@@ -447,9 +448,54 @@ def register_in_namespace(statement, home, mutable bindings)
     step = evaluate_expression(value, bindings)
     # "constant" rather than "local" so it survives a fresh method scope.
     [[qualify(home, name), "constant", slot_value(step.value)]] + step.bindings
+  # Nested or module-housed enums register their cases unqualified — the
+  # seed looks a case up across every declaration, since a bare `:paid`
+  # says nothing about which vocabulary it came from.
+  in EnumDefNode then register_enum(statement, bindings)
   else
     bindings
   end
+end
+
+# ADR 0022's one runtime check needs the declarations at hand, so every enum
+# adds its cases to the `__enums__` registry riding in the bindings — the
+# `__loaded__` trick again. Every declaration is kept, not just the first,
+# because two enums may declare one case name and must then agree (#45).
+def register_enum(node, bindings)
+  slot = lookup(bindings, "__enums__")
+  known = if slot.empty?
+    []
+  else
+    value_at(slot.first, 2)
+  end
+  mutable cases = known
+  node.cases.each do |declared|
+    cases += [[declared.name, declared.labels]]
+  end
+  [["__enums__", "enums", cases]] + bindings
+end
+
+# The one enum check a *runtime* can make (ADR 0022): a payload names the
+# labels its case declared, in declaration order. Membership and
+# exhaustiveness stay static (#9) — this one is answerable because the value
+# carries its own case name.
+def check_payload_labels(node, bindings)
+  slot = lookup(bindings, "__enums__")
+  known = if slot.empty?
+    []
+  else
+    value_at(slot.first, 2)
+  end
+  declarations = known.select { it[0] == node.name }
+  panic("no enum declares a case :#{node.name}") if declarations.empty?
+  labels = value_at(declarations.first, 1)
+  declarations.each do |declaration|
+    panic("two enums declare :#{node.name} with different payloads — the seed cannot tell them apart") unless value_at(declaration, 1) == labels
+  end
+  given = node.payload.map { it.label }
+  return if given == labels
+  wanted = labels.map { it + ":" }.join(", ")
+  panic("`:#{node.name}` takes (#{wanted})")
 end
 
 def evaluate_expression(node, bindings)
@@ -745,6 +791,7 @@ end
 
 # `:paid(on: "tuesday")` — a guest enum case, tagged like a guest struct.
 def evaluate_enum_case(node, mutable bindings)
+  check_payload_labels(node, bindings)
   mutable payload = []
   node.payload.each do |argument|
     step = evaluate_expression(argument.value, bindings)
