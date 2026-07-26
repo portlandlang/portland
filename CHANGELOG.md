@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec covers namespaces and heredocs** (ADRs 0020, 0021) — `namespace_spec`: `::` names while `.` invokes, constants top-level and nested, and bare names resolving outward from where they were written, `module A::B` included; `heredoc_spec`: squiggly dedent, interpolation and its quoted suppression, and a method call riding the opener.
+
 - **The language spec covers blocks** (ADRs 0016, 0024) — `spec/block/` gains `brace_spec` and `iteration_spec`: the two spellings dead-identical, ADR 0024's driving line `repeat { greet name: "pdx" }` pinned as a passing example, `{{name: 1}}` as a block holding a hash, `do` belonging to the outermost call with the block itself as the witness, and the whole block-taking library — `each` over arrays and hashes, `each_with_index`, the transformers, `reduce`, and the number loops.
 
 - **The language spec covers methods and calls** (ADR 0014) — `method_spec`: implicit return of the last expression, required and defaulted keywords, arguments in any order, a default referencing an earlier parameter, and `yield` running either block spelling handed to the call.
