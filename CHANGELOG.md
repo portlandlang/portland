@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The spec runner has a tally, and it reports every failure instead of the first** — `16 examples, 0 failures`, on both oracles. `expect` prints an indented `FAIL` line and keeps going where it used to `panic`, so a run says everything that is wrong in one pass rather than stopping at the earliest.
+
+- **The tally lives in `script/spec`, not in the spec file**, because a Portland method cannot hold one. Only a block can reach an outer `mutable`; a method body gets a fresh scope, and there are no instance variables, class variables, or globals — so `specify` and `expect`, being methods, can never count. That is the wall the whole block-scope fix did not move, and moving the counting out is what gets around it rather than waiting on the object model. Also how mspec separates examples from formatters, so it is prior art rather than a workaround.
+
+- Both harnesses now print the **same countable shape** — `- description` per example, an indented `FAIL detail` under a failure — so one tally covers all sixteen rather than each shape reporting its own, and the eventual migration of the remaining flat examples will not change a byte of output. `report` no longer counts or panics; it prints.
+
+- **The gate had to learn what failure looks like**, and this is the part worth flagging: with nothing panicking, a zero exit status would have passed a spec that failed every example. `the_language_spec_passes_on_both_oracles` now also asserts that no line begins with an indented `FAIL`, and names the ones it finds. Verified by flipping one expectation in *each* harness and watching both `script/spec` (exit 1, two failures counted) and the Rust gate (`reported failing examples direct`) catch them, then restoring. A gate that only checked the exit code would have been the same shape of hole as "green is not covered."
+
 - **The dots are unbroken now**: 28 lines for a full green run, down from 469. Two things were interrupting them, and only one was the empty-target blocks.
 
 - Empty test targets announced themselves mid-suite — four `running 0 tests` / `test result: ok. 0 passed` pairs from targets that hold no tests. The name-squat `portland` crate turns both of its own off outright, since it is three lines of doc comment that will never have tests. The seed turns off **doc-tests**, and that one is a real trade rather than a freebie, so it is written down in `seed/Cargo.toml` rather than left silent (principle 4): a rustdoc `///` example in the seed would no longer be compiled or run.

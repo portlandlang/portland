@@ -1070,9 +1070,13 @@ fn every_builtin_appears_in_a_hosted_fixture() {
 ///
 /// The differential harness proves the seed and the trio agree with each
 /// other. It cannot prove either agrees with what was *decided* — a shared
-/// misreading of an ADR passes it. So the spec runs twice, and its own
-/// `report` panics when any example fails, which is how a failure reaches
-/// this test.
+/// misreading of an ADR passes it. So the spec runs twice.
+///
+/// A failing example is a `  FAIL ` line, not a panic, and this test has to
+/// look for it: the spec file reports every failure and keeps going, because a
+/// Portland method cannot hold a tally, so counting lives in `script/spec`
+/// instead. A zero exit status alone would therefore pass a spec that failed
+/// every example — the same shape of hole as "green is not covered."
 #[test]
 fn the_language_spec_passes_on_both_oracles() {
     for spec in std::fs::read_dir(format!("{}/../spec", env!("CARGO_MANIFEST_DIR")))
@@ -1101,6 +1105,17 @@ fn the_language_spec_passes_on_both_oracles() {
                 spec.display(),
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
+            );
+            let transcript = String::from_utf8_lossy(&output.stdout);
+            let failures: Vec<&str> = transcript
+                .lines()
+                .filter(|line| line.starts_with("  FAIL "))
+                .collect();
+            assert!(
+                failures.is_empty(),
+                "{} reported failing examples {label}:\n{}",
+                spec.display(),
+                failures.join("\n")
             );
         }
         // Same spec, same oracles, same answers.

@@ -4,15 +4,45 @@
 # Twice: once on the seed, once hosted on the trio. The differential harness
 # already proves those two agree with each other; this proves they agree with
 # what was decided. A spec that only ran one way would miss half the point.
+#
+# The tally lives here rather than in the spec file, and not by preference. A
+# Portland method cannot reach a counter — a method body gets a fresh scope,
+# and there are no instance variables, class variables, or globals — so only a
+# block can accumulate, and `specify`/`expect` are methods. So the spec file
+# prints one `- ` line per example and one `  FAIL ` line per failure, counts
+# nothing, and never panics; the counting and the exit status happen here.
+#
+# That split is how mspec separates examples from formatters too, and it buys
+# back the property panicking cost: every failure gets reported, not just the
+# first one.
 set -e
 cd "$(dirname "$0")/.."
 
 export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 cargo build --quiet --package portland-seed --bin pdx
 
+transcript=$(mktemp)
+trap 'rm -f "$transcript"' EXIT
+failed=0
+
+# `grep -c` exits 1 when it counts none, which `set -e` would treat as fatal.
+tally() {
+  examples=$(grep -c '^- ' "$transcript" || true)
+  failures=$(grep -c '^  FAIL ' "$transcript" || true)
+  echo "$examples examples, $failures failures"
+  [ "$failures" -eq 0 ] || failed=1
+}
+
 for spec in spec/*_spec.pdx; do
   echo "$spec — direct"
-  ./target/debug/pdx "$spec"
+  ./target/debug/pdx "$spec" > "$transcript"
+  cat "$transcript"
+  tally
+
   echo "$spec — hosted"
-  ./target/debug/pdx compiler/run.pdx "$spec"
+  ./target/debug/pdx compiler/run.pdx "$spec" > "$transcript"
+  cat "$transcript"
+  tally
 done
+
+[ "$failed" -eq 0 ] || { echo "language spec failed"; exit 1; }

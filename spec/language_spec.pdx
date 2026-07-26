@@ -40,22 +40,20 @@ def spec(description, actual, expected)
   Example.new(description: description, detail: "expected #{expected}, got #{actual}", ok: false)
 end
 
+# Prints in the same shape `specify` does, so the runner's count covers both
+# harnesses and there is exactly one tally rather than one per shape. Counts
+# nothing itself, and no longer panics: the runner decides the exit status.
 def report(examples)
-  failures = examples.reject { it.ok }
-  failures.each do |failure|
-    puts "FAIL  #{failure.description}"
-    puts "      #{failure.detail}"
+  examples.each do |example|
+    puts "- #{example.description}"
+    puts "  FAIL #{example.detail}" unless example.ok
   end
-  puts "#{examples.length} examples, #{failures.length} failures"
-  panic "language spec failed" unless failures.empty?
 end
 
-# The shape this file is migrating toward. `describe` and `specify` do nothing
-# but print their own name and run the block they were handed; `expect` panics
-# on the spot, because a method cannot reach a counter (see above), so there is
-# nothing to report at the end. That costs the every-failure property `report`
-# has, and is the reason this section runs first: a failure here never hides
-# `report`'s list.
+# The shape this file is migrating toward. `describe` and `specify` print their
+# own name and run the block they were handed; `expect` reports a mismatch and
+# keeps going. Nothing here counts, and nothing here panics — see the note above
+# on why a method cannot hold a tally, and `script/spec` for who does instead.
 #
 # `specify` rather than rubyspec's more familiar `it`, and not by taste. `it`
 # is an ordinary binding under the no-shadow rule (ADR 0017), so a file that
@@ -69,14 +67,17 @@ def describe(subject)
 end
 
 def specify(behavior)
-  puts "  #{behavior}"
+  puts "- #{behavior}"
   yield
 end
 
+# One countable line per failure, indented under the example it belongs to, so
+# the runner can find it and a reader can see which example it came from
+# without the message having to repeat the description.
 def expect(actual, expected)
   return if actual == expected
 
-  panic "expected #{expected}, got #{actual}"
+  puts "  FAIL expected #{expected}, got #{actual}"
 end
 
 # ADR 0019 — a slice is a collection, never a maybe.
