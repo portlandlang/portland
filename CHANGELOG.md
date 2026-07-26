@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The dots are unbroken now**: 28 lines for a full green run, down from 469. Two things were interrupting them, and only one was the empty-target blocks.
+
+- Empty test targets announced themselves mid-suite — four `running 0 tests` / `test result: ok. 0 passed` pairs from targets that hold no tests. The name-squat `portland` crate turns both of its own off outright, since it is three lines of doc comment that will never have tests. The seed turns off **doc-tests**, and that one is a real trade rather than a freebie, so it is written down in `seed/Cargo.toml` rather than left silent (principle 4): a rustdoc `///` example in the seed would no longer be compiled or run.
+
+- **The `pdx` binary's test target stays on, deliberately**, which is why one empty block survives. `main.rs` holds pure functions — `repl_command`, `panic_message`, `history_path` — that are natural unit-test targets, and `test = false` would silently foreclose them to buy three lines of output. The honest fix is moving those into `lib.rs` so the binary is thin wiring, and that is a refactor, not a flag.
+
+- The second interruption was **stray output**, and it was a test-hygiene bug: bare `42`, `1` and `value` were appearing between the dots. libtest's capture only intercepts `print!` and friends, so the interpreter's `std::io::stdout()` handle escaped it, and every test that evaluated a *printing* program sprayed onto the real stdout. Fixed once rather than per-site: the test module now shadows the crate's `evaluate` with one that writes into a buffer nobody reads, so future printing tests are covered without anyone remembering to be careful. `output_of` already did this and was the model.
+
 - `script/test` and the `pre-commit` hook run `cargo test --quiet`, so the suite reports as progress dots — `............ 261/360` — the way `rspec --format progress` does. 469 lines of output to 47, measured both ways. The hook mattered as much as the script: it runs on every commit, which is where the roll call was actually being read. Failures still print in full, with the test name and the assertion diff; quiet drops the per-test roll call, not the diagnostics. Rust has no `F`-versus-`E` distinction to lose, since a panic *is* the failure.
 
 - **The block-scope gap is closed** — the builtin block methods thread bindings too, so `each`, `map`, `select`, `reject`, `times`, `each_with_index`, `reduce`, `upto` and `downto` all carry an accumulator now. `3.times` with a `count += 1` block was 3 direct against 0 hosted; it agrees. That was the most conspicuous divergence left between the oracles, and it is the one that broke a pattern ADR 0001 explicitly licenses while staying green.

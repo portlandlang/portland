@@ -5,6 +5,15 @@ edition = "2024"
 description = "Stage 0 seed compiler for Portland. Crude and disposable on purpose. Never published."
 publish = false
 
+# Recorded rather than silent (principle 4): doc-tests are off, so a rustdoc
+# `///` example in the seed would not be compiled or run. The seed is
+# `publish = false` and disposable, its docs are never rendered, and it has
+# never used a doc example — the markdown code blocks that do get checked live
+# in docs/ and are covered by script/docs/check. The trade buys back the empty
+# `Doc-tests portland_seed` block in the middle of the progress dots.
+[lib]
+doctest = false
+
 [[bin]]
 name = "pdx"
 path = "src/main.rs"

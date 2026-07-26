@@ -9,4 +9,11 @@ license = "MIT"
 keywords = ["portland", "language", "compiler", "apple-silicon"]
 categories = ["compilers"]
 
+# A name squat with three lines of doc comment in it (see AGENT.md), so it has
+# no tests and never will. Saying so keeps `cargo test` from announcing two
+# empty test targets in the middle of the suite's progress dots.
+[lib]
+test = false
+doctest = false
+
 [dependencies]

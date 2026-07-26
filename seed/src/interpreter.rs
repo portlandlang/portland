@@ -4020,6 +4020,19 @@ end
         String::from_utf8(interpreter.output).unwrap()
     }
 
+    /// Run a source for its value, sending output to a buffer nobody reads.
+    ///
+    /// Shadows the crate's `evaluate`, which writes to `std::io::stdout()`.
+    /// libtest's capture only intercepts `print!` and friends, so a direct
+    /// stdout handle escapes it — and the tests that evaluate a printing
+    /// program were spraying bare `42`, `1` and `value` across the suite's
+    /// progress dots. Every test below gets this one instead.
+    fn evaluate(source: &str) -> Option<Value> {
+        let program = parser::parse(source);
+        let mut interpreter = Interpreter::with_output(Vec::new());
+        interpreter.program(&program)
+    }
+
     #[test]
     fn evaluates_a_nil_literal() {
         assert_eq!(evaluate("nil"), Some(Value::Nil));
