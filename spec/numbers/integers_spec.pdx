@@ -8,7 +8,7 @@ require_relative "../spec_helper"
 # examples show the same divergence from Rust, which truncates toward zero.
 describe("Integer#/") do
   specify("floors toward negative infinity") do
-    expect((0 - 7) / 2, 0 - 4)
+    expect((0 - 7) / 2, -4)
   end
 end
 
