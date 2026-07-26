@@ -917,7 +917,22 @@ def run_guest_block(block, arguments, bindings)
     index += 1
   end
   result = run_body(block.body, scope)
-  Outcome.new(value: result.value, bindings: flow_back(bindings, scope, result.bindings), signal: result.signal)
+  # `next` ends just this invocation of the block; `break` and `return` stay
+  # for the iterating caller to handle — the seed's rule (#41, #42).
+  signal = if result.signal == "next"
+    "none"
+  else
+    result.signal
+  end
+  Outcome.new(value: result.value, bindings: flow_back(bindings, scope, result.bindings), signal: signal)
+end
+
+# After a block interrupted its iteration: a `break` is consumed here and the
+# call produces nil (ADR 0012); a `return` keeps unwinding to the enclosing
+# method (#41, #42). The seed's block_interrupt, in outcome clothing.
+def block_interrupted(step, scope)
+  return outcome([nil], scope) if step.signal == "break"
+  signal_outcome(step.signal, step.value, scope)
 end
 
 # Every arm threads `scope` across its iterations, so what one pass of the
@@ -925,67 +940,133 @@ end
 # accumulator pattern, which is why `scope` is rebound rather than `bindings`
 # read repeatedly. The host block doing the rebinding is itself relying on
 # the same rule one level down, in the seed.
+# Every arm watches for a signal after each pass (#41, #42): a `break` or a
+# `return` stops the host iteration right there — the host `break` below is
+# doing for the trio what `block_interrupt` does for the seed — and
+# `block_interrupted` decides what the interrupted call answers. The arm
+# repetition is deliberate; the host `break` has to live inside each host
+# block to stop it.
 def evaluate_block_call(node, receiver, arguments, mutable scope)
   block = node.block
+  mutable interrupt = nil
   case node.name
   when "each"
     if block.parameters.length == 2
       receiver.each do |first, second|
-        scope = run_guest_block(block, [first, second], scope).bindings
+        step = run_guest_block(block, [first, second], scope)
+        scope = step.bindings
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
       end
     else
       receiver.each do |element|
-        scope = run_guest_block(block, [element], scope).bindings
+        step = run_guest_block(block, [element], scope)
+        scope = step.bindings
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
       end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "map"
     results = receiver.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      # A valueless pass — a bare `next`, a trailing `puts` — has nothing to
+      # collect, and the seed refuses rather than inventing a nil.
+      panic("map block produced no value") if step.value.empty?
       slot_value(step.value)
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   when "select"
     results = receiver.select do |element|
       step = run_guest_block(block, [element], scope)
       scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
       slot_value(step.value)
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   when "reject"
     results = receiver.reject do |element|
       step = run_guest_block(block, [element], scope)
       scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
       slot_value(step.value)
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   when "times"
     receiver.times do |index|
-      scope = run_guest_block(block, [index], scope).bindings
+      step = run_guest_block(block, [index], scope)
+      scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "each_with_index"
     receiver.each_with_index do |element, index|
-      scope = run_guest_block(block, [element, index], scope).bindings
+      step = run_guest_block(block, [element, index], scope)
+      scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "reduce"
     results = receiver.reduce(arguments.first) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("reduce block produced no value") if step.value.empty?
       slot_value(step.value)
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   when "upto"
     receiver.upto(arguments.first) do |number|
-      scope = run_guest_block(block, [number], scope).bindings
+      step = run_guest_block(block, [number], scope)
+      scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "downto"
     receiver.downto(arguments.first) do |number|
-      scope = run_guest_block(block, [number], scope).bindings
+      step = run_guest_block(block, [number], scope)
+      scope = step.bindings
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   else
     puts "evaluator: cannot evaluate block method #{node.name} yet"
@@ -1056,6 +1137,11 @@ def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   scope = [["__block__", "block", [block, bindings]]] + scope unless block.nil?
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
+  # A `return` is consumed here — the method boundary is what it unwinds to.
+  # A `break` or `next` reaching a boundary escaped every loop that could
+  # have owned it, and the seed refuses; so does this (#41, #42).
+  panic("break outside of a loop") if result.signal == "break"
+  panic("next outside of a loop") if result.signal == "next"
   # Callee locals are discarded, but a block the body yielded to may have
   # rebound names belonging to the caller, and those are the caller's.
   return outcome(result.value, scope_after_yield(result.bindings, bindings)) unless block.nil?
@@ -1075,7 +1161,10 @@ def evaluate_yield(bindings)
   # channel to its caller — so the updated caller scope rides home inside
   # `__block__`, which `invoke_with_block` unpacks on the way out. Rebinding
   # it here also keeps it present, so a second `yield` still finds a block.
-  outcome(result.value, [["__block__", "block", [block, result.bindings]]] + bindings)
+  #
+  # The signal rides along too (#41): a `return` in the block stops the
+  # yielding method's body at this statement, exactly as it stops the seed's.
+  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings]]] + bindings, signal: result.signal)
 end
 
 # The caller's scope as it stands after the body ran, which is whatever the

@@ -640,6 +640,20 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
     );
 }
 
+/// Block interrupts, through the trio (#41, #42): `break` stops the
+/// iteration and the call answers nil (ADR 0012); `return` unwinds on to the
+/// enclosing method — through a builtin's block and through `yield` alike,
+/// where it stops the yielding body at that statement. A valueless `map`
+/// pass refuses rather than inventing a nil. None of these shapes appeared
+/// in any fixture, which is how both promises broke silently.
+#[test]
+fn portland_evaluator_matches_the_seed_on_block_interrupts() {
+    assert_evaluator_matches_seed(
+        "evaluator_block_interrupts.pdx",
+        "def broken_out\n  [1, 2].each do\n    break\n  end\nend\np broken_out\ndef through_blocks\n  [1, 2, 3].each do\n    return \"unwound\"\n  end\n  \"never reached\"\nend\nputs through_blocks\ndef stopped_map\n  [1, 2, 3].map do |n|\n    break if n == 2\n    n * 10\n  end\nend\np stopped_map\ndef early_from_select\n  [1, 2, 3, 4].select do |n|\n    return \"left early\" if n == 3\n    n.odd?\n  end\nend\np early_from_select\ndef counted\n  mutable ticks = 0\n  5.times do\n    break if ticks == 2\n    ticks += 1\n  end\n  ticks\nend\np counted\ndef apply\n  yield\n  puts \"apply continued\"\n  \"apply's own\"\nend\ndef outer\n  from_apply = apply do\n    return \"unwound through yield\"\n  end\n  puts from_apply\n  \"after\"\nend\nputs outer\nmutable seen = []\n1.upto(9) do |n|\n  break if n > 3\n  seen << n\nend\np seen\n",
+    );
+}
+
 /// Range patterns, through the trio (#40): membership not equality, both
 /// dot counts, beginless and endless ends, negative bounds, a non-integer
 /// subject missing rather than erroring, and the one-line form. No fixture

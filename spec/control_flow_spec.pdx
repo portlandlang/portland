@@ -87,18 +87,45 @@ describe "while" do
   end
 end
 
-# ADR 0012 — a loop that never produced a value answers nil, typed. Its
-# siblings — a call broken out of answering nil, and `return` unwinding
-# through blocks — belong here too, and the seed keeps both promises; the trio
-# currently keeps neither, so those examples wait on the harness settling it.
+# ADR 0012 — a loop that never produced a value answers nil, typed, and so
+# does a call broken out of. The broken-out example lived as a comment until
+# the trio kept the promise too (#42).
 def finished_loop
   while false
+  end
+end
+
+def broken_out
+  [1, 2].each do
+    break
   end
 end
 
 describe "a finished while" do
   specify "produces nil" do
     expect(finished_loop, nil)
+  end
+end
+
+describe "a call broken out of" do
+  specify "produces nil, not the collection" do
+    expect(broken_out, nil)
+  end
+end
+
+# `return` exits the enclosing method, unwinding through blocks — the
+# or-guard's load-bearing half, and the other promise the trio dropped until
+# #41.
+def through_blocks
+  [1, 2, 3].each do
+    return "unwound"
+  end
+  "never reached"
+end
+
+describe "return inside a block" do
+  specify "unwinds the enclosing method" do
+    expect(through_blocks, "unwound")
   end
 end
 
