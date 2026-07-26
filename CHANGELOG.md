@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A struct may hold an enum and a method again, hosted** ([#44](https://github.com/portlandlang/portland/issues/44)) — the trio's struct body ran two loops in sequence, methods then nested types, so an enum ahead of a `def` ended method parsing for good and the struct never found its `end`. Now one loop dispatches per keyword, which is the seed's shape. The `evaluator_enums` differential pins the combination, and `enum_spec`'s Purchase got its `paid?` back.
+
 - **The language spec rounds out symbols and `to_s`** (ADRs 0006, 0023) — `symbol_spec` gains distinct symbols unequal, the `?` suffix as part of the name, and the quoted `:"odd key"` spelling; `string_spec` gains the universal `to_s`, with a comment naming nil's absence from the list as ADR 0006's point. Found alongside: `p 2.5.to_s` parses in the seed but not the trio — a float literal taking a method call in command-argument position is one more hosted parser gap.
 
 - **The language spec deepens mutability and enums** (ADRs 0001, 0015, 0022) — `mutable_spec` gains index assignment on hashes with the alias left alone, all five compound operators, the string `<<`, a `mutable` parameter that never touches the caller's binding, and the licensed accumulator; `enum_spec` gains multi-label payloads destructured by any subset, the one-line `in`, the payload-free-case-is-a-symbol rule, and an enum nested in a struct.

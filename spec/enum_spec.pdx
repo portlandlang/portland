@@ -8,9 +8,9 @@ require_relative "spec_helper"
 #
 # A top-level enum is owned by no type; the nested one follows the
 # types-nest-in-types rule, `Purchase::Status` naming it while
-# `purchase.status` reads the value. No methods sit beside the nested enum,
-# for now — a struct holding both an enum and a method parses in the seed and
-# not in the trio, a gap recorded the day this file grew.
+# `purchase.status` reads the value. The method beside the nested enum is
+# load-bearing: that combination parsed in the seed and not in the trio the
+# day this file grew (#44).
 enum Ordering
   :less
   :equal
@@ -25,6 +25,10 @@ struct Purchase
     :pending
     :paid(on:)
     :refunded(on:, reason:)
+  end
+
+  def paid?
+    status in :paid(on:)
   end
 end
 
@@ -77,5 +81,9 @@ describe "an enum nested in a struct" do
     in :paid(on:) then on
     end
     expect(day, "tuesday")
+  end
+
+  specify "and the struct's own methods match on it" do
+    expect(purchase.paid?, true)
   end
 end

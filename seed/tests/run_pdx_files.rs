@@ -673,7 +673,7 @@ fn portland_evaluator_matches_the_seed_on_struct_methods_and_type_patterns() {
 fn portland_evaluator_matches_the_seed_on_symbols_and_enums() {
     assert_evaluator_matches_seed(
         "evaluator_enums.pdx",
-        "struct Purchase\n  status\n\n  enum Status\n    :pending\n    :paid(on:)\n  end\nend\n\nconfig = {name: \"pdx\", port: 8080}\nputs(config[:name])\nputs(config[:port].to_s)\nmixed = {\"s\" => 1, sym: 2}\nputs(mixed[:sym].to_s)\nsame = :paid == :paid\nputs(same.to_s)\ndiffer = :paid == :pending\nputs(differ.to_s)\ncase Purchase.new(status: :paid(on: \"tuesday\")).status\nin :pending then puts(\"no\")\nin :paid(on:) then puts(on)\nend\ncase :pending\nin :paid(on:) then puts(on)\nin :pending then puts(\"bare case\")\nend\n",
+        "struct Purchase\n  status\n\n  enum Status\n    :pending\n    :paid(on:)\n  end\n\n  def paid?\n    status in :paid(on:)\n  end\nend\n\nputs(Purchase.new(status: :paid(on: \"tuesday\")).paid?)\nconfig = {name: \"pdx\", port: 8080}\nputs(config[:name])\nputs(config[:port].to_s)\nmixed = {\"s\" => 1, sym: 2}\nputs(mixed[:sym].to_s)\nsame = :paid == :paid\nputs(same.to_s)\ndiffer = :paid == :pending\nputs(differ.to_s)\ncase Purchase.new(status: :paid(on: \"tuesday\")).status\nin :pending then puts(\"no\")\nin :paid(on:) then puts(on)\nend\ncase :pending\nin :paid(on:) then puts(on)\nin :pending then puts(\"bare case\")\nend\n",
     );
 }
 

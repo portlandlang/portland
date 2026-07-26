@@ -2142,23 +2142,26 @@ def parse_struct(tokens, mutable position)
     fields << tokens[position].text
     position = skip_newlines_at(tokens, position + 1)
   end
-  # Methods after the fields (#27).
+  # Methods after the fields (#27), and nested types — a type may nest in a
+  # type; a module may not (ADR 0021 §5). One loop dispatching per keyword,
+  # matching the seed: two loops in sequence meant an enum between two defs
+  # ended method parsing for good, and the struct never found its end (#44).
   mutable methods = []
-  while keyword_at?(tokens, position, %w[def])
-    method = parse_def(tokens, position + 1)
-    methods << method.node
-    position = skip_newlines_at(tokens, method.position)
-  end
-  # A type may nest in a type; a module may not (ADR 0021 §5).
   mutable nested = []
-  while keyword_at?(tokens, position, %w[struct enum])
-    inner = if keyword_at?(tokens, position, %w[enum])
-      parse_enum(tokens, position + 1)
+  while keyword_at?(tokens, position, %w[def enum struct])
+    if keyword_at?(tokens, position, %w[def])
+      method = parse_def(tokens, position + 1)
+      methods << method.node
+      position = skip_newlines_at(tokens, method.position)
     else
-      parse_struct(tokens, position + 1)
+      inner = if keyword_at?(tokens, position, %w[enum])
+        parse_enum(tokens, position + 1)
+      else
+        parse_struct(tokens, position + 1)
+      end
+      nested << inner.node
+      position = skip_newlines_at(tokens, inner.position)
     end
-    nested << inner.node
-    position = skip_newlines_at(tokens, inner.position)
   end
   if keyword_at?(tokens, position, %w[module])
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
