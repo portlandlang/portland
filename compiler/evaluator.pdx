@@ -891,6 +891,10 @@ def flow_back(bindings, scope, block_bindings)
 end
 
 # Blocks see the enclosing scope; parameters are prepended for the call.
+#
+# The bindings handed back are at the *caller's* level, already flowed back —
+# so every call site can thread `result.bindings` on without knowing which of
+# the names inside belonged to the block.
 def run_guest_block(block, arguments, bindings)
   mutable scope = bindings
   mutable index = 0
@@ -898,66 +902,80 @@ def run_guest_block(block, arguments, bindings)
     scope = [[parameter, "local", value_at(arguments, index)]] + scope if index < arguments.length
     index += 1
   end
-  run_body(block.body, scope)
+  result = run_body(block.body, scope)
+  Outcome.new(value: result.value, bindings: flow_back(bindings, scope, result.bindings), signal: result.signal)
 end
 
-def evaluate_block_call(node, receiver, arguments, bindings)
+# Every arm threads `scope` across its iterations, so what one pass of the
+# block rebound is visible to the next and to the caller afterward — the
+# accumulator pattern, which is why `scope` is rebound rather than `bindings`
+# read repeatedly. The host block doing the rebinding is itself relying on
+# the same rule one level down, in the seed.
+def evaluate_block_call(node, receiver, arguments, mutable scope)
   block = node.block
   case node.name
   when "each"
     if block.parameters.length == 2
       receiver.each do |first, second|
-        run_guest_block(block, [first, second], bindings)
+        scope = run_guest_block(block, [first, second], scope).bindings
       end
     else
       receiver.each do |element|
-        run_guest_block(block, [element], bindings)
+        scope = run_guest_block(block, [element], scope).bindings
       end
     end
-    outcome([receiver], bindings)
+    outcome([receiver], scope)
   when "map"
     results = receiver.map do |element|
-      slot_value(run_guest_block(block, [element], bindings).value)
+      step = run_guest_block(block, [element], scope)
+      scope = step.bindings
+      slot_value(step.value)
     end
-    outcome([results], bindings)
+    outcome([results], scope)
   when "select"
     results = receiver.select do |element|
-      slot_value(run_guest_block(block, [element], bindings).value)
+      step = run_guest_block(block, [element], scope)
+      scope = step.bindings
+      slot_value(step.value)
     end
-    outcome([results], bindings)
+    outcome([results], scope)
   when "reject"
     results = receiver.reject do |element|
-      slot_value(run_guest_block(block, [element], bindings).value)
+      step = run_guest_block(block, [element], scope)
+      scope = step.bindings
+      slot_value(step.value)
     end
-    outcome([results], bindings)
+    outcome([results], scope)
   when "times"
     receiver.times do |index|
-      run_guest_block(block, [index], bindings)
+      scope = run_guest_block(block, [index], scope).bindings
     end
-    outcome([receiver], bindings)
+    outcome([receiver], scope)
   when "each_with_index"
     receiver.each_with_index do |element, index|
-      run_guest_block(block, [element, index], bindings)
+      scope = run_guest_block(block, [element, index], scope).bindings
     end
-    outcome([receiver], bindings)
+    outcome([receiver], scope)
   when "reduce"
     results = receiver.reduce(arguments.first) do |running, element|
-      slot_value(run_guest_block(block, [running, element], bindings).value)
+      step = run_guest_block(block, [running, element], scope)
+      scope = step.bindings
+      slot_value(step.value)
     end
-    outcome([results], bindings)
+    outcome([results], scope)
   when "upto"
     receiver.upto(arguments.first) do |number|
-      run_guest_block(block, [number], bindings)
+      scope = run_guest_block(block, [number], scope).bindings
     end
-    outcome([receiver], bindings)
+    outcome([receiver], scope)
   when "downto"
     receiver.downto(arguments.first) do |number|
-      run_guest_block(block, [number], bindings)
+      scope = run_guest_block(block, [number], scope).bindings
     end
-    outcome([receiver], bindings)
+    outcome([receiver], scope)
   else
     puts "evaluator: cannot evaluate block method #{node.name} yet"
-    outcome([], bindings)
+    outcome([], scope)
   end
 end
 
@@ -1043,8 +1061,7 @@ def evaluate_yield(bindings)
   # channel to its caller — so the updated caller scope rides home inside
   # `__block__`, which `invoke_with_block` unpacks on the way out. Rebinding
   # it here also keeps it present, so a second `yield` still finds a block.
-  flowed = flow_back(written_in, written_in, result.bindings)
-  outcome(result.value, [["__block__", "block", [block, flowed]]] + bindings)
+  outcome(result.value, [["__block__", "block", [block, result.bindings]]] + bindings)
 end
 
 # The caller's scope as it stands after the body ran, which is whatever the

@@ -67,8 +67,20 @@ end
   puts number.to_s
 end
 
-# Note what this file does NOT do: accumulate into a `mutable` outside a
-# block. That is the accumulator pattern ADR 0001 licenses, and the trio
-# discards a block's bindings, so it silently computes a different answer.
-# A documented crude divergence, and the reason this fixture prints from
-# inside its blocks instead.
+# The accumulator pattern ADR 0001 licenses, which this fixture used to avoid
+# on purpose: the trio discarded a block's bindings, so a counter incremented
+# from inside one was right under the seed and wrong under the trio. It
+# threads them now, and these are the differential coverage for that — a
+# regression would show up here as a number that disagrees.
+mutable tally = 0
+[1, 2, 3].each do |number|
+  tally += number
+end
+puts tally.to_s
+
+# Appending rebinds the name (ADR 0015), so this needs the same threading.
+mutable collected = []
+%w[rose city].each_with_index do |entry, index|
+  collected << "#{index}:#{entry}"
+end
+puts collected.length.to_s

@@ -662,6 +662,16 @@ fn portland_evaluator_matches_the_seed_on_a_block_that_accumulates() {
     );
 }
 
+/// The same accumulator, through a builtin's block rather than `yield` —
+/// `times` here, standing in for the dozen arms of `evaluate_block_call`.
+#[test]
+fn portland_evaluator_matches_the_seed_on_a_builtin_block_that_accumulates() {
+    assert_evaluator_matches_seed(
+        "evaluator_accumulator_builtin.pdx",
+        "mutable count = 0\n\n3.times do\n  count += 1\nend\n\nputs(count)\n",
+    );
+}
+
 /// `yield`, through the trio.
 #[test]
 fn portland_evaluator_matches_the_seed_on_yield() {

@@ -14,13 +14,14 @@
 # possible; the rest of the examples are still values collected into an array
 # and handed to `report`.
 #
-# Note what this file avoids: accumulating into a `mutable` from inside a
-# block. The trio discards a block's bindings, so a counter incremented that
-# way would be right under the seed and wrong under the trio — and the point
-# of a language spec is that both must agree. That gap is what keeps the two
-# shapes apart: `report` counts, so it needs every example to be a value it
-# can hold, while `describe`/`it` can only run examples and print. Closing it
-# is what lets the second shape grow a tally and absorb the first.
+# What keeps the two shapes apart is no longer the trio: a block's rebindings
+# now survive the block on both oracles, so accumulating into an outer
+# `mutable` is safe here. What is left is narrower, and it lives in the
+# language rather than in the trio — a tally has to be kept somewhere, and
+# only a block can reach an outer `mutable`. A method body gets a fresh scope,
+# and there are no instance variables, no class variables, and no globals, so
+# `specify` and `expect` — being methods — cannot count anything. Hiding the
+# bookkeeping the way rubyspec does needs state a method can reach.
 
 struct Example
   description
@@ -50,11 +51,11 @@ def report(examples)
 end
 
 # The shape this file is migrating toward. `describe` and `specify` do nothing
-# but print their own name and run the block they were handed, which is all
-# they can do until the trio stops discarding a block's bindings — with no way
-# to accumulate, there is nothing to report at the end, so `expect` panics on
-# the spot. That costs the every-failure property `report` has, and is the
-# reason this section runs first: a failure here never hides `report`'s list.
+# but print their own name and run the block they were handed; `expect` panics
+# on the spot, because a method cannot reach a counter (see above), so there is
+# nothing to report at the end. That costs the every-failure property `report`
+# has, and is the reason this section runs first: a failure here never hides
+# `report`'s list.
 #
 # `specify` rather than rubyspec's more familiar `it`, and not by taste. `it`
 # is an ordinary binding under the no-shadow rule (ADR 0017), so a file that
