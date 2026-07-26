@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`hash_spec` now specs the hash** — it was a verbatim copy of symbol_spec's shorthand example, header comment and all, left behind when the suite split into files. It now pins what the collection itself promises: any key type with rockets and shorthand mixed, insertion order, value equality, and the `length`/`empty?`/`key?`/`keys`/`values` library. The shorthand's own rules stay in symbol_spec, where ADR 0023 lives.
+
 - **The language spec covers the value library** — `string_spec`, `array_spec`, and three files under `spec/number/`: the read-only method tables from [language.md](docs/language.md#the-library-so-far), the literals' rules (interpolation nests and auto-`to_s`es, `%w`, mixed-key hashes), `+`/`*` on strings and arrays, and ADR 0018's floored rules reaching floats — `-7.0 % 2` is `1.0` while `to_i` truncates toward zero, both Ruby's choices.
 
 - **The language spec pins the unwrap toolkit and `some()`** (ADRs 0006, 0008, 0009) — the or-guard's both edges, `&.` on present and absent receivers, `nil?`/`some?` as the one universal dispatch, `some` as identity on plain values and a real box around nil, and the stored-hash-nil-beats-a-default rule that is `fetch` kept without `fetch`.
