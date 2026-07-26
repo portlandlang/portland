@@ -648,11 +648,21 @@ fn portland_evaluator_matches_the_seed_on_symbols_and_enums() {
     );
 }
 
-/// `yield`, through the trio.
+/// A block rebinds the caller's `mutable`, and the rebinding outlives the
+/// block — ADR 0001's accumulator pattern, through the trio.
 ///
-/// The block prints rather than accumulating into an outer `mutable`: the
-/// trio discards a block's bindings, so an accumulator would diverge here
-/// for a reason that has nothing to do with `yield`.
+/// Smallest case that pins the block-scope gap: a `yield`ed block that
+/// counts. Nothing about `yield` is under test here beyond its scope
+/// threading, which is why the count is the only thing printed.
+#[test]
+fn portland_evaluator_matches_the_seed_on_a_block_that_accumulates() {
+    assert_evaluator_matches_seed(
+        "evaluator_accumulator.pdx",
+        "def twice\n  yield\n  yield\nend\n\nmutable count = 0\n\ntwice do\n  count += 1\nend\n\nputs(count)\n",
+    );
+}
+
+/// `yield`, through the trio.
 #[test]
 fn portland_evaluator_matches_the_seed_on_yield() {
     assert_evaluator_matches_seed(

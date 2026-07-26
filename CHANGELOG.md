@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A block's rebindings survive the block in the trio, through `yield`** — the accumulator pattern ADR 0001 licenses now computes the same answer on both oracles, where it was 2 direct against 0 hosted this morning. `def twice; yield; yield; end` with a `count += 1` block is the whole test, and it failed before it passed.
+
+- The fix turned on finding the channel rather than writing one. A method body cannot reach its caller — `invoke_with_block` returns the caller's bindings exactly as captured — so an updated caller scope had nowhere to go. But `__block__` is already a caller-owned thing parked in the method's scope, so `yield` now rebinds it with the caller scope *as the block left it*, and `invoke_with_block` unpacks that on the way out. Rebinding it also keeps it present, which is what a second `yield` needs.
+
+- `flow_back` decides what survives, and the prepend-only bindings list makes it nearly free: everything a block added sits in front of the scope it was handed, and the added entries worth keeping are exactly those whose name the caller already had. A new name is the block's own and dies; a name already out there is a rebinding of it. So block parameters and fresh block locals drop out by construction rather than by a list of exceptions.
+
+- Scope: **`yield` only.** The builtin block methods — `each`, `map`, `times`, `reduce` and the rest of `evaluate_block_call` — still discard, and each of their ~12 call sites needs threading of its own. `yield` came first because it is what the spec runner's tally goes through, and it is now demonstrably enough for it: `describe`/`specify` nested two deep with two counters agrees byte-for-byte on both oracles.
+
 - **ADR 0017 is pinned by the spec suite** — `words.map { it.upcase }`, inside a `specify` block, which is the example that could not have been written an hour ago and is the entire payoff of the rename. The blind spot is closed rather than merely argued about. Two `describe`s now, 16 examples across both shapes.
 
 - **The spec DSL says `specify`, not `it`** — mspec's own alias (`lib/mspec/runner/object.rb`), read rather than recalled, so it is borrowed vocabulary and not an invention. The reason is a coverage hole, not taste: a file defining `def it` gives up implicit `it` throughout, so the language spec could never write an example *about* `it`, which would make ADR 0017 the one ADR the third oracle structurally cannot pin — a blind spot in the file whose whole job is to have none. The rule it generalises to: **the spec DSL occupies no name the language reserves for user code.** `it` is the only such name, since `_1`–`_9` are out, so this does not recur. `report`'s `reject { it.ok }` went back to the implicit spelling, which is the proof the name is free again.
