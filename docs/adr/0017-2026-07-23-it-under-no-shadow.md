@@ -57,7 +57,7 @@ Everything else falls out of "it's a binding":
 
 ### The one `def it` that does not go extinct (2026-07-25)
 
-"Extinct in practice" above holds everywhere except the place it matters most: **a spec DSL**, where `it` is the single most established method name in Ruby. `spec/language_spec.pdx` hit this the moment it grew `describe`/`it`, and the collision is not a nuisance but a coverage hole — a file that defines `def it` gives up implicit `it` throughout, so the language spec could never write an example *about* `it`, making this the one ADR the third oracle structurally cannot pin.
+"Extinct in practice" above holds everywhere except the place it matters most: **a spec DSL**, where `it` is the single most established method name in Ruby. The language spec in `spec/` hit this the moment it grew `describe`/`it`, and the collision is not a nuisance but a coverage hole — a file that defines `def it` gives up implicit `it` throughout, so the language spec could never write an example *about* `it`, making this the one ADR the third oracle structurally cannot pin.
 
 Resolved by renaming the DSL, not the binding, and not with a special case. Portland's spec DSL says **`specify`** — mspec's own alias for `it` (`lib/mspec/runner/object.rb`), so it is borrowed vocabulary rather than invented. The general rule it follows: **the spec DSL occupies no name the language reserves for user code**, or the suite acquires a blind spot shaped exactly like that name. `it` is the only such name in Portland, since `_1`–`_9` are out, so this does not recur.
 

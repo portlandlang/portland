@@ -1080,13 +1080,26 @@ fn every_builtin_appears_in_a_hosted_fixture() {
 /// every example — the same shape of hole as "green is not covered."
 #[test]
 fn the_language_spec_passes_on_both_oracles() {
-    for spec in std::fs::read_dir(format!("{}/../spec", env!("CARGO_MANIFEST_DIR")))
-        .expect("failed to read spec/")
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            (path.extension()? == "pdx").then_some(path)
-        })
-    {
+    let mut specs: Vec<std::path::PathBuf> =
+        std::fs::read_dir(format!("{}/../spec", env!("CARGO_MANIFEST_DIR")))
+            .expect("failed to read spec/")
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                // `_spec.pdx`, the same glob `script/spec` uses — `spec_helper.pdx`
+                // is a library, and running it as a spec would report zero examples
+                // and pass, which is noise dressed as coverage.
+                path.file_name()?
+                    .to_str()?
+                    .ends_with("_spec.pdx")
+                    .then_some(path)
+            })
+            .collect();
+    // Directory order is not stable across filesystems, and a failure message
+    // naming a different file each run is a worse failure message.
+    specs.sort();
+    assert!(!specs.is_empty(), "no *_spec.pdx files found in spec/");
+
+    for spec in specs {
         let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
             .arg(&spec)
             .output()

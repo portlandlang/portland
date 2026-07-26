@@ -1,0 +1,40 @@
+# A symbol is a name, not text. Enums share the file because an enum case is
+# a symbol that carries a payload, and the two ADRs landed as one arc.
+
+require_relative "spec_helper"
+
+# ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
+describe("a symbol") do
+  specify("equals itself") do
+    expect(:paid == :paid, true)
+  end
+
+  specify("is not the string of its name") do
+    expect(:paid == "paid", false)
+  end
+end
+
+describe("hash shorthand") do
+  specify("builds symbol keys") do
+    expect({name: "pdx"}[:name], "pdx")
+  end
+end
+
+# ADR 0022 — an enum case carries a keyword payload, destructured by label.
+# The declaration stays at the top level: it is compile-time information, and
+# nothing about a `describe` block is the right home for it.
+enum Status
+  :pending
+  :paid(on:)
+end
+
+describe("an enum case carrying a payload") do
+  specify("destructures by label") do
+    paid = :paid(on: "tuesday")
+    day = case paid
+    in :pending   then "never"
+    in :paid(on:) then on
+    end
+    expect(day, "tuesday")
+  end
+end

@@ -1,0 +1,22 @@
+# Values never mutate; names do. Ruby's action-at-a-distance bug class, closed.
+
+require_relative "spec_helper"
+
+# ADR 0015 — values never mutate; names do. An alias cannot be spooked.
+#
+# The `mutable` here is safe at `describe` level, against the caveat in the
+# helper, because the append happens in the setup rather than in an example:
+# neither example rebinds anything, so they stay independent of each other.
+describe("appending to an array") do
+  mutable numbers = [1]
+  alias_of = numbers
+  numbers << 2
+
+  specify("rebinds the name, leaving aliases alone") do
+    expect(alias_of.length, 1)
+  end
+
+  specify("and the name itself sees the append") do
+    expect(numbers.length, 2)
+  end
+end

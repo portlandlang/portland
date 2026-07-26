@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The spec suite is five files sharing one harness** — `spec/spec_helper.pdx` holds `describe`, `specify`, `expect` and `shown`, and each spec requires it. Split by what a group of ADRs is *about* rather than by type, because this suite pins decisions rather than a standard library: `optionals_spec.pdx` (7 examples, ADRs 0005/0010/0012/0019 — absence, which four ADRs push in one direction), `symbols_spec.pdx` (4, ADRs 0022/0023 — an enum case is a symbol carrying a payload), `numbers_spec.pdx` (2, ADR 0018), `mutability_spec.pdx` (2, ADR 0015), `blocks_spec.pdx` (1, ADR 0017). Sixteen still, across ten `describe` groups.
+
+- Both gates already handled multiple files, as measured a few commits ago — but the Rust one globbed every `.pdx` in `spec/`, which would have run `spec_helper.pdx` as a spec and reported zero examples and a pass. **Noise dressed as coverage**, so it now matches `_spec.pdx`, the same glob `script/spec` uses, and asserts it found something rather than passing vacuously on an empty directory. Its file list is sorted too: directory order is not stable across filesystems, and a failure naming a different file each run is a worse failure.
+
+- Verified by breaking one example in one of the five: `script/spec` reported `2 examples, 1 failures` and exited 1, and the Rust gate named `numbers_spec.pdx` specifically rather than the suite. Then restored — ten runs, ten zero-failure tallies.
+
+- `1 examples` is now visible in the output, since `blocks_spec.pdx` has exactly one. Left alone deliberately: pluralising is a `script/spec` change and this commit is about the split.
+
 - **The trio speaks `require_relative`** ([#37](https://github.com/portlandlang/portland/issues/37)) — a guest program running hosted can load a sibling file, resolved against the directory of the file doing the requiring, with `.pdx` implied and load-once answering false the second time. Byte-identical to the seed on the existing fixture pair, nested requires included: `a.pdx` requiring `sub/b`, which requires `c`, resolves that `c` inside `sub/` on both oracles.
 
 - The failing test was already sitting in the repo. `requires_library.pdx` and `library.pdx` have existed as fixtures since the seed learned `require_relative`, and were **never in the differential fixture list** — which is exactly why the trio's gap stayed invisible while the suite was green. Adding one line to that list was the whole red test, and "green is not covered" has now been the same lesson three times.
