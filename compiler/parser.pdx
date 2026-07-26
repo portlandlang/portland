@@ -1652,31 +1652,40 @@ end
 # opens block parameters, and a hash needs a `=>` at its own depth — so
 # this trims the menu without ever picking a winner (ADR 0016).
 def braces_could_be_a_hash?(tokens, position)
+  # Block parameters cannot open a hash.
   return false if operator_at?(tokens, position + 1, %w[|])
+  # `{}` — an empty hash or an empty block.
   return true if operator_at?(tokens, position + 1, ["}"])
+  # A shorthand key (ADR 0023), and only in first position.
+  return true if identifier_at?(tokens, position + 1) && operator_at?(tokens, position + 2, %w[:])
+
+  # Otherwise a hash's first element has to be `value => ...`, so look for a
+  # `=>` at the braces' own level before that element could have ended. A
+  # comma ends it; so does a newline, since a hash literal cannot span lines.
   mutable depth = 0
-  mutable index = position
+  mutable index = position + 1
   while index < tokens.length
     token = tokens[index]
-    if token.operator? && token.text == "{"
+    if token.operator? && ["{", "[", "("].include?(token.text)
       depth += 1
-    elsif token.operator? && token.text == "}"
+    elsif token.operator? && ["]", ")"].include?(token.text)
       depth -= 1
+    elsif token.operator? && token.text == "}"
       return false if depth == 0
-    elsif token.operator? && token.text == "=>" && depth == 1
+      depth -= 1
+    elsif token.operator? && token.text == "=>" && depth == 0
       return true
-    elsif token.identifier? && depth == 1 && operator_at?(tokens, index + 1, %w[:])
-      # ADR 0023's shorthand: `{name: "pdx"}` is every bit as much a hash as
-      # `{"name" => "pdx"}`, and this peek predated it — so `render config
-      # {name: 1}` was told its braces could only be a block, dropping a real
-      # reading. A keyword argument inside a block body trips this too and
-      # widens the menu by one line, which is the safe direction: the peek
-      # exists to trim the menu, never to pick (ADR 0016).
-      return true
+    elsif depth == 0 && (token.newline? || (token.operator? && token.text == ","))
+      return false
     end
     index += 1
   end
   false
+end
+
+def identifier_at?(tokens, position)
+  return false if position >= tokens.length
+  tokens[position].identifier?
 end
 
 # The seed's wording for a `{` sitting directly after a call's name, where the

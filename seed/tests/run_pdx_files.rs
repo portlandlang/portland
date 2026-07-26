@@ -542,6 +542,13 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def expecting(v)\n  v\nend\nexpecting { |item| item }\n",
             "is this call's block",
         ),
+        // The peek reads the first pair position only, so a keyword argument
+        // inside a block body is not mistaken for a hash key. Both oracles
+        // used to scan the whole body and call this ambiguous.
+        (
+            "def greet(name:)\n  name\nend\ndef twice\n  yield\nend\ntwice { greet name: \"pdx\" }\n",
+            "is this call's block",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");

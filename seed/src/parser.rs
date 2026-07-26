@@ -1067,36 +1067,29 @@ impl<'source> Parser<'source> {
     fn braces_at_could_be_a_hash(&self, brace: usize) -> bool {
         let kind_at = |offset: usize| self.tokens.get(brace + offset).map(|token| token.kind);
         if kind_at(1) == Some(TokenKind::Pipe) {
-            return false;
+            return false; // block parameters cannot open a hash
         }
         if kind_at(1) == Some(TokenKind::RightBrace) {
             return true; // `{}` — an empty hash or an empty block
         }
+        // A shorthand key (ADR 0023), and only in first position.
+        if kind_at(1) == Some(TokenKind::Identifier) && kind_at(2) == Some(TokenKind::Colon) {
+            return true;
+        }
+        // Otherwise a hash's first element has to be `value => …`, so look for
+        // a `=>` at the braces' own level before that element could have
+        // ended. A comma ends it; so does a newline, since a hash literal
+        // cannot span lines.
         let mut depth = 0;
-        let mut index = brace;
+        let mut index = brace + 1;
         while let Some(token) = self.tokens.get(index) {
             match token.kind {
-                TokenKind::LeftBrace => depth += 1,
-                TokenKind::RightBrace => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return false;
-                    }
-                }
-                TokenKind::FatArrow if depth == 1 => return true,
-                // ADR 0023's shorthand: `{name: "pdx"}` is every bit as much a
-                // hash as `{"name" => "pdx"}`, and this peek predated it — so
-                // `render config {name: 1}` was told its braces could only be a
-                // block, dropping a real reading. A keyword argument inside a
-                // block body (`{ send label: 1 }`) trips this too and widens
-                // the menu by one line, which is the safe direction.
-                TokenKind::Identifier
-                    if depth == 1
-                        && self.tokens.get(index + 1).map(|token| token.kind)
-                            == Some(TokenKind::Colon) =>
-                {
-                    return true;
-                }
+                TokenKind::LeftBrace | TokenKind::LeftBracket | TokenKind::LeftParen => depth += 1,
+                TokenKind::RightBracket | TokenKind::RightParen => depth -= 1,
+                TokenKind::RightBrace if depth == 0 => return false,
+                TokenKind::RightBrace => depth -= 1,
+                TokenKind::FatArrow if depth == 0 => return true,
+                TokenKind::Comma | TokenKind::Newline if depth == 0 => return false,
                 _ => {}
             }
             index += 1;

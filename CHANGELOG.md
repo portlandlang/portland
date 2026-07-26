@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The brace peek reads the first pair position, not the whole body.** `twice { greet name: "pdx" }` was called ambiguous because the peek saw `name:` *somewhere* inside and concluded the braces might be a hash. They cannot be: a hash's first element has to be `label: value` or `value => value`, and this one starts with `greet` followed by an identifier. `config = { greet name: "pdx" }` is `expected => in hash literal`, so the parser already knew — the peek just was not asking in the right place. Now it asks at the front, and stops at the first comma or newline, since a hash literal cannot span lines either.
+
+- This was the peek trimming the menu **wrongly**, which is the failure principle 3 names: peek to shorten the question, never to answer it. Yesterday's fix taught it about shorthand keys and made it too eager in the process; both halves are now pinned, the shorthand one and this one, on both oracles.
+
 - **A bare `{` right after a call's name says what it could mean.** It used to report `expected a newline after statement, got Some(Token { leading_space: true, kind: LeftBrace, text: "{" })` — a token dump in a never-guess position, which is the one place the language promises a menu with rewrites. `starts_command` simply had no `LeftBrace` arm, so the call never became a command call and the statement-boundary check picked up the pieces. It now names both readings, a block for the call or a hash argument to it, exactly as the position one token later has always done.
 
 - **And it trims that menu honestly, which turned out to matter.** With no argument in between there is no inner call to own the block, so `expecting { |item| item }` has *one* reading, not two — a `|` rules the hash out. The first draft said "could be two things" for it, which is the peek picking a winner by omission in reverse: claiming an ambiguity that is not there. Where the menu is one long the error stops asking and starts telling: `` `{` after a paren-less call is this call's block — write expecting() { ... } or expecting do ... end ``.

@@ -2714,6 +2714,16 @@ end
         evaluate("def expecting(value)\n  value\nend\nexpecting { 1 }\n");
     }
 
+    /// The peek reads only the first pair position, so a keyword argument in a
+    /// block body is not mistaken for a hash key.
+    #[test]
+    #[should_panic(expected = "is this call's block")]
+    fn a_keyword_argument_in_a_block_body_is_not_a_hash() {
+        evaluate(
+            "def greet(name:)\n  name\nend\ndef twice\n  yield\nend\ntwice { greet name: \"pdx\" }\n",
+        );
+    }
+
     /// A `|` rules the hash out the same way.
     #[test]
     #[should_panic(expected = "`{` after a paren-less call is this call's block")]
