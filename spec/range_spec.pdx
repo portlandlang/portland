@@ -1,0 +1,64 @@
+# Ranges: two dots and three, endless and beginless, integer bounds only.
+
+require_relative "spec_helper"
+
+# ADR 0019 — `..` keeps its end and `...` excludes it, and both iterate.
+describe "a range literal" do
+  specify "two dots keep the end" do
+    expect((1..5).to_a, [1, 2, 3, 4, 5])
+  end
+
+  specify "three dots exclude it" do
+    expect((1...5).to_a, [1, 2, 3, 4])
+  end
+
+  specify "iterates through the block methods" do
+    expect((1..3).map { it * 2 }, [2, 4, 6])
+  end
+
+  specify "sums without being spelled out" do
+    expect((1..5).sum, 15)
+  end
+end
+
+# ADR 0019 — `include?` answers membership without walking, which is what
+# lets an endless or beginless range answer at all.
+describe "Range#include?" do
+  specify "respects the exclusive end" do
+    expect([(1..5).include?(5), (1...5).include?(5)], [true, false])
+  end
+
+  specify "answers for an endless range" do
+    expect((1..).include?(99), true)
+  end
+
+  specify "answers for a beginless one" do
+    expect([(..4).include?(0 - 5), (..4).include?(5)], [true, false])
+  end
+end
+
+# ADR 0019 — a slice is a collection, never a maybe. The past-the-end half of
+# that promise lives in optionals_spec; these are the ordinary slices.
+describe "indexing with a range" do
+  words = %w[a b c d e]
+
+  specify "slices an array, inclusive or exclusive" do
+    expect([words[1..2], words[1...3]], [["b", "c"], ["b", "c"]])
+  end
+
+  specify "slices from the start with a beginless range" do
+    expect(words[..1], ["a", "b"])
+  end
+
+  specify "slices to the end with an endless one" do
+    expect(words[3..], ["d", "e"])
+  end
+
+  specify "slices strings the same way" do
+    expect(["portland"[0..3], "portland"[5..]], ["port", "and"])
+  end
+
+  specify "answers an empty string past the end, never nil" do
+    expect("portland"[9..], "")
+  end
+end
