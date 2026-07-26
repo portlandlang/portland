@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The language spec covers methods and calls** (ADR 0014) — `method_spec`: implicit return of the last expression, required and defaulted keywords, arguments in any order, a default referencing an earlier parameter, and `yield` running either block spelling handed to the call.
+
 - **The language spec covers control flow** (ADR 0012 in part) — `control_flow_spec`: `if`/`unless`/`case-when` as expressions, postfix guards on `return`, `while` with `break` and `next`, a finished loop answering nil, and `next` skipping a block iteration.
 
 - **Two more promises the trio does not keep, found the same way as the range patterns.** `return` inside a block should unwind the enclosing method (language.md's rule; the seed's behavior) — hosted, the method runs on past the block as if the `return` were a `next`. And a call broken out of should answer nil (ADR 0012) — hosted, `[1, 2].each do break end` answers `[1, 2]`. Both examples are noted in the spec file and wait on the trio; both are silent divergences, since no fixture exercised either shape.
