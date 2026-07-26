@@ -855,8 +855,13 @@ def evaluate_method_call(node, mutable bindings)
   when "end_with?" then receiver.end_with?(arguments.first)
   when "slice" then receiver.slice(arguments[0], arguments[1])
   else
-    # Anything else is a struct field read; on a non-struct the host
-    # panics, which is the crude error story.
+    # Anything else is a struct field read. On a non-struct that used to
+    # index and fail with an unrelated message — `7.positive?` reported
+    # "cannot index Integer(7) with Integer(2)" — which is how nine missing
+    # methods stayed hidden. Say what actually happened instead.
+    unless receiver in ["__struct__", *]
+      panic("no method #{node.name} on this value — the trio may be missing a builtin the seed has")
+    end
     struct_field(receiver, node.name)
   end
   outcome([result], bindings)

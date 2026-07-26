@@ -945,3 +945,90 @@ fn parse_only_needs_a_file() {
             .contains("needs a file")
     );
 }
+
+/// The seed and the trio must implement the same builtin methods, and every
+/// one of them must appear in a hosted fixture.
+///
+/// This exists because an audit found nine methods the trio simply did not
+/// have — `positive?`, `keys`, `reduce`, `upto` and friends — and the
+/// differential harness was green throughout, because no fixture used them.
+/// Twenty-one of the forty-two documented methods had never run through the
+/// trio at all.
+///
+/// Relying on someone remembering to add a fixture is what failed. These two
+/// checks read the implementations instead, so a method added to the seed
+/// tomorrow is picked up without anyone deciding to look.
+///
+/// Both directions are deliberately one-sided. Absence from the trio's
+/// dispatch, or from every fixture, is conclusive; presence is only evidence.
+/// A method could appear in a fixture inside a comment and count as covered —
+/// a false negative, which is the safe direction. A check that cries wolf
+/// gets deleted, and then there is no check at all.
+fn seed_builtin_methods() -> Vec<String> {
+    let source = include_str!("../src/interpreter.rs");
+    let mut names: Vec<String> = source
+        .match_indices(", \"")
+        .filter_map(|(at, _)| {
+            let rest = &source[at + 3..];
+            let end = rest.find('"')?;
+            let name = &rest[..end];
+            // A dispatch arm is `(receiver, "name", [args])`.
+            if !rest[end..].starts_with("\", [") {
+                return None;
+            }
+            let plain = name
+                .chars()
+                .all(|character| character.is_ascii_lowercase() || "_?!".contains(character));
+            (plain && !name.is_empty()).then(|| name.to_string())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+#[test]
+fn the_trio_implements_every_builtin_the_seed_does() {
+    let evaluator = std::fs::read_to_string(format!(
+        "{}/../compiler/evaluator.pdx",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("failed to read evaluator.pdx");
+
+    let missing: Vec<String> = seed_builtin_methods()
+        .into_iter()
+        .filter(|name| !evaluator.contains(&format!("when \"{name}\"")))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "the seed implements these and compiler/evaluator.pdx does not: {}.\n\
+         The trio's dispatch treats an unknown method as a struct-field read, so \
+         these fail with an unrelated error rather than saying no such method.",
+        missing.join(", ")
+    );
+}
+
+#[test]
+fn every_builtin_appears_in_a_hosted_fixture() {
+    let fixtures: String =
+        std::fs::read_dir(format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR")))
+            .expect("failed to read the fixture directory")
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                (path.extension()? == "pdx").then(|| std::fs::read_to_string(path).ok())?
+            })
+            .collect();
+
+    let untested: Vec<String> = seed_builtin_methods()
+        .into_iter()
+        .filter(|name| !fixtures.contains(name.as_str()))
+        .collect();
+
+    assert!(
+        untested.is_empty(),
+        "no fixture mentions these, so the differential harness never runs them: {}.\n\
+         Add them to a fixture — green is not covered.",
+        untested.join(", ")
+    );
+}

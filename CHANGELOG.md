@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Two tests that read the implementations instead of trusting anyone to remember.** Relying on somebody adding a fixture is exactly what failed — nine methods were missing from the trio and twenty-one of forty-two had never run through it, with the harness green throughout. So: `the_trio_implements_every_builtin_the_seed_does` extracts the seed's dispatch arms and requires a matching `when` in `evaluator.pdx`, and `every_builtin_appears_in_a_hosted_fixture` requires each to appear in some `.pdx` fixture. Both read the source of truth, so **a method added to the seed tomorrow is picked up without anyone deciding to look**. Verified against yesterday's evaluator, where the parity check names all nine.
+
+- The coverage check found four more on its first run that the parity check structurally could not see — `odd?`, `select`, `to_f`, `to_i` were implemented in both and exercised by neither. Now in `value_methods.pdx`.
+
+- Both checks are deliberately **one-sided**: absence is conclusive, presence is only evidence. A method could appear in a fixture inside a comment and count as covered — a false negative, which is the safe direction, because a check that cries wolf gets deleted and then there is no check at all.
+
+- The trio's method dispatch says what actually happened when it does not recognise a name. It treated any unknown method as a struct-field read, so `7.positive?` reported `cannot index Integer(7) with Integer(2)` — a wrong answer wearing an unrelated error, which is how nine missing methods stayed invisible. It now says `no method positive? on this value`, naming the likely cause.
+
 - **Nine methods the trio was missing, found by auditing differential coverage rather than by hitting a bug.** The audit asked a mechanical question — which of the 42 methods in `docs/language.md`'s library table ever run through the trio — and the answer was 21. Probing the other half found **ten divergences**, of which nine were genuinely absent from `evaluator.pdx`: `positive?`, `negative?`, `key?`, `keys`, `values`, `each_with_index`, `reduce`, `upto`, `downto`. Block calls also never received their arguments, which is why `upto(3)` could not have worked. New fixture `value_methods.pdx` covers the lot, direct and hosted.
 
 - The failure mode was worse than a missing method: the trio's dispatch treats an unknown method as a **struct field read**, so `7.positive?` did not say "no such method" — it said `cannot index Integer(7) with Integer(2)`. A wrong answer wearing an unrelated error message, in a fallback that assumes anything unrecognised must be a field.

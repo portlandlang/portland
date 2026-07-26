@@ -22,6 +22,11 @@ puts 7.positive?.to_s
 negative = 0 - 3
 puts negative.negative?.to_s
 
+puts 3.odd?.to_s
+puts "42".to_i.to_s
+puts "3.5".to_f.to_s
+puts 7.to_f.to_s
+
 # — arrays —
 numbers = [3, 1, 2]
 puts numbers.last.to_s
@@ -43,6 +48,7 @@ end
 
 counting = [1, 2, 3, 4]
 puts counting.reject { it.even? }.join(",")
+puts counting.select { it.even? }.join(",")
 
 total = counting.reduce(0) do |running, number|
   running + number
