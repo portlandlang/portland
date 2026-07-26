@@ -534,18 +534,21 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "could be three things",
         ),
         // A `{` directly after the name, where there is no argument for the
-        // block to belong to instead: two readings, or one when the braces
-        // cannot be a hash. The trio used to crash on this rather than
-        // diagnose it — `IdentifierNode has no field value`.
-        (
-            "def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n",
-            "could be two things",
-        ),
-        // ADR 0024 accepts the one-reading forms, so the refusals that remain
-        // are the genuinely two-reading ones. `{}` is the empty pair.
+        // block to belong to instead. The trio used to crash on this rather
+        // than diagnose it — `IdentifierNode has no field value`.
+        //
+        // ADR 0024 accepts the one-reading block forms, so the refusals that
+        // remain are the genuinely two-reading ones — `{}` is one, an empty
+        // hash or an empty block.
         (
             "def expecting(v)\n  v\nend\nexpecting {}\n",
             "could be two things",
+        ),
+        // And the one-reading *hash* form is told, not asked: a label cannot
+        // start a statement, so there is no block body to weigh against it.
+        (
+            "def expecting(v)\n  v\nend\nexpecting {name: 1}\n",
+            "is a hash, not a block",
         ),
     ];
     for (source, expected) in cases {

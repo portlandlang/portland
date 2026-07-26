@@ -2698,11 +2698,31 @@ end
         evaluate("def expecting(value)\n  value\nend\nexpecting {\"a\" => 1}\n");
     }
 
-    /// The shape that found this: a hash argument that looks like a block body.
+    /// A shorthand key has **one** reading, not two: a label cannot start a
+    /// statement, so there is no block body to read `{name: 1}` as. Saying
+    /// "could be two things" here invented a reading and then offered a
+    /// `expecting() { ... }` rewrite that does not parse.
     #[test]
-    #[should_panic(expected = "`{` after a paren-less call could be two things")]
-    fn a_hash_shorthand_argument_without_parens_names_both_readings() {
+    #[should_panic(expected = "is a hash, not a block — a block body cannot start with a label")]
+    fn a_shorthand_key_after_a_call_name_is_a_hash_and_only_a_hash() {
         evaluate("def expecting(a, b)\n  a\nend\nexpecting {name: \"pdx\"}[:name], \"pdx\"\n");
+    }
+
+    /// A pair *list* is not a statement either, so it is a hash and only a
+    /// hash — unlike a lone `key => value`, which is also a match assertion.
+    #[test]
+    #[should_panic(expected = "is a hash, not a block")]
+    fn a_multi_pair_rocket_hash_after_a_call_name_is_a_hash_and_only_a_hash() {
+        evaluate("def expecting(v)\n  v\nend\nexpecting {\"a\" => 1, \"b\" => 2}\n");
+    }
+
+    /// And a nested hash is unambiguously a block whose body is that hash —
+    /// the first element inside the outer braces is a `{`, which cannot start
+    /// a pair. Ruby 4.0.6 reads it the same way.
+    #[test]
+    fn a_nested_hash_after_a_call_name_is_a_block_holding_it() {
+        let source = "def twice\n  puts(\"got #{yield}\")\nend\ntwice {{name: 1}}\n";
+        assert_eq!(output_of(source), "got {name => 1}\n");
     }
 
     /// ADR 0024: one reading is not an ambiguity, so the braces are this call's

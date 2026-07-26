@@ -1723,17 +1723,28 @@ end
 # Could the braces starting here be a hash literal? A `|` right after
 # opens block parameters, and a hash needs a `=>` at its own depth — so
 # this trims the menu without ever picking a winner (ADR 0016).
-def braces_could_be_a_hash?(tokens, position)
+# What the `{` at `position` could be, judged from the first pair position only
+# (ADR 0024): "block", "hash", or "either".
+#
+# Three answers, not two, because "could be a hash" hides a distinction that
+# matters: `{name: 1}` can *only* be a hash, since a label cannot start a
+# statement and so cannot be a block body. Collapsing that into "ambiguous"
+# invents a reading, and then offers a `foo() { ... }` rewrite that does not
+# parse.
+def brace_reading(tokens, position)
   # Block parameters cannot open a hash.
-  return false if operator_at?(tokens, position + 1, %w[|])
+  return "block" if operator_at?(tokens, position + 1, %w[|])
   # `{}` — an empty hash or an empty block.
-  return true if operator_at?(tokens, position + 1, ["}"])
-  # A shorthand key (ADR 0023), and only in first position.
-  return true if identifier_at?(tokens, position + 1) && operator_at?(tokens, position + 2, %w[:])
+  return "either" if operator_at?(tokens, position + 1, ["}"])
+  # A shorthand key (ADR 0023), first position only. A label is not a
+  # statement, so there is no block reading to weigh against the hash.
+  return "hash" if identifier_at?(tokens, position + 1) && operator_at?(tokens, position + 2, %w[:])
 
   # Otherwise a hash's first element has to be `value => ...`, so look for a
   # `=>` at the braces' own level before that element could have ended. A
-  # comma ends it; so does a newline, since a hash literal cannot span lines.
+  # newline ends it, since a hash literal cannot span lines; a comma means a
+  # second pair, and a pair list is not a statement either.
+  mutable rocket = false
   mutable depth = 0
   mutable index = position + 1
   while index < tokens.length
@@ -1743,16 +1754,25 @@ def braces_could_be_a_hash?(tokens, position)
     elsif token.operator? && ["]", ")"].include?(token.text)
       depth -= 1
     elsif token.operator? && token.text == "}"
-      return false if depth == 0
+      break if depth == 0
       depth -= 1
+    elsif token.newline? && depth == 0
+      break
     elsif token.operator? && token.text == "=>" && depth == 0
-      return true
-    elsif depth == 0 && (token.newline? || (token.operator? && token.text == ","))
-      return false
+      rocket = true
+    elsif token.operator? && token.text == "," && depth == 0
+      return "hash" if rocket
+      return "block"
     end
     index += 1
   end
-  false
+  # A lone `key => value` is both a pair and a match assertion (ADR 0013).
+  return "either" if rocket
+  "block"
+end
+
+def braces_could_be_a_hash?(tokens, position)
+  brace_reading(tokens, position) != "block"
 end
 
 def identifier_at?(tokens, position)
@@ -1760,12 +1780,12 @@ def identifier_at?(tokens, position)
   tokens[position].identifier?
 end
 
-# The seed's wording for a `{` sitting directly after a call's name, where the
-# menu is two long — or one, when the braces cannot be a hash, and then the
-# error stops asking and starts telling.
+# The seed's wording for a `{` sitting directly after a call's name. Two
+# readings get the menu; one reading that is a hash gets told, not asked.
+# (A single block reading never reaches here — ADR 0024 accepts it.)
 def brace_after_name_message(name, tokens, position)
-  unless braces_could_be_a_hash?(tokens, position)
-    return "`{` after a paren-less call is this call's block — write #{name}() { ... } or #{name} do ... end"
+  if brace_reading(tokens, position) == "hash"
+    return "`{` after a paren-less call is a hash, not a block — a block body cannot start with a label. Write #{name}({ ... })"
   end
 
   head = "`{` after a paren-less call could be two things — parenthesize the one you mean:"

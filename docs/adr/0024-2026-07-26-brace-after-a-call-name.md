@@ -53,19 +53,32 @@ Three parts, in dependency order:
 
    ```ruby
    twice { puts "again" }            # accepted — no `=>`, no leading label
-   twice { greet name: "pdx" }       # accepted — first element is not a pair
+   twice { greet name: "pdx" }       # accepted — the first element is not a pair
    twice { |item| item }             # accepted — a `|` cannot open a hash
+   twice {{name: 1}}                 # accepted — a `{` cannot open a pair either
 
-   twice {}                          # error — empty hash argument, or empty block?
-   twice {name: 1}                   # error — hash argument, or block?
-   twice { "a" => 1 }                # error — hash argument, or a match assertion (ADR 0013)?
+   twice {}                          # error, two readings — empty hash, or empty block?
+   twice { "a" => 1 }                # error, two readings — a pair, or a match assertion?
+   twice {name: 1}                   # error, one reading — a hash; write twice({name: 1})
    ```
 
 1. **A paren-less call with arguments is unchanged.** `render config { ... }` keeps ADR 0016's three-way menu, because three readings really are available there. Its rewrites become reachable via part 1.
 
-The peek that decides part 2 is `braces_could_be_a_hash`, and because it now decides *what compiles* rather than which error prints, its rule belongs in this ADR rather than in the source:
+The peek that decides part 2 now decides *what compiles* rather than which error prints, so its rule belongs in this ADR rather than in the source. It answers **three** ways, not two — "could be a hash" hides a distinction that matters, and collapsing it invents ambiguities:
 
-> Judge the **first pair position only**. A hash's first element is `label: value` or `value => value`. So: a `|` rules the hash out; `{}` keeps it; an identifier immediately followed by `:` keeps it; otherwise scan at the braces' own level for a `=>` before the first comma or newline. Anything else rules the hash out, however hash-like the rest of the body looks.
+| the braces | reading | because |
+| --- | --- | --- |
+| `{ \|item\| … }` | block | a `\|` cannot start a pair |
+| `{ greet name: 1 }` | block | the first element is not a pair, however pair-like the rest looks |
+| `{{name: 1}}` | block | the first element is a `{`, which cannot start a pair |
+| `{name: 1}` | **hash** | a label is not a statement, so there is no block body to read it as |
+| `{"a" => 1, "b" => 2}` | **hash** | a pair *list* is not a statement either |
+| `{}` | either | an empty hash, or an empty block |
+| `{"a" => 1}` | either | a lone pair is also a one-line match assertion (ADR 0013) |
+
+Judged from the **first pair position only**: a hash's first element is `label: value` or `value => value`, so anything else rules the hash out. The rows are not guesses — each was checked by asking the seed whether the body is a statement.
+
+**One reading does not always mean accept.** Where the single reading is a *block*, the braces attach. Where it is a *hash*, the call is still refused, and told rather than asked: `` `{` after a paren-less call is a hash, not a block — a block body cannot start with a label. Write foo({ ... }) ``. Refused because accepting would make `foo { … }` mean a block for most bodies and a hash argument for pair-shaped ones — the unrecitable rule this ADR exists to avoid. Nothing is lost: `foo name: 1` already passes keyword arguments and `foo({name: 1})` a literal hash.
 
 Rejected, one line each:
 

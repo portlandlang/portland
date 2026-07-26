@@ -40,18 +40,31 @@ render config { "a" => 1 }
 
 With no argument in between there is no inner call to own the block, so the menu is shorter, and for most spellings it collapses to one reading and Portland agrees with Ruby: `twice { puts "again" }` and `expecting { |item| item }` are that call's block, exactly as in Ruby.
 
-**The difference is `foo {}`.** Ruby reads it as a call handed an empty block; Portland refuses it, because `{}` is equally an empty hash argument and neither reading wins:
+**Two spellings Ruby accepts and Portland refuses**, both because a second reading exists here that Ruby does not have. Ruby is committed to `{` after a call name being a block, so it never has to ask; Portland also has the hash-argument reading, and where both are real it declines to pick.
 
-<!-- not-portland: shows the error this rule produces, so it must not parse -->
+<!-- not-portland: shows the errors this rule produces, so it must not parse -->
 
 ```ruby
-expecting {}
+expecting {}            # Ruby: an empty block. Here: empty block, or empty hash?
+expecting { "a" => 1 }  # Ruby: a block, `=>` being a pattern. Here: that, or a hash?
 # error: `{` after a paren-less call could be two things — parenthesize the one you mean:
 #   a block for expecting:         expecting() { ... }
 #   a hash argument to expecting:  expecting({ ... })
 ```
 
-Migrating code: `foo {}` fails to compile with the rewrite named, never changes meaning. The polyfill can autocorrect it to `foo() {}` mechanically — the block is empty, so there is nothing for the rewrite to alter.
+Migrating code: both fail to compile with the rewrites named, and neither changes meaning. `foo {}` is a free autocorrect to `foo() {}` — an empty block has nothing for the rewrite to alter. `foo { "a" => 1 }` needs a human, because the two readings do different things.
+
+**And one Ruby rejects for a different reason.** `foo {name: 1}` is a syntax error in Ruby — it reads the brace as a block, then `name: 1` is not a valid body. Portland refuses it too, and says which reading survives:
+
+<!-- not-portland: shows the error this rule produces, so it must not parse -->
+
+```ruby
+expecting {name: 1}
+# error: `{` after a paren-less call is a hash, not a block — a block body cannot
+#        start with a label. Write expecting({ ... })
+```
+
+Not accepted as a hash, even though that is the only reading the grammar admits, because `foo { ... }` would then mean a block for most bodies and a hash argument for pair-shaped ones. Nothing is lost: `foo name: 1` already passes keyword arguments.
 
 ## `it` (ADR 0017 — decided, not yet built)
 

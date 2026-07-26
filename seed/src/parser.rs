@@ -48,6 +48,18 @@ struct Parser<'source> {
     tokens: Vec<Token<'source>>,
 }
 
+/// What a `{` in a call-block position could be (ADR 0024).
+#[derive(PartialEq)]
+enum BraceReading {
+    /// This call's block, and nothing else — no pair can start here.
+    Block,
+    /// A hash argument, and nothing else — the contents are pairs, and a pair
+    /// list is not a statement, so there is no block body to read them as.
+    Hash,
+    /// Both readings are real, so the author has to say which.
+    Either,
+}
+
 #[derive(Default)]
 struct ItFrame {
     claimed_by_child: bool,
@@ -371,12 +383,21 @@ impl<'source> Parser<'source> {
             // the hash out it is one long, which is not an ambiguity at all.
             // Then the braces are this call's block, the same as `do`.
             TokenKind::LeftBrace => {
-                if self.braces_at_could_be_a_hash(self.position + 1) {
-                    panic!(
+                match self.brace_reading(self.position + 1) {
+                    BraceReading::Either => panic!(
                         "`{{` after a paren-less call could be two things — parenthesize the one you mean:\n  \
                          a block for {name}:         {name}() {{ ... }}\n  \
                          a hash argument to {name}:  {name}({{ ... }})"
-                    );
+                    ),
+                    // One reading, but a hash rather than a block, so the
+                    // rewrite is a paren and not a `()`. Refused rather than
+                    // accepted so that `{` after a call always means a block:
+                    // accepting here would make the same shape mean a hash
+                    // when the body happens to be pair-shaped.
+                    BraceReading::Hash => panic!(
+                        "`{{` after a paren-less call is a hash, not a block — a block body cannot start with a label. Write {name}({{ ... }})"
+                    ),
+                    BraceReading::Block => {}
                 }
                 let name = name.to_string();
                 self.position += 1; // the name; `block` starts at the `{`
@@ -1055,52 +1076,69 @@ impl<'source> Parser<'source> {
     }
 
     /// Could the braces starting at the current `{` be a hash literal?
-    /// A `|` right after opens block parameters, and a hash needs a `=>` at
-    /// its own depth — so this trims the never-guess menu without ever
-    /// picking a winner (ADR 0016).
     fn braces_could_be_a_hash(&self) -> bool {
-        self.braces_at_could_be_a_hash(self.position)
+        self.brace_reading(self.position) != BraceReading::Block
     }
 
-    /// The same question about the `{` at `brace`, which is not always the
-    /// token the parser is sitting on — directly after a call's name it is one
-    /// ahead.
+    /// What the `{` at `brace` could be, judged from the **first pair position
+    /// only** (ADR 0024). `brace` is not always the token the parser is sitting
+    /// on — directly after a call's name it is one ahead.
     ///
-    /// Wrong answers are not symmetric here, which is what sets the bias. This
-    /// peek exists to *trim* the menu, never to pick (ADR 0016), so keeping a
-    /// reading that turns out to be impossible only makes the error longer,
-    /// while dropping a genuine one makes the parser silently choose.
-    fn braces_at_could_be_a_hash(&self, brace: usize) -> bool {
+    /// Three answers, not two, because "could be a hash" hides a distinction
+    /// that matters: `{name: 1}` can *only* be a hash, since a label cannot
+    /// start a statement and so cannot be a block body. Collapsing that into
+    /// "ambiguous" invents a reading, and then offers a `foo() { ... }` rewrite
+    /// that does not parse.
+    ///
+    /// Verified against the seed rather than reasoned, by asking which bodies
+    /// are statements: `name: 1` is not, `{name: 1}` is, `"a" => 1` is (a
+    /// one-line match assertion, ADR 0013), `"a" => 1, "b" => 2` is not.
+    fn brace_reading(&self, brace: usize) -> BraceReading {
         let kind_at = |offset: usize| self.tokens.get(brace + offset).map(|token| token.kind);
         if kind_at(1) == Some(TokenKind::Pipe) {
-            return false; // block parameters cannot open a hash
+            return BraceReading::Block; // block parameters cannot open a hash
         }
         if kind_at(1) == Some(TokenKind::RightBrace) {
-            return true; // `{}` — an empty hash or an empty block
+            return BraceReading::Either; // `{}` — an empty hash or an empty block
         }
-        // A shorthand key (ADR 0023), and only in first position.
+        // A shorthand key (ADR 0023), first position only. A label is not a
+        // statement, so there is no block reading to weigh against the hash.
         if kind_at(1) == Some(TokenKind::Identifier) && kind_at(2) == Some(TokenKind::Colon) {
-            return true;
+            return BraceReading::Hash;
         }
         // Otherwise a hash's first element has to be `value => …`, so look for
         // a `=>` at the braces' own level before that element could have
-        // ended. A comma ends it; so does a newline, since a hash literal
-        // cannot span lines.
+        // ended. A newline ends it, since a hash literal cannot span lines; a
+        // comma means a second pair, and a pair list is not a statement either.
+        let mut rocket = false;
         let mut depth = 0;
         let mut index = brace + 1;
         while let Some(token) = self.tokens.get(index) {
             match token.kind {
                 TokenKind::LeftBrace | TokenKind::LeftBracket | TokenKind::LeftParen => depth += 1,
                 TokenKind::RightBracket | TokenKind::RightParen => depth -= 1,
-                TokenKind::RightBrace if depth == 0 => return false,
+                TokenKind::RightBrace | TokenKind::Newline if depth == 0 => break,
                 TokenKind::RightBrace => depth -= 1,
-                TokenKind::FatArrow if depth == 0 => return true,
-                TokenKind::Comma | TokenKind::Newline if depth == 0 => return false,
+                TokenKind::FatArrow if depth == 0 => rocket = true,
+                // A second pair. `{"a" => 1, "b" => 2}` is a hash and nothing
+                // else, because a list of pairs is not a statement.
+                TokenKind::Comma if depth == 0 => {
+                    return if rocket {
+                        BraceReading::Hash
+                    } else {
+                        BraceReading::Block
+                    };
+                }
                 _ => {}
             }
             index += 1;
         }
-        false
+        // A lone `key => value` is both a pair and a match assertion.
+        if rocket {
+            BraceReading::Either
+        } else {
+            BraceReading::Block
+        }
     }
 
     /// Whether a block opens here — `do ... end` or `{ ... }` (ADR 0016).
