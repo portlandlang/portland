@@ -2,52 +2,55 @@
 
 require_relative "spec_helper"
 
-# ADR 0007 — `or`, `and`, and `not` are dead-identical to `||`, `&&`, and `!`.
-# Same precedence, same semantics; Ruby's secret second precedence is gone.
-describe "the word operators" do
-  specify "or is ||" do
-    expect((false or true), (false || true))
+context "the word operators" do
+  # ADR 0007 — `or`, `and`, and `not` are dead-identical to `||`, `&&`, and
+  # `!`. Same precedence, same semantics; Ruby's secret second precedence is
+  # gone.
+  describe "against the sigils" do
+    specify "or is ||" do
+      expect((false or true), (false || true))
+    end
+
+    specify "and is &&" do
+      expect((true and false), (true && false))
+    end
+
+    specify "not is !" do
+      expect((not true), (!true))
+    end
   end
 
-  specify "and is &&" do
-    expect((true and false), (true && false))
+  # ADR 0007 — one precedence means `x = nil or 7` binds the `or` first, so
+  # the name gets 7. In Ruby this assigns nil and the 7 vanishes — the exact
+  # trap whose removal this example pins.
+  describe "assignment through or" do
+    bound = nil or 7
+
+    specify "binds the whole or expression, not the nil" do
+      expect(bound, 7)
+    end
   end
 
-  specify "not is !" do
-    expect((not true), (!true))
-  end
-end
+  # ADR 0007 — `or` is typed: booleans get logical or, a maybe gets
+  # unwrap-or-else. Both spellings, one meaning each.
+  describe "typed or" do
+    specify "on booleans is logical" do
+      expect((false or true), true)
+    end
 
-# ADR 0007 — one precedence means `x = nil or 7` binds the `or` first, so the
-# name gets 7. In Ruby this assigns nil and the 7 vanishes — the exact trap
-# whose removal this example pins.
-describe "assignment through or" do
-  bound = nil or 7
+    specify "on an absent maybe takes the default" do
+      expect((nil or "anonymous"), "anonymous")
+    end
 
-  specify "binds the whole or expression, not the nil" do
-    expect(bound, 7)
-  end
-end
+    specify "on a present maybe keeps the value" do
+      expect(("found" or "unused"), "found")
+    end
 
-# ADR 0007 — `or` is typed: booleans get logical or, a maybe gets
-# unwrap-or-else. Both spellings, one meaning each.
-describe "typed or" do
-  specify "on booleans is logical" do
-    expect((false or true), true)
-  end
-
-  specify "on an absent maybe takes the default" do
-    expect((nil or "anonymous"), "anonymous")
-  end
-
-  specify "on a present maybe keeps the value" do
-    expect(("found" or "unused"), "found")
-  end
-
-  # `or panic` is the only crash you can write (ADR 0008), which makes it the
-  # sharpest probe of laziness there is: if the right side ran eagerly, this
-  # example would not fail — it would take the whole file down with it.
-  specify "never evaluates the right side of a hit" do
-    expect(("present" or panic("the right side ran")), "present")
+    # `or panic` is the only crash you can write (ADR 0008), which makes it
+    # the sharpest probe of laziness there is: if the right side ran eagerly,
+    # this example would not fail — it would take the whole file down with it.
+    specify "never evaluates the right side of a hit" do
+      expect(("present" or panic("the right side ran")), "present")
+    end
   end
 end

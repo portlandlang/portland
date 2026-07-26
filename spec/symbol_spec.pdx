@@ -1,33 +1,37 @@
-# A symbol is a name, not text. Enums share the file because an enum case is
-# a symbol that carries a payload, and the two ADRs landed as one arc.
+# A symbol is a name, not text (ADR 0023). Its enum kin live in enum_spec.
 
 require_relative "spec_helper"
 
-# ADR 0023 — a symbol is a name, not text, and they are not interchangeable.
-describe "a symbol" do
-  specify "equals itself" do
-    expect(:paid == :paid, true)
+context "a symbol" do
+  # ADR 0023 — comparison is equality only, and a symbol is not a String.
+  describe "equality" do
+    specify "holds against itself" do
+      expect(:paid == :paid, true)
+    end
+
+    specify "breaks against the string of its name" do
+      expect(:paid == "paid", false)
+    end
+
+    specify "breaks against any other symbol" do
+      expect(:paid == :pending, false)
+    end
   end
 
-  specify "is not the string of its name" do
-    expect(:paid == "paid", false)
+  describe "the spellings" do
+    specify "may end in a question mark, the suffix part of the name" do
+      expect([:paid? == :paid?, :paid == :paid?], [true, false])
+    end
+
+    specify "take quotes when the name is not identifier-shaped" do
+      expect(:"odd key" == :"odd key", true)
+    end
   end
 
-  specify "is not any other symbol" do
-    expect(:paid == :pending, false)
-  end
-
-  specify "may end in a question mark, the suffix part of the name" do
-    expect([:paid? == :paid?, :paid == :paid?], [true, false])
-  end
-
-  specify "takes the quoted spelling when the name is not identifier-shaped" do
-    expect(:"odd key" == :"odd key", true)
-  end
-end
-
-describe "hash shorthand" do
-  specify "builds symbol keys" do
-    expect({name: "pdx"}[:name], "pdx")
+  # ADR 0023 — the shorthand is the only spelling of a symbol key.
+  describe "the hash shorthand" do
+    specify "builds symbol keys" do
+      expect({name: "pdx"}[:name], "pdx")
+    end
   end
 end

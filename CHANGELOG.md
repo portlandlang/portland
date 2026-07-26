@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The type and rule specs nest** — structs, enums, symbols, optionals, the word operators, and mutability now group under `context`: `context "a struct" → describe "#with"`, optionals split into `context "absence"` and `context "the unwrap toolkit"`, and symbol equality reads apart from its spellings. Declarations and defs stay at the top level, where they live.
+
 - **The spec harness grows `context`, and the value-type specs nest under it** — `context` is `describe`'s twin letter for letter (an alias would be metaprogramming), and nesting needed nothing new: blocks are closures, so an inner describe's examples see the context's fixtures, and sibling scopes reuse names because block locals die at `end`. `Array`, `String`, `Hash`, `Range`, and the number files now read `context "Array" → describe "#[]" → specify`. The transcript stays flat — a method cannot know its depth, for the same no-state reason the tally lives in the runner.
 
 - **`it` counts from inside an interpolation** ([#47](https://github.com/portlandlang/portland/issues/47)) — `words.map { "#{it}!" }` now declares the implicit parameter on both oracles. The seed parsed interpolation innards in a fresh sub-parser whose empty frame stack swallowed the declaration; the frames now travel into the sub-parser and back, which also lets a block *inside* an interpolation nest correctly. The trio's flat token scan never looked inside string tokens; it now lexes each interpolation and asks the same question of what comes out, recursively, and the mixing refusal (`use one or the other`) fires through an interpolation too. Pinned in the brace-blocks differential and `it_spec`.

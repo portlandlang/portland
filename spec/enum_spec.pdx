@@ -1,10 +1,10 @@
-# A symbol is a name, not text. Enums share the file because an enum case is
-# a symbol that carries a payload, and the two ADRs landed as one arc.
+# An enum is a closed vocabulary of symbol cases; a case may carry a
+# keyword-only payload (ADR 0022).
 
 require_relative "spec_helper"
 
 # ADR 0022 — the declarations stay at the top level: they are compile-time
-# information, and nothing about a `describe` block is the right home for them.
+# information, and nothing about a block is the right home for them.
 #
 # A top-level enum is owned by no type; the nested one follows the
 # types-nest-in-types rule, `Purchase::Status` naming it while
@@ -32,58 +32,60 @@ struct Purchase
   end
 end
 
-describe "an enum case carrying a payload" do
-  specify "destructures by label" do
-    paid = :paid(on: "tuesday")
-    day = case paid
-    in :pending   then "never"
-    in :paid(on:) then on
+context "an enum" do
+  describe "a case carrying a payload" do
+    specify "destructures by label" do
+      paid = :paid(on: "tuesday")
+      day = case paid
+      in :pending   then "never"
+      in :paid(on:) then on
+      end
+      expect(day, "tuesday")
     end
-    expect(day, "tuesday")
-  end
 
-  specify "matches on any subset of its labels" do
-    refund = :refunded(on: "friday", reason: "damaged")
-    why = case refund
-    in :paid(on:)         then on
-    in :refunded(reason:) then reason
+    specify "matches on any subset of its labels" do
+      refund = :refunded(on: "friday", reason: "damaged")
+      why = case refund
+      in :paid(on:)         then on
+      in :refunded(reason:) then reason
+      end
+      expect(why, "damaged")
     end
-    expect(why, "damaged")
-  end
 
-  specify "binds every label when asked" do
-    refund = :refunded(on: "friday", reason: "damaged")
-    both = case refund
-    in :refunded(on:, reason:) then "#{reason} on #{on}"
+    specify "binds every label when asked" do
+      refund = :refunded(on: "friday", reason: "damaged")
+      both = case refund
+      in :refunded(on:, reason:) then "#{reason} on #{on}"
+      end
+      expect(both, "damaged on friday")
     end
-    expect(both, "damaged on friday")
-  end
 
-  specify "hits the one-line in form too" do
-    expect((:paid(on: "tuesday") in :paid(on:)), true)
-  end
-end
-
-# ADR 0022 — a payload-free case is simply a symbol; nothing about :less
-# needs to exist at runtime.
-describe "a payload-free case" do
-  specify "is the plain symbol" do
-    expect(:less == :less, true)
-  end
-end
-
-describe "an enum nested in a struct" do
-  purchase = Purchase.new(amount: 40, status: :paid(on: "tuesday"))
-
-  specify "reads back off the field" do
-    day = case purchase.status
-    in :pending   then "never"
-    in :paid(on:) then on
+    specify "hits the one-line in form too" do
+      expect((:paid(on: "tuesday") in :paid(on:)), true)
     end
-    expect(day, "tuesday")
   end
 
-  specify "and the struct's own methods match on it" do
-    expect(purchase.paid?, true)
+  # ADR 0022 — a payload-free case is simply a symbol; nothing about :less
+  # needs to exist at runtime.
+  describe "a payload-free case" do
+    specify "is the plain symbol" do
+      expect(:less == :less, true)
+    end
+  end
+
+  describe "nesting in a struct" do
+    purchase = Purchase.new(amount: 40, status: :paid(on: "tuesday"))
+
+    specify "reads back off the field" do
+      day = case purchase.status
+      in :pending   then "never"
+      in :paid(on:) then on
+      end
+      expect(day, "tuesday")
+    end
+
+    specify "and the struct's own methods match on it" do
+      expect(purchase.paid?, true)
+    end
   end
 end

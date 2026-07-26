@@ -2,86 +2,8 @@
 
 require_relative "spec_helper"
 
-# ADR 0015 — values never mutate; names do. An alias cannot be spooked.
-#
-# The `mutable` here is safe at `describe` level, against the caveat in the
-# helper, because the append happens in the setup rather than in an example:
-# neither example rebinds anything, so they stay independent of each other.
-describe "appending to an array" do
-  mutable numbers = [1]
-  alias_of = numbers
-  numbers << 2
-
-  specify "rebinds the name, leaving aliases alone" do
-    expect(alias_of.length, 1)
-  end
-
-  specify "and the name itself sees the append" do
-    expect(numbers.length, 2)
-  end
-end
-
-# ADR 0015 — index assignment is the same rebinding sugar, so the alias rule
-# holds there too. The array half crashed the trio's evaluator the day this
-# file grew (#43).
-describe "index assignment on a hash" do
-  mutable scores = {home: 1}
-  frozen_view = scores
-  scores[:away] = 2
-
-  specify "rebinds the name, leaving aliases alone" do
-    expect(frozen_view.length, 1)
-  end
-
-  specify "and the name itself sees the entry" do
-    expect(scores[:away], 2)
-  end
-end
-
-# Each example carries its own `mutable`, per the helper's caveat: these
-# rebind inside the specify, and a shared fixture would chain them.
-describe "index assignment on an array" do
-  specify "rebinds the name, leaving aliases alone" do
-    mutable list = [1, 2, 3]
-    snapshot = list
-    list[0] = 9
-    expect([snapshot, list], [[1, 2, 3], [9, 2, 3]])
-  end
-
-  specify "replaces in range, counting negatives from the end" do
-    mutable list = [1, 2, 3]
-    list[0 - 1] = 7
-    expect(list, [1, 2, 7])
-  end
-
-  specify "appends at the position one past the end" do
-    mutable list = [1, 2]
-    list[2] = 3
-    expect(list, [1, 2, 3])
-  end
-end
-
-# ADR 0001 — `mutable` gates rebinding, and every compound spelling is one.
-describe "compound assignment" do
-  specify "rebinds through all five operators" do
-    mutable count = 10
-    count += 5
-    count -= 3
-    count *= 2
-    count /= 4
-    count %= 4
-    expect(count, 2)
-  end
-
-  specify "appends to a string with <<" do
-    mutable line = "rose"
-    line << " city"
-    expect(line, "rose city")
-  end
-end
-
 # ADR 0001 — parameters are binding sites too, so one can be declared mutable
-# without the caller's value being any less its own.
+# without the caller's value being any less its own. Defs live at the top.
 def countdown(mutable position)
   mutable steps = []
   while position > 0
@@ -91,28 +13,108 @@ def countdown(mutable position)
   steps
 end
 
-describe "a mutable parameter" do
-  start = 3
+context "rebinding under mutable" do
+  # ADR 0015 — values never mutate; names do. An alias cannot be spooked.
+  #
+  # The `mutable` here is safe at `describe` level, against the caveat in the
+  # helper, because the append happens in the setup rather than in an
+  # example: neither example rebinds anything, so they stay independent.
+  describe "appending to an array" do
+    mutable numbers = [1]
+    alias_of = numbers
+    numbers << 2
 
-  specify "rebinds freely inside the method" do
-    expect(countdown(start), [3, 2, 1])
-  end
-
-  specify "without touching the caller's binding" do
-    countdown(start)
-    expect(start, 3)
-  end
-end
-
-# ADR 0001 — a block rebinding an outer mutable is the accumulator pattern,
-# the one licensed exception to examples staying independent (see the
-# spec_helper's caveat), which is why this mutable sits inside its specify.
-describe "a block over an outer mutable" do
-  specify "accumulates" do
-    mutable total = 0
-    [1, 2, 3].each do |number|
-      total += number
+    specify "rebinds the name, leaving aliases alone" do
+      expect(alias_of.length, 1)
     end
-    expect(total, 6)
+
+    specify "and the name itself sees the append" do
+      expect(numbers.length, 2)
+    end
+  end
+
+  # ADR 0015 — index assignment is the same rebinding sugar, so the alias
+  # rule holds there too. The array half crashed the trio's evaluator the
+  # day this file grew (#43).
+  describe "index assignment on a hash" do
+    mutable scores = {home: 1}
+    frozen_view = scores
+    scores[:away] = 2
+
+    specify "rebinds the name, leaving aliases alone" do
+      expect(frozen_view.length, 1)
+    end
+
+    specify "and the name itself sees the entry" do
+      expect(scores[:away], 2)
+    end
+  end
+
+  # Each example carries its own `mutable`, per the helper's caveat: these
+  # rebind inside the specify, and a shared fixture would chain them.
+  describe "index assignment on an array" do
+    specify "rebinds the name, leaving aliases alone" do
+      mutable list = [1, 2, 3]
+      snapshot = list
+      list[0] = 9
+      expect([snapshot, list], [[1, 2, 3], [9, 2, 3]])
+    end
+
+    specify "replaces in range, counting negatives from the end" do
+      mutable list = [1, 2, 3]
+      list[0 - 1] = 7
+      expect(list, [1, 2, 7])
+    end
+
+    specify "appends at the position one past the end" do
+      mutable list = [1, 2]
+      list[2] = 3
+      expect(list, [1, 2, 3])
+    end
+  end
+
+  # ADR 0001 — `mutable` gates rebinding, and every compound spelling is one.
+  describe "compound assignment" do
+    specify "rebinds through all five operators" do
+      mutable count = 10
+      count += 5
+      count -= 3
+      count *= 2
+      count /= 4
+      count %= 4
+      expect(count, 2)
+    end
+
+    specify "appends to a string with <<" do
+      mutable line = "rose"
+      line << " city"
+      expect(line, "rose city")
+    end
+  end
+
+  describe "a mutable parameter" do
+    start = 3
+
+    specify "rebinds freely inside the method" do
+      expect(countdown(start), [3, 2, 1])
+    end
+
+    specify "without touching the caller's binding" do
+      countdown(start)
+      expect(start, 3)
+    end
+  end
+
+  # ADR 0001 — a block rebinding an outer mutable is the accumulator pattern,
+  # the one licensed exception to examples staying independent (see the
+  # spec_helper's caveat), which is why this mutable sits inside its specify.
+  describe "a block over an outer mutable" do
+    specify "accumulates" do
+      mutable total = 0
+      [1, 2, 3].each do |number|
+        total += number
+      end
+      expect(total, 6)
+    end
   end
 end
