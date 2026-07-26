@@ -55,7 +55,10 @@ end
 # — evaluation —
 
 def evaluate_program(nodes)
-  run_body(nodes, [])
+  # `require_relative` resolves against the file doing the requiring, so that
+  # path has to be in scope from the first statement. `argv.first` is it: the
+  # trio was handed the guest program's path, and run.pdx read the same value.
+  run_body(nodes, [["__file__", "file", argv.first or "."]])
 end
 
 # Run statements until done or a signal starts unwinding.
@@ -1073,6 +1076,67 @@ def scope_after_yield(body_bindings, bindings)
   value_at(slot.first[2], 1)
 end
 
+# — require_relative (ADR-free; matching the seed's rule) —
+#
+# The path resolves against the directory of the file doing the requiring,
+# `.pdx` is implied when the name carries no extension of its own, and a file
+# loads only once: a second require answers false and runs nothing. The loaded
+# set and the current file both ride in the bindings, the same trick already
+# used for `__self__`, `__home__` and `__block__`.
+#
+# Two recorded divergences (principle 4 — a gap is written down, never silent):
+# the seed canonicalises the resolved path before comparing, and the trio has
+# no filesystem call that can, so the load-once key is the joined string. Two
+# spellings of one file — `"helper"` and `"./helper"` — therefore load twice
+# here and once there. And a missing file reports the host's read error rather
+# than the seed's `require_relative "x": No such file or directory`.
+
+def file_of(bindings)
+  slot = lookup(bindings, "__file__")
+  return "." if slot.empty?
+  value_at(slot.first, 2)
+end
+
+# The directory holding a path, or "." when the path names none.
+def directory_of(path)
+  parts = path.split("/")
+  return "." if parts.length < 2
+  parts[0..-2].join("/")
+end
+
+# A dot in the last segment means the name brought its own extension, which is
+# what the seed's `Path::extension` is asking too — a dot in an earlier segment
+# does not count, so `a.b/c` still becomes `a.b/c.pdx`.
+def required_path(bindings, name)
+  target = "#{directory_of(file_of(bindings))}/#{name}"
+  parts = target.split("/")
+  return target if parts.last.include?(".")
+  "#{target}.pdx"
+end
+
+def loaded_paths(bindings)
+  slot = lookup(bindings, "__loaded__")
+  return [] if slot.empty?
+  value_at(slot.first, 2)
+end
+
+def evaluate_require(name, bindings)
+  target = required_path(bindings, name)
+  return outcome([false], bindings) if loaded_paths(bindings).include?(target)
+
+  # Marked loaded before the file runs, not after, so a file that requires
+  # itself answers false the second time instead of recursing until the stack
+  # gives out. The seed inserts before running for the same reason.
+  loaded = [["__loaded__", "loaded", loaded_paths(bindings) + [target]]]
+  scope = [["__file__", "file", target]] + loaded + bindings
+  result = run_body(parse_program(lex(read_file(target))), scope)
+  # Everything the file defined stays in scope — that is the point of a require,
+  # and the opposite of a method call. Only `__file__` is put back, so the rest
+  # of the requiring file resolves its own relative paths, not the required
+  # file's.
+  outcome([true], [["__file__", "file", file_of(bindings)]] + result.bindings)
+end
+
 def evaluate_call(node, mutable bindings)
   mutable arguments = []
   mutable keyword_values = []
@@ -1113,6 +1177,8 @@ def evaluate_call(node, mutable bindings)
     outcome(arguments, bindings)
   when "some"
     outcome([some(slot_value(arguments))], bindings)
+  when "require_relative"
+    evaluate_require(slot_value(arguments), bindings)
   when "panic"
     panic(slot_value(arguments))
   else

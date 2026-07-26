@@ -696,6 +696,7 @@ fn portland_evaluator_runs_the_fixture_suite() {
         "namespaces",
         "enums",
         "value_methods",
+        "requires_library",
     ] {
         let path = format!(
             "{}/tests/fixtures/{fixture}.pdx",

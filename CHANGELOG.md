@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **The trio speaks `require_relative`** ([#37](https://github.com/portlandlang/portland/issues/37)) — a guest program running hosted can load a sibling file, resolved against the directory of the file doing the requiring, with `.pdx` implied and load-once answering false the second time. Byte-identical to the seed on the existing fixture pair, nested requires included: `a.pdx` requiring `sub/b`, which requires `c`, resolves that `c` inside `sub/` on both oracles.
+
+- The failing test was already sitting in the repo. `requires_library.pdx` and `library.pdx` have existed as fixtures since the seed learned `require_relative`, and were **never in the differential fixture list** — which is exactly why the trio's gap stayed invisible while the suite was green. Adding one line to that list was the whole red test, and "green is not covered" has now been the same lesson three times.
+
+- The current file and the loaded set both ride in the bindings as `__file__` and `__loaded__`, the trick already used for `__self__`, `__home__` and `__block__`. `__file__` is seeded from `argv.first` — the trio was handed the guest program's path, and `run.pdx` reads the same value — and swapped for the duration of a require so a required file resolves its own relative paths rather than its requirer's. A path is marked loaded *before* its body runs, so a file requiring itself answers false rather than recursing until the stack gives out; the seed inserts before running for the same reason.
+
+- **Two divergences, measured rather than assumed, and written into the code (principle 4).** The seed canonicalises a resolved path before comparing; the trio has no filesystem call that can, so its load-once key is the joined string. `require_relative "helper"` followed by `require_relative "./helper"` therefore runs the library body twice hosted and once direct — verified, not predicted. A missing file also reports the host's read error rather than the seed's wording.
+
 - **The language spec is all `describe`/`specify` now** — the flat harness is gone, `struct Example`, `spec()` and `report()` with it, and the file is one shape instead of two. Still 16 examples, which is the check that they migrated rather than evaporated. Ten `describe` groups, each naming a subject and carrying its own fixtures.
 
 - Subjects name methods where an ADR is about one — `Integer#/`, `Integer#%`, `Array#first`, `Array#[] with a range` — and name the rule where it spans several, since ADR 0010's three examples are `Array#first`, `Array#[]` and `Hash#[]` and no single method is the subject. Descriptions were rewritten rather than moved: a `spec()` description had to stand alone, while a `specify` only finishes the sentence its `describe` started.
