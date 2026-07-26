@@ -640,6 +640,19 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
     );
 }
 
+/// Range patterns, through the trio (#40): membership not equality, both
+/// dot counts, beginless and endless ends, negative bounds, a non-integer
+/// subject missing rather than erroring, and the one-line form. No fixture
+/// matched on a range before this, which is how the trio shipped without
+/// them and stayed green.
+#[test]
+fn portland_evaluator_matches_the_seed_on_range_patterns() {
+    assert_evaluator_matches_seed(
+        "evaluator_range_patterns.pdx",
+        "def bucket(value)\n  case value\n  in ..-1  then \"low\"\n  in 0...10 then \"single\"\n  in 10..  then \"high\"\n  end\nend\nputs bucket(0 - 5)\nputs bucket(5)\nputs bucket(50)\ncase \"text\"\nin 1..9 then puts \"range hit\"\nelse\n  puts \"a string misses\"\nend\nputs 7 in 1..9 | 20..29\nputs 15 in 1..9 | 20..29\n",
+    );
+}
+
 #[test]
 fn portland_evaluator_matches_the_seed_on_one_line_patterns() {
     assert_evaluator_matches_seed(

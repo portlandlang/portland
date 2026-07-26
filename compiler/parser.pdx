@@ -1952,7 +1952,25 @@ def parse_pattern_primary(tokens, position)
     return Step.new(node: error_node("expected a pattern"), position: position)
   end
   token = tokens[position]
+  # `in ..0` — a beginless range pattern (ADR 0019): the operator leads, and
+  # membership rather than equality is the meaning (#40).
+  if token.operator? && (token.text == ".." || token.text == "...")
+    finish = parse_pattern_range_bound(tokens, position + 1)
+    return finish if finish.node in ErrorNode
+    return Step.new(node: range_node(nil, finish.node, token.text == "..."), position: finish.position)
+  end
   if token.integer?
+    # `in 1..9`, endless when nothing integer-shaped follows the dots.
+    if operator_at?(tokens, position + 1, %w[.. ...])
+      exclusive = tokens[position + 1].text == "..."
+      after = position + 2
+      unless pattern_range_end_at?(tokens, after)
+        return Step.new(node: range_node(integer_node(token.text), nil, exclusive), position: after)
+      end
+      finish = parse_pattern_range_bound(tokens, after)
+      return finish if finish.node in ErrorNode
+      return Step.new(node: range_node(integer_node(token.text), finish.node, exclusive), position: finish.position)
+    end
     return Step.new(node: integer_node(token.text), position: position + 1)
   end
   if token.operator? && token.text == "-" && position + 1 < tokens.length && tokens[position + 1].integer?
@@ -1993,6 +2011,27 @@ def parse_pattern_primary(tokens, position)
     return Step.new(node: identifier_node(name), position: position + 1)
   end
   Step.new(node: error_node("unsupported pattern starting with #{token.text}"), position: position + 1)
+end
+
+# One integer bound of a range pattern, negative allowed — the seed's rule:
+# range patterns take integer bounds and nothing else.
+def parse_pattern_range_bound(tokens, mutable position)
+  negative = operator_at?(tokens, position, %w[-])
+  position += 1 if negative
+  unless position < tokens.length && tokens[position].integer?
+    return Step.new(node: error_node("range patterns take integer bounds"), position: position)
+  end
+  text = tokens[position].text
+  return Step.new(node: integer_node("-" + text), position: position + 1) if negative
+  Step.new(node: integer_node(text), position: position + 1)
+end
+
+# The end of a range pattern, absent for `in 10..` — an end exists only when
+# an integer (negative allowed) sits at the cursor, which is the seed's rule:
+# patterns always sit before a token that cannot continue them.
+def pattern_range_end_at?(tokens, position)
+  return true if position < tokens.length && tokens[position].integer?
+  operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].integer?
 end
 
 # `[p, p]` exact, or `[p, *rest]` — a splat may only end the pattern.

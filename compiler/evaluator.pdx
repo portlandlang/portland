@@ -208,6 +208,7 @@ def match_pattern(pattern, subject, bindings)
   in ArrayPatternNode then match_array(pattern, subject, bindings)
   in IdentifierNode(name:) then [[name, subject]]
   in PinNode then match_pin(pattern, subject, bindings)
+  in RangeNode then match_range(pattern, subject, bindings)
   in StructPatternNode then match_struct(pattern, subject, bindings)
   in EnumCasePatternNode then match_enum_case(pattern, subject, bindings)
   else
@@ -251,6 +252,16 @@ end
 def match_literal(pattern, subject, bindings)
   value_step = evaluate_expression(pattern, bindings)
   return [] if slot_value(value_step.value) == subject
+  nil
+end
+
+# A range pattern tests membership, not equality (ADR 0019 §1). Integer
+# subjects only — anything else misses, the seed's rule (#40). Guest ranges
+# are host ranges, so `include?` answers without walking.
+def match_range(pattern, subject, bindings)
+  return nil unless subject in Integer
+  range_step = evaluate_expression(pattern, bindings)
+  return [] if slot_value(range_step.value).include?(subject)
   nil
 end
 

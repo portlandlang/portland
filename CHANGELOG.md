@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The trio matches range patterns** ([#40](https://github.com/portlandlang/portland/issues/40)) — `parse_pattern_primary` now reads `1..9`, `1...5`, `..0`, `10..`, and negative bounds, and the evaluator answers membership rather than equality, integer subjects only, all of which is the seed's shape. The silent half is what made this one urgent: with an `else` in place the miss took the wrong branch and nothing panicked. A new `evaluator_range_patterns` differential pins every form, and the two displaced `pattern_matching_spec` examples are back, plus a beginless/endless one that could not have been written before.
+
 - **A struct may hold an enum and a method again, hosted** ([#44](https://github.com/portlandlang/portland/issues/44)) — the trio's struct body ran two loops in sequence, methods then nested types, so an enum ahead of a `def` ended method parsing for good and the struct never found its `end`. Now one loop dispatches per keyword, which is the seed's shape. The `evaluator_enums` differential pins the combination, and `enum_spec`'s Purchase got its `paid?` back.
 
 - **The language spec rounds out symbols and `to_s`** (ADRs 0006, 0023) — `symbol_spec` gains distinct symbols unequal, the `?` suffix as part of the name, and the quoted `:"odd key"` spelling; `string_spec` gains the universal `to_s`, with a comment naming nil's absence from the list as ADR 0006's point. Found alongside: `p 2.5.to_s` parses in the seed but not the trio — a float literal taking a method call in command-argument position is one more hosted parser gap.

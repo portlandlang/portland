@@ -37,13 +37,20 @@ describe "the smaller patterns" do
     expect((2 in 1 | 2 | 3), true)
   end
 
-  # A range-pattern example belongs here — `case 5 in 1..9` matching by
-  # membership — and writing it is what found that the trio cannot run it: the
-  # seed answers the match, the trio parses the pattern and then misses it,
-  # silently taking the `else`. One-line `in` with a range does not even parse
-  # there. Restore the example when the trio learns range patterns; a spec
-  # that only one oracle can run pins nothing, and hiding the miss behind an
-  # `else` would be worse than the gap.
+  # Writing this example is what found that the trio could not match a range
+  # pattern at all (#40) — it lived as a comment until both oracles agreed.
+  specify "a range matches by membership, exclusive end honored" do
+    expect([(5 in 1..9), (5 in 1...5)], [true, false])
+  end
+
+  specify "a range pattern may run beginless or endless" do
+    edges = case 50
+    in ..0  then "low"
+    in 1..9 then "single"
+    in 10.. then "high"
+    end
+    expect(edges, "high")
+  end
 
   specify "a pin matches the named value instead of binding it" do
     expected = 5
@@ -80,10 +87,10 @@ end
 describe "overlapping branches" do
   specify "give it to the first match" do
     answer = case 5
-    in 1 | 5 then "the alternation, written first"
-    in 5     then "the literal, written second"
+    in 1..9 then "the range, written first"
+    in 5    then "the literal, written second"
     end
-    expect(answer, "the alternation, written first")
+    expect(answer, "the range, written first")
   end
 end
 
