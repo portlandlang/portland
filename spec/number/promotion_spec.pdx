@@ -3,18 +3,20 @@
 
 require_relative "../spec_helper"
 
-describe "mixed integer and float arithmetic" do
-  specify "promotes addition" do
-    expect(1 + 2.5, 3.5)
+context "Integer and Float, mixed" do
+  describe "arithmetic" do
+    specify "promotes addition" do
+      expect(1 + 2.5, 3.5)
+    end
+
+    specify "promotes division, where the same operands floored as integers" do
+      expect([7 / 2.0, 7 / 2], [3.5, 3])
+    end
   end
 
-  specify "promotes division, where the same operands floored as integers" do
-    expect([7 / 2.0, 7 / 2], [3.5, 3])
-  end
-end
-
-describe "numeric equality" do
-  specify "reaches across the integer/float line" do
-    expect(1 == 1.0, true)
+  describe "equality" do
+    specify "reaches across the integer/float line" do
+      expect(1 == 1.0, true)
+    end
   end
 end

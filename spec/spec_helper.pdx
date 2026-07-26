@@ -47,6 +47,22 @@ def describe(subject)
   yield
 end
 
+# `context` is `describe`'s twin, letter for letter. rspec's distinction —
+# `describe` names a thing, `context` a circumstance or a home — is carried
+# entirely by the word at the call site. A twin rather than an alias, because
+# aliasing is runtime metaprogramming and Portland doesn't have any; writing
+# the two lines out is the whole cost.
+#
+# Nesting works — a block is a closure, so an inner `describe`'s examples see
+# every fixture of the `context` above them, and sibling blocks reuse fixture
+# names freely because block locals die at `end`. The transcript stays flat,
+# though: a method cannot know its depth, for the same no-state reason the
+# tally lives in the runner, so nested subjects print at the margin.
+def context(subject)
+  puts subject
+  yield
+end
+
 def specify(behavior)
   puts "- #{behavior}"
   yield

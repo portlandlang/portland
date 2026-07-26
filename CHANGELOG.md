@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The spec harness grows `context`, and the value-type specs nest under it** — `context` is `describe`'s twin letter for letter (an alias would be metaprogramming), and nesting needed nothing new: blocks are closures, so an inner describe's examples see the context's fixtures, and sibling scopes reuse names because block locals die at `end`. `Array`, `String`, `Hash`, `Range`, and the number files now read `context "Array" → describe "#[]" → specify`. The transcript stays flat — a method cannot know its depth, for the same no-state reason the tally lives in the runner.
+
 - **`it` counts from inside an interpolation** ([#47](https://github.com/portlandlang/portland/issues/47)) — `words.map { "#{it}!" }` now declares the implicit parameter on both oracles. The seed parsed interpolation innards in a fresh sub-parser whose empty frame stack swallowed the declaration; the frames now travel into the sub-parser and back, which also lets a block *inside* an interpolation nest correctly. The trio's flat token scan never looked inside string tokens; it now lexes each interpolation and asks the same question of what comes out, recursively, and the mixing refusal (`use one or the other`) fires through an interpolation too. Pinned in the brace-blocks differential and `it_spec`.
 
 - **`p 2.5` is a command call hosted** ([#46](https://github.com/portlandlang/portland/issues/46)) — the trio's `command_start?` list simply lacked `"float"`, so a float could never begin a command argument and the statement boundary reported the leftover token. One word of fix; the floats differential now opens with the bare forms, whose absence — every line used parens — is what let this hide.

@@ -2,20 +2,22 @@
 
 require_relative "../spec_helper"
 
-describe "the float library" do
-  specify "abs drops the sign" do
-    expect((0 - 2.5).abs, 2.5)
+context "Float" do
+  describe "the library" do
+    specify "abs drops the sign" do
+      expect((0 - 2.5).abs, 2.5)
+    end
+
+    specify "to_i truncates toward zero, Ruby's rule" do
+      expect([2.9.to_i, (0 - 2.9).to_i], [2, -2])
+    end
   end
 
-  specify "to_i truncates toward zero, Ruby's rule" do
-    expect([2.9.to_i, (0 - 2.9).to_i], [2, -2])
-  end
-end
-
-# ADR 0018 — the floored rules carry over to floats: the sign of a modulo
-# follows the divisor there too.
-describe "Float#%" do
-  specify "takes the sign of the divisor" do
-    expect((0 - 7.0) % 2, 1.0)
+  # ADR 0018 — the floored rules carry over to floats: the sign of a modulo
+  # follows the divisor there too.
+  describe "#%" do
+    specify "takes the sign of the divisor" do
+      expect((0 - 7.0) % 2, 1.0)
+    end
   end
 end

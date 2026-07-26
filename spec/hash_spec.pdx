@@ -4,40 +4,42 @@
 
 require_relative "spec_helper"
 
-describe "a hash literal" do
-  specify "takes any type of key, rockets and shorthand mixed" do
-    mixed = {"string" => 1, sym: 2}
-    expect([mixed["string"], mixed[:sym]], [1, 2])
+context "Hash" do
+  describe "the literal" do
+    specify "takes any type of key, rockets and shorthand mixed" do
+      mixed = {"string" => 1, sym: 2}
+      expect([mixed["string"], mixed[:sym]], [1, 2])
+    end
+
+    specify "keeps insertion order" do
+      config = {name: "pdx", port: 8080}
+      expect(config.keys, [:name, :port])
+    end
   end
 
-  specify "keeps insertion order" do
+  describe "the library" do
     config = {name: "pdx", port: 8080}
-    expect(config.keys, [:name, :port])
+
+    specify "measures length" do
+      expect(config.length, 2)
+    end
+
+    specify "answers empty? only for the empty hash" do
+      expect([config.empty?, {}.empty?], [false, true])
+    end
+
+    specify "answers key? without touching the value" do
+      expect([config.key?(:name), config.key?(:nope)], [true, false])
+    end
+
+    specify "lists values in the keys' order" do
+      expect(config.values, ["pdx", 8080])
+    end
   end
-end
 
-describe "the hash library" do
-  config = {name: "pdx", port: 8080}
-
-  specify "measures length" do
-    expect(config.length, 2)
-  end
-
-  specify "answers empty? only for the empty hash" do
-    expect([config.empty?, {}.empty?], [false, true])
-  end
-
-  specify "answers key? without touching the value" do
-    expect([config.key?(:name), config.key?(:nope)], [true, false])
-  end
-
-  specify "lists values in the keys' order" do
-    expect(config.values, ["pdx", 8080])
-  end
-end
-
-describe "hash equality" do
-  specify "is by value" do
-    expect({name: "pdx"} == {name: "pdx"}, true)
+  describe "equality" do
+    specify "is by value" do
+      expect({name: "pdx"} == {name: "pdx"}, true)
+    end
   end
 end

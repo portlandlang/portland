@@ -1,13 +1,15 @@
 # Arithmetic that follows Ruby rather than the Rust floor it is built on.
 
-# Up one, because `require_relative` resolves against this file's own directory
+# Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
 require_relative "../../spec_helper"
 
-# ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's. Both
-# examples show the same divergence from Rust, which truncates toward zero.
-describe "Integer#%" do
-  specify "takes the sign of the divisor" do
-    expect((0 - 7) % 2, 1)
+context "Integer" do
+  # ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's,
+  # which truncates toward zero.
+  describe "#%" do
+    specify "takes the sign of the divisor" do
+      expect((0 - 7) % 2, 1)
+    end
   end
 end
