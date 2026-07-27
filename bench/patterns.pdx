@@ -1,0 +1,26 @@
+# case/in dispatch: struct patterns, ranges, alternation — the trio's own
+# hot path (ADR 0013).
+
+struct Word
+  text
+end
+
+def classify(value)
+  case value
+  in nil        then "absent"
+  in 0..9       then "digit"
+  in 10 | 20    then "round"
+  in Word(text:) then text
+  in String     then "text"
+  in other      then "#{other}"
+  end
+end
+
+mutable tally = 0
+mutable index = 0
+while index < 25
+  tally += classify(index % 25).length
+  tally += classify(Word.new(text: "w#{index % 7}")).length
+  index += 1
+end
+puts tally

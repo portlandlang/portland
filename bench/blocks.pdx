@@ -1,0 +1,12 @@
+# The block-taking library: map/select/reduce pipelines and closures.
+
+mutable total = 0
+mutable index = 0
+while index < 30
+  numbers = (1..40).to_a
+  doubled = numbers.map { it * 2 }
+  kept = doubled.select { it % 3 == 0 }
+  total += kept.reduce(0) { |sum, value| sum + value }
+  index += 1
+end
+puts total

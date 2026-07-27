@@ -89,7 +89,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#23](https://github.com/portlandlang/portland/issues/23) — a living ruby/spec fork as compatibility oracle
 - [#1](https://github.com/portlandlang/portland/issues/1) — brand story: voice, tagline, the teal carpet, the rose
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
-- [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench`, and eventually receipts against Ruby
+- [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench` exists, baseline taken (hosted lex: 4741x, the fixpoint's scoreboard); receipts against Ruby still to come
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
 - [#36](https://github.com/portlandlang/portland/issues/36) — the polyfill shim gem and migration linter; a placeholder holding the tier inventory, not a commitment
 

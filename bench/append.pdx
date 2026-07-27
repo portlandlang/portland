@@ -1,0 +1,10 @@
+# Append-heavy: the `<<` rebinding path, RC exactness's home turf (#34).
+
+mutable words = []
+mutable index = 0
+while index < 4000
+  words << "word-#{index}"
+  index += 1
+end
+puts words.length
+puts words.last

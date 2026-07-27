@@ -1,0 +1,9 @@
+# The real-world workload: the trio's own lexer over real Portland source.
+# Direct, the seed runs the lexer; hosted, the trio runs its own front end —
+# the closest thing to Stage 2 on this menu.
+
+require_relative "../compiler/lexer"
+
+source = read_file("spec/spec_helper.pdx") or panic "bench/lex.pdx: run from the repo root"
+tokens = lex(source)
+puts tokens.length

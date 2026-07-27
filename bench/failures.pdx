@@ -1,0 +1,21 @@
+# The typed-results toolkit under load: failure boxes, or-fallbacks, and !
+# propagation (ADR 0027).
+
+def risky(value)
+  return failure("odd one out") if value % 5 == 0
+  value * 2
+end
+
+def doubled_or_zero(value)
+  amount = risky!(value)
+  amount + 1
+end
+
+mutable total = 0
+mutable index = 1
+while index < 60
+  outcome = doubled_or_zero(index) or 1
+  total += outcome
+  index += 1
+end
+puts total

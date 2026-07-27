@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **`script/bench` exists, and the baseline is honestly ugly** ([#25](https://github.com/portlandlang/portland/issues/25)'s harness) — six workloads in `bench/`, each run on both oracles, medians reported with the hosted/direct ratio that Stage 2 exists to crush. The harness doubles as a differential: outputs are compared across oracles, so a workload can never get faster by getting wrong. The first scoreboard, taken knowing it would be unflattering so improvements have something to be measured against:
+
+  | workload | direct (s) | hosted (s) | hosted/direct |
+  |----------|-----------:|-----------:|--------------:|
+  | append   |      0.032 |      7.104 |          221x |
+  | blocks   |      0.016 |      1.953 |          120x |
+  | failures |      0.004 |      0.371 |           84x |
+  | patterns |      0.004 |      0.242 |           66x |
+  | structs  |      0.004 |      0.420 |          110x |
+  | lex      |      0.058 |    276.196 |         4741x |
+
+  (`lex` — the trio running its own lexer — is the slow tier, skipped by default; `script/bench slow` includes it.) Calibration itself surfaced two findings: the trio's hosted loops are **superlinear** — the same workload at 60 vs 2000 iterations shows per-iteration cost growing, which points squarely at the assoc-list bindings making lookup O(n) as scopes deepen — and the 4741× front-end ratio is the number the fixpoint work will be graded on.
+
 - **`together` runs** ([ADR 0029](docs/adr/0029-2026-07-27-together-semantics.md), settling and closing [#11](https://github.com/portlandlang/portland/issues/11)) — serially, on both oracles, differentially pinned, and that is the design: the serial build is the oracle the parallel runtime must match on everything promised, while cross-task effect ordering stays deliberately unpromised as the scheduler's room. Seven rules, each an old rule applied: task names bind at `end` and not before; tasks cannot see siblings; a failed task binds its `failure` for the toolkit — ADR 0027 dissolved what would have been the hardest question, since there is nothing to throw across a join; a panic is still a panic; nothing unwinds across the join (`!`, `return`, and the or-guard refuse from inside a task); a task cannot rebind an outer `mutable` — safe-because-immutable as a rule, not a slogan; and `together` produces nothing, its answer being the names. Five refusal wordings shared across the oracles, an `evaluator_together` differential, `spec/together_spec.pdx` on both, and language.md's Concurrency section moves from decided-someday to running-today.
 
 - **Traits are built, and the trio wears the first one** ([ADR 0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md), closing [#60](https://github.com/portlandlang/portland/issues/60)) — both oracles, differentially pinned, specced. `trait Name ... end` declares a stateless method bundle; `include` in a struct body merges it **at registration**, so dispatch and bare-name resolution needed no new rungs, and every collision refuses naming both owners — two traits, a trait against an own method, a trait method against a field, and (found by the dogfood itself) a trait method's *parameter* against a carrier's field, which is the no-shadow ladder reaching where Ruby never looked. `include` of a module or a struct refuses with the rewrite named; module-nested traits resolve outward. The dogfood is the payoff #27 promised: the trio's four sexp helpers became `trait Sexp`, carried by seventeen of its own AST nodes — so the self-parse test now parses traits, and the differential suite runs the trio's own trait dispatch on two thousand lines of real code. `spec/trait_spec.pdx`, an `evaluator_traits` differential, and six refusal wordings pin it.

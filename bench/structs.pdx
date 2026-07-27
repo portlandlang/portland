@@ -1,0 +1,25 @@
+# Struct construction, `with` copies, and trait dispatch (ADRs 0015, 0028).
+
+trait Described
+  def label
+    "#{kind}:#{text}"
+  end
+end
+
+struct Token
+  kind
+  text
+
+  include Described
+end
+
+mutable labels = []
+mutable index = 0
+while index < 50
+  token = Token.new(kind: "word", text: "t#{index}")
+  renamed = token.with(text: token.label)
+  labels << renamed.text
+  index += 1
+end
+puts labels.length
+puts labels.last
