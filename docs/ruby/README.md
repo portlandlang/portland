@@ -26,7 +26,9 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
+- [Error handling: results, not raises](errors.md) — `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
+- [`inspect` is a function, not a method](inspect.md) — the rendering is Ruby's, the spelling is `inspect(value)` — a function, because Portland's nil has no methods and absence is inspect's most important input.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
 - [Sharing behavior: traits, not modules or superclasses](mixins-and-inheritance.md) — `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.

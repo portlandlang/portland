@@ -248,7 +248,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[argv p panic puts read_file require_relative some write_file].include?(name)
+  %w[argv inspect p panic puts read_file require_relative some write_file].include?(name)
 end
 
 # Try a pattern against a value: an array of [name, value] captures on a
@@ -1563,6 +1563,10 @@ def evaluate_call(node, mutable bindings)
     outcome(arguments, bindings)
   when "some"
     outcome([some(slot_value(arguments))], bindings)
+  when "inspect"
+    # `p` without the printing (ADR 0026); the host builtin answers the
+    # untagged shapes, and render_inspect already speaks for the tagged ones.
+    outcome([render_inspect(slot_value(arguments))], bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
   when "panic"

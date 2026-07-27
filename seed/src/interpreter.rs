@@ -1503,6 +1503,7 @@ impl<W: std::io::Write> Interpreter<W> {
         matches!(
             name,
             "argv"
+                | "inspect"
                 | "p"
                 | "panic"
                 | "puts"
@@ -2130,6 +2131,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 1 => Some(arguments.remove(0)),
                 _ => Some(Value::array(arguments)),
             };
+        }
+        // `p` without the printing (ADR 0026): the source-shaped rendering as
+        // a string, for composing into messages. A function rather than a
+        // method so absence needs no ceremony — nil is its most important
+        // input, and nil has no methods (ADR 0006).
+        if self.lookup_method(name).is_none() && name == "inspect" {
+            match arguments.as_slice() {
+                [argument] => return Some(Value::String(argument.inspect())),
+                other => panic!("inspect takes one argument, got {}", other.len()),
+            }
         }
 
         // Crude IO builtins so real programs are possible before the object
