@@ -1,6 +1,6 @@
 # 0027 — Recoverable errors: failure is absence with a reason, and `!` propagates it
 
-- **Status:** Accepted (chosen for [#28](https://github.com/portlandlang/portland/issues/28) over `begin/rescue` and the rescue-sugar hybrid, whose drafts closed unmerged; `!` settled with it, closing ADR 0015 §5's deferral. A decision — the build follows as its own arc.)
+- **Status:** Accepted (chosen for [#28](https://github.com/portlandlang/portland/issues/28) over `begin/rescue` and the rescue-sugar hybrid, whose drafts closed unmerged; `!` settled with it, closing ADR 0015 §5's deferral. Built in the seed and the trio, differentially pinned, 2026-07-27.)
 - **Date:** 2026-07-27
 
 ## Context, shared by all three drafts

@@ -1,6 +1,6 @@
 # 0028 — The object model: structs stay the only type; traits carry shared behavior
 
-- **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. A decision — the build follows as its own arc.)
+- **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. Built in the seed and the trio, differentially pinned, 2026-07-27.)
 - **Date:** 2026-07-27
 
 ## Context, shared by both drafts

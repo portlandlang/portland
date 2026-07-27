@@ -601,6 +601,32 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "sad = failure(\"why\")\nputs sad\n",
             "puts got a failure — handle the failure case first (p renders it for debugging)",
         ),
+        // ADR 0028's refusals: every collision names both owners, and only
+        // a trait can be included.
+        (
+            "trait A\n  def hit\n    1\n  end\nend\ntrait B\n  def hit\n    2\n  end\nend\nstruct S\n  x\n  include A\n  include B\nend\n",
+            "hit is declared by both A and B — S must not include both, or one renames",
+        ),
+        (
+            "trait A\n  def probe\n    1\n  end\nend\nstruct S\n  x\n  include A\n  def probe\n    2\n  end\nend\n",
+            "S defines probe and includes it from A — one of them renames",
+        ),
+        (
+            "trait A\n  def x\n    1\n  end\nend\nstruct S\n  x\n  include A\nend\n",
+            "x is a field of S and a method of A — a name is a field or a method, never both",
+        ),
+        (
+            "module M\n  def helper\n    1\n  end\nend\nstruct S\n  x\n  include M\nend\n",
+            "M is a namespace, not a trait — namespaces are never injected",
+        ),
+        (
+            "struct T\n  y\nend\nstruct S\n  x\n  include T\nend\n",
+            "T is a struct, not a trait — a struct is a value; hold one in a field",
+        ),
+        (
+            "struct S\n  x\n  include Missing\nend\n",
+            "undefined trait Missing",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");
@@ -701,6 +727,17 @@ fn portland_evaluator_matches_the_seed_on_yield_delegation() {
     assert_evaluator_matches_seed(
         "evaluator_yield_delegation.pdx",
         "def inner_apply\n  yield\n  \"inner's answer\"\nend\ndef outer_apply\n  inner_apply do\n    yield\n  end\n  \"outer's answer\"\nend\ndef two_layers\n  outer_apply do\n    \"the block's value\"\n  end\nend\nputs two_layers\ndef accumulating\n  mutable count = 0\n  outer_apply do\n    count += 1\n  end\n  outer_apply do\n    count += 10\n  end\n  count\nend\nputs accumulating\ndef returning_through_two\n  outer_apply do\n    return \"through both layers\"\n  end\n  \"never\"\nend\nputs returning_through_two\ndef twice\n  yield\n  yield\n  \"twice done\"\nend\ndef delegate_twice\n  mutable log = []\n  twice do\n    inner_apply do\n      log << \"ran\"\n    end\n  end\n  log.length\nend\nputs delegate_twice\n",
+    );
+}
+
+/// Traits (ADR 0028, #60): stateless method bundles, included with Ruby's
+/// verb, merged at registration; trait methods reach the carrier's fields
+/// and its own methods, and a module-nested trait resolves outward.
+#[test]
+fn portland_evaluator_matches_the_seed_on_traits() {
+    assert_evaluator_matches_seed(
+        "evaluator_traits.pdx",
+        "trait Sexpable\n  def sexp_list(nodes)\n    nodes.map { it.sexp }.join(\" \")\n  end\nend\ntrait Countable\n  def size_note\n    \"#{elements.length} elements\"\n  end\nend\nstruct ArrayNode\n  elements\n\n  include Sexpable\n  include Countable\n\n  def sexp\n    \"(array #{sexp_list(elements)})\"\n  end\nend\nstruct Leaf\n  value\n\n  def sexp\n    \"#{value}\"\n  end\nend\nnode = ArrayNode.new(elements: [Leaf.new(value: 1), Leaf.new(value: 2)])\nputs node.sexp\nputs node.size_note\nmodule Rendering\n  trait Framed\n    def framed\n      \"[#{label}]\"\n    end\n  end\n\n  struct Badge\n    label\n\n    include Framed\n  end\nend\nputs Rendering::Badge.new(label: \"pdx\").framed\n",
     );
 }
 

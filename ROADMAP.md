@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
-**Next:** build what 2026-07-27 decided — typed results with `!` ([#59](https://github.com/portlandlang/portland/issues/59)) and traits ([#60](https://github.com/portlandlang/portland/issues/60)). The decisions themselves (ADRs 0026–0028: `inspect`, errors, the object model) landed by competing draft PRs, closed siblings recording the roads not taken.
+**Next:** open ground again — the `%` zoo (#29), `together` semantics (#11), or the transitional-tooling trio (#36/#57/#58), whose specs all reference the freshly built surface. The 2026-07-27 wave is fully landed: ADRs 0025–0028 decided *and* built — write-site `return`, `inspect()`, typed results with `!`, and traits — each by competing draft PRs with the roads not taken recorded in closed siblings.
 
 ## Done 🎉
 
@@ -37,7 +37,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 | `return` unwinds to its write site, through yield            | [0025](docs/adr/0025-2026-07-27-return-unwinds-to-its-write-site.md)                                                                                                                                                                                                                            | ✅              |
 | `inspect(value)` — p without the printing                    | [0026](docs/adr/0026-2026-07-27-inspect-as-a-function.md)                                                                                                                                                                                                                                       | ✅              |
 | Errors as typed results; `!` is unwrap-or-propagate          | [0027](docs/adr/0027-2026-07-27-errors-as-typed-results.md)                                                                                                                                                                                                                                     | ✅              |
-| The object model: structs and traits, `include`              | [0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md)                                                                                                                                                                                                                             | ⬜ [#60](https://github.com/portlandlang/portland/issues/60) |
+| The object model: structs and traits, `include`              | [0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md)                                                                                                                                                                                                                             | ✅              |
 
 ### The implementation
 
@@ -65,7 +65,6 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [#60](https://github.com/portlandlang/portland/issues/60) — build traits: `trait`, `include`, the resolution rung (ADR 0028 decided it)
 - [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#11](https://github.com/portlandlang/portland/issues/11) — `together` semantics, serial implementation first

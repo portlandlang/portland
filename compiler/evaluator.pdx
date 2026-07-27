@@ -109,6 +109,7 @@ def evaluate_statement(node, bindings)
     step = evaluate_expression(value, bindings)
     return_outcome(step.value, step.bindings, frame_of(bindings))
   in StructDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
+  in TraitDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
   # Membership and exhaustiveness are static (#9) and a payload-free case is
   # just a symbol — but the declared labels register, because the one check
   # a runtime can make needs them (ADR 0022, #45).
@@ -488,13 +489,19 @@ def register_in_namespace(statement, home, mutable bindings)
   case statement
   in DefNode(name:, parameters:, body:)
     [[qualify(home, name), "method", [parameters, body, home]]] + bindings
-  in StructDefNode(name:, fields:, methods:, nested:)
+  in StructDefNode(name:, fields:, includes:, methods:, nested:)
     inner_home = qualify(home, name)
-    mutable result = [[inner_home, "struct", [fields, methods]]] + bindings
+    # Included traits merge here, at registration (ADR 0028), so dispatch
+    # needs no new rungs and every collision refuses naming both owners.
+    merged = merged_methods(name, fields, includes, methods, home, bindings)
+    mutable result = [[inner_home, "struct", [fields, merged]]] + bindings
     nested.each do |inner|
       result = register_in_namespace(inner, inner_home, result)
     end
     result
+  # A trait waits under its qualified name to be included (ADR 0028).
+  in TraitDefNode(name:, methods:)
+    [[qualify(home, name), "trait", methods]] + bindings
   in ModuleDefNode(path:, body:)
     inner_home = qualify(home, path.join("::"))
     mutable result = bindings
@@ -513,6 +520,54 @@ def register_in_namespace(statement, home, mutable bindings)
   else
     bindings
   end
+end
+
+# Included traits merge at struct registration (ADR 0028): the seed's rule
+# and the seed's wordings — every collision a refusal naming both owners,
+# never Ruby's silent last-include-wins.
+def merged_methods(struct_name, fields, includes, methods, home, bindings)
+  mutable merged = methods
+  mutable origins = []
+  includes.each do |written|
+    slot = resolve_from(bindings, home, written)
+    trait_methods = trait_methods_of(written, slot, bindings)
+    trait_methods.each do |method|
+      panic("#{method.name} is a field of #{struct_name} and a method of #{written} — a name is a field or a method, never both") if fields.include?(method.name)
+      origins.each do |origin|
+        panic("#{method.name} is declared by both #{origin[0]} and #{written} — #{struct_name} must not include both, or one renames") if value_at(origin, 1) == method.name
+      end
+      methods.each do |own|
+        panic("#{struct_name} defines #{method.name} and includes it from #{written} — one of them renames") if own.name == method.name
+      end
+      origins << [written, method.name]
+      merged += [method]
+    end
+  end
+  merged
+end
+
+# The trait's method list, or the seed's refusal for whatever `written`
+# turned out to be instead.
+def trait_methods_of(written, slot, bindings)
+  unless slot.empty?
+    kind = slot.first[1]
+    return value_at(slot.first, 2) if kind == "trait"
+    panic("#{written} is a struct, not a trait — a struct is a value; hold one in a field") if kind == "struct"
+  end
+  panic("#{written} is a namespace, not a trait — namespaces are never injected; write #{written}.method(...)") if namespace?(bindings, written)
+  panic("undefined trait #{written}")
+end
+
+# Resolve outward from an explicit home — registration runs before any
+# `__home__` binding reflects the namespace being defined.
+def resolve_from(bindings, mutable home, name)
+  while true
+    slot = lookup(bindings, qualify(home, name))
+    return slot unless slot.empty?
+    break if home.empty?
+    home = enclosing(home)
+  end
+  []
 end
 
 # ADR 0022's one runtime check needs the declarations at hand, so every enum

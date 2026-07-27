@@ -2,7 +2,7 @@
 
 **Summary:** `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.
 
-**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md)). Not yet built — the build is its own arc.
+**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#values).
 
 ## Ruby
 
@@ -21,8 +21,6 @@ end
 One keyword (`module`) serves namespacing and mixing-in, so `include Comparable` (behavior) and `include Math` (namespace injection) are the same operation; method conflicts resolve silently by ancestor order; `class << self` opens a singleton for good measure.
 
 ## Portland
-
-<!-- not-portland: decided syntax from ADR 0028; nothing here is built -->
 
 ```ruby
 trait Sexpable

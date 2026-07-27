@@ -219,6 +219,14 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("struct") {
             return self.struct_definition();
         }
+        if self.peek_is_keyword("trait") {
+            return self.trait_definition();
+        }
+        if self.peek_is_keyword("include") {
+            panic!(
+                "`include` belongs inside a struct body — a trait is carried by a struct (ADR 0028)"
+            );
+        }
         if self.peek_is_keyword("while") {
             return self.while_statement();
         }
@@ -670,9 +678,24 @@ impl<'source> Parser<'source> {
         self.expect_statement_boundary();
         self.skip_newlines();
         let mut fields: Vec<String> = Vec::new();
+        let mut includes: Vec<String> = Vec::new();
         let mut methods: Vec<Statement> = Vec::new();
         let mut nested: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
+            // `include TraitName` — a declaration, not a call (ADR 0028).
+            if self.peek_is_keyword("include") {
+                self.position += 1; // the `include`
+                let token = self.advance();
+                if token.kind != TokenKind::Identifier
+                    || !token.text.chars().next().unwrap().is_ascii_uppercase()
+                {
+                    panic!("expected a trait name after include, got {token:?}");
+                }
+                includes.push(token.text.to_string());
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                continue;
+            }
             if self.position >= self.tokens.len() {
                 panic!("expected end to close struct {name}");
             }
@@ -740,10 +763,66 @@ impl<'source> Parser<'source> {
         self.position += 1; // the `end`
         Statement::StructDefinition {
             fields,
+            includes,
             methods,
             name,
             nested,
         }
+    }
+
+    /// `trait Name ... end` — methods only (ADR 0028): no fields, no state,
+    /// no nesting; a bundle of behavior for structs to include.
+    fn trait_definition(&mut self) -> Statement {
+        self.position += 1; // the `trait`
+        let token = self.advance();
+        if token.kind != TokenKind::Identifier {
+            panic!("expected trait name after trait, got {token:?}");
+        }
+        if !token.text.chars().next().unwrap().is_ascii_uppercase() {
+            panic!(
+                "trait names start with a capital letter, got {}",
+                token.text
+            );
+        }
+        let name = token.text.to_string();
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let mut methods: Vec<Statement> = Vec::new();
+        while !self.peek_is_keyword("end") {
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close trait {name}");
+            }
+            if self.peek_is_keyword("def") {
+                let method = self.method_definition();
+                let Statement::MethodDefinition {
+                    name: method_name, ..
+                } = &method
+                else {
+                    unreachable!()
+                };
+                if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                    panic!("{method_name} is reserved on structs, so a trait cannot carry it");
+                }
+                if methods.iter().any(|existing| {
+                    matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
+                }) {
+                    panic!("duplicate method {method_name} in trait {name}");
+                }
+                methods.push(method);
+                self.skip_newlines();
+                continue;
+            }
+            let token = self.advance();
+            panic!(
+                "a trait has methods only — {} looks like state, and state belongs to the struct that includes {name}",
+                token.text
+            );
+        }
+        if methods.is_empty() {
+            panic!("trait {name} has no methods — a bundle needs behavior");
+        }
+        self.position += 1; // the `end`
+        Statement::TraitDefinition { methods, name }
     }
 
     /// `module Foo ... end` and `module Foo::Bar ... end` (ADR 0021). Both

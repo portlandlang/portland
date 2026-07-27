@@ -44,6 +44,9 @@ pub enum Statement {
     },
     StructDefinition {
         fields: Vec<String>,
+        /// Traits this struct includes (ADR 0028): their methods join the
+        /// struct's own at registration, collisions refused by name.
+        includes: Vec<String>,
         /// Methods defined in the struct body (each a `MethodDefinition`
         /// statement), dispatched on instances (#27).
         methods: Vec<Statement>,
@@ -51,6 +54,12 @@ pub enum Statement {
         /// Types declared inside this one (ADR 0021 §5) — reached as
         /// `Outer::Inner`. Modules may not nest here.
         nested: Vec<Statement>,
+    },
+    /// `trait Name ... end` — a bundle of methods with no state (ADR 0028),
+    /// carried by any struct that `include`s it.
+    TraitDefinition {
+        methods: Vec<Statement>,
+        name: String,
     },
     While {
         body: Vec<Statement>,

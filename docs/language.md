@@ -87,6 +87,28 @@ Value equality, definition-ordered fields, capitalized names. Struct bodies take
 
 Types nest in types (`Invoice::Line`). Modules inside structs are an error.
 
+**Traits carry shared behavior** (ADR 0028): a `trait` is a bundle of methods with no state, and a struct `include`s it —
+
+```ruby
+trait Sexpable
+  def sexp_list(nodes)
+    nodes.map { it.sexp }.join(" ")
+  end
+end
+
+struct ArrayNode
+  elements
+
+  include Sexpable
+
+  def sexp
+    "(array #{sexp_list(elements)})"
+  end
+end
+```
+
+The verb is Ruby's and the safety is in the noun: `trait` and `module` are distinct declarations, so `include Statistics` — a namespace — is a refusal with the rewrite named, and Ruby's two meanings of `include` cannot be spelled. Trait methods merge into the struct at its declaration, reach the carrier's fields bare, and sit in the same no-shadow ladder as everything else — every collision (two traits, a trait and an own method, a trait method and a field, even a trait method's *parameter* against a carrier's field) is a refusal naming both owners, never Ruby's silent last-include-wins. There is no inheritance and no `class` — declined, not deferred. The trio's own AST nodes carry `trait Sexp`, which is the dogfood.
+
 ## Names and binding
 
 ```ruby
@@ -350,8 +372,6 @@ Emerging rather than settled — this section describes how the trio is actually
 Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose when they are dead-identical, and how much to lean on postfix guards. Both wait on more real Portland to look at.
 
 ## Decided, not yet built
-
-- **Traits carry shared behavior** (ADR 0028, [#60](https://github.com/portlandlang/portland/issues/60) builds it). A `trait` is a bundle of methods with no state; a struct `include`s it, trait methods resolve after the struct's own, and a collision between two included traits is a refusal naming both. No inheritance, no `class`, no subtyping — declined, not deferred.
 
 - **Concurrency** (ADRs 0002, 0004, 0011 — tentative). Three tiers, and you live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` spreads across cores when it is worth it and you never asked. Tier two declares independence:
 

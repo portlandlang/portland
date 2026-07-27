@@ -20,9 +20,43 @@ end
 # for the evaluator's few remaining shape checks.
 
 # `in 1 | 2` — first matching option wins.
+# The rendering helpers every AST node shares — the trio's first real trait
+# (ADR 0028, #60's taste payoff): what was top-level helper soup, carried by
+# the structs that use it instead.
+# Parameter names dodge every carrier's field names on purpose: a trait
+# method's parameters sit in the same no-shadow ladder as the including
+# struct's fields, and the seed refuses a collision — which it did, for
+# `arguments`, the moment CallNode carried this.
+trait Sexp
+  def sexp_list(items)
+    items.map { it.sexp }.join(" ")
+  end
+
+  def headed_sexp(head, items)
+    return "(#{head})" if items.empty?
+    "(#{head} #{sexp_list(items)})"
+  end
+
+  def branch_sexp(head, items)
+    return "(#{head})" if items.nil?
+    headed_sexp(head, items)
+  end
+
+  def method_call_sexp(node, dot)
+    plain = headed_sexp("#{dot} #{node.receiver.sexp} #{node.name}", node.arguments)
+    return plain if node.block.nil?
+    mutable spelled = "do"
+    spelled << " |#{node.block.parameters.join(" ")}|" unless node.block.parameters.empty?
+    inner = plain.slice(1, plain.length - 2)
+    "(#{inner} #{headed_sexp(spelled, node.block.body)})"
+  end
+end
+
 struct AlternativePatternNode
   kind
   options
+
+  include Sexp
 
   def sexp
     headed_sexp("|", options)
@@ -32,6 +66,8 @@ end
 struct ArrayNode
   kind
   elements
+
+  include Sexp
 
   def sexp
     headed_sexp("array", elements)
@@ -115,6 +151,8 @@ struct CallNode
   arguments
   block
 
+  include Sexp
+
   def sexp
     headed_sexp("call #{name}", arguments)
   end
@@ -136,6 +174,8 @@ struct CaseInNode
   branches
   else_body
 
+  include Sexp
+
   def sexp
     mutable result = "(case #{subject.sexp}"
     branches.each do |branch|
@@ -152,6 +192,8 @@ struct CaseNode
   branches
   else_body
 
+  include Sexp
+
   def sexp
     mutable result = "(case #{subject.sexp}"
     branches.each do |branch|
@@ -167,6 +209,8 @@ struct DefNode
   name
   parameters
   body
+
+  include Sexp
 
   def sexp
     mutable result = "(def #{name} #{headed_sexp("params", parameters)}"
@@ -187,6 +231,8 @@ end
 struct HashNode
   kind
   pairs
+
+  include Sexp
 
   def sexp
     headed_sexp("hash", pairs)
@@ -210,6 +256,8 @@ struct IfNode
   then_body
   else_body
 
+  include Sexp
+
   def sexp
     mutable result = "(if #{condition.sexp} #{branch_sexp("then", then_body)}"
     result << " #{headed_sexp("else", else_body)}" if else_body.some?
@@ -224,6 +272,8 @@ struct InBranchNode
   pattern
   guard
   body
+
+  include Sexp
 
   def sexp
     mutable head = "in #{pattern.sexp}"
@@ -365,6 +415,8 @@ struct MethodCallNode
   arguments
   block
 
+  include Sexp
+
   def sexp
     method_call_sexp(self, ".")
   end
@@ -449,6 +501,8 @@ struct SafeMethodCallNode
   arguments
   block
 
+  include Sexp
+
   def sexp
     method_call_sexp(self, "&.")
   end
@@ -480,6 +534,8 @@ struct EnumCaseNode
   name
   payload
 
+  include Sexp
+
   def sexp
     "(enum_case " + name + " " + sexp_list(payload) + ")"
   end
@@ -490,6 +546,8 @@ struct EnumDefNode
   cases
   kind
   name
+
+  include Sexp
 
   def sexp
     "(enum " + name + " " + sexp_list(cases) + ")"
@@ -510,14 +568,31 @@ struct StructDefNode
   kind
   name
   fields
+  includes
   methods
   nested
 
+  include Sexp
+
   def sexp
     mutable result = "(struct #{name} #{fields.join(" ")}"
+    result << " (include #{includes.join(" ")})" unless includes.empty?
     result << " #{sexp_list(methods)}" unless methods.empty?
     result << " #{sexp_list(nested)}" unless nested.empty?
     result + ")"
+  end
+end
+
+# `trait Name ... end` — a bundle of methods with no state (ADR 0028).
+struct TraitDefNode
+  kind
+  name
+  methods
+
+  include Sexp
+
+  def sexp
+    "(trait #{name} #{sexp_list(methods)})"
   end
 end
 
@@ -527,6 +602,8 @@ struct ModuleDefNode
   kind
   path
   body
+
+  include Sexp
 
   def sexp
     mutable result = "(module #{path.join("::")}"
@@ -597,6 +674,8 @@ struct WhileNode
   kind
   condition
   body
+
+  include Sexp
 
   def sexp
     headed_sexp("while #{condition.sexp}", body)
@@ -807,8 +886,12 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, methods, nested)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, methods: methods, nested: nested)
+def struct_def_node(name, fields, includes, methods, nested)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested)
+end
+
+def trait_def_node(name, methods)
+  TraitDefNode.new(kind: "trait_def", name: name, methods: methods)
 end
 
 def module_def_node(path, body)
@@ -1588,6 +1671,8 @@ def parse_statement(tokens, position)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
+    when "trait" then return parse_trait(tokens, position + 1)
+    when "include" then return Step.new(node: error_node("`include` belongs inside a struct body — a trait is carried by a struct (ADR 0028)"), position: skip_line_at(tokens, position))
     when "enum" then return parse_enum(tokens, position + 1)
     when "module" then return parse_module(tokens, position + 1)
     end
@@ -2319,14 +2404,22 @@ def parse_struct(tokens, mutable position)
     fields << tokens[position].text
     position = skip_newlines_at(tokens, position + 1)
   end
-  # Methods after the fields (#27), and nested types — a type may nest in a
-  # type; a module may not (ADR 0021 §5). One loop dispatching per keyword,
-  # matching the seed: two loops in sequence meant an enum between two defs
-  # ended method parsing for good, and the struct never found its end (#44).
+  # Methods after the fields (#27), includes (ADR 0028), and nested types —
+  # a type may nest in a type; a module may not (ADR 0021 §5). One loop
+  # dispatching per keyword, matching the seed: two loops in sequence meant
+  # an enum between two defs ended method parsing for good, and the struct
+  # never found its end (#44).
+  mutable includes = []
   mutable methods = []
   mutable nested = []
-  while keyword_at?(tokens, position, %w[def enum struct])
-    if keyword_at?(tokens, position, %w[def])
+  while keyword_at?(tokens, position, %w[def enum include struct])
+    if keyword_at?(tokens, position, %w[include])
+      unless position + 1 < tokens.length && tokens[position + 1].identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(tokens[position + 1].text.slice(0, 1))
+        return Step.new(node: error_node("expected a trait name after include"), position: position + 1)
+      end
+      includes << tokens[position + 1].text
+      position = skip_newlines_at(tokens, position + 2)
+    elsif keyword_at?(tokens, position, %w[def])
       method = parse_def(tokens, position + 1)
       methods << method.node
       position = skip_newlines_at(tokens, method.position)
@@ -2344,9 +2437,36 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: struct_def_node(name, fields, methods, nested), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, includes, methods, nested), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+# `trait Name ... end` — methods only (ADR 0028): no fields, no state, no
+# nesting; a bundle of behavior for structs to include.
+def parse_trait(tokens, mutable position)
+  if position >= tokens.length || !tokens[position].identifier?
+    return Step.new(node: error_node("expected trait name after trait"), position: position)
+  end
+  name = tokens[position].text
+  unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
+    return Step.new(node: error_node("trait names start with a capital letter, got #{name}"), position: position + 1)
+  end
+  position = skip_newlines_at(tokens, position + 1)
+  mutable methods = []
+  while keyword_at?(tokens, position, %w[def])
+    method = parse_def(tokens, position + 1)
+    methods << method.node
+    position = skip_newlines_at(tokens, method.position)
+  end
+  if position < tokens.length && tokens[position].identifier?
+    return Step.new(node: error_node("a trait has methods only — #{tokens[position].text} looks like state, and state belongs to the struct that includes #{name}"), position: position + 1)
+  end
+  unless keyword_at?(tokens, position, %w[end])
+    return Step.new(node: error_node("expected end to close trait #{name}"), position: position)
+  end
+  return Step.new(node: error_node("trait #{name} has no methods — a bundle needs behavior"), position: position + 1) if methods.empty?
+  Step.new(node: trait_def_node(name, methods), position: position + 1)
 end
 
 # `Foo::Bar` in expression position (ADR 0021). `::` names, `.` invokes —
@@ -2519,28 +2639,5 @@ def parse_program(tokens)
 end
 
 # — printing —
-# Helpers alphabetical; the sexp dispatcher last, its branches alphabetical.
-
-def branch_sexp(head, body)
-  return "(#{head})" if body.nil?
-  headed_sexp(head, body)
-end
-
-def headed_sexp(head, arguments)
-  return "(#{head})" if arguments.empty?
-  "(#{head} #{sexp_list(arguments)})"
-end
-
-def method_call_sexp(node, dot)
-  plain = headed_sexp("#{dot} #{node.receiver.sexp} #{node.name}", node.arguments)
-  return plain if node.block.nil?
-  block = node.block
-  mutable head = "do"
-  head << " |#{block.parameters.join(" ")}|" unless block.parameters.empty?
-  inner = plain.slice(1, plain.length - 2)
-  "(#{inner} #{headed_sexp(head, block.body)})"
-end
-
-def sexp_list(nodes)
-  nodes.map { it.sexp }.join(" ")
-end
+# The shared rendering helpers live in `trait Sexp` at the top of the file
+# (ADR 0028): the structs that render carry them, and nothing else can.

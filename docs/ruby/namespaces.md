@@ -10,6 +10,8 @@
 
 The consequence is that `include Foo` is ambiguous to a reader:
 
+<!-- not-portland: Ruby, shown for contrast — Portland's include takes only traits (ADR 0028) -->
+
 ```ruby
 include Comparable   # real mixin — you want <=> to power < > between?
 include Math         # namespace convenience — you just didn't want to type Math.

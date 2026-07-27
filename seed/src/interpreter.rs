@@ -148,7 +148,15 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     current_block: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
+    /// Method bundles waiting to be included (ADR 0028).
+    traits: HashMap<String, TraitInfo>,
     variables: HashMap<String, Binding>,
+}
+
+/// A trait: methods only, no state (ADR 0028). Merged into a struct's
+/// method table at that struct's registration.
+struct TraitInfo {
+    methods: HashMap<String, std::rc::Rc<Method>>,
 }
 
 #[derive(Clone)]
@@ -209,6 +217,7 @@ impl<W: std::io::Write> Interpreter<W> {
             current_block: None,
             enums: HashMap::new(),
             structs: HashMap::new(),
+            traits: HashMap::new(),
             variables: HashMap::new(),
         }
     }
@@ -422,8 +431,43 @@ impl<W: std::io::Write> Interpreter<W> {
                 );
                 None
             }
+            // `trait Name ... end` — registered like a struct's method table,
+            // waiting to be included (ADR 0028). Each method keeps this
+            // module as its home, so bare names resolve from where the trait
+            // was written.
+            Statement::TraitDefinition { methods, name } => {
+                let mut method_table = HashMap::new();
+                for method in methods {
+                    let Statement::MethodDefinition {
+                        body,
+                        keyword_parameters,
+                        name: method_name,
+                        parameters,
+                    } = method
+                    else {
+                        unreachable!()
+                    };
+                    method_table.insert(
+                        method_name.clone(),
+                        std::rc::Rc::new(Method {
+                            body: body.clone(),
+                            home: self.module_path.clone(),
+                            keyword_parameters: keyword_parameters.clone(),
+                            parameters: parameters.clone(),
+                        }),
+                    );
+                }
+                self.traits.insert(
+                    self.qualified(name),
+                    TraitInfo {
+                        methods: method_table,
+                    },
+                );
+                None
+            }
             Statement::StructDefinition {
                 fields,
+                includes,
                 methods,
                 name,
                 nested,
@@ -448,6 +492,59 @@ impl<W: std::io::Write> Interpreter<W> {
                             parameters: parameters.clone(),
                         }),
                     );
+                }
+                // Included traits merge here, at registration (ADR 0028), so
+                // dispatch and bare-name resolution need no new rungs — and
+                // every collision is a refusal naming both owners, never
+                // Ruby's silent last-include-wins.
+                let mut origin: HashMap<String, String> = HashMap::new();
+                for written in includes {
+                    let Some((_, info)) = Self::resolve(&self.module_path, written, &self.traits)
+                    else {
+                        if Self::resolve(&self.module_path, written, &self.structs).is_some() {
+                            panic!(
+                                "{written} is a struct, not a trait — a struct is a value; hold one in a field"
+                            );
+                        }
+                        if self
+                            .methods
+                            .keys()
+                            .any(|key| key.starts_with(&format!("{written}::")))
+                            || self
+                                .variables
+                                .keys()
+                                .any(|key| key.starts_with(&format!("{written}::")))
+                        {
+                            panic!(
+                                "{written} is a namespace, not a trait — namespaces are never injected; write {written}.method(...)"
+                            );
+                        }
+                        panic!("undefined trait {written}");
+                    };
+                    let carried: Vec<(String, std::rc::Rc<Method>)> = info
+                        .methods
+                        .iter()
+                        .map(|(method_name, method)| (method_name.clone(), method.clone()))
+                        .collect();
+                    for (method_name, method) in carried {
+                        if fields.contains(&method_name) {
+                            panic!(
+                                "{method_name} is a field of {name} and a method of {written} — a name is a field or a method, never both"
+                            );
+                        }
+                        if let Some(earlier) = origin.get(&method_name) {
+                            panic!(
+                                "{method_name} is declared by both {earlier} and {written} — {name} must not include both, or one renames"
+                            );
+                        }
+                        if method_table.contains_key(&method_name) {
+                            panic!(
+                                "{name} defines {method_name} and includes it from {written} — one of them renames"
+                            );
+                        }
+                        origin.insert(method_name.clone(), written.clone());
+                        method_table.insert(method_name, method);
+                    }
                 }
                 self.structs.insert(
                     self.qualified(name),
