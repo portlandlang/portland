@@ -36,7 +36,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 | Structs, methods in struct bodies, builtin type patterns     | [#27](https://github.com/portlandlang/portland/issues/27) first increment                                                                                                                                                                                                                       | ✅              |
 | `return` unwinds to its write site, through yield            | [0025](docs/adr/0025-2026-07-27-return-unwinds-to-its-write-site.md)                                                                                                                                                                                                                            | ✅              |
 | `inspect(value)` — p without the printing                    | [0026](docs/adr/0026-2026-07-27-inspect-as-a-function.md)                                                                                                                                                                                                                                       | ✅              |
-| Errors as typed results; `!` is unwrap-or-propagate          | [0027](docs/adr/0027-2026-07-27-errors-as-typed-results.md)                                                                                                                                                                                                                                     | ⬜ [#59](https://github.com/portlandlang/portland/issues/59) |
+| Errors as typed results; `!` is unwrap-or-propagate          | [0027](docs/adr/0027-2026-07-27-errors-as-typed-results.md)                                                                                                                                                                                                                                     | ✅              |
 | The object model: structs and traits, `include`              | [0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md)                                                                                                                                                                                                                             | ⬜ [#60](https://github.com/portlandlang/portland/issues/60) |
 
 ### The implementation
@@ -65,7 +65,6 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [#59](https://github.com/portlandlang/portland/issues/59) — build typed results: `failure()`, the toolkit extension, `!` (ADR 0027 decided it)
 - [#60](https://github.com/portlandlang/portland/issues/60) — build traits: `trait`, `include`, the resolution rung (ADR 0028 decided it)
 - [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))

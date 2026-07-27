@@ -248,12 +248,17 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[argv inspect p panic puts read_file require_relative some write_file].include?(name)
+  %w[argv failure inspect p panic puts read_file require_relative some write_file].include?(name)
 end
 
 # Try a pattern against a value: an array of [name, value] captures on a
 # match (empty for literals), nil on a miss.
-def match_pattern(pattern, subject, bindings)
+def match_pattern(pattern, mutable subject, bindings)
+  # A failure is transparent to patterns (ADR 0027): its whole use is
+  # carrying the reason to a handler whose tool is the pattern.
+  while subject.failure?
+    subject = failure_payload(subject)
+  end
   case pattern
   in AlternativePatternNode then match_alternative(pattern, subject, bindings)
   in ArrayPatternNode then match_array(pattern, subject, bindings)
@@ -573,6 +578,7 @@ def evaluate_expression(node, bindings)
   in MatchTestNode then evaluate_match_test(node, bindings)
   in MethodCallNode | SafeMethodCallNode then evaluate_method_call(node, bindings)
   in NilNode then outcome([nil], bindings)
+  in PropagateNode then evaluate_propagate(node, bindings)
   in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
   # Guest symbols are tagged arrays, like guest structs — the trio cannot
@@ -647,7 +653,9 @@ def evaluate_logical(node, bindings)
     return outcome([false], left_step.bindings) unless left
     return evaluate_expression(node.right, left_step.bindings)
   end
-  return evaluate_statement(node.right, left_step.bindings) if left.nil?
+  # A failure takes the fallback exactly as nil does (ADR 0027): failure is
+  # absence with a reason, and `or` is its unwrap-or-else.
+  return evaluate_statement(node.right, left_step.bindings) if left.nil? || left.failure?
   return outcome([true], left_step.bindings) if left == true
   return evaluate_expression(node.right, left_step.bindings) if left == false
   outcome([left or nil], left_step.bindings)
@@ -805,11 +813,32 @@ def symbol_source(name)
   ":" + encode_string(name)
 end
 
+# The payload of a failure, pulled through the host's own pattern
+# transparency (ADR 0027): a capture matches a failure as its payload, so
+# the one-line `in` is the unwrapper — the same bootstrap trick as type
+# patterns, with no privileged builtin.
+def failure_payload(value)
+  value in unwrapped
+  unwrapped
+end
+
+# `!` — unwrap-or-propagate (ADR 0027): a failure returns from the
+# enclosing method, aimed like a `return` at the frame the `!` was written
+# in; anything else passes through untouched.
+def evaluate_propagate(node, bindings)
+  step = evaluate_expression(node.value, bindings)
+  return step unless step.signal == "none"
+  value = slot_value(step.value)
+  return return_outcome([value], step.bindings, frame_of(step.bindings)) if value.failure?
+  step
+end
+
 # The seed's Display: what `puts`, `to_s`, `join`, and interpolation show.
-# Symbols shed the colon; structs, enum cases, and maybes keep their inspect
-# form, which is the seed's rule too.
+# Symbols shed the colon; structs, enum cases, maybes, and failures keep
+# their inspect form, which is the seed's rule too.
 def render(value)
   return "nil" if value.nil?
+  return render_inspect(value) if value.failure?
   return value_at(value, 1) if value in ["__symbol__", *]
   return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *]
   if plain_array?(value)
@@ -831,6 +860,7 @@ end
 # shorthand for identifier-shaped symbol keys and the rocket for the rest.
 def render_inspect(value)
   return "nil" if value.nil?
+  return "failure(#{render_inspect(failure_payload(value))})" if value.failure?
   return symbol_source(value_at(value, 1)) if value in ["__symbol__", *]
   if value in ["__enum_case__", *]
     labels = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
@@ -1084,6 +1114,7 @@ def evaluate_method_call(node, mutable bindings)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
+  when "failure?" then receiver.failure?
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then rendered_to_s(receiver)
@@ -1513,7 +1544,11 @@ def evaluate_require(name, bindings)
   # gives out. The seed inserts before running for the same reason.
   loaded = [["__loaded__", "loaded", loaded_paths(bindings) + [target]]]
   scope = [["__file__", "file", target]] + loaded + bindings
-  result = run_body(parse_program(lex(read_file(target))), scope)
+  # `read_file` answers a failure now (ADR 0027), which lets this refusal
+  # finally wear the seed's wording — one recorded divergence retired. The
+  # message names the *requested* path, as the seed's does.
+  source = read_file(target) or panic "require_relative #{inspect(name)}: No such file or directory (os error 2)"
+  result = run_body(parse_program(lex(source)), scope)
   # Everything the file defined stays in scope — that is the point of a require,
   # and the opposite of a method call. Only `__file__` is put back, so the rest
   # of the requiring file resolves its own relative paths, not the required
@@ -1551,8 +1586,9 @@ def evaluate_call(node, mutable bindings)
   when "puts"
     puts "" if arguments.empty?
     arguments.each do |argument|
-      # The refusal comes before the rendering, with the seed's wording.
+      # The refusals come before the rendering, with the seed's wording.
       panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
+      panic("puts got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
       puts render(argument)
     end
     outcome([], bindings)
@@ -1563,6 +1599,13 @@ def evaluate_call(node, mutable bindings)
     outcome(arguments, bindings)
   when "some"
     outcome([some(slot_value(arguments))], bindings)
+  when "failure"
+    # Absence with a reason (ADR 0027); the host box carries the guest value.
+    outcome([failure(slot_value(arguments))], bindings)
+  when "read_file"
+    # Delegated whole: the host answers content or a failure (ADR 0027),
+    # and both are plain values the guest can hold.
+    outcome([read_file(slot_value(arguments))], bindings)
   when "inspect"
     # `p` without the printing (ADR 0026); the host builtin answers the
     # untagged shapes, and render_inspect already speaks for the tagged ones.

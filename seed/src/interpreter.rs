@@ -957,6 +957,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 let left = self.value_of(left);
                 match (operator, left) {
                     (LogicalOperator::Or, Value::Nil) => self.expression(right),
+                    // A failure takes the fallback too (ADR 0027): failure is
+                    // absence with a reason, and `or` is its unwrap-or-else.
+                    (LogicalOperator::Or, Value::Failure(_)) => self.expression(right),
                     // Present-but-wrapped: unwrap one layer — a stored nil
                     // beats the default, exactly fetch's rule (ADR 0010).
                     (LogicalOperator::Or, Value::Some(inner)) => Some(*inner),
@@ -1047,6 +1050,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 self.current_block = outer;
                 result
+            }
+            // `!` — unwrap-or-propagate (ADR 0027): a failure returns from
+            // the enclosing method, aimed like a `return` at the frame the
+            // `!` was written in; anything else passes through untouched.
+            Expression::Propagate(inner) => {
+                let value = self.expression(inner);
+                if self.pending.is_some() {
+                    return None;
+                }
+                match value {
+                    Some(Value::Failure(failure)) => {
+                        self.pending = Some(Pending::Return {
+                            target: self.home_depth,
+                            value: Some(Value::Failure(failure)),
+                        });
+                        None
+                    }
+                    other => other,
+                }
             }
             // `yield` — run the block this method was handed, in the scope,
             // frame, and block context that block was written in.
@@ -1377,8 +1399,17 @@ impl<W: std::io::Write> Interpreter<W> {
             // statically they belong to the maybe, not to nil.
             (_, "nil?", []) => Value::Boolean(matches!(receiver, Value::Nil)),
             (_, "some?", []) => Value::Boolean(!matches!(receiver, Value::Nil)),
+            // `failure?` is universal for the same reason (ADR 0027): it asks
+            // which side of the sad line a value sits on, and every value has
+            // an answer.
+            (_, "failure?", []) => Value::Boolean(matches!(receiver, Value::Failure(_))),
             (Value::Nil, name, _) => {
                 panic!("nil has no method {name} — handle the nil case first")
+            }
+            // A failure answers the predicates above and renders under
+            // `inspect`/`p`; everything else waits for the handler.
+            (Value::Failure(_), name, _) => {
+                panic!("a failure has no method {name} — handle the failure case first")
             }
             (Value::Array(elements), "empty?", []) => Value::Boolean(elements.is_empty()),
             (Value::Array(elements), "first", []) => {
@@ -1503,6 +1534,7 @@ impl<W: std::io::Write> Interpreter<W> {
         matches!(
             name,
             "argv"
+                | "failure"
                 | "inspect"
                 | "p"
                 | "panic"
@@ -1766,6 +1798,14 @@ impl<W: std::io::Write> Interpreter<W> {
         pattern: &Pattern,
         subject: &Value,
     ) -> Option<Vec<(String, Value)>> {
+        // A failure is transparent to patterns (ADR 0027): its whole use is
+        // carrying the reason to a handler whose tool is the pattern, so
+        // `in ReadFailed(reason:)` matches the payload and a capture binds
+        // it. (A some-box stays opaque — its whole use is distinguishability.)
+        let mut subject = subject;
+        while let Value::Failure(inner) = subject {
+            subject = inner;
+        }
         match pattern {
             Pattern::Alternative(options) => options
                 .iter()
@@ -2101,6 +2141,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         "puts got nil — handle the nil case first (p renders nil for debugging)"
                     );
                 }
+                // A failure printing casually is a sad path going unnoticed.
+                if matches!(argument, Value::Failure(_)) {
+                    panic!(
+                        "puts got a failure — handle the failure case first (p renders it for debugging)"
+                    );
+                }
                 writeln!(self.output, "{argument}").expect("failed to write output");
             }
             return None;
@@ -2110,6 +2156,15 @@ impl<W: std::io::Write> Interpreter<W> {
             match arguments.len() {
                 1 => return Some(Value::present(arguments.remove(0))),
                 other => panic!("some takes one argument, got {other}"),
+            }
+        }
+        // `failure(reason)` — absence with a reason (ADR 0027). Always a
+        // real box, where `some` boxes only nil and other boxes.
+        if self.lookup_method(name).is_none() && name == "failure" {
+            let mut arguments = arguments;
+            match arguments.len() {
+                1 => return Some(Value::Failure(Box::new(arguments.remove(0)))),
+                other => panic!("failure takes one argument, got {other}"),
             }
         }
         if self.lookup_method(name).is_none() && name == "panic" {
@@ -2155,15 +2210,24 @@ impl<W: std::io::Write> Interpreter<W> {
                         .collect();
                     return Some(Value::array(arguments));
                 }
+                // The first fallible operations (ADR 0027): a failure comes
+                // back instead of a panic, and the caller decides. String
+                // payloads for now — struct payloads wait for library types.
                 ("read_file", [Value::String(path)]) => {
-                    let content = std::fs::read_to_string(path)
-                        .unwrap_or_else(|error| panic!("read_file {path:?}: {error}"));
-                    return Some(Value::String(content));
+                    return Some(match std::fs::read_to_string(path) {
+                        Ok(content) => Value::String(content),
+                        Err(error) => Value::Failure(Box::new(Value::String(format!(
+                            "read_file {path:?}: {error}"
+                        )))),
+                    });
                 }
                 ("write_file", [Value::String(path), Value::String(content)]) => {
-                    std::fs::write(path, content)
-                        .unwrap_or_else(|error| panic!("write_file {path:?}: {error}"));
-                    return None;
+                    return match std::fs::write(path, content) {
+                        Ok(()) => None,
+                        Err(error) => Some(Value::Failure(Box::new(Value::String(format!(
+                            "write_file {path:?}: {error}"
+                        ))))),
+                    };
                 }
                 ("require_relative", [Value::String(path)]) => {
                     return Some(Value::Boolean(self.require_relative(path)));
@@ -3072,9 +3136,16 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "read_file")]
-    fn panics_on_reading_a_missing_file() {
-        evaluate("read_file(\"no_such_file.txt\")");
+    fn reading_a_missing_file_answers_a_failure() {
+        // ADR 0027: the first fallible operation — a failure, not a panic.
+        assert_eq!(
+            evaluate("read_file(\"no_such_file.txt\").failure?"),
+            Some(Value::Boolean(true))
+        );
+        assert_eq!(
+            evaluate("read_file(\"no_such_file.txt\") or \"fallback\""),
+            Some(Value::String("fallback".to_string()))
+        );
     }
 
     #[test]

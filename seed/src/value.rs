@@ -41,6 +41,11 @@ pub enum Value {
     /// another Some — a plain present value is never boxed (`some(5)` is
     /// `5`). Built by `Value::present`; keeps `[nil].first` ≠ `[].first`.
     Some(Box<Value>),
+    /// A failure: absence with a reason (ADR 0027). Always a real box —
+    /// unlike `some`, which is identity on plain values, `failure` must
+    /// mark, because its whole job is telling the sad path from a value
+    /// that merely looks like one.
+    Failure(Box<Value>),
     String(String),
     /// `:name` — a name rather than data (ADR 0023). Holds the name without
     /// its colon. Interning is an optimisation the seed does not need: there
@@ -132,6 +137,7 @@ impl Value {
             Value::Nil => "nil".to_string(),
             Value::Range { .. } => self.to_string(),
             Value::Some(inner) => format!("some({})", inner.inspect()),
+            Value::Failure(inner) => format!("failure({})", inner.inspect()),
             Value::String(value) => format!("{value:?}"),
             Value::Symbol(name) => Value::symbol_source(name),
             Value::Struct { fields, name } => {
@@ -205,6 +211,7 @@ impl fmt::Display for Value {
             }
             Value::Nil => write!(formatter, "nil"),
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
+            Value::Failure(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),
             // `puts :paid` shows the name; `p :paid` shows the literal.
             Value::Symbol(name) => write!(formatter, "{name}"),

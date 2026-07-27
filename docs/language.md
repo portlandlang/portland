@@ -106,7 +106,7 @@ numbers << 2
 others.length              # 1 — in Ruby this would be 2
 ```
 
-Bang methods (`upcase!`, `push`) do not exist and will not. Rebinding spells it: `word = word.upcase`.
+Bang methods (`upcase!`, `push`) do not exist and will not — `!` belongs to call sites as unwrap-or-propagate (ADR 0027), and `def save!` is a refusal naming the rewrite. Rebinding spells the mutation Ruby's bangs meant: `word = word.upcase`.
 
 Parameters are binding sites too, so `def f(mutable position)` works. Blocks rebind outer mutables — the accumulator pattern — refuse outer immutables with the fix named, and their own fresh locals die at `end`. Loop iterations are fresh scopes for their own locals, which is the block rule applied to `while`.
 
@@ -120,13 +120,14 @@ The headline feature (ADRs 0005–0010, 0012). There is no ambient nil. Absence 
 
 **Partial operations return maybes** instead of panicking: `[].first`, `last`, `min`, `max`, out-of-range array and string indexing, and missing hash keys. `fetch` retired, because all three of its arities are the or-guard with lazy evaluation for free.
 
-The unwrap toolkit is four things, and deliberately nothing else:
+The unwrap toolkit is five things, and deliberately nothing else:
 
 ```ruby
 name = lookup(id) or "anonymous"        # or — lazy, typed
 user = find(id) or return               # or-guard: return / break / next
 config = load_config or panic "no key"  # the only crash you can write
 title = article&.headline               # &. — absent receiver short-circuits
+content = read_file!(path)              # ! — unwrap-or-propagate (failures, below)
 case value
 in nil then "nothing"                 # case/in matches payload or nil
 in found then found.upcase
@@ -138,6 +139,8 @@ There is **no `if let`** and **no force-unwrap operator**. `or panic "why"` is t
 `or`, `and`, and `not` are **dead-identical** to `||`, `&&`, and `!` — same precedence, same semantics (ADR 0007). Ruby's secret `and`/`or` precedence is gone, so `x = nil or 7` binds the `or` first. `or` is _typed_: booleans get logical or, a maybe gets unwrap-or-else.
 
 `some(x)` is written only in genuinely nested cases. It is identity on plain values and a real box only around `nil` or another `some`, so `[nil].first` and `[].first` differ, and a stored hash nil beats an or-guard default — Ruby's `fetch` rule, preserved.
+
+**Failure is absence with a reason** (ADR 0027). A fallible operation returns its value or a `failure(reason)` — always a real box, since its whole job is marking the sad path — and the toolkit above handles it unchanged: `or` takes the fallback, `case/in` reaches *through* the box to the reason (a failure is transparent to patterns, where a some-box stays opaque), and `failure?` joins `nil?`/`some?` as a universal dispatch. `!` is the propagation: `read_file!(path)` yields the content or returns the failure from the enclosing method — one greppable character per frame a failure may cross, unwinding to its write site like any `return` (ADR 0025). There is no `raise` and no `rescue`: a failure never crosses a frame that did not mark it. `puts` refuses a failure as it refuses nil; `p` and `inspect` render it. `read_file` and `write_file` are the first fallible operations, and a method can never be *named* with `!` — `def save!` is a refusal pointing at the call site.
 
 The **static** half of this — flow narrowing, unhandled-maybe compile errors, the `Boolean?` never-guess, dead right-hand sides — is the real compiler's job (#9). Today those surface as runtime panics.
 
@@ -347,8 +350,6 @@ Emerging rather than settled — this section describes how the trio is actually
 Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose when they are dead-identical, and how much to lean on postfix guards. Both wait on more real Portland to look at.
 
 ## Decided, not yet built
-
-- **Errors are typed results, and `!` propagates them** (ADR 0027, [#59](https://github.com/portlandlang/portland/issues/59) builds it). Failure is absence with a reason: a fallible operation returns its value or a `failure`, and the unwrap toolkit above already handles it — `or` takes a fallback, `case/in` destructures the reason, and `read_file!(path)` yields the content or returns the failure from the enclosing method, one greppable character per frame a failure may cross. There is no `raise`, no `rescue`, and no flight: a failure never crosses a frame that did not mark it.
 
 - **Traits carry shared behavior** (ADR 0028, [#60](https://github.com/portlandlang/portland/issues/60) builds it). A `trait` is a bundle of methods with no state; a struct `include`s it, trait methods resolve after the struct's own, and a collision between two included traits is a refusal naming both. No inheritance, no `class`, no subtyping — declined, not deferred.
 

@@ -226,6 +226,15 @@ impl<'source> Parser<'source> {
         self.postfix_modifier(statement)
     }
 
+    /// A binding site cannot take the `!` suffix (ADR 0027): a reference
+    /// ending in `!` always reads as unwrap-or-propagate, so the name could
+    /// never be reached again.
+    fn refuse_bang_binding(name: &str) {
+        if let Some(base) = name.strip_suffix('!') {
+            panic!("`!` is unwrap-or-propagate — a binding cannot take it; name it {base}");
+        }
+    }
+
     fn simple_statement(&mut self) -> Statement {
         if self.peek_is_keyword("mutable") {
             self.position += 1; // the `mutable`
@@ -234,6 +243,7 @@ impl<'source> Parser<'source> {
                 panic!("expected a name after mutable, got {token:?}");
             }
             let name = token.text.to_string();
+            Self::refuse_bang_binding(&name);
             if self.peek_kind() != Some(TokenKind::Equal) {
                 // Fused to first assignment (ADR 0001): no uninitialized holes.
                 panic!("mutable is fused to the first assignment — write `mutable {name} = ...`");
@@ -267,6 +277,7 @@ impl<'source> Parser<'source> {
             && self.peek_kind_at(1) == Some(TokenKind::Equal)
         {
             let name = self.advance().text.to_string();
+            Self::refuse_bang_binding(&name);
             self.position += 1; // the `=`
             let value = self.expression();
             return Statement::Assignment {
@@ -287,6 +298,7 @@ impl<'source> Parser<'source> {
         {
             // `x += e` desugars to `x = x + e`.
             let name = self.advance().text.to_string();
+            Self::refuse_bang_binding(&name);
             self.position += 1; // the compound operator
             let value = Expression::Binary {
                 left: Box::new(Expression::Variable(name.clone())),
@@ -305,6 +317,7 @@ impl<'source> Parser<'source> {
             && self.peek_kind_at(1) == Some(TokenKind::LessLess)
         {
             let name = self.advance().text.to_string();
+            Self::refuse_bang_binding(&name);
             self.position += 1; // the `<<`
             let value = Box::new(self.expression());
             return Statement::Assignment {
@@ -486,12 +499,21 @@ impl<'source> Parser<'source> {
                  a block for {name}:  {name}({inner}) {{ ... }}"
             );
         }
-        Some(Statement::Expression(Expression::Call {
+        // `save_config! path` — the `!` wraps the command call (ADR 0027).
+        let (name, propagates) = match name.strip_suffix('!') {
+            Some(base) => (base.to_string(), true),
+            None => (name, false),
+        };
+        let call = Expression::Call {
             arguments,
             block,
             keyword_arguments,
             name,
-        }))
+        };
+        if propagates {
+            return Some(Statement::Expression(Expression::Propagate(Box::new(call))));
+        }
+        Some(Statement::Expression(call))
     }
 
     /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.
@@ -525,6 +547,13 @@ impl<'source> Parser<'source> {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
+        // `!` belongs to call sites, never to methods (ADR 0027): a method
+        // named with it could not be told apart from a propagated call.
+        if let Some(base) = name.strip_suffix('!') {
+            panic!(
+                "`!` is unwrap-or-propagate and belongs to call sites — define {base} and write {name} where its failure should propagate"
+            );
+        }
         let (parameters, keyword_parameters) = if self.peek_kind() == Some(TokenKind::LeftParen) {
             self.position += 1;
             self.parameters()
@@ -1173,6 +1202,7 @@ impl<'source> Parser<'source> {
                 if token.kind != TokenKind::Identifier {
                     panic!("expected block parameter, got {token:?}");
                 }
+                Self::refuse_bang_binding(token.text);
                 if parameters.contains(&token.text.to_string()) {
                     panic!("duplicate block parameter name {}", token.text);
                 }
@@ -1313,6 +1343,7 @@ impl<'source> Parser<'source> {
                     panic!("expected parameter name, got {token:?}");
                 }
                 let name = token.text.to_string();
+                Self::refuse_bang_binding(&name);
                 if parameters.iter().any(|parameter| parameter.name == name)
                     || keyword_parameters
                         .iter()
@@ -1713,6 +1744,12 @@ impl<'source> Parser<'source> {
                     if token.kind != TokenKind::Identifier {
                         panic!("expected method name after dot, got {token:?}");
                     }
+                    // `token.parse!` — the `!` wraps the call (ADR 0027),
+                    // exactly as it does on a bare name.
+                    let (name, propagates) = match token.text.strip_suffix('!') {
+                        Some(base) => (base.to_string(), true),
+                        None => (token.text.to_string(), false),
+                    };
                     let (arguments, keyword_arguments) =
                         if self.peek_kind() == Some(TokenKind::LeftParen) {
                             self.position += 1; // the `(`
@@ -1729,10 +1766,13 @@ impl<'source> Parser<'source> {
                         arguments,
                         block,
                         keyword_arguments,
-                        name: token.text.to_string(),
+                        name,
                         receiver: Box::new(expression),
                         safe: kind == TokenKind::AmpersandDot,
                     };
+                    if propagates {
+                        expression = Expression::Propagate(Box::new(expression));
+                    }
                 }
                 Some(TokenKind::LeftBracket) => {
                     self.position += 1; // the `[`
@@ -1800,7 +1840,14 @@ impl<'source> Parser<'source> {
                 Expression::Path(path)
             }
             TokenKind::Identifier => {
-                if self.peek_kind() == Some(TokenKind::LeftParen) {
+                // `!` is unwrap-or-propagate (ADR 0027): `name!` is the plain
+                // `name` expression wrapped in a Propagate, so the suffix
+                // marks call sites and never methods.
+                let (name, propagates) = match token.text.strip_suffix('!') {
+                    Some(base) => (base.to_string(), true),
+                    None => (token.text.to_string(), false),
+                };
+                let expression = if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
                     // ADR 0024: parens closed the argument list, so a block
@@ -1815,7 +1862,7 @@ impl<'source> Parser<'source> {
                         arguments,
                         block,
                         keyword_arguments,
-                        name: token.text.to_string(),
+                        name,
                     }
                 // A bare name followed by `do` is a call handed a block,
                 // which `yield` reaches from inside the method. Same exception:
@@ -1833,17 +1880,22 @@ impl<'source> Parser<'source> {
                         arguments: Vec::new(),
                         block: Some(self.block()),
                         keyword_arguments: Vec::new(),
-                        name: token.text.to_string(),
+                        name,
                     }
                 } else {
                     // ADR 0017: naming `it` inside a block declares that
                     // block's implicit parameter.
-                    if token.text == "it"
+                    if name == "it"
                         && let Some(frame) = self.it_frames.last_mut()
                     {
                         frame.named_here = true;
                     }
-                    Expression::Variable(token.text.to_string())
+                    Expression::Variable(name)
+                };
+                if propagates {
+                    Expression::Propagate(Box::new(expression))
+                } else {
+                    expression
                 }
             }
             TokenKind::String => string_expression(token.text, &mut self.it_frames),

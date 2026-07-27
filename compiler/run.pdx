@@ -4,4 +4,7 @@
 
 require_relative "evaluator"
 
-evaluate_program(parse_program(lex(read_file(argv.first))))
+# `read_file` answers a failure now (ADR 0027); a tool that cannot read its
+# input has nothing to do but say so.
+source = read_file(argv.first) or panic "run.pdx: cannot read #{argv.first}"
+evaluate_program(parse_program(lex(source)))

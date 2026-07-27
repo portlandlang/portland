@@ -4,6 +4,7 @@
 
 require_relative "parser"
 
-parse_program(lex(read_file(argv.first))).each do |node|
+source = read_file(argv.first) or panic "parse.pdx: cannot read #{argv.first}"
+parse_program(lex(source)).each do |node|
   puts node.sexp
 end

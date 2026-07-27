@@ -398,6 +398,18 @@ struct PairNode
 end
 
 # `self` — the receiver, inside a struct method.
+struct PropagateNode
+  kind
+  value
+
+  # `read_file!(path)` — unwrap-or-propagate (ADR 0027): the inner value
+  # passes through unless it is a failure, which returns from the
+  # enclosing method instead.
+  def sexp
+    "(propagate! #{value.sexp})"
+  end
+end
+
 struct SelfNode
   kind
 
@@ -641,6 +653,10 @@ end
 
 def break_node
   BreakNode.new(kind: "break")
+end
+
+def propagate_node(value)
+  PropagateNode.new(kind: "propagate", value: value)
 end
 
 def call_node(name, arguments)
@@ -1036,20 +1052,32 @@ def parse_dot(tokens, receiver, mutable position, safe)
     block = block_step.node
     position = block_step.position
   end
-  node = if safe
-    safe_method_call_node(receiver, token.text, arguments, block)
+  # `token.parse!` — the `!` wraps the call (ADR 0027), exactly as it does
+  # on a bare name.
+  name = if bang_name?(token.text)
+    bang_base(token.text)
   else
-    method_call_node(receiver, token.text, arguments, block)
+    token.text
   end
+  node = if safe
+    safe_method_call_node(receiver, name, arguments, block)
+  else
+    method_call_node(receiver, name, arguments, block)
+  end
+  return Step.new(node: propagate_node(node), position: position) if bang_name?(token.text)
   Step.new(node: node, position: position)
 end
 
 # `do |params| ... end`, position already past the `do`.
 def parse_block(tokens, mutable position, braced)
   mutable parameters = []
+  mutable refused = nil
   if operator_at?(tokens, position, %w[|])
     position += 1
     while position < tokens.length && tokens[position].identifier?
+      # A `!` parameter would be unreachable (ADR 0027); the refusal rides
+      # in the body, so the block's shape survives for the caller.
+      refused = bang_binding_error(tokens[position].text) if bang_name?(tokens[position].text)
       parameters << tokens[position].text
       position += 1
       position += 1 if operator_at?(tokens, position, %w[,])
@@ -1065,7 +1093,11 @@ def parse_block(tokens, mutable position, braced)
     body = parse_braced_body(tokens, position)
     # A diagnostic replaces the body rather than the block, so the outer
     # parse stays in sync and the error surfaces when the block runs.
-    statements = diagnosed_body(body.node, parameters, tokens, body_start, body.position)
+    statements = if refused.nil?
+      diagnosed_body(body.node, parameters, tokens, body_start, body.position)
+    else
+      [refused]
+    end
     parameters = implicit_parameters(parameters, tokens, body_start, body.position)
     if operator_at?(tokens, body.position, ["}"])
       return Step.new(node: block_node(parameters, statements), position: body.position + 1)
@@ -1073,7 +1105,11 @@ def parse_block(tokens, mutable position, braced)
     return Step.new(node: error_node("expected } to close {"), position: body.position)
   end
   body = parse_body(tokens, position, %w[end])
-  statements = diagnosed_body(body.node, parameters, tokens, body_start, body.position)
+  statements = if refused.nil?
+    diagnosed_body(body.node, parameters, tokens, body_start, body.position)
+  else
+    [refused]
+  end
   parameters = implicit_parameters(parameters, tokens, body_start, body.position)
   if keyword_at?(tokens, body.position, %w[end])
     return Step.new(node: block_node(parameters, statements), position: body.position + 1)
@@ -1320,6 +1356,57 @@ def skip_newlines_at(tokens, mutable position)
   position
 end
 
+# Does this name carry the `!` suffix (ADR 0027)?
+def bang_name?(name)
+  name.end_with?("!")
+end
+
+def bang_base(name)
+  name.slice(0, name.length - 1)
+end
+
+# A binding site cannot take the `!` suffix (ADR 0027): a reference ending
+# in `!` always reads as unwrap-or-propagate, so the name could never be
+# reached again. The seed's wording.
+def bang_binding_error(name)
+  error_node("`!` is unwrap-or-propagate — a binding cannot take it; name it #{bang_base(name)}")
+end
+
+# An identifier in expression position, by whatever it turns out to lead:
+# a `::` path, a paren call, a block-handed call, or a bare name.
+def parse_identifier_primary(tokens, position, name)
+  after = position + 1
+  if operator_at?(tokens, after, ["::"])
+    parse_path(tokens, name, after)
+  elsif operator_at?(tokens, after, %w[(])
+    arguments = parse_arguments(tokens, after + 1)
+    # ADR 0024: parens closed the argument list, so a block opening here has
+    # one owner and `{` is as good as `do`.
+    if keyword_at?(tokens, arguments.position, %w[do])
+      block = parse_block(tokens, arguments.position + 1, false)
+      Step.new(node: call_with_block_node(name, arguments.node, block.node), position: block.position)
+    elsif operator_at?(tokens, arguments.position, %w[{])
+      block = parse_block(tokens, arguments.position + 1, true)
+      Step.new(node: call_with_block_node(name, arguments.node, block.node), position: block.position)
+    else
+      Step.new(node: call_node(name, arguments.node), position: arguments.position)
+    end
+  elsif keyword_at?(tokens, after, %w[do])
+    # A bare name followed by `do` is a call handed a block, which
+    # `yield` reaches from inside the method.
+    block = parse_block(tokens, after + 1, false)
+    Step.new(node: call_with_block_node(name, [], block.node), position: block.position)
+  elsif operator_at?(tokens, after, %w[{]) && !braces_could_be_a_hash?(tokens, after)
+    # ADR 0024, in expression position: a `{` the peek has ruled out as a
+    # hash is this call's block. Where it could be a hash the never-guess
+    # menu still owns it, so this branch declines and the caller reports.
+    block = parse_block(tokens, after + 1, true)
+    Step.new(node: call_with_block_node(name, [], block.node), position: block.position)
+  else
+    Step.new(node: identifier_node(name), position: after)
+  end
+end
+
 def parse_primary(tokens, position)
   return Step.new(node: error_node("unexpected end of input"), position: position) if position >= tokens.length
   token = tokens[position]
@@ -1336,34 +1423,14 @@ def parse_primary(tokens, position)
       Step.new(node: symbol_node(symbol_name(token.text)), position: after)
     end
   when "identifier"
-    if operator_at?(tokens, after, ["::"])
-      parse_path(tokens, token.text, after)
-    elsif operator_at?(tokens, after, %w[(])
-      arguments = parse_arguments(tokens, after + 1)
-      # ADR 0024: parens closed the argument list, so a block opening here has
-      # one owner and `{` is as good as `do`.
-      if keyword_at?(tokens, arguments.position, %w[do])
-        block = parse_block(tokens, arguments.position + 1, false)
-        Step.new(node: call_with_block_node(token.text, arguments.node, block.node), position: block.position)
-      elsif operator_at?(tokens, arguments.position, %w[{])
-        block = parse_block(tokens, arguments.position + 1, true)
-        Step.new(node: call_with_block_node(token.text, arguments.node, block.node), position: block.position)
-      else
-        Step.new(node: call_node(token.text, arguments.node), position: arguments.position)
-      end
-    elsif keyword_at?(tokens, after, %w[do])
-      # A bare name followed by `do` is a call handed a block, which
-      # `yield` reaches from inside the method.
-      block = parse_block(tokens, after + 1, false)
-      Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
-    elsif operator_at?(tokens, after, %w[{]) && !braces_could_be_a_hash?(tokens, after)
-      # ADR 0024, in expression position: a `{` the peek has ruled out as a
-      # hash is this call's block. Where it could be a hash the never-guess
-      # menu still owns it, so this branch declines and the caller reports.
-      block = parse_block(tokens, after + 1, true)
-      Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
+    # `!` is unwrap-or-propagate (ADR 0027): `name!` is the plain `name`
+    # expression wrapped in a PropagateNode, so the suffix marks call
+    # sites and never methods.
+    if bang_name?(token.text)
+      step = parse_identifier_primary(tokens, position, bang_base(token.text))
+      Step.new(node: propagate_node(step.node), position: step.position)
     else
-      Step.new(node: identifier_node(token.text), position: after)
+      parse_identifier_primary(tokens, position, token.text)
     end
   when "string" then Step.new(node: string_expression(token.text), position: after)
   when "word_array" then Step.new(node: word_array_node(token.text), position: after)
@@ -1543,14 +1610,17 @@ def parse_statement(tokens, position)
     return Step.new(node: error_node(brace_after_name_message(token.text, tokens, position + 1)), position: skip_line_at(tokens, position))
   end
   if token.identifier? && operator_at?(tokens, position + 1, %w[=])
+    return Step.new(node: bang_binding_error(token.text), position: skip_line_at(tokens, position)) if bang_name?(token.text)
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, value.node), position: value.position)
   end
   if token.identifier? && operator_at?(tokens, position + 1, %w[<<])
+    return Step.new(node: bang_binding_error(token.text), position: skip_line_at(tokens, position)) if bang_name?(token.text)
     value = parse_expression(tokens, position + 2)
     return Step.new(node: assignment_node(token.text, append_node(token.text, value.node)), position: value.position)
   end
   if token.identifier? && operator_at?(tokens, position + 1, %w[+= -= *= /= %=])
+    return Step.new(node: bang_binding_error(token.text), position: skip_line_at(tokens, position)) if bang_name?(token.text)
     # `x += e` desugars to `x = x + e`, as in the seed.
     operator = tokens[position + 1].text.slice(0, 1)
     value = parse_expression(tokens, position + 2)
@@ -1589,6 +1659,7 @@ def parse_mutable(tokens, position)
     return Step.new(node: error_node("expected a name after mutable"), position: position)
   end
   name = tokens[position].text
+  return Step.new(node: bang_binding_error(name), position: skip_line_at(tokens, position)) if bang_name?(name)
   unless operator_at?(tokens, position + 1, %w[=])
     return Step.new(node: error_node("mutable is fused to the first assignment — write `mutable #{name} = ...`"), position: position + 1)
   end
@@ -1722,7 +1793,13 @@ def matching_paren_before(tokens, position)
 end
 
 def parse_command(tokens, mutable position)
-  name = tokens[position].text
+  # `save_config! path` — the `!` wraps the command call (ADR 0027).
+  written = tokens[position].text
+  name = if bang_name?(written)
+    bang_base(written)
+  else
+    written
+  end
   # An opener past these arguments belongs to this call, never to an argument.
   # For `do` that is Ruby's rule; for `{` it is the position ADR 0016 refuses,
   # and either way the arguments must not see it — so they are parsed against a
@@ -1745,13 +1822,16 @@ def parse_command(tokens, mutable position)
   unless opener < 0
     if keyword_at?(tokens, opener, %w[do])
       block = parse_block(tokens, opener + 1, false)
-      return Step.new(node: call_with_block_node(name, arguments, block.node), position: block.position)
+      handed = call_with_block_node(name, arguments, block.node)
+      return Step.new(node: propagate_node(handed), position: block.position) if bang_name?(written)
+      return Step.new(node: handed, position: block.position)
     end
     # ADR 0016: a bare `{` here has two or three genuine readings. Name them
     # all and let the author pick with a paren — never guess.
     message = brace_ambiguity_message(name, arguments.last, tokens, opener)
     return Step.new(node: error_node(message), position: skip_line_at(tokens, opener))
   end
+  return Step.new(node: propagate_node(call_node(name, arguments)), position: position) if bang_name?(written)
   Step.new(node: call_node(name, arguments), position: position)
 end
 
@@ -1887,10 +1967,16 @@ def parse_def(tokens, mutable position)
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text
+  # `!` belongs to call sites, never to methods (ADR 0027).
+  if bang_name?(name)
+    return Step.new(node: error_node("`!` is unwrap-or-propagate and belongs to call sites — define #{bang_base(name)} and write #{name} where its failure should propagate"), position: position + 1)
+  end
   position += 1
   mutable parameters = []
   if operator_at?(tokens, position, %w[(])
     parameter_step = parse_parameters(tokens, position + 1)
+    # A refusal in the parameter list stands in for the whole def.
+    return parameter_step if parameter_step.node in ErrorNode
     parameters = parameter_step.node
     position = parameter_step.position
   end
@@ -1912,6 +1998,7 @@ def parse_parameters(tokens, mutable position)
     rebindable = keyword_at?(tokens, position, %w[mutable])
     position += 1 if rebindable
     name = tokens[position].text
+    return Step.new(node: bang_binding_error(name), position: skip_line_at(tokens, position)) if bang_name?(name)
     position += 1
     if operator_at?(tokens, position, %w[:])
       position += 1

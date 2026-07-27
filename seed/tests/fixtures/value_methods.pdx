@@ -84,3 +84,10 @@ mutable collected = []
   collected << "#{index}:#{entry}"
 end
 puts collected.length.to_s
+
+# Failure is absence with a reason (ADR 0027).
+sad = failure("out of roses")
+p sad
+puts sad.failure?
+puts 5.failure?
+puts(sad or "fallback")

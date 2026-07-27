@@ -4,6 +4,7 @@
 
 require_relative "lexer"
 
-lex(read_file(argv.first)).each do |token|
+source = read_file(argv.first) or panic "tokenize.pdx: cannot read #{argv.first}"
+lex(source).each do |token|
   puts "#{token.kind} #{token.text}"
 end
