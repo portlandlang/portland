@@ -673,6 +673,19 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
     );
 }
 
+/// Yield delegation (#49): a `yield` inside a yielded block reaches the
+/// block of its *writer's* method, never itself — the seed used to loop
+/// forever here while the trio delegated correctly. The accumulator runs
+/// through both layers because the handed block is shared, not copied, so
+/// a delegated yield's write-back lands where the writer will look.
+#[test]
+fn portland_evaluator_matches_the_seed_on_yield_delegation() {
+    assert_evaluator_matches_seed(
+        "evaluator_yield_delegation.pdx",
+        "def inner_apply\n  yield\n  \"inner's answer\"\nend\ndef outer_apply\n  inner_apply do\n    yield\n  end\n  \"outer's answer\"\nend\ndef two_layers\n  outer_apply do\n    \"the block's value\"\n  end\nend\nputs two_layers\ndef accumulating\n  mutable count = 0\n  outer_apply do\n    count += 1\n  end\n  outer_apply do\n    count += 10\n  end\n  count\nend\nputs accumulating\ndef returning_through_two\n  outer_apply do\n    return \"through both layers\"\n  end\n  \"never\"\nend\nputs returning_through_two\ndef twice\n  yield\n  yield\n  \"twice done\"\nend\ndef delegate_twice\n  mutable log = []\n  twice do\n    inner_apply do\n      log << \"ran\"\n    end\n  end\n  log.length\nend\nputs delegate_twice\n",
+    );
+}
+
 /// The legal side of ADR 0001's line, through the trio (#45): everything
 /// here must RUN, because enforcement that over-refuses is worse than none.
 /// A failed guard discards its captures so the next branch binds them fresh;

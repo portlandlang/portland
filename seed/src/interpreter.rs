@@ -139,9 +139,13 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// fresh scope, so yielding into the method's own scope would hide the
     /// caller's locals — a block closes over where it was written, not where
     /// it is run. Saved and restored around each call, like `self_receiver`.
-    /// The trailing depth is the frame the block was written in, which is
-    /// where a `return` inside it unwinds to (ADR 0025).
-    current_block: Option<(Block, HashMap<String, Binding>, usize)>,
+    ///
+    /// Shared (`Rc<RefCell>`) rather than owned, because the same handed
+    /// block is reachable from two places at once — the frame that received
+    /// it, and the closure of any block written in that frame (#49) — and a
+    /// `yield`'s scope write-back must land in the one canonical copy, or an
+    /// accumulator stops accumulating the moment a yield delegates.
+    current_block: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     variables: HashMap<String, Binding>,
@@ -168,6 +172,18 @@ struct EnumInfo {
 struct Binding {
     mutable: bool,
     value: Value,
+}
+
+/// A block in flight: the block itself and its closure — the scope, frame
+/// (ADR 0025), and handed block (#49) of the method that *wrote* it.
+struct HandedBlock {
+    block: Block,
+    home: usize,
+    /// The writer's own handed block — what a `yield` inside this block
+    /// reaches, the way Ruby's `yield` always means the lexically enclosing
+    /// method's block.
+    outer: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
+    scope: HashMap<String, Binding>,
 }
 
 impl Interpreter {
@@ -1006,43 +1022,63 @@ impl<W: std::io::Write> Interpreter<W> {
                 // in for the duration and put back after — the same shape as
                 // `self_receiver`, and for the same reason: a nested call
                 // must not see its caller's block.
-                // The home depth travels with the block: written here, so a
-                // `return` inside it unwinds back to *this* frame — or to
-                // this block's own writer, when it is written inside one.
-                let handed = block
-                    .clone()
-                    .map(|block| (block, self.variables.clone(), self.home_depth));
-                let handed_one = handed.is_some();
-                let outer = std::mem::replace(&mut self.current_block, handed);
+                //
+                // The closure snapshot is three things: the writer's scope,
+                // the writer's frame (ADR 0025), and the writer's own handed
+                // block, which is what a `yield` written inside this block
+                // reaches (#49).
+                let handed = block.clone().map(|block| {
+                    std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
+                        block,
+                        home: self.home_depth,
+                        outer: self.current_block.clone(),
+                        scope: self.variables.clone(),
+                    }))
+                });
+                let outer = std::mem::replace(&mut self.current_block, handed.clone());
                 let result = self.call(name, arguments, keyword_arguments);
                 // What the block rebound belongs to the caller, not to the
                 // method that yielded — `call` has just restored the caller's
-                // scope, so the block's version of it goes back on top. That
-                // is the accumulator pattern working through `yield`.
-                if handed_one && let Some((_, scope, _)) = self.current_block.take() {
-                    self.variables = scope;
+                // scope, so the block's version of it goes back on top. Read
+                // from our own handle: shared, so delegated yields' write-
+                // backs are already in it.
+                if let Some(handed) = handed {
+                    self.variables = handed.borrow().scope.clone();
                 }
                 self.current_block = outer;
                 result
             }
-            // `yield` — run the block this method was handed, in the scope
-            // that block was written in.
+            // `yield` — run the block this method was handed, in the scope,
+            // frame, and block context that block was written in.
             Expression::Yield(_) => {
-                let Some((block, written_in, home)) = self.current_block.clone() else {
+                let Some(handed) = self.current_block.clone() else {
                     panic!("yield without a block — this method was called without one");
+                };
+                let (block, written_in, home, written_under) = {
+                    let handed = handed.borrow();
+                    (
+                        handed.block.clone(),
+                        handed.scope.clone(),
+                        handed.home,
+                        handed.outer.clone(),
+                    )
                 };
                 let here = std::mem::replace(&mut self.variables, written_in);
                 // The block runs in its writer's frame for `return` purposes
-                // (ADR 0025), exactly as it runs in its writer's scope.
+                // (ADR 0025), exactly as it runs in its writer's scope — and
+                // under its writer's block, so a `yield` inside it delegates
+                // instead of re-entering itself (#49).
                 let yielding_home = std::mem::replace(&mut self.home_depth, home);
+                let yielding_block = std::mem::replace(&mut self.current_block, written_under);
                 let result = self.run_block(&block, Vec::new());
+                self.current_block = yielding_block;
                 self.home_depth = yielding_home;
                 // Whatever the block rebound stays rebound: blocks rebind
-                // outer mutables, which is the accumulator pattern (ADR 0001).
+                // outer mutables, which is the accumulator pattern (ADR
+                // 0001). The write-back lands in the shared cell, where the
+                // writer's frame will find it too.
                 let after = std::mem::replace(&mut self.variables, here);
-                if let Some((_, scope, _)) = self.current_block.as_mut() {
-                    *scope = after;
-                }
+                handed.borrow_mut().scope = after;
                 result
             }
         }
