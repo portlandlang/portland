@@ -330,6 +330,8 @@ Method chains continue across newlines with a leading dot.
 
 **IO** is `puts` (one line per argument, produces no value), `p` (prints `inspect` renderings and returns its argument, like Ruby), and crude file access: `argv()`, `read_file(path)`, `write_file(path, content)`. Those three are placeholder names until the real object model exists.
 
+**`inspect(value)`** is `p` without the printing — the source-shaped rendering as a string, for composing into messages. A function rather than Ruby's method, because absence is its most important input and nil has no methods (ADR 0026); `inspect(nil)` is `"nil"`.
+
 Comments are `#` to end of line. Names are `snake_case`, and `?`/`!` suffixes are part of the name.
 
 ## Style

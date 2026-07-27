@@ -27,6 +27,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
+- [`inspect` is a function, not a method](inspect.md) — the rendering is Ruby's, the spelling is `inspect(value)` — a function, because Portland's nil has no methods and absence is inspect's most important input.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
