@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Hosted loops stop being quadratic — dead triples compact at iteration boundaries** ([#62](https://github.com/portlandlang/portland/issues/62), first half) — every rebinding is a prepend, so `i += 1` in a loop shadowed the previous iteration's triple instead of replacing it, and after 2,000 iterations `lookup` walked 2,000 dead entries on every bare name. `compacted_since` now deduplicates after each `while` iteration and each block-call pass, keeping the newest triple per name and touching only the region added since the construct's entry — everything below is shared suffix, which is what keeps the added-entries arithmetic in `flow_back` and `refuse_task_rebinds` exact. Zero observable semantics: full suite and spec suite unchanged on both oracles. The scaling probe — `bench/failures.pdx` with its loop at 2,000 iterations instead of 60 — goes **172.6s → 6.1s** hosted, and linear-from-60 predicts ~7.9s, so the superlinearity is gone, not just reduced. The quick tier, same session, before and after:
+
+  | workload | hosted before (s) | hosted after (s) | ratio before | ratio after |
+  |----------|------------------:|-----------------:|-------------:|------------:|
+  | append   |             7.223 |            5.074 |         230x |        165x |
+  | blocks   |             1.979 |            1.363 |         114x |         81x |
+  | failures |             0.377 |            0.238 |          82x |         61x |
+  | patterns |             0.246 |            0.185 |          71x |         53x |
+  | structs  |             0.425 |            0.260 |          97x |         69x |
+
 - **`script/bench` exists, and the baseline is honestly ugly** ([#25](https://github.com/portlandlang/portland/issues/25)'s harness) — six workloads in `bench/`, each run on both oracles, medians reported with the hosted/direct ratio that Stage 2 exists to crush. The harness doubles as a differential: outputs are compared across oracles, so a workload can never get faster by getting wrong. The first scoreboard, taken knowing it would be unflattering so improvements have something to be measured against:
 
   | workload | direct (s) | hosted (s) | hosted/direct |

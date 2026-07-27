@@ -163,6 +163,7 @@ def refuse_task_rebinds(before, after)
 end
 
 def evaluate_while(node, mutable bindings)
+  entry = bindings
   while true
     condition = evaluate_expression(node.condition, bindings)
     bindings = condition.bindings
@@ -172,7 +173,10 @@ def evaluate_while(node, mutable bindings)
     # applied to `while` (ADR 0001). Names first bound in the body die here,
     # so the next iteration binds them fresh; rebindings of names that
     # existed before the body flow through, which is what flow_back keeps.
+    # What it keeps is a fresh shadow per iteration, so the shadowed dead
+    # triples are compacted away before the next pass (#62).
     bindings = flow_back(bindings, bindings, body.bindings)
+    bindings = compacted_since(entry, bindings)
     break if body.signal == "break"
     return return_outcome(body.value, bindings, body.target) if body.signal == "return"
   end
@@ -439,6 +443,32 @@ def match_struct(pattern, subject, bindings)
     index += 1
   end
   captures
+end
+
+# Every rebinding is a prepend (the shadow-stack rule), so a loop that
+# rebinds a name leaves the previous iteration's triple behind it, dead: the
+# newer one in front is all lookup can ever reach. Dropping those dead
+# triples at each iteration boundary caps the ledger at the loop's steady
+# state instead of growing it by every iteration, which is what made hosted
+# loops quadratic (#62).
+#
+# Only the region added since `entry` is deduplicated — first (newest) triple
+# per name kept, in place. Everything at or below the entry is untouched
+# shared suffix, which is what keeps the added-entries arithmetic elsewhere
+# exact: flow_back and refuse_task_rebinds mark scopes that always sit at or
+# below the loop's entry, so the entries they walk are dropped by no one.
+def compacted_since(entry, bindings)
+  added_count = bindings.length - entry.length
+  return bindings if added_count < 2
+  mutable kept = []
+  mutable index = 0
+  while index < added_count
+    triple = bindings[index]
+    kept << triple if lookup(kept, triple[0]).empty?
+    index += 1
+  end
+  return bindings if kept.length == added_count
+  kept + bindings.slice(added_count, bindings.length - added_count)
 end
 
 # Bindings are [name, kind, payload] triples — kind is "local" or "method".
@@ -1337,6 +1367,10 @@ end
 # repetition is deliberate; the host `break` has to live inside each host
 # block to stop it.
 def evaluate_block_call(node, receiver, arguments, mutable scope)
+  # Each pass's rebindings flow back as fresh shadows, so the pass boundary
+  # compacts them the way a while iteration does (#62) — dead triples from
+  # earlier passes drop, everything at or below this call's entry stays.
+  entry = scope
   block = node.block
   mutable interrupt = nil
   case node.name
@@ -1344,7 +1378,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     if block.parameters.length == 2
       receiver.each do |first, second|
         step = run_guest_block(block, [first, second], scope)
-        scope = step.bindings
+        scope = compacted_since(entry, step.bindings)
         if step.signal != "none"
           interrupt = step
           break
@@ -1353,7 +1387,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     else
       receiver.each do |element|
         step = run_guest_block(block, [element], scope)
-        scope = step.bindings
+        scope = compacted_since(entry, step.bindings)
         if step.signal != "none"
           interrupt = step
           break
@@ -1365,7 +1399,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "map"
     results = receiver.map do |element|
       step = run_guest_block(block, [element], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1380,7 +1414,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "select"
     results = receiver.select do |element|
       step = run_guest_block(block, [element], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1392,7 +1426,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "reject"
     results = receiver.reject do |element|
       step = run_guest_block(block, [element], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1404,7 +1438,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "times"
     receiver.times do |index|
       step = run_guest_block(block, [index], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1415,7 +1449,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "each_with_index"
     receiver.each_with_index do |element, index|
       step = run_guest_block(block, [element, index], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1426,7 +1460,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "reduce"
     results = receiver.reduce(arguments.first) do |running, element|
       step = run_guest_block(block, [running, element], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1439,7 +1473,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "upto"
     receiver.upto(arguments.first) do |number|
       step = run_guest_block(block, [number], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
@@ -1450,7 +1484,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "downto"
     receiver.downto(arguments.first) do |number|
       step = run_guest_block(block, [number], scope)
-      scope = step.bindings
+      scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
         break
