@@ -1,6 +1,6 @@
-# 0027 — Recoverable errors: failure is absence with a reason
+# 0027 — Recoverable errors: failure is absence with a reason, and `!` propagates it
 
-- **Status:** Tentative (one of three competing drafts for [#28](https://github.com/portlandlang/portland/issues/28) — this, `begin/rescue`, and a hybrid; the branches not merged close unmerged)
+- **Status:** Accepted (chosen for [#28](https://github.com/portlandlang/portland/issues/28) over `begin/rescue` and the rescue-sugar hybrid, whose drafts closed unmerged; `!` settled with it, closing ADR 0015 §5's deferral. A decision — the build follows as its own arc.)
 - **Date:** 2026-07-27
 
 ## Context, shared by all three drafts
@@ -37,28 +37,21 @@ paths.each do |path|
   end
 end
 
-# Program 3 — the deep unwind: each frame passes the failure up, visibly
+# Program 3 — the deep unwind: `!` propagates, visibly, one frame at a time
 def load_settings(path)
-  content = read_file(path) or return failure_of(read_file(path))
-  parse_settings(content)
+  parse_settings(read_file!(path))
 end
 ```
 
 The `or`/or-guard semantics extend exactly as they extended from booleans to maybes (ADR 0007's "typed or"): a failure on the left takes the right side. A stored failure is a value — it can sit in an array, print with `p`, match in a pattern — because it *is* one.
 
+**And `!` is settled here, with it** — the suffix ADR 0015 §5 deferred becomes **unwrap-or-propagate**: `read_file!(path)` yields the content, or returns the failure from the enclosing method. It is sugar over the or-guard (bind on success, return the failure on failure), it is one character per frame a failure may cross, and it makes `grep '!'` the audit of every propagation path the way `grep panic` audits every accepted crash. A failure never crosses a frame that did not mark it: delete the `!` and the failure is a plain return value at that boundary, handled with `or` or `case` like any other.
+
 ## The trade, stated plainly
 
 **Bought:** every failure path is **visible at the call site and greppable** — program 3's propagation is written, not flown, which keeps the `grep panic` property for recoverable errors too. Zero new control-flow constructs; #9 can check exhaustive handling of failures exactly as it will check maybes, with no effect system.
 
-**Spent:** ceremony, and program 3 is where it bites — the draft's `or return failure_of(...)` spelling is honest about the wart: each intermediate frame must re-state the propagation, and without sugar the re-spelling is awkward (the example calls the fallible operation twice, which is wrong; the real shape needs a binding form). **This is the strongest argument for settling the deferred `!` here** (ADR 0015 §5): `content = read_file!(path)` as *unwrap-or-propagate* — one suffix character marking exactly the call sites a failure can pass through, which makes `grep '!'` the audit of every propagation path the way `grep panic` audits every accepted crash. With `!`, program 3 collapses to:
-
-<!-- not-portland: the `!` propagation sugar this draft proposes alongside -->
-
-```ruby
-def load_settings(path)
-  parse_settings(read_file!(path))
-end
-```
+**Spent:** ceremony at every unpropagated handling site — `case/in` where Ruby wrote nothing at all — and a real idiom migration for rescuing code. What would have been the sharpest cost, deep-unwind ceremony at every intermediate frame, is what settling `!` removes: propagation is a character, and the census's fastest-growing rescue shape (rescue-to-re-raise, 24.4% of 2020+ gems) is that character written out longhand in Ruby today. The rescue-shaped *sugar* from the sibling hybrid draft is deliberately **not** taken now: sugar can be added when real Portland code pulls for it, and cannot be cheaply removed once shipped.
 
 ## Interactions
 
