@@ -1,0 +1,38 @@
+# `inspect` — the source-shaped rendering as a value, `p` without the
+# printing (ADR 0026).
+
+require_relative "spec_helper"
+
+struct Badge
+  label
+end
+
+context "inspect" do
+  describe "on the value kinds" do
+    specify "quotes a string, where to_s would not" do
+      expect("rose".inspect, "\"rose\"")
+    end
+
+    specify "keeps a symbol's colon, where to_s drops it" do
+      expect(:paid.inspect, ":paid")
+    end
+
+    specify "answers on nil — the third dispatch a maybe allows" do
+      expect(nil.inspect, "nil")
+    end
+
+    specify "writes a hash back the way it would be typed" do
+      expect({name: "pdx"}.inspect, "{name: \"pdx\"}")
+    end
+
+    specify "and a struct as its constructor would read" do
+      expect(Badge.new(label: "pdx").inspect, "Badge(label: \"pdx\")")
+    end
+  end
+
+  describe "composed into a message" do
+    specify "is what a failure line wants" do
+      expect("got #{nil.inspect}, not #{"nil".inspect}", "got nil, not \"nil\"")
+    end
+  end
+end

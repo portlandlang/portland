@@ -84,3 +84,8 @@ mutable collected = []
   collected << "#{index}:#{entry}"
 end
 puts collected.length.to_s
+
+# The source-shaped rendering, nil included (ADR 0026).
+puts "rose".inspect
+puts nil.inspect
+puts([1, "two"].inspect)

@@ -1207,8 +1207,9 @@ impl<W: std::io::Write> Interpreter<W> {
             if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
                 return Some(value.clone());
             }
-            // to_s and the maybe predicates fall through to the generic arms.
-            if !matches!(name, "nil?" | "some?" | "to_s") {
+            // to_s, inspect, and the maybe predicates fall through to the
+            // generic arms.
+            if !matches!(name, "nil?" | "some?" | "to_s" | "inspect") {
                 panic!("{struct_name} has no field {name}");
             }
         }
@@ -1377,6 +1378,11 @@ impl<W: std::io::Write> Interpreter<W> {
             // statically they belong to the maybe, not to nil.
             (_, "nil?", []) => Value::Boolean(matches!(receiver, Value::Nil)),
             (_, "some?", []) => Value::Boolean(!matches!(receiver, Value::Nil)),
+            // `inspect` joins them (ADR 0026): the debugging rendering must
+            // answer for the value you most need to see, which is this one.
+            // Ruby's spelling, at the deliberate cost of widening nil's
+            // method surface from two to three.
+            (_, "inspect", []) => Value::String(receiver.inspect()),
             (Value::Nil, name, _) => {
                 panic!("nil has no method {name} — handle the nil case first")
             }

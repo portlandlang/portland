@@ -1087,6 +1087,9 @@ def evaluate_method_call(node, mutable bindings)
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then rendered_to_s(receiver)
+  # `inspect` renders too (ADR 0026), and unlike to_s it answers on nil —
+  # the third dispatch a maybe allows, after nil? and some?.
+  when "inspect" then render_inspect(receiver)
   when "to_i" then receiver.to_i
   when "length" then receiver.length
   when "empty?" then receiver.empty?

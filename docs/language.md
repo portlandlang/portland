@@ -116,7 +116,7 @@ Constants needed no new concept: immutability already makes `MAX = 5` unrebindab
 
 The headline feature (ADRs 0005–0010, 0012). There is no ambient nil. Absence is one explicit case of a maybe, and it is typed.
 
-`nil` is a keyword literal with no methods — `nil.upcase` refuses and tells you to handle the nil case first, `puts nil` refuses, and it is not falsy because nothing is. `nil?` and `some?` work on every value; they are the one dispatch a maybe allows.
+`nil` is a keyword literal with almost no methods — `nil.upcase` refuses and tells you to handle the nil case first, `puts nil` refuses, and it is not falsy because nothing is. `nil?`, `some?`, and `inspect` work on every value; they are the three dispatches a maybe allows (ADR 0026), total over presence and absence by meaning — two ask which side you are on, the third names it in writing.
 
 **Partial operations return maybes** instead of panicking: `[].first`, `last`, `min`, `max`, out-of-range array and string indexing, and missing hash keys. `fetch` retired, because all three of its arities are the or-guard with lazy evaluation for free.
 
@@ -324,7 +324,7 @@ Read-only, and small on purpose.
 | Float      | `abs to_i`                                                                                                       |
 | Array      | `length first last empty? join include? sum min max sort slice` and `[index]`, negative indices included         |
 | Hash       | `length empty? key? keys values` and `[key]`                                                                     |
-| Everything | `to_s`, `nil?`, `some?`                                                                                          |
+| Everything | `to_s`, `nil?`, `some?`, and `inspect` — the source-shaped rendering, `p` without the printing (ADR 0026)        |
 
 Method chains continue across newlines with a leading dot.
 
