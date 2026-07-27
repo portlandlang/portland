@@ -39,6 +39,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0025](0025-2026-07-27-return-unwinds-to-its-write-site.md) — `return` unwinds to the method it was written in
 - [0026](0026-2026-07-27-inspect-as-a-function.md) — `inspect` is a function, because nil is its most important input
 - [0027](0027-2026-07-27-errors-as-typed-results.md) — Recoverable errors: failure is absence with a reason, and `!` propagates it
+- [0028](0028-2026-07-27-object-model-structs-and-traits.md) — The object model: structs stay the only type; traits carry shared behavior
 
 <!-- /generated -->
 

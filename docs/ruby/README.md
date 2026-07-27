@@ -31,6 +31,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [`inspect` is a function, not a method](inspect.md) — the rendering is Ruby's, the spelling is `inspect(value)` — a function, because Portland's nil has no methods and absence is inspect's most important input.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
+- [Sharing behavior: traits, not modules or superclasses](mixins-and-inheritance.md) — `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 - [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
