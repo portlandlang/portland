@@ -701,6 +701,16 @@ fn portland_evaluator_matches_the_seed_on_binding_rules() {
     );
 }
 
+/// `inspect(value)` (ADR 0026): p's rendering as a string, composable, nil
+/// included.
+#[test]
+fn portland_evaluator_matches_the_seed_on_inspect() {
+    assert_evaluator_matches_seed(
+        "evaluator_inspect.pdx",
+        "puts inspect(\"rose\")\nputs inspect(nil)\nputs inspect(:paid)\nputs inspect({name: \"pdx\"})\nputs inspect([1, \"two\"])\nputs inspect(some(nil))\nputs \"got #{inspect(nil)} and #{inspect(\"x\")}\"\nstruct Badge\n  label\nend\nputs inspect(Badge.new(label: \"pdx\"))\n",
+    );
+}
+
 /// Rendering parity (#39): the trio's tagged guest shapes — symbols,
 /// structs, enum cases — used to print raw (`{[__symbol__, name] => 1}`),
 /// so any program that displayed a symbol-keyed hash diverged. The trio now
