@@ -254,7 +254,7 @@ Statistics::LIMIT                      # naming → ::
 Statistics::Summary.new(mean: 2)       # both, in order
 ```
 
-`module` is a namespace and **nothing else** (ADR 0021). Mixins are deferred and will get a different keyword, so `include Comparable` and `include Math` can never be confused the way they are in Ruby.
+`module` is a namespace and **nothing else** (ADR 0021). Mixins are decided and unbuilt: a `trait` is its own declaration kind, and `include` takes only traits (ADR 0028) — so `include Comparable` and `include Math` can never be confused the way they are in Ruby, because including a namespace is a refusal with the rewrite named.
 
 **`::` names, `.` invokes** — a rule, not a convention. `Statistics::mean(x)` is a never-guess error.
 
@@ -348,6 +348,10 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
 ## Decided, not yet built
 
+- **Errors are typed results, and `!` propagates them** (ADR 0027, [#59](https://github.com/portlandlang/portland/issues/59) builds it). Failure is absence with a reason: a fallible operation returns its value or a `failure`, and the unwrap toolkit above already handles it — `or` takes a fallback, `case/in` destructures the reason, and `read_file!(path)` yields the content or returns the failure from the enclosing method, one greppable character per frame a failure may cross. There is no `raise`, no `rescue`, and no flight: a failure never crosses a frame that did not mark it.
+
+- **Traits carry shared behavior** (ADR 0028, [#60](https://github.com/portlandlang/portland/issues/60) builds it). A `trait` is a bundle of methods with no state; a struct `include`s it, trait methods resolve after the struct's own, and a collision between two included traits is a refusal naming both. No inheritance, no `class`, no subtyping — declined, not deferred.
+
 - **Concurrency** (ADRs 0002, 0004, 0011 — tentative). Three tiers, and you live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` spreads across cores when it is worth it and you never asked. Tier two declares independence:
 
   <!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
@@ -366,7 +370,7 @@ Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose w
 
 ## Not yet designed
 
-The rest of the object model — mixins, inheritance, visibility (#27), error handling and the deferred `!` (#28), compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9).
+Visibility, compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), and error handling stopped being on this list on 2026-07-27 (ADR 0027).
 
 ## Gone, on purpose, forever
 

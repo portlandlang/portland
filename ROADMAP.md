@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
-**Next:** the object model (#27) or error handling (#28). Symbols, hash shorthand, and enums closed out on 2026-07-25 — seed and trio, differentially pinned.
+**Next:** build what 2026-07-27 decided — typed results with `!` ([#59](https://github.com/portlandlang/portland/issues/59)) and traits ([#60](https://github.com/portlandlang/portland/issues/60)). The decisions themselves (ADRs 0026–0028: `inspect`, errors, the object model) landed by competing draft PRs, closed siblings recording the roads not taken.
 
 ## Done 🎉
 
@@ -34,6 +34,10 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 | Bitwise operators out; named methods instead                 | [0003](docs/adr/0003-2026-07-20-bitwise-operators-out.md) _tentative_                                                                                                                                                                                                                           | ✅              |
 | Paren-less calls: command calls, no-shadow, never-guess      | pre-log                                                                                                                                                                                                                                                                                         | ✅              |
 | Structs, methods in struct bodies, builtin type patterns     | [#27](https://github.com/portlandlang/portland/issues/27) first increment                                                                                                                                                                                                                       | ✅              |
+| `return` unwinds to its write site, through yield            | [0025](docs/adr/0025-2026-07-27-return-unwinds-to-its-write-site.md)                                                                                                                                                                                                                            | ✅              |
+| `inspect(value)` — p without the printing                    | [0026](docs/adr/0026-2026-07-27-inspect-as-a-function.md)                                                                                                                                                                                                                                       | ✅              |
+| Errors as typed results; `!` is unwrap-or-propagate          | [0027](docs/adr/0027-2026-07-27-errors-as-typed-results.md)                                                                                                                                                                                                                                     | ⬜ [#59](https://github.com/portlandlang/portland/issues/59) |
+| The object model: structs and traits, `include`              | [0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md)                                                                                                                                                                                                                             | ⬜ [#60](https://github.com/portlandlang/portland/issues/60) |
 
 ### The implementation
 
@@ -61,9 +65,10 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [#27](https://github.com/portlandlang/portland/issues/27) — the object model: mixins, inheritance, visibility
-- [#28](https://github.com/portlandlang/portland/issues/28) — error handling: exceptions vs typed results; decides the deferred `!`
+- [#59](https://github.com/portlandlang/portland/issues/59) — build typed results: `failure()`, the toolkit extension, `!` (ADR 0027 decided it)
+- [#60](https://github.com/portlandlang/portland/issues/60) — build traits: `trait`, `include`, the resolution rung (ADR 0028 decided it)
 - [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
+- Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#11](https://github.com/portlandlang/portland/issues/11) — `together` semantics, serial implementation first
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
 - Regex — undecided, and a real hole
