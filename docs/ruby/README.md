@@ -26,6 +26,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
+- [Error handling: rescue by pattern, not by ancestry](errors.md) — `begin/rescue` survives, but errors are plain struct values and `rescue` filters with a pattern; the rescue modifier, bare `retry`, and ancestry filtering are gone.
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.

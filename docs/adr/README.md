@@ -37,6 +37,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0023](0023-2026-07-25-symbols.md) — Symbols: a general type, checked against declared vocabularies
 - [0024](0024-2026-07-26-brace-after-a-call-name.md) — Brace blocks attach wherever `do` blocks do
 - [0025](0025-2026-07-27-return-unwinds-to-its-write-site.md) — `return` unwinds to the method it was written in
+- [0027](0027-2026-07-27-errors-as-rescue-blocks.md) — Recoverable errors: `begin/rescue`, Portland-shaped _(tentative)_
 
 <!-- /generated -->
 
