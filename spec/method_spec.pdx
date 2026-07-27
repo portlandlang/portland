@@ -20,6 +20,14 @@ def apply
   yield
 end
 
+# A `yield` written inside a block reaches the block of *its* enclosing
+# method — Ruby's rule, and the shape that looped the seed forever until #49.
+def relay
+  apply do
+    yield
+  end
+end
+
 context "a method" do
   describe "its body" do
     specify "returns its last expression" do
@@ -54,6 +62,26 @@ context "a method" do
 
     specify "runs a brace block the same way" do
       expect(apply() { "from braces" }, "from braces")
+    end
+
+    # ADR 0025's closure rule paying off twice: the inner `yield` finds the
+    # writer's block, and the block's value rides back through both layers.
+    specify "delegates from inside a yielded block" do
+      handed = relay do
+        "handed through two layers"
+      end
+      expect(handed, "handed through two layers")
+    end
+
+    specify "and an accumulator flows through the delegation" do
+      mutable count = 0
+      relay do
+        count += 1
+      end
+      relay do
+        count += 10
+      end
+      expect(count, 11)
     end
   end
 end
