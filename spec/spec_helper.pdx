@@ -68,28 +68,18 @@ def specify(behavior)
   yield
 end
 
-# Absence has no methods, `to_s` included (ADR 0005/0006), so a value that may
-# be nil cannot go straight into an interpolation. Several examples expect nil,
-# and without this a regression in any of them would panic with `nil has no
-# method to_s` — a message pointing at the harness rather than the example, and
-# a panic stopping the run at the first failure, which is the property this
-# harness exists to keep. Found by inverting `expect` to check every example
-# still fails when it should; the probe crashed instead of reporting.
-#
-# A workaround for having no `inspect` ([#38]), and it should be deleted rather
-# than generalised when that lands: this renders via `to_s`, and `inspect` means
-# something else — `to_s` on a string has no quotes and `inspect` does.
-def shown(value)
-  return "nil" if value.nil?
-
-  "#{value}"
-end
-
 # One countable line per failure, indented under the example it belongs to, so
 # the runner can find it and a reader can see which example it came from
 # without the message having to repeat the description.
+#
+# `inspect` rather than interpolation ([#38]): a failure message must tell
+# `"ROSE"` from `:ROSE` from `ROSE`-the-output-of-something, and it must
+# survive an expected nil — which interpolation cannot render at all, since
+# absence has no methods, `to_s` included (ADR 0005/0006). A `shown` helper
+# used to paper over exactly that, and this is the deletion its comment
+# asked for.
 def expect(actual, expected)
   return if actual == expected
 
-  puts "  FAIL expected #{shown(expected)}, got #{shown(actual)}"
+  puts "  FAIL expected #{inspect(expected)}, got #{inspect(actual)}"
 end
