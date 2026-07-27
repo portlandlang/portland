@@ -1,6 +1,6 @@
-# 0027 — The object model: structs stay the only type; traits carry shared behavior
+# 0028 — The object model: structs stay the only type; traits carry shared behavior
 
-- **Status:** Tentative (one of two competing drafts for [#27](https://github.com/portlandlang/portland/issues/27) — this and single inheritance; the branches not merged close unmerged)
+- **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. A decision — the build follows as its own arc.)
 - **Date:** 2026-07-27
 
 ## Context, shared by both drafts
@@ -11,9 +11,11 @@ Both drafts answer the same worked example — the trio's nodes sharing their re
 
 ## Decision (this draft)
 
-**Structs stay the only concrete type. Shared behavior lives in traits: bundles of methods a struct carries.** There is no inheritance, no `class`, no subtyping — a struct is exactly its declaration, plus the methods its traits contribute. ADR 0021 §5 already promised this shape: mixins were deferred *with the note that they would get their own keyword*, so `module` (a namespace, nothing else) can never blur into `include Comparable` the way Ruby's one keyword serves both masters.
+**Structs stay the only concrete type. Shared behavior lives in traits: bundles of methods a struct includes.** There is no inheritance, no `class`, no subtyping — a struct is exactly its declaration, plus the methods its traits contribute. ADR 0021 §5 already promised the load-bearing half of this shape: mixins were deferred with the note that they would get their own **declaration** keyword, so `module` (a namespace, nothing else) can never blur into a mixin the way Ruby's one keyword serves both masters.
 
-<!-- not-portland: this draft's proposed syntax; nothing here is built -->
+**The verb is Ruby's `include`, and that is safe *because* the noun is new.** Ruby's confusion was never the word `include` — it was that `include Comparable` (mix in behavior) and `include Math` (inject a namespace) are the same operation on the same kind of thing. With `trait` and `module` as distinct declarations, the never-guess check moves to the operand and the confusion cannot be spelled: `include Describable` mixes in a trait; `include Statistics` is a refusal with the rewrite named — a namespace is never injected, write `Statistics.mean(...)`. Forty years of muscle memory kept, at the cost of nothing.
+
+<!-- not-portland: this ADR's decided syntax; nothing here is built -->
 
 ```ruby
 trait Sexpable
@@ -25,7 +27,7 @@ end
 struct ArrayNode
   elements
 
-  carries Sexpable
+  include Sexpable
 
   def sexp
     "(array #{sexp_list(elements)})"
@@ -35,7 +37,7 @@ end
 struct HashNode
   pairs
 
-  carries Sexpable
+  include Sexpable
 
   def sexp
     "(hash #{sexp_list(pairs)})"
@@ -47,9 +49,9 @@ The rules, each an application of an existing one:
 
 - **A trait has methods only** — no fields, no state; a struct's shape stays entirely in its own declaration, so `with`, value equality, and construction are untouched.
 - **Trait methods resolve after the struct's own** — locals → fields → own methods → trait methods → top-level, extending the existing ladder by one rung; a collision between two carried traits is a **no-shadow refusal naming both**, never Ruby's silent last-include-wins.
-- **`carries` is not `include`** — it appears in struct bodies only, it is not a runtime call, and there is no `Module.ancestors` to inspect: which traits a struct carries is compile-time information, like its fields.
+- **`include` is a declaration, not a call** — it appears in struct bodies only, it is not a runtime operation, and there is no `Module.ancestors` to inspect: which traits a struct includes is compile-time information, like its fields. Same spelling as Ruby; none of the mechanics.
 - **Type patterns stay concrete** — `in ArrayNode` works as today; whether `in Sexpable` (match by capability) exists is deferred until #9 can check it, noted rather than smuggled.
-- The keyword pair `trait`/`carries` is a proposal, not a hill; the shape is the decision.
+- `trait` as the declaration word is settled with the shape; it reads right and no Ruby meaning collides with it.
 
 ## The trade, stated plainly
 

@@ -1,8 +1,8 @@
 # Sharing behavior: traits, not modules or superclasses
 
-**Summary:** `include`/`extend`/`prepend` and subclassing are gone; a struct `carries` traits — method bundles with no state, resolved after the struct's own methods, collisions refused by name.
+**Summary:** `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.
 
-**Status:** tentative ([ADR 0027](../adr/0027-2026-07-27-object-model-structs-and-traits.md), one of two competing drafts for [#27](https://github.com/portlandlang/portland/issues/27)).
+**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md)). Not yet built — the build is its own arc.
 
 ## Ruby
 
@@ -18,11 +18,11 @@ class ArrayNode < Node
 end
 ```
 
-One keyword (`module`) serves namespacing and mixing-in; `include` is a runtime call; method conflicts resolve silently by ancestor order; `class << self` opens a singleton for good measure.
+One keyword (`module`) serves namespacing and mixing-in, so `include Comparable` (behavior) and `include Math` (namespace injection) are the same operation; method conflicts resolve silently by ancestor order; `class << self` opens a singleton for good measure.
 
-## Portland (this draft)
+## Portland
 
-<!-- not-portland: proposed syntax from a tentative ADR; nothing here is built -->
+<!-- not-portland: decided syntax from ADR 0028; nothing here is built -->
 
 ```ruby
 trait Sexpable
@@ -34,16 +34,17 @@ end
 struct ArrayNode
   elements
 
-  carries Sexpable
+  include Sexpable
 end
 ```
 
-Namespaces and mixins can never be confused, because they never shared a keyword (ADR 0021 kept `module` a namespace and nothing else, promising mixins their own word).
+The verb is Ruby's; the safety is in the noun. `trait` and `module` are distinct declarations, so `include Statistics` — a namespace — is a refusal with the rewrite named: namespaces are never injected, write `Statistics.mean(...)`. Ruby's two meanings of `include` cannot be spelled.
 
 ## Migrating
 
-- `include Comparable`-style capability modules — become traits, nearly verbatim; methods-only modules port cleanly.
+- `include Comparable`-style capability modules — become traits, often **zero-character** at the include site: the module body moves under `trait`, and the `include` line does not change. The shim gem ([#36](https://github.com/portlandlang/portland/issues/36)) can even rehearse the strictness in Ruby: `extend Portland::Trait` on a module makes collisions raise at class-definition time.
 - Modules with state (`@memo` in a mixin) — do not port; state belongs to the struct that declares it.
-- Subclassing — flattens: shared behavior into traits, shared *shape* into composition or duplication. This is the real cost, and this draft pays it on purpose.
-- `class << self` (17/50 gems) — becomes module functions; namespaces already invoke with `.`.
-- Conflicting methods from two mixins — no longer silent: carrying both is a refusal naming the collision.
+- `include Math`-style namespace injection — a refusal; write the qualified call.
+- Subclassing — flattens: shared behavior into traits, shared *shape* written out per struct. This is the real cost, and ADR 0028 pays it on purpose.
+- `class << self` (17% of gems at n=50) — becomes module functions; namespaces already invoke with `.`.
+- Conflicting methods from two mixins — no longer silent: including both is a refusal naming the collision.
