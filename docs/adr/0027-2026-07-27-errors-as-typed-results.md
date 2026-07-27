@@ -5,7 +5,9 @@
 
 ## Context, shared by all three drafts
 
-`panic` is deliberately unrecoverable — the only crash is one you typed (ADR 0010) — and Portland has no story for errors a program should *survive*. The first genuinely fallible operations are already here and currently panic: `read_file` on a missing path, `write_file` on a bad one, and every tool that parses many files and should report all failures rather than die at the first. The census at n=50: `begin` appears in 23 gems, `rescue nil` in 8, bare `retry` in 1.
+`panic` is deliberately unrecoverable — the only crash is one you typed (ADR 0010) — and Portland has no story for errors a program should *survive*. The first genuinely fallible operations are already here and currently panic: `read_file` on a missing path, `write_file` on a bad one, and every tool that parses many files and should report all failures rather than die at the first.
+
+The census, across all 195,390 gems on RubyGems.org with era cohorts (ruby_research, 2026-07): **38.5% of gems have a `rescue` clause** (45.4% of 2020+ gems), and raising outstrips rescuing — 48.6% of gems raise, and raise is 54% of all error-handling *sites* in modern code, up from 36% pre-2015. The constructs this decision must place: the rescue modifier sits at 8.2% of gems with its density collapsing by era (12.4 → 3.1 sites per 100k AST nodes), bare `retry` at 3.4% and halving, `ensure` at a real 12.0%. Two trend lines matter most: **40.2% of 2020+ gems define custom error classes** (up from 20.5% pre-2015) — the ecosystem is already moving toward typed, specific errors — and **33.1% of gems swallow an error somewhere**, the pathology invisible flight makes easy.
 
 Each draft answers the same three programs, so they can be read side by side: **a fallback** (read an optional config, default if absent), **collect-don't-stop** (check many files, report every failure), and **the deep unwind** (a helper three frames down fails; the top decides).
 
@@ -62,4 +64,5 @@ end
 
 - **#9 inference:** failure types are ordinary return types — inferred, not written; unhandled failures become the same compile error as unhandled maybes. No effect tracking needed, the cleanest #9 story of the three drafts.
 - **#11 `together`:** a task's failure is a value at the join point — no flight to intercept, the policy question shrinks to "which value".
-- **Migration:** the hardest of the three — `begin/rescue` has no direct equivalent, and the 23/50 gems using it rewrite handler-by-handler into `case/in` or `or` forms. The ledger entry records the rewrites; the honest note is that this is a different idiom, not a respelling.
+- **Migration:** the hardest of the three — `begin/rescue` has no direct equivalent, and the 38.5% of gems using it rewrite handler-by-handler into `case/in` or `or` forms. The ledger entry records the rewrites; the honest note is that this is a different idiom, not a respelling.
+- **The corpus tailwinds, named:** modern Ruby is already drifting this way. 40.2% of 2020+ gems define custom error classes — errors as specific, typed things, which is what a `failure` struct *is* with the flight removed. And rescue-to-re-raise is the fastest-growing rescue shape (17.2% of gems overall, 24.4% of 2020+): Ruby programmers already write propagation ceremony by hand, one `rescue => e; raise` at a time, which is exactly what `!` collapses to a character.
