@@ -52,12 +52,16 @@ pub enum TokenKind {
     String,
     /// `:name` — a symbol literal (ADR 0023). Its `text` includes the colon.
     Symbol,
+    /// `~` — a task line inside `together` (ADRs 0002, 0029), and nothing
+    /// else anywhere: ADR 0003 cut the bitwise readings that would have
+    /// contested it.
+    Tilde,
     WordArray,
 }
 
 /// The Stage 0 keyword set — grows as the subset does.
 #[rustfmt::skip]
-const KEYWORDS: [&str; 29] = [
+const KEYWORDS: [&str; 31] = [
     "and",
     "break",
     "case",
@@ -71,6 +75,7 @@ const KEYWORDS: [&str; 29] = [
     "if",
     "in",
     "include",
+    "meanwhile",
     "module",
     "mutable",
     "next",
@@ -81,6 +86,7 @@ const KEYWORDS: [&str; 29] = [
     "self",
     "struct",
     "then",
+    "together",
     "trait",
     "true",
     "unless",
@@ -225,10 +231,11 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..=closing],
                 });
             }
-            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' => {
+            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' | '~' => {
                 chars.next();
                 let next = chars.peek().map(|&(_, following)| following);
                 let (kind, length) = match (character, next) {
+                    ('~', _) => (TokenKind::Tilde, 1),
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
                     ('&', Some('.')) => (TokenKind::AmpersandDot, 2),
                     ('&', _) => panic!("unexpected character '&' at byte {start}"),

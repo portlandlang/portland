@@ -371,21 +371,23 @@ Emerging rather than settled — this section describes how the trio is actually
 
 Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose when they are dead-identical, and how much to lean on postfix guards. Both wait on more real Portland to look at.
 
+## Concurrency
+
+Three tiers, and you will live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` will spread across cores when it is worth it and you never asked. **Tier two runs today** — serially, with its semantics decided and pinned, so the eventual scheduler must match it (ADR 0029):
+
+```ruby
+together do
+  meanwhile user = fetch_user(id)
+  ~ orders = recent_orders(id)      # ~ and meanwhile are dead-identical
+end
+render(user, orders)                # plain values after end
+```
+
+The rules are the language's rules, applied: task names bind **at the `end`** and not before, so nothing can read a result that is not there yet; a task cannot see a sibling's name, because independence is the declaration; a failed task binds its `failure` to its name, handled after the join with the toolkit — siblings always run to completion; nothing unwinds across the join (`return`, `break`, `!` inside a task refuse); a task cannot rebind an outer `mutable`, which is safe-because-immutable as a rule rather than a slogan; and `together` produces nothing, its answer being the names. Plain lines interleave freely, their locals dying at `end`. Cross-task effect ordering is deliberately unpromised — that is the room the scheduler will live in.
+
+Tier three — cancellation, timeouts, racing — is future work, rare by design.
+
 ## Decided, not yet built
-
-- **Concurrency** (ADRs 0002, 0004, 0011 — tentative). Three tiers, and you live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` spreads across cores when it is worth it and you never asked. Tier two declares independence:
-
-  <!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
-
-  ```ruby
-  together do
-    meanwhile user = fetch_user(id)
-    ~ orders = recent_orders(id)      # ~ and meanwhile are dead-identical
-  end
-  render(user, orders)                # plain values after end
-  ```
-
-  Results are named at the task site — there is no positional register. Tier three is explicit control: cancellation, timeouts, racing. Rare. Semantics are #11.
 
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
 

@@ -96,6 +96,7 @@ def evaluate_statement(node, bindings)
   in BreakNode then signal_outcome("break", [], bindings)
   in NextNode then signal_outcome("next", [], bindings)
   in WhileNode then evaluate_while(node, bindings)
+  in TogetherNode then evaluate_together(node, bindings)
   in AssignmentNode(name:, value:)
     step = evaluate_expression(value, bindings)
     # An or-guard diverted (`x = f() or return`): skip the binding, unwind.
@@ -117,6 +118,47 @@ def evaluate_statement(node, bindings)
   in ModuleDefNode then evaluate_module(node, bindings)
   else
     evaluate_expression(node, bindings)
+  end
+end
+
+# `together do ... end` (ADR 0029): serial today, and the oracle the
+# parallel build must match on everything promised. Task expressions run in
+# line order; names bind at the join; nothing unwinds across it; no outer
+# mutable moves inside a task.
+def evaluate_together(node, mutable bindings)
+  entry = bindings
+  mutable joined = []
+  node.lines.each do |line|
+    if line in TaskLineNode
+      before = bindings
+      step = evaluate_expression(line.value, bindings)
+      panic("a task cannot unwind across the join — bind a name and handle it after end") unless step.signal == "none"
+      panic("task #{line.name} produced no value") if step.value.empty?
+      refuse_task_rebinds(before, step.bindings)
+      bindings = step.bindings
+      joined << [line.name, slot_value(step.value)]
+    else
+      step = evaluate_statement(line, bindings)
+      panic("nothing unwinds out of together — the join comes first") unless step.signal == "none"
+      bindings = step.bindings
+    end
+  end
+  # Plain-line locals die at the end, like any block's.
+  bindings = flow_back(entry, entry, bindings)
+  joined.each do |pair|
+    bindings = assigned(pair[0], value_at(pair, 1), false, bindings)
+  end
+  outcome([], bindings)
+end
+
+# A task rebinding an outer mutable is refused (ADR 0029): walk the entries
+# its evaluation added; a preexisting mutable among them is one that moved.
+def refuse_task_rebinds(before, after)
+  mutable index = after.length - before.length - 1
+  while index >= 0
+    triple = after[index]
+    panic("a task cannot rebind an outer mutable — bind a name and combine after the join") if triple[1] == "mutable" && !lookup(before, triple[0]).empty?
+    index -= 1
   end
 end
 

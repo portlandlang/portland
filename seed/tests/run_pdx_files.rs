@@ -627,6 +627,27 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "struct S\n  x\n  include Missing\nend\n",
             "undefined trait Missing",
         ),
+        // ADR 0029's refusals: independence is enforced, not hoped for.
+        (
+            "together do\n  ~ x = 1\n  ~ x = 2\nend\n",
+            "two tasks bind x — every task line binds its own name",
+        ),
+        (
+            "~ x = 1\n",
+            "a task line belongs inside `together` — every task lives in the block that joins it",
+        ),
+        (
+            "together do\n  ~ 1 + 1\nend\n",
+            "a task line binds a name — write ~ name = ...",
+        ),
+        (
+            "mutable total = 0\ntogether do\n  ~ x = [1, 2].map { total += it }\nend\n",
+            "a task cannot rebind an outer mutable — bind a name and combine after the join",
+        ),
+        (
+            "def risky\n  failure(\"down\")\nend\ndef f\n  together do\n    ~ x = risky!\n  end\nend\nf\n",
+            "a task cannot unwind across the join — bind a name and handle it after end",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");
@@ -727,6 +748,18 @@ fn portland_evaluator_matches_the_seed_on_yield_delegation() {
     assert_evaluator_matches_seed(
         "evaluator_yield_delegation.pdx",
         "def inner_apply\n  yield\n  \"inner's answer\"\nend\ndef outer_apply\n  inner_apply do\n    yield\n  end\n  \"outer's answer\"\nend\ndef two_layers\n  outer_apply do\n    \"the block's value\"\n  end\nend\nputs two_layers\ndef accumulating\n  mutable count = 0\n  outer_apply do\n    count += 1\n  end\n  outer_apply do\n    count += 10\n  end\n  count\nend\nputs accumulating\ndef returning_through_two\n  outer_apply do\n    return \"through both layers\"\n  end\n  \"never\"\nend\nputs returning_through_two\ndef twice\n  yield\n  yield\n  \"twice done\"\nend\ndef delegate_twice\n  mutable log = []\n  twice do\n    inner_apply do\n      log << \"ran\"\n    end\n  end\n  log.length\nend\nputs delegate_twice\n",
+    );
+}
+
+/// `together` (ADR 0029, #11): serial fork-join — task names bind at the
+/// join, plain lines interleave, a failed task is a bound failure, and
+/// plain-line locals die at end. Only promised semantics appear here, so
+/// this differential survives the parallel build unchanged.
+#[test]
+fn portland_evaluator_matches_the_seed_on_together() {
+    assert_evaluator_matches_seed(
+        "evaluator_together.pdx",
+        "def fetch_user(id)\n  \"user-#{id}\"\nend\ndef recent_orders(id)\n  return failure(\"orders down\") if id == 0\n  [\"order-a\", \"order-b\"]\nend\ntogether do\n  greeting = \"hello\"\n  ~ user = fetch_user(7)\n  meanwhile orders = recent_orders(7)\n  puts \"#{greeting} from a plain line\"\nend\nputs user\nputs orders.length\ntogether do\n  ~ sad_orders = recent_orders(0)\nend\nputs sad_orders.failure?\np(sad_orders or \"no orders today\")\n",
     );
 }
 

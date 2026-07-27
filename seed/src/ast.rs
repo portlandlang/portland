@@ -61,6 +61,11 @@ pub enum Statement {
         methods: Vec<Statement>,
         name: String,
     },
+    /// `together do ... end` — structured fork-join (ADR 0029). Task lines
+    /// bind at the `end`; plain lines run as ordinary block statements.
+    Together {
+        lines: Vec<TogetherLine>,
+    },
     While {
         body: Vec<Statement>,
         condition: Expression,
@@ -92,6 +97,15 @@ pub enum LogicalOperator {
 pub enum UnaryOperator {
     Negate,
     Not,
+}
+
+/// One line of a `together` block (ADR 0029): a task declares independence
+/// and binds its name at the join; anything unmarked is an ordinary
+/// statement.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TogetherLine {
+    Plain(Statement),
+    Task { name: String, value: Expression },
 }
 
 /// What an or-guard does when the left side is absent (ADR 0007/0008):

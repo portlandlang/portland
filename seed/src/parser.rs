@@ -3,7 +3,7 @@
 
 use crate::ast::{
     BinaryOperator, Block, CaseBranch, Expression, GuardAction, InBranch, LogicalOperator,
-    Parameter, Pattern, Program, Statement, UnaryOperator,
+    Parameter, Pattern, Program, Statement, TogetherLine, UnaryOperator,
 };
 use crate::lexer::{self, Token, TokenKind};
 
@@ -229,6 +229,14 @@ impl<'source> Parser<'source> {
         }
         if self.peek_is_keyword("while") {
             return self.while_statement();
+        }
+        if self.peek_is_keyword("together") {
+            return self.together_block();
+        }
+        if self.peek_is_keyword("meanwhile") || self.peek_kind() == Some(TokenKind::Tilde) {
+            panic!(
+                "a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"
+            );
         }
         let statement = self.simple_statement();
         self.postfix_modifier(statement)
@@ -768,6 +776,56 @@ impl<'source> Parser<'source> {
             name,
             nested,
         }
+    }
+
+    /// `together do ... end` (ADR 0029): task lines (`~` / `meanwhile`)
+    /// bind their names at the `end`; unmarked lines are ordinary
+    /// statements.
+    fn together_block(&mut self) -> Statement {
+        self.position += 1; // the `together`
+        if !self.peek_is_keyword("do") {
+            panic!(
+                "together takes a do block — write together do ... end, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1; // the `do`
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let mut lines: Vec<TogetherLine> = Vec::new();
+        while !self.peek_is_keyword("end") {
+            if self.position >= self.tokens.len() {
+                panic!("expected end to close together");
+            }
+            if self.peek_is_keyword("meanwhile") || self.peek_kind() == Some(TokenKind::Tilde) {
+                self.position += 1; // the marker
+                let token = self.advance();
+                if token.kind != TokenKind::Identifier {
+                    panic!("a task line binds a name — write ~ name = ..., got {token:?}");
+                }
+                let name = token.text.to_string();
+                Self::refuse_bang_binding(&name);
+                if self.peek_kind() != Some(TokenKind::Equal) {
+                    panic!("a task line binds a name — write ~ {name} = ...");
+                }
+                self.position += 1; // the `=`
+                let value = self.expression();
+                if lines.iter().any(|line| {
+                    matches!(line, TogetherLine::Task { name: existing, .. } if *existing == name)
+                }) {
+                    panic!("two tasks bind {name} — every task line binds its own name");
+                }
+                lines.push(TogetherLine::Task { name, value });
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                continue;
+            }
+            lines.push(TogetherLine::Plain(self.statement()));
+            self.expect_statement_boundary();
+            self.skip_newlines();
+        }
+        self.position += 1; // the `end`
+        Statement::Together { lines }
     }
 
     /// `trait Name ... end` — methods only (ADR 0028): no fields, no state,

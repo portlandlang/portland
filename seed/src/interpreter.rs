@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::ast::{
     BinaryOperator, Block, Expression, GuardAction, LogicalOperator, Parameter, Pattern, Program,
-    Statement, UnaryOperator,
+    Statement, TogetherLine, UnaryOperator,
 };
 use crate::parser;
 use crate::value::Value;
@@ -558,6 +558,58 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.module_path.push(name.clone());
                     self.run_body(nested);
                     self.module_path.pop();
+                }
+                None
+            }
+            // `together do ... end` (ADR 0029): serial today, and the oracle
+            // the parallel build must match on everything promised. Task
+            // expressions run in line order; names bind at the join; nothing
+            // unwinds across it; no outer mutable moves inside a task.
+            Statement::Together { lines } => {
+                let preexisting: std::collections::HashSet<String> =
+                    self.variables.keys().cloned().collect();
+                let mut joined: Vec<(String, Value)> = Vec::new();
+                for line in lines {
+                    match line {
+                        TogetherLine::Plain(statement) => {
+                            self.statement(statement);
+                            if self.pending.is_some() {
+                                panic!("nothing unwinds out of together — the join comes first");
+                            }
+                        }
+                        TogetherLine::Task { name, value } => {
+                            let mutable_before: Vec<(String, Value)> = self
+                                .variables
+                                .iter()
+                                .filter(|(_, binding)| binding.mutable)
+                                .map(|(held, binding)| (held.clone(), binding.value.clone()))
+                                .collect();
+                            let result = self.expression(value);
+                            if self.pending.is_some() {
+                                panic!(
+                                    "a task cannot unwind across the join — bind a name and handle it after end"
+                                );
+                            }
+                            let Some(result) = result else {
+                                panic!("task {name} produced no value");
+                            };
+                            for (held, before) in &mutable_before {
+                                if let Some(binding) = self.variables.get(held)
+                                    && binding.value != *before
+                                {
+                                    panic!(
+                                        "a task cannot rebind an outer mutable — bind a name and combine after the join"
+                                    );
+                                }
+                            }
+                            joined.push((name.clone(), result));
+                        }
+                    }
+                }
+                // Plain-line locals die at the end, like any block's.
+                self.variables.retain(|name, _| preexisting.contains(name));
+                for (name, value) in joined {
+                    self.assign(&name, value, false);
                 }
                 None
             }

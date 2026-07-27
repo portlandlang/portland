@@ -2,7 +2,7 @@
 
 **Summary:** No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 
-**Status:** vocabulary decided-tentative ([ADR 0002](../adr/0002-2026-07-20-together-task-sigil.md), [ADR 0004](../adr/0004-2026-07-20-together-meanwhile.md)); semantics are [#11](https://github.com/portlandlang/portland/issues/11). Nothing implemented.
+**Status:** vocabulary decided ([ADR 0002](../adr/0002-2026-07-20-together-task-sigil.md), [ADR 0004](../adr/0004-2026-07-20-together-meanwhile.md)); semantics decided and built serially ([ADR 0029](../adr/0029-2026-07-27-together-semantics.md)) — the serial build is the oracle the parallel runtime must match. Tiers one and three remain future work.
 
 ## Ruby
 

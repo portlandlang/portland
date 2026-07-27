@@ -55,7 +55,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end enum false if in include module mutable next nil not or return self struct then trait true unless when while yield].include?(word)
+  %w[and break case def do else elsif end enum false if in include meanwhile module mutable next nil not or return self struct then together trait true unless when while yield].include?(word)
 end
 
 def two_character_operator?(pair)
@@ -68,7 +68,7 @@ def three_character_operator?(triple)
 end
 
 def one_character_operator?(character)
-  "(){}[],.:+-*/%<>=!|&^".include?(character)
+  "(){}[],.:+-*/%<>=!|&^~".include?(character)
 end
 
 # Does the colon at `index` open a symbol (ADR 0023)?

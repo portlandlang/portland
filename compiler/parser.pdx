@@ -583,6 +583,30 @@ struct StructDefNode
   end
 end
 
+# `together do ... end` — structured fork-join (ADR 0029). Lines are task
+# nodes or ordinary statements, in written order.
+struct TogetherNode
+  kind
+  lines
+
+  include Sexp
+
+  def sexp
+    headed_sexp("together", lines)
+  end
+end
+
+# One `~ name = expr` / `meanwhile name = expr` line.
+struct TaskLineNode
+  kind
+  name
+  value
+
+  def sexp
+    "(task #{name} #{value.sexp})"
+  end
+end
+
 # `trait Name ... end` — a bundle of methods with no state (ADR 0028).
 struct TraitDefNode
   kind
@@ -892,6 +916,14 @@ end
 
 def trait_def_node(name, methods)
   TraitDefNode.new(kind: "trait_def", name: name, methods: methods)
+end
+
+def together_node(lines)
+  TogetherNode.new(kind: "together", lines: lines)
+end
+
+def task_line_node(name, value)
+  TaskLineNode.new(kind: "task_line", name: name, value: value)
 end
 
 def module_def_node(path, body)
@@ -1671,11 +1703,16 @@ def parse_statement(tokens, position)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
+    when "together" then return parse_together(tokens, position + 1)
+    when "meanwhile" then return Step.new(node: error_node("a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"), position: skip_line_at(tokens, position))
     when "trait" then return parse_trait(tokens, position + 1)
     when "include" then return Step.new(node: error_node("`include` belongs inside a struct body — a trait is carried by a struct (ADR 0028)"), position: skip_line_at(tokens, position))
     when "enum" then return parse_enum(tokens, position + 1)
     when "module" then return parse_module(tokens, position + 1)
     end
+  end
+  if token.operator? && token.text == "~"
+    return Step.new(node: error_node("a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"), position: skip_line_at(tokens, position))
   end
   if token.identifier? && command_start?(tokens, position + 1)
     return parse_command(tokens, position)
@@ -2440,6 +2477,42 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: struct_def_node(name, fields, includes, methods, nested), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+# `together do ... end` (ADR 0029): task lines (`~` / `meanwhile`) bind
+# their names at the `end`; unmarked lines are ordinary statements.
+def parse_together(tokens, mutable position)
+  unless keyword_at?(tokens, position, %w[do])
+    return Step.new(node: error_node("together takes a do block — write together do ... end"), position: position)
+  end
+  position = skip_newlines_at(tokens, position + 1)
+  mutable lines = []
+  mutable task_names = []
+  while position < tokens.length && !keyword_at?(tokens, position, %w[end])
+    if keyword_at?(tokens, position, %w[meanwhile]) || operator_at?(tokens, position, %w[~])
+      marker_after = position + 1
+      unless marker_after < tokens.length && tokens[marker_after].identifier? && operator_at?(tokens, marker_after + 1, %w[=])
+        return Step.new(node: error_node("a task line binds a name — write ~ name = ..."), position: skip_line_at(tokens, position))
+      end
+      name = tokens[marker_after].text
+      return Step.new(node: bang_binding_error(name), position: skip_line_at(tokens, position)) if bang_name?(name)
+      if task_names.include?(name)
+        return Step.new(node: error_node("two tasks bind #{name} — every task line binds its own name"), position: skip_line_at(tokens, position))
+      end
+      value = parse_expression(tokens, marker_after + 2)
+      task_names << name
+      lines << task_line_node(name, value.node)
+      position = skip_newlines_at(tokens, value.position)
+    else
+      statement = parse_statement_with_guard(tokens, position)
+      lines << statement.node
+      position = skip_newlines_at(tokens, statement.position)
+    end
+  end
+  unless keyword_at?(tokens, position, %w[end])
+    return Step.new(node: error_node("expected end to close together"), position: position)
+  end
+  Step.new(node: together_node(lines), position: position + 1)
 end
 
 # `trait Name ... end` — methods only (ADR 0028): no fields, no state, no
