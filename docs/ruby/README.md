@@ -29,6 +29,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
+- [Sharing behavior: single inheritance, nothing else](mixins-and-inheritance.md) — `struct Child < Parent` survives with Ruby's spelling; mixins, `super`, runtime subclassing, and `class << self` do not.
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 - [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
