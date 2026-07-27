@@ -1,6 +1,6 @@
 # 0026 — `inspect` is a function, because nil is its most important input
 
-- **Status:** Tentative (one of two competing drafts for [#38](https://github.com/portlandlang/portland/issues/38); the branch not merged closes unmerged)
+- **Status:** Accepted (chosen over the method spelling for [#38](https://github.com/portlandlang/portland/issues/38); built in the seed and the trio, differentially pinned, 2026-07-27)
 - **Date:** 2026-07-27
 
 ## Context
