@@ -15,19 +15,37 @@
 require_relative "parser"
 
 # signal is "none", or an unwinding "break" / "next" / "return"
-# (a return's value rides in the value slot).
+# (a return's value rides in the value slot). A return also carries the
+# frame depth it unwinds to — the method its block was written in (ADR
+# 0025) — in target; the other signals leave it nil.
 struct Outcome
   value
   bindings
   signal
+  target
 end
 
 def outcome(value, bindings)
-  Outcome.new(value: value, bindings: bindings, signal: "none")
+  Outcome.new(value: value, bindings: bindings, signal: "none", target: nil)
 end
 
 def signal_outcome(signal, value, bindings)
-  Outcome.new(value: value, bindings: bindings, signal: signal)
+  Outcome.new(value: value, bindings: bindings, signal: signal, target: nil)
+end
+
+# A `return` in flight: aimed at the frame it was written in.
+def return_outcome(value, bindings, target)
+  Outcome.new(value: value, bindings: bindings, signal: "return", target: target)
+end
+
+# The call depth of the frame these bindings belong to. Rides the bindings
+# as `__frame__` — the `__block__` trick — so a block evaluating a `return`
+# reads its *writer's* depth, because a block closes over its writer's
+# bindings (ADR 0025 gets write-site returns from that for free).
+def frame_of(bindings)
+  slot = lookup(bindings, "__frame__")
+  return 0 if slot.empty?
+  value_at(slot.first, 2)
 end
 
 # Pull a slot's value raw. Host `first`/`[index]` lift a stored nil to
@@ -87,9 +105,9 @@ def evaluate_statement(node, bindings)
   in DefNode(name:, parameters:, body:)
     outcome([], [[name, "method", [parameters, body]]] + bindings)
   in ReturnNode(value:)
-    return signal_outcome("return", [], bindings) if value.nil?
+    return return_outcome([], bindings, frame_of(bindings)) if value.nil?
     step = evaluate_expression(value, bindings)
-    signal_outcome("return", step.value, step.bindings)
+    return_outcome(step.value, step.bindings, frame_of(bindings))
   in StructDefNode then outcome([], register_in_namespace(node, home_of(bindings), bindings))
   # Membership and exhaustiveness are static (#9) and a payload-free case is
   # just a symbol — but the declared labels register, because the one check
@@ -113,7 +131,7 @@ def evaluate_while(node, mutable bindings)
     # existed before the body flow through, which is what flow_back keeps.
     bindings = flow_back(bindings, bindings, body.bindings)
     break if body.signal == "break"
-    return signal_outcome("return", body.value, bindings) if body.signal == "return"
+    return return_outcome(body.value, bindings, body.target) if body.signal == "return"
   end
   # A finished while is nil, always (ADR 0012).
   outcome([nil], bindings)
@@ -1003,8 +1021,16 @@ def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
     scope = [[pair[0], "local", value_at(pair, 1)]] + scope
     pair_index += 1
   end
+  # This frame's depth, for `return` to aim at (ADR 0025).
+  depth = frame_of(bindings) + 1
+  scope = [["__frame__", "frame", depth]] + scope
   scope = bind_parameters(method.parameters, arguments, keyword_values, scope)
   result = run_body(method.body, scope)
+  panic("break outside of a loop") if result.signal == "break"
+  panic("next outside of a loop") if result.signal == "next"
+  if result.signal == "return" && result.target.some? && result.target < depth
+    return return_outcome(result.value, bindings, result.target)
+  end
   outcome(result.value, bindings)
 end
 
@@ -1160,7 +1186,7 @@ def run_guest_block(block, arguments, bindings)
   else
     result.signal
   end
-  Outcome.new(value: result.value, bindings: flow_back(bindings, scope, result.bindings), signal: signal)
+  Outcome.new(value: result.value, bindings: flow_back(bindings, scope, result.bindings), signal: signal, target: result.target)
 end
 
 # After a block interrupted its iteration: a `break` is consumed here and the
@@ -1168,7 +1194,7 @@ end
 # method (#41, #42). The seed's block_interrupt, in outcome clothing.
 def block_interrupted(step, scope)
   return outcome([nil], scope) if step.signal == "break"
-  signal_outcome(step.signal, step.value, scope)
+  return_outcome(step.value, scope, step.target)
 end
 
 # Every arm threads `scope` across its iterations, so what one pass of the
@@ -1379,17 +1405,30 @@ def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   # it, because a block closes over where it was *written*: the method's own
   # scope has dropped every local, so yielding into it would hide them.
   scope = [["__block__", "block", [block, bindings]]] + scope unless block.nil?
+  # This frame's depth, for `return` to aim at (ADR 0025). The caller's
+  # `__frame__` survives the local-reject above; prepending shadows it.
+  depth = frame_of(bindings) + 1
+  scope = [["__frame__", "frame", depth]] + scope
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
-  # A `return` is consumed here — the method boundary is what it unwinds to.
   # A `break` or `next` reaching a boundary escaped every loop that could
   # have owned it, and the seed refuses; so does this (#41, #42).
   panic("break outside of a loop") if result.signal == "break"
   panic("next outside of a loop") if result.signal == "next"
   # Callee locals are discarded, but a block the body yielded to may have
   # rebound names belonging to the caller, and those are the caller's.
-  return outcome(result.value, scope_after_yield(result.bindings, bindings)) unless block.nil?
-  outcome(result.value, bindings)
+  settled = if block.nil?
+    bindings
+  else
+    scope_after_yield(result.bindings, bindings)
+  end
+  # A `return` is consumed here only when this frame is its write site (ADR
+  # 0025); aimed further out, it keeps unwinding — through this method,
+  # whose own result never happened.
+  if result.signal == "return" && result.target.some? && result.target < depth
+    return return_outcome(result.value, settled, result.target)
+  end
+  outcome(result.value, settled)
 end
 
 # `yield` — run the block the enclosing method was handed.
@@ -1406,9 +1445,10 @@ def evaluate_yield(bindings)
   # `__block__`, which `invoke_with_block` unpacks on the way out. Rebinding
   # it here also keeps it present, so a second `yield` still finds a block.
   #
-  # The signal rides along too (#41): a `return` in the block stops the
-  # yielding method's body at this statement, exactly as it stops the seed's.
-  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings]]] + bindings, signal: result.signal)
+  # The signal rides along too (#41), target included: a `return` in the
+  # block stops the yielding method's body at this statement and keeps its
+  # aim on the block's writer (ADR 0025).
+  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings]]] + bindings, signal: result.signal, target: result.target)
 end
 
 # The caller's scope as it stands after the body ran, which is whatever the

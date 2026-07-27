@@ -34,6 +34,20 @@ def through_blocks
   "never reached"
 end
 
+# ADR 0025 — a return belongs to the method its block was *written* in, so a
+# yielding helper is transparent to it: `apply` here never gets to answer.
+def apply
+  yield
+  "apply's own answer"
+end
+
+def through_a_yield
+  apply do
+    return "unwound past the helper"
+  end
+  "never reached"
+end
+
 context "conditionals as expressions" do
   describe "if" do
     specify "answers the taken branch" do
@@ -151,6 +165,10 @@ context "unwinding" do
   describe "return inside a block" do
     specify "unwinds the enclosing method" do
       expect(through_blocks, "unwound")
+    end
+
+    specify "unwinds to its write site, through a yielding helper" do
+      expect(through_a_yield, "unwound past the helper")
     end
   end
 end

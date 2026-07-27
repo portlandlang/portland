@@ -101,7 +101,13 @@ struct Method {
 enum Pending {
     Break,
     Next,
-    Return(Option<Value>),
+    /// A `return` belongs to the method its block was written in (ADR 0025),
+    /// so it carries the call depth of that frame and unwinds until it gets
+    /// there — through any method that merely yielded to the block.
+    Return {
+        target: usize,
+        value: Option<Value>,
+    },
 }
 
 /// Deep enough for real programs, shallow enough to fail as a clean Portland
@@ -113,6 +119,10 @@ const MAXIMUM_EXPRESSION_DEPTH: usize = 100_000;
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     arguments: Vec<String>,
     call_depth: usize,
+    /// The call depth a `return` executed right now would belong to: the
+    /// current frame ordinarily, and the *writing* frame while a block runs
+    /// (ADR 0025) — a block written inside another block keeps its writer's.
+    home_depth: usize,
     /// The file currently executing; `require_relative` resolves against it.
     current_file: Option<std::path::PathBuf>,
     expression_depth: usize,
@@ -129,7 +139,9 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// fresh scope, so yielding into the method's own scope would hide the
     /// caller's locals — a block closes over where it was written, not where
     /// it is run. Saved and restored around each call, like `self_receiver`.
-    current_block: Option<(Block, HashMap<String, Binding>)>,
+    /// The trailing depth is the frame the block was written in, which is
+    /// where a `return` inside it unwinds to (ADR 0025).
+    current_block: Option<(Block, HashMap<String, Binding>, usize)>,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     variables: HashMap<String, Binding>,
@@ -169,6 +181,7 @@ impl<W: std::io::Write> Interpreter<W> {
         Self {
             arguments: Vec::new(),
             call_depth: 0,
+            home_depth: 0,
             current_file: None,
             loaded: std::collections::HashSet::new(),
             expression_depth: 0,
@@ -286,7 +299,7 @@ impl<W: std::io::Write> Interpreter<W> {
             None => last,
             Some(Pending::Break) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
-            Some(Pending::Return(_)) => panic!("return outside of a method"),
+            Some(Pending::Return { .. }) => panic!("return outside of a method"),
         }
     }
 
@@ -364,7 +377,10 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             Statement::Return { value } => {
                 let value = value.as_ref().map(|expression| self.value_of(expression));
-                self.pending = Some(Pending::Return(value));
+                self.pending = Some(Pending::Return {
+                    target: self.home_depth,
+                    value,
+                });
                 None
             }
             // Namespaces are flattened at definition time into qualified
@@ -457,7 +473,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         Some(Pending::Next) => self.pending = None,
                         // A return keeps unwinding to the enclosing method.
-                        Some(Pending::Return(_)) => return None,
+                        Some(Pending::Return { .. }) => return None,
                     }
                 }
                 // A finished while is nil, always (ADR 0012, Ruby's rule).
@@ -593,7 +609,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     GuardAction::Next => self.pending = Some(Pending::Next),
                     GuardAction::Return(value) => {
                         let value = value.as_ref().map(|expression| self.value_of(expression));
-                        self.pending = Some(Pending::Return(value));
+                        self.pending = Some(Pending::Return {
+                            target: self.home_depth,
+                            value,
+                        });
                     }
                 }
                 None
@@ -987,7 +1006,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 // in for the duration and put back after — the same shape as
                 // `self_receiver`, and for the same reason: a nested call
                 // must not see its caller's block.
-                let handed = block.clone().map(|block| (block, self.variables.clone()));
+                // The home depth travels with the block: written here, so a
+                // `return` inside it unwinds back to *this* frame — or to
+                // this block's own writer, when it is written inside one.
+                let handed = block
+                    .clone()
+                    .map(|block| (block, self.variables.clone(), self.home_depth));
                 let handed_one = handed.is_some();
                 let outer = std::mem::replace(&mut self.current_block, handed);
                 let result = self.call(name, arguments, keyword_arguments);
@@ -995,7 +1019,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // method that yielded — `call` has just restored the caller's
                 // scope, so the block's version of it goes back on top. That
                 // is the accumulator pattern working through `yield`.
-                if handed_one && let Some((_, scope)) = self.current_block.take() {
+                if handed_one && let Some((_, scope, _)) = self.current_block.take() {
                     self.variables = scope;
                 }
                 self.current_block = outer;
@@ -1004,15 +1028,19 @@ impl<W: std::io::Write> Interpreter<W> {
             // `yield` — run the block this method was handed, in the scope
             // that block was written in.
             Expression::Yield(_) => {
-                let Some((block, written_in)) = self.current_block.clone() else {
+                let Some((block, written_in, home)) = self.current_block.clone() else {
                     panic!("yield without a block — this method was called without one");
                 };
                 let here = std::mem::replace(&mut self.variables, written_in);
+                // The block runs in its writer's frame for `return` purposes
+                // (ADR 0025), exactly as it runs in its writer's scope.
+                let yielding_home = std::mem::replace(&mut self.home_depth, home);
                 let result = self.run_block(&block, Vec::new());
+                self.home_depth = yielding_home;
                 // Whatever the block rebound stays rebound: blocks rebind
                 // outer mutables, which is the accumulator pattern (ADR 0001).
                 let after = std::mem::replace(&mut self.variables, here);
-                if let Some((_, scope)) = self.current_block.as_mut() {
+                if let Some((_, scope, _)) = self.current_block.as_mut() {
                     *scope = after;
                 }
                 result
@@ -1979,14 +2007,25 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         let previous_self = self.self_receiver.replace((struct_name, receiver));
         let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
+        let caller_home = std::mem::replace(&mut self.home_depth, self.call_depth);
         let mut result = self.run_body(&method.body);
+        self.home_depth = caller_home;
         self.module_path = caller_module;
         self.call_depth -= 1;
         self.self_receiver = previous_self;
         std::mem::swap(&mut self.variables, &mut scope);
         match self.pending.take() {
             None => {}
-            Some(Pending::Return(value)) => result = value,
+            // Consumed here only when this frame is the write site (ADR
+            // 0025); a return aimed further out keeps unwinding, and this
+            // method's own result never happened.
+            Some(Pending::Return { target, value }) => {
+                if target > self.call_depth {
+                    result = value;
+                } else {
+                    self.pending = Some(Pending::Return { target, value });
+                }
+            }
             Some(Pending::Break) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
         }
@@ -2181,14 +2220,25 @@ impl<W: std::io::Write> Interpreter<W> {
         let previous_self = self.self_receiver.take();
         // Bare names resolve from where the method was written (ADR 0021).
         let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
+        let caller_home = std::mem::replace(&mut self.home_depth, self.call_depth);
         let mut result = self.run_body(&method.body);
+        self.home_depth = caller_home;
         self.module_path = caller_module;
         self.call_depth -= 1;
         self.self_receiver = previous_self;
         std::mem::swap(&mut self.variables, &mut scope);
         match self.pending.take() {
             None => {}
-            Some(Pending::Return(value)) => result = value,
+            // Consumed here only when this frame is the write site (ADR
+            // 0025); a return aimed further out keeps unwinding, and this
+            // method's own result never happened.
+            Some(Pending::Return { target, value }) => {
+                if target > self.call_depth {
+                    result = value;
+                } else {
+                    self.pending = Some(Pending::Return { target, value });
+                }
+            }
             Some(Pending::Break) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
         }
