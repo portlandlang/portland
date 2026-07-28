@@ -6,9 +6,11 @@
 # No mutable collections exist, so evaluation threads state the way the
 # parser threads Step: every function returns an Outcome. The value field
 # is a slot — [] for no value, [v] for a value — because statements may
-# produce nothing and there is no nil. Bindings are an assoc array of
-# [name, value] pairs. Guest values are host values, so arithmetic,
-# equality, and puts formatting match the seed for free.
+# produce nothing and there is no nil. Bindings splits the ledger the way
+# the seed does (#62): a globals hash for the never-shadowed kinds and an
+# assoc list of [name, kind, value] triples for the shadowed minority.
+# Guest values are host values, so arithmetic, equality, and puts
+# formatting match the seed for free.
 #
 # To run a file, see run.pdx.
 
@@ -23,6 +25,32 @@ struct Outcome
   bindings
   signal
   target
+end
+
+# The two-ledger scope (#62). `globals` holds the kinds no program can
+# shadow — "method", "struct", "trait", "constant" — as a hash from name to
+# [kind, payload], because a hash read is one host step where an assoc walk
+# is a hosted loop, and the wide static majority of any scope is exactly
+# these. `entries` keeps the shadow stack: [name, kind, value] triples for
+# locals, mutables, and the __underscore__ machinery, where
+# prepend-then-flow_back is the scoping model and order is meaning.
+struct Bindings
+  globals
+  entries
+end
+
+# Prepend one triple onto the shadow stack — both set and shadow, exactly
+# as before the split.
+def prepended(triple, bindings)
+  bindings.with(entries: [triple] + bindings.entries)
+end
+
+# Register one never-shadowed name. Registration is global, as the seed's
+# is: a def lands in the one table wherever it runs.
+def with_global(name, kind, payload, bindings)
+  mutable globals = bindings.globals
+  globals[name] = [kind, payload]
+  bindings.with(globals: globals)
 end
 
 def outcome(value, bindings)
@@ -76,7 +104,7 @@ def evaluate_program(nodes)
   # `require_relative` resolves against the file doing the requiring, so that
   # path has to be in scope from the first statement. `argv.first` is it: the
   # trio was handed the guest program's path, and run.pdx read the same value.
-  run_body(nodes, [["__file__", "file", argv.first or "."]])
+  run_body(nodes, Bindings.new(globals: {}, entries: [["__file__", "file", argv.first or "."]]))
 end
 
 # Run statements until done or a signal starts unwinding.
@@ -104,7 +132,7 @@ def evaluate_statement(node, bindings)
     bound = slot_value(step.value)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
   in DefNode(name:, parameters:, body:)
-    outcome([], [[name, "method", [parameters, body]]] + bindings)
+    outcome([], with_global(name, "method", [parameters, body], bindings))
   in ReturnNode(value:)
     return return_outcome([], bindings, frame_of(bindings)) if value.nil?
     step = evaluate_expression(value, bindings)
@@ -154,9 +182,9 @@ end
 # A task rebinding an outer mutable is refused (ADR 0029): walk the entries
 # its evaluation added; a preexisting mutable among them is one that moved.
 def refuse_task_rebinds(before, after)
-  mutable index = after.length - before.length - 1
+  mutable index = after.entries.length - before.entries.length - 1
   while index >= 0
-    triple = after[index]
+    triple = after.entries[index]
     panic("a task cannot rebind an outer mutable — bind a name and combine after the join") if triple[1] == "mutable" && !lookup(before, triple[0]).empty?
     index -= 1
   end
@@ -286,11 +314,11 @@ def assigned(name, value, rebindable, bindings)
   panic("local #{name} shadows method #{name} — rename one") if kind == "method" || builtin_method?(name)
   if rebindable
     panic("#{name} is already declared — mutable declares a new name once") if kind == "local" || kind == "mutable"
-    return [[name, "mutable", value]] + bindings
+    return prepended([name, "mutable", value], bindings)
   end
   panic("#{name} is immutable — declare it `mutable #{name} = ...` if it needs to change") if kind == "local"
-  return [[name, "mutable", value]] + bindings if kind == "mutable"
-  [[name, "local", value]] + bindings
+  return prepended([name, "mutable", value], bindings) if kind == "mutable"
+  prepended([name, "local", value], bindings)
 end
 
 # The seed's builtin_name: names a local may never take.
@@ -458,26 +486,39 @@ end
 # exact: flow_back and refuse_task_rebinds mark scopes that always sit at or
 # below the loop's entry, so the entries they walk are dropped by no one.
 def compacted_since(entry, bindings)
-  added_count = bindings.length - entry.length
+  entries = bindings.entries
+  added_count = entries.length - entry.entries.length
   return bindings if added_count < 2
   mutable kept = []
   mutable index = 0
   while index < added_count
-    triple = bindings[index]
-    kept << triple if lookup(kept, triple[0]).empty?
+    triple = entries[index]
+    kept << triple if first_named(kept, triple[0]).empty?
     index += 1
   end
   return bindings if kept.length == added_count
-  kept + bindings.slice(added_count, bindings.length - added_count)
+  bindings.with(entries: kept + entries.slice(added_count, entries.length - added_count))
 end
 
-# Bindings are [name, kind, payload] triples — kind is "local" or "method".
-# The no-shadow rule means one namespace serves both. First match wins,
-# so prepending a triple is both set and shadow.
+# The no-shadow rule means one namespace serves every kind, so one lookup
+# answers for both ledgers. The shadow stack goes first — a local is always
+# newer than anything registered — and the globals hash answers for the
+# wide static rest in one host step, reconstructed as the triple every
+# caller already reads.
 def lookup(bindings, name)
+  slot = first_named(bindings.entries, name)
+  return slot unless slot.empty?
+  stored = bindings.globals[name]
+  return [] if stored.nil?
+  [[name, stored[0], value_at(stored, 1)]]
+end
+
+# Entries are [name, kind, value] triples; first match wins, so a prepended
+# triple is both set and shadow.
+def first_named(triples, name)
   mutable index = 0
-  while index < bindings.length
-    triple = bindings[index]
+  while index < triples.length
+    triple = triples[index]
     return [triple] if triple[0] == name
     index += 1
   end
@@ -524,12 +565,14 @@ def resolve(bindings, name)
 end
 
 # Does any binding live under this name? Tells `Statistics.mean(x)` from
-# an ordinary receiver.
+# an ordinary receiver. Qualified names live only in the globals ledger —
+# no local is ever spelled with `::`.
 def namespace?(bindings, name)
   prefix = "#{name}::"
+  keys = bindings.globals.keys
   mutable index = 0
-  while index < bindings.length
-    return true if bindings[index][0].start_with?(prefix)
+  while index < keys.length
+    return true if keys[index].start_with?(prefix)
     index += 1
   end
   false
@@ -560,20 +603,20 @@ end
 def register_in_namespace(statement, home, mutable bindings)
   case statement
   in DefNode(name:, parameters:, body:)
-    [[qualify(home, name), "method", [parameters, body, home]]] + bindings
+    with_global(qualify(home, name), "method", [parameters, body, home], bindings)
   in StructDefNode(name:, fields:, includes:, methods:, nested:)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
     merged = merged_methods(name, fields, includes, methods, home, bindings)
-    mutable result = [[inner_home, "struct", [fields, merged]]] + bindings
+    mutable result = with_global(inner_home, "struct", [fields, merged], bindings)
     nested.each do |inner|
       result = register_in_namespace(inner, inner_home, result)
     end
     result
   # A trait waits under its qualified name to be included (ADR 0028).
   in TraitDefNode(name:, methods:)
-    [[qualify(home, name), "trait", methods]] + bindings
+    with_global(qualify(home, name), "trait", methods, bindings)
   in ModuleDefNode(path:, body:)
     inner_home = qualify(home, path.join("::"))
     mutable result = bindings
@@ -584,7 +627,7 @@ def register_in_namespace(statement, home, mutable bindings)
   in AssignmentNode(name:, value:)
     step = evaluate_expression(value, bindings)
     # "constant" rather than "local" so it survives a fresh method scope.
-    [[qualify(home, name), "constant", slot_value(step.value)]] + step.bindings
+    with_global(qualify(home, name), "constant", slot_value(step.value), step.bindings)
   # Nested or module-housed enums register their cases unqualified — the
   # seed looks a case up across every declaration, since a bare `:paid`
   # says nothing about which vocabulary it came from.
@@ -657,7 +700,7 @@ def register_enum(node, bindings)
   node.cases.each do |declared|
     cases += [[declared.name, declared.labels]]
   end
-  [["__enums__", "enums", cases]] + bindings
+  prepended(["__enums__", "enums", cases], bindings)
 end
 
 # The one enum check a *runtime* can make (ADR 0022): a payload names the
@@ -1167,28 +1210,32 @@ end
 # Run one struct method: globals + self + the receiver's fields, then
 # parameters (#27).
 def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
-  mutable scope = bindings.reject do |triple|
+  kept_entries = bindings.entries.reject do |triple|
     triple[1] == "local" || triple[1] == "mutable"
   end
-  scope = [["__self__", "local", receiver]] + scope
+  mutable scope = bindings.with(entries: kept_entries)
+  scope = prepended(["__self__", "local", receiver], scope)
   mutable pair_index = 0
   pairs = value_at(receiver, 2)
   while pair_index < pairs.length
     pair = pairs[pair_index]
-    scope = [[pair[0], "local", value_at(pair, 1)]] + scope
+    scope = prepended([pair[0], "local", value_at(pair, 1)], scope)
     pair_index += 1
   end
   # This frame's depth, for `return` to aim at (ADR 0025).
   depth = frame_of(bindings) + 1
-  scope = [["__frame__", "frame", depth]] + scope
+  scope = prepended(["__frame__", "frame", depth], scope)
   scope = bind_parameters(method.parameters, arguments, keyword_values, scope)
   result = run_body(method.body, scope)
   panic("break outside of a loop") if result.signal == "break"
   panic("next outside of a loop") if result.signal == "next"
+  # Registration is global (the seed's rule): the body's defs ride home in
+  # the globals ledger while its locals die with the scope.
+  settled = bindings.with(globals: result.bindings.globals)
   if result.signal == "return" && result.target.some? && result.target < depth
-    return return_outcome(result.value, bindings, result.target)
+    return return_outcome(result.value, settled, result.target)
   end
-  outcome(result.value, bindings)
+  outcome(result.value, settled)
 end
 
 # Guest receivers are host values, so host method dispatch does the work.
@@ -1296,18 +1343,20 @@ end
 # block has to outlive the block, while the block's parameters and its fresh
 # locals have to die at end.
 #
-# The bindings list is prepend-only, so everything the block added sits in
+# The entries list is prepend-only, so everything the block added sits in
 # front of the scope it was handed — and the added entries worth keeping are
 # exactly those whose name the caller already had. A new name is the block's
-# own; a name already out there is a rebinding of it.
+# own; a name already out there is a rebinding of it. The globals ledger
+# rides through whole: registration is global (the seed's rule), so nothing
+# a block defined dies here.
 def flow_back(bindings, scope, block_bindings)
-  mutable result = bindings
+  mutable result = bindings.with(globals: block_bindings.globals)
   # Newest first, so walk the added entries back to front: the last one
   # prepended ends up in front, where lookup finds it.
-  mutable index = block_bindings.length - scope.length - 1
+  mutable index = block_bindings.entries.length - scope.entries.length - 1
   while index >= 0
-    triple = block_bindings[index]
-    result = [triple] + result unless lookup(bindings, triple[0]).empty?
+    triple = block_bindings.entries[index]
+    result = prepended(triple, result) unless lookup(bindings, triple[0]).empty?
     index -= 1
   end
   result
@@ -1332,7 +1381,7 @@ def run_guest_block(block, arguments, bindings)
       if parameter == "it" && !slot.empty? && (slot.first[1] == "local" || slot.first[1] == "mutable")
         panic("`it` is a local here and a block parameter there — rename one")
       end
-      scope = [[parameter, "local", value_at(arguments, index)]] + scope
+      scope = prepended([parameter, "local", value_at(arguments, index)], scope)
     end
     index += 1
   end
@@ -1523,7 +1572,7 @@ def bind_parameters(parameters, arguments, keyword_values, mutable scope)
   parameters.each do |parameter|
     if parameter in KeywordParameterNode
       value = keyword_value_for(keyword_values, parameter, scope)
-      scope = [[parameter.name, "local", value]] + scope
+      scope = prepended([parameter.name, "local", value], scope)
     else
       value = if index < arguments.length
         value_at(arguments, index)
@@ -1538,7 +1587,7 @@ def bind_parameters(parameters, arguments, keyword_values, mutable scope)
       else
         "local"
       end
-      scope = [[parameter.name, kind, value]] + scope
+      scope = prepended([parameter.name, kind, value], scope)
       index += 1
     end
   end
@@ -1556,21 +1605,22 @@ def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop —
   # the rebindable kind included, since a mutable is a local that moves.
-  mutable scope = bindings.reject do |triple|
+  kept_entries = bindings.entries.reject do |triple|
     triple[1] == "local" || triple[1] == "mutable"
   end
+  mutable scope = bindings.with(entries: kept_entries)
   # Bare names in the body resolve from where the method was written, not
   # from where it was called (ADR 0021).
   home = value_at(payload, 2)
-  scope = [["__home__", "home", home]] + scope unless home.nil?
+  scope = prepended(["__home__", "home", home], scope) unless home.nil?
   # A `yield` inside the body reaches this. The caller's bindings travel with
   # it, because a block closes over where it was *written*: the method's own
   # scope has dropped every local, so yielding into it would hide them.
-  scope = [["__block__", "block", [block, bindings]]] + scope unless block.nil?
+  scope = prepended(["__block__", "block", [block, bindings]], scope) unless block.nil?
   # This frame's depth, for `return` to aim at (ADR 0025). The caller's
   # `__frame__` survives the local-reject above; prepending shadows it.
   depth = frame_of(bindings) + 1
-  scope = [["__frame__", "frame", depth]] + scope
+  scope = prepended(["__frame__", "frame", depth], scope)
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   # A `break` or `next` reaching a boundary escaped every loop that could
@@ -1579,11 +1629,14 @@ def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   panic("next outside of a loop") if result.signal == "next"
   # Callee locals are discarded, but a block the body yielded to may have
   # rebound names belonging to the caller, and those are the caller's.
-  settled = if block.nil?
+  # Registration is global (the seed's rule), so the body's defs ride home
+  # in the globals ledger either way.
+  settled_caller = if block.nil?
     bindings
   else
     scope_after_yield(result.bindings, bindings)
   end
+  settled = settled_caller.with(globals: result.bindings.globals)
   # A `return` is consumed here only when this frame is its write site (ADR
   # 0025); aimed further out, it keeps unwinding — through this method,
   # whose own result never happened.
@@ -1610,7 +1663,7 @@ def evaluate_yield(bindings)
   # The signal rides along too (#41), target included: a `return` in the
   # block stops the yielding method's body at this statement and keeps its
   # aim on the block's writer (ADR 0025).
-  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings]]] + bindings, signal: result.signal, target: result.target)
+  Outcome.new(value: result.value, bindings: prepended(["__block__", "block", [block, result.bindings]], bindings), signal: result.signal, target: result.target)
 end
 
 # The caller's scope as it stands after the body ran, which is whatever the
@@ -1673,8 +1726,8 @@ def evaluate_require(name, bindings)
   # Marked loaded before the file runs, not after, so a file that requires
   # itself answers false the second time instead of recursing until the stack
   # gives out. The seed inserts before running for the same reason.
-  loaded = [["__loaded__", "loaded", loaded_paths(bindings) + [target]]]
-  scope = [["__file__", "file", target]] + loaded + bindings
+  mutable scope = prepended(["__loaded__", "loaded", loaded_paths(bindings) + [target]], bindings)
+  scope = prepended(["__file__", "file", target], scope)
   # `read_file` answers a failure now (ADR 0027), which lets this refusal
   # finally wear the seed's wording — one recorded divergence retired. The
   # message names the *requested* path, as the seed's does.
@@ -1684,7 +1737,7 @@ def evaluate_require(name, bindings)
   # and the opposite of a method call. Only `__file__` is put back, so the rest
   # of the requiring file resolves its own relative paths, not the required
   # file's.
-  outcome([true], [["__file__", "file", file_of(bindings)]] + result.bindings)
+  outcome([true], prepended(["__file__", "file", file_of(bindings)], result.bindings))
 end
 
 def evaluate_call(node, mutable bindings)
