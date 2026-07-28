@@ -1011,7 +1011,7 @@ def range_closes?(tokens, position)
   return true if position >= tokens.length
   token = tokens[position]
   return true if token.newline?
-  return true if token.operator? && ["]", ")", "}", ","].include?(token.text)
+  return true if token.operator? && %w[\] ) } ,].include?(token.text)
   return true if token.keyword? && %w[then end else elsif in when if unless].include?(token.text)
   false
 end
@@ -1863,8 +1863,8 @@ def command_opener_at(tokens, start)
       return index if token.keyword? && token.text == "do"
       return index if token.operator? && token.text == "{" && closes_a_callable?(tokens, index - 1)
     end
-    depth += 1 if token.operator? && ["(", "[", "{"].include?(token.text)
-    depth -= 1 if token.operator? && [")", "]", "}"].include?(token.text)
+    depth += 1 if token.operator? && %w[( \[ {].include?(token.text)
+    depth -= 1 if token.operator? && %w[) \] }].include?(token.text)
     index += 1
   end
   0 - 1
@@ -1993,9 +1993,9 @@ def brace_reading(tokens, position)
   mutable index = position + 1
   while index < tokens.length
     token = tokens[index]
-    if token.operator? && ["{", "[", "("].include?(token.text)
+    if token.operator? && %w[{ \[ (].include?(token.text)
       depth += 1
-    elsif token.operator? && ["]", ")"].include?(token.text)
+    elsif token.operator? && %w[\] )].include?(token.text)
       depth -= 1
     elsif token.operator? && token.text == "}"
       break if depth == 0
