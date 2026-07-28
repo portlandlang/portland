@@ -78,6 +78,50 @@ fn symbol_name(text: &str) -> String {
     }
 }
 
+/// The words of a `%w[...]` body — Ruby's rules (ADR 0030), run against
+/// Ruby 4.0.6 rather than remembered. A backslash before a bracket, a
+/// backslash, or whitespace drops away (escaped whitespace joins a word
+/// instead of splitting); before anything else it stays, `\n` meaning the
+/// two characters. Whitespace runs split once and never produce empties.
+fn word_array_words(content: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut started = false;
+    let mut chars = content.chars();
+    while let Some(character) = chars.next() {
+        if character == '\\' {
+            match chars.next() {
+                Some(escaped) => {
+                    if !(escaped == '['
+                        || escaped == ']'
+                        || escaped == '\\'
+                        || escaped.is_whitespace())
+                    {
+                        current.push('\\');
+                    }
+                    current.push(escaped);
+                }
+                // Unreachable through the lexer, which consumes the escaped
+                // character or refuses the token as unterminated.
+                None => current.push('\\'),
+            }
+            started = true;
+        } else if character.is_whitespace() {
+            if started {
+                words.push(std::mem::take(&mut current));
+                started = false;
+            }
+        } else {
+            current.push(character);
+            started = true;
+        }
+    }
+    if started {
+        words.push(current);
+    }
+    words
+}
+
 /// a plain literal, or — when it contains `#{...}` — a `+` chain with
 /// each interpolation wrapped in `.to_s`. The enclosing parser's block
 /// frames come along for the ride: an `it` inside an interpolation declares
@@ -2075,9 +2119,9 @@ impl<'source> Parser<'source> {
             TokenKind::WordArray => {
                 let words = &token.text[3..token.text.len() - 1];
                 Expression::ArrayLiteral(
-                    words
-                        .split_whitespace()
-                        .map(|word| Expression::String(word.to_string()))
+                    word_array_words(words)
+                        .into_iter()
+                        .map(Expression::String)
                         .collect(),
                 )
             }

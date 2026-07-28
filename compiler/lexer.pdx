@@ -154,14 +154,29 @@ def read_double_quoted(characters, start)
   text
 end
 
+# ADR 0030: a backslash escapes the next character, and unescaped brackets
+# balance, so only an unescaped `]` at depth zero closes. Escapes stay raw
+# in the token text — unescaping is the evaluator's job, as it is the
+# seed's parser's.
 def read_word_array(characters, start)
   mutable text = "%w["
   mutable index = start + 3
+  mutable depth = 0
   while index < characters.length
     character = characters[index]
     text << character
     index += 1
-    return text if character == "]"
+    if character == "\\"
+      if index < characters.length
+        text << characters[index]
+        index += 1
+      end
+    elsif character == "["
+      depth += 1
+    elsif character == "]"
+      return text if depth == 0
+      depth -= 1
+    end
   end
   text
 end

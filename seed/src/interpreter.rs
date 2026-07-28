@@ -3736,6 +3736,49 @@ end
             evaluate("%w[a b c].length + 1 % 2"),
             Some(Value::Integer(4))
         );
+        // ADR 0030: Ruby's content rules, run against Ruby 4.0.6 rather than
+        // remembered. Escaped brackets, backslashes, and whitespace drop the
+        // backslash; balanced brackets pass through whole; any other escape
+        // keeps its backslash; whitespace runs split once.
+        assert_eq!(
+            evaluate(r"%w[a \] b]"),
+            Some(Value::array(vec![
+                Value::String("a".to_string()),
+                Value::String("]".to_string()),
+                Value::String("b".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate("%w[a [b] c]"),
+            Some(Value::array(vec![
+                Value::String("a".to_string()),
+                Value::String("[b]".to_string()),
+                Value::String("c".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate(r"%w[a\ b c]"),
+            Some(Value::array(vec![
+                Value::String("a b".to_string()),
+                Value::String("c".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate(r"%w[a\nb a\\b]"),
+            Some(Value::array(vec![
+                Value::String(r"a\nb".to_string()),
+                Value::String(r"a\b".to_string()),
+            ]))
+        );
+        assert_eq!(
+            evaluate("%w[a  b\tc\nd]"),
+            Some(Value::array(vec![
+                Value::String("a".to_string()),
+                Value::String("b".to_string()),
+                Value::String("c".to_string()),
+                Value::String("d".to_string()),
+            ]))
+        );
     }
 
     #[test]

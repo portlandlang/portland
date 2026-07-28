@@ -41,6 +41,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0027](0027-2026-07-27-errors-as-typed-results.md) — Recoverable errors: failure is absence with a reason, and `!` propagates it
 - [0028](0028-2026-07-27-object-model-structs-and-traits.md) — The object model: structs stay the only type; traits carry shared behavior
 - [0029](0029-2026-07-27-together-semantics.md) — `together` semantics: independence declared, failure held, nothing shared
+- [0030](0030-2026-07-27-word-array-contents.md) — `%w[]` contents take Ruby's rules: escapes and balanced nesting
 
 <!-- /generated -->
 

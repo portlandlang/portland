@@ -221,9 +221,28 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     Some((_, '[')) => {}
                     other => panic!("expected [ after %w, got {other:?}"),
                 }
-                scan_while(&mut chars, |character| character != ']');
-                let Some((closing, _)) = chars.next() else {
-                    panic!("unterminated %w[] starting at byte {start}");
+                // ADR 0030: a backslash escapes the next character, and
+                // unescaped brackets balance, so only an unescaped `]` at
+                // depth zero closes. Escapes stay raw here — the token
+                // borrows the source, so unescaping is the parser's job.
+                let mut depth = 0usize;
+                let closing = loop {
+                    match chars.next() {
+                        None => panic!("unterminated %w[] starting at byte {start}"),
+                        Some((_, '\\')) => {
+                            if chars.next().is_none() {
+                                panic!("unterminated %w[] starting at byte {start}");
+                            }
+                        }
+                        Some((_, '[')) => depth += 1,
+                        Some((position, ']')) => {
+                            if depth == 0 {
+                                break position;
+                            }
+                            depth -= 1;
+                        }
+                        Some(_) => {}
+                    }
                 };
                 tokens.push(Token {
                     leading_space: false,
@@ -537,6 +556,15 @@ mod tests {
         assert_eq!(
             kinds("1 % 2"),
             vec![TokenKind::Integer, TokenKind::Percent, TokenKind::Integer]
+        );
+        // ADR 0030: a backslash escapes the next character raw — the token
+        // borrows the source, so unescaping waits for the parser — and
+        // unescaped brackets balance instead of closing.
+        assert_eq!(texts(r"%w[a \] b]"), vec![r"%w[a \] b]"]);
+        assert_eq!(texts("%w[a [b] c]"), vec!["%w[a [b] c]"]);
+        assert_eq!(
+            kinds(r"%w[\]] * 2"),
+            vec![TokenKind::WordArray, TokenKind::Star, TokenKind::Integer]
         );
     }
 

@@ -64,7 +64,7 @@ Comparison is `== != < <= > >=`. Equality works across all types, with mixed typ
 
 **Heredocs** are squiggly only — `<<~SQL`, SCREAMING_CAPS terminator (ADR 0020). `<<~'SQL'` suppresses interpolation. Indented terminators, attached method calls, and several per line all work. `<<EOS` and `<<-EOS` do not exist, and that is what lets `<<` stay unambiguously the append operator with no disambiguation rule anywhere.
 
-**Arrays** are `[1, "two", [3]]`. **Hashes** are `{"key" => value}`, insertion-ordered, any type of key. `%w[rose city]` builds a word array — with one live bug: it cannot contain a `]`, because the lexer scans to the first one (#29).
+**Arrays** are `[1, "two", [3]]`. **Hashes** are `{"key" => value}`, insertion-ordered, any type of key. `%w[rose city]` builds a word array, with Ruby's content rules ([ADR 0030](adr/0030-2026-07-27-word-array-contents.md)): `\]` escapes a bracket, balanced brackets nest, `rose\ city` keeps its space, and whitespace runs split once. The rest of the `%` family waits on #29.
 
 **Ranges** are `1..5` and `1...5`, with endless and beginless forms (ADR 0019). Integer bounds only. `(1..n)` iterates via `each`/`map`/ `sum`/`to_a`, `include?` answers without walking, and range patterns match by membership.
 

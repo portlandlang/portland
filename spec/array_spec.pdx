@@ -11,6 +11,26 @@ context "Array" do
     specify "has a %w shorthand for words" do
       expect(%w[rose city], ["rose", "city"])
     end
+
+    specify "a backslash escapes a bracket into a word" do
+      expect(%w[a \] b \[ c], ["a", "]", "b", "[", "c"])
+    end
+
+    specify "balanced brackets nest without escapes" do
+      expect(%w[a [b] c], ["a", "[b]", "c"])
+    end
+
+    specify "an escaped space joins a word instead of splitting" do
+      expect(%w[rose\ city elsewhere], ["rose city", "elsewhere"])
+    end
+
+    specify "any other escape keeps its backslash" do
+      expect(%w[a\nb].first.length, 4)
+    end
+
+    specify "whitespace runs split once, never into empty words" do
+      expect(%w[rose  city], ["rose", "city"])
+    end
   end
 
   describe "the operators" do

@@ -704,6 +704,17 @@ fn portland_evaluator_matches_the_seed_on_floats_and_ranges() {
     );
 }
 
+/// ADR 0030: `%w[]` takes Ruby's content rules — escaped and balanced
+/// brackets, escaped whitespace joining a word, other escapes keeping
+/// their backslash, whitespace runs splitting once — on both oracles.
+#[test]
+fn portland_evaluator_matches_the_seed_on_word_arrays() {
+    assert_evaluator_matches_seed(
+        "evaluator_word_arrays.pdx",
+        "p %w[rose city]\np %w[]\np %w[a \\] b]\np %w[a [b] c]\np %w[[nested [deep]] x]\np %w[a\\ b c]\np %w[a\\nb a\\\\b]\np %w[a  b\tc]\np %w[one\ntwo]\nputs %w[\\] ) } ,].join(\"-\")\nputs %w[a \\] b].length\n",
+    );
+}
+
 /// ADR 0018: the trio delegates `/` and `%` to the host, so Ruby's
 /// floored semantics must reach hosted programs unchanged.
 #[test]

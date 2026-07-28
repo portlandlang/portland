@@ -1052,10 +1052,49 @@ def updated_array(current, index, value, name)
   rebuilt
 end
 
+# The words of a `%w[...]` body — Ruby's rules (ADR 0030), matching the
+# seed's `word_array_words`. A backslash before a bracket, a backslash, or
+# whitespace drops away (escaped whitespace joins a word instead of
+# splitting); before anything else it stays. Whitespace runs split once and
+# never produce empties. The seed asks Unicode what whitespace is where this
+# asks the three separators a Portland string can spell — carriage return
+# has no escape here, on purpose — the recorded divergence class no
+# literally-written program has met.
 def word_array_elements(lexeme)
   content = lexeme.slice(3, lexeme.length - 4)
-  return [] if content.empty?
-  content.split(" ")
+  characters = content.chars
+  mutable words = []
+  mutable current = ""
+  mutable started = false
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    index += 1
+    if character == "\\" && index < characters.length
+      escaped = characters[index]
+      index += 1
+      unless escaped == "[" || escaped == "]" || escaped == "\\" || word_separator?(escaped)
+        current << "\\"
+      end
+      current << escaped
+      started = true
+    elsif word_separator?(character)
+      if started
+        words << current
+        current = ""
+        started = false
+      end
+    else
+      current << character
+      started = true
+    end
+  end
+  words << current if started
+  words
+end
+
+def word_separator?(character)
+  character == " " || character == "\t" || character == "\n"
 end
 
 def evaluate_index(node, bindings)
