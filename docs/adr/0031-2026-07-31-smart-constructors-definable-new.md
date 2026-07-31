@@ -38,6 +38,7 @@ The rules:
 - **`fields(...)` is legal only inside `def self.new`.** Anywhere else it refuses with the rewrite named. Inside, it is unambiguous *by construction*: no instance exists there, so no field or local can claim the name — and a program-defined `fields` function is refused in that one position, naming the collision.
 - **The defined `new` takes any signature** — positional `Token.new("rose")` included, which the raw kwargs form never could. A fallible one returns the value or a `failure` (ADR 0027), handled with the toolkit like any call.
 - **The ladder stays no-shadow:** defining `new` twice refuses; `with` is not declarable; traits may not define `self.` anything (ADR 0028).
+- **In a module body, `def self.name` is accepted and identical to plain `def`** (settled in review, 2026-07-31). Ruby reaches `Statistics.mean` only through `def self.mean`; Portland's module `def` already means that (ADR 0021) — so the marker is redundant there, and accepting it is a non-difference that lets migrating modules compile unchanged instead of refusing over a prefix that changes nothing.
 
 ## The word
 
