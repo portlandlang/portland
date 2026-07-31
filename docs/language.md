@@ -83,7 +83,22 @@ token.kind                                       # field access
 token.with(text: "43")                           # updated copy; nothing mutates
 ```
 
-Value equality, definition-ordered fields, capitalized names. Struct bodies take fields first, then methods. Inside a method, bare names resolve locals → the receiver's fields → its own methods → top-level methods, with no-shadow enforced across every layer; `new`, `with`, `nil?`, and `some?` are reserved. `self` is the receiver, and exists for the pass-myself-along case.
+Value equality, definition-ordered fields, capitalized names. Struct bodies take fields first, then methods. Inside a method, bare names resolve locals → the receiver's fields → its own methods → top-level methods, with no-shadow enforced across every layer; `with`, `nil?`, and `some?` are reserved. `self` is the receiver, and exists for the pass-myself-along case.
+
+**Construction logic lives in type functions** ([ADR 0031](adr/0031-2026-07-31-smart-constructors-definable-new.md)): `def self.name` in a struct body declares a function on the type — `Token.of(raw)` — with no instance and no `self` value inside, bare names resolving outward from the struct's namespace. `new` is one of the definable names: defining it replaces the raw constructor everywhere, takes any signature (positional included), and returns the value or a `failure` (ADR 0027); inside it — and only there — `fields(kind: "word", text: raw)` is the raw kwargs-in-fields-out layer every struct starts with. One namespace serves instances and the type, so the same name on both sides refuses naming both. In a module body, `def self.` is accepted as a plain `def` — Ruby's spelling of the meaning Portland's module `def` already has.
+
+```ruby
+struct Badge
+  label
+
+  def self.new(raw)
+    return failure("a badge needs text") if raw.empty?
+    fields(label: raw)
+  end
+end
+
+badge = Badge.new("rose") or panic "a badge was required"
+```
 
 Types nest in types (`Invoice::Line`). Modules inside structs are an error.
 
@@ -390,7 +405,6 @@ Tier three — cancellation, timeouts, racing — is future work, rare by design
 ## Decided, not yet built
 
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
-- **Smart constructors** ([ADR 0031](adr/0031-2026-07-31-smart-constructors-definable-new.md), building in [#67](https://github.com/portlandlang/portland/issues/67)): `def self.name` in a struct body declares a type function; `new` is definable and replaces the raw constructor, with `fields(...)` — legal only there — as the raw kwargs-in-fields-out layer beneath it.
 
 ## Not yet designed
 

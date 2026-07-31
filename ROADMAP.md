@@ -39,6 +39,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 | `inspect(value)` — p without the printing                    | [0026](docs/adr/0026-2026-07-27-inspect-as-a-function.md)                                                                                                                                                                                                                                       | ✅              |
 | Errors as typed results; `!` is unwrap-or-propagate          | [0027](docs/adr/0027-2026-07-27-errors-as-typed-results.md)                                                                                                                                                                                                                                     | ✅              |
 | The object model: structs and traits, `include`              | [0028](docs/adr/0028-2026-07-27-object-model-structs-and-traits.md)                                                                                                                                                                                                                             | ✅              |
+| Smart constructors: `def self.`, definable `new`, `fields`   | [0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md)                                                                                                                                                                                                                            | ✅              |
 
 ### The implementation
 
@@ -67,7 +68,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 ### Language surface — decide, then build
 
 - [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; `%w[]`'s content rules are decided and built ([ADR 0030](docs/adr/0030-2026-07-27-word-array-contents.md)), the rest waits on the corpus
-- [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; job 3 is decided ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md), building in [#67](https://github.com/portlandlang/portland/issues/67)), job 4 waits on #11
+- [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; jobs 1–3 are decided and built ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md) closed the ledger), job 4 waits on #11
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
 - Regex — undecided, and a real hole

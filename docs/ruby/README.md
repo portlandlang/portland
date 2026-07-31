@@ -24,6 +24,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
+- [`class`: four jobs, four homes](classes.md) — the keyword is gone — declined, not deferred — and its four jobs re-homed: data-with-behavior is a `struct`, shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects wait on the concurrency story.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Error handling: results, not raises](errors.md) — `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
