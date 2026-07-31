@@ -390,6 +390,7 @@ Tier three — cancellation, timeouts, racing — is future work, rare by design
 ## Decided, not yet built
 
 - **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
+- **Smart constructors** ([ADR 0031](adr/0031-2026-07-31-smart-constructors-definable-new.md), building in [#67](https://github.com/portlandlang/portland/issues/67)): `def self.name` in a struct body declares a type function; `new` is definable and replaces the raw constructor, with `fields(...)` — legal only there — as the raw kwargs-in-fields-out layer beneath it.
 
 ## Not yet designed
 
