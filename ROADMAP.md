@@ -66,7 +66,8 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; carries the `%w[]`-can't-contain-`]` bug
+- [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; `%w[]`'s content rules are decided and built ([ADR 0030](docs/adr/0030-2026-07-27-word-array-contents.md)), the rest waits on the corpus
+- [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; job 3, smart constructors, is pull-ready, job 4 waits on #11
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
 - Regex — undecided, and a real hole
