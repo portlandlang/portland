@@ -151,6 +151,14 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// Method bundles waiting to be included (ADR 0028).
     traits: HashMap<String, TraitInfo>,
     variables: HashMap<String, Binding>,
+    /// While a defined `new` runs (ADR 0031), the qualified name of the
+    /// struct whose raw constructor `fields(...)` builds. Cleared across
+    /// every other call boundary — `fields` is legal only inside
+    /// `def self.new`, not in anything it calls.
+    fields_target: Option<String>,
+    /// Set by the defined-`new` dispatch for exactly one `call`, which moves
+    /// it into `fields_target` as it enters the body.
+    pending_fields: Option<String>,
 }
 
 /// A trait: methods only, no state (ADR 0028). Merged into a struct's
@@ -219,6 +227,8 @@ impl<W: std::io::Write> Interpreter<W> {
             structs: HashMap::new(),
             traits: HashMap::new(),
             variables: HashMap::new(),
+            fields_target: None,
+            pending_fields: None,
         }
     }
 
@@ -471,6 +481,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 methods,
                 name,
                 nested,
+                type_functions,
             } => {
                 let mut method_table = HashMap::new();
                 for method in methods {
@@ -553,6 +564,34 @@ impl<W: std::io::Write> Interpreter<W> {
                         methods: method_table,
                     },
                 );
+                // Type functions (ADR 0031) register as ordinary methods
+                // under the struct's namespace — `Token::of` — so the
+                // existing namespace rung dispatches `Token.of(...)` with no
+                // new machinery. Their home is the struct itself: bare names
+                // inside resolve outward from `Token::`, sibling type
+                // functions included.
+                for type_function in type_functions {
+                    let Statement::MethodDefinition {
+                        body,
+                        keyword_parameters,
+                        name: function_name,
+                        parameters,
+                    } = type_function
+                    else {
+                        unreachable!()
+                    };
+                    let mut home = self.module_path.clone();
+                    home.push(name.clone());
+                    self.methods.insert(
+                        format!("{}::{function_name}", self.qualified(name)),
+                        std::rc::Rc::new(Method {
+                            body: body.clone(),
+                            home,
+                            keyword_parameters: keyword_parameters.clone(),
+                            parameters: parameters.clone(),
+                        }),
+                    );
+                }
                 // A type nested in a type lives under it: `Outer::Inner`.
                 if !nested.is_empty() {
                     self.module_path.push(name.clone());
@@ -1059,6 +1098,22 @@ impl<W: std::io::Write> Interpreter<W> {
             } => {
                 // `Name.new(...)` constructs a struct; the name is not a value.
                 if name == "new" {
+                    // A defined `new` replaces the raw constructor everywhere
+                    // (ADR 0031): while it runs, `fields(...)` is the raw
+                    // layer, and only there — the target is cleared across
+                    // every other call boundary.
+                    if let Some((struct_name, qualified_new)) = self.defined_new(receiver) {
+                        let arguments: Vec<Value> = arguments
+                            .iter()
+                            .map(|argument| self.value_of(argument))
+                            .collect();
+                        let keyword_arguments: Vec<(String, Value)> = keyword_arguments
+                            .iter()
+                            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                            .collect();
+                        self.pending_fields = Some(struct_name);
+                        return self.call(&qualified_new, arguments, keyword_arguments);
+                    }
                     return Some(self.construct_struct(receiver, arguments, keyword_arguments));
                 }
                 // `Statistics.mean(x)` — the receiver names a namespace, so
@@ -1282,6 +1337,12 @@ impl<W: std::io::Write> Interpreter<W> {
             .iter()
             .map(|(label, expression)| (label.clone(), self.value_of(expression)))
             .collect();
+        Self::fill_fields(struct_name, &fields, provided)
+    }
+
+    /// The raw kwargs-in-fields-out layer, shared by `new` on a plain struct
+    /// and `fields(...)` inside a defined one (ADR 0031).
+    fn fill_fields(struct_name: &str, fields: &[String], provided: Vec<(String, Value)>) -> Value {
         for (label, _) in &provided {
             if !fields.contains(label) {
                 panic!("{struct_name} has no field {label}");
@@ -1301,8 +1362,29 @@ impl<W: std::io::Write> Interpreter<W> {
             .collect();
         Value::Struct {
             fields: ordered,
-            name: struct_name.clone(),
+            name: struct_name.to_string(),
         }
+    }
+
+    /// The struct this `new` receiver resolves to, when that struct defined
+    /// its own `new` (ADR 0031): `(qualified struct, qualified function)`.
+    fn defined_new(&self, receiver: &Expression) -> Option<(String, String)> {
+        let written = match receiver {
+            Expression::Variable(name) => {
+                if self.variables.contains_key(name) {
+                    return None;
+                }
+                name.clone()
+            }
+            Expression::Path(path) => path.join("::"),
+            _ => return None,
+        };
+        let (struct_name, _) = Self::resolve(&self.module_path, &written, &self.structs)?;
+        let qualified_new = format!("{struct_name}::new");
+        if self.methods.contains_key(&qualified_new) {
+            return Some((struct_name, qualified_new));
+        }
+        None
     }
 
     /// Built-in methods on values — read-only on purpose; mutation is a
@@ -2234,7 +2316,11 @@ impl<W: std::io::Write> Interpreter<W> {
         let previous_self = self.self_receiver.replace((struct_name, receiver));
         let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
         let caller_home = std::mem::replace(&mut self.home_depth, self.call_depth);
+        // `fields` is legal only inside `def self.new` itself (ADR 0031),
+        // never in anything it calls.
+        let caller_fields = self.fields_target.take();
         let mut result = self.run_body(&method.body);
+        self.fields_target = caller_fields;
         self.home_depth = caller_home;
         self.module_path = caller_module;
         self.call_depth -= 1;
@@ -2274,6 +2360,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 arguments,
                 keyword_arguments,
             );
+        }
+        // `fields(...)` — the raw constructor, and only inside `def self.new`
+        // (ADR 0031). The name is unclaimable there: a program's own `fields`
+        // function is refused rather than guessed at.
+        if name == "fields" {
+            if let Some(target) = self.fields_target.clone() {
+                if self.lookup_method(name).is_some() {
+                    panic!(
+                        "fields is the raw constructor inside def self.new — rename the fields function"
+                    );
+                }
+                if !arguments.is_empty() {
+                    panic!("fields takes keyword arguments, not positional ones");
+                }
+                let info = self
+                    .structs
+                    .get(&target)
+                    .unwrap_or_else(|| panic!("undefined struct {target}"))
+                    .clone();
+                return Some(Self::fill_fields(&target, &info.fields, keyword_arguments));
+            }
+            if self.lookup_method(name).is_none() {
+                panic!("`fields` is the raw constructor — it only exists inside def self.new");
+            }
         }
         if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() {
             panic!("{name} takes no keyword arguments");
@@ -2481,7 +2591,12 @@ impl<W: std::io::Write> Interpreter<W> {
         // Bare names resolve from where the method was written (ADR 0021).
         let caller_module = std::mem::replace(&mut self.module_path, method.home.clone());
         let caller_home = std::mem::replace(&mut self.home_depth, self.call_depth);
+        // `fields` is legal only inside `def self.new` itself (ADR 0031):
+        // the target arrives only via the defined-`new` dispatch, and every
+        // other call boundary clears it.
+        let caller_fields = std::mem::replace(&mut self.fields_target, self.pending_fields.take());
         let mut result = self.run_body(&method.body);
+        self.fields_target = caller_fields;
         self.home_depth = caller_home;
         self.module_path = caller_module;
         self.call_depth -= 1;
@@ -3778,6 +3893,98 @@ end
                 Value::String("c".to_string()),
                 Value::String("d".to_string()),
             ]))
+        );
+    }
+
+    // — type functions and definable new (ADR 0031) —
+
+    #[test]
+    fn type_functions_dispatch_on_the_struct_name() {
+        assert_eq!(
+            evaluate(
+                "struct Token\n  kind\n  text\n\n  def self.of(raw)\n    Token.new(kind: \"word\", text: raw)\n  end\nend\nToken.of(\"rose\").text"
+            ),
+            Some(Value::String("rose".to_string()))
+        );
+    }
+
+    #[test]
+    fn type_function_bare_names_resolve_from_the_struct() {
+        assert_eq!(
+            evaluate(
+                "struct Token\n  kind\n\n  def self.fallback\n    \"word\"\n  end\n\n  def self.of\n    Token.new(kind: fallback)\n  end\nend\nToken.of.kind"
+            ),
+            Some(Value::String("word".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_defined_new_replaces_the_raw_constructor() {
+        assert_eq!(
+            evaluate(
+                "struct Token\n  kind\n  text\n\n  def self.new(raw)\n    fields(kind: \"word\", text: raw)\n  end\nend\nToken.new(\"rose\").text"
+            ),
+            Some(Value::String("rose".to_string()))
+        );
+    }
+
+    #[test]
+    fn a_defined_new_answers_a_failure() {
+        assert_eq!(
+            output_of(
+                "struct Token\n  kind\n\n  def self.new(raw)\n    return failure(\"a token needs text\") if raw.empty?\n    fields(kind: raw)\n  end\nend\np Token.new(\"\")\ntoken = Token.new(\"\") or Token.new(\"word\")\nputs token.kind\n"
+            ),
+            "failure(\"a token needs text\")\nword\n"
+        );
+    }
+
+    #[test]
+    fn a_plain_struct_keeps_the_raw_new() {
+        assert_eq!(
+            evaluate("struct Point\n  x\nend\nPoint.new(x: 41).x + 1"),
+            Some(Value::Integer(42))
+        );
+    }
+
+    #[test]
+    fn module_def_self_is_a_plain_def() {
+        assert_eq!(
+            evaluate(
+                "module Statistics\n  def self.mean(values)\n    values.sum / values.length\n  end\nend\nStatistics.mean([2, 4, 6])"
+            ),
+            Some(Value::Integer(4))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "is the raw constructor — it only exists inside def self.new")]
+    fn fields_outside_a_defined_new_refuses() {
+        evaluate("fields(x: 1)");
+    }
+
+    #[test]
+    #[should_panic(expected = "is the raw constructor — it only exists inside def self.new")]
+    fn fields_does_not_leak_into_called_functions() {
+        evaluate(
+            "def helper\n  fields(kind: \"word\")\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    helper\n  end\nend\nToken.new(\"rose\")",
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "fields is the raw constructor inside def self.new — rename the fields function"
+    )]
+    fn a_program_fields_function_collides_inside_a_defined_new() {
+        evaluate(
+            "def fields\n  1\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    fields(kind: raw)\n  end\nend\nToken.new(\"rose\")",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "fields takes keyword arguments, not positional ones")]
+    fn fields_refuses_positional_arguments() {
+        evaluate(
+            "struct Token\n  kind\n\n  def self.new(raw)\n    fields(raw)\n  end\nend\nToken.new(\"rose\")",
         );
     }
 

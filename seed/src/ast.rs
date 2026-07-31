@@ -54,6 +54,10 @@ pub enum Statement {
         /// Types declared inside this one (ADR 0021 §5) — reached as
         /// `Outer::Inner`. Modules may not nest here.
         nested: Vec<Statement>,
+        /// `def self.name` declarations (ADR 0031): type functions, called
+        /// on the struct's name with no instance — `new` among them, which
+        /// then replaces the raw constructor.
+        type_functions: Vec<Statement>,
     },
     /// `trait Name ... end` — a bundle of methods with no state (ADR 0028),
     /// carried by any struct that `include`s it.

@@ -16,6 +16,7 @@ pub fn parse(source: &str) -> Program {
         command_arguments: false,
         depth: 0,
         it_frames: Vec::new(),
+        module_depth: 0,
         position: 0,
         tokens,
     };
@@ -44,6 +45,10 @@ struct Parser<'source> {
     /// block names `it` directly, and whether a block nested inside it
     /// already claimed the name.
     it_frames: Vec<ItFrame>,
+    /// How many `module` bodies enclose the current position. `def self.`
+    /// there is accepted as a plain `def` (ADR 0031): Ruby spells module
+    /// functions that way, and Portland's module `def` already means it.
+    module_depth: usize,
     position: usize,
     tokens: Vec<Token<'source>>,
 }
@@ -229,6 +234,7 @@ fn expression_from(source: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
         command_arguments: false,
         depth: 0,
         it_frames: std::mem::take(it_frames),
+        module_depth: 0,
         position: 0,
         tokens,
     };
@@ -252,7 +258,17 @@ impl<'source> Parser<'source> {
 
     fn statement(&mut self) -> Statement {
         if self.peek_is_keyword("def") {
-            return self.method_definition();
+            let (definition, type_function) = self.method_definition();
+            // `def self.` outside a struct body: a module body accepts it as
+            // a plain `def` — Ruby's spelling of the same meaning (ADR 0031)
+            // — and the top level refuses it, naming the rewrite.
+            if type_function && self.module_depth == 0 {
+                let Statement::MethodDefinition { name, .. } = &definition else {
+                    unreachable!()
+                };
+                panic!("`def self.` belongs inside a struct body — write def {name}");
+            }
+            return definition;
         }
         if self.peek_is_keyword("enum") {
             return self.enum_definition();
@@ -600,8 +616,17 @@ impl<'source> Parser<'source> {
         })
     }
 
-    fn method_definition(&mut self) -> Statement {
+    /// The second value answers "was this `def self.name`?" — a type
+    /// function (ADR 0031). Each context decides what that means: a struct
+    /// body registers it on the type, a module body accepts it as a plain
+    /// `def` (Ruby's spelling of the same meaning), everywhere else refuses.
+    fn method_definition(&mut self) -> (Statement, bool) {
         self.position += 1; // the `def`
+        let mut type_function = false;
+        if self.peek_is_keyword("self") && self.peek_kind_at(1) == Some(TokenKind::Dot) {
+            self.position += 2; // the `self` and the `.`
+            type_function = true;
+        }
         let token = self.advance();
         if token.kind != TokenKind::Identifier {
             panic!("expected method name after def, got {token:?}");
@@ -624,12 +649,15 @@ impl<'source> Parser<'source> {
         self.skip_newlines();
         let body = self.body_until(&["end"], &format!("def {name}"));
         self.position += 1; // the `end`
-        Statement::MethodDefinition {
-            body,
-            keyword_parameters,
-            name,
-            parameters,
-        }
+        (
+            Statement::MethodDefinition {
+                body,
+                keyword_parameters,
+                name,
+                parameters,
+            },
+            type_function,
+        )
     }
 
     /// `struct Name` then one field name per line, closed by `end`.
@@ -733,6 +761,7 @@ impl<'source> Parser<'source> {
         let mut includes: Vec<String> = Vec::new();
         let mut methods: Vec<Statement> = Vec::new();
         let mut nested: Vec<Statement> = Vec::new();
+        let mut type_functions: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
             // `include TraitName` — a declaration, not a call (ADR 0028).
             if self.peek_is_keyword("include") {
@@ -771,7 +800,7 @@ impl<'source> Parser<'source> {
             }
             // Fields first, then methods (#27).
             if self.peek_is_keyword("def") {
-                let method = self.method_definition();
+                let (method, type_function) = self.method_definition();
                 let Statement::MethodDefinition {
                     name: method_name, ..
                 } = &method
@@ -783,15 +812,43 @@ impl<'source> Parser<'source> {
                         "{method_name} is a field of {name} — a name is a field or a method, never both"
                     );
                 }
-                if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
-                    panic!("{method_name} is reserved on structs");
-                }
-                if methods.iter().any(|existing| {
+                // One namespace serves instances and the type (ADR 0031):
+                // the same name on both sides is a collision, not overloading.
+                let instance_taken = methods.iter().any(|existing| {
                     matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
-                }) {
-                    panic!("duplicate method {method_name} in struct {name}");
+                });
+                let type_taken = type_functions.iter().any(|existing| {
+                    matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
+                });
+                if type_function {
+                    // `new` is definable on the type (ADR 0031); the rest of
+                    // the reserved set stays reserved on both sides.
+                    if matches!(method_name.as_str(), "nil?" | "some?" | "with") {
+                        panic!("{method_name} is reserved on structs");
+                    }
+                    if instance_taken {
+                        panic!(
+                            "{method_name} is defined on {name} instances and on the type — rename one"
+                        );
+                    }
+                    if type_taken {
+                        panic!("duplicate method {method_name} in struct {name}");
+                    }
+                    type_functions.push(method);
+                } else {
+                    if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                        panic!("{method_name} is reserved on structs");
+                    }
+                    if type_taken {
+                        panic!(
+                            "{method_name} is defined on {name} instances and on the type — rename one"
+                        );
+                    }
+                    if instance_taken {
+                        panic!("duplicate method {method_name} in struct {name}");
+                    }
+                    methods.push(method);
                 }
-                methods.push(method);
                 self.skip_newlines();
                 continue;
             }
@@ -799,7 +856,7 @@ impl<'source> Parser<'source> {
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
             }
-            if !methods.is_empty() {
+            if !methods.is_empty() || !type_functions.is_empty() {
                 panic!("fields come before methods in struct {name}");
             }
             if fields.contains(&token.text.to_string()) {
@@ -819,6 +876,7 @@ impl<'source> Parser<'source> {
             methods,
             name,
             nested,
+            type_functions,
         }
     }
 
@@ -895,13 +953,20 @@ impl<'source> Parser<'source> {
                 panic!("expected end to close trait {name}");
             }
             if self.peek_is_keyword("def") {
-                let method = self.method_definition();
+                let (method, type_function) = self.method_definition();
                 let Statement::MethodDefinition {
                     name: method_name, ..
                 } = &method
                 else {
                     unreachable!()
                 };
+                // A trait is instance behavior with no state (ADR 0028); a
+                // type function has no instance, so it cannot ride one.
+                if type_function {
+                    panic!(
+                        "a trait cannot define def self.{method_name} — a type function lives on the struct that includes it"
+                    );
+                }
                 if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
                     panic!("{method_name} is reserved on structs, so a trait cannot carry it");
                 }
@@ -934,7 +999,9 @@ impl<'source> Parser<'source> {
         let path = self.namespace_path("module");
         self.expect_statement_boundary();
         self.skip_newlines();
+        self.module_depth += 1;
         let body = self.body_until(&["end"], "module");
+        self.module_depth -= 1;
         self.position += 1; // the `end`
         Statement::ModuleDefinition { body, path }
     }
@@ -2442,6 +2509,61 @@ mod tests {
                 name: "pdx".to_string(),
                 parameters: vec![],
             }]
+        );
+    }
+
+    #[test]
+    fn parses_type_functions_into_their_own_list() {
+        let source =
+            "struct Token\n  kind\n\n  def self.of(raw)\n    Token.new(kind: raw)\n  end\nend\n";
+        let Statement::StructDefinition {
+            methods,
+            type_functions,
+            ..
+        } = &parse(source).statements[0]
+        else {
+            panic!("expected a struct definition");
+        };
+        assert!(methods.is_empty());
+        assert_eq!(type_functions.len(), 1);
+        assert!(
+            matches!(&type_functions[0], Statement::MethodDefinition { name, .. } if name == "of")
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "`def self.` belongs inside a struct body — write def of")]
+    fn refuses_a_top_level_type_function() {
+        parse("def self.of\n  1\nend\n");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "a trait cannot define def self.of — a type function lives on the struct that includes it"
+    )]
+    fn refuses_a_type_function_in_a_trait() {
+        parse("trait Sexp\n  def self.of\n    1\n  end\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "greet is defined on Token instances and on the type — rename one")]
+    fn refuses_a_name_on_both_sides_of_a_struct() {
+        parse(
+            "struct Token\n  kind\n\n  def greet\n    kind\n  end\n\n  def self.greet\n    1\n  end\nend\n",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "with is reserved on structs")]
+    fn refuses_a_type_function_named_with() {
+        parse("struct Token\n  kind\n\n  def self.with\n    1\n  end\nend\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "duplicate method of in struct Token")]
+    fn refuses_a_duplicate_type_function() {
+        parse(
+            "struct Token\n  kind\n\n  def self.of\n    1\n  end\n\n  def self.of\n    2\n  end\nend\n",
         );
     }
 
