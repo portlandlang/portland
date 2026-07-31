@@ -42,6 +42,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0028](0028-2026-07-27-object-model-structs-and-traits.md) — The object model: structs stay the only type; traits carry shared behavior
 - [0029](0029-2026-07-27-together-semantics.md) — `together` semantics: independence declared, failure held, nothing shared
 - [0030](0030-2026-07-27-word-array-contents.md) — `%w[]` contents take Ruby's rules: escapes and balanced nesting
+- [0031](0031-2026-07-31-smart-constructors-definable-new.md) — Smart constructors: `new` is definable, and `super` reaches the fields
 
 <!-- /generated -->
 
