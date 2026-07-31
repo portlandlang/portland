@@ -561,12 +561,19 @@ def register_in_namespace(statement, home, mutable bindings)
   case statement
   in DefNode(name:, parameters:, body:)
     [[qualify(home, name), "method", [parameters, body, home]]] + bindings
-  in StructDefNode(name:, fields:, includes:, methods:, nested:)
+  in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
     merged = merged_methods(name, fields, includes, methods, home, bindings)
     mutable result = [[inner_home, "struct", [fields, merged]]] + bindings
+    # Type functions (ADR 0031) register as ordinary methods under the
+    # struct's namespace — `Token::of` — so the namespace rung dispatches
+    # them with no new machinery. Their home is the struct itself: bare
+    # names inside resolve outward from it, sibling type functions included.
+    type_functions.each do |function|
+      result = [["#{inner_home}::#{function.name}", "method", [function.parameters, function.body, inner_home]]] + result
+    end
     nested.each do |inner|
       result = register_in_namespace(inner, inner_home, result)
     end
@@ -1121,6 +1128,26 @@ def evaluate_new(node, mutable bindings)
     puts "evaluator: undefined struct #{written}"
     return outcome([], bindings)
   end
+  # A defined `new` replaces the raw constructor everywhere (ADR 0031):
+  # while it runs, `fields(...)` is the raw layer, and only there — the
+  # marker dies at every other call boundary.
+  new_slot = lookup(bindings, "#{slot.first[0]}::new")
+  if !new_slot.empty? && new_slot.first[1] == "method"
+    mutable arguments = []
+    mutable keyword_values = []
+    node.arguments.each do |argument|
+      if argument in KeywordArgumentNode
+        step = evaluate_expression(argument.value, bindings)
+        bindings = step.bindings
+        keyword_values << [argument.label, slot_value(step.value)]
+      else
+        step = evaluate_expression(argument, bindings)
+        bindings = step.bindings
+        arguments += step.value
+      end
+    end
+    return invoke_with_block(new_slot.first[2], arguments, keyword_values, nil, slot.first[0], bindings)
+  end
   fields = value_at(slot.first[2], 0)
   mutable provided = []
   node.arguments.each do |argument|
@@ -1207,7 +1234,7 @@ end
 # parameters (#27).
 def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
   mutable scope = bindings.reject do |triple|
-    triple[1] == "local" || triple[1] == "mutable"
+    triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
   end
   scope = [["__self__", "local", receiver]] + scope
   mutable pair_index = 0
@@ -1234,6 +1261,40 @@ end
 def evaluate_method_call(node, mutable bindings)
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
     return evaluate_new(node, bindings)
+  end
+  # `Token.of(...)` — a type function (ADR 0031): the receiver names a
+  # struct, and the function lives under its namespace. A local wearing the
+  # name wins first, as everywhere.
+  if (node.receiver in IdentifierNode) || (node.receiver in PathNode)
+    receiver_name = if node.receiver in PathNode
+      node.receiver.parts.join("::")
+    else
+      node.receiver.name
+    end
+    struct_slot = if node.receiver in PathNode
+      lookup(bindings, receiver_name)
+    else
+      resolve(bindings, receiver_name)
+    end
+    if !struct_slot.empty? && struct_slot.first[1] == "struct"
+      function_slot = lookup(bindings, "#{struct_slot.first[0]}::#{node.name}")
+      if !function_slot.empty? && function_slot.first[1] == "method"
+        mutable arguments = []
+        mutable keyword_values = []
+        node.arguments.each do |argument|
+          if argument in KeywordArgumentNode
+            step = evaluate_expression(argument.value, bindings)
+            bindings = step.bindings
+            keyword_values << [argument.label, slot_value(step.value)]
+          else
+            step = evaluate_expression(argument, bindings)
+            bindings = step.bindings
+            arguments += step.value
+          end
+        end
+        return invoke_with_block(function_slot.first[2], arguments, keyword_values, nil, nil, bindings)
+      end
+    end
   end
   # `Statistics.mean(x)` — the receiver names a namespace, so this invokes
   # a function inside it rather than dispatching on a value (ADR 0021).
@@ -1587,16 +1648,18 @@ end
 # Run a user method: fresh scope of methods only (no outer locals). The
 # caller's bindings come back untouched — callee scope is discarded.
 def invoke(payload, arguments, keyword_values, bindings)
-  invoke_with_block(payload, arguments, keyword_values, nil, bindings)
+  invoke_with_block(payload, arguments, keyword_values, nil, nil, bindings)
 end
 
-def invoke_with_block(payload, arguments, keyword_values, block, bindings)
+def invoke_with_block(payload, arguments, keyword_values, block, fields_target, bindings)
   parameters = payload[0]
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop —
-  # the rebindable kind included, since a mutable is a local that moves.
+  # the rebindable kind included, since a mutable is a local that moves,
+  # and the `__fields__` marker, since `fields` is legal only inside
+  # `def self.new` itself (ADR 0031), never in anything it calls.
   mutable scope = bindings.reject do |triple|
-    triple[1] == "local" || triple[1] == "mutable"
+    triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
   end
   # Bare names in the body resolve from where the method was written, not
   # from where it was called (ADR 0021).
@@ -1610,6 +1673,9 @@ def invoke_with_block(payload, arguments, keyword_values, block, bindings)
   # `__frame__` survives the local-reject above; prepending shadows it.
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
+  # While a defined `new` runs, `fields(...)` is its raw constructor
+  # (ADR 0031); the marker rides the scope and dies at the next boundary.
+  scope = [["__fields__", "fields", fields_target]] + scope unless fields_target.nil?
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   # A `break` or `next` reaching a boundary escaped every loop that could
@@ -1747,10 +1813,36 @@ def evaluate_call(node, mutable bindings)
     own = struct_method_for(receiver, node.name, bindings)
     return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   end
+  # `fields(...)` — the raw constructor, and only inside `def self.new`
+  # (ADR 0031). The name is unclaimable there: a program's own `fields`
+  # function is refused rather than guessed at. The wordings are the seed's.
+  if node.name == "fields"
+    fields_slot = lookup(bindings, "__fields__")
+    mutable function_slot = lookup(bindings, "fields")
+    function_slot = resolve(bindings, "fields") if function_slot.empty?
+    taken = !function_slot.empty? && function_slot.first[1] == "method"
+    unless fields_slot.empty?
+      panic("fields is the raw constructor inside def self.new — rename the fields function") if taken
+      panic("fields takes keyword arguments, not positional ones") unless arguments.empty?
+      target = value_at(fields_slot.first, 2)
+      struct_slot = lookup(bindings, target)
+      declared = value_at(struct_slot.first[2], 0)
+      mutable ordered = []
+      declared.each do |field|
+        mutable index = 0
+        while index < keyword_values.length
+          ordered << [field, value_at(keyword_values[index], 1)] if keyword_values[index][0] == field
+          index += 1
+        end
+      end
+      return outcome([["__struct__", target, ordered]], bindings)
+    end
+    panic("`fields` is the raw constructor — it only exists inside def self.new") unless taken
+  end
   mutable slot = lookup(bindings, node.name)
   slot = resolve(bindings, node.name) if slot.empty?
   if !slot.empty? && slot.first[1] == "method"
-    return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, bindings)
+    return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings)
   end
   case node.name
   when "puts"

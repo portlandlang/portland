@@ -648,6 +648,39 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def risky\n  failure(\"down\")\nend\ndef f\n  together do\n    ~ x = risky!\n  end\nend\nf\n",
             "a task cannot unwind across the join — bind a name and handle it after end",
         ),
+        // ADR 0031: type functions, definable `new`, and `fields`.
+        (
+            "fields(x: 1)\n",
+            "`fields` is the raw constructor — it only exists inside def self.new",
+        ),
+        (
+            "def self.of\n  1\nend\n",
+            "`def self.` belongs inside a struct body — write def of",
+        ),
+        (
+            "trait Sexp\n  def self.of\n    1\n  end\nend\n",
+            "a trait cannot define def self.of — a type function lives on the struct that includes it",
+        ),
+        (
+            "struct Token\n  kind\n\n  def greet\n    kind\n  end\n\n  def self.greet\n    1\n  end\nend\n",
+            "greet is defined on Token instances and on the type — rename one",
+        ),
+        (
+            "def fields\n  1\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    fields(kind: raw)\n  end\nend\nToken.new(\"rose\")\n",
+            "fields is the raw constructor inside def self.new — rename the fields function",
+        ),
+        (
+            "struct Token\n  kind\n\n  def self.new(raw)\n    fields(raw)\n  end\nend\nToken.new(\"rose\")\n",
+            "fields takes keyword arguments, not positional ones",
+        ),
+        (
+            "def helper\n  fields(kind: \"word\")\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    helper\n  end\nend\nToken.new(\"rose\")\n",
+            "`fields` is the raw constructor — it only exists inside def self.new",
+        ),
+        (
+            "struct Token\n  kind\n\n  def self.with\n    1\n  end\nend\n",
+            "with is reserved on structs",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("trio_error_case.pdx");
@@ -712,6 +745,18 @@ fn portland_evaluator_matches_the_seed_on_word_arrays() {
     assert_evaluator_matches_seed(
         "evaluator_word_arrays.pdx",
         "p %w[rose city]\np %w[]\np %w[a \\] b]\np %w[a [b] c]\np %w[[nested [deep]] x]\np %w[a\\ b c]\np %w[a\\nb a\\\\b]\np %w[a  b\tc]\np %w[one\ntwo]\nputs %w[\\] ) } ,].join(\"-\")\nputs %w[a \\] b].length\n",
+    );
+}
+
+/// ADR 0031 threaded through the trio: type functions, sibling bare calls,
+/// definable `new` with `fields` beneath, positional signatures, the
+/// failure path, module-body `def self.` as a plain def, and raw `new` on
+/// a plain struct untouched.
+#[test]
+fn portland_evaluator_matches_the_seed_on_type_functions() {
+    assert_evaluator_matches_seed(
+        "evaluator_type_functions.pdx",
+        "struct Token\n  kind\n  text\n\n  def self.of(raw)\n    Token.new(kind: \"word\", text: raw)\n  end\n\n  def self.fallback\n    \"blank\"\n  end\n\n  def self.labeled(raw)\n    return Token.new(kind: fallback, text: \"\") if raw.empty?\n    Token.of(raw)\n  end\nend\n\np Token.of(\"rose\")\np Token.labeled(\"\")\np Token.labeled(\"city\")\n\nstruct Badge\n  label\n\n  def self.new(raw)\n    return failure(\"a badge needs text\") if raw.empty?\n    fields(label: raw)\n  end\nend\n\np Badge.new(\"rose\")\np Badge.new(\"\")\nbadge = Badge.new(\"\") or Badge.new(\"fallback\")\nputs badge.label\n\nmodule Statistics\n  def self.mean(values)\n    values.sum / values.length\n  end\nend\nputs Statistics.mean([2, 4, 6])\n\nstruct Point\n  x\nend\np Point.new(x: 41)\np Point.new(x: 41).with(x: 42)\n",
     );
 }
 

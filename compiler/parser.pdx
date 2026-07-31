@@ -209,11 +209,17 @@ struct DefNode
   name
   parameters
   body
+  type_function
 
   include Sexp
 
   def sexp
-    mutable result = "(def #{name} #{headed_sexp("params", parameters)}"
+    written = if type_function
+      "self.#{name}"
+    else
+      name
+    end
+    mutable result = "(def #{written} #{headed_sexp("params", parameters)}"
     result << " #{sexp_list(body)}" unless body.empty?
     result + ")"
   end
@@ -571,6 +577,7 @@ struct StructDefNode
   includes
   methods
   nested
+  type_functions
 
   include Sexp
 
@@ -578,6 +585,7 @@ struct StructDefNode
     mutable result = "(struct #{name} #{fields.join(" ")}"
     result << " (include #{includes.join(" ")})" unless includes.empty?
     result << " #{sexp_list(methods)}" unless methods.empty?
+    result << " #{sexp_list(type_functions)}" unless type_functions.empty?
     result << " #{sexp_list(nested)}" unless nested.empty?
     result + ")"
   end
@@ -782,8 +790,8 @@ def case_node(subject, branches, else_body)
   CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
 end
 
-def def_node(name, parameters, body)
-  DefNode.new(kind: "def", name: name, parameters: parameters, body: body)
+def def_node(name, parameters, body, type_function)
+  DefNode.new(kind: "def", name: name, parameters: parameters, body: body, type_function: type_function)
 end
 
 def error_node(message)
@@ -910,8 +918,8 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, includes, methods, nested)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested)
+def struct_def_node(name, fields, includes, methods, nested, type_functions)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions)
 end
 
 def trait_def_node(name, methods)
@@ -2085,6 +2093,14 @@ end
 # — definitions —
 
 def parse_def(tokens, mutable position)
+  # `def self.name` — a type function (ADR 0031). The flag rides the node;
+  # each context decides what it means: a struct body registers it on the
+  # type, a module body accepts it as a plain def, the rest refuse.
+  mutable type_function = false
+  if keyword_at?(tokens, position, %w[self]) && operator_at?(tokens, position + 1, %w[.])
+    type_function = true
+    position += 2
+  end
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
@@ -2104,7 +2120,7 @@ def parse_def(tokens, mutable position)
   end
   body = parse_body(tokens, position, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: def_node(name, parameters, body.node), position: body.position + 1)
+    return Step.new(node: def_node(name, parameters, body.node, type_function), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close def #{name}"), position: body.position)
 end
@@ -2449,6 +2465,7 @@ def parse_struct(tokens, mutable position)
   mutable includes = []
   mutable methods = []
   mutable nested = []
+  mutable type_functions = []
   while keyword_at?(tokens, position, %w[def enum include struct])
     if keyword_at?(tokens, position, %w[include])
       unless position + 1 < tokens.length && tokens[position + 1].identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(tokens[position + 1].text.slice(0, 1))
@@ -2458,7 +2475,19 @@ def parse_struct(tokens, mutable position)
       position = skip_newlines_at(tokens, position + 2)
     elsif keyword_at?(tokens, position, %w[def])
       method = parse_def(tokens, position + 1)
-      methods << method.node
+      # One namespace serves instances and the type (ADR 0031): the same
+      # name on both sides is a collision, not overloading. The wordings
+      # are the seed's.
+      if (method.node in DefNode) && method.node.type_function
+        checked = check_type_function(name, fields, methods, type_functions, method.node)
+        return Step.new(node: checked, position: method.position) if checked in ErrorNode
+        type_functions << method.node
+      else
+        if (method.node in DefNode) && !type_functions.select { it.name == method.node.name }.empty?
+          return Step.new(node: error_node("#{method.node.name} is defined on #{name} instances and on the type — rename one"), position: method.position)
+        end
+        methods << method.node
+      end
       position = skip_newlines_at(tokens, method.position)
     else
       inner = if keyword_at?(tokens, position, %w[enum])
@@ -2474,9 +2503,19 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: struct_def_node(name, fields, includes, methods, nested), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+# The struct-body rules for one `def self.` (ADR 0031), each wording the
+# seed's: the node back when it passes, an ErrorNode when it refuses.
+def check_type_function(struct_name, fields, methods, type_functions, node)
+  return error_node("#{node.name} is a field of #{struct_name} — a name is a field or a method, never both") if fields.include?(node.name)
+  return error_node("#{node.name} is reserved on structs") if %w[nil? some? with].include?(node.name)
+  return error_node("#{node.name} is defined on #{struct_name} instances and on the type — rename one") unless methods.select { (it in DefNode) && it.name == node.name }.empty?
+  return error_node("duplicate method #{node.name} in struct #{struct_name}") unless type_functions.select { it.name == node.name }.empty?
+  node
 end
 
 # `together do ... end` (ADR 0029): task lines (`~` / `meanwhile`) bind
@@ -2529,6 +2568,11 @@ def parse_trait(tokens, mutable position)
   mutable methods = []
   while keyword_at?(tokens, position, %w[def])
     method = parse_def(tokens, position + 1)
+    # A trait is instance behavior with no state (ADR 0028); a type
+    # function has no instance, so it cannot ride one (ADR 0031).
+    if (method.node in DefNode) && method.node.type_function
+      return Step.new(node: error_node("a trait cannot define def self.#{method.node.name} — a type function lives on the struct that includes it"), position: method.position)
+    end
     methods << method.node
     position = skip_newlines_at(tokens, method.position)
   end
@@ -2700,6 +2744,16 @@ def parse_program(tokens)
       next
     end
     step = parse_statement_with_guard(tokens, position)
+    # `def self.` needs a struct body to mean anything (ADR 0031); a module
+    # body accepts it as a plain def, and those never reach this loop. A
+    # def nested in another def's body is not checked — a flat statement
+    # walk cannot see it, the decline-to-check rule — and the seed refuses
+    # it first. The wording is the seed's.
+    if (step.node in DefNode) && step.node.type_function
+      nodes << error_node("`def self.` belongs inside a struct body — write def #{step.node.name}")
+      position = step.position
+      next
+    end
     nodes << step.node
     position = step.position
     next if statement_boundary?(tokens, position)

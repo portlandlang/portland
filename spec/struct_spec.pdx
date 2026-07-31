@@ -120,3 +120,68 @@ context "a struct" do
     end
   end
 end
+
+# Construction logic (ADR 0031): type functions ride the struct body as
+# `def self.`, `new` is one of the definable names, and `fields(...)` is
+# the raw layer beneath a defined `new`.
+
+struct Ticket
+  label
+
+  def self.of(raw)
+    Ticket.new(label: raw)
+  end
+
+  def self.fallback
+    "unlabeled"
+  end
+
+  def self.labeled(raw)
+    return Ticket.new(label: fallback) if raw.empty?
+    Ticket.of(raw)
+  end
+end
+
+struct Badge
+  label
+
+  def self.new(raw)
+    return failure("a badge needs text") if raw.empty?
+    fields(label: raw)
+  end
+end
+
+module Doubling
+  def self.double(value)
+    value * 2
+  end
+end
+
+context "construction" do
+  describe "a type function" do
+    specify "dispatches on the struct's name" do
+      expect(Ticket.of("rose").label, "rose")
+    end
+
+    specify "reaches sibling type functions bare" do
+      expect(Ticket.labeled("").label, "unlabeled")
+    end
+  end
+
+  describe "a defined new" do
+    specify "replaces the raw constructor, positional signature included" do
+      expect(Badge.new("rose").label, "rose")
+    end
+
+    specify "answers a failure the toolkit handles" do
+      badge = Badge.new("") or Badge.new("fallback")
+      expect(badge.label, "fallback")
+    end
+  end
+
+  describe "def self. in a module body" do
+    specify "is a plain def — Ruby's spelling of the same meaning" do
+      expect(Doubling.double(21), 42)
+    end
+  end
+end
