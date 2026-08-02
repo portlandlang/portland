@@ -58,7 +58,7 @@ context "conditionals as expressions" do
       else
         "hello"
       end
-      expect(greeting, "afternoon")
+      expect(greeting).to(eq("afternoon"))
     end
   end
 
@@ -67,7 +67,7 @@ context "conditionals as expressions" do
       quiet = unless false
         "quiet"
       end
-      expect(quiet, "quiet")
+      expect(quiet).to(eq("quiet"))
     end
   end
 
@@ -79,7 +79,7 @@ context "conditionals as expressions" do
       else
         "many"
       end
-      expect(label, "two")
+      expect(label).to(eq("two"))
     end
 
     specify "falls to else when nothing matches" do
@@ -88,17 +88,19 @@ context "conditionals as expressions" do
       else
         "else branch"
       end
-      expect(label, "else branch")
+      expect(label).to(eq("else branch"))
     end
   end
 
   describe "postfix guards" do
     specify "return early on a hit" do
-      expect([guarded(true), guarded(false)], ["early", "late"])
+      expect(guarded(true)).to(eq("early"))
+      expect(guarded(false)).to(eq("late"))
     end
 
     specify "and unless inverts the test" do
-      expect([negated_guard(false), negated_guard(true)], ["stopped", "went on"])
+      expect(negated_guard(false)).to(eq("stopped"))
+      expect(negated_guard(true)).to(eq("went on"))
     end
   end
 end
@@ -110,7 +112,7 @@ context "loops" do
       while count < 3
         count += 1
       end
-      expect(count, 3)
+      expect(count).to(eq(3))
     end
 
     specify "break stops it and next skips an iteration" do
@@ -122,7 +124,7 @@ context "loops" do
         break if i > 7
         sum += i
       end
-      expect(sum, 16)
+      expect(sum).to(eq(16))
     end
 
     # ADR 0001 — the block rule applied to `while`: a name first bound in
@@ -133,13 +135,13 @@ context "loops" do
         fresh = index * 2
         index += 1
       end
-      expect(index, 3)
+      expect(index).to(eq(3))
     end
   end
 
   describe "a finished while" do
     specify "produces nil" do
-      expect(finished_loop, nil)
+      expect(finished_loop).to(be_nil)
     end
   end
 
@@ -150,7 +152,7 @@ context "loops" do
         next if n.even?
         collected << n
       end
-      expect(collected, [1, 3])
+      expect(collected).to(eq([1, 3]))
     end
   end
 end
@@ -158,17 +160,17 @@ end
 context "unwinding" do
   describe "a call broken out of" do
     specify "produces nil, not the collection" do
-      expect(broken_out, nil)
+      expect(broken_out).to(be_nil)
     end
   end
 
   describe "return inside a block" do
     specify "unwinds the enclosing method" do
-      expect(through_blocks, "unwound")
+      expect(through_blocks).to(eq("unwound"))
     end
 
     specify "unwinds to its write site, through a yielding helper" do
-      expect(through_a_yield, "unwound past the helper")
+      expect(through_a_yield).to(eq("unwound past the helper"))
     end
   end
 end

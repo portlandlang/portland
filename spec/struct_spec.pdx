@@ -55,7 +55,8 @@ context "a struct" do
     token = Token.new(kind: "integer", text: "42")
 
     specify "answers its fields" do
-      expect([token.kind, token.text], ["integer", "42"])
+      expect(token.kind).to(eq("integer"))
+      expect(token.text).to(eq("42"))
     end
   end
 
@@ -65,11 +66,11 @@ context "a struct" do
     copy = token.with(text: "43")
 
     specify "answers an updated copy" do
-      expect(copy.text, "43")
+      expect(copy.text).to(eq("43"))
     end
 
     specify "leaves the original untouched" do
-      expect(token.text, "42")
+      expect(token.text).to(eq("42"))
     end
   end
 
@@ -77,11 +78,11 @@ context "a struct" do
     token = Token.new(kind: "integer", text: "42")
 
     specify "is by value" do
-      expect(token == Token.new(kind: "integer", text: "42"), true)
+      expect(token).to(eq(Token.new(kind: "integer", text: "42")))
     end
 
     specify "and any differing field breaks it" do
-      expect(token == token.with(text: "43"), false)
+      expect(token).not_to(eq(token.with(text: "43")))
     end
   end
 
@@ -91,23 +92,23 @@ context "a struct" do
     token = Token.new(kind: "integer", text: "42")
 
     specify "reach fields bare" do
-      expect(token.integer?, true)
+      expect(token.integer?).to(be_true)
     end
 
     specify "reach their own methods and top-level methods bare" do
-      expect(token.framed, "[INTEGER]")
+      expect(token.framed).to(eq("[INTEGER]"))
     end
 
     specify "reach `with` through self" do
-      expect(token.renamed("43").text, "43")
+      expect(token.renamed("43").text).to(eq("43"))
     end
 
     specify "take other structs as arguments" do
-      expect(token.handed_to(Token.new(kind: "word", text: "pdx")), "pdx")
+      expect(token.handed_to(Token.new(kind: "word", text: "pdx"))).to(eq("pdx"))
     end
 
     specify "hand self along" do
-      expect(token.paired, "integer")
+      expect(token.paired).to(eq("integer"))
     end
   end
 
@@ -116,7 +117,7 @@ context "a struct" do
     line = Invoice::Line.new(amount: 5)
 
     specify "is named through its owner" do
-      expect(line.amount, 5)
+      expect(line.amount).to(eq(5))
     end
   end
 end
@@ -160,28 +161,32 @@ end
 context "construction" do
   describe "a type function" do
     specify "dispatches on the struct's name" do
-      expect(Ticket.of("rose").label, "rose")
+      expect(Ticket.of("rose").label).to(eq("rose"))
     end
 
     specify "reaches sibling type functions bare" do
-      expect(Ticket.labeled("").label, "unlabeled")
+      expect(Ticket.labeled("").label).to(eq("unlabeled"))
     end
   end
 
   describe "a defined new" do
     specify "replaces the raw constructor, positional signature included" do
-      expect(Badge.new("rose").label, "rose")
+      expect(Badge.new("rose").label).to(eq("rose"))
     end
 
-    specify "answers a failure the toolkit handles" do
+    specify "answers a failure when its own rule refuses" do
+      expect(Badge.new("")).to(be_failure)
+    end
+
+    specify "and the failure is one the toolkit handles" do
       badge = Badge.new("") or Badge.new("fallback")
-      expect(badge.label, "fallback")
+      expect(badge.label).to(eq("fallback"))
     end
   end
 
   describe "def self. in a module body" do
     specify "is a plain def — Ruby's spelling of the same meaning" do
-      expect(Doubling.double(21), 42)
+      expect(Doubling.double(21)).to(eq(42))
     end
   end
 end

@@ -36,7 +36,8 @@ context "a brace block" do
     end
 
     specify "calls the same way" do
-      expect([braced, donned], ["brace brace", "do do"])
+      expect(braced).to(eq("brace brace"))
+      expect(donned).to(eq("do do"))
     end
   end
 
@@ -48,7 +49,7 @@ context "a brace block" do
     greeted = repeat { greet name: "pdx" }
 
     specify "is that call's block" do
-      expect(greeted, "hello, pdx hello, pdx")
+      expect(greeted).to(eq("hello, pdx hello, pdx"))
     end
   end
 
@@ -58,7 +59,7 @@ context "a brace block" do
     unwrapped = unwrap {{name: 1}}
 
     specify "hands the hash through" do
-      expect(unwrapped, 1)
+      expect(unwrapped).to(eq(1))
     end
   end
 end
@@ -75,7 +76,7 @@ context "a do block" do
     end
 
     specify "belongs to the outermost call" do
-      expect(record, ["ran under outer"])
+      expect(record).to(eq(["ran under outer"]))
     end
   end
 end

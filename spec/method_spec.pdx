@@ -31,21 +31,22 @@ end
 context "a method" do
   describe "its body" do
     specify "returns its last expression" do
-      expect(implicit, "the last expression")
+      expect(implicit).to(eq("the last expression"))
     end
   end
 
   describe "keyword parameters" do
     specify "fill in a declared default" do
-      expect(tag(name: "pdx"), "pdx@1")
+      expect(tag(name: "pdx")).to(eq("pdx@1"))
     end
 
     specify "take arguments in any order" do
-      expect(tag(level: 3, name: "swap"), "swap@3")
+      expect(tag(level: 3, name: "swap")).to(eq("swap@3"))
     end
 
     specify "may default to an earlier parameter" do
-      expect([box(3), box(3, height: 2)], [9, 6])
+      expect(box(3)).to(eq(9))
+      expect(box(3, height: 2)).to(eq(6))
     end
   end
 
@@ -57,11 +58,11 @@ context "a method" do
       handed = apply do
         "from the block"
       end
-      expect(handed, "from the block")
+      expect(handed).to(eq("from the block"))
     end
 
     specify "runs a brace block the same way" do
-      expect(apply() { "from braces" }, "from braces")
+      expect(apply() { "from braces" }).to(eq("from braces"))
     end
 
     # ADR 0025's closure rule paying off twice: the inner `yield` finds the
@@ -70,7 +71,7 @@ context "a method" do
       handed = relay do
         "handed through two layers"
       end
-      expect(handed, "handed through two layers")
+      expect(handed).to(eq("handed through two layers"))
     end
 
     specify "and an accumulator flows through the delegation" do
@@ -81,7 +82,7 @@ context "a method" do
       relay do
         count += 10
       end
-      expect(count, 11)
+      expect(count).to(eq(11))
     end
   end
 end

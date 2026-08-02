@@ -6,19 +6,19 @@ context "Range" do
   # ADR 0019 — `..` keeps its end and `...` excludes it, and both iterate.
   describe "the literal" do
     specify "two dots keep the end" do
-      expect((1..5).to_a, [1, 2, 3, 4, 5])
+      expect((1..5).to_a).to(eq([1, 2, 3, 4, 5]))
     end
 
     specify "three dots exclude it" do
-      expect((1...5).to_a, [1, 2, 3, 4])
+      expect((1...5).to_a).to(eq([1, 2, 3, 4]))
     end
 
     specify "iterates through the block methods" do
-      expect((1..3).map { it * 2 }, [2, 4, 6])
+      expect((1..3).map { it * 2 }).to(eq([2, 4, 6]))
     end
 
     specify "sums without being spelled out" do
-      expect((1..5).sum, 15)
+      expect((1..5).sum).to(eq(15))
     end
   end
 
@@ -26,15 +26,17 @@ context "Range" do
   # lets an endless or beginless range answer at all.
   describe "#include?" do
     specify "respects the exclusive end" do
-      expect([(1..5).include?(5), (1...5).include?(5)], [true, false])
+      expect((1..5)).to(contain(5))
+      expect((1...5)).not_to(contain(5))
     end
 
     specify "answers for an endless range" do
-      expect((1..).include?(99), true)
+      expect((1..)).to(contain(99))
     end
 
     specify "answers for a beginless one" do
-      expect([(..4).include?(0 - 5), (..4).include?(5)], [true, false])
+      expect((..4)).to(contain(0 - 5))
+      expect((..4)).not_to(contain(5))
     end
   end
 
@@ -44,23 +46,25 @@ context "Range" do
     words = %w[a b c d e]
 
     specify "slices an array, inclusive or exclusive" do
-      expect([words[1..2], words[1...3]], [["b", "c"], ["b", "c"]])
+      expect(words[1..2]).to(eq(["b", "c"]))
+      expect(words[1...3]).to(eq(["b", "c"]))
     end
 
     specify "slices from the start with a beginless range" do
-      expect(words[..1], ["a", "b"])
+      expect(words[..1]).to(eq(["a", "b"]))
     end
 
     specify "slices to the end with an endless one" do
-      expect(words[3..], ["d", "e"])
+      expect(words[3..]).to(eq(["d", "e"]))
     end
 
     specify "slices strings the same way" do
-      expect(["portland"[0..3], "portland"[5..]], ["port", "and"])
+      expect("portland"[0..3]).to(eq("port"))
+      expect("portland"[5..]).to(eq("and"))
     end
 
     specify "answers an empty string past the end, never nil" do
-      expect("portland"[9..], "")
+      expect("portland"[9..]).to(be_empty)
     end
   end
 end

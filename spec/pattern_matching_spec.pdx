@@ -19,7 +19,7 @@ context "case/in" do
       in Node(kind: "word", text:)    then "the word #{text}"
       in Node(kind: "integer", text:) then "the number #{text}"
       end
-      expect(answer, "the number 42")
+      expect(answer).to(eq("the number 42"))
     end
   end
 
@@ -29,20 +29,21 @@ context "case/in" do
       in []              then "empty"
       in [first, *rest]  then [first, rest.length]
       end
-      expect(answer, [9, 2])
+      expect(answer).to(eq([9, 2]))
     end
   end
 
   describe "the smaller patterns" do
     specify "alternation takes any branch" do
-      expect((2 in 1 | 2 | 3), true)
+      expect((2 in 1 | 2 | 3)).to(be_true)
     end
 
     # Writing this example is what found that the trio could not match a
     # range pattern at all (#40) — it lived as a comment until both oracles
     # agreed.
     specify "a range matches by membership, exclusive end honored" do
-      expect([(5 in 1..9), (5 in 1...5)], [true, false])
+      expect((5 in 1..9)).to(be_true)
+      expect((5 in 1...5)).to(be_false)
     end
 
     specify "a range pattern may run beginless or endless" do
@@ -51,12 +52,12 @@ context "case/in" do
       in 1..9 then "single"
       in 10.. then "high"
       end
-      expect(edges, "high")
+      expect(edges).to(eq("high"))
     end
 
     specify "a pin matches the named value instead of binding it" do
       expected = 5
-      expect((5 in ^expected), true)
+      expect((5 in ^expected)).to(be_true)
     end
 
     specify "a guard vetoes a structural hit" do
@@ -65,7 +66,7 @@ context "case/in" do
       else
         "few"
       end
-      expect(answer, "many")
+      expect(answer).to(eq("many"))
     end
 
     # A vetoed branch never happened, so its captures die with it — the next
@@ -75,11 +76,12 @@ context "case/in" do
       in count if count > 10 then "many"
       in count               then "few — #{count}"
       end
-      expect(answer, "few — 5")
+      expect(answer).to(eq("few — 5"))
     end
 
     specify "nil matches only absence" do
-      expect([(nil in nil), (5 in nil)], [true, false])
+      expect((nil in nil)).to(be_true)
+      expect((5 in nil)).to(be_false)
     end
   end
 
@@ -88,11 +90,11 @@ context "case/in" do
   describe "a builtin type pattern" do
     specify "answers for all five types" do
       hits = [(1 in Integer), ("x" in String), ([1] in Array), ({a: 1} in Hash), (true in Boolean)]
-      expect(hits, [true, true, true, true, true])
+      expect(hits).to(eq([true, true, true, true, true]))
     end
 
     specify "and a miss is just false" do
-      expect(("x" in Integer), false)
+      expect(("x" in Integer)).to(be_false)
     end
   end
 
@@ -102,7 +104,7 @@ context "case/in" do
       in 1..9 then "the range, written first"
       in 5    then "the literal, written second"
       end
-      expect(answer, "the range, written first")
+      expect(answer).to(eq("the range, written first"))
     end
   end
 
@@ -114,7 +116,8 @@ context "case/in" do
     end
 
     specify "outlives its case" do
-      expect([head, tail], [1, 2])
+      expect(head).to(eq(1))
+      expect(tail).to(eq(2))
     end
   end
 end
@@ -124,14 +127,16 @@ context "the one-line forms" do
     specify "is a boolean that binds on a hit" do
       scores = [70, 80]
       hit = scores in [low, high]
-      expect([hit, low + high], [true, 150])
+      expect(hit).to(be_true)
+      expect(low + high).to(eq(150))
     end
   end
 
   describe "=>" do
     specify "destructures rightward" do
       [1, 2, 3] => [first, *rest]
-      expect([first, rest], [1, [2, 3]])
+      expect(first).to(eq(1))
+      expect(rest).to(eq([2, 3]))
     end
   end
 end

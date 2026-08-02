@@ -25,11 +25,11 @@ context "rebinding under mutable" do
     numbers << 2
 
     specify "rebinds the name, leaving aliases alone" do
-      expect(alias_of.length, 1)
+      expect(alias_of).to(have_length(1))
     end
 
     specify "and the name itself sees the append" do
-      expect(numbers.length, 2)
+      expect(numbers).to(have_length(2))
     end
   end
 
@@ -42,11 +42,11 @@ context "rebinding under mutable" do
     scores[:away] = 2
 
     specify "rebinds the name, leaving aliases alone" do
-      expect(frozen_view.length, 1)
+      expect(frozen_view).to(have_length(1))
     end
 
     specify "and the name itself sees the entry" do
-      expect(scores[:away], 2)
+      expect(scores[:away]).to(eq(2))
     end
   end
 
@@ -57,19 +57,20 @@ context "rebinding under mutable" do
       mutable list = [1, 2, 3]
       snapshot = list
       list[0] = 9
-      expect([snapshot, list], [[1, 2, 3], [9, 2, 3]])
+      expect(snapshot).to(eq([1, 2, 3]))
+      expect(list).to(eq([9, 2, 3]))
     end
 
     specify "replaces in range, counting negatives from the end" do
       mutable list = [1, 2, 3]
       list[0 - 1] = 7
-      expect(list, [1, 2, 7])
+      expect(list).to(eq([1, 2, 7]))
     end
 
     specify "appends at the position one past the end" do
       mutable list = [1, 2]
       list[2] = 3
-      expect(list, [1, 2, 3])
+      expect(list).to(eq([1, 2, 3]))
     end
   end
 
@@ -82,13 +83,13 @@ context "rebinding under mutable" do
       count *= 2
       count /= 4
       count %= 4
-      expect(count, 2)
+      expect(count).to(eq(2))
     end
 
     specify "appends to a string with <<" do
       mutable line = "rose"
       line << " city"
-      expect(line, "rose city")
+      expect(line).to(eq("rose city"))
     end
   end
 
@@ -96,12 +97,12 @@ context "rebinding under mutable" do
     start = 3
 
     specify "rebinds freely inside the method" do
-      expect(countdown(start), [3, 2, 1])
+      expect(countdown(start)).to(eq([3, 2, 1]))
     end
 
     specify "without touching the caller's binding" do
       countdown(start)
-      expect(start, 3)
+      expect(start).to(eq(3))
     end
   end
 
@@ -114,7 +115,7 @@ context "rebinding under mutable" do
       [1, 2, 3].each do |number|
         total += number
       end
-      expect(total, 6)
+      expect(total).to(eq(6))
     end
   end
 
@@ -126,7 +127,7 @@ context "rebinding under mutable" do
       case 5
       in found then found
       end
-      expect(found, 5)
+      expect(found).to(eq(5))
     end
   end
 end

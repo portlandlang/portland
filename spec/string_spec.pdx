@@ -5,29 +5,29 @@ require_relative "spec_helper"
 context "String" do
   describe "the literal" do
     specify "interpolates, auto-to_s-ing the value" do
-      expect("port#{"land"} #{503}", "portland 503")
+      expect("port#{"land"} #{503}").to(eq("portland 503"))
     end
 
     specify "nests interpolations" do
-      expect("#{"outer #{"inner"}"}", "outer inner")
+      expect("#{"outer #{"inner"}"}").to(eq("outer inner"))
     end
 
     specify "escapes the newline, tab, quote, and backslash" do
-      expect("\n\t\"\\".length, 4)
+      expect("\n\t\"\\".length).to(eq(4))
     end
 
     specify "escapes the interpolation hash" do
-      expect("\#{not run}".length, 10)
+      expect("\#{not run}".length).to(eq(10))
     end
   end
 
   describe "the operators" do
     specify "+ concatenates" do
-      expect("rose" + " city", "rose city")
+      expect("rose" + " city").to(eq("rose city"))
     end
 
     specify "* repeats" do
-      expect("ab" * 3, "ababab")
+      expect("ab" * 3).to(eq("ababab"))
     end
   end
 
@@ -35,39 +35,39 @@ context "String" do
     city = "portland"
 
     specify "measures length" do
-      expect(city.length, 8)
+      expect(city).to(have_length(8))
     end
 
     specify "upcases and downcases" do
-      expect(city.upcase.downcase, "portland")
+      expect(city.upcase.downcase).to(eq("portland"))
     end
 
     specify "reverses" do
-      expect("drawer".reverse, "reward")
+      expect("drawer".reverse).to(eq("reward"))
     end
 
     specify "answers empty? only for the empty string" do
-      expect("".empty?, true)
+      expect("").to(be_empty)
     end
 
     specify "splits into chars" do
-      expect("pdx".chars, ["p", "d", "x"])
+      expect("pdx".chars).to(eq(["p", "d", "x"]))
     end
 
     specify "splits on a separator" do
-      expect("a,b,c".split(","), ["a", "b", "c"])
+      expect("a,b,c".split(",")).to(eq(["a", "b", "c"]))
     end
 
     specify "answers include?, start_with?, and end_with?" do
-      expect(city.include?("tla") and city.start_with?("port") and city.end_with?("land"), true)
+      expect(city.include?("tla") and city.start_with?("port") and city.end_with?("land")).to(be_true)
     end
 
     specify "converts to_i and to_f" do
-      expect("42".to_i + "0.5".to_f, 42.5)
+      expect("42".to_i + "0.5".to_f).to(eq(42.5))
     end
 
     specify "slices by start and length" do
-      expect(city.slice(0, 4), "port")
+      expect(city.slice(0, 4)).to(eq("port"))
     end
   end
 
@@ -76,15 +76,15 @@ context "String" do
     city = "portland"
 
     specify "answers the character at an index" do
-      expect(city[0], "p")
+      expect(city[0]).to(eq("p"))
     end
 
     specify "counts negative indices from the end" do
-      expect(city[0 - 1], "d")
+      expect(city[0 - 1]).to(eq("d"))
     end
 
     specify "answers nil past the end" do
-      expect(city[99], nil)
+      expect(city[99]).to(be_nil)
     end
   end
 end
@@ -94,10 +94,10 @@ end
 # its absence from this list is the point of that ADR.
 describe "to_s, on every value" do
   specify "renders numbers, booleans, and collections" do
-    expect([42.to_s, 2.5.to_s, true.to_s, [1, "two"].to_s], ["42", "2.5", "true", "[1, two]"])
+    expect([42.to_s, 2.5.to_s, true.to_s, [1, "two"].to_s]).to(eq(["42", "2.5", "true", "[1, two]"]))
   end
 
   specify "is identity on a string" do
-    expect("already".to_s, "already")
+    expect("already".to_s).to(eq("already"))
   end
 end

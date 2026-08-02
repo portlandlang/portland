@@ -10,29 +10,29 @@ end
 context "inspect" do
   describe "on the value kinds" do
     specify "quotes a string, where to_s would not" do
-      expect(inspect("rose"), "\"rose\"")
+      expect(inspect("rose")).to(eq("\"rose\""))
     end
 
     specify "keeps a symbol's colon, where to_s drops it" do
-      expect(inspect(:paid), ":paid")
+      expect(inspect(:paid)).to(eq(":paid"))
     end
 
     specify "renders nil — a function takes absence without ceremony" do
-      expect(inspect(nil), "nil")
+      expect(inspect(nil)).to(eq("nil"))
     end
 
     specify "writes a hash back the way it would be typed" do
-      expect(inspect({name: "pdx"}), "{name: \"pdx\"}")
+      expect(inspect({name: "pdx"})).to(eq("{name: \"pdx\"}"))
     end
 
     specify "and a struct as its constructor would read" do
-      expect(inspect(Badge.new(label: "pdx")), "Badge(label: \"pdx\")")
+      expect(inspect(Badge.new(label: "pdx"))).to(eq("Badge(label: \"pdx\")"))
     end
   end
 
   describe "composed into a message" do
     specify "is what a failure line wants" do
-      expect("got #{inspect(nil)}, not #{inspect("nil")}", "got nil, not \"nil\"")
+      expect("got #{inspect(nil)}, not #{inspect("nil")}").to(eq("got nil, not \"nil\""))
     end
   end
 end

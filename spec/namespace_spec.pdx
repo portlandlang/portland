@@ -38,15 +38,15 @@ context "a namespace" do
   # ADR 0021 — `::` names, `.` invokes: a rule, not a convention.
   describe "the two operators" do
     specify ". invokes a module method" do
-      expect(Statistics.scaled(3), 30)
+      expect(Statistics.scaled(3)).to(eq(30))
     end
 
     specify ":: names a constant" do
-      expect(Statistics::BASE, 10)
+      expect(Statistics::BASE).to(eq(10))
     end
 
     specify "and both walk into a nested type in order" do
-      expect(Statistics::Summary.new(mean: 2).mean, 2)
+      expect(Statistics::Summary.new(mean: 2).mean).to(eq(2))
     end
   end
 
@@ -54,22 +54,22 @@ context "a namespace" do
   # the place for the name to live — including the top level.
   describe "a constant" do
     specify "lives at the top level too" do
-      expect(MAX, 5)
+      expect(MAX).to(eq(5))
     end
   end
 
   # ADR 0021 — bare names resolve outward from where they were written.
   describe "lexical resolution" do
     specify "reaches a sibling method bare" do
-      expect(Statistics.doubled_scale(3), 60)
+      expect(Statistics.doubled_scale(3)).to(eq(60))
     end
 
     specify "reaches outward from a nested module" do
-      expect(Statistics::Deep.reach(3), 40)
+      expect(Statistics::Deep.reach(3)).to(eq(40))
     end
 
     specify "treats module A::B as the nested spelling" do
-      expect(Statistics::Extra.lifted(2), 20)
+      expect(Statistics::Extra.lifted(2)).to(eq(20))
     end
   end
 end

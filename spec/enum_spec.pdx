@@ -40,7 +40,7 @@ context "an enum" do
       in :pending   then "never"
       in :paid(on:) then on
       end
-      expect(day, "tuesday")
+      expect(day).to(eq("tuesday"))
     end
 
     specify "matches on any subset of its labels" do
@@ -49,7 +49,7 @@ context "an enum" do
       in :paid(on:)         then on
       in :refunded(reason:) then reason
       end
-      expect(why, "damaged")
+      expect(why).to(eq("damaged"))
     end
 
     specify "binds every label when asked" do
@@ -57,11 +57,11 @@ context "an enum" do
       both = case refund
       in :refunded(on:, reason:) then "#{reason} on #{on}"
       end
-      expect(both, "damaged on friday")
+      expect(both).to(eq("damaged on friday"))
     end
 
     specify "hits the one-line in form too" do
-      expect((:paid(on: "tuesday") in :paid(on:)), true)
+      expect((:paid(on: "tuesday") in :paid(on:))).to(be_true)
     end
   end
 
@@ -69,7 +69,7 @@ context "an enum" do
   # needs to exist at runtime.
   describe "a payload-free case" do
     specify "is the plain symbol" do
-      expect(:less == :less, true)
+      expect(:less).to(eq(:less))
     end
   end
 
@@ -81,11 +81,11 @@ context "an enum" do
       in :pending   then "never"
       in :paid(on:) then on
       end
-      expect(day, "tuesday")
+      expect(day).to(eq("tuesday"))
     end
 
     specify "and the struct's own methods match on it" do
-      expect(purchase.paid?, true)
+      expect(purchase.paid?).to(be_true)
     end
   end
 end

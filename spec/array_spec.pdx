@@ -5,41 +5,41 @@ require_relative "spec_helper"
 context "Array" do
   describe "the literal" do
     specify "holds any mix of types, nesting included" do
-      expect([1, "two", [3]].length, 3)
+      expect([1, "two", [3]]).to(have_length(3))
     end
 
     specify "has a %w shorthand for words" do
-      expect(%w[rose city], ["rose", "city"])
+      expect(%w[rose city]).to(eq(["rose", "city"]))
     end
 
     specify "a backslash escapes a bracket into a word" do
-      expect(%w[a \] b \[ c], ["a", "]", "b", "[", "c"])
+      expect(%w[a \] b \[ c]).to(eq(["a", "]", "b", "[", "c"]))
     end
 
     specify "balanced brackets nest without escapes" do
-      expect(%w[a [b] c], ["a", "[b]", "c"])
+      expect(%w[a [b] c]).to(eq(["a", "[b]", "c"]))
     end
 
     specify "an escaped space joins a word instead of splitting" do
-      expect(%w[rose\ city elsewhere], ["rose city", "elsewhere"])
+      expect(%w[rose\ city elsewhere]).to(eq(["rose city", "elsewhere"]))
     end
 
     specify "any other escape keeps its backslash" do
-      expect(%w[a\nb].first.length, 4)
+      expect(%w[a\nb].first).to(have_length(4))
     end
 
     specify "whitespace runs split once, never into empty words" do
-      expect(%w[rose  city], ["rose", "city"])
+      expect(%w[rose  city]).to(eq(["rose", "city"]))
     end
   end
 
   describe "the operators" do
     specify "+ concatenates" do
-      expect([1, 2] + [3], [1, 2, 3])
+      expect([1, 2] + [3]).to(eq([1, 2, 3]))
     end
 
     specify "* repeats" do
-      expect([0] * 3, [0, 0, 0])
+      expect([0] * 3).to(eq([0, 0, 0]))
     end
   end
 
@@ -47,31 +47,31 @@ context "Array" do
     numbers = [3, 1, 2]
 
     specify "measures length" do
-      expect(numbers.length, 3)
+      expect(numbers).to(have_length(3))
     end
 
     specify "answers empty? only for the empty array" do
-      expect(numbers.empty?, false)
+      expect(numbers).not_to(be_empty)
     end
 
     specify "joins on a separator" do
-      expect(numbers.join("-"), "3-1-2")
+      expect(numbers.join("-")).to(eq("3-1-2"))
     end
 
     specify "answers include?" do
-      expect(numbers.include?(2), true)
+      expect(numbers).to(contain(2))
     end
 
     specify "sums" do
-      expect(numbers.sum, 6)
+      expect(numbers.sum).to(eq(6))
     end
 
     specify "sorts into a new array, leaving the original alone" do
-      expect(numbers.sort, [1, 2, 3])
+      expect(numbers.sort).to(eq([1, 2, 3]))
     end
 
     specify "slices by start and length" do
-      expect(numbers.slice(0, 2), [3, 1])
+      expect(numbers.slice(0, 2)).to(eq([3, 1]))
     end
   end
 
@@ -82,11 +82,13 @@ context "Array" do
     numbers = [3, 1, 2]
 
     specify "first and last answer the ends" do
-      expect([numbers.first, numbers.last], [3, 2])
+      expect(numbers.first).to(eq(3))
+      expect(numbers.last).to(eq(2))
     end
 
     specify "min and max answer the extremes" do
-      expect([numbers.min, numbers.max], [1, 3])
+      expect(numbers.min).to(eq(1))
+      expect(numbers.max).to(eq(3))
     end
   end
 
@@ -94,7 +96,7 @@ context "Array" do
     numbers = [3, 1, 2]
 
     specify "counts negative indices from the end" do
-      expect(numbers[0 - 1], 2)
+      expect(numbers[0 - 1]).to(eq(2))
     end
   end
 end

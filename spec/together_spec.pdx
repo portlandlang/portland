@@ -20,7 +20,8 @@ context "a together block" do
         ~ user = fetch_user(7)
         meanwhile orders = recent_orders(7)
       end
-      expect([user, orders.length], ["user-7", 2])
+      expect(user).to(eq("user-7"))
+      expect(orders).to(have_length(2))
     end
 
     specify "interleaves plain lines, whose locals die at end" do
@@ -28,7 +29,7 @@ context "a together block" do
         greeting = "hello"
         ~ note = "#{7} looked up"
       end
-      expect(note, "7 looked up")
+      expect(note).to(eq("7 looked up"))
     end
   end
 
@@ -37,14 +38,14 @@ context "a together block" do
       together do
         ~ sad_orders = recent_orders(0)
       end
-      expect(sad_orders.failure?, true)
+      expect(sad_orders).to(be_failure)
     end
 
     specify "which is one or away from a fallback, after the join" do
       together do
         ~ sad_orders = recent_orders(0)
       end
-      expect((sad_orders or "no orders today"), "no orders today")
+      expect((sad_orders or "no orders today")).to(eq("no orders today"))
     end
 
     specify "while its siblings run to completion" do
@@ -52,7 +53,8 @@ context "a together block" do
         ~ sad_orders = recent_orders(0)
         ~ user = fetch_user(7)
       end
-      expect([sad_orders.failure?, user], [true, "user-7"])
+      expect(sad_orders).to(be_failure)
+      expect(user).to(eq("user-7"))
     end
   end
 end

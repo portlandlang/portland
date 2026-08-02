@@ -50,25 +50,27 @@ context "a trait" do
 
   describe "carried by a struct" do
     specify "hands its methods to the carrier" do
-      expect(token.label, "word: pdx")
+      expect(token.label).to(eq("word: pdx"))
     end
 
     specify "reaches the carrier's fields bare" do
-      expect(token.size_note, "3 characters")
+      expect(token.size_note).to(eq("3 characters"))
     end
 
     specify "reaches its own sibling methods bare" do
-      expect(token.shouted, "WORD: PDX")
+      expect(token.shouted).to(eq("WORD: PDX"))
     end
 
     specify "sits beside the struct's own methods, two traits at once" do
-      expect([token.brief, token.label, token.size_note], ["pdx", "word: pdx", "3 characters"])
+      expect(token.brief).to(eq("pdx"))
+      expect(token.label).to(eq("word: pdx"))
+      expect(token.size_note).to(eq("3 characters"))
     end
   end
 
   describe "nested in a module" do
     specify "resolves outward from where the struct was written" do
-      expect(Rendering::Badge.new(label: "pdx").framed, "[pdx]")
+      expect(Rendering::Badge.new(label: "pdx").framed).to(eq("[pdx]"))
     end
   end
 end

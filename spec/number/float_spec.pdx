@@ -5,11 +5,12 @@ require_relative "../spec_helper"
 context "Float" do
   describe "the library" do
     specify "abs drops the sign" do
-      expect((0 - 2.5).abs, 2.5)
+      expect((0 - 2.5).abs).to(eq(2.5))
     end
 
     specify "to_i truncates toward zero, Ruby's rule" do
-      expect([2.9.to_i, (0 - 2.9).to_i], [2, -2])
+      expect(2.9.to_i).to(eq(2))
+      expect((0 - 2.9).to_i).to(eq(-2))
     end
   end
 
@@ -17,7 +18,7 @@ context "Float" do
   # follows the divisor there too.
   describe "#%" do
     specify "takes the sign of the divisor" do
-      expect((0 - 7.0) % 2, 1.0)
+      expect((0 - 7.0) % 2).to(eq(1.0))
     end
   end
 end

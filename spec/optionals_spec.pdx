@@ -20,7 +20,7 @@ context "absence" do
     words = %w[rose city]
 
     specify "returns an empty collection past the end, never nil" do
-      expect(words[9..].length, 0)
+      expect(words[9..]).to(be_empty)
     end
   end
 
@@ -29,15 +29,15 @@ context "absence" do
   # three of them.
   describe "a partial operation" do
     specify "answers nil for first on an empty array" do
-      expect([].first, nil)
+      expect([].first).to(be_nil)
     end
 
     specify "answers nil for an out-of-range index" do
-      expect([1, 2][9], nil)
+      expect([1, 2][9]).to(be_nil)
     end
 
     specify "answers nil for a missing hash key" do
-      expect({name: "pdx"}[:nope], nil)
+      expect({name: "pdx"}[:nope]).to(be_nil)
     end
   end
 
@@ -48,7 +48,7 @@ context "absence" do
     end
 
     specify "produces nil" do
-      expect(branchless, nil)
+      expect(branchless).to(be_nil)
     end
   end
 
@@ -60,22 +60,22 @@ context "absence" do
     missing = []
 
     specify "comes back present when a nil was stored" do
-      expect(stored.first.nil?, false)
+      expect(stored.first).not_to(be_nil)
     end
 
     specify "comes back absent when the array was empty" do
-      expect(missing.first.nil?, true)
+      expect(missing.first).to(be_nil)
     end
   end
 
   # ADR 0006/0009 — `nil?` and `some?` are the one dispatch every value allows.
   describe "nil? and some?" do
     specify "call a plain value present" do
-      expect(42.some?, true)
+      expect(42).to(be_some)
     end
 
     specify "and not absent" do
-      expect(42.nil?, false)
+      expect(42).not_to(be_nil)
     end
   end
 end
@@ -83,11 +83,11 @@ end
 context "the unwrap toolkit" do
   describe "the or-guard" do
     specify "returns early on an absent maybe" do
-      expect(first_or_bail([]), "bailed")
+      expect(first_or_bail([])).to(eq("bailed"))
     end
 
     specify "passes a present value straight through" do
-      expect(first_or_bail([5]), 5)
+      expect(first_or_bail([5])).to(eq(5))
     end
   end
 
@@ -98,11 +98,11 @@ context "the unwrap toolkit" do
     empty = []
 
     specify "forwards to a present receiver" do
-      expect(words.first&.upcase, "ROSE")
+      expect(words.first&.upcase).to(eq("ROSE"))
     end
 
     specify "answers nil for an absent one" do
-      expect(empty.first&.upcase, nil)
+      expect(empty.first&.upcase).to(be_nil)
     end
   end
 
@@ -112,21 +112,21 @@ context "the unwrap toolkit" do
   # and the stored nothing are different answers.
   describe "some()" do
     specify "is identity on a plain value" do
-      expect(some(5), 5)
+      expect(some(5)).to(eq(5))
     end
 
     specify "boxes a nil into a present value" do
-      expect(some(nil).some?, true)
+      expect(some(nil)).to(be_some)
     end
 
     specify "lets a stored hash nil beat an or-guard default" do
       notes = {note: nil}
-      expect((notes[:note] or "default"), nil)
+      expect((notes[:note] or "default")).to(be_nil)
     end
 
     specify "while a genuinely missing key takes the default" do
       notes = {note: nil}
-      expect((notes[:nope] or "default"), "default")
+      expect((notes[:nope] or "default")).to(eq("default"))
     end
   end
 end

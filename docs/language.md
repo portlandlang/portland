@@ -259,7 +259,7 @@ A user-defined method takes a block too, reached with `yield`, and a paren-less 
 ```ruby
 describe "Array#first" do
   specify "comes back absent when the array was empty" do
-    expect([].first.nil?, true)
+    expect([].first).to(be_nil)
   end
 end
 ```

@@ -78,8 +78,232 @@ end
 # absence has no methods, `to_s` included (ADR 0005/0006). A `shown` helper
 # used to paper over exactly that, and this is the deletion its comment
 # asked for.
-def expect(actual, expected)
-  return if actual == expected
+#
+# The chain is the sentence grammar. `expect(x).to(eq(y))` reads
+# subject-verb-preposition-complement, where `expect(x, y)` — and every xUnit
+# `assert_equal x, y` — is verb-object-object with nothing joining the two.
+# `.to` is doing a preposition's job, the same instinct that puts `.of` and
+# `.from` on constructor entry points (ADR 0031). The parens around the
+# matcher are the one piece of ceremony left, and [#68] is the parse that
+# would drop them: `expect(x).to eq(y)`.
+struct Expectation
+  actual
 
-  puts "  FAIL expected #{inspect(expected)}, got #{inspect(actual)}"
+  def to(matcher)
+    return if matcher.matches?(actual)
+
+    puts "  FAIL #{matcher.failure_message(actual)}"
+  end
+
+  def not_to(matcher)
+    return unless matcher.matches?(actual)
+
+    puts "  FAIL #{matcher.negated_failure_message(actual)}"
+  end
+end
+
+def expect(actual)
+  Expectation.new(actual: actual)
+end
+
+# The matcher protocol is `matches?`, `failure_message`, and
+# `negated_failure_message` — structural, not declared. Nothing checks that a
+# matcher supplies all three until it is asked for one; type inference (#9)
+# is what turns the convention into a checked shape, and a `trait` cannot do
+# it today because each matcher's `matches?` is its own.
+#
+# Every matcher carries at least one field, because a struct needs one. That
+# is not a workaround here: the field a stateless matcher would not have
+# turns out to be the word its failure message wants.
+struct EqualMatcher
+  expected
+
+  def matches?(actual)
+    actual == expected
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(expected)}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected anything but #{inspect(expected)}"
+  end
+end
+
+def eq(expected)
+  EqualMatcher.new(expected: expected)
+end
+
+struct BooleanMatcher
+  wanted
+
+  def matches?(actual)
+    actual == wanted
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(wanted)}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected anything but #{inspect(wanted)}"
+  end
+end
+
+def be_true
+  BooleanMatcher.new(wanted: true)
+end
+
+def be_false
+  BooleanMatcher.new(wanted: false)
+end
+
+# The predicate matchers are one struct apiece, and they differ by exactly
+# one method call. This is what rspec's `be_empty` / `be_nil` / `be_whatever`
+# buys with `method_missing`, written out — the repetition is the honest cost
+# of having no runtime dynamism, and the shape a compile-time macro (#14)
+# would generate. Four of them is tolerable; forty would not be, which is the
+# argument for the macro when a real file asks.
+struct EmptyMatcher
+  word
+
+  def matches?(actual)
+    actual.empty?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_empty
+  EmptyMatcher.new(word: "empty")
+end
+
+struct NilMatcher
+  word
+
+  def matches?(actual)
+    actual.nil?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_nil
+  NilMatcher.new(word: "nil")
+end
+
+struct SomeMatcher
+  word
+
+  def matches?(actual)
+    actual.some?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_some
+  SomeMatcher.new(word: "some")
+end
+
+struct FailureMatcher
+  word
+
+  def matches?(actual)
+    actual.failure?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_failure
+  FailureMatcher.new(word: "a failure")
+end
+
+# `include` is a keyword (ADR 0028 spends it on traits), so rspec's
+# `expect(list).to include(3)` is unspellable and `contain` is the Portland
+# word for it.
+struct ContainMatcher
+  wanted
+
+  def matches?(actual)
+    actual.include?(wanted)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to contain #{inspect(wanted)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to contain #{inspect(wanted)}"
+  end
+end
+
+def contain(wanted)
+  ContainMatcher.new(wanted: wanted)
+end
+
+struct KeyMatcher
+  key
+
+  def matches?(actual)
+    actual.key?(key)
+  end
+
+  def failure_message(actual)
+    "expected a key #{inspect(key)} in #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected no key #{inspect(key)} in #{inspect(actual)}"
+  end
+end
+
+def have_key(wanted)
+  KeyMatcher.new(key: wanted)
+end
+
+struct LengthMatcher
+  expected
+
+  def matches?(actual)
+    actual.length == expected
+  end
+
+  def failure_message(actual)
+    "expected length #{inspect(expected)}, got #{inspect(actual.length)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected any length but #{inspect(expected)}"
+  end
+end
+
+def have_length(count)
+  LengthMatcher.new(expected: count)
 end
