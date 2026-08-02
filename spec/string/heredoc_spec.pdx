@@ -1,12 +1,12 @@
-# Heredocs: squiggly only, which is what keeps `<<` the append operator
-# everywhere else.
+# Heredocs: another spelling of a string literal, squiggly only — which is
+# what keeps `<<` the append operator everywhere else.
 
-require_relative "spec_helper"
+require_relative "../spec_helper"
 
-context "a heredoc" do
+context "String" do
   # ADR 0020 — `<<~` strips the common indentation, keeps the line breaks,
   # and interpolates like any double-quoted string.
-  describe "the squiggly form" do
+  describe "the heredoc" do
     city = "portland"
 
     specify "dedents to the shallowest line" do
@@ -33,7 +33,7 @@ context "a heredoc" do
   end
 
   # ADR 0020 — the quoted terminator suppresses interpolation entirely.
-  describe "the quoted terminator" do
+  describe "the heredoc's quoted terminator" do
     specify "keeps the interpolation spelling as text" do
       raw = <<~'TEXT'
         no #{interpolation} here
