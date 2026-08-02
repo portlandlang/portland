@@ -1,0 +1,12 @@
+# `nil` as a pattern matches absence and nothing else.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "the nil pattern" do
+    specify "matches only absence" do
+      expect((nil in nil)).to(be_true)
+      expect((5 in nil)).to(be_false)
+    end
+  end
+end

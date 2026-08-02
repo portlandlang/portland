@@ -1,0 +1,22 @@
+# A struct is an immutable named record: kwargs in, fields out.
+#
+# Declarations sit at the top level, like the enum in spec/enum/: a type is
+# compile-time information, and a block is not the right home.
+
+require_relative "../spec_helper"
+
+struct Token
+  kind
+  text
+end
+
+context "a struct" do
+  describe "construction" do
+    token = Token.new(kind: "integer", text: "42")
+
+    specify "answers its fields" do
+      expect(token.kind).to(eq("integer"))
+      expect(token.text).to(eq("42"))
+    end
+  end
+end

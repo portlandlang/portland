@@ -1,0 +1,24 @@
+# `yield` runs the block the method was handed, and both block spellings —
+# `do` on a command call, braces on a parenthesized one — arrive the same
+# way.
+
+require_relative "../spec_helper"
+
+def apply
+  yield
+end
+
+context "a method" do
+  describe "yield" do
+    specify "runs a do block handed to a paren-less call" do
+      handed = apply do
+        "from the block"
+      end
+      expect(handed).to(eq("from the block"))
+    end
+
+    specify "runs a brace block the same way" do
+      expect(apply() { "from braces" }).to(eq("from braces"))
+    end
+  end
+end

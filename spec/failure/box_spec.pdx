@@ -1,0 +1,22 @@
+# Failure is absence with a reason (ADR 0027): a marked box carrying why.
+
+require_relative "../spec_helper"
+
+context "a failure" do
+  describe "the box" do
+    specify "is marked, and marks nothing else" do
+      expect(failure("why")).to(be_failure)
+      expect(5).not_to(be_failure)
+      expect(nil).not_to(be_failure)
+    end
+
+    specify "is present, not absent — absence with a reason is still a value" do
+      expect(failure("why")).to(be_some)
+      expect(failure("why")).not_to(be_nil)
+    end
+
+    specify "renders under inspect with its reason" do
+      expect(inspect(failure(42))).to(eq("failure(42)"))
+    end
+  end
+end

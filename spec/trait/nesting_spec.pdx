@@ -1,0 +1,26 @@
+# A module-nested trait resolves outward from where the struct was written
+# (ADR 0021's rule, reaching ADR 0028's declaration).
+
+require_relative "../spec_helper"
+
+module Rendering
+  trait Framed
+    def framed
+      "[#{label}]"
+    end
+  end
+
+  struct Badge
+    label
+
+    include Framed
+  end
+end
+
+context "a trait" do
+  describe "nested in a module" do
+    specify "resolves outward from where the struct was written" do
+      expect(Rendering::Badge.new(label: "pdx").framed).to(eq("[pdx]"))
+    end
+  end
+end

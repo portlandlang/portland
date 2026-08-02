@@ -1,0 +1,21 @@
+# ADR 0007 — `or`, `and`, and `not` are dead-identical to `||`, `&&`, and
+# `!`. Same precedence, same semantics; Ruby's secret second precedence is
+# gone.
+
+require_relative "../spec_helper"
+
+context "the word operators" do
+  describe "against the sigils" do
+    specify "or is ||" do
+      expect((false or true)).to(eq((false || true)))
+    end
+
+    specify "and is &&" do
+      expect((true and false)).to(eq((true && false)))
+    end
+
+    specify "not is !" do
+      expect((not true)).to(eq((!true)))
+    end
+  end
+end

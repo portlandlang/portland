@@ -1,0 +1,15 @@
+# `|` takes any of its branches.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "alternation" do
+    specify "takes any branch" do
+      expect((2 in 1 | 2 | 3)).to(be_true)
+    end
+
+    specify "and misses when none of them hit" do
+      expect((9 in 1 | 2 | 3)).to(be_false)
+    end
+  end
+end

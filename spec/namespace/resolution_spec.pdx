@@ -1,0 +1,45 @@
+# ADR 0021 — bare names resolve outward from where they were written, and
+# `module A::B` is the nested spelling, which is what drops Ruby's
+# `Module.nesting` trap.
+
+require_relative "../spec_helper"
+
+module Statistics
+  BASE = 10
+
+  def scaled(value)
+    value * BASE
+  end
+
+  def doubled_scale(value)
+    scaled(value) * 2
+  end
+
+  module Deep
+    def reach(value)
+      scaled(value) + BASE
+    end
+  end
+end
+
+module Statistics::Extra
+  def lifted(value)
+    scaled(value)
+  end
+end
+
+context "a namespace" do
+  describe "lexical resolution" do
+    specify "reaches a sibling method bare" do
+      expect(Statistics.doubled_scale(3)).to(eq(60))
+    end
+
+    specify "reaches outward from a nested module" do
+      expect(Statistics::Deep.reach(3)).to(eq(40))
+    end
+
+    specify "treats module A::B as the nested spelling" do
+      expect(Statistics::Extra.lifted(2)).to(eq(20))
+    end
+  end
+end

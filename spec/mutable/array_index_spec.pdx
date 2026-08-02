@@ -1,0 +1,31 @@
+# ADR 0015 — the array half of index assignment, which crashed the trio's
+# evaluator the day this file grew (#43).
+#
+# Each example carries its own `mutable`, per the helper's caveat: these
+# rebind inside the specify, and a shared fixture would chain them.
+
+require_relative "../spec_helper"
+
+context "rebinding under mutable" do
+  describe "index assignment on an array" do
+    specify "rebinds the name, leaving aliases alone" do
+      mutable list = [1, 2, 3]
+      snapshot = list
+      list[0] = 9
+      expect(snapshot).to(eq([1, 2, 3]))
+      expect(list).to(eq([9, 2, 3]))
+    end
+
+    specify "replaces in range, counting negatives from the end" do
+      mutable list = [1, 2, 3]
+      list[0 - 1] = 7
+      expect(list).to(eq([1, 2, 7]))
+    end
+
+    specify "appends at the position one past the end" do
+      mutable list = [1, 2]
+      list[2] = 3
+      expect(list).to(eq([1, 2, 3]))
+    end
+  end
+end

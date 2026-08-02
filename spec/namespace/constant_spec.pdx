@@ -1,0 +1,22 @@
+# Immutability already made constants unrebindable; a namespace is just the
+# place for the name to live — including the top level.
+
+require_relative "../spec_helper"
+
+MAX = 5
+
+module Limits
+  CEILING = 99
+end
+
+context "a namespace" do
+  describe "a constant" do
+    specify "lives at the top level too" do
+      expect(MAX).to(eq(5))
+    end
+
+    specify "and inside a module, named through it" do
+      expect(Limits::CEILING).to(eq(99))
+    end
+  end
+end

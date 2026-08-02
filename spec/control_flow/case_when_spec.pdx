@@ -1,0 +1,27 @@
+# `case/when` matches by equality; `case/in` and its patterns live in
+# spec/pattern_matching/.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "case/when" do
+    specify "answers the matching branch" do
+      label = case 2
+      when 1 then "one"
+      when 2 then "two"
+      else
+        "many"
+      end
+      expect(label).to(eq("two"))
+    end
+
+    specify "falls to else when nothing matches" do
+      label = case 9
+      when 1 then "one"
+      else
+        "else branch"
+      end
+      expect(label).to(eq("else branch"))
+    end
+  end
+end

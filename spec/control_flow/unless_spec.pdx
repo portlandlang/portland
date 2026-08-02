@@ -1,0 +1,22 @@
+# `unless` is `if` with the test inverted, and an expression like everything.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "unless" do
+    specify "answers when the condition is false" do
+      quiet = unless false
+        "quiet"
+      end
+      expect(quiet).to(eq("quiet"))
+    end
+
+    # ADR 0012 — a branch that doesn't happen produces nil.
+    specify "and answers nil when it is true" do
+      loud = unless true
+        "quiet"
+      end
+      expect(loud).to(be_nil)
+    end
+  end
+end

@@ -1,0 +1,18 @@
+# `if` is an expression, and conditions are booleans only.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "if" do
+    specify "answers the taken branch" do
+      greeting = if false
+        "morning"
+      elsif true
+        "afternoon"
+      else
+        "hello"
+      end
+      expect(greeting).to(eq("afternoon"))
+    end
+  end
+end

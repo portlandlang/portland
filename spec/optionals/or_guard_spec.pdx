@@ -1,0 +1,22 @@
+# ADR 0008 — the or-guard: `or return` hands the early exit to the caller.
+# The guard must sit inside a method, since `return` exits one; the def sits
+# at the top level, where defs live.
+
+require_relative "../spec_helper"
+
+def first_or_bail(values)
+  found = values.first or return "bailed"
+  found
+end
+
+context "the unwrap toolkit" do
+  describe "the or-guard" do
+    specify "returns early on an absent maybe" do
+      expect(first_or_bail([])).to(eq("bailed"))
+    end
+
+    specify "passes a present value straight through" do
+      expect(first_or_bail([5])).to(eq(5))
+    end
+  end
+end

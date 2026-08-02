@@ -1,0 +1,29 @@
+# ADR 0014 — Ruby 3 keywords: `label:` required, `label: default` optional,
+# strictly separate from positionals.
+
+require_relative "../spec_helper"
+
+def tag(name:, level: 1)
+  "#{name}@#{level}"
+end
+
+def box(width, height: width)
+  width * height
+end
+
+context "a method" do
+  describe "keyword parameters" do
+    specify "fill in a declared default" do
+      expect(tag(name: "pdx")).to(eq("pdx@1"))
+    end
+
+    specify "take arguments in any order" do
+      expect(tag(level: 3, name: "swap")).to(eq("swap@3"))
+    end
+
+    specify "may default to an earlier parameter" do
+      expect(box(3)).to(eq(9))
+      expect(box(3, height: 2)).to(eq(6))
+    end
+  end
+end

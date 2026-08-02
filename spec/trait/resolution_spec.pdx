@@ -1,0 +1,42 @@
+# A trait's methods join the same no-shadow ladder as everything else: they
+# reach the carrier's fields bare, and their own siblings bare.
+
+require_relative "../spec_helper"
+
+trait Describable
+  def label
+    "#{kind}: #{text}"
+  end
+
+  def shouted
+    label.upcase
+  end
+end
+
+trait Sized
+  def size_note
+    "#{text.length} characters"
+  end
+end
+
+struct Token
+  kind
+  text
+
+  include Describable
+  include Sized
+end
+
+context "a trait" do
+  token = Token.new(kind: "word", text: "pdx")
+
+  describe "its bare names" do
+    specify "reach the carrier's fields" do
+      expect(token.size_note).to(eq("3 characters"))
+    end
+
+    specify "reach its own sibling methods" do
+      expect(token.shouted).to(eq("WORD: PDX"))
+    end
+  end
+end

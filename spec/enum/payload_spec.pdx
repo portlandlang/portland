@@ -1,0 +1,46 @@
+# ADR 0022 — a case may carry a keyword-only payload, destructured by label.
+#
+# The declarations stay at the top level: they are compile-time information,
+# and nothing about a block is the right home for them.
+
+require_relative "../spec_helper"
+
+enum Status
+  :pending
+  :paid(on:)
+  :refunded(on:, reason:)
+end
+
+context "an enum" do
+  describe "a case carrying a payload" do
+    specify "destructures by label" do
+      paid = :paid(on: "tuesday")
+      day = case paid
+      in :pending   then "never"
+      in :paid(on:) then on
+      end
+      expect(day).to(eq("tuesday"))
+    end
+
+    specify "matches on any subset of its labels" do
+      refund = :refunded(on: "friday", reason: "damaged")
+      why = case refund
+      in :paid(on:)         then on
+      in :refunded(reason:) then reason
+      end
+      expect(why).to(eq("damaged"))
+    end
+
+    specify "binds every label when asked" do
+      refund = :refunded(on: "friday", reason: "damaged")
+      both = case refund
+      in :refunded(on:, reason:) then "#{reason} on #{on}"
+      end
+      expect(both).to(eq("damaged on friday"))
+    end
+
+    specify "hits the one-line in form too" do
+      expect((:paid(on: "tuesday") in :paid(on:))).to(be_true)
+    end
+  end
+end

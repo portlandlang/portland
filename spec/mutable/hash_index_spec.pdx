@@ -1,0 +1,20 @@
+# ADR 0015 — index assignment is the same rebinding sugar, so the alias
+# rule holds there too.
+
+require_relative "../spec_helper"
+
+context "rebinding under mutable" do
+  describe "index assignment on a hash" do
+    mutable scores = {home: 1}
+    frozen_view = scores
+    scores[:away] = 2
+
+    specify "rebinds the name, leaving aliases alone" do
+      expect(frozen_view).to(have_length(1))
+    end
+
+    specify "and the name itself sees the entry" do
+      expect(scores[:away]).to(eq(2))
+    end
+  end
+end

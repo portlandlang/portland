@@ -1,0 +1,27 @@
+# A guard vetoes a structural hit — and a vetoed branch never happened, so
+# its captures die with it.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "a guard" do
+    specify "vetoes a structural hit" do
+      answer = case 15
+      in count if count > 10 then "many"
+      else
+        "few"
+      end
+      expect(answer).to(eq("many"))
+    end
+
+    # The next branch binds the same name fresh instead of tripping
+    # no-shadow, because the vetoed branch never happened.
+    specify "discards its captures when it fails" do
+      answer = case 5
+      in count if count > 10 then "many"
+      in count               then "few — #{count}"
+      end
+      expect(answer).to(eq("few — 5"))
+    end
+  end
+end

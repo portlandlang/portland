@@ -1,0 +1,35 @@
+# `together` (ADR 0029): task names bind at `end` and not before. Serial
+# today, and only the promised semantics are pinned here, so these examples
+# survive the parallel build unchanged.
+
+require_relative "../spec_helper"
+
+def fetch_user(id)
+  "user-#{id}"
+end
+
+def recent_orders(id)
+  return failure("orders down") if id == 0
+  ["order-a", "order-b"]
+end
+
+context "a together block" do
+  describe "the join" do
+    specify "binds every task name after end, both marker spellings" do
+      together do
+        ~ user = fetch_user(7)
+        meanwhile orders = recent_orders(7)
+      end
+      expect(user).to(eq("user-7"))
+      expect(orders).to(have_length(2))
+    end
+
+    specify "interleaves plain lines, whose locals die at end" do
+      together do
+        greeting = "hello"
+        ~ note = "#{7} looked up"
+      end
+      expect(note).to(eq("7 looked up"))
+    end
+  end
+end

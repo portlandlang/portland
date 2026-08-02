@@ -1,0 +1,28 @@
+# ADR 0001 — parameters are binding sites too, so one can be declared
+# mutable without the caller's value being any less its own.
+
+require_relative "../spec_helper"
+
+def countdown(mutable position)
+  mutable steps = []
+  while position > 0
+    steps << position
+    position -= 1
+  end
+  steps
+end
+
+context "rebinding under mutable" do
+  describe "a mutable parameter" do
+    start = 3
+
+    specify "rebinds freely inside the method" do
+      expect(countdown(start)).to(eq([3, 2, 1]))
+    end
+
+    specify "without touching the caller's binding" do
+      countdown(start)
+      expect(start).to(eq(3))
+    end
+  end
+end

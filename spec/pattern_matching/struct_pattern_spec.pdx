@@ -1,0 +1,23 @@
+# ADR 0013 — struct patterns are keyword-only, and a bare `text:` binds a
+# name of the same name.
+
+require_relative "../spec_helper"
+
+struct Node
+  kind
+  text
+end
+
+context "case/in" do
+  describe "a struct pattern" do
+    node = Node.new(kind: "integer", text: "42")
+
+    specify "matches on fields and binds the shorthand" do
+      answer = case node
+      in Node(kind: "word", text:)    then "the word #{text}"
+      in Node(kind: "integer", text:) then "the number #{text}"
+      end
+      expect(answer).to(eq("the number 42"))
+    end
+  end
+end

@@ -1,0 +1,51 @@
+# `break` and `return` leave a block for the caller to handle — and a
+# `return` aims at the method its block was *written* in (ADR 0025).
+
+require_relative "../spec_helper"
+
+def broken_out
+  [1, 2].each do
+    break
+  end
+end
+
+# `return` exits the enclosing method, unwinding through blocks — the
+# or-guard's load-bearing half, and a promise the trio dropped until #41.
+def through_blocks
+  [1, 2, 3].each do
+    return "unwound"
+  end
+  "never reached"
+end
+
+# ADR 0025 — a return belongs to the method its block was *written* in, so a
+# yielding helper is transparent to it: `apply` here never gets to answer.
+def apply
+  yield
+  "apply's own answer"
+end
+
+def through_a_yield
+  apply do
+    return "unwound past the helper"
+  end
+  "never reached"
+end
+
+context "control flow" do
+  describe "a call broken out of" do
+    specify "produces nil, not the collection" do
+      expect(broken_out).to(be_nil)
+    end
+  end
+
+  describe "return inside a block" do
+    specify "unwinds the enclosing method" do
+      expect(through_blocks).to(eq("unwound"))
+    end
+
+    specify "unwinds to its write site, through a yielding helper" do
+      expect(through_a_yield).to(eq("unwound past the helper"))
+    end
+  end
+end

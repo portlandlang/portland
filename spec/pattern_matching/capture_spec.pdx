@@ -1,0 +1,17 @@
+# ADR 0013 — captures persist past the match, as in Ruby, fenced by
+# no-shadow.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "a capture" do
+    case [1, 2]
+    in [head, tail] then head
+    end
+
+    specify "outlives its case" do
+      expect(head).to(eq(1))
+      expect(tail).to(eq(2))
+    end
+  end
+end

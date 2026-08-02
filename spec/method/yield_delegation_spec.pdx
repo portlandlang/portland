@@ -1,0 +1,38 @@
+# A `yield` written inside a block reaches the block of *its* enclosing
+# method — Ruby's rule, and the shape that looped the seed forever until
+# #49. ADR 0025's closure rule pays off twice here: the inner `yield` finds
+# the writer's block, and the block's value rides back through both layers.
+
+require_relative "../spec_helper"
+
+def apply
+  yield
+end
+
+def relay
+  apply do
+    yield
+  end
+end
+
+context "a method" do
+  describe "yield, delegated" do
+    specify "delegates from inside a yielded block" do
+      handed = relay do
+        "handed through two layers"
+      end
+      expect(handed).to(eq("handed through two layers"))
+    end
+
+    specify "and an accumulator flows through the delegation" do
+      mutable count = 0
+      relay do
+        count += 1
+      end
+      relay do
+        count += 10
+      end
+      expect(count).to(eq(11))
+    end
+  end
+end

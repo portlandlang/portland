@@ -1,0 +1,33 @@
+# ADR 0031 — `def self.name` in a struct body declares a type function:
+# called on the struct's name, with no instance and no `self` value inside.
+
+require_relative "../spec_helper"
+
+struct Ticket
+  label
+
+  def self.of(raw)
+    Ticket.new(label: raw)
+  end
+
+  def self.fallback
+    "unlabeled"
+  end
+
+  def self.labeled(raw)
+    return Ticket.new(label: fallback) if raw.empty?
+    Ticket.of(raw)
+  end
+end
+
+context "construction" do
+  describe "a type function" do
+    specify "dispatches on the struct's name" do
+      expect(Ticket.of("rose").label).to(eq("rose"))
+    end
+
+    specify "reaches sibling type functions bare" do
+      expect(Ticket.labeled("").label).to(eq("unlabeled"))
+    end
+  end
+end

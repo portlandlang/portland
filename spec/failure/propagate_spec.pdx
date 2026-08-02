@@ -1,0 +1,40 @@
+# ADR 0027 — `!` is unwrap-or-propagate: one character per frame a failure
+# may cross, aimed at its write site like any return (ADR 0025).
+
+require_relative "../spec_helper"
+
+def risky(flag)
+  return failure("flagged") if flag
+  "fine"
+end
+
+def guarded(flag)
+  value = risky!(flag)
+  "got #{value}"
+end
+
+def through_a_block(flag)
+  [1, 2].each do |number|
+    risky!(flag)
+  end
+  "walked all #{2} elements"
+end
+
+context "the ! suffix" do
+  describe "on a call whose value is sound" do
+    specify "passes the value through untouched" do
+      expect(guarded(false)).to(eq("got fine"))
+    end
+  end
+
+  describe "on a call that failed" do
+    specify "returns the failure from the enclosing method" do
+      expect(guarded(true)).to(be_failure)
+    end
+
+    specify "unwinds through blocks to its write site" do
+      expect(through_a_block(false)).to(eq("walked all 2 elements"))
+      expect(through_a_block(true)).to(be_failure)
+    end
+  end
+end

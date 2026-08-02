@@ -1,0 +1,22 @@
+# ADR 0022 — a payload-free case is simply a symbol; nothing about `:less`
+# needs to exist at runtime.
+
+require_relative "../spec_helper"
+
+enum Ordering
+  :less
+  :equal
+  :greater
+end
+
+context "an enum" do
+  describe "a payload-free case" do
+    specify "is the plain symbol" do
+      expect(:less).to(eq(:less))
+    end
+
+    specify "and differs from its siblings, as symbols do" do
+      expect(:less).not_to(eq(:greater))
+    end
+  end
+end

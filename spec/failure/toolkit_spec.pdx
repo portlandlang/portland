@@ -1,0 +1,16 @@
+# ADR 0027 — the unwrap toolkit already knew what to do: `or` is a
+# failure's unwrap-or-else exactly as it is nil's.
+
+require_relative "../spec_helper"
+
+context "a failure" do
+  describe "or" do
+    specify "takes the fallback on a failure" do
+      expect((failure("why") or "fallback")).to(eq("fallback"))
+    end
+
+    specify "and keeps a present value" do
+      expect(("present" or "unused")).to(eq("present"))
+    end
+  end
+end

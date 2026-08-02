@@ -1,0 +1,22 @@
+# Equality is by value, field for field.
+
+require_relative "../spec_helper"
+
+struct Token
+  kind
+  text
+end
+
+context "a struct" do
+  describe "#==" do
+    token = Token.new(kind: "integer", text: "42")
+
+    specify "is by value" do
+      expect(token).to(eq(Token.new(kind: "integer", text: "42")))
+    end
+
+    specify "and any differing field breaks it" do
+      expect(token).not_to(eq(token.with(text: "43")))
+    end
+  end
+end

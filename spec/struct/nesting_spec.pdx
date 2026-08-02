@@ -1,0 +1,21 @@
+# Types nest in types, `::` naming the way in (ADR 0021's operator split).
+
+require_relative "../spec_helper"
+
+struct Invoice
+  total
+
+  struct Line
+    amount
+  end
+end
+
+context "a struct" do
+  describe "nesting" do
+    line = Invoice::Line.new(amount: 5)
+
+    specify "is named through its owner" do
+      expect(line.amount).to(eq(5))
+    end
+  end
+end

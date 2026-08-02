@@ -1,0 +1,17 @@
+# Branches are tried in written order, and the first match wins. Whether
+# overlapping branches are *allowed* to exist is exhaustiveness's question,
+# which is static and belongs to #9.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "overlapping branches" do
+    specify "give it to the first match" do
+      answer = case 5
+      in 1..9 then "the range, written first"
+      in 5    then "the literal, written second"
+      end
+      expect(answer).to(eq("the range, written first"))
+    end
+  end
+end

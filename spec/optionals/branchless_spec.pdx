@@ -1,0 +1,15 @@
+# ADR 0012 — a branch that doesn't happen is nil.
+
+require_relative "../spec_helper"
+
+context "absence" do
+  describe "if without a matching branch" do
+    branchless = if false
+      "taken"
+    end
+
+    specify "produces nil" do
+      expect(branchless).to(be_nil)
+    end
+  end
+end

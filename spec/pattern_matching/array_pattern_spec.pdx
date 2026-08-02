@@ -1,0 +1,23 @@
+# An array pattern matches by shape, and `*rest` takes the tail.
+
+require_relative "../spec_helper"
+
+context "case/in" do
+  describe "an array pattern" do
+    specify "splits head from rest" do
+      answer = case [9, 8, 7]
+      in []              then "empty"
+      in [first, *rest]  then [first, rest.length]
+      end
+      expect(answer).to(eq([9, 2]))
+    end
+
+    specify "matches the empty array by shape" do
+      answer = case []
+      in []             then "empty"
+      in [first, *rest] then "some"
+      end
+      expect(answer).to(eq("empty"))
+    end
+  end
+end

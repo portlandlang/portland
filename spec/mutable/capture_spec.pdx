@@ -1,0 +1,16 @@
+# A capture is a binding site like any other, so it follows the same rule:
+# rebind a mutable freely, where an immutable would refuse.
+
+require_relative "../spec_helper"
+
+context "rebinding under mutable" do
+  describe "a capture over an outer mutable" do
+    specify "rebinds it, as any assignment would" do
+      mutable found = 0
+      case 5
+      in found then found
+      end
+      expect(found).to(eq(5))
+    end
+  end
+end

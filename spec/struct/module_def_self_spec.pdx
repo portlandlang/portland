@@ -1,0 +1,29 @@
+# ADR 0031 — in a module body `def self.` is accepted and identical to a
+# plain `def`: Ruby spells module functions that way, and Portland's module
+# `def` already means it, so migrating modules compile unchanged.
+
+require_relative "../spec_helper"
+
+module Doubling
+  def self.double(value)
+    value * 2
+  end
+end
+
+module Halving
+  def half(value)
+    value / 2
+  end
+end
+
+context "construction" do
+  describe "def self. in a module body" do
+    specify "is a plain def — Ruby's spelling of the same meaning" do
+      expect(Doubling.double(21)).to(eq(42))
+    end
+
+    specify "and the unmarked spelling means exactly the same thing" do
+      expect(Halving.half(42)).to(eq(21))
+    end
+  end
+end

@@ -1,0 +1,31 @@
+# ADR 0031 — `new` is one of the definable names: defining it replaces the
+# raw constructor everywhere, and inside it — and only there — `fields(...)`
+# is the raw kwargs-in-fields-out layer.
+
+require_relative "../spec_helper"
+
+struct Badge
+  label
+
+  def self.new(raw)
+    return failure("a badge needs text") if raw.empty?
+    fields(label: raw)
+  end
+end
+
+context "construction" do
+  describe "a defined new" do
+    specify "replaces the raw constructor, positional signature included" do
+      expect(Badge.new("rose").label).to(eq("rose"))
+    end
+
+    specify "answers a failure when its own rule refuses" do
+      expect(Badge.new("")).to(be_failure)
+    end
+
+    specify "and the failure is one the toolkit handles" do
+      badge = Badge.new("") or Badge.new("fallback")
+      expect(badge.label).to(eq("fallback"))
+    end
+  end
+end

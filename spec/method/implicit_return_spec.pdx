@@ -1,0 +1,15 @@
+# A method answers its last expression; `return` is for leaving early.
+
+require_relative "../spec_helper"
+
+def implicit
+  "the last expression"
+end
+
+context "a method" do
+  describe "its body" do
+    specify "returns its last expression" do
+      expect(implicit).to(eq("the last expression"))
+    end
+  end
+end

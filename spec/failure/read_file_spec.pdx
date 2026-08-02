@@ -1,0 +1,16 @@
+# The first fallible operation in the language: `read_file` answers a
+# failure rather than panicking (ADR 0027).
+
+require_relative "../spec_helper"
+
+context "the first fallible operation" do
+  describe "read_file on a missing path" do
+    specify "answers a failure, not a panic" do
+      expect(read_file("/tmp/portland-definitely-missing")).to(be_failure)
+    end
+
+    specify "which is one or away from a default" do
+      expect((read_file("/tmp/portland-definitely-missing") or "default config")).to(eq("default config"))
+    end
+  end
+end

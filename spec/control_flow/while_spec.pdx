@@ -1,0 +1,48 @@
+# `while` — the only loop keyword; everything else iterates with a block.
+
+require_relative "../spec_helper"
+
+# ADR 0012 — a loop that never produced a value answers nil, typed.
+def finished_loop
+  while false
+  end
+end
+
+context "control flow" do
+  describe "while" do
+    specify "loops until its condition turns" do
+      mutable count = 0
+      while count < 3
+        count += 1
+      end
+      expect(count).to(eq(3))
+    end
+
+    specify "break stops it and next skips an iteration" do
+      mutable sum = 0
+      mutable i = 0
+      while i < 10
+        i += 1
+        next if i.even?
+        break if i > 7
+        sum += i
+      end
+      expect(sum).to(eq(16))
+    end
+
+    # ADR 0001 — the block rule applied to `while`: a name first bound in
+    # the body dies each iteration, so binding it again is not a rebinding.
+    specify "gives each iteration a fresh scope for its own locals" do
+      mutable index = 0
+      while index < 3
+        fresh = index * 2
+        index += 1
+      end
+      expect(index).to(eq(3))
+    end
+
+    specify "produces nil when it finishes" do
+      expect(finished_loop).to(be_nil)
+    end
+  end
+end

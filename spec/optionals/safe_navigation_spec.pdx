@@ -1,0 +1,19 @@
+# ADR 0008 — `&.` short-circuits an absent receiver instead of crashing,
+# and leaves a present one alone. The whole chain answers nil on a miss.
+
+require_relative "../spec_helper"
+
+context "the unwrap toolkit" do
+  describe "the safe-navigation operator" do
+    words = %w[rose city]
+    empty = []
+
+    specify "forwards to a present receiver" do
+      expect(words.first&.upcase).to(eq("ROSE"))
+    end
+
+    specify "answers nil for an absent one" do
+      expect(empty.first&.upcase).to(be_nil)
+    end
+  end
+end

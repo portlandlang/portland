@@ -1,0 +1,21 @@
+# ADR 0006/0009 — `nil?` and `some?` are the one dispatch every value
+# allows, absence included.
+
+require_relative "../spec_helper"
+
+context "absence" do
+  describe "nil? and some?" do
+    specify "call a plain value present" do
+      expect(42).to(be_some)
+    end
+
+    specify "and not absent" do
+      expect(42).not_to(be_nil)
+    end
+
+    specify "and answer for nil itself, the one thing it can do" do
+      expect(nil).to(be_nil)
+      expect(nil).not_to(be_some)
+    end
+  end
+end

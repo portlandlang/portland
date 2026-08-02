@@ -1,0 +1,15 @@
+# ADR 0007 — one precedence means `x = nil or 7` binds the `or` first, so
+# the name gets 7. In Ruby this assigns nil and the 7 vanishes — the exact
+# trap whose removal this example pins.
+
+require_relative "../spec_helper"
+
+context "the word operators" do
+  describe "assignment through or" do
+    bound = nil or 7
+
+    specify "binds the whole or expression, not the nil" do
+      expect(bound).to(eq(7))
+    end
+  end
+end

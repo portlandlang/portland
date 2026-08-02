@@ -1,0 +1,27 @@
+# ADR 0027 — patterns are *transparent* to the failure box: a failure's
+# whole use is carrying its reason to a handler whose tool is the pattern.
+
+require_relative "../spec_helper"
+
+struct ParseFailed
+  line
+end
+
+context "a failure" do
+  describe "case/in" do
+    specify "reaches through the box to the reason" do
+      answer = case failure("out of roses")
+      in reason then "reason was #{reason}"
+      end
+      expect(answer).to(eq("reason was out of roses"))
+    end
+
+    specify "and destructures a struct payload by pattern" do
+      shaped = case failure(ParseFailed.new(line: 7))
+      in ParseFailed(line:) then "failed on line #{line}"
+      in content            then "parsed #{content}"
+      end
+      expect(shaped).to(eq("failed on line 7"))
+    end
+  end
+end

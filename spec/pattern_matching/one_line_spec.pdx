@@ -1,0 +1,24 @@
+# The one-line forms: `in` is a boolean that binds on a hit, and `=>`
+# destructures rightward — which is also the answer to destructuring
+# assignment.
+
+require_relative "../spec_helper"
+
+context "the one-line forms" do
+  describe "in" do
+    specify "is a boolean that binds on a hit" do
+      scores = [70, 80]
+      hit = scores in [low, high]
+      expect(hit).to(be_true)
+      expect(low + high).to(eq(150))
+    end
+  end
+
+  describe "=>" do
+    specify "destructures rightward" do
+      [1, 2, 3] => [first, *rest]
+      expect(first).to(eq(1))
+      expect(rest).to(eq([2, 3]))
+    end
+  end
+end
