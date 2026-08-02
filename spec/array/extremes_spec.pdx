@@ -1,0 +1,19 @@
+# ADR 0010 — `min` and `max` are partial too, and answer maybes.
+
+require_relative "../spec_helper"
+
+context "Array" do
+  numbers = [3, 1, 2]
+
+  describe "#min" do
+    specify "answers the smallest" do
+      expect(numbers.min).to(eq(1))
+    end
+  end
+
+  describe "#max" do
+    specify "answers the largest" do
+      expect(numbers.max).to(eq(3))
+    end
+  end
+end

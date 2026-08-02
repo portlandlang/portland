@@ -1,0 +1,31 @@
+# `%w[]` — the word-array shorthand, with Ruby's content rules (ADR 0030).
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "%w[]" do
+    specify "splits words on whitespace" do
+      expect(%w[rose city]).to(eq(["rose", "city"]))
+    end
+
+    specify "a backslash escapes a bracket into a word" do
+      expect(%w[a \] b \[ c]).to(eq(["a", "]", "b", "[", "c"]))
+    end
+
+    specify "balanced brackets nest without escapes" do
+      expect(%w[a [b] c]).to(eq(["a", "[b]", "c"]))
+    end
+
+    specify "an escaped space joins a word instead of splitting" do
+      expect(%w[rose\ city elsewhere]).to(eq(["rose city", "elsewhere"]))
+    end
+
+    specify "any other escape keeps its backslash" do
+      expect(%w[a\nb].first).to(have_length(4))
+    end
+
+    specify "whitespace runs split once, never into empty words" do
+      expect(%w[rose  city]).to(eq(["rose", "city"]))
+    end
+  end
+end

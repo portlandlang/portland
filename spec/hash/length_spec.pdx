@@ -1,0 +1,11 @@
+# How many pairs a hash holds.
+
+require_relative "../spec_helper"
+
+context "Hash" do
+  describe "#length" do
+    specify "counts the pairs" do
+      expect({name: "pdx", port: 8080}).to(have_length(2))
+    end
+  end
+end

@@ -1,0 +1,17 @@
+# A range iterates, so the block-taking library reaches it.
+
+require_relative "../spec_helper"
+
+context "Range" do
+  describe "#map" do
+    specify "iterates through the block methods" do
+      expect((1..3).map { it * 2 }).to(eq([2, 4, 6]))
+    end
+  end
+
+  describe "#sum" do
+    specify "adds without being spelled out" do
+      expect((1..5).sum).to(eq(15))
+    end
+  end
+end

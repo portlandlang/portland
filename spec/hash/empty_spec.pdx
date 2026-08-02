@@ -1,0 +1,16 @@
+# `empty?` — the question every collection answers.
+
+require_relative "../spec_helper"
+
+context "Hash" do
+  describe "#empty?" do
+    specify "holds for the empty hash" do
+      blank = {}
+      expect(blank).to(be_empty)
+    end
+
+    specify "and for nothing else" do
+      expect({name: "pdx"}).not_to(be_empty)
+    end
+  end
+end

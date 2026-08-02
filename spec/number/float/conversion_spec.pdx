@@ -1,0 +1,15 @@
+# `to_i` truncates toward zero — Ruby's rule, and not the same as the
+# floored division next door.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "#to_i" do
+    specify "truncates toward zero, Ruby's rule" do
+      expect(2.9.to_i).to(eq(2))
+      expect((0 - 2.9).to_i).to(eq(-2))
+    end
+  end
+end

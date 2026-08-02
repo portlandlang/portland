@@ -1,0 +1,19 @@
+# ADR 0023 — comparison is equality only, and a symbol is not a String.
+
+require_relative "../spec_helper"
+
+context "Symbol" do
+  describe "#==" do
+    specify "holds against itself" do
+      expect(:paid).to(eq(:paid))
+    end
+
+    specify "breaks against the string of its name" do
+      expect(:paid).not_to(eq("paid"))
+    end
+
+    specify "breaks against any other symbol" do
+      expect(:paid).not_to(eq(:pending))
+    end
+  end
+end

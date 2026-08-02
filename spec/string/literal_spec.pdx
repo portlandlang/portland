@@ -1,0 +1,23 @@
+# The string literal: interpolation and the four escapes.
+
+require_relative "../spec_helper"
+
+context "String" do
+  describe "the literal" do
+    specify "interpolates, auto-to_s-ing the value" do
+      expect("port#{"land"} #{503}").to(eq("portland 503"))
+    end
+
+    specify "nests interpolations" do
+      expect("#{"outer #{"inner"}"}").to(eq("outer inner"))
+    end
+
+    specify "escapes the newline, tab, quote, and backslash" do
+      expect("\n\t\"\\").to(have_length(4))
+    end
+
+    specify "escapes the interpolation hash" do
+      expect("\#{not run}").to(have_length(10))
+    end
+  end
+end

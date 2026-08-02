@@ -1,0 +1,15 @@
+# The array literal: any mix of types, nesting included.
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "the literal" do
+    specify "holds any mix of types, nesting included" do
+      expect([1, "two", [3]]).to(have_length(3))
+    end
+
+    specify "is empty when written empty" do
+      expect([]).to(be_empty)
+    end
+  end
+end

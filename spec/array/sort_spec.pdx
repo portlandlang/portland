@@ -1,0 +1,18 @@
+# `sort` answers a new array — values never mutate (ADR 0015).
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "#sort" do
+    numbers = [3, 1, 2]
+
+    specify "orders into a new array" do
+      expect(numbers.sort).to(eq([1, 2, 3]))
+    end
+
+    specify "leaving the original alone" do
+      numbers.sort
+      expect(numbers).to(eq([3, 1, 2]))
+    end
+  end
+end

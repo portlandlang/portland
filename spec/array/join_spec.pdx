@@ -1,0 +1,15 @@
+# `join` renders each element the way `to_s` would, then splices (#39).
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "#join" do
+    specify "splices on a separator" do
+      expect([3, 1, 2].join("-")).to(eq("3-1-2"))
+    end
+
+    specify "renders each element as to_s would" do
+      expect([1, "two", true].join(" ")).to(eq("1 two true"))
+    end
+  end
+end

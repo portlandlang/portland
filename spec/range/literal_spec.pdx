@@ -1,0 +1,15 @@
+# ADR 0019 — `..` keeps its end and `...` excludes it, and both iterate.
+
+require_relative "../spec_helper"
+
+context "Range" do
+  describe "the literal" do
+    specify "two dots keep the end" do
+      expect((1..5).to_a).to(eq([1, 2, 3, 4, 5]))
+    end
+
+    specify "three dots exclude it" do
+      expect((1...5).to_a).to(eq([1, 2, 3, 4]))
+    end
+  end
+end

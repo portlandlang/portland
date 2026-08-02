@@ -1,0 +1,13 @@
+# `abs` drops the sign here too.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "#abs" do
+    specify "drops the sign" do
+      expect((0 - 2.5).abs).to(eq(2.5))
+    end
+  end
+end

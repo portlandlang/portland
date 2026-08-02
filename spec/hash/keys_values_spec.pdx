@@ -1,0 +1,19 @@
+# `keys` and `values`, both in insertion order.
+
+require_relative "../spec_helper"
+
+context "Hash" do
+  config = {name: "pdx", port: 8080}
+
+  describe "#keys" do
+    specify "lists the keys in insertion order" do
+      expect(config.keys).to(eq([:name, :port]))
+    end
+  end
+
+  describe "#values" do
+    specify "lists the values in the keys' order" do
+      expect(config.values).to(eq(["pdx", 8080]))
+    end
+  end
+end

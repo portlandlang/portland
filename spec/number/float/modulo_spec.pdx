@@ -1,0 +1,14 @@
+# ADR 0018 — the floored rules carry over to floats: the sign of a modulo
+# follows the divisor there too.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "#%" do
+    specify "takes the sign of the divisor" do
+      expect((0 - 7.0) % 2).to(eq(1.0))
+    end
+  end
+end

@@ -1,0 +1,28 @@
+# The question-shaped library: does this string contain, start, or end with?
+
+require_relative "../spec_helper"
+
+context "String" do
+  city = "portland"
+
+  describe "#include?" do
+    specify "finds a substring anywhere" do
+      expect(city).to(contain("tla"))
+      expect(city).not_to(contain("rose"))
+    end
+  end
+
+  describe "#start_with?" do
+    specify "anchors at the front" do
+      expect(city.start_with?("port")).to(be_true)
+      expect(city.start_with?("land")).to(be_false)
+    end
+  end
+
+  describe "#end_with?" do
+    specify "anchors at the back" do
+      expect(city.end_with?("land")).to(be_true)
+      expect(city.end_with?("port")).to(be_false)
+    end
+  end
+end

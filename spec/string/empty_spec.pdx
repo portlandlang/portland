@@ -1,0 +1,16 @@
+# `empty?` — the question every collection answers.
+
+require_relative "../spec_helper"
+
+context "String" do
+  describe "#empty?" do
+    specify "holds for the empty string" do
+      expect("").to(be_empty)
+    end
+
+    specify "and for nothing else, a single space included" do
+      expect(" ").not_to(be_empty)
+      expect("pdx").not_to(be_empty)
+    end
+  end
+end

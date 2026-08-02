@@ -1,0 +1,19 @@
+# `upcase` and `downcase` answer new strings; the receiver is untouched.
+
+require_relative "../spec_helper"
+
+context "String" do
+  city = "portland"
+
+  describe "#upcase" do
+    specify "raises every letter" do
+      expect(city.upcase).to(eq("PORTLAND"))
+    end
+  end
+
+  describe "#downcase" do
+    specify "lowers every letter, round-tripping the upcase" do
+      expect(city.upcase.downcase).to(eq("portland"))
+    end
+  end
+end

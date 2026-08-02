@@ -1,0 +1,19 @@
+# `even?` and `odd?` partition the integers.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#even? and #odd?" do
+    specify "partition" do
+      expect(4.even?).to(be_true)
+      expect(3.odd?).to(be_true)
+      expect(4.odd?).to(be_false)
+    end
+
+    specify "and zero is even" do
+      expect(0.even?).to(be_true)
+    end
+  end
+end

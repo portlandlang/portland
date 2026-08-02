@@ -1,0 +1,13 @@
+# `to_f` promotes across the integer/float line.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#to_f" do
+    specify "promotes" do
+      expect(2.to_f).to(eq(2.0))
+    end
+  end
+end

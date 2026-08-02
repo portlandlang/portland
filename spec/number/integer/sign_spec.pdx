@@ -1,0 +1,22 @@
+# The sign questions: `zero?`, `positive?`, `negative?`.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#zero?" do
+    specify "answers only for zero" do
+      expect(0.zero?).to(be_true)
+      expect(1.zero?).to(be_false)
+    end
+  end
+
+  describe "#positive? and #negative?" do
+    specify "split around zero, which is neither" do
+      expect(5.positive?).to(be_true)
+      expect((0 - 5).negative?).to(be_true)
+      expect(0.positive?).to(be_false)
+    end
+  end
+end

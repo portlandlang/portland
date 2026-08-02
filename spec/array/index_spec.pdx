@@ -1,0 +1,18 @@
+# ADR 0010 — indexing is a partial operation, so it answers a maybe. The
+# out-of-range half lives in spec/optionals_spec.pdx.
+
+require_relative "../spec_helper"
+
+context "Array" do
+  numbers = [3, 1, 2]
+
+  describe "#[]" do
+    specify "answers the element at an index" do
+      expect(numbers[0]).to(eq(3))
+    end
+
+    specify "counts negative indices from the end" do
+      expect(numbers[0 - 1]).to(eq(2))
+    end
+  end
+end
