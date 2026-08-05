@@ -1735,12 +1735,13 @@ end
 # set and the current file both ride in the bindings, the same trick already
 # used for `__self__`, `__home__` and `__block__`.
 #
-# Two recorded divergences (principle 4 — a gap is written down, never silent):
-# the seed canonicalises the resolved path before comparing, and the trio has
-# no filesystem call that can, so the load-once key is the joined string. Two
-# spellings of one file — `"helper"` and `"./helper"` — therefore load twice
-# here and once there. And a missing file reports the host's read error rather
-# than the seed's `require_relative "x": No such file or directory`.
+# One recorded divergence remains (principle 4 — a gap is written down, never
+# silent): a missing file reports the host's read error rather than the seed's
+# `require_relative "x": No such file or directory`.
+#
+# The other one — that the seed canonicalises a resolved path and the trio
+# could not, so `"helper"` and `"./helper"` loaded twice here and once there —
+# is retired: `canonical_path` resolves the segments textually.
 
 def file_of(bindings)
   slot = lookup(bindings, "__file__")
@@ -1755,11 +1756,35 @@ def directory_of(path)
   parts[0..-2].join("/")
 end
 
+# Resolve `.` and `..` segments textually, so every spelling of one file
+# shares a load-once key: `spec/string/../spec_helper.pdx` and
+# `spec/spec_helper.pdx` name the same file and now compare equal.
+#
+# The seed asks the filesystem to canonicalise; the trio has no call that can,
+# but a `..` following a named segment cancels it without one. The only case a
+# text walk answers differently is a `..` that crosses a symlink, which the
+# filesystem would resolve and this does not.
+def canonical_path(path)
+  absolute = path.start_with?("/")
+  mutable parts = []
+  path.split("/").each do |part|
+    next if part.empty? || part == "."
+    if part == ".." && !parts.empty? && parts.last != ".."
+      parts = parts.slice(0, parts.length - 1)
+    else
+      parts << part
+    end
+  end
+  joined = parts.join("/")
+  return "/#{joined}" if absolute
+  joined
+end
+
 # A dot in the last segment means the name brought its own extension, which is
 # what the seed's `Path::extension` is asking too — a dot in an earlier segment
 # does not count, so `a.b/c` still becomes `a.b/c.pdx`.
 def required_path(bindings, name)
-  target = "#{directory_of(file_of(bindings))}/#{name}"
+  target = canonical_path("#{directory_of(file_of(bindings))}/#{name}")
   parts = target.split("/")
   return target if parts.last.include?(".")
   "#{target}.pdx"

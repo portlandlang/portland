@@ -22,7 +22,9 @@ export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 cargo build --quiet --package portland-seed --bin pdx
 
 transcript=$(mktemp)
-trap 'rm -f "$transcript"' EXIT
+hosted_all=$(mktemp)
+hosted_parts=$(mktemp -d)
+trap 'rm -f "$transcript" "$hosted_all"; rm -rf "$hosted_parts"' EXIT
 failed=0
 
 # `grep -c` exits 1 when it counts none, which `set -e` would treat as fatal.
@@ -61,17 +63,63 @@ total_failures=0
 specs=$(find spec -name "*_spec.pdx" | sort)
 [ -n "$specs" ] || { echo "no *_spec.pdx files under spec/"; exit 1; }
 
+# The hosted half runs once for the whole suite, not once per spec. What a
+# hosted spec costs is not the trio — loading that is 0.02s — but
+# `spec_helper.pdx`, re-parsed into every spec's fresh scope at 0.40s a time;
+# `run_specs.pdx` parses the harness once and shares it (#69). The output is
+# split back apart below so the per-file tallies survive.
+#
+# Not under `set -e`: a spec that panics should still print everything that
+# ran before it, the way one-process-per-spec used to.
+hosted_status=0
+./target/debug/pdx spec/run_specs.pdx spec/spec_helper.pdx $specs > "$hosted_all" || hosted_status=$?
+
+# One file per spec, in the order the driver ran them, split on its `=== `
+# markers. `read` drops a trailing partial line, which a panic can leave; that
+# only ever loses part of the diagnostic, never a countable line.
+index=0
+part="$hosted_parts/0"
+: > "$part"
+while IFS= read -r line; do
+  case "$line" in
+    "=== "*)
+      index=$((index + 1))
+      part="$hosted_parts/$index"
+      : > "$part"
+      ;;
+    *)
+      printf '%s\n' "$line" >> "$part"
+      ;;
+  esac
+done < "$hosted_all"
+
+index=0
 for spec in $specs; do
   echo "$spec — direct"
   ./target/debug/pdx "$spec" > "$transcript"
   cat "$transcript"
   tally
 
+  index=$((index + 1))
   echo "$spec — hosted"
-  ./target/debug/pdx compiler/run.pdx "$spec" > "$transcript"
+  # A spec the batch never reached has no part file. Say so and fail, rather
+  # than tallying an empty transcript as zero examples and zero failures —
+  # which would read as green.
+  if [ -f "$hosted_parts/$index" ]; then
+    cp "$hosted_parts/$index" "$transcript"
+  else
+    echo "  FAIL the hosted run stopped before reaching this spec" > "$transcript"
+  fi
   cat "$transcript"
   tally
 done
+
+if [ "$hosted_status" -ne 0 ]; then
+  echo ""
+  echo "the hosted run exited $hosted_status — the tail of its output:"
+  tail -3 "$hosted_all"
+  failed=1
+fi
 
 # The grand total counts runs, not examples: every spec runs twice, once per
 # oracle, and both halves count — agreeing with the seed is half the job.

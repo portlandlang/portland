@@ -227,13 +227,16 @@ fn portland_tokenize() -> String {
     format!("{}/../compiler/tokenize.pdx", env!("CARGO_MANIFEST_DIR"))
 }
 
+/// Once per file, not once per spelling: the three `false`s are a second
+/// require of the same library written three ways, and a path that resolves
+/// to a file already loaded answers false without running it again.
 #[test]
 fn require_relative_loads_once() {
     let output = run_fixture("requires_library.pdx");
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "hello from the library\nfalse\n"
+        "hello from the library\nfalse\nfalse\nfalse\n"
     );
 }
 
@@ -1409,28 +1412,71 @@ fn the_language_spec_passes_on_both_oracles() {
     specs.sort();
     assert!(!specs.is_empty(), "no *_spec.pdx files found under spec/");
 
-    for spec in specs {
+    // The hosted half runs once for the whole suite. What a hosted spec costs
+    // is not the trio — loading that is 0.02s — but `spec_helper.pdx`,
+    // re-parsed into every spec's fresh scope at 0.40s a time; run_specs.pdx
+    // parses the harness once and shares it (#69). The ceiling covers the
+    // whole batch rather than one file, so it is scaled to match.
+    let batch = within_seconds(120, "language spec, hosted", || {
+        Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(format!(
+                "{}/../spec/run_specs.pdx",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .arg(format!(
+                "{}/../spec/spec_helper.pdx",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .args(&specs)
+            .output()
+            .expect("failed to run pdx")
+    });
+    assert!(
+        batch.status.success(),
+        "the hosted run failed:\n{}{}",
+        String::from_utf8_lossy(&batch.stdout),
+        String::from_utf8_lossy(&batch.stderr)
+    );
+
+    // Split the batch back into one transcript per spec, on the `=== ` marker
+    // the driver prints before each file.
+    let batch_stdout = String::from_utf8(batch.stdout).unwrap();
+    let mut hosted: Vec<String> = Vec::new();
+    for line in batch_stdout.lines() {
+        match line.strip_prefix("=== ") {
+            Some(_) => hosted.push(String::new()),
+            None => {
+                let current = hosted
+                    .last_mut()
+                    .expect("the hosted run printed output before naming a spec");
+                current.push_str(line);
+                current.push('\n');
+            }
+        }
+    }
+    assert_eq!(
+        hosted.len(),
+        specs.len(),
+        "the hosted run covered {} specs, not {}",
+        hosted.len(),
+        specs.len()
+    );
+
+    for (spec, hosted) in specs.iter().zip(hosted) {
         let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(&spec)
+            .arg(spec)
             .output()
             .expect("failed to run pdx");
-        let hosted = within_seconds(20, "language spec, hosted", || {
-            Command::new(env!("CARGO_BIN_EXE_pdx"))
-                .arg(portland_run())
-                .arg(&spec)
-                .output()
-                .expect("failed to run pdx")
-        });
+        assert!(
+            direct.status.success(),
+            "{} failed direct:\n{}{}",
+            spec.display(),
+            String::from_utf8_lossy(&direct.stdout),
+            String::from_utf8_lossy(&direct.stderr)
+        );
+        let direct = String::from_utf8(direct.stdout).unwrap();
 
-        for (label, output) in [("direct", &direct), ("hosted", &hosted)] {
-            assert!(
-                output.status.success(),
-                "{} failed {label}:\n{}{}",
-                spec.display(),
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-            let transcript = String::from_utf8_lossy(&output.stdout);
+        for (label, transcript) in [("direct", &direct), ("hosted", &hosted)] {
             let failures: Vec<&str> = transcript
                 .lines()
                 .filter(|line| line.starts_with("  FAIL "))
@@ -1444,8 +1490,8 @@ fn the_language_spec_passes_on_both_oracles() {
         }
         // Same spec, same oracles, same answers.
         assert_eq!(
-            String::from_utf8(direct.stdout).unwrap(),
-            String::from_utf8(hosted.stdout).unwrap(),
+            direct,
+            hosted,
             "{} diverged between the seed and the trio",
             spec.display()
         );

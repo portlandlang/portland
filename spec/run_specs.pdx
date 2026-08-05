@@ -1,0 +1,39 @@
+# Run many spec files on the trio in one process (#69).
+#
+# Usage: pdx spec/run_specs.pdx <spec_helper.pdx> <a_spec.pdx> [more...]
+#
+# What a hosted spec pays for is not the trio — loading that is 0.02s — it is
+# `spec_helper.pdx`, which every spec re-requires into its own fresh scope:
+# 0.40s of the 0.42s, once per file, a hundred-odd times. This driver
+# evaluates the harness once and hands each spec a scope that starts from it.
+#
+# Sharing the harness is safe where sharing a spec's own scope would not be.
+# Spec files declare their fixtures at the top level and those names collide
+# across files — six `struct Token`s, three `def apply`s, with different
+# bodies — so each spec still gets a scope of its own; it is just built from
+# the harness rather than from nothing. `__loaded__` is seeded with the
+# harness path, so each spec's own `require_relative` answers false and runs
+# nothing.
+#
+# The harness path is an argument rather than a constant so it is spelled the
+# way the caller spells the specs — both relative to the repo root, or both
+# absolute. `canonical_path` collapses `..` either way, so a spec's computed
+# key and this seeded one agree whatever the depth.
+#
+# The `===` line before each file is what lets `script/spec` keep its
+# per-file tallies. It is printed before the file runs, so a spec that panics
+# still names itself.
+
+require_relative "../compiler/evaluator"
+
+harness_path = argv.first
+harness_source = read_file(harness_path) or panic "run_specs.pdx: cannot read #{harness_path}"
+harness = run_body(parse_program(lex(harness_source)), [["__file__", "file", harness_path]])
+already_loaded = [["__loaded__", "loaded", [canonical_path(harness_path)]]]
+
+argv.slice(1, argv.length - 1).each do |path|
+  puts "=== #{path}"
+  source = read_file(path) or panic "run_specs.pdx: cannot read #{path}"
+  scope = [["__file__", "file", path]] + already_loaded + harness.bindings
+  run_body(parse_program(lex(source)), scope)
+end
