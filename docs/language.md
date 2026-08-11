@@ -240,7 +240,7 @@ end
 
 Implicit return of the last expression, arity-checked calls, trailing default parameter values that may reference earlier parameters, and Ruby 3 keyword parameters (ADR 0014) — `label:` required, `label: default` optional, strictly separate from positionals, accepted on both paren and command calls. Splats are deferred. Method bodies get a fresh scope and see no outer locals, which is Ruby's rule, kept.
 
-**Paren-less calls** work at statement position — `puts "hello"`, `shout word, other` — and bare zero-argument calls work anywhere: `ready?`, `pdx`. Two rules replace Ruby's whitespace heuristics: no shadowing makes the bare name unambiguous, and never-guess turns the genuinely ambiguous forms into errors. `puts -1`, `puts [1]`, and `puts (1)` each say _ambiguous without parens_ and show both readings. `foo - 1` stays subtraction.
+**Paren-less calls** work at statement position — `puts "hello"`, `shout word, other` — and bare zero-argument calls work anywhere: `ready?`, `pdx`. **Dot calls take paren-less arguments too** ([ADR 0032](adr/0032-2026-08-11-dotted-calls-take-paren-less-arguments.md)): `expect(x).to eq(y)`, `words.join "-"`, `"portland".slice 0, 4` — adjacency nests to the innermost call, commas make siblings, a `do` past the arguments belongs to the outermost call, and a bare command as an argument (`.to eq y`) stays unparsed on purpose. Two rules replace Ruby's whitespace heuristics: no shadowing makes the bare name unambiguous, and never-guess turns the genuinely ambiguous forms into errors. `puts -1`, `puts [1]`, and `puts (1)` each say _ambiguous without parens_ and show both readings, dotted or bare. `foo - 1` stays subtraction.
 
 ## Blocks
 

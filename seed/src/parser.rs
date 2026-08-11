@@ -7,6 +7,10 @@ use crate::ast::{
 };
 use crate::lexer::{self, Token, TokenKind};
 
+/// Positional arguments and keyword arguments, the pair every argument
+/// parse hands back.
+type ParsedArguments = (Vec<Expression>, Vec<(String, Expression)>);
+
 pub fn parse(source: &str) -> Program {
     // Heredocs are rewritten into ordinary string literals first (ADR 0020):
     // a dedented body is not a slice of the source, and tokens borrow it.
@@ -590,6 +594,114 @@ impl<'source> Parser<'source> {
             return Some(Statement::Expression(Expression::Propagate(Box::new(call))));
         }
         Some(Statement::Expression(call))
+    }
+
+    /// Paren-less arguments on a dot call — `expect(x).to eq(y)` (#68).
+    ///
+    /// The mirror of `command_call`, one dot deeper: the same test for what
+    /// starts an argument, the same refusals where two readings exist, the
+    /// same argument loop. `None` means the dot call takes no arguments and
+    /// the caller falls back to what it always did — every acceptance here
+    /// is in previously-refused space, so no existing program changes
+    /// meaning.
+    ///
+    /// The messages spell rewrites with the bare method name — `to(-1)`,
+    /// never `expect(x).to(-1)` — because a receiver is an expression the
+    /// parser cannot faithfully re-print, and the trio, which must say these
+    /// wordings byte-for-byte, cannot either.
+    fn dotted_arguments(&mut self, name: &str) -> Option<ParsedArguments> {
+        let next = *self.tokens.get(self.position)?;
+        let starts_argument = match next.kind {
+            TokenKind::Bang
+            | TokenKind::Float
+            | TokenKind::Identifier
+            | TokenKind::Integer
+            | TokenKind::String
+            | TokenKind::Symbol
+            | TokenKind::WordArray => true,
+            TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
+            TokenKind::Minus if next.leading_space => {
+                // `a.b - 1` is subtraction; `a.b -1` would be a guess. Ruby
+                // itself warns on this exact shape ("ambiguous first
+                // argument"); here the warning is a refusal.
+                let after = self.tokens.get(self.position + 1)?;
+                if after.leading_space {
+                    return None;
+                }
+                panic!(
+                    "ambiguous without parens — write {name}(-{}) or {name} - {}",
+                    after.text, after.text
+                );
+            }
+            // `a.b [x]` could index b's answer or pass an array; `a.b[x]`
+            // stays the index it always was.
+            TokenKind::LeftBracket if next.leading_space => {
+                panic!(
+                    "ambiguous without parens — write {name}([...]) to pass an array or {name}[...] to index"
+                );
+            }
+            // `a.b (x)` could be an argument list or a parenthesized first
+            // argument; `a.b(x)` stays the call it always was.
+            TokenKind::LeftParen => {
+                panic!("ambiguous without parens — write {name}(...) with no space to call");
+            }
+            _ => false,
+        };
+        if !starts_argument {
+            return None;
+        }
+        let mut arguments = Vec::new();
+        let mut keyword_arguments: Vec<(String, Expression)> = Vec::new();
+        // A `do` past these arguments belongs to the outermost call.
+        let outer_command = std::mem::replace(&mut self.command_arguments, true);
+        loop {
+            if self.peek_kind() == Some(TokenKind::Identifier)
+                && self.peek_kind_at(1) == Some(TokenKind::Colon)
+            {
+                let label = self.advance().text.to_string();
+                self.position += 1; // the `:`
+                if keyword_arguments
+                    .iter()
+                    .any(|(existing, _)| *existing == label)
+                {
+                    panic!("duplicate keyword argument {label}");
+                }
+                keyword_arguments.push((label, self.expression()));
+            } else {
+                if !keyword_arguments.is_empty() {
+                    panic!("positional arguments cannot follow keyword arguments");
+                }
+                arguments.push(self.expression());
+            }
+            if self.peek_kind() != Some(TokenKind::Comma) {
+                break;
+            }
+            self.position += 1; // the `,`
+        }
+        self.command_arguments = outer_command;
+        // ADR 0016: a bare `{` after an argument has two or three genuine
+        // readings. Name them all and let the author pick with a paren.
+        if self.peek_kind() == Some(TokenKind::LeftBrace) {
+            let inner = match arguments.last() {
+                Some(Expression::Call { name, .. }) => name.clone(),
+                Some(Expression::Variable(name)) => name.clone(),
+                _ => "the last argument".to_string(),
+            };
+            if self.braces_could_be_a_hash() {
+                panic!(
+                    "`{{` after a command call could be three things — parenthesize the one you mean:\n  \
+                     a hash argument to {inner}:  {name} {inner}({{ ... }})\n  \
+                     a block for {inner}:         {name}({inner}() {{ ... }})\n  \
+                     a block for {name}:         {name}({inner}) {{ ... }}"
+                );
+            }
+            panic!(
+                "`{{` after a command call is a block — but whose? parenthesize the one you mean:\n  \
+                 a block for {inner}:  {name}({inner}() {{ ... }})\n  \
+                 a block for {name}:  {name}({inner}) {{ ... }}"
+            );
+        }
+        Some((arguments, keyword_arguments))
     }
 
     /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.
@@ -1998,17 +2110,31 @@ impl<'source> Parser<'source> {
                         Some(base) => (base.to_string(), true),
                         None => (token.text.to_string(), false),
                     };
-                    let (arguments, keyword_arguments) =
-                        if self.peek_kind() == Some(TokenKind::LeftParen) {
-                            self.position += 1; // the `(`
-                            self.call_arguments()
-                        } else {
-                            (Vec::new(), Vec::new())
-                        };
-                    let block = if self.block_opens() {
-                        Some(self.block())
+                    let attached_paren = self.peek_kind() == Some(TokenKind::LeftParen)
+                        && self
+                            .tokens
+                            .get(self.position)
+                            .is_some_and(|next| !next.leading_space);
+                    let (arguments, keyword_arguments, block) = if attached_paren {
+                        self.position += 1; // the `(`
+                        let (arguments, keyword_arguments) = self.call_arguments();
+                        let block = self.block_opens().then(|| self.block());
+                        (arguments, keyword_arguments, block)
+                    } else if let Some((arguments, keyword_arguments)) =
+                        self.dotted_arguments(&name)
+                    {
+                        // A dot call took paren-less arguments (#68). A bare
+                        // `{` after them was refused inside `dotted_arguments`
+                        // (the whose-block menu), and a `do` belongs to the
+                        // outermost command call — Ruby's rule, the same one
+                        // the bare form leans on — so it attaches here only
+                        // when no enclosing command is parsing its arguments.
+                        let block = (!self.command_arguments && self.peek_is_keyword("do"))
+                            .then(|| self.block());
+                        (arguments, keyword_arguments, block)
                     } else {
-                        None
+                        let block = self.block_opens().then(|| self.block());
+                        (Vec::new(), Vec::new(), block)
                     };
                     expression = Expression::MethodCall {
                         arguments,

@@ -43,6 +43,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0029](0029-2026-07-27-together-semantics.md) — `together` semantics: independence declared, failure held, nothing shared
 - [0030](0030-2026-07-27-word-array-contents.md) — `%w[]` contents take Ruby's rules: escapes and balanced nesting
 - [0031](0031-2026-07-31-smart-constructors-definable-new.md) — Smart constructors: `new` is definable, and `fields` is the raw constructor
+- [0032](0032-2026-08-11-dotted-calls-take-paren-less-arguments.md) — Dotted calls take paren-less arguments
 
 <!-- /generated -->
 

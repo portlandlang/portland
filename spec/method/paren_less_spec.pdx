@@ -1,0 +1,44 @@
+# ADR 0032 — a dot call takes paren-less arguments, which is what lets a
+# chain read as a sentence: this very suite's `expect(x).to eq(y)`.
+
+require_relative "../spec_helper"
+
+struct Wrap
+  actual
+
+  def to(matcher)
+    matcher + actual
+  end
+end
+
+context "a dot call" do
+  describe "paren-less arguments" do
+    specify "carry like a command call's" do
+      expect(Wrap.new(actual: 1).to 41).to eq(42)
+    end
+
+    specify "take several, comma-separated" do
+      expect("portland".slice 0, 4).to eq("port")
+    end
+
+    specify "take keywords" do
+      wrap = Wrap.new(actual: 1)
+      expect(wrap.with(actual: 2).actual).to eq(2)
+    end
+
+    specify "nest — the innermost call takes the arguments" do
+      expect(Wrap.new(actual: 2).to Wrap.new(actual: 3).to 1).to eq(6)
+    end
+
+    specify "leave subtraction alone when the minus is spaced" do
+      expect(Wrap.new(actual: 1).to 5 - 1).to eq(5)
+    end
+
+    specify "hand a do block to the call, past the arguments" do
+      folded = [1, 2, 3].reduce 10 do |total, number|
+        total + number
+      end
+      expect(folded).to eq(16)
+    end
+  end
+end

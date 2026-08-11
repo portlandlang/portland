@@ -1160,11 +1160,62 @@ def parse_dot(tokens, receiver, mutable position, safe)
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end
   position += 1
+  # `token.parse!` — the `!` wraps the call (ADR 0027), exactly as it does
+  # on a bare name.
+  name = if bang_name?(token.text)
+    bang_base(token.text)
+  else
+    token.text
+  end
   mutable arguments = []
-  if operator_at?(tokens, position, %w[(])
+  if operator_at?(tokens, position, %w[(]) && !tokens[position].leading_space
     argument_step = parse_arguments(tokens, position + 1)
     arguments = argument_step.node
     position = argument_step.position
+  elsif dotted_ambiguous?(tokens, position)
+    return Step.new(node: error_node(dotted_ambiguity_message(name, tokens, position)), position: skip_line_at(tokens, position))
+  elsif command_start?(tokens, position)
+    # Paren-less arguments on a dot call (#68) — `expect(x).to eq(y)`, the
+    # mirror of parse_command one dot deeper: the same start test, the same
+    # refusals, the same truncation so an opener past the arguments belongs
+    # to the outermost call and never to an argument.
+    opener = command_opener_at(tokens, position)
+    argument_tokens = if opener < 0
+      tokens
+    else
+      tokens[0..opener - 1]
+    end
+    mutable step = parse_argument(argument_tokens, position)
+    arguments << step.node
+    position = step.position
+    while operator_at?(argument_tokens, position, %w[,])
+      step = parse_argument(argument_tokens, position + 1)
+      arguments << step.node
+      position = step.position
+    end
+    unless opener < 0
+      if keyword_at?(tokens, opener, %w[do])
+        handed_block = parse_block(tokens, opener + 1, false)
+        handed = if safe
+          safe_method_call_node(receiver, name, arguments, handed_block.node)
+        else
+          method_call_node(receiver, name, arguments, handed_block.node)
+        end
+        return Step.new(node: propagate_node(handed), position: handed_block.position) if bang_name?(token.text)
+        return Step.new(node: handed, position: handed_block.position)
+      end
+      # ADR 0016: a bare `{` after an argument has two or three genuine
+      # readings. Name them all and let the author pick with a paren.
+      message = brace_ambiguity_message(name, arguments.last, tokens, opener)
+      return Step.new(node: error_node(message), position: skip_line_at(tokens, opener))
+    end
+    node = if safe
+      safe_method_call_node(receiver, name, arguments, nil)
+    else
+      method_call_node(receiver, name, arguments, nil)
+    end
+    return Step.new(node: propagate_node(node), position: position) if bang_name?(token.text)
+    return Step.new(node: node, position: position)
   end
   # Exhibit C, resolved: an absent block is nil, not an empty array.
   mutable block = nil
@@ -1175,13 +1226,6 @@ def parse_dot(tokens, receiver, mutable position, safe)
     block = block_step.node
     position = block_step.position
   end
-  # `token.parse!` — the `!` wraps the call (ADR 0027), exactly as it does
-  # on a bare name.
-  name = if bang_name?(token.text)
-    bang_base(token.text)
-  else
-    token.text
-  end
   node = if safe
     safe_method_call_node(receiver, name, arguments, block)
   else
@@ -1189,6 +1233,33 @@ def parse_dot(tokens, receiver, mutable position, safe)
   end
   return Step.new(node: propagate_node(node), position: position) if bang_name?(token.text)
   Step.new(node: node, position: position)
+end
+
+# The never-guess shapes after a dot call's name, refused with the bare
+# command's wordings — the rewrites spell the bare method name, since a
+# receiver is an expression neither oracle can faithfully re-print.
+def dotted_ambiguous?(tokens, position)
+  return false if position >= tokens.length
+  token = tokens[position]
+  return false unless token.operator? && token.leading_space
+  if token.text == "-"
+    after = position + 1
+    return false if after >= tokens.length
+    return !tokens[after].leading_space
+  end
+  token.text == "[" || token.text == "("
+end
+
+def dotted_ambiguity_message(name, tokens, position)
+  following = tokens[position].text
+  if following == "-"
+    argument = tokens[position + 1].text
+    return "ambiguous without parens — write #{name}(-#{argument}) or #{name} - #{argument}"
+  end
+  if following == "["
+    return "ambiguous without parens — write #{name}([...]) to pass an array or #{name}[...] to index"
+  end
+  "ambiguous without parens — write #{name}(...) with no space to call"
 end
 
 # `do |params| ... end`, position already past the `do`.

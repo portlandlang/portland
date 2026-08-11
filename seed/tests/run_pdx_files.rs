@@ -651,6 +651,19 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def risky\n  failure(\"down\")\nend\ndef f\n  together do\n    ~ x = risky!\n  end\nend\nf\n",
             "a task cannot unwind across the join — bind a name and handle it after end",
         ),
+        // ADR 0032 (#68): the never-guess shapes after a dot call's name.
+        (
+            "p \"x\".slice -1\n",
+            "ambiguous without parens — write slice(-1) or slice - 1",
+        ),
+        (
+            "numbers = [1]\np numbers.slice [0]\n",
+            "ambiguous without parens — write slice([...]) to pass an array or slice[...] to index",
+        ),
+        (
+            "p \"abc\".slice (0)\n",
+            "ambiguous without parens — write slice(...) with no space to call",
+        ),
         // ADR 0031: type functions, definable `new`, and `fields`.
         (
             "fields(x: 1)\n",
@@ -760,6 +773,18 @@ fn portland_evaluator_matches_the_seed_on_type_functions() {
     assert_evaluator_matches_seed(
         "evaluator_type_functions.pdx",
         "struct Token\n  kind\n  text\n\n  def self.of(raw)\n    Token.new(kind: \"word\", text: raw)\n  end\n\n  def self.fallback\n    \"blank\"\n  end\n\n  def self.labeled(raw)\n    return Token.new(kind: fallback, text: \"\") if raw.empty?\n    Token.of(raw)\n  end\nend\n\np Token.of(\"rose\")\np Token.labeled(\"\")\np Token.labeled(\"city\")\n\nstruct Badge\n  label\n\n  def self.new(raw)\n    return failure(\"a badge needs text\") if raw.empty?\n    fields(label: raw)\n  end\nend\n\np Badge.new(\"rose\")\np Badge.new(\"\")\nbadge = Badge.new(\"\") or Badge.new(\"fallback\")\nputs badge.label\n\nmodule Statistics\n  def self.mean(values)\n    values.sum / values.length\n  end\nend\nputs Statistics.mean([2, 4, 6])\n\nstruct Point\n  x\nend\np Point.new(x: 41)\np Point.new(x: 41).with(x: 42)\n",
+    );
+}
+
+/// ADR 0032 (#68): dot calls take paren-less arguments — the rspec chain
+/// (`expect(x).to eq(y)`), multi-argument and keyword forms, recursive
+/// nesting, a `do` block after the arguments, and subtraction staying
+/// subtraction.
+#[test]
+fn portland_evaluator_matches_the_seed_on_dotted_commands() {
+    assert_evaluator_matches_seed(
+        "evaluator_dotted_commands.pdx",
+        "def eq(value)\n  value * 10\nend\nstruct Wrap\n  actual\n\n  def to(matcher)\n    matcher + actual\n  end\nend\np Wrap.new(actual: 1).to eq(4)\np Wrap.new(actual: 5).to 7\np Wrap.new(actual: 2).to Wrap.new(actual: 3).to eq(1)\nputs %w[rose city].join \"-\"\nputs \"portland\".slice 0, 4\nstruct Token\n  kind\n  text\nend\np Token.new(kind: \"word\", text: \"42\").with text: \"43\"\nfolded = [1, 2, 3].reduce 10 do |total, number|\n  total + number\nend\np folded\nfive = 6 - 1\np five\np Wrap.new(actual: 1).to 5 - 1\n",
     );
 }
 
