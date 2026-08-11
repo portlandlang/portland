@@ -5,11 +5,11 @@ require_relative "../spec_helper"
 context "Array" do
   describe "#sum" do
     specify "adds the elements" do
-      expect([3, 1, 2].sum).to(eq(6))
+      expect([3, 1, 2].sum).to eq(6)
     end
 
     specify "answers zero for the empty array" do
-      expect([].sum).to(eq(0))
+      expect([].sum).to eq(0)
     end
   end
 end

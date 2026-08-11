@@ -9,8 +9,8 @@ require_relative "../spec_helper"
 context "case/in" do
   describe "a range pattern" do
     specify "matches by membership, exclusive end honored" do
-      expect((5 in 1..9)).to(be_true)
-      expect((5 in 1...5)).to(be_false)
+      expect((5 in 1..9)).to be_true
+      expect((5 in 1...5)).to be_false
     end
 
     specify "may run beginless or endless" do
@@ -19,7 +19,7 @@ context "case/in" do
       in 1..9 then "single"
       in 10.. then "high"
       end
-      expect(edges).to(eq("high"))
+      expect(edges).to eq("high")
     end
   end
 end

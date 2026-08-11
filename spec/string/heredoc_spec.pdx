@@ -14,21 +14,21 @@ context "String" do
         select *
           from roses
       SQL
-      expect(sql).to(eq("select *\n  from roses\n"))
+      expect(sql).to eq("select *\n  from roses\n")
     end
 
     specify "interpolates" do
       line = <<~LINE
         hello from #{city}
       LINE
-      expect(line).to(eq("hello from portland\n"))
+      expect(line).to eq("hello from portland\n")
     end
 
     specify "takes a method call on the opener" do
       shouted = <<~TEXT.upcase
         rose city
       TEXT
-      expect(shouted).to(eq("ROSE CITY\n"))
+      expect(shouted).to eq("ROSE CITY\n")
     end
   end
 
@@ -38,7 +38,7 @@ context "String" do
       raw = <<~'TEXT'
         no #{interpolation} here
       TEXT
-      expect(raw).to(contain("\#{interpolation}"))
+      expect(raw).to contain("\#{interpolation}")
     end
   end
 end

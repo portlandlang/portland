@@ -32,13 +32,13 @@ context "a trait" do
 
   describe "include" do
     specify "hands its methods to the carrier" do
-      expect(token.label).to(eq("word: pdx"))
+      expect(token.label).to eq("word: pdx")
     end
 
     specify "sits beside the struct's own methods, two traits at once" do
-      expect(token.brief).to(eq("pdx"))
-      expect(token.label).to(eq("word: pdx"))
-      expect(token.size_note).to(eq("3 characters"))
+      expect(token.brief).to eq("pdx")
+      expect(token.label).to eq("word: pdx")
+      expect(token.size_note).to eq("3 characters")
     end
   end
 end

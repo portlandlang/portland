@@ -17,12 +17,12 @@ context "rebinding under mutable" do
     start = 3
 
     specify "rebinds freely inside the method" do
-      expect(countdown(start)).to(eq([3, 2, 1]))
+      expect(countdown(start)).to eq([3, 2, 1])
     end
 
     specify "without touching the caller's binding" do
       countdown(start)
-      expect(start).to(eq(3))
+      expect(start).to eq(3)
     end
   end
 end

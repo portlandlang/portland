@@ -17,7 +17,7 @@ context "case/in" do
       in Node(kind: "word", text:)    then "the word #{text}"
       in Node(kind: "integer", text:) then "the number #{text}"
       end
-      expect(answer).to(eq("the number 42"))
+      expect(answer).to eq("the number 42")
     end
   end
 end

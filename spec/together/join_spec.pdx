@@ -20,8 +20,8 @@ context "a together block" do
         ~ user = fetch_user(7)
         meanwhile orders = recent_orders(7)
       end
-      expect(user).to(eq("user-7"))
-      expect(orders).to(have_length(2))
+      expect(user).to eq("user-7")
+      expect(orders).to have_length(2)
     end
 
     specify "interleaves plain lines, whose locals die at end" do
@@ -29,7 +29,7 @@ context "a together block" do
         greeting = "hello"
         ~ note = "#{7} looked up"
       end
-      expect(note).to(eq("7 looked up"))
+      expect(note).to eq("7 looked up")
     end
   end
 end

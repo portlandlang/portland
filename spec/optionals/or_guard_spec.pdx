@@ -12,11 +12,11 @@ end
 context "the unwrap toolkit" do
   describe "the or-guard" do
     specify "returns early on an absent maybe" do
-      expect(first_or_bail([])).to(eq("bailed"))
+      expect(first_or_bail([])).to eq("bailed")
     end
 
     specify "passes a present value straight through" do
-      expect(first_or_bail([5])).to(eq(5))
+      expect(first_or_bail([5])).to eq(5)
     end
   end
 end

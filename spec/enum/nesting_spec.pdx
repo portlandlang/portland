@@ -30,11 +30,11 @@ context "an enum" do
       in :pending   then "never"
       in :paid(on:) then on
       end
-      expect(day).to(eq("tuesday"))
+      expect(day).to eq("tuesday")
     end
 
     specify "and the struct's own methods match on it" do
-      expect(purchase.paid?).to(be_true)
+      expect(purchase.paid?).to be_true
     end
   end
 end

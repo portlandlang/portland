@@ -14,11 +14,11 @@ context "a method" do
       handed = apply do
         "from the block"
       end
-      expect(handed).to(eq("from the block"))
+      expect(handed).to eq("from the block")
     end
 
     specify "runs a brace block the same way" do
-      expect(apply() { "from braces" }).to(eq("from braces"))
+      expect(apply() { "from braces" }).to eq("from braces")
     end
   end
 end

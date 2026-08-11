@@ -35,17 +35,17 @@ end
 context "control flow" do
   describe "a call broken out of" do
     specify "produces nil, not the collection" do
-      expect(broken_out).to(be_nil)
+      expect(broken_out).to be_nil
     end
   end
 
   describe "return inside a block" do
     specify "unwinds the enclosing method" do
-      expect(through_blocks).to(eq("unwound"))
+      expect(through_blocks).to eq("unwound")
     end
 
     specify "unwinds to its write site, through a yielding helper" do
-      expect(through_a_yield).to(eq("unwound past the helper"))
+      expect(through_a_yield).to eq("unwound past the helper")
     end
   end
 end

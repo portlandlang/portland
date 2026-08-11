@@ -5,11 +5,11 @@ require_relative "../spec_helper"
 context "Hash" do
   describe "#==" do
     specify "is by value" do
-      expect({name: "pdx"}).to(eq({name: "pdx"}))
+      expect({name: "pdx"}).to eq({name: "pdx"})
     end
 
     specify "and a differing value breaks it" do
-      expect({name: "pdx"}).not_to(eq({name: "rose"}))
+      expect({name: "pdx"}).not_to eq({name: "rose"})
     end
   end
 end

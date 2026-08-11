@@ -8,7 +8,7 @@ context "control flow" do
       quiet = unless false
         "quiet"
       end
-      expect(quiet).to(eq("quiet"))
+      expect(quiet).to eq("quiet")
     end
 
     # ADR 0012 — a branch that doesn't happen produces nil.
@@ -16,7 +16,7 @@ context "control flow" do
       loud = unless true
         "quiet"
       end
-      expect(loud).to(be_nil)
+      expect(loud).to be_nil
     end
   end
 end

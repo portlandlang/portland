@@ -8,8 +8,8 @@ require_relative "../../spec_helper"
 context "Float" do
   describe "#to_i" do
     specify "truncates toward zero, Ruby's rule" do
-      expect(2.9.to_i).to(eq(2))
-      expect((0 - 2.9).to_i).to(eq(-2))
+      expect(2.9.to_i).to eq(2)
+      expect((0 - 2.9).to_i).to eq(-2)
     end
   end
 end

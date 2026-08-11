@@ -6,22 +6,22 @@ require_relative "../spec_helper"
 context "the word operators" do
   describe "typed or" do
     specify "on booleans is logical" do
-      expect((false or true)).to(be_true)
+      expect((false or true)).to be_true
     end
 
     specify "on an absent maybe takes the default" do
-      expect((nil or "anonymous")).to(eq("anonymous"))
+      expect((nil or "anonymous")).to eq("anonymous")
     end
 
     specify "on a present maybe keeps the value" do
-      expect(("found" or "unused")).to(eq("found"))
+      expect(("found" or "unused")).to eq("found")
     end
 
     # `or panic` is the only crash you can write (ADR 0008), which makes it
     # the sharpest probe of laziness there is: if the right side ran eagerly,
     # this example would not fail — it would take the whole file down with it.
     specify "never evaluates the right side of a hit" do
-      expect(("present" or panic("the right side ran"))).to(eq("present"))
+      expect(("present" or panic("the right side ran"))).to eq("present")
     end
   end
 end

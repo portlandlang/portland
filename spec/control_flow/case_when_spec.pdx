@@ -12,7 +12,7 @@ context "control flow" do
       else
         "many"
       end
-      expect(label).to(eq("two"))
+      expect(label).to eq("two")
     end
 
     specify "falls to else when nothing matches" do
@@ -21,7 +21,7 @@ context "control flow" do
       else
         "else branch"
       end
-      expect(label).to(eq("else branch"))
+      expect(label).to eq("else branch")
     end
   end
 end

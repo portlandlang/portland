@@ -5,12 +5,12 @@ require_relative "../spec_helper"
 context "Array" do
   describe "#empty?" do
     specify "holds for the empty array" do
-      expect([]).to(be_empty)
+      expect([]).to be_empty
     end
 
     specify "and for nothing else, an array of nil included" do
-      expect([3, 1, 2]).not_to(be_empty)
-      expect([nil]).not_to(be_empty)
+      expect([3, 1, 2]).not_to be_empty
+      expect([nil]).not_to be_empty
     end
   end
 end

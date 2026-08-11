@@ -6,11 +6,11 @@ require_relative "../spec_helper"
 context "the first fallible operation" do
   describe "read_file on a missing path" do
     specify "answers a failure, not a panic" do
-      expect(read_file("/tmp/portland-definitely-missing")).to(be_failure)
+      expect(read_file("/tmp/portland-definitely-missing")).to be_failure
     end
 
     specify "which is one or away from a default" do
-      expect((read_file("/tmp/portland-definitely-missing") or "default config")).to(eq("default config"))
+      expect((read_file("/tmp/portland-definitely-missing") or "default config")).to eq("default config")
     end
   end
 end

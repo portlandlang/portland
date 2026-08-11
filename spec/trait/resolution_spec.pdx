@@ -32,11 +32,11 @@ context "a trait" do
 
   describe "its bare names" do
     specify "reach the carrier's fields" do
-      expect(token.size_note).to(eq("3 characters"))
+      expect(token.size_note).to eq("3 characters")
     end
 
     specify "reach its own sibling methods" do
-      expect(token.shouted).to(eq("WORD: PDX"))
+      expect(token.shouted).to eq("WORD: PDX")
     end
   end
 end

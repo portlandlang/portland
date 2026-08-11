@@ -5,11 +5,11 @@ require_relative "../spec_helper"
 context "String" do
   describe "#length" do
     specify "counts the characters" do
-      expect("portland").to(have_length(8))
+      expect("portland").to have_length(8)
     end
 
     specify "answers zero for the empty string" do
-      expect("").to(have_length(0))
+      expect("").to have_length(0)
     end
   end
 end

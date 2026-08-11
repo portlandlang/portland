@@ -31,15 +31,15 @@ end
 context "a namespace" do
   describe "lexical resolution" do
     specify "reaches a sibling method bare" do
-      expect(Statistics.doubled_scale(3)).to(eq(60))
+      expect(Statistics.doubled_scale(3)).to eq(60)
     end
 
     specify "reaches outward from a nested module" do
-      expect(Statistics::Deep.reach(3)).to(eq(40))
+      expect(Statistics::Deep.reach(3)).to eq(40)
     end
 
     specify "treats module A::B as the nested spelling" do
-      expect(Statistics::Extra.lifted(2)).to(eq(20))
+      expect(Statistics::Extra.lifted(2)).to eq(20)
     end
   end
 end

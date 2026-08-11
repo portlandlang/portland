@@ -9,11 +9,11 @@ context "the unwrap toolkit" do
     empty = []
 
     specify "forwards to a present receiver" do
-      expect(words.first&.upcase).to(eq("ROSE"))
+      expect(words.first&.upcase).to eq("ROSE")
     end
 
     specify "answers nil for an absent one" do
-      expect(empty.first&.upcase).to(be_nil)
+      expect(empty.first&.upcase).to be_nil
     end
   end
 end

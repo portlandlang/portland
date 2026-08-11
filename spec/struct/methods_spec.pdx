@@ -45,23 +45,23 @@ context "a struct" do
     token = Token.new(kind: "integer", text: "42")
 
     specify "reach fields bare" do
-      expect(token.integer?).to(be_true)
+      expect(token.integer?).to be_true
     end
 
     specify "reach their own methods and top-level methods bare" do
-      expect(token.framed).to(eq("[INTEGER]"))
+      expect(token.framed).to eq("[INTEGER]")
     end
 
     specify "reach `with` through self" do
-      expect(token.renamed("43").text).to(eq("43"))
+      expect(token.renamed("43").text).to eq("43")
     end
 
     specify "take other structs as arguments" do
-      expect(token.handed_to(Token.new(kind: "word", text: "pdx"))).to(eq("pdx"))
+      expect(token.handed_to(Token.new(kind: "word", text: "pdx"))).to eq("pdx")
     end
 
     specify "hand self along" do
-      expect(token.paired).to(eq("integer"))
+      expect(token.paired).to eq("integer")
     end
   end
 end

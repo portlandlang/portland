@@ -7,15 +7,15 @@ context "String" do
 
   describe "#[]" do
     specify "answers the character at an index" do
-      expect(city[0]).to(eq("p"))
+      expect(city[0]).to eq("p")
     end
 
     specify "counts negative indices from the end" do
-      expect(city[0 - 1]).to(eq("d"))
+      expect(city[0 - 1]).to eq("d")
     end
 
     specify "answers nil past the end" do
-      expect(city[99]).to(be_nil)
+      expect(city[99]).to be_nil
     end
   end
 end

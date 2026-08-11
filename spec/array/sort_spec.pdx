@@ -7,12 +7,12 @@ context "Array" do
     numbers = [3, 1, 2]
 
     specify "orders into a new array" do
-      expect(numbers.sort).to(eq([1, 2, 3]))
+      expect(numbers.sort).to eq([1, 2, 3])
     end
 
     specify "leaving the original alone" do
       numbers.sort
-      expect(numbers).to(eq([3, 1, 2]))
+      expect(numbers).to eq([3, 1, 2])
     end
   end
 end

@@ -21,7 +21,7 @@ context "a method" do
       handed = relay do
         "handed through two layers"
       end
-      expect(handed).to(eq("handed through two layers"))
+      expect(handed).to eq("handed through two layers")
     end
 
     specify "and an accumulator flows through the delegation" do
@@ -32,7 +32,7 @@ context "a method" do
       relay do
         count += 10
       end
-      expect(count).to(eq(11))
+      expect(count).to eq(11)
     end
   end
 end

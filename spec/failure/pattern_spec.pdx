@@ -13,7 +13,7 @@ context "a failure" do
       answer = case failure("out of roses")
       in reason then "reason was #{reason}"
       end
-      expect(answer).to(eq("reason was out of roses"))
+      expect(answer).to eq("reason was out of roses")
     end
 
     specify "and destructures a struct payload by pattern" do
@@ -21,7 +21,7 @@ context "a failure" do
       in ParseFailed(line:) then "failed on line #{line}"
       in content            then "parsed #{content}"
       end
-      expect(shaped).to(eq("failed on line 7"))
+      expect(shaped).to eq("failed on line 7")
     end
   end
 end

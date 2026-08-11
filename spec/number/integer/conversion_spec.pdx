@@ -7,7 +7,7 @@ require_relative "../../spec_helper"
 context "Integer" do
   describe "#to_f" do
     specify "promotes" do
-      expect(2.to_f).to(eq(2.0))
+      expect(2.to_f).to eq(2.0)
     end
   end
 end

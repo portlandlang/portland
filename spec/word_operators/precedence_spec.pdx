@@ -9,7 +9,7 @@ context "the word operators" do
     bound = nil or 7
 
     specify "binds the whole or expression, not the nil" do
-      expect(bound).to(eq(7))
+      expect(bound).to eq(7)
     end
   end
 end

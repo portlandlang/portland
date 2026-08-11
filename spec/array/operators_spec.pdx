@@ -5,13 +5,13 @@ require_relative "../spec_helper"
 context "Array" do
   describe "#+" do
     specify "concatenates" do
-      expect([1, 2] + [3]).to(eq([1, 2, 3]))
+      expect([1, 2] + [3]).to eq([1, 2, 3])
     end
   end
 
   describe "#*" do
     specify "repeats" do
-      expect([0] * 3).to(eq([0, 0, 0]))
+      expect([0] * 3).to eq([0, 0, 0])
     end
   end
 end

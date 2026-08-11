@@ -13,11 +13,11 @@ context "a struct" do
     copy = token.with(text: "43")
 
     specify "answers an updated copy" do
-      expect(copy.text).to(eq("43"))
+      expect(copy.text).to eq("43")
     end
 
     specify "leaves the original untouched" do
-      expect(token.text).to(eq("42"))
+      expect(token.text).to eq("42")
     end
   end
 end

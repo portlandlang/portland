@@ -6,12 +6,12 @@ context "case/in" do
   describe "a pin" do
     specify "matches the named value instead of binding it" do
       expected = 5
-      expect((5 in ^expected)).to(be_true)
+      expect((5 in ^expected)).to be_true
     end
 
     specify "and misses when the values differ" do
       expected = 5
-      expect((9 in ^expected)).to(be_false)
+      expect((9 in ^expected)).to be_false
     end
   end
 end

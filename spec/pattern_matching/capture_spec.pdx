@@ -10,8 +10,8 @@ context "case/in" do
     end
 
     specify "outlives its case" do
-      expect(head).to(eq(1))
-      expect(tail).to(eq(2))
+      expect(head).to eq(1)
+      expect(tail).to eq(2)
     end
   end
 end

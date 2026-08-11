@@ -5,11 +5,11 @@ require_relative "../spec_helper"
 context "String" do
   describe "#split" do
     specify "cuts on the separator" do
-      expect("a,b,c".split(",")).to(eq(["a", "b", "c"]))
+      expect("a,b,c".split(",")).to eq(["a", "b", "c"])
     end
 
     specify "answers the whole string when the separator is absent" do
-      expect("abc".split(",")).to(eq(["abc"]))
+      expect("abc".split(",")).to eq(["abc"])
     end
   end
 end

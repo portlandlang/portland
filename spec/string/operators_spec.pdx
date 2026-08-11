@@ -5,13 +5,13 @@ require_relative "../spec_helper"
 context "String" do
   describe "#+" do
     specify "concatenates" do
-      expect("rose" + " city").to(eq("rose city"))
+      expect("rose" + " city").to eq("rose city")
     end
   end
 
   describe "#*" do
     specify "repeats" do
-      expect("ab" * 3).to(eq("ababab"))
+      expect("ab" * 3).to eq("ababab")
     end
   end
 end

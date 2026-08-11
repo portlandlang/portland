@@ -9,13 +9,13 @@ context "Array" do
 
   describe "#first" do
     specify "answers the front" do
-      expect(numbers.first).to(eq(3))
+      expect(numbers.first).to eq(3)
     end
   end
 
   describe "#last" do
     specify "answers the back" do
-      expect(numbers.last).to(eq(2))
+      expect(numbers.last).to eq(2)
     end
   end
 end

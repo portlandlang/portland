@@ -11,7 +11,7 @@ context "case/in" do
       in 1..9 then "the range, written first"
       in 5    then "the literal, written second"
       end
-      expect(answer).to(eq("the range, written first"))
+      expect(answer).to eq("the range, written first")
     end
   end
 end

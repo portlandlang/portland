@@ -9,7 +9,7 @@ context "case/in" do
       in []              then "empty"
       in [first, *rest]  then [first, rest.length]
       end
-      expect(answer).to(eq([9, 2]))
+      expect(answer).to eq([9, 2])
     end
 
     specify "matches the empty array by shape" do
@@ -17,7 +17,7 @@ context "case/in" do
       in []             then "empty"
       in [first, *rest] then "some"
       end
-      expect(answer).to(eq("empty"))
+      expect(answer).to eq("empty")
     end
   end
 end

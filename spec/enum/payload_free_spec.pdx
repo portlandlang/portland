@@ -12,11 +12,11 @@ end
 context "an enum" do
   describe "a payload-free case" do
     specify "is the plain symbol" do
-      expect(:less).to(eq(:less))
+      expect(:less).to eq(:less)
     end
 
     specify "and differs from its siblings, as symbols do" do
-      expect(:less).not_to(eq(:greater))
+      expect(:less).not_to eq(:greater)
     end
   end
 end

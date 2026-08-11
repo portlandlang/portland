@@ -23,11 +23,11 @@ end
 context "construction" do
   describe "a type function" do
     specify "dispatches on the struct's name" do
-      expect(Ticket.of("rose").label).to(eq("rose"))
+      expect(Ticket.of("rose").label).to eq("rose")
     end
 
     specify "reaches sibling type functions bare" do
-      expect(Ticket.labeled("").label).to(eq("unlabeled"))
+      expect(Ticket.labeled("").label).to eq("unlabeled")
     end
   end
 end

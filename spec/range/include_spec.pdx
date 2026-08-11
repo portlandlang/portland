@@ -6,17 +6,17 @@ require_relative "../spec_helper"
 context "Range" do
   describe "#include?" do
     specify "respects the exclusive end" do
-      expect((1..5)).to(contain(5))
-      expect((1...5)).not_to(contain(5))
+      expect((1..5)).to contain(5)
+      expect((1...5)).not_to contain(5)
     end
 
     specify "answers for an endless range" do
-      expect((1..)).to(contain(99))
+      expect((1..)).to contain(99)
     end
 
     specify "answers for a beginless one" do
-      expect((..4)).to(contain(0 - 5))
-      expect((..4)).not_to(contain(5))
+      expect((..4)).to contain(0 - 5)
+      expect((..4)).not_to contain(5)
     end
   end
 end

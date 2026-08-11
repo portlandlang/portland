@@ -17,15 +17,15 @@ end
 context "a namespace" do
   describe "the two operators" do
     specify ". invokes a module method" do
-      expect(Statistics.scaled(3)).to(eq(30))
+      expect(Statistics.scaled(3)).to eq(30)
     end
 
     specify ":: names a constant" do
-      expect(Statistics::BASE).to(eq(10))
+      expect(Statistics::BASE).to eq(10)
     end
 
     specify "and both walk into a nested type in order" do
-      expect(Statistics::Summary.new(mean: 2).mean).to(eq(2))
+      expect(Statistics::Summary.new(mean: 2).mean).to eq(2)
     end
   end
 end

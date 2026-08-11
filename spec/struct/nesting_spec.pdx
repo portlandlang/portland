@@ -15,7 +15,7 @@ context "a struct" do
     line = Invoice::Line.new(amount: 5)
 
     specify "is named through its owner" do
-      expect(line.amount).to(eq(5))
+      expect(line.amount).to eq(5)
     end
   end
 end

@@ -6,11 +6,11 @@ require_relative "../spec_helper"
 context "String" do
   describe "#slice" do
     specify "takes a start and a length" do
-      expect("portland".slice(0, 4)).to(eq("port"))
+      expect("portland".slice(0, 4)).to eq("port")
     end
 
     specify "stops at the end rather than running past it" do
-      expect("portland".slice(5, 99)).to(eq("and"))
+      expect("portland".slice(5, 99)).to eq("and")
     end
   end
 end

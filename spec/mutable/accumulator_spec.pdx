@@ -11,7 +11,7 @@ context "rebinding under mutable" do
       [1, 2, 3].each do |number|
         total += number
       end
-      expect(total).to(eq(6))
+      expect(total).to eq(6)
     end
   end
 end

@@ -11,7 +11,7 @@ context "case/in" do
       else
         "few"
       end
-      expect(answer).to(eq("many"))
+      expect(answer).to eq("many")
     end
 
     # The next branch binds the same name fresh instead of tripping
@@ -21,7 +21,7 @@ context "case/in" do
       in count if count > 10 then "many"
       in count               then "few — #{count}"
       end
-      expect(answer).to(eq("few — 5"))
+      expect(answer).to eq("few — 5")
     end
   end
 end

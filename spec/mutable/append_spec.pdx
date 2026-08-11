@@ -13,11 +13,11 @@ context "rebinding under mutable" do
     numbers << 2
 
     specify "rebinds the name, leaving aliases alone" do
-      expect(alias_of).to(have_length(1))
+      expect(alias_of).to have_length(1)
     end
 
     specify "and the name itself sees the append" do
-      expect(numbers).to(have_length(2))
+      expect(numbers).to have_length(2)
     end
   end
 end

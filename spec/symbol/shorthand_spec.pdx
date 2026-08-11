@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 context "Symbol" do
   describe "the hash shorthand" do
     specify "builds symbol keys" do
-      expect({name: "pdx"}[:name]).to(eq("pdx"))
+      expect({name: "pdx"}[:name]).to eq("pdx")
     end
   end
 end

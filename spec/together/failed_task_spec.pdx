@@ -18,14 +18,14 @@ context "a together block" do
       together do
         ~ sad_orders = recent_orders(0)
       end
-      expect(sad_orders).to(be_failure)
+      expect(sad_orders).to be_failure
     end
 
     specify "which is one or away from a fallback, after the join" do
       together do
         ~ sad_orders = recent_orders(0)
       end
-      expect((sad_orders or "no orders today")).to(eq("no orders today"))
+      expect((sad_orders or "no orders today")).to eq("no orders today")
     end
 
     specify "while its siblings run to completion" do
@@ -33,8 +33,8 @@ context "a together block" do
         ~ sad_orders = recent_orders(0)
         ~ user = fetch_user(7)
       end
-      expect(sad_orders).to(be_failure)
-      expect(user).to(eq("user-7"))
+      expect(sad_orders).to be_failure
+      expect(user).to eq("user-7")
     end
   end
 end

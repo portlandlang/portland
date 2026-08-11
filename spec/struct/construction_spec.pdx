@@ -15,8 +15,8 @@ context "a struct" do
     token = Token.new(kind: "integer", text: "42")
 
     specify "answers its fields" do
-      expect(token.kind).to(eq("integer"))
-      expect(token.text).to(eq("42"))
+      expect(token.kind).to eq("integer")
+      expect(token.text).to eq("42")
     end
   end
 end

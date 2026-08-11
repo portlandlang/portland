@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 context "String" do
   describe "#reverse" do
     specify "turns the characters around" do
-      expect("drawer".reverse).to(eq("reward"))
+      expect("drawer".reverse).to eq("reward")
     end
   end
 end

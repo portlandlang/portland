@@ -5,15 +5,15 @@ require_relative "../spec_helper"
 context "Symbol" do
   describe "#==" do
     specify "holds against itself" do
-      expect(:paid).to(eq(:paid))
+      expect(:paid).to eq(:paid)
     end
 
     specify "breaks against the string of its name" do
-      expect(:paid).not_to(eq("paid"))
+      expect(:paid).not_to eq("paid")
     end
 
     specify "breaks against any other symbol" do
-      expect(:paid).not_to(eq(:pending))
+      expect(:paid).not_to eq(:pending)
     end
   end
 end

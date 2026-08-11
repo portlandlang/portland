@@ -5,11 +5,11 @@ require_relative "../spec_helper"
 context "String" do
   describe "#chars" do
     specify "splits into single characters" do
-      expect("pdx".chars).to(eq(["p", "d", "x"]))
+      expect("pdx".chars).to eq(["p", "d", "x"])
     end
 
     specify "answers an empty array for the empty string" do
-      expect("".chars).to(be_empty)
+      expect("".chars).to be_empty
     end
   end
 end

@@ -15,13 +15,13 @@ end
 context "control flow" do
   describe "postfix guards" do
     specify "return early on a hit" do
-      expect(guarded(true)).to(eq("early"))
-      expect(guarded(false)).to(eq("late"))
+      expect(guarded(true)).to eq("early")
+      expect(guarded(false)).to eq("late")
     end
 
     specify "and unless inverts the test" do
-      expect(negated_guard(false)).to(eq("stopped"))
-      expect(negated_guard(true)).to(eq("went on"))
+      expect(negated_guard(false)).to eq("stopped")
+      expect(negated_guard(true)).to eq("went on")
     end
   end
 end

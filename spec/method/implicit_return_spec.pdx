@@ -9,7 +9,7 @@ end
 context "a method" do
   describe "its body" do
     specify "returns its last expression" do
-      expect(implicit).to(eq("the last expression"))
+      expect(implicit).to eq("the last expression")
     end
   end
 end

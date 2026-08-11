@@ -8,15 +8,15 @@ context "Hash" do
     config = {name: "pdx", port: 8080}
 
     specify "finds a key" do
-      expect(config).to(have_key(:name))
+      expect(config).to have_key(:name)
     end
 
     specify "and misses one that is absent" do
-      expect(config).not_to(have_key(:nope))
+      expect(config).not_to have_key(:nope)
     end
 
     specify "holds for a key whose value is nil" do
-      expect({note: nil}).to(have_key(:note))
+      expect({note: nil}).to have_key(:note)
     end
   end
 end

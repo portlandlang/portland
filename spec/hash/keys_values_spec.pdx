@@ -7,13 +7,13 @@ context "Hash" do
 
   describe "#keys" do
     specify "lists the keys in insertion order" do
-      expect(config.keys).to(eq([:name, :port]))
+      expect(config.keys).to eq([:name, :port])
     end
   end
 
   describe "#values" do
     specify "lists the values in the keys' order" do
-      expect(config.values).to(eq(["pdx", 8080]))
+      expect(config.values).to eq(["pdx", 8080])
     end
   end
 end

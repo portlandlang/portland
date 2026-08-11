@@ -10,7 +10,7 @@ context "control flow" do
         next if n.even?
         collected << n
       end
-      expect(collected).to(eq([1, 3]))
+      expect(collected).to eq([1, 3])
     end
   end
 end

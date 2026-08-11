@@ -7,15 +7,15 @@ require_relative "../spec_helper"
 context "the word operators" do
   describe "against the sigils" do
     specify "or is ||" do
-      expect((false or true)).to(eq((false || true)))
+      expect((false or true)).to eq((false || true))
     end
 
     specify "and is &&" do
-      expect((true and false)).to(eq((true && false)))
+      expect((true and false)).to eq((true && false))
     end
 
     specify "not is !" do
-      expect((not true)).to(eq((!true)))
+      expect((not true)).to eq((!true))
     end
   end
 end

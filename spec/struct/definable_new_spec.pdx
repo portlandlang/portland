@@ -16,16 +16,16 @@ end
 context "construction" do
   describe "a defined new" do
     specify "replaces the raw constructor, positional signature included" do
-      expect(Badge.new("rose").label).to(eq("rose"))
+      expect(Badge.new("rose").label).to eq("rose")
     end
 
     specify "answers a failure when its own rule refuses" do
-      expect(Badge.new("")).to(be_failure)
+      expect(Badge.new("")).to be_failure
     end
 
     specify "and the failure is one the toolkit handles" do
       badge = Badge.new("") or Badge.new("fallback")
-      expect(badge.label).to(eq("fallback"))
+      expect(badge.label).to eq("fallback")
     end
   end
 end

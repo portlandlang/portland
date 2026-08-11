@@ -7,11 +7,11 @@ context "case/in" do
   describe "a builtin type pattern" do
     specify "answers for all five types" do
       hits = [(1 in Integer), ("x" in String), ([1] in Array), ({a: 1} in Hash), (true in Boolean)]
-      expect(hits).to(eq([true, true, true, true, true]))
+      expect(hits).to eq([true, true, true, true, true])
     end
 
     specify "and a miss is just false" do
-      expect(("x" in Integer)).to(be_false)
+      expect(("x" in Integer)).to be_false
     end
   end
 end

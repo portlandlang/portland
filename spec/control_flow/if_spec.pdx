@@ -12,7 +12,7 @@ context "control flow" do
       else
         "hello"
       end
-      expect(greeting).to(eq("afternoon"))
+      expect(greeting).to eq("afternoon")
     end
   end
 end

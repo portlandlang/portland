@@ -9,7 +9,7 @@ context "Integer" do
   # which truncates toward zero.
   describe "#/" do
     specify "floors toward negative infinity" do
-      expect((0 - 7) / 2).to(eq(-4))
+      expect((0 - 7) / 2).to eq(-4)
     end
   end
 end

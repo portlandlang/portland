@@ -9,7 +9,7 @@ context "Integer" do
   # which truncates toward zero.
   describe "#%" do
     specify "takes the sign of the divisor" do
-      expect((0 - 7) % 2).to(eq(1))
+      expect((0 - 7) % 2).to eq(1)
     end
   end
 end

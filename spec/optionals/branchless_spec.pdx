@@ -9,7 +9,7 @@ context "absence" do
     end
 
     specify "produces nil" do
-      expect(branchless).to(be_nil)
+      expect(branchless).to be_nil
     end
   end
 end

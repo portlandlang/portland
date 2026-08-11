@@ -8,11 +8,11 @@ context "Array" do
 
   describe "#[]" do
     specify "answers the element at an index" do
-      expect(numbers[0]).to(eq(3))
+      expect(numbers[0]).to eq(3)
     end
 
     specify "counts negative indices from the end" do
-      expect(numbers[0 - 1]).to(eq(2))
+      expect(numbers[0 - 1]).to eq(2)
     end
   end
 end

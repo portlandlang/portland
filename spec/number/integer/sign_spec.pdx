@@ -7,16 +7,16 @@ require_relative "../../spec_helper"
 context "Integer" do
   describe "#zero?" do
     specify "answers only for zero" do
-      expect(0.zero?).to(be_true)
-      expect(1.zero?).to(be_false)
+      expect(0.zero?).to be_true
+      expect(1.zero?).to be_false
     end
   end
 
   describe "#positive? and #negative?" do
     specify "split around zero, which is neither" do
-      expect(5.positive?).to(be_true)
-      expect((0 - 5).negative?).to(be_true)
-      expect(0.positive?).to(be_false)
+      expect(5.positive?).to be_true
+      expect((0 - 5).negative?).to be_true
+      expect(0.positive?).to be_false
     end
   end
 end

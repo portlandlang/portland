@@ -7,13 +7,13 @@ context "Array" do
 
   describe "#min" do
     specify "answers the smallest" do
-      expect(numbers.min).to(eq(1))
+      expect(numbers.min).to eq(1)
     end
   end
 
   describe "#max" do
     specify "answers the largest" do
-      expect(numbers.max).to(eq(3))
+      expect(numbers.max).to eq(3)
     end
   end
 end

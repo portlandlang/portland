@@ -5,12 +5,12 @@ require_relative "../spec_helper"
 context "Symbol" do
   describe "the spellings" do
     specify "may end in a question mark, the suffix part of the name" do
-      expect(:paid?).to(eq(:paid?))
-      expect(:paid).not_to(eq(:paid?))
+      expect(:paid?).to eq(:paid?)
+      expect(:paid).not_to eq(:paid?)
     end
 
     specify "take quotes when the name is not identifier-shaped" do
-      expect(:"odd key").to(eq(:"odd key"))
+      expect(:"odd key").to eq(:"odd key")
     end
   end
 end

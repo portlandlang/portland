@@ -10,11 +10,11 @@ context "absence" do
     missing = []
 
     specify "comes back present when a nil was stored" do
-      expect(stored.first).not_to(be_nil)
+      expect(stored.first).not_to be_nil
     end
 
     specify "comes back absent when the array was empty" do
-      expect(missing.first).to(be_nil)
+      expect(missing.first).to be_nil
     end
   end
 end

@@ -7,15 +7,15 @@ require_relative "../spec_helper"
 context "absence" do
   describe "a partial operation" do
     specify "answers nil for first on an empty array" do
-      expect([].first).to(be_nil)
+      expect([].first).to be_nil
     end
 
     specify "answers nil for an out-of-range index" do
-      expect([1, 2][9]).to(be_nil)
+      expect([1, 2][9]).to be_nil
     end
 
     specify "answers nil for a missing hash key" do
-      expect({name: "pdx"}[:nope]).to(be_nil)
+      expect({name: "pdx"}[:nope]).to be_nil
     end
   end
 
@@ -23,7 +23,7 @@ context "absence" do
   describe "a slice, which is not partial" do
     specify "returns an empty collection past the end, never nil" do
       words = %w[rose city]
-      expect(words[9..]).to(be_empty)
+      expect(words[9..]).to be_empty
     end
   end
 end

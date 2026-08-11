@@ -6,11 +6,11 @@ require_relative "../spec_helper"
 context "a failure" do
   describe "or" do
     specify "takes the fallback on a failure" do
-      expect((failure("why") or "fallback")).to(eq("fallback"))
+      expect((failure("why") or "fallback")).to eq("fallback")
     end
 
     specify "and keeps a present value" do
-      expect(("present" or "unused")).to(eq("present"))
+      expect(("present" or "unused")).to eq("present")
     end
   end
 end

@@ -8,21 +8,21 @@ require_relative "../spec_helper"
 context "the unwrap toolkit" do
   describe "some()" do
     specify "is identity on a plain value" do
-      expect(some(5)).to(eq(5))
+      expect(some(5)).to eq(5)
     end
 
     specify "boxes a nil into a present value" do
-      expect(some(nil)).to(be_some)
+      expect(some(nil)).to be_some
     end
 
     specify "lets a stored hash nil beat an or-guard default" do
       notes = {note: nil}
-      expect((notes[:note] or "default")).to(be_nil)
+      expect((notes[:note] or "default")).to be_nil
     end
 
     specify "while a genuinely missing key takes the default" do
       notes = {note: nil}
-      expect((notes[:nope] or "default")).to(eq("default"))
+      expect((notes[:nope] or "default")).to eq("default")
     end
   end
 end
