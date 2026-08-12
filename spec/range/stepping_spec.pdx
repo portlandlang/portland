@@ -1,0 +1,21 @@
+# Walking a range in strides, and its extremes — held pending (#23).
+#
+# From ruby/spec core/range/{step,min,max}_spec.rb. `size` and `count` ride
+# the alias-cluster policy question noted in spec/hash/queries_spec.pdx
+# rather than pending here.
+
+require_relative "../spec_helper"
+
+context "Range" do
+  describe "the strides and extremes" do
+    pending "Range#step — no builtin yet" do
+      expect((1..9).step(3).to_a).to eq([1, 4, 7])
+    end
+
+    pending "Range#min and #max — no builtins yet; exclusive end honored" do
+      expect((1..9).min).to eq(1)
+      expect((1..9).max).to eq(9)
+      expect((1...9).max).to eq(8)
+    end
+  end
+end
