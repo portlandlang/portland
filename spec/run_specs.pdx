@@ -1,8 +1,8 @@
-# Run many spec files on the trio in one process (#69).
+# Run many spec files on the compiler in one process (#69).
 #
 # Usage: pdx spec/run_specs.pdx <spec_helper.pdx> <a_spec.pdx> [more...]
 #
-# What a hosted spec pays for is not the trio — loading that is 0.02s — it is
+# What a hosted spec pays for is not the compiler — loading that is 0.02s — it is
 # `spec_helper.pdx`, which every spec re-requires into its own fresh scope:
 # 0.40s of the 0.42s, once per file, a hundred-odd times. This driver
 # evaluates the harness once and hands each spec a scope that starts from it.

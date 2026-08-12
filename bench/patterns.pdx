@@ -1,4 +1,4 @@
-# case/in dispatch: struct patterns, ranges, alternation — the trio's own
+# case/in dispatch: struct patterns, ranges, alternation — the compiler's own
 # hot path (ADR 0013).
 
 struct Word

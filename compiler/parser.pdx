@@ -20,7 +20,7 @@ end
 # for the evaluator's few remaining shape checks.
 
 # `in 1 | 2` — first matching option wins.
-# The rendering helpers every AST node shares — the trio's first real trait
+# The rendering helpers every AST node shares — the compiler's first real trait
 # (ADR 0028, #60's taste payoff): what was top-level helper soup, carried by
 # the structs that use it instead.
 # Parameter names dodge every carrier's field names on purpose: a trait
@@ -1013,7 +1013,7 @@ def parse_range(tokens, position)
 end
 
 # A range closes when the next meaningful token cannot continue an
-# expression (ADR 0019 §3). The trio is the syntax half; the seed is the
+# expression (ADR 0019 §3). The compiler is the syntax half; the seed is the
 # oracle for the never-guess error, so an ambiguous line just closes here.
 def range_closes?(tokens, position)
   return true if position >= tokens.length
@@ -1139,7 +1139,7 @@ def parse_unary(tokens, position)
     return chained
   end
   # The float twin of the branch above — the seed fuses `-2.5` the same way,
-  # and the trio silently did not until the `**` work made the gap loud.
+  # and the compiler silently did not until the `**` work made the gap loud.
   if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].float?
     if operator_at?(tokens, position + 2, %w[**])
       right = parse_unary(tokens, position + 3)
@@ -1358,7 +1358,7 @@ def parse_block(tokens, mutable position, braced)
 end
 
 # The block's body, or a single diagnostic if the block breaks an `it`
-# rule the trio can check.
+# rule the compiler can check.
 def diagnosed_body(statements, parameters, tokens, start, finish)
   mixed = mixed_it_error(parameters, tokens, start, finish)
   return [mixed] if mixed.some?
@@ -1416,7 +1416,7 @@ def opens_a_block?(tokens, start, finish)
 end
 
 # ADR 0017: `it` alongside declared `|parameters|` is a shadow, and
-# shadows error. The trio catches this one — but only when the body opens
+# shadows error. The compiler catches this one — but only when the body opens
 # no block of its own, since a flat token scan cannot tell an `it` of
 # *this* block from one belonging to a nested block. Where it can't tell,
 # it declines to guess and leaves the seed as the oracle.
@@ -1428,7 +1428,7 @@ def mixed_it_error(parameters, tokens, start, finish)
 end
 
 # ADR 0017: naming `it` declares the block's implicit parameter. Crude
-# divergence: the trio scans the body's tokens rather than tracking
+# divergence: the compiler scans the body's tokens rather than tracking
 # frames, so it catches the mixing rule (above) but not the two that need
 # frames — a nested `it`, or a local of that name. The seed is the
 # enforcement oracle for those, and they cannot appear in a program the

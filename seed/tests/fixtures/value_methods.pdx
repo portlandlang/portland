@@ -2,7 +2,7 @@
 # docs/language.md's library table.
 #
 # Written because an audit found 21 of 42 documented methods had never run
-# through the trio — the harness was green over a surface it had never
+# through the compiler — the harness was green over a surface it had never
 # exercised, which is the failure mode that already bit once during the
 # 0016–0020 batch. Everything here runs direct and hosted, byte-identical.
 
@@ -73,8 +73,8 @@ end
 end
 
 # The accumulator pattern ADR 0001 licenses, which this fixture used to avoid
-# on purpose: the trio discarded a block's bindings, so a counter incremented
-# from inside one was right under the seed and wrong under the trio. It
+# on purpose: the compiler discarded a block's bindings, so a counter incremented
+# from inside one was right under the seed and wrong under the compiler. It
 # threads them now, and these are the differential coverage for that — a
 # regression would show up here as a number that disagrees.
 mutable tally = 0

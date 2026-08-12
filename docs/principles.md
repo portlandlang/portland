@@ -32,9 +32,9 @@ Where the menu can be trimmed honestly, trim it — the parser peeks to drop the
 
 The same rule, turned inward, and the harder half.
 
-The Portland trio often cannot see what the Rust seed can — its parser is functional, so it holds no frames. Where it cannot tell, it **declines to check** rather than checking wrongly. `mixed_it_error` skips any block body that opens a block of its own, because a flat token scan cannot tell whose `it` it is.
+The Portland compiler often cannot see what the Rust seed can — its parser is functional, so it holds no frames. Where it cannot tell, it **declines to check** rather than checking wrongly. `mixed_it_error` skips any block body that opens a block of its own, because a flat token scan cannot tell whose `it` it is.
 
-A wrong diagnostic is worse than a missing one: a gap leaves the trio incomplete, a false positive makes it unusable. The seed is the oracle either way, so the cost of declining is bounded. Every such gap is recorded rather than left silent.
+A wrong diagnostic is worse than a missing one: a gap leaves the compiler incomplete, a false positive makes it unusable. The seed is the oracle either way, so the cost of declining is bounded. Every such gap is recorded rather than left silent.
 
 ### 5. Divergence is loud, never silent
 
@@ -53,11 +53,11 @@ Demand-driven. Issues are commitments, not wishes. A feature earns its place by 
 
 ### 7. The seed is the oracle
 
-The Rust seed defines behavior; the Portland trio must match it byte-identically. **Never hand-write expected output.** This covers error wording as well as results: where the trio can diagnose at all, it must say exactly what the seed says, and a test pins it.
+The Rust seed defines behavior; the Portland compiler must match it byte-identically. **Never hand-write expected output.** This covers error wording as well as results: where the compiler can diagnose at all, it must say exactly what the seed says, and a test pins it.
 
-The succession, begun with the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)): where the trio refuses a program the seed cannot — a build-time check with no runtime analog — no oracle has a wording to match, so the full rule is *never hand-write what an oracle can produce; where no oracle exists, the deciding ADR is the oracle, and the test pins its exact words.* A check that merely moves a runtime refusal to build time keeps the seed's wording byte for byte; only the timing moves.
+The succession, begun with the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)): where the compiler refuses a program the seed cannot — a build-time check with no runtime analog — no oracle has a wording to match, so the full rule is *never hand-write what an oracle can produce; where no oracle exists, the deciding ADR is the oracle, and the test pins its exact words.* A check that merely moves a runtime refusal to build time keeps the seed's wording byte for byte; only the timing moves.
 
-Corollary, learned the hard way: **green is not covered.** The differential suite stayed green through an entire batch of new syntax the trio did not understand, because no test exercised it. Ship the hosted test _with_ the feature, not after.
+Corollary, learned the hard way: **green is not covered.** The differential suite stayed green through an entire batch of new syntax the compiler did not understand, because no test exercised it. Ship the hosted test _with_ the feature, not after.
 
 ### 8. Verify, don't remember
 

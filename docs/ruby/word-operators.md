@@ -2,7 +2,7 @@
 
 **Summary:** `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed.
 
-**Status:** decided ([ADR 0007](../adr/0007-2026-07-22-or-and-not-dead-identical.md)). Built in the seed and the trio — see [the language](../language.md#absence).
+**Status:** decided ([ADR 0007](../adr/0007-2026-07-22-or-and-not-dead-identical.md)). Built in the seed and the compiler — see [the language](../language.md#absence).
 
 ## Ruby
 

@@ -1,7 +1,7 @@
 # The harness every spec file in this directory loads.
 #
 # Portland's language spec is the ADRs' promises, executable — the third
-# oracle. The differential harness proves the seed and the trio agree with each
+# oracle. The differential harness proves the seed and the compiler agree with each
 # other; it cannot prove either agrees with what was *decided*, since a shared
 # misreading of an ADR passes it. Every example cites the ADR it pins.
 #
@@ -16,7 +16,7 @@
 # how mspec separates examples from formatters, and it is what lets a run
 # report every failure rather than stopping at the first.
 #
-# This file lives here rather than being copied into each spec because the trio
+# This file lives here rather than being copied into each spec because the compiler
 # learned `require_relative` ([#37]). Splitting the suite was the thing that
 # asked for it.
 

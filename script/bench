@@ -1,5 +1,5 @@
 #!/bin/sh
-# Benchmark the seed and the trio (#25) — the harness itself is Ruby, and
+# Benchmark the seed and the compiler (#25) — the harness itself is Ruby, and
 # selecting a Ruby is the script's job, not the caller's (see ruby.sh).
 set -e
 cd "$(dirname "$0")/.."

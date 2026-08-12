@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
-# Benchmark the seed and the trio on the workloads in bench/ (#25).
+# Benchmark the seed and the compiler on the workloads in bench/ (#25).
 #
 # Every workload runs both ways — direct (the seed interpreting it) and
-# hosted (the seed interpreting the trio interpreting it) — because the
+# hosted (the seed interpreting the compiler interpreting it) — because the
 # hosted/direct ratio is the number Stage 2 exists to crush. Outputs are
 # compared while we're at it, so the bench doubles as a differential: a
 # workload that got faster by getting wrong fails loudly.
@@ -12,7 +12,7 @@
 # Lower is better; the ratio column is the one to watch over time.
 #
 # `script/bench` runs the quick set (median of three runs); add `slow` to
-# include the slow tier — bench/lex.pdx hosted is the trio running its own
+# include the slow tier — bench/lex.pdx hosted is the compiler running its own
 # front end, and it takes minutes today. That is a finding, not a bug in
 # this script.
 

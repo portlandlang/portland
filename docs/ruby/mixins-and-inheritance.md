@@ -2,7 +2,7 @@
 
 **Summary:** `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.
 
-**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#values).
+**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values).
 
 ## Ruby
 

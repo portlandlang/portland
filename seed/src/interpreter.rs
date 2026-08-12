@@ -908,7 +908,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 if else_body.is_empty() {
                     // The runtime preview of compile-checked exhaustiveness
-                    // (ADR 0013 §1): the real compiler refuses to build this.
+                    // (ADR 0013 §1): the checker (#9) refuses to build this.
                     panic!(
                         "no pattern matched {} — add an in branch or an else",
                         subject.inspect()

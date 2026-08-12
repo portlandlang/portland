@@ -6,7 +6,7 @@ puts library_greeting
 puts second
 
 # And a path spelled the long way round is the same file, so it does not load
-# again either — the seed asks the filesystem to canonicalise, the trio
+# again either — the seed asks the filesystem to canonicalise, the compiler
 # resolves the segments textually, and they agree.
 puts require_relative("./library")
 puts require_relative("../fixtures/library")

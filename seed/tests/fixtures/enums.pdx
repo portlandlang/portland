@@ -1,7 +1,7 @@
 # Living documentation for ADRs 0022 and 0023: symbols, hash shorthand,
 # and enums. Runs direct and hosted, byte-identical.
 #
-# Note what this file avoids printing: a bare symbol or enum case. The trio
+# Note what this file avoids printing: a bare symbol or enum case. The compiler
 # represents those as tagged arrays, exactly as it already does for guest
 # structs, because it cannot manufacture a host symbol — ADR 0023 removed
 # `to_sym`, so nothing can build one from a name at runtime. The decision

@@ -9,16 +9,16 @@ Portland is being bootstrapped. That single fact explains most of the layout: th
 ## The shape today
 
 ```text
-compiler/*.pdx     the trio — Portland, written in Portland
+compiler/*.pdx     the compiler — Portland, written in Portland
        ↑ runs on
 seed/  (Rust)      the seed — lexer, parser, tree-walking interpreter, pdx binary
        ↑ runs on
 macOS 26+ / Apple silicon
 ```
 
-There is no compiler yet in the sense of "emits a binary." The seed interprets. The trio is interpreted _by_ the seed. Everything below the seed is, for now, just the operating system.
+The compiler does not emit binaries yet — it checks, then runs programs through its evaluator; the back end (#5) is the missing part. The seed interprets, and the compiler is interpreted _by_ the seed. Everything below the seed is, for now, just the operating system.
 
-![Three states of the architecture: now, with a fat Rust seed and the trio interpreted on top of it; next, with the seed retired and a Portland compiler lowering through LLVM to a native binary over a thin Rust floor; and the ideal future, adding inference and heterogeneous dispatch across P/E cores, SME, and the Metal GPU, with FFI and Apple-framework bridges, the Rust floor still thin and shrinking.](architecture.svg)
+![Three states of the architecture: now, with a fat Rust seed and the compiler interpreted on top of it; next, with the seed retired and a Portland compiler lowering through LLVM to a native binary over a thin Rust floor; and the ideal future, adding inference and heterogeneous dispatch across P/E cores, SME, and the Metal GPU, with FFI and Apple-framework bridges, the Rust floor still thin and shrinking.](architecture.svg)
 
 ## The two kinds of Rust
 
@@ -47,9 +47,9 @@ The parser is hand-written recursive descent, which is what every language that 
 
 The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stack the seed died at roughly 1,200 nested parens, 1,500-term arithmetic chains, and 900 Portland call frames — and died as a silent macOS _hang_, not a crash, because even a trivial `fn f() { f() }` in Rust hangs on overflow under macOS 26. The fat stack moves the real limits about 64× out. Above that, explicit depth guards fail as clean Portland errors long before the Rust stack is at risk: expression nesting over 10,000 at parse time, expression evaluation over 100,000, call stack over 10,000 frames.
 
-**Panics are the seed's whole error story.** Parse errors, type errors, arity mismatches, a missing `end` — all panics. Real diagnostics are a headline joy feature of the actual compiler and deliberately not the seed's job.
+**Panics are the seed's whole error story.** Parse errors, type errors, arity mismatches, a missing `end` — all panics. Real diagnostics are a headline joy feature of the compiler and deliberately not the seed's job.
 
-## The trio
+## The compiler
 
 `compiler/` is Portland written in Portland — the beginning of Stage 1.
 
@@ -60,7 +60,7 @@ The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stac
 | `evaluator.pdx` | 963   | walks the AST                       |
 | `checker.pdx`   | 250   | static checks before evaluation (#9, ADR 0034) — the first walker the seed will never have |
 
-Plus three small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `run.pdx` evaluates a file. Each is under ten lines, because each is one composed expression — `evaluate_program(parse_program(lex(read_file(argv.first))))`.
+Plus four small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `check.pdx` checks without running, `run.pdx` checks and evaluates a file. Each is a handful of lines around one composed expression — `evaluate_program(parse_program(lex(read_file(argv.first))))`.
 
 Two milestones are reached: **`parser.pdx` parses the whole compiler including itself**, and **`evaluator.pdx` runs the fixture suite byte-identically to the seed**. The evaluator also dispatches on its own AST using `case/in` struct patterns, and the AST nodes print themselves via a `sexp` method — Portland matching on Portland, which is the point.
 
@@ -71,45 +71,45 @@ The differential harness is the reason two implementations do not drift. Every f
 - **direct** — the seed runs `fixture.pdx`
 - **hosted** — the seed runs `compiler/run.pdx`, which runs `fixture.pdx`
 
-The two stdouts are compared byte-for-byte. **Expected output is never hand-written**; the seed is the oracle, so the test asserts agreement rather than a transcript somebody typed. This covers **error wording as well as results** — where the trio can diagnose at all, it must say exactly what the seed says, pinned by `portland_evaluator_reports_the_seed_wording_on_errors`.
+The two stdouts are compared byte-for-byte. **Expected output is never hand-written**; the seed is the oracle, so the test asserts agreement rather than a transcript somebody typed. This covers **error wording as well as results** — where the compiler can diagnose at all, it must say exactly what the seed says, pinned by `portland_evaluator_reports_the_seed_wording_on_errors`.
 
-The failure mode this harness has already shown: it stayed green through an entire batch of new syntax the trio did not understand, because no fixture used it. Green is not covered — see [principles](principles.md#7-the-seed-is-the-oracle).
+The failure mode this harness has already shown: it stayed green through an entire batch of new syntax the compiler did not understand, because no fixture used it. Green is not covered — see [principles](principles.md#7-the-seed-is-the-oracle).
 
 ### The oracle relationship is asymmetric, and dated
 
 "The seed is the oracle" is true today and will stop being true, per check, in a predictable way. It is worth writing down before it happens, because the first time it does it will look like a regression.
 
-The trio is not a second implementation kept around for comparison — **it is the compiler**, at an early stage. Stage 1 grows into Stage 2, and the seed is deleted. So the trio is expected to overtake the seed, and the first place it does is static analysis: a tree-walking interpreter structurally cannot check exhaustiveness, and a compiler must ([#9](https://github.com/portlandlang/portland/issues/9) inventories the seven deferred checks).
+What lives in `compiler/` is not a second implementation kept around for comparison — **it is the language's one real implementation**, at an early stage. Stage 1 grows into Stage 2, and the seed is deleted. So the compiler is expected to overtake the seed, and the first place it does is static analysis: a tree-walking interpreter structurally cannot check exhaustiveness, and a compiler must ([#9](https://github.com/portlandlang/portland/issues/9) inventories the seven deferred checks).
 
-At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the trio refuses to build it. Byte-equivalence breaks — **because the trio got better**.
+At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the compiler refuses to build it. Byte-equivalence breaks — **because the compiler got better**.
 
-So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the trio, exactly as this section predicted.
+So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the compiler, exactly as this section predicted.
 
-|                             | seed    | trio             | harness                                                                  |
+|                             | seed    | compiler         | harness                                                                  |
 | --------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |
 | Both accept                 | runs    | runs             | byte-identical, forever — this is the fixture suite                      |
 | Trio cannot tell            | refuses | accepts silently | recorded as a gap, below                                                 |
 | **Trio refuses, seed runs** | runs    | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
 
-The third row is progress, not drift. When it appears, the answer is not to weaken the trio: it is that the seed's runtime behavior has stopped being evidence about a program the compiler has correctly rejected. The harness narrows to programs both accept, which stays the overwhelming majority.
+The third row is progress, not drift. When it appears, the answer is not to weaken the compiler: it is that the seed's runtime behavior has stopped being evidence about a program the compiler has correctly rejected. The harness narrows to programs both accept, which stays the overwhelming majority.
 
-Note the overlap window is real rather than theoretical — the order is #9, then #5, then Stage 2 — so the trio gains static checks while the seed still exists.
+Note the overlap window is real rather than theoretical — the order is #9, then #5, then Stage 2 — so the compiler gains static checks while the seed still exists.
 
-## Where the trio falls short, on purpose
+## Where the compiler falls short, on purpose
 
-The trio's parser is **functional** — it holds no mutable per-block state — where the seed's is not. So there are checks the seed can make that the trio structurally cannot, and where it cannot tell, it **declines to check** rather than checking wrongly.
+The compiler's parser is **functional** — it holds no mutable per-block state — where the seed's is not. So there are checks the seed can make that the compiler structurally cannot, and where it cannot tell, it **declines to check** rather than checking wrongly.
 
-One rule is currently accepted silently by the trio and refused by the seed: a nested `it`, which needs the per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. (`it` colliding with a local used to sit beside it, but that one is a *binding* question, and the evaluator catches it at bind time since [#45](https://github.com/portlandlang/portland/issues/45) brought ADR 0001 enforcement hosted — rebinding immutables, double `mutable` declarations, and method shadows all refuse with the seed's wording now.) Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
+One rule is currently accepted silently by the compiler and refused by the seed: a nested `it`, which needs the per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. (`it` colliding with a local used to sit beside it, but that one is a *binding* question, and the evaluator catches it at bind time since [#45](https://github.com/portlandlang/portland/issues/45) brought ADR 0001 enforcement hosted — rebinding immutables, double `mutable` declarations, and method shadows all refuse with the seed's wording now.) Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
 
-The related check that _is_ possible — `it` mixed with declared `|parameters|` — works only because it declines to guess whenever the block body opens a block of its own. That is the whole principle in miniature: a gap leaves the trio incomplete, a false positive would make it unusable, and the seed catches it either way.
+The related check that _is_ possible — `it` mixed with declared `|parameters|` — works only because it declines to guess whenever the block body opens a block of its own. That is the whole principle in miniature: a gap leaves the compiler incomplete, a false positive would make it unusable, and the seed catches it either way.
 
-### Guest values the trio cannot spell
+### Guest values the compiler cannot spell
 
-The trio represents some guest values as **tagged arrays** — `["__struct__", name, pairs]`, `["__symbol__", name]`, `["__enum_case__", name, payload]` — because it cannot construct the host equivalent. They compare and match correctly, and since [#39](https://github.com/portlandlang/portland/issues/39) they _print_ correctly too: the evaluator carries the seed's Display and inspect rules as two Portland walkers (`render` and `render_inspect`), so `puts`, `p`, `to_s`, `join`, and interpolation say what the seed says, tagged shapes included. The representation is the trio's private business again, which is what a representation should be.
+The compiler represents some guest values as **tagged arrays** — `["__struct__", name, pairs]`, `["__symbol__", name]`, `["__enum_case__", name, payload]` — because it cannot construct the host equivalent. They compare and match correctly, and since [#39](https://github.com/portlandlang/portland/issues/39) they _print_ correctly too: the evaluator carries the seed's Display and inspect rules as two Portland walkers (`render` and `render_inspect`), so `puts`, `p`, `to_s`, `join`, and interpolation say what the seed says, tagged shapes included. The representation is the compiler's private business again, which is what a representation should be.
 
-For structs the tags are ordinary crudeness. For symbols they are something better: **`String#to_sym` does not exist** (ADR 0023 §3), and it was cut precisely so that no symbol can be conjured from a name at runtime — that is what makes membership checking possible rather than best-effort. The trio holds a symbol's name as text and therefore cannot build one either. The decision is being felt by its own compiler, which is the right outcome rather than an oversight, and the alternative — a privileged builtin the trio alone may call — would be `to_sym` wearing a hat.
+For structs the tags are ordinary crudeness. For symbols they are something better: **`String#to_sym` does not exist** (ADR 0023 §3), and it was cut precisely so that no symbol can be conjured from a name at runtime — that is what makes membership checking possible rather than best-effort. The compiler holds a symbol's name as text and therefore cannot build one either. The decision is being felt by its own compiler, which is the right outcome rather than an oversight, and the alternative — a privileged builtin the compiler alone may call — would be `to_sym` wearing a hat.
 
-Two rendering divergences are accepted and recorded: the seed asks Unicode whether a symbol is identifier-shaped where the trio asks an ASCII table, and the seed escapes strings with Rust's debug formatting where the trio escapes the four sequences Portland strings can spell. No literally-written program has met either edge.
+Two rendering divergences are accepted and recorded: the seed asks Unicode whether a symbol is identifier-shaped where the compiler asks an ASCII table, and the seed escapes strings with Rust's debug formatting where the compiler escapes the four sequences Portland strings can spell. No literally-written program has met either edge.
 
 ## One known cost
 
@@ -120,7 +120,7 @@ This is not a semantics problem, it is a naive implementation of correct semanti
 ## The bootstrap ladder
 
 - **Stage 0** — Rust seed for a tiny subset. Crude, disposable, done.
-- **Stage 1** — the compiler rewritten in that subset, built by the seed. Begun: the trio is its beginning.
+- **Stage 1** — the compiler rewritten in that subset, built by the seed. Begun: the compiler is its beginning.
 - **Stage 2** — the fixpoint. Feed the compiler its own source to the previous build of itself, and out comes a compiler that no longer needs the seed. **The seed is deleted.** This is what "bootstrapped" means.
 - **Stage 3** — gardening. Push the primitive boundary down; move more of the standard library and compiler internals into Portland; shrink the Rust floor toward its irreducible core.
 
@@ -136,7 +136,7 @@ Everything in this section is direction, not code. Issue #5 owns it.
 
 **Memory (#12, plan proposed).** Portland is memory-safe by semantics on every chip, not by hardware. The key observation: **immutable values cannot form reference cycles**, so plain reference counting is _exact_ — no tracing garbage collector, no weak/unowned ceremony, no borrow-checker bookkeeping in the surface language. MIE and EMTE (A19 and M5 or newer, not M1–M4) are defense-in-depth for the Rust floor, never the foundation.
 
-**Types (#9).** Inference is the real compiler's job; the seed is dynamically checked at runtime. The lean is bidirectional inference with local generalization rather than Hindley-Milner purity — better errors, and it plays well with structural typing and future macros. The static half of optionals lives here: flow narrowing, unhandled-maybe errors, exhaustiveness.
+**Types (#9).** Inference is the checker's job; the seed is dynamically checked at runtime. The lean is bidirectional inference with local generalization rather than Hindley-Milner purity — better errors, and it plays well with structural typing and future macros. The static half of optionals lives here: flow narrowing, unhandled-maybe errors, exhaustiveness.
 
 ## The Apple silicon layer — bets, not library calls
 
@@ -152,7 +152,7 @@ These are language semantics, not an SDK we call into. Issue #13 owns the dispat
 | Path                   | What                                                                |
 | ---------------------- | ------------------------------------------------------------------- |
 | `seed/`                | the disposable Rust seed and its tests                              |
-| `compiler/`            | the trio, in Portland                                               |
+| `compiler/`            | the compiler, in Portland                                               |
 | `crate/`               | the crates.io `portland` placeholder — a name squat, nothing more   |
 | `script/`              | Scripts to Rule Them All: `bootstrap`, `test`, `console`, `cibuild` |
 | `script/docs/`         | `check` and `generate`, plus one file per check and per generator   |

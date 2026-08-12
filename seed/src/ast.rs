@@ -298,7 +298,7 @@ pub enum Expression {
         safe: bool,
     },
     /// Absence — the empty case of a maybe (ADR 0006). Not Ruby's nil: it has
-    /// no methods and is not falsy; the seed panics where the real compiler
+    /// no methods and is not falsy; the seed panics where the checker (#9)
     /// will reject at compile time.
     Nil,
     /// `Foo::Bar` — reaching a name inside a namespace (ADR 0021). Naming

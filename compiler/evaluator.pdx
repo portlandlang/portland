@@ -75,7 +75,7 @@ end
 def evaluate_program(nodes)
   # `require_relative` resolves against the file doing the requiring, so that
   # path has to be in scope from the first statement. `argv.first` is it: the
-  # trio was handed the guest program's path, and run.pdx read the same value.
+  # compiler was handed the guest program's path, and run.pdx read the same value.
   run_body(nodes, [["__file__", "file", argv.first or "."]])
 end
 
@@ -407,7 +407,7 @@ def match_array(pattern, subject, bindings)
   captures
 end
 
-# Builtin type patterns bootstrap on the seed's own (#27): the trio asks
+# Builtin type patterns bootstrap on the seed's own (#27): the compiler asks
 # the host `subject in Integer` to answer the guest's `in Integer`.
 def match_builtin_type(pattern, subject)
   matched = case pattern.name
@@ -715,7 +715,7 @@ def evaluate_expression(node, bindings)
   in PropagateNode then evaluate_propagate(node, bindings)
   in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
-  # Guest symbols are tagged arrays, like guest structs — the trio cannot
+  # Guest symbols are tagged arrays, like guest structs — the compiler cannot
   # manufacture a host symbol, because ADR 0023 removed `to_sym` and there
   # is deliberately no way to build one from a name at runtime. That is the
   # decision working as intended, felt by its own compiler.
@@ -908,7 +908,7 @@ def evaluate_index_update(node, mutable bindings)
 end
 
 # A host array that is a guest array — not one of the tagged shapes standing
-# in for values the trio cannot spell.
+# in for values the compiler cannot spell.
 def plain_array?(value)
   return false unless value in Array
   return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *]
@@ -1219,7 +1219,7 @@ def evaluate_self(bindings)
 end
 
 # The struct method `method_name` for a tagged-array instance, if any.
-# The struct-shape test is a pattern — the trio's first type predicate.
+# The struct-shape test is a pattern — the compiler's first type predicate.
 def struct_method_for(receiver, method_name, bindings)
   return nil unless receiver in ["__struct__", *]
   slot = lookup(bindings, value_at(receiver, 1))
@@ -1389,7 +1389,7 @@ def evaluate_method_call(node, mutable bindings)
     # "cannot index Integer(7) with Integer(2)" — which is how nine missing
     # methods stayed hidden. Say what actually happened instead.
     unless receiver in ["__struct__", *]
-      panic("no method #{node.name} on this value — the trio may be missing a builtin the seed has")
+      panic("no method #{node.name} on this value — the compiler may be missing a builtin the seed has")
     end
     struct_field(receiver, node.name)
   end
@@ -1467,7 +1467,7 @@ end
 # the same rule one level down, in the seed.
 # Every arm watches for a signal after each pass (#41, #42): a `break` or a
 # `return` stops the host iteration right there — the host `break` below is
-# doing for the trio what `block_interrupt` does for the seed — and
+# doing for the compiler what `block_interrupt` does for the seed — and
 # `block_interrupted` decides what the interrupted call answers. The arm
 # repetition is deliberate; the host `break` has to live inside each host
 # block to stop it.
@@ -1744,7 +1744,7 @@ end
 # silent): a missing file reports the host's read error rather than the seed's
 # `require_relative "x": No such file or directory`.
 #
-# The other one — that the seed canonicalises a resolved path and the trio
+# The other one — that the seed canonicalises a resolved path and the compiler
 # could not, so `"helper"` and `"./helper"` loaded twice here and once there —
 # is retired: `canonical_path` resolves the segments textually.
 
@@ -1765,7 +1765,7 @@ end
 # shares a load-once key: `spec/string/../spec_helper.pdx` and
 # `spec/spec_helper.pdx` name the same file and now compare equal.
 #
-# The seed asks the filesystem to canonicalise; the trio has no call that can,
+# The seed asks the filesystem to canonicalise; the compiler has no call that can,
 # but a `..` following a named segment cancels it without one. The only case a
 # text walk answers differently is a `..` that crosses a symlink, which the
 # filesystem would resolve and this does not.

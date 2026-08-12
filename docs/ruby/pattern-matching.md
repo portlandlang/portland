@@ -2,7 +2,7 @@
 
 **Summary:** `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 
-**Status:** specced ([ADR 0013](../adr/0013-2026-07-22-case-in-spec.md); the pattern-edge calls are tentative) and the **runtime half is built** in the seed and the trio (2026-07-23) — including the payoff: the trio's evaluator dispatches on its own AST with struct patterns. The static half (exhaustiveness, unreachable arms, the unused-capture lint) waits for #9, previewed as runtime panics.
+**Status:** specced ([ADR 0013](../adr/0013-2026-07-22-case-in-spec.md); the pattern-edge calls are tentative) and the **runtime half is built** in the seed and the compiler (2026-07-23) — including the payoff: the compiler's evaluator dispatches on its own AST with struct patterns. The static half (exhaustiveness, unreachable arms, the unused-capture lint) waits for #9, previewed as runtime panics.
 
 ## Ruby
 

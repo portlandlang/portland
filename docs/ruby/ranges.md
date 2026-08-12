@@ -2,7 +2,7 @@
 
 **Summary:** Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 
-**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
+**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
 
 ## Ruby
 

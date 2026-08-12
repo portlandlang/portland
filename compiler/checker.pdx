@@ -17,7 +17,7 @@
 # - A pattern `in :paid(on:)` naming an undeclared case is refused too —
 #   and there the seed says nothing at all: an undeclared case in a pattern
 #   silently never matches, which is the classic typo bug. This wording is
-#   the trio's first original diagnostic, pinned by ADR 0034 §3 and its
+#   the compiler's first original diagnostic, pinned by ADR 0034 §3 and its
 #   tests rather than by any oracle.
 #
 # Where the checker cannot tell, it declines to check (principle 4): any

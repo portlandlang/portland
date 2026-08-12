@@ -9,7 +9,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 1. **[docs/principles.md](docs/principles.md)** — the eleven rules that settle arguments, in precedence order. Read before deciding anything. Several exist because we broke them once, and the file says which.
 1. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
 1. **[docs/language.md](docs/language.md)** — what Portland speaks today.
-1. **[docs/architecture.md](docs/architecture.md)** — the seed, the trio, and the contract between them.
+1. **[docs/architecture.md](docs/architecture.md)** — the seed, the compiler, and the contract between them.
 1. **[docs/adr/](docs/adr/)** — the decision log. ADRs beat everything except a newer ADR.
 1. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
 
@@ -27,7 +27,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **One small logical change per commit**, tests green at each. For work that can't stay green across a boundary, branch and merge when it's green again — no PR needed for solo work.
 
-**Never hand-write expected output.** The seed is the oracle; tests assert that the trio agrees with it.
+**Never hand-write expected output.** The seed is the oracle; tests assert that the compiler agrees with it.
 
 **Tick issue-body checklists as parts land**, so an issue's state is readable without reading its comments.
 
@@ -39,7 +39,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
-| `script/spec`          | the language spec in `spec/`, on both oracles — seed and trio                   |
+| `script/spec`          | the language spec in `spec/`, on both oracles — seed and compiler                   |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.

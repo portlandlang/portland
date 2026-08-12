@@ -2,7 +2,7 @@
 # the type while `purchase.status` reads the value.
 #
 # The method beside the nested enum is load-bearing: that combination parsed
-# in the seed and not in the trio the day this file grew (#44).
+# in the seed and not in the compiler the day this file grew (#44).
 
 require_relative "../spec_helper"
 

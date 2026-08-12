@@ -2,7 +2,7 @@
 
 **Summary:** `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
 
-**Status:** decided ([ADR 0027](../adr/0027-2026-07-27-errors-as-typed-results.md)), with `!` settled as unwrap-or-propagate in the same breath. Built in the seed and the trio, differentially pinned — see [the language](../language.md#absence).
+**Status:** decided ([ADR 0027](../adr/0027-2026-07-27-errors-as-typed-results.md)), with `!` settled as unwrap-or-propagate in the same breath. Built in the seed and the compiler, differentially pinned — see [the language](../language.md#absence).
 
 ## Ruby
 

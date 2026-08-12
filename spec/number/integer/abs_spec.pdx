@@ -6,7 +6,7 @@
 # does not already say.
 
 # Up two, because `require_relative` resolves against this file's own directory
-# (the seed's rule, matched by the trio) — not against `spec/`.
+# (the seed's rule, matched by the compiler) — not against `spec/`.
 require_relative "../../spec_helper"
 
 context "Integer" do

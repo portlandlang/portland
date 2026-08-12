@@ -53,7 +53,7 @@ end
 1. **Data with behavior** — `struct`, the only concrete type: value equality, `with` for updated copies, methods after the fields (ADR 0028).
 1. **Shared behavior** — a `trait`, included with Ruby's verb; hierarchies flatten, and [the mixins entry](mixins-and-inheritance.md) owns that story.
 1. **Construction logic** — `def self.name` declares a type function; `new` is one of the definable names and replaces the raw constructor everywhere, any signature, value-or-`failure` (ADRs 0027, 0031). Inside it — and only there — `fields(...)` is the raw kwargs-in-fields-out layer, so a validating struct cannot be constructed around: the raw constructor has no spelling outside the body.
-1. **Stateful objects** — the parser-with-a-position, the connection, the cache — have no home yet, **on purpose**. Values thread through returns today (the trio's own Outcome pattern); whether an ergonomic story arrives is decided after `together` grows its parallel semantics, not before ([#11](https://github.com/portlandlang/portland/issues/11)).
+1. **Stateful objects** — the parser-with-a-position, the connection, the cache — have no home yet, **on purpose**. Values thread through returns today (the compiler's own Outcome pattern); whether an ergonomic story arrives is decided after `together` grows its parallel semantics, not before ([#11](https://github.com/portlandlang/portland/issues/11)).
 
 ## Migration
 

@@ -2,7 +2,7 @@
 
 **Summary:** the rendering is Ruby's, the spelling is `inspect(value)` — a function, because Portland's nil has no methods and absence is inspect's most important input.
 
-**Status:** decided ([ADR 0026](../adr/0026-2026-07-27-inspect-as-a-function.md)). Built in the seed and the trio, differentially pinned.
+**Status:** decided ([ADR 0026](../adr/0026-2026-07-27-inspect-as-a-function.md)). Built in the seed and the compiler, differentially pinned.
 
 ## Ruby
 

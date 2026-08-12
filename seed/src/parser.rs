@@ -607,7 +607,7 @@ impl<'source> Parser<'source> {
     ///
     /// The messages spell rewrites with the bare method name — `to(-1)`,
     /// never `expect(x).to(-1)` — because a receiver is an expression the
-    /// parser cannot faithfully re-print, and the trio, which must say these
+    /// parser cannot faithfully re-print, and the compiler, which must say these
     /// wordings byte-for-byte, cannot either.
     fn dotted_arguments(&mut self, name: &str) -> Option<ParsedArguments> {
         let next = *self.tokens.get(self.position)?;

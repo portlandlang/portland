@@ -1,6 +1,6 @@
 # A range pattern tests membership, not equality (ADR 0019 §1).
 #
-# Writing the first of these is what found that the trio could not match a
+# Writing the first of these is what found that the compiler could not match a
 # range pattern at all (#40) — it lived as a comment until both oracles
 # agreed.
 

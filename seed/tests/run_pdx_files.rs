@@ -472,7 +472,7 @@ fn assert_evaluator_matches_seed(name: &str, source: &str) {
         .arg(&sample)
         .output()
         .expect("failed to run pdx");
-    // Hosted runs pay the trio's cost on top of the seed's, so this is where
+    // Hosted runs pay the compiler's cost on top of the seed's, so this is where
     // a quadratic shows up first.
     let hosted = within_seconds(20, name, || {
         Command::new(env!("CARGO_BIN_EXE_pdx"))
@@ -500,7 +500,7 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
-/// Where the trio can diagnose, it must say exactly what the seed says.
+/// Where the compiler can diagnose, it must say exactly what the seed says.
 /// These four used to reach the evaluator as an unhelpful "cannot
 /// evaluate error yet"; now the message survives to stderr verbatim.
 #[test]
@@ -537,7 +537,7 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "could be three things",
         ),
         // A `{` directly after the name, where there is no argument for the
-        // block to belong to instead. The trio used to crash on this rather
+        // block to belong to instead. The compiler used to crash on this rather
         // than diagnose it — `IdentifierNode has no field value`.
         //
         // ADR 0024 accepts the one-reading block forms, so the refusals that
@@ -553,7 +553,7 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def expecting(v)\n  v\nend\nexpecting {name: 1}\n",
             "is a hash, not a block",
         ),
-        // ADR 0022's runtime refusals (#45): the trio used to construct all
+        // ADR 0022's runtime refusals (#45): the compiler used to construct all
         // three of these happily where the seed refuses.
         ("paid = :paid(on: 1)\n", "no enum declares a case :paid"),
         (
@@ -564,7 +564,7 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "enum A\n  :hit(x:)\nend\nenum B\n  :hit(y:)\nend\nv = :hit(x: 1)\n",
             "two enums declare :hit with different payloads",
         ),
-        // ADR 0001's refusals (#45): the trio used to run all six of these.
+        // ADR 0001's refusals (#45): the compiler used to run all six of these.
         (
             "x = 1\nx = 2\n",
             "x is immutable — declare it `mutable x = ...`",
@@ -709,7 +709,7 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         ),
     ];
     for (source, expected) in cases {
-        let sample = std::env::temp_dir().join("trio_error_case.pdx");
+        let sample = std::env::temp_dir().join("compiler_error_case.pdx");
         std::fs::write(&sample, source).expect("failed to write probe file");
         let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
             .arg(portland_run())
@@ -719,12 +719,12 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         let stderr = String::from_utf8(hosted.stderr).unwrap();
         assert!(
             stderr.contains(expected),
-            "trio should report {expected:?}, got: {stderr}"
+            "the compiler should report {expected:?}, got: {stderr}"
         );
     }
 }
 
-/// ADR 0021 threaded through the trio: namespaces, `::` paths, lexical
+/// ADR 0021 threaded through the compiler: namespaces, `::` paths, lexical
 /// resolution outward, both declaration forms, and types nesting in types.
 #[test]
 fn portland_evaluator_matches_the_seed_on_namespaces() {
@@ -734,7 +734,7 @@ fn portland_evaluator_matches_the_seed_on_namespaces() {
     );
 }
 
-/// ADRs 0016 + 0017 threaded through the trio: brace blocks are
+/// ADRs 0016 + 0017 threaded through the compiler: brace blocks are
 /// dead-identical to `do ... end`, and `it` is the implicit parameter.
 #[test]
 fn portland_evaluator_matches_the_seed_on_brace_blocks_and_it() {
@@ -744,7 +744,7 @@ fn portland_evaluator_matches_the_seed_on_brace_blocks_and_it() {
     );
 }
 
-/// ADR 0020 threaded through the trio: every heredoc form, byte-identical.
+/// ADR 0020 threaded through the compiler: every heredoc form, byte-identical.
 #[test]
 fn portland_evaluator_matches_the_seed_on_heredocs() {
     assert_evaluator_matches_seed(
@@ -753,7 +753,7 @@ fn portland_evaluator_matches_the_seed_on_heredocs() {
     );
 }
 
-/// ADR 0018 + 0019 threaded through the trio: float and range literals
+/// ADR 0018 + 0019 threaded through the compiler: float and range literals
 /// lex, parse, and evaluate to the same host values the seed produces.
 #[test]
 fn portland_evaluator_matches_the_seed_on_floats_and_ranges() {
@@ -774,7 +774,7 @@ fn portland_evaluator_matches_the_seed_on_word_arrays() {
     );
 }
 
-/// ADR 0031 threaded through the trio: type functions, sibling bare calls,
+/// ADR 0031 threaded through the compiler: type functions, sibling bare calls,
 /// definable `new` with `fields` beneath, positional signatures, the
 /// failure path, module-body `def self.` as a plain def, and raw `new` on
 /// a plain struct untouched.
@@ -810,9 +810,9 @@ fn portland_evaluator_matches_the_seed_on_exponents() {
     );
 }
 
-/// The checker (#9, ADR 0034): the first place the trio overtakes the seed.
+/// The checker (#9, ADR 0034): the first place the compiler overtakes the seed.
 /// Each case is a program the seed runs to completion — the offending line
-/// is dead code — and the trio refuses at build. Nothing to compare, and
+/// is dead code — and the compiler refuses at build. Nothing to compare, and
 /// that is the point: these expectations are hand-written against the ADR,
 /// the first tests in this suite that are, because no oracle has a wording
 /// for a refusal the seed cannot make (ADR 0034 §3).
@@ -834,7 +834,7 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         ),
         (
             // The pattern typo the seed answers silently — the branch just
-            // never matches. The trio's first original diagnostic.
+            // never matches. The compiler's first original diagnostic.
             "enum Status\n  :pending\n  :paid(on:)\nend\ndef label(s)\n  case s\n  in :payed(on:) then \"typo\"\n  else\n    \"fine\"\n  end\nend\nputs label(:pending)\n",
             "fine\n",
             "in :payed can never match — no enum declares a case :payed",
@@ -901,7 +901,7 @@ fn portland_check_passes_a_clean_program_without_running_it() {
     );
 }
 
-/// ADR 0018: the trio delegates `/` and `%` to the host, so Ruby's
+/// ADR 0018: the compiler delegates `/` and `%` to the host, so Ruby's
 /// floored semantics must reach hosted programs unchanged.
 #[test]
 fn portland_evaluator_matches_the_seed_on_floored_division() {
@@ -937,7 +937,7 @@ fn portland_evaluator_matches_the_seed_on_case_in() {
 
 /// Yield delegation (#49): a `yield` inside a yielded block reaches the
 /// block of its *writer's* method, never itself — the seed used to loop
-/// forever here while the trio delegated correctly. The accumulator runs
+/// forever here while the compiler delegated correctly. The accumulator runs
 /// through both layers because the handed block is shared, not copied, so
 /// a delegated yield's write-back lands where the writer will look.
 #[test]
@@ -983,7 +983,7 @@ fn portland_evaluator_matches_the_seed_on_failures() {
     );
 }
 
-/// The legal side of ADR 0001's line, through the trio (#45): everything
+/// The legal side of ADR 0001's line, through the compiler (#45): everything
 /// here must RUN, because enforcement that over-refuses is worse than none.
 /// A failed guard discards its captures so the next branch binds them fresh;
 /// while-loop iterations are fresh scopes for their own locals; a block
@@ -1008,9 +1008,9 @@ fn portland_evaluator_matches_the_seed_on_inspect() {
     );
 }
 
-/// Rendering parity (#39): the trio's tagged guest shapes — symbols,
+/// Rendering parity (#39): the compiler's tagged guest shapes — symbols,
 /// structs, enum cases — used to print raw (`{[__symbol__, name] => 1}`),
-/// so any program that displayed a symbol-keyed hash diverged. The trio now
+/// so any program that displayed a symbol-keyed hash diverged. The compiler now
 /// carries the seed's Display and inspect rules, so every printing path —
 /// `p`, `puts`, `to_s`, `join`, interpolation — agrees byte for byte.
 #[test]
@@ -1021,7 +1021,7 @@ fn portland_evaluator_matches_the_seed_on_rendering() {
     );
 }
 
-/// Block interrupts, through the trio (#41, #42, ADR 0025): `break` stops
+/// Block interrupts, through the compiler (#41, #42, ADR 0025): `break` stops
 /// the iteration and the call answers nil (ADR 0012); `return` unwinds to
 /// the method its block was *written* in — through a builtin's block, and
 /// through any method that merely yielded to it, whose own body stops and
@@ -1036,10 +1036,10 @@ fn portland_evaluator_matches_the_seed_on_block_interrupts() {
     );
 }
 
-/// Range patterns, through the trio (#40): membership not equality, both
+/// Range patterns, through the compiler (#40): membership not equality, both
 /// dot counts, beginless and endless ends, negative bounds, a non-integer
 /// subject missing rather than erroring, and the one-line form. No fixture
-/// matched on a range before this, which is how the trio shipped without
+/// matched on a range before this, which is how the compiler shipped without
 /// them and stayed green.
 #[test]
 fn portland_evaluator_matches_the_seed_on_range_patterns() {
@@ -1074,7 +1074,7 @@ fn portland_evaluator_matches_the_seed_on_struct_methods_and_type_patterns() {
     );
 }
 
-/// Symbols, hash shorthand, and enums through the trio (ADRs 0022, 0023).
+/// Symbols, hash shorthand, and enums through the compiler (ADRs 0022, 0023).
 ///
 /// The fixture covers the same ground, but this pins the pieces separately
 /// so a regression names which one broke.
@@ -1087,7 +1087,7 @@ fn portland_evaluator_matches_the_seed_on_symbols_and_enums() {
 }
 
 /// A block rebinds the caller's `mutable`, and the rebinding outlives the
-/// block — ADR 0001's accumulator pattern, through the trio.
+/// block — ADR 0001's accumulator pattern, through the compiler.
 ///
 /// Smallest case that pins the block-scope gap: a `yield`ed block that
 /// counts. Nothing about `yield` is under test here beyond its scope
@@ -1110,7 +1110,7 @@ fn portland_evaluator_matches_the_seed_on_a_builtin_block_that_accumulates() {
     );
 }
 
-/// `yield`, through the trio.
+/// `yield`, through the compiler.
 #[test]
 fn portland_evaluator_matches_the_seed_on_yield() {
     assert_evaluator_matches_seed(
@@ -1418,20 +1418,20 @@ fn parse_only_needs_a_file() {
     );
 }
 
-/// The seed and the trio must implement the same builtin methods, and every
+/// The seed and the compiler must implement the same builtin methods, and every
 /// one of them must appear in a hosted fixture.
 ///
-/// This exists because an audit found nine methods the trio simply did not
+/// This exists because an audit found nine methods the compiler simply did not
 /// have — `positive?`, `keys`, `reduce`, `upto` and friends — and the
 /// differential harness was green throughout, because no fixture used them.
 /// Twenty-one of the forty-two documented methods had never run through the
-/// trio at all.
+/// compiler at all.
 ///
 /// Relying on someone remembering to add a fixture is what failed. These two
 /// checks read the implementations instead, so a method added to the seed
 /// tomorrow is picked up without anyone deciding to look.
 ///
-/// Both directions are deliberately one-sided. Absence from the trio's
+/// Both directions are deliberately one-sided. Absence from the compiler's
 /// dispatch, or from every fixture, is conclusive; presence is only evidence.
 /// A method could appear in a fixture inside a comment and count as covered —
 /// a false negative, which is the safe direction. A check that cries wolf
@@ -1460,7 +1460,7 @@ fn seed_builtin_methods() -> Vec<String> {
 }
 
 #[test]
-fn the_trio_implements_every_builtin_the_seed_does() {
+fn the_compiler_implements_every_builtin_the_seed_does() {
     let evaluator = std::fs::read_to_string(format!(
         "{}/../compiler/evaluator.pdx",
         env!("CARGO_MANIFEST_DIR")
@@ -1475,7 +1475,7 @@ fn the_trio_implements_every_builtin_the_seed_does() {
     assert!(
         missing.is_empty(),
         "the seed implements these and compiler/evaluator.pdx does not: {}.\n\
-         The trio's dispatch treats an unknown method as a struct-field read, so \
+         The compiler's dispatch treats an unknown method as a struct-field read, so \
          these fail with an unrelated error rather than saying no such method.",
         missing.join(", ")
     );
@@ -1507,7 +1507,7 @@ fn every_builtin_appears_in_a_hosted_fixture() {
 
 /// Portland's language spec runs, on both oracles (`spec/`).
 ///
-/// The differential harness proves the seed and the trio agree with each
+/// The differential harness proves the seed and the compiler agree with each
 /// other. It cannot prove either agrees with what was *decided* — a shared
 /// misreading of an ADR passes it. So the spec runs twice.
 ///
@@ -1551,7 +1551,7 @@ fn the_language_spec_passes_on_both_oracles() {
     assert!(!specs.is_empty(), "no *_spec.pdx files found under spec/");
 
     // The hosted half runs once for the whole suite. What a hosted spec costs
-    // is not the trio — loading that is 0.02s — but `spec_helper.pdx`,
+    // is not the compiler — loading that is 0.02s — but `spec_helper.pdx`,
     // re-parsed into every spec's fresh scope at 0.40s a time; run_specs.pdx
     // parses the harness once and shares it (#69). The ceiling covers the
     // whole batch rather than one file, so it is scaled to match.
@@ -1630,7 +1630,7 @@ fn the_language_spec_passes_on_both_oracles() {
         assert_eq!(
             direct,
             hosted,
-            "{} diverged between the seed and the trio",
+            "{} diverged between the seed and the compiler",
             spec.display()
         );
     }

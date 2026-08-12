@@ -122,7 +122,7 @@ struct ArrayNode
 end
 ```
 
-The verb is Ruby's and the safety is in the noun: `trait` and `module` are distinct declarations, so `include Statistics` — a namespace — is a refusal with the rewrite named, and Ruby's two meanings of `include` cannot be spelled. Trait methods merge into the struct at its declaration, reach the carrier's fields bare, and sit in the same no-shadow ladder as everything else — every collision (two traits, a trait and an own method, a trait method and a field, even a trait method's *parameter* against a carrier's field) is a refusal naming both owners, never Ruby's silent last-include-wins. There is no inheritance and no `class` — declined, not deferred. The trio's own AST nodes carry `trait Sexp`, which is the dogfood.
+The verb is Ruby's and the safety is in the noun: `trait` and `module` are distinct declarations, so `include Statistics` — a namespace — is a refusal with the rewrite named, and Ruby's two meanings of `include` cannot be spelled. Trait methods merge into the struct at its declaration, reach the carrier's fields bare, and sit in the same no-shadow ladder as everything else — every collision (two traits, a trait and an own method, a trait method and a field, even a trait method's *parameter* against a carrier's field) is a refusal naming both owners, never Ruby's silent last-include-wins. There is no inheritance and no `class` — declined, not deferred. The compiler's own AST nodes carry `trait Sexp`, which is the dogfood.
 
 ## Names and binding
 
@@ -179,7 +179,7 @@ There is **no `if let`** and **no force-unwrap operator**. `or panic "why"` is t
 
 **Failure is absence with a reason** (ADR 0027). A fallible operation returns its value or a `failure(reason)` — always a real box, since its whole job is marking the sad path — and the toolkit above handles it unchanged: `or` takes the fallback, `case/in` reaches *through* the box to the reason (a failure is transparent to patterns, where a some-box stays opaque), and `failure?` joins `nil?`/`some?` as a universal dispatch. `!` is the propagation: `read_file!(path)` yields the content or returns the failure from the enclosing method — one greppable character per frame a failure may cross, unwinding to its write site like any `return` (ADR 0025). There is no `raise` and no `rescue`: a failure never crosses a frame that did not mark it. `puts` refuses a failure as it refuses nil; `p` and `inspect` render it. `read_file` and `write_file` are the first fallible operations, and a method can never be *named* with `!` — `def save!` is a refusal pointing at the call site.
 
-The **static** half of this — flow narrowing, unhandled-maybe compile errors, the `Boolean?` never-guess, dead right-hand sides — is the real compiler's job (#9). Today those surface as runtime panics.
+The **static** half of this — flow narrowing, unhandled-maybe compile errors, the `Boolean?` never-guess, dead right-hand sides — is the checker's job (#9). Today those surface as runtime panics.
 
 ## Control flow
 
@@ -206,7 +206,7 @@ There is no ternary operator — `?` is not an operator at all, it is part of a 
 
 ## Pattern matching
 
-Load-bearing, not a corner feature (ADR 0013). The trio dispatches on its own AST with it.
+Load-bearing, not a corner feature (ADR 0013). The compiler dispatches on its own AST with it.
 
 ```ruby
 case node
@@ -224,7 +224,7 @@ Struct patterns are **keyword-only**, and `text:` on its own binds a name of the
 
 Builtin type patterns are `in String`, `Integer`, `Array`, `Hash`, `Boolean`. **The type predicate is a pattern, not a reflection API** — `is_a?` and `.class` do not exist.
 
-No match and no `else` panics today. That is the runtime preview of what the real compiler will check statically: exhaustiveness. Range patterns count toward it — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`. Overlap is legal, first match wins, and gaps are an error.
+No match and no `else` panics today. That is the runtime preview of what the checker will enforce statically: exhaustiveness. Range patterns count toward it — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`. Overlap is legal, first match wins, and gaps are an error.
 
 Hash patterns and the find pattern (`in [*, x, *]`) are deliberately not built; they wait to be pulled for.
 
@@ -302,7 +302,7 @@ Names are **always fully qualified**: no import, no aliasing, no injection, with
 
 ## Symbols and enums
 
-A symbol is a name rather than data (ADR 0023). `:paid`, `:paid?`, and `:"odd key"` when the name is not identifier-shaped. Comparison is equality only; a symbol is not a String, and `:paid == "paid"` is `false` here where the real compiler will refuse it.
+A symbol is a name rather than data (ADR 0023). `:paid`, `:paid?`, and `:"odd key"` when the name is not identifier-shaped. Comparison is equality only; a symbol is not a String, and `:paid == "paid"` is `false` here where the checker will refuse it.
 
 Hash keys use the shorthand, and it is the only spelling of a symbol key:
 
@@ -376,10 +376,10 @@ Comments are `#` to end of line. Names are `snake_case`, and `?`/`!` suffixes ar
 
 ## Style
 
-Emerging rather than settled — this section describes how the trio is actually written, and it will grow as more of the language exists.
+Emerging rather than settled — this section describes how the compiler is actually written, and it will grow as more of the language exists.
 
 - **`it` for a single block parameter**, named parameters otherwise. `nodes.map { it.sexp }` reads better than naming a variable you use once. Nesting forces names anyway, since a nested `it` is a shadow.
-- **`<<` to accumulate, `+=` to concatenate or count.** Building a collection an element at a time is `tokens << token`; adding two whole things is `+=`. The trio converted about forty-five sites to this rule and kept `+=` where it was genuinely concatenation.
+- **`<<` to accumulate, `+=` to concatenate or count.** Building a collection an element at a time is `tokens << token`; adding two whole things is `+=`. The compiler converted about forty-five sites to this rule and kept `+=` where it was genuinely concatenation.
 - **Leading dot for chains that break across lines.**
 - **Keyword arguments at struct construction**, which the language requires, and increasingly at call sites where a bare positional would be a mystery at the call site.
 - **Ask, don't guess.** When you write a construct with two readings, the compiler will make you disambiguate. Reach for the parens rather than learning which way it would have gone — there is no which-way to learn.

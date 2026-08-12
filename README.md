@@ -66,7 +66,7 @@ end
 |                                          |                                                                 |
 | ---------------------------------------- | --------------------------------------------------------------- |
 | [**The language**](docs/language.md)     | what it is — syntax, rules, style                               |
-| [**Architecture**](docs/architecture.md) | how it's built: the seed, the trio, the road to a real compiler |
+| [**Architecture**](docs/architecture.md) | how it's built: the seed, the compiler, the road to self-hosting |
 | [**Principles**](docs/principles.md)     | the rules that settle arguments                                 |
 | [**Portland for Rubyists**](docs/ruby/)  | every difference from Ruby, and what it costs to migrate        |
 | [**ADRs**](docs/adr/)                    | the decision log, one file per decision                         |

@@ -2,7 +2,7 @@
 
 **Summary:** Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
 
-**Status:** decided ([ADR 0020](../adr/0020-2026-07-23-heredocs-squiggly-only.md)). Built in the seed and the trio, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
+**Status:** decided ([ADR 0020](../adr/0020-2026-07-23-heredocs-squiggly-only.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
 
 ## Ruby
 

@@ -3,7 +3,7 @@
 # Usage: pdx compiler/check.pdx <file.pdx>
 #
 # Silence is a pass; a refusal panics with its wording. The seed has no
-# counterpart on purpose — this is the first door only the trio has.
+# counterpart on purpose — this is the first door only the compiler has.
 
 require_relative "checker"
 

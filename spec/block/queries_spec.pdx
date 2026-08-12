@@ -1,6 +1,6 @@
-# The block-taking library beyond the twelve arms the trio carries — none
+# The block-taking library beyond the twelve arms the compiler carries — none
 # built yet, held pending (#23). These are heavier builds than value
-# methods: each is a new arm in the trio's deliberately-repetitive
+# methods: each is a new arm in the compiler's deliberately-repetitive
 # block-call dispatch, not just a seed builtin.
 #
 # From ruby/spec core/array/{any,all,find,zip,tally,sort_by,each_slice,

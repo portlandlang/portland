@@ -2,7 +2,7 @@
 
 **Summary:** Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 
-**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); the first check family — enum vocabularies, static — is built in the trio's checker. The rest of [#9](https://github.com/portlandlang/portland/issues/9)'s inventory (exhaustiveness, flow narrowing, unhandled maybes) lands here as it arrives.
+**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); the first check family — enum vocabularies, static — is built in the compiler's checker. The rest of [#9](https://github.com/portlandlang/portland/issues/9)'s inventory (exhaustiveness, flow narrowing, unhandled maybes) lands here as it arrives.
 
 ## Ruby
 
@@ -10,7 +10,7 @@ Every check happens when the line runs, so a typo in a rarely-taken branch ships
 
 ## Portland
 
-The trio runs a checker before evaluating (the seed deliberately never will — it is the disposable half). First family, from ADR 0022's closed vocabularies:
+The compiler runs a checker before evaluating (the seed deliberately never will — it is the disposable half). First family, from ADR 0022's closed vocabularies:
 
 - A payload-carrying construction must name a declared case, agree with every declaration, and bring exactly the declared labels — refused at build with the same words Ruby-style runtime checking used to say, only earlier: `no enum declares a case :shipped`, `` `:paid` takes (on:) ``.
 - A pattern naming an undeclared case — the silent-forever branch — refuses with the diagnostic Ruby never had: `in :payed can never match — no enum declares a case :payed`.

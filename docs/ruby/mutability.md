@@ -2,7 +2,7 @@
 
 **Summary:** Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 
-**Status:** fully decided — the keyword and rebinding rules ([ADR 0001](../adr/0001-2026-07-20-mutable-keyword.md)) and the values question ([ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md): values never mutate; names do). **Built** in the seed and trio (2026-07-23) — enforcement, `mutable` parameters, loop-iteration scoping, and the `<<`/`[]=` sugar, with the whole codebase migrated to its own rules. `!`-suffix semantics deferred.
+**Status:** fully decided — the keyword and rebinding rules ([ADR 0001](../adr/0001-2026-07-20-mutable-keyword.md)) and the values question ([ADR 0015](../adr/0015-2026-07-23-values-never-mutate.md): values never mutate; names do). **Built** in the seed and compiler (2026-07-23) — enforcement, `mutable` parameters, loop-iteration scoping, and the `<<`/`[]=` sugar, with the whole codebase migrated to its own rules. `!`-suffix semantics deferred.
 
 ## Ruby
 

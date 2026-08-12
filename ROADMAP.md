@@ -6,7 +6,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ## Where we are
 
-**Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The trio — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
+**Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The compiler — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
 **Next:** the `%` zoo (#29), smart constructors (job 3 of [#61](https://github.com/portlandlang/portland/issues/61)), or the parallel runtime that ADR 0029's serial oracle now waits for (#12/#13 territory). The 2026-07-27 wave landed ADRs 0025–0029 decided _and_ built — write-site `return`, `inspect()`, typed results with `!`, traits, and serial `together` — the decisions by competing draft PRs, the roads not taken recorded in closed siblings. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
 
@@ -78,7 +78,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story, and where the OS surface lives
 - [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: Ruby's other names
 
-### The real compiler
+### Toward the fixpoint
 
 - [#9](https://github.com/portlandlang/portland/issues/9) — type inference; the static half of optionals lives here
 - [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
