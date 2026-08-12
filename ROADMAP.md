@@ -71,8 +71,12 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; jobs 1–3 are decided and built ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md) closed the ledger), job 4 waits on #11
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
-- Regex — undecided, and a real hole
-- String semantics — no ADR on Unicode, length, or normalization
+- [#74](https://github.com/portlandlang/portland/issues/74) — regex: literals, engine, and what a match answers
+- [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: what is a character; the Unicode pile is the pull
+- [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>`, Comparable-as-a-trait, user types sorting
+- [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
+- [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story, and where the OS surface lives
+- [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: Ruby's other names
 
 ### The real compiler
 
