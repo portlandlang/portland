@@ -1,4 +1,9 @@
 # `abs` drops the sign.
+#
+# Grown from ruby/spec core/integer/abs_spec.rb (#23); the bignum half
+# stays behind — a literal past i64 is a parse refusal — and so does `+2`,
+# since unary plus does not parse and buys nothing an unsigned literal
+# does not already say.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -8,10 +13,19 @@ context "Integer" do
   describe "#abs" do
     specify "drops the sign" do
       expect((0 - 5).abs).to eq(5)
+      expect((-2).abs).to eq(2)
+      expect((-100).abs).to eq(100)
     end
 
     specify "leaves a positive alone" do
       expect(5.abs).to eq(5)
+      expect(2.abs).to eq(2)
+      expect(100.abs).to eq(100)
+    end
+
+    specify "and zero is its own magnitude" do
+      expect(0.abs).to eq(0)
+      expect((-0).abs).to eq(0)
     end
   end
 end

@@ -1,9 +1,12 @@
 # `+`, `-`, and `*` on integers stay integers; mixing with a float promotes,
 # and the promotion rules have their own home in spec/number/promotion_spec.
 #
-# Grown from ruby/spec core/integer/{plus,minus,multiply}_spec.rb (#23);
-# the coercion protocol stays behind — there is no `coerce`, and a wrong
-# operand type panics rather than negotiating.
+# Grown from ruby/spec core/integer/{plus,minus,multiply,uminus}_spec.rb
+# (#23); the coercion protocol stays behind — there is no `coerce`, and a
+# wrong operand type panics rather than negotiating. Exponentiation stays
+# behind too, undecided rather than pending: `**` does not parse, and ADR
+# 0003's precedent (bitwise operators became named methods) means the
+# spelling is a decision, not a hole.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -34,6 +37,19 @@ context "Integer" do
 
     specify "reaches past 32 bits without ceremony" do
       expect(65536 * 65536).to eq(4294967296)
+    end
+  end
+
+  describe "unary minus" do
+    specify "negates a value, both directions" do
+      bound = 5
+      expect(-bound).to eq(-5)
+      expect(-(-bound)).to eq(5)
+    end
+
+    specify "and zero is its own negation" do
+      zero = 0
+      expect(-zero).to eq(0)
     end
   end
 end
