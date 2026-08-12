@@ -23,5 +23,15 @@ context "control flow" do
       end
       expect(label).to eq("else branch")
     end
+
+    # From ruby/spec language/case_spec.rb (#23).
+    specify "takes several values in one when, comma-separated" do
+      label = case 2
+      when 1, 2 then "small"
+      else
+        "large"
+      end
+      expect(label).to eq("small")
+    end
   end
 end
