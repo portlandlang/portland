@@ -810,6 +810,97 @@ fn portland_evaluator_matches_the_seed_on_exponents() {
     );
 }
 
+/// The checker (#9, ADR 0034): the first place the trio overtakes the seed.
+/// Each case is a program the seed runs to completion — the offending line
+/// is dead code — and the trio refuses at build. Nothing to compare, and
+/// that is the point: these expectations are hand-written against the ADR,
+/// the first tests in this suite that are, because no oracle has a wording
+/// for a refusal the seed cannot make (ADR 0034 §3).
+#[test]
+fn the_checker_refuses_what_the_seed_cannot_see() {
+    let cases = [
+        (
+            // A dead-branch construction with a wrong label: the seed prints
+            // and exits zero; the checker refuses with the seed's own
+            // *runtime* wording, moved to build time (ADR 0034 §2).
+            "enum Status\n  :pending\n  :paid(on:)\nend\nif false\n  x = :paid(whenever: \"never\")\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "`:paid` takes (on:)",
+        ),
+        (
+            "enum Status\n  :pending\nend\nif false\n  x = :shipped(on: \"never\")\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "no enum declares a case :shipped",
+        ),
+        (
+            // The pattern typo the seed answers silently — the branch just
+            // never matches. The trio's first original diagnostic.
+            "enum Status\n  :pending\n  :paid(on:)\nend\ndef label(s)\n  case s\n  in :payed(on:) then \"typo\"\n  else\n    \"fine\"\n  end\nend\nputs label(:pending)\n",
+            "fine\n",
+            "in :payed can never match — no enum declares a case :payed",
+        ),
+        (
+            "enum A\n  :hit(x:)\nend\nenum B\n  :hit(y:)\nend\nif false\n  z = :hit(x: 1)\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "two enums declare :hit with different payloads — the seed cannot tell them apart",
+        ),
+    ];
+    for (source, seed_output, refusal) in cases {
+        let sample = std::env::temp_dir().join("checker_case.pdx");
+        std::fs::write(&sample, source).unwrap();
+        let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(direct.status.success(), "the seed should run this program");
+        assert_eq!(
+            String::from_utf8(direct.stdout).unwrap(),
+            seed_output,
+            "the seed's run changed"
+        );
+        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            !hosted.status.success(),
+            "the checker should refuse this program"
+        );
+        let stderr = String::from_utf8(hosted.stderr).unwrap();
+        assert!(
+            stderr.contains(refusal),
+            "the checker should say {refusal:?}, got: {stderr}"
+        );
+    }
+}
+
+/// `check.pdx` — the checker's own door: silence-then-ok on a clean
+/// program, nothing evaluated.
+#[test]
+fn portland_check_passes_a_clean_program_without_running_it() {
+    let sample = std::env::temp_dir().join("checker_clean.pdx");
+    std::fs::write(
+        &sample,
+        "enum Status\n  :paid(on:)\nend\nputs \"side effect\"\n",
+    )
+    .unwrap();
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(checked.status.success());
+    assert_eq!(
+        String::from_utf8(checked.stdout).unwrap(),
+        "ok\n",
+        "check must not evaluate the program"
+    );
+}
+
 /// ADR 0018: the trio delegates `/` and `%` to the host, so Ruby's
 /// floored semantics must reach hosted programs unchanged.
 #[test]

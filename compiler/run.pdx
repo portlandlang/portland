@@ -1,10 +1,16 @@
 # Run a Portland file on the Portland evaluator.
 #
 # Usage: pdx compiler/run.pdx <file.pdx>
+#
+# The checker goes first (#9, ADR 0034): a program with a refusable line
+# refuses before any line runs, whether or not that line would have.
 
+require_relative "checker"
 require_relative "evaluator"
 
 # `read_file` answers a failure now (ADR 0027); a tool that cannot read its
 # input has nothing to do but say so.
 source = read_file(argv.first) or panic "run.pdx: cannot read #{argv.first}"
-evaluate_program(parse_program(lex(source)))
+program = parse_program(lex(source))
+check_program(program)
+evaluate_program(program)

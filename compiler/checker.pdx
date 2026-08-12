@@ -1,0 +1,253 @@
+# Stage 1, act three: the checker — the first walker the seed will never
+# have (#9, ADR 0034).
+#
+# A library: require_relative "checker", then check_program(nodes) before
+# evaluating. It walks the whole tree, so a refusal fires whether or not
+# the offending line would ever run — which is the entire point: the seed
+# can only refuse the code it reaches, and a compiler must refuse the code
+# it can read.
+#
+# One check family so far, the narrowest that exists (ADR 0022's closed
+# vocabularies, checked statically):
+#
+# - A payload-carrying construction `:paid(on: x)` must name a declared
+#   case, agree with every declaration, and bring exactly the declared
+#   labels. The seed refuses these at *runtime*; the wordings here are the
+#   seed's own, byte for byte — only the timing moves (ADR 0034 §2).
+# - A pattern `in :paid(on:)` naming an undeclared case is refused too —
+#   and there the seed says nothing at all: an undeclared case in a pattern
+#   silently never matches, which is the classic typo bug. This wording is
+#   the trio's first original diagnostic, pinned by ADR 0034 §3 and its
+#   tests rather than by any oracle.
+#
+# Where the checker cannot tell, it declines to check (principle 4): any
+# node kind it does not recognize passes through silently, and a bare
+# symbol is never checked — a payload-free case is simply a symbol
+# (ADR 0022), and symbols are legal everywhere.
+
+require_relative "parser"
+
+# Every enum declaration in the program, as [name, labels] pairs — all of
+# them, not just the textually-earlier ones: a build reads the whole file
+# before judging any line of it.
+def declared_cases(nodes)
+  mutable declarations = []
+  nodes.each do |node|
+    declarations += declarations_in(node)
+  end
+  declarations
+end
+
+def declarations_in(node)
+  case node
+  in EnumDefNode
+    mutable found = []
+    node.cases.each do |declared|
+      found << [declared.name, declared.labels]
+    end
+    found
+  in ModuleDefNode(body:) then declared_cases(body)
+  in StructDefNode(nested:) then declared_cases(nested)
+  else
+    []
+  end
+end
+
+# The one entry point: refuse or stay silent. Panics with the first
+# refusal — reporting every refusal at once is the diagnostics arc's job,
+# not this increment's.
+def check_program(nodes)
+  enums = declared_cases(nodes)
+  check_body(nodes, enums)
+end
+
+def check_body(nodes, enums)
+  nodes.each do |node|
+    check_node(node, enums)
+  end
+end
+
+# The walk. Dispatch mirrors the evaluator's, but visits everything —
+# bodies that would never run included — and checks only what it knows.
+def check_node(node, enums)
+  case node
+  in EnumCaseNode then check_construction(node, enums)
+  in EnumCasePatternNode then check_case_pattern(node, enums)
+  in AssignmentNode(value:) then check_node(value, enums)
+  in DefNode(parameters:, body:)
+    check_parameters(parameters, enums)
+    check_body(body, enums)
+  in StructDefNode(methods:, nested:, type_functions:)
+    check_body(methods, enums)
+    check_body(type_functions, enums)
+    check_body(nested, enums)
+  in TraitDefNode(methods:) then check_body(methods, enums)
+  in ModuleDefNode(body:) then check_body(body, enums)
+  in WhileNode(condition:, body:)
+    check_node(condition, enums)
+    check_body(body, enums)
+  in TogetherNode(lines:) then check_together(lines, enums)
+  in ReturnNode(value:)
+    check_node(value, enums) unless value.nil?
+  in IfNode
+    check_node(node.condition, enums)
+    # `unless` parses as an if with no then-side, so either body may be nil.
+    check_body(node.then_body, enums) unless node.then_body.nil?
+    check_body(node.else_body, enums) unless node.else_body.nil?
+  in CaseNode then check_case(node, enums)
+  in CaseInNode then check_case_in(node, enums)
+  in CallNode then check_call(node, enums)
+  in MethodCallNode | SafeMethodCallNode then check_method_call(node, enums)
+  in ArrayNode(elements:) then check_body(elements, enums)
+  in HashNode(pairs:) then check_pairs(node.pairs, enums)
+  in BinaryNode(left:, right:)
+    check_node(left, enums)
+    check_node(right, enums)
+  in LogicalNode(left:, right:)
+    check_node(left, enums)
+    check_node(right, enums)
+  in UnaryNode(operand:) then check_node(operand, enums)
+  in IndexNode(receiver:, index:)
+    check_node(receiver, enums)
+    check_node(index, enums)
+  in IndexUpdateNode(index: update_index, value: update_value)
+    check_node(update_index, enums)
+    check_node(update_value, enums)
+  in AppendNode(value:) then check_node(value, enums)
+  in PropagateNode(value:) then check_node(value, enums)
+  in MatchAssertNode(subject:, pattern:)
+    check_node(subject, enums)
+    check_pattern(pattern, enums)
+  in MatchTestNode(subject: test_subject, pattern: test_pattern)
+    check_node(test_subject, enums)
+    check_pattern(test_pattern, enums)
+  in KeywordArgumentNode(value:) then check_node(value, enums)
+  else
+    nil
+  end
+end
+
+def check_parameters(parameters, enums)
+  parameters.each do |parameter|
+    if parameter in KeywordParameterNode
+      check_node(parameter.default, enums) unless parameter.default.nil?
+    elsif (parameter in AssignmentNode) && parameter.value.some?
+      check_node(parameter.value, enums)
+    end
+  end
+end
+
+def check_together(lines, enums)
+  lines.each do |line|
+    if line in TaskLineNode
+      check_node(line.value, enums)
+    else
+      check_node(line, enums)
+    end
+  end
+end
+
+def check_case(node, enums)
+  check_node(node.subject, enums)
+  node.branches.each do |branch|
+    check_body(branch.values, enums)
+    check_body(branch.body, enums)
+  end
+  check_body(node.else_body, enums) unless node.else_body.nil?
+end
+
+def check_case_in(node, enums)
+  check_node(node.subject, enums)
+  node.branches.each do |branch|
+    check_pattern(branch.pattern, enums)
+    check_node(branch.guard, enums) unless branch.guard.nil?
+    check_body(branch.body, enums)
+  end
+  check_body(node.else_body, enums) unless node.else_body.nil?
+end
+
+def check_call(node, enums)
+  check_body(node.arguments, enums)
+  check_block(node.block, enums)
+end
+
+def check_method_call(node, enums)
+  check_node(node.receiver, enums)
+  check_body(node.arguments, enums)
+  check_block(node.block, enums)
+end
+
+def check_block(block, enums)
+  return if block.nil?
+  check_body(block.body, enums)
+end
+
+def check_pairs(pairs, enums)
+  pairs.each do |pair|
+    check_node(pair.key, enums)
+    check_node(pair.value, enums)
+  end
+end
+
+# Patterns hold sub-patterns and, in two places, expressions.
+def check_pattern(pattern, enums)
+  case pattern
+  in EnumCasePatternNode then check_case_pattern(pattern, enums)
+  in AlternativePatternNode(options:) then options.each { check_pattern(it, enums) }
+  in ArrayPatternNode(elements:) then elements.each { check_pattern(it, enums) }
+  in StructPatternNode(fields:)
+    fields.each do |field|
+      check_pattern(field[1], enums)
+    end
+  else
+    nil
+  end
+end
+
+# — the checks themselves —
+
+def cases_named(enums, name)
+  enums.select { it[0] == name }
+end
+
+# `:paid(on: x)` — the seed's three runtime refusals, made at build time
+# with the same words (ADR 0034 §2). The seed reaches them only when the
+# line runs; this reaches them because the line was written.
+def check_construction(node, enums)
+  declarations = cases_named(enums, node.name)
+  panic("no enum declares a case :#{node.name}") if declarations.empty?
+  labels = value_at_checked(declarations.first, 1)
+  declarations.each do |declaration|
+    panic("two enums declare :#{node.name} with different payloads — the seed cannot tell them apart") unless value_at_checked(declaration, 1) == labels
+  end
+  given = node.payload.map { it.label }
+  unless given == labels
+    wanted = labels.map { it + ":" }.join(", ")
+    panic("`:#{node.name}` takes (#{wanted})")
+  end
+  node.payload.each do |argument|
+    check_node(argument.value, enums)
+  end
+end
+
+# `in :paid(on:)` naming an undeclared case — the seed says nothing and the
+# pattern silently never matches, which is how a typo becomes a branch that
+# cannot fire. The first refusal with no oracle behind it (ADR 0034 §3).
+def check_case_pattern(pattern, enums)
+  if cases_named(enums, pattern.name).empty?
+    panic("in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}")
+  end
+  pattern.payload.each do |entry|
+    check_pattern(entry[1], enums)
+  end
+end
+
+# Raw positional read, mirroring the evaluator's value_at: a labels list in
+# a pair may be empty, and host indexing lifts nil.
+def value_at_checked(list, target_index)
+  mutable result = nil
+  list.each_with_index do |element, index|
+    result = element if index == target_index
+  end
+  result
+end

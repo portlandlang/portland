@@ -58,6 +58,7 @@ The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stac
 | `lexer.pdx`     | 446   | source → tokens                     |
 | `parser.pdx`    | 1,961 | tokens → AST, with `sexp` rendering |
 | `evaluator.pdx` | 963   | walks the AST                       |
+| `checker.pdx`   | 250   | static checks before evaluation (#9, ADR 0034) — the first walker the seed will never have |
 
 Plus three small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `run.pdx` evaluates a file. Each is under ten lines, because each is one composed expression — `evaluate_program(parse_program(lex(read_file(argv.first))))`.
 
@@ -82,7 +83,7 @@ The trio is not a second implementation kept around for comparison — **it is t
 
 At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the trio refuses to build it. Byte-equivalence breaks — **because the trio got better**.
 
-So the contract has three states, not two, and only the first two exist today:
+So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the trio, exactly as this section predicted.
 
 |                             | seed    | trio             | harness                                                                  |
 | --------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |

@@ -55,6 +55,8 @@ Demand-driven. Issues are commitments, not wishes. A feature earns its place by 
 
 The Rust seed defines behavior; the Portland trio must match it byte-identically. **Never hand-write expected output.** This covers error wording as well as results: where the trio can diagnose at all, it must say exactly what the seed says, and a test pins it.
 
+The succession, begun with the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)): where the trio refuses a program the seed cannot — a build-time check with no runtime analog — no oracle has a wording to match, so the full rule is *never hand-write what an oracle can produce; where no oracle exists, the deciding ADR is the oracle, and the test pins its exact words.* A check that merely moves a runtime refusal to build time keeps the seed's wording byte for byte; only the timing moves.
+
 Corollary, learned the hard way: **green is not covered.** The differential suite stayed green through an entire batch of new syntax the trio did not understand, because no test exercised it. Ship the hosted test _with_ the feature, not after.
 
 ### 8. Verify, don't remember

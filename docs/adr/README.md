@@ -45,6 +45,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0031](0031-2026-07-31-smart-constructors-definable-new.md) — Smart constructors: `new` is definable, and `fields` is the raw constructor
 - [0032](0032-2026-08-11-dotted-calls-take-paren-less-arguments.md) — Dotted calls take paren-less arguments
 - [0033](0033-2026-08-11-exponent-is-starstar-and-pow.md) — Exponent is `**` and `pow`, and a negated base needs parens
+- [0034](0034-2026-08-11-the-checker-and-the-oracle-succession.md) — The checker arrives, and the oracle succession begins
 
 <!-- /generated -->
 

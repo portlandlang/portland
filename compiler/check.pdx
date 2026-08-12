@@ -1,0 +1,12 @@
+# Check a Portland file without running it (#9, ADR 0034).
+#
+# Usage: pdx compiler/check.pdx <file.pdx>
+#
+# Silence is a pass; a refusal panics with its wording. The seed has no
+# counterpart on purpose — this is the first door only the trio has.
+
+require_relative "checker"
+
+source = read_file(argv.first) or panic "check.pdx: cannot read #{argv.first}"
+check_program(parse_program(lex(source)))
+puts "ok"
