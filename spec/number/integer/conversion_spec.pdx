@@ -27,9 +27,12 @@ context "Integer" do
       expect(0.to_s).to eq("0")
     end
 
-    pending "Integer#to_s with a base — the builtin takes no arguments yet" do
+    specify "with a base writes lowercase digits, the sign out front" do
       expect(5.to_s(2)).to eq("101")
       expect(255.to_s(16)).to eq("ff")
+      expect((-255).to_s(16)).to eq("-ff")
+      expect(255.to_s(36)).to eq("73")
+      expect(0.to_s(2)).to eq("0")
     end
   end
 end

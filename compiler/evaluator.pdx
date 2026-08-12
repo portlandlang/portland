@@ -1029,6 +1029,13 @@ def rendered_to_s(receiver)
   render(receiver)
 end
 
+# `to_s` at the dispatch: bare renders; with a base it rides the host,
+# bounds refusal included.
+def to_s_of(receiver, arguments)
+  return rendered_to_s(receiver) if arguments.empty?
+  receiver.to_s(arguments.first)
+end
+
 # One hash pair, written the way it would be typed (ADR 0023 §1).
 def rendered_pair(key, entry)
   if key in ["__symbol__", *]
@@ -1347,7 +1354,8 @@ def evaluate_method_call(node, mutable bindings)
   when "failure?" then receiver.failure?
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
-  when "to_s" then rendered_to_s(receiver)
+  when "to_s" then to_s_of(receiver, arguments)
+  when "gcd" then receiver.gcd(arguments.first)
   when "to_i" then receiver.to_i
   when "length" then receiver.length
   when "empty?" then receiver.empty?

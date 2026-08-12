@@ -64,6 +64,26 @@ fn as_float(value: &Value) -> f64 {
     }
 }
 
+/// A whole number written in another base, 2 through 36 — lowercase digits,
+/// the sign out front, Ruby's shapes (probed on 4.0.6).
+fn integer_in_base(number: i64, base: i64) -> String {
+    if number == 0 {
+        return "0".to_string();
+    }
+    let digits = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    let mut magnitude = number.unsigned_abs();
+    let mut written = Vec::new();
+    while magnitude > 0 {
+        written.push(digits[(magnitude % base as u64) as usize]);
+        magnitude /= base as u64;
+    }
+    if number < 0 {
+        written.push(b'-');
+    }
+    written.reverse();
+    String::from_utf8(written).expect("base digits are ascii")
+}
+
 /// Integer division, floored — Ruby's rule, not Rust's truncation
 /// (ADR 0018): `-7 / 2` is `-4`, because the quotient rounds toward
 /// negative infinity rather than toward zero.
@@ -1733,6 +1753,26 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Integer(number), "succ", []) => Value::Integer(number + 1),
             (Value::Integer(number), "next", []) => Value::Integer(number + 1),
             (Value::Integer(number), "pred", []) => Value::Integer(number - 1),
+            // Euclid on magnitudes — the answer never carries a sign, and a
+            // zero yields the other side's magnitude (Ruby 4.0.6, probed).
+            (Value::Integer(number), "gcd", [Value::Integer(other)]) => {
+                let mut left = number.abs();
+                let mut right = other.abs();
+                while right != 0 {
+                    let remainder = left % right;
+                    left = right;
+                    right = remainder;
+                }
+                Value::Integer(left)
+            }
+            // `to_s` with a base, 2 through 36, lowercase digits, the sign
+            // out front — Ruby's shapes, including the refusal's bounds.
+            (Value::Integer(number), "to_s", [Value::Integer(base)]) => {
+                if !(2..=36).contains(base) {
+                    panic!("invalid radix {base}");
+                }
+                Value::String(integer_in_base(*number, *base))
+            }
             // `pow` is `**`'s named twin (ADR 0033), one arity; the modular
             // second argument waits to be pulled for.
             (Value::Integer(base), "pow", [Value::Integer(exponent)]) => {

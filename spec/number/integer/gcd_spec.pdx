@@ -1,5 +1,5 @@
-# `gcd` — not built yet, held pending (#23): the first entries in the
-# compatibility-hole inventory `script/spec | grep PENDING` keeps.
+# `gcd` — Euclid on magnitudes: the answer never carries a sign, and a zero
+# yields the other side's magnitude.
 #
 # From ruby/spec core/integer/gcd_spec.rb.
 
@@ -9,14 +9,19 @@ require_relative "../../spec_helper"
 
 context "Integer" do
   describe "#gcd" do
-    pending "Integer#gcd — no builtin yet" do
+    specify "answers the greatest common divisor" do
       expect(12.gcd(8)).to eq(4)
       expect(100.gcd(17)).to eq(1)
     end
 
-    pending "Integer#gcd of zero is the other magnitude" do
+    specify "of zero is the other magnitude" do
       expect(0.gcd(5)).to eq(5)
       expect(5.gcd(0)).to eq(5)
+    end
+
+    specify "never carries a sign" do
+      expect((-12).gcd(8)).to eq(4)
+      expect(12.gcd(-8)).to eq(4)
     end
   end
 end

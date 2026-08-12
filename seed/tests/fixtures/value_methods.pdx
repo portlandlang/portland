@@ -71,6 +71,10 @@ puts 0.0.zero?.to_s
 puts not_a_number.nan?.to_s
 puts endless.finite?.to_s
 puts endless.infinite?.to_s
+# Euclid on magnitudes, and `to_s` in another base.
+puts 12.gcd(8).to_s
+puts 255.to_s(16)
+
 rounded_down = (-2.5).round
 ceiled_up = (-1.5).ceil
 cut_short = (-1.9).truncate
