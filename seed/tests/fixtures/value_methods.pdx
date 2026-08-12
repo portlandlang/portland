@@ -104,6 +104,18 @@ counting = [1, 2, 3, 4]
 puts counting.reject { it.even? }.join(",")
 puts counting.select { it.even? }.join(",")
 
+# The verdict trio, the finders, and the shapers.
+puts counting.any? { it > 3 }.to_s
+puts counting.all? { it > 0 }.to_s
+puts counting.none? { it > 9 }.to_s
+first_even = counting.find { it.even? }
+puts first_even.to_s
+puts %w[bb a ccc].sort_by { it.length }.join(",")
+puts %w[a b a].tally.length.to_s
+puts counting.zip([9, 8, 7, 6]).flatten.join(",")
+puts counting.each_slice(3).length.to_s
+puts counting.flat_map { [it, it] }.join(",")
+
 # `pow` is `**`'s named twin (ADR 0033).
 puts 2.pow(8).to_s
 

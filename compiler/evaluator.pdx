@@ -1430,6 +1430,9 @@ def evaluate_method_call(node, mutable bindings)
   when "first" then first_of(receiver, arguments)
   when "last" then last_of(receiver, arguments)
   when "uniq" then receiver.uniq
+  when "tally" then receiver.tally
+  when "zip" then receiver.zip(arguments.first)
+  when "each_slice" then receiver.each_slice(arguments.first)
   when "flatten" then receiver.flatten
   when "compact" then receiver.compact
   when "count" then count_of(receiver, arguments)
@@ -1664,6 +1667,80 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
+  when "any?"
+    result = receiver.any? do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "all?"
+    result = receiver.all? do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "none?"
+    result = receiver.none? do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "find"
+    result = receiver.find do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "sort_by"
+    results = receiver.sort_by do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("sort_by block produced no value") if step.value.empty?
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  when "flat_map"
+    results = receiver.flat_map do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("flat_map block produced no value") if step.value.empty?
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
   else
     puts "evaluator: cannot evaluate block method #{node.name} yet"
     outcome([], scope)

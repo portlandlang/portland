@@ -244,7 +244,7 @@ Implicit return of the last expression, arity-checked calls, trailing default pa
 
 ## Blocks
 
-`do |item| ... end` and `{ |item| ... }` are **dead-identical** (ADR 0016) — Ruby's braces-bind-tighter rule is gone. They work on `each` (arrays, and hashes with `|key, value|`), `each_with_index`, `map`, `select`, `reject`, `reduce(initial)`, `times`, `upto`, `downto`. Blocks are closures; their parameters are block-local.
+`do |item| ... end` and `{ |item| ... }` are **dead-identical** (ADR 0016) — Ruby's braces-bind-tighter rule is gone. They work on `each` (arrays, and hashes with `|key, value|`), `each_with_index`, `map`, `select`, `reject`, `reduce(initial)`, `any?`, `all?`, `none?`, `find`, `sort_by`, `flat_map`, `times`, `upto`, `downto`. Blocks are closures; their parameters are block-local.
 
 Naming **`it`** declares the implicit parameter (ADR 0017):
 
@@ -357,14 +357,15 @@ There are no generated predicates and no `Status.all`: an enum is a type, not a 
 
 Read-only, and small on purpose.
 
-| Type       | Methods                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| String     | `length upcase downcase reverse empty? chars split include? start_with? end_with? to_i to_f slice` and `[index]` |
-| Integer    | `abs zero? positive? negative? even? odd? to_f`                                                                  |
-| Float      | `abs to_i`                                                                                                       |
-| Array      | `length first last empty? join include? sum min max sort slice` and `[index]`, negative indices included         |
-| Hash       | `length empty? key? keys values` and `[key]`                                                                     |
-| Everything | `to_s`, `nil?`, `some?`                                                                                          |
+| Type       | Methods                                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| String     | `length upcase downcase capitalize swapcase reverse empty? chars split strip lstrip rstrip chomp lines include? index count start_with? end_with? to_i to_f slice` and `[index]`               |
+| Integer    | `abs zero? positive? negative? even? odd? gcd pow succ pred next to_f` and `to_s(base)`                                                                                                        |
+| Float      | `abs zero? nan? finite? infinite? floor ceil round truncate to_i`                                                                                                                              |
+| Array      | `length first last empty? join include? index count sum min max sort reverse uniq flatten compact to_a tally zip each_slice slice` and `[index]`, negative indices included                     |
+| Hash       | `length empty? key? keys values merge dig to_a` and `[key]`                                                                                                                                    |
+| Range      | `include? to_a step min max`, and everything an array answers, by walking                                                                                                                      |
+| Everything | `to_s`, `nil?`, `some?`                                                                                                                                                                        |
 
 Method chains continue across newlines with a leading dot.
 

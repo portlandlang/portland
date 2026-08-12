@@ -1653,6 +1653,127 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(kept))
                 }
+                (Value::Array(elements), "any?", []) => {
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => return Some(Value::Boolean(true)),
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("any? block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Boolean(false))
+                }
+                (Value::Array(elements), "all?", []) => {
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => {}
+                            Some(Value::Boolean(false)) => return Some(Value::Boolean(false)),
+                            other => {
+                                panic!("all? block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Boolean(true))
+                }
+                (Value::Array(elements), "none?", []) => {
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => return Some(Value::Boolean(false)),
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("none? block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Boolean(true))
+                }
+                // The first hit — a maybe, like every partial lookup.
+                (Value::Array(elements), "find", []) => {
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => return Some(Value::present(element)),
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("find block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Nil)
+                }
+                // Sorts by the block's answers, which take `sort`'s rule:
+                // uniform, all integers or all strings.
+                (Value::Array(elements), "sort_by", []) => {
+                    let mut keyed = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let key = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let key = key.unwrap_or_else(|| panic!("sort_by block produced no value"));
+                        keyed.push((key, element));
+                    }
+                    if keyed
+                        .iter()
+                        .all(|(key, _)| matches!(key, Value::Integer(_)))
+                    {
+                        keyed.sort_by_key(|(key, _)| match key {
+                            Value::Integer(number) => *number,
+                            _ => unreachable!("all keys are integers"),
+                        });
+                    } else if keyed.iter().all(|(key, _)| matches!(key, Value::String(_))) {
+                        keyed.sort_by(|(left, _), (right, _)| match (left, right) {
+                            (Value::String(left), Value::String(right)) => left.cmp(right),
+                            _ => unreachable!("all keys are strings"),
+                        });
+                    } else {
+                        let offender = keyed
+                            .iter()
+                            .map(|(key, _)| key)
+                            .find(|key| !matches!(key, Value::Integer(_)))
+                            .expect("a non-integer key exists");
+                        panic!(
+                            "sort_by keys must be all integers or all strings, found {offender:?}"
+                        );
+                    }
+                    Some(Value::array(
+                        keyed.into_iter().map(|(_, element)| element).collect(),
+                    ))
+                }
+                // One level opens, Ruby's rule: an array splices, any other
+                // value lands whole.
+                (Value::Array(elements), "flat_map", []) => {
+                    let mut results = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let result = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match result {
+                            Some(Value::Array(inner)) => results.extend(inner.iter().cloned()),
+                            Some(other) => results.push(other),
+                            None => panic!("flat_map block produced no value"),
+                        }
+                    }
+                    Some(Value::array(results))
+                }
                 (Value::Integer(count), "times", []) => {
                     for index in 0..*count {
                         self.run_block(block, vec![Value::Integer(index)]);
@@ -1787,6 +1908,48 @@ impl<W: std::io::Write> Interpreter<W> {
                 .map_or(Value::Nil, Value::Integer),
             // An array already is one — the harmless end of Ruby's rule.
             (receiver @ Value::Array(_), "to_a", []) => receiver.clone(),
+            // Counts into a hash, keys in first-seen order.
+            (Value::Array(elements), "tally", []) => {
+                let mut counts: Vec<(Value, i64)> = Vec::new();
+                for element in elements.iter() {
+                    match counts.iter_mut().find(|(seen, _)| seen == element) {
+                        Some(entry) => entry.1 += 1,
+                        None => counts.push((element.clone(), 1)),
+                    }
+                }
+                Value::hash(
+                    counts
+                        .into_iter()
+                        .map(|(element, count)| (element, Value::Integer(count)))
+                        .collect(),
+                )
+            }
+            // Pairs walked to the left side's length; a short right side
+            // fills with nil, Ruby's rule.
+            (Value::Array(elements), "zip", [Value::Array(others)]) => Value::array(
+                elements
+                    .iter()
+                    .enumerate()
+                    .map(|(position, element)| {
+                        Value::array(vec![
+                            element.clone(),
+                            others.get(position).cloned().unwrap_or(Value::Nil),
+                        ])
+                    })
+                    .collect(),
+            ),
+            (Value::Array(elements), "each_slice", [Value::Integer(size)]) => {
+                let width = usize::try_from(*size)
+                    .ok()
+                    .filter(|width| *width > 0)
+                    .unwrap_or_else(|| panic!("each_slice takes a positive size, got {size}"));
+                Value::array(
+                    elements
+                        .chunks(width)
+                        .map(|chunk| Value::array(chunk.to_vec()))
+                        .collect(),
+                )
+            }
             // Strides and extremes walk the same elements `each` walks, so a
             // range without both ends refuses with the same words. The
             // extremes are maybes: an empty range has neither.
