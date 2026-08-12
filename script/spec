@@ -31,9 +31,15 @@ failed=0
 tally() {
   examples=$(grep -c '^- ' "$transcript" || true)
   failures=$(grep -c '^  FAIL ' "$transcript" || true)
-  echo "$(counted "$examples" example), $(counted "$failures" failure)"
+  pendings=$(grep -c '^\* PENDING ' "$transcript" || true)
+  line="$(counted "$examples" example), $(counted "$failures" failure)"
+  # Pending examples are holes we owe (#23) — counted and shown, never
+  # failed on, and silent when there are none.
+  [ "$pendings" -eq 0 ] || line="$line, $pendings pending"
+  echo "$line"
   total_examples=$((total_examples + examples))
   total_failures=$((total_failures + failures))
+  total_pendings=$((total_pendings + pendings))
   [ "$failures" -eq 0 ] || failed=1
 }
 
@@ -49,6 +55,7 @@ counted() {
 
 total_examples=0
 total_failures=0
+total_pendings=0
 
 # `find` rather than a glob, so a spec nested in a subdirectory is picked up
 # too — `spec/numbers/integers_spec.pdx` is not matched by `spec/*_spec.pdx`,
@@ -124,6 +131,8 @@ fi
 # The grand total counts runs, not examples: every spec runs twice, once per
 # oracle, and both halves count — agreeing with the seed is half the job.
 echo ""
-echo "total: $(counted "$total_examples" "example run"), $(counted "$total_failures" failure)"
+grand="total: $(counted "$total_examples" "example run"), $(counted "$total_failures" failure)"
+[ "$total_pendings" -eq 0 ] || grand="$grand, $total_pendings pending"
+echo "$grand"
 
 [ "$failed" -eq 0 ] || { echo "language spec failed"; exit 1; }

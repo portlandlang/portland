@@ -68,6 +68,21 @@ def specify(behavior)
   yield
 end
 
+# A hole we owe, held in place: the example stays written where it belongs,
+# prints one countable `* PENDING` line, and its block never runs — which is
+# the only semantics available, not a taste choice. rspec's true `pending`
+# runs the block and alerts when it starts passing; that needs a failure to
+# be caught, and here `expect` prints rather than raises while a missing
+# builtin panics the whole file. mspec's guards skip the same way.
+#
+# The body still has to *parse* on both oracles, since blocks parse whether
+# or not they run — so `pending` holds missing builtins and wrong behavior,
+# never missing syntax. `script/spec | grep PENDING` is the standing
+# inventory of what is owed (#23).
+def pending(behavior)
+  puts "* PENDING #{behavior}"
+end
+
 # One countable line per failure, indented under the example it belongs to, so
 # the runner can find it and a reader can see which example it came from
 # without the message having to repeat the description.
