@@ -1,21 +1,28 @@
-# Walking a range in strides, and its extremes — held pending (#23).
+# Walking a range in strides, and its extremes.
 #
 # From ruby/spec core/range/{step,min,max}_spec.rb. `size` and `count` ride
 # the alias-cluster policy question noted in spec/hash/queries_spec.pdx
-# rather than pending here.
+# rather than pending here. `step` answers an array outright — Portland has
+# no lazy enumerator to hand back — so `.to_a` on it is the identity.
 
 require_relative "../spec_helper"
 
 context "Range" do
   describe "the strides and extremes" do
-    pending "Range#step — no builtin yet" do
+    specify "Range#step walks in strides" do
       expect((1..9).step(3).to_a).to eq([1, 4, 7])
+      expect((1..9).step(3)).to eq([1, 4, 7])
     end
 
-    pending "Range#min and #max — no builtins yet; exclusive end honored" do
+    specify "Range#min and #max honor the exclusive end" do
       expect((1..9).min).to eq(1)
       expect((1..9).max).to eq(9)
       expect((1...9).max).to eq(8)
+    end
+
+    specify "the extremes of an empty range are maybes" do
+      expect((5..1).max).to be_nil
+      expect((1...1).max).to be_nil
     end
   end
 end

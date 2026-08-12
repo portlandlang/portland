@@ -1785,6 +1785,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 .into_iter()
                 .min()
                 .map_or(Value::Nil, Value::Integer),
+            // An array already is one — the harmless end of Ruby's rule.
+            (receiver @ Value::Array(_), "to_a", []) => receiver.clone(),
+            // Strides and extremes walk the same elements `each` walks, so a
+            // range without both ends refuses with the same words. The
+            // extremes are maybes: an empty range has neither.
+            (range @ Value::Range { .. }, "step", [Value::Integer(stride)]) => {
+                if *stride <= 0 {
+                    panic!("step takes a positive stride, got {stride}");
+                }
+                Value::array(
+                    range_elements(range)
+                        .into_iter()
+                        .step_by(*stride as usize)
+                        .collect(),
+                )
+            }
+            (range @ Value::Range { .. }, "min", []) => range_elements(range)
+                .into_iter()
+                .next()
+                .map_or(Value::Nil, Value::present),
+            (range @ Value::Range { .. }, "max", []) => range_elements(range)
+                .into_iter()
+                .last()
+                .map_or(Value::Nil, Value::present),
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
                 let start = usize::try_from(*start)
                     .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));

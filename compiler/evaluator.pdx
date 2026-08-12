@@ -1438,6 +1438,7 @@ def evaluate_method_call(node, mutable bindings)
   when "sort" then receiver.sort
   when "min" then receiver.min
   when "max" then receiver.max
+  when "step" then receiver.step(arguments.first)
   when "to_a" then receiver.to_a
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
