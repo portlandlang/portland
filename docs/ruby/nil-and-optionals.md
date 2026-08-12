@@ -41,3 +41,5 @@ Absent is not empty: `""` and `[]` are _present_ values with nothing in them. `e
 - Ruby cannot represent a nested optional (`nil` doesn't nest), so the polyfill covers the whole unnested surface and the linter flags nested sites as fix-at-flip-time.
 
 The presence partner is **`some`** / **`some?`** (ADR 0009) — unclaimed in Ruby core, Rails, and Hanami; precedented with exactly this meaning by dry-monads' `Maybe#some?`. Auto-wrapping means `some(x)` is written only in the rare nested case (`some(nil)`: present-but-absent-inside), where a bare `nil` would be a never-guess error.
+
+A corollary for Ruby methods whose *answer* leans on ambient nil: `Float#infinite?` in Ruby answers `nil`, `1`, or `-1` — a direction wearing a predicate's name. Portland's `infinite?` is a predicate proper, `true` or `false`, because a nil answer is not falsy here and the Ruby shape would be unusable in a condition. The divergence is detected, not silent: Ruby code comparing `x.infinite?` against `1`/`-1`/`nil` fails to compile against a Boolean. A signed spelling (`infinity_sign`, say) waits to be pulled for.

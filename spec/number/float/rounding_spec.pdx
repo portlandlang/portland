@@ -1,8 +1,8 @@
-# The rounding family — none built yet, held pending (#23).
+# The rounding family — each answers an Integer. The values are Ruby
+# 4.0.6's, run rather than recalled: `round` goes half away from zero,
+# `truncate` toward it.
 #
-# From ruby/spec core/float/{floor,ceil,round,truncate}_spec.rb. The values
-# are Ruby 4.0.6's, run rather than recalled: `round` goes half away from
-# zero, `truncate` toward it.
+# From ruby/spec core/float/{floor,ceil,round,truncate}_spec.rb.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the compiler) — not against `spec/`.
@@ -10,23 +10,23 @@ require_relative "../../spec_helper"
 
 context "Float" do
   describe "the rounding family" do
-    pending "Float#floor — no builtin yet" do
+    specify "Float#floor goes down" do
       expect(1.5.floor).to eq(1)
       expect((-1.5).floor).to eq(-2)
     end
 
-    pending "Float#ceil — no builtin yet" do
+    specify "Float#ceil goes up" do
       expect(1.5.ceil).to eq(2)
       expect((-1.5).ceil).to eq(-1)
     end
 
-    pending "Float#round — no builtin yet; half goes away from zero" do
+    specify "Float#round goes half away from zero" do
       expect(2.5.round).to eq(3)
       expect((-2.5).round).to eq(-3)
       expect(2.4.round).to eq(2)
     end
 
-    pending "Float#truncate — no builtin yet; toward zero" do
+    specify "Float#truncate goes toward zero" do
       expect(1.9.truncate).to eq(1)
       expect((-1.9).truncate).to eq(-1)
     end

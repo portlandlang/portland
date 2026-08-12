@@ -1805,6 +1805,20 @@ impl<W: std::io::Write> Interpreter<W> {
             // floored division of ADR 0018.
             (Value::Float(number), "to_i", []) => Value::Integer(*number as i64),
             (Value::Float(number), "abs", []) => Value::Float(number.abs()),
+            (Value::Float(number), "zero?", []) => Value::Boolean(*number == 0.0),
+            (Value::Float(number), "nan?", []) => Value::Boolean(number.is_nan()),
+            (Value::Float(number), "finite?", []) => Value::Boolean(number.is_finite()),
+            // A predicate proper, answering true/false — not Ruby's nil/1/-1,
+            // which reads as a predicate and answers a direction (recorded in
+            // the ledger; nil is not falsy here, so Ruby's shape is unusable).
+            (Value::Float(number), "infinite?", []) => Value::Boolean(number.is_infinite()),
+            // The rounding family answers Integers, Ruby's shapes verified on
+            // 4.0.6: `round` goes half away from zero (Rust's f64::round
+            // agrees), `truncate` toward it, `floor`/`ceil` by their names.
+            (Value::Float(number), "floor", []) => Value::Integer(number.floor() as i64),
+            (Value::Float(number), "ceil", []) => Value::Integer(number.ceil() as i64),
+            (Value::Float(number), "round", []) => Value::Integer(number.round() as i64),
+            (Value::Float(number), "truncate", []) => Value::Integer(number.trunc() as i64),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {

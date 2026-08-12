@@ -1367,6 +1367,14 @@ def evaluate_method_call(node, mutable bindings)
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?
+  # The float predicates and the rounding family ride the host's builtins.
+  when "nan?" then receiver.nan?
+  when "finite?" then receiver.finite?
+  when "infinite?" then receiver.infinite?
+  when "floor" then receiver.floor
+  when "ceil" then receiver.ceil
+  when "round" then receiver.round
+  when "truncate" then receiver.truncate
   when "positive?" then receiver.positive?
   when "negative?" then receiver.negative?
   when "keys" then receiver.keys

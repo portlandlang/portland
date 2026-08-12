@@ -62,6 +62,23 @@ puts below_zero.to_s
 puts 41.next.to_s
 puts 43.pred.to_s
 puts 0.pred.to_s
+
+# The float predicates and the rounding family. `infinite?` answers a plain
+# Boolean here, not Ruby's nil/1/-1 (see the ledger).
+not_a_number = 0.0 / 0.0
+endless = 1.0 / 0.0
+puts 0.0.zero?.to_s
+puts not_a_number.nan?.to_s
+puts endless.finite?.to_s
+puts endless.infinite?.to_s
+rounded_down = (-2.5).round
+ceiled_up = (-1.5).ceil
+cut_short = (-1.9).truncate
+puts 2.5.round.to_s
+puts rounded_down.to_s
+puts 1.5.floor.to_s
+puts ceiled_up.to_s
+puts cut_short.to_s
 tower = 2 ** 3 ** 2
 puts tower.to_s
 
