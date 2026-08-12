@@ -3,8 +3,7 @@
 #
 # Grown from ruby/spec core/integer/{plus,minus,multiply}_spec.rb (#23);
 # the coercion protocol stays behind — there is no `coerce`, and a wrong
-# operand type panics rather than negotiating. Underscored literals
-# (`5_280`) stay behind too: they do not lex yet, found by this import.
+# operand type panics rather than negotiating.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -23,6 +22,8 @@ context "Integer" do
       expect(5 - 10).to eq(-5)
       expect(9237212 - 5280).to eq(9231932)
     end
+
+    pending "9237212 - 5_280 — underscored literals do not lex (#71)"
   end
 
   describe "#*" do

@@ -76,9 +76,18 @@ end
 # builtin panics the whole file. mspec's guards skip the same way.
 #
 # The body still has to *parse* on both oracles, since blocks parse whether
-# or not they run — so `pending` holds missing builtins and wrong behavior,
-# never missing syntax. `script/spec | grep PENDING` is the standing
-# inventory of what is owed (#23).
+# or not they run. Three tiers, and the block is what tells them apart:
+#
+# - will build, body writable — `pending "desc" do ... end`: the example is
+#   already written, and landing the feature means deleting one word.
+# - will build, body unparseable (missing syntax) — `pending` with no block,
+#   the unwritable spelling and its issue number carried in the string:
+#   `pending "5_280 — underscored literals do not lex (#71)"`.
+# - decided out, forever — a comment, never a `pending`: the inventory is a
+#   to-do list, and a won't-fix inside it would rot its trustworthiness.
+#
+# `script/spec | grep PENDING` is the standing inventory of what is owed
+# (#23).
 def pending(behavior)
   puts "* PENDING #{behavior}"
 end
