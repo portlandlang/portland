@@ -764,6 +764,9 @@ def evaluate_binary(node, bindings)
   when "*" then left * right
   when "/" then left / right
   when "%" then left % right
+  # `**` rides the host whole (ADR 0033): the rational and overflow
+  # refusals below are the seed's own, wording included.
+  when "**" then left ** right
   when "==" then left == right
   when "!=" then left != right
   when "<" then left < right
@@ -1353,6 +1356,8 @@ def evaluate_method_call(node, mutable bindings)
   when "reverse" then receiver.reverse
   when "chars" then receiver.chars
   when "abs" then receiver.abs
+  # `pow` is `**`'s named twin (ADR 0033), one arity, the host's edges.
+  when "pow" then receiver ** arguments.first
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?

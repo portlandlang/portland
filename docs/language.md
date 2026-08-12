@@ -56,7 +56,7 @@ Four rules do most of the work. They are not features; they are the reasons othe
 
 **Integers** are `i64`. **Floats** are IEEE doubles, printed Ruby's way, and mixed arithmetic promotes. A dot is only a float when a digit follows it, which is what keeps `1..5` a range.
 
-Arithmetic is `+ - * / %` with unary minus and parens. `+` concatenates strings and arrays; `*` repeats them. Integer division and modulo are **floored, exactly as in Ruby** (ADR 0018) — `-7 / 2` is `-4`, and `-7 % 2` is `1`.
+Arithmetic is `+ - * / % **` with unary minus and parens. `+` concatenates strings and arrays; `*` repeats them. Integer division and modulo are **floored, exactly as in Ruby** (ADR 0018) — `-7 / 2` is `-4`, and `-7 % 2` is `1`. Exponent is `**` or its named twin `pow` ([ADR 0033](adr/0033-2026-08-11-exponent-is-starstar-and-pow.md)): right-associative, above `*`, floats through the host — and a negated base refuses (`-2 ** 2` is the question every tool answers differently; write `(-2) ** 2` or `-(2 ** 2)`). A negative integer exponent and a past-i64 result refuse with their rewrites named, since Portland has neither rationals nor bignums.
 
 Comparison is `== != < <= > >=`. Equality works across all types, with mixed types simply unequal; ordering is integers-only for now.
 

@@ -49,6 +49,7 @@ pub enum TokenKind {
     SlashEqual,
     Star,
     StarEqual,
+    StarStar,
     String,
     /// `:name` — a symbol literal (ADR 0023). Its `text` includes the colon.
     Symbol,
@@ -281,6 +282,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('/', Some('=')) => (TokenKind::SlashEqual, 2),
                     ('/', _) => (TokenKind::Slash, 1),
                     ('*', Some('=')) => (TokenKind::StarEqual, 2),
+                    ('*', Some('*')) => (TokenKind::StarStar, 2),
                     ('*', _) => (TokenKind::Star, 1),
                     // `^` exists only as the pattern pin (ADR 0013 §4);
                     // bitwise xor is out (ADR 0003).

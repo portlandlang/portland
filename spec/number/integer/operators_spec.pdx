@@ -1,12 +1,9 @@
 # `+`, `-`, and `*` on integers stay integers; mixing with a float promotes,
 # and the promotion rules have their own home in spec/number/promotion_spec.
 #
-# Grown from ruby/spec core/integer/{plus,minus,multiply,uminus}_spec.rb
-# (#23); the coercion protocol stays behind — there is no `coerce`, and a
-# wrong operand type panics rather than negotiating. Exponentiation stays
-# behind too, undecided rather than pending: `**` does not parse, and ADR
-# 0003's precedent (bitwise operators became named methods) means the
-# spelling is a decision, not a hole.
+# Grown from ruby/spec core/integer/{plus,minus,multiply,uminus,pow,
+# exponent}_spec.rb (#23); the coercion protocol stays behind — there is no
+# `coerce`, and a wrong operand type panics rather than negotiating.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -37,6 +34,38 @@ context "Integer" do
 
     specify "reaches past 32 bits without ceremony" do
       expect(65536 * 65536).to eq(4294967296)
+    end
+  end
+
+  # ADR 0033 — `**` and its named twin. The negated base is a refusal, so
+  # the parenthesized spellings are the only ones with examples.
+  describe "#** and #pow" do
+    specify "raises to the power" do
+      expect(2 ** 8).to eq(256)
+      expect(2.pow(8)).to eq(256)
+    end
+
+    specify "associates rightward — the tower reading" do
+      expect(2 ** 3 ** 2).to eq(512)
+    end
+
+    specify "binds above *" do
+      expect(4 * 2 ** 3).to eq(32)
+    end
+
+    specify "answers one for a zero exponent, zero included" do
+      expect(2 ** 0).to eq(1)
+      expect(0 ** 0).to eq(1)
+    end
+
+    specify "takes a parenthesized negative base" do
+      expect((-2) ** 2).to eq(4)
+      expect((-2) ** 3).to eq(-8)
+    end
+
+    specify "crosses into floats for roots" do
+      expect(9 ** 0.5).to eq(3.0)
+      expect(2.0 ** -1).to eq(0.5)
     end
   end
 

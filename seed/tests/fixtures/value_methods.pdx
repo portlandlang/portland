@@ -50,6 +50,11 @@ counting = [1, 2, 3, 4]
 puts counting.reject { it.even? }.join(",")
 puts counting.select { it.even? }.join(",")
 
+# `pow` is `**`'s named twin (ADR 0033).
+puts 2.pow(8).to_s
+tower = 2 ** 3 ** 2
+puts tower.to_s
+
 total = counting.reduce(0) do |running, number|
   running + number
 end

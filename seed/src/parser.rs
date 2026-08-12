@@ -2030,7 +2030,7 @@ impl<'source> Parser<'source> {
     }
 
     fn multiplication(&mut self) -> Expression {
-        let mut left = self.unary();
+        let mut left = self.exponent();
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::Percent) => Some(BinaryOperator::Modulo),
             Some(TokenKind::Slash) => Some(BinaryOperator::Divide),
@@ -2038,7 +2038,7 @@ impl<'source> Parser<'source> {
             _ => None,
         } {
             self.position += 1;
-            let right = self.unary();
+            let right = self.exponent();
             left = Expression::Binary {
                 left: Box::new(left),
                 operator,
@@ -2046,6 +2046,34 @@ impl<'source> Parser<'source> {
             };
         }
         left
+    }
+
+    /// `**` (ADR 0033): right-associative — `2 ** 3 ** 2` is `2 ** 512`'s
+    /// tower reading, mathematics' own — and binding above `*`. The negated
+    /// base never reaches here: `unary` refuses it first.
+    fn exponent(&mut self) -> Expression {
+        let left = self.unary();
+        if self.peek_kind() == Some(TokenKind::StarStar) {
+            self.position += 1;
+            let right = self.exponent();
+            return Expression::Binary {
+                left: Box::new(left),
+                operator: BinaryOperator::Power,
+                right: Box::new(right),
+            };
+        }
+        left
+    }
+
+    /// A negated base directly under `**` has two genuine readings, and the
+    /// tools people learn from disagree: every spreadsheet answers `(-2) ** 2`
+    /// and every programming language answers `-(2 ** 2)` — Apple ships both,
+    /// depending on whether you asked Spotlight or Numbers. ES2016 saw the
+    /// same split and made the parenthesis mandatory; so does this (ADR 0033).
+    fn refuse_negated_base(&self) {
+        if self.peek_kind() == Some(TokenKind::StarStar) {
+            panic!("a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)");
+        }
     }
 
     fn unary(&mut self) -> Expression {
@@ -2062,17 +2090,23 @@ impl<'source> Parser<'source> {
             if self.peek_kind() == Some(TokenKind::Integer) {
                 let token = self.advance();
                 let value: i64 = token.text.parse().expect("integer literal out of range");
-                return self.postfix_from(Expression::Integer(-value));
+                let chained = self.postfix_from(Expression::Integer(-value));
+                self.refuse_negated_base();
+                return chained;
             }
             if self.peek_kind() == Some(TokenKind::Float) {
                 let token = self.advance();
                 let value: f64 = token.text.parse().expect("float literal out of range");
-                return self.postfix_from(Expression::Float(-value));
+                let chained = self.postfix_from(Expression::Float(-value));
+                self.refuse_negated_base();
+                return chained;
             }
-            return Expression::Unary {
+            let negated = Expression::Unary {
                 operand: Box::new(self.unary()),
                 operator: UnaryOperator::Negate,
             };
+            self.refuse_negated_base();
+            return negated;
         }
         self.postfix()
     }

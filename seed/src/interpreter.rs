@@ -67,6 +67,34 @@ fn as_float(value: &Value) -> f64 {
 /// Integer division, floored — Ruby's rule, not Rust's truncation
 /// (ADR 0018): `-7 / 2` is `-4`, because the quotient rounds toward
 /// negative infinity rather than toward zero.
+/// Integer `**` and `pow` (ADR 0033). Two edges Ruby has answers for that
+/// Portland cannot follow: a negative exponent is a Rational there and a
+/// refusal here, and past-i64 results refuse the way past-i64 literals do.
+fn integer_power(left: i64, right: i64) -> Value {
+    if right < 0 {
+        panic!(
+            "{left} ** {right} is a fraction, and integers have none — write {left}.0 ** {right} for the float"
+        );
+    }
+    // A magnitude of one never grows, however tall the tower — Ruby's
+    // answers, reached before the width check could refuse them.
+    if left == 0 && right > 0 {
+        return Value::Integer(0);
+    }
+    if left == 1 {
+        return Value::Integer(1);
+    }
+    if left == -1 {
+        return Value::Integer(if right % 2 == 0 { 1 } else { -1 });
+    }
+    let exponent = u32::try_from(right)
+        .unwrap_or_else(|_| panic!("{left} ** {right} overflows the 64-bit integers"));
+    match left.checked_pow(exponent) {
+        Some(value) => Value::Integer(value),
+        None => panic!("{left} ** {right} overflows the 64-bit integers"),
+    }
+}
+
 fn floored_divide(left: i64, right: i64) -> i64 {
     let quotient = left / right;
     if left % right != 0 && (left < 0) != (right < 0) {
@@ -1012,6 +1040,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
                         Some(Value::Integer(left * right))
                     }
+                    (Value::Integer(left), BinaryOperator::Power, Value::Integer(right)) => {
+                        Some(integer_power(left, right))
+                    }
                     (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
                         Some(Value::Integer(left - right))
                     }
@@ -1035,6 +1066,7 @@ impl<W: std::io::Write> Interpreter<W> {
                                 Value::Float(left - right * (left / right).floor())
                             }
                             BinaryOperator::Multiply => Value::Float(left * right),
+                            BinaryOperator::Power => Value::Float(left.powf(right)),
                             BinaryOperator::Subtract => Value::Float(left - right),
                             BinaryOperator::Greater => Value::Boolean(left > right),
                             BinaryOperator::GreaterOrEqual => Value::Boolean(left >= right),
@@ -1695,6 +1727,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
             }
             (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
+            // `pow` is `**`'s named twin (ADR 0033), one arity; the modular
+            // second argument waits to be pulled for.
+            (Value::Integer(base), "pow", [Value::Integer(exponent)]) => {
+                integer_power(*base, *exponent)
+            }
+            (Value::Integer(base), "pow", [Value::Float(exponent)]) => {
+                Value::Float((*base as f64).powf(*exponent))
+            }
+            (Value::Float(base), "pow", [Value::Integer(exponent)]) => {
+                Value::Float(base.powf(*exponent as f64))
+            }
+            (Value::Float(base), "pow", [Value::Float(exponent)]) => {
+                Value::Float(base.powf(*exponent))
+            }
             // Raw `%` here, not `floored_modulo` — deliberately, and safely.
             // Portland's `%` is floored (ADR 0018) while Rust's truncates, so
             // `-7 % 2` is 1 there and -1 here. The two differ only in *sign*,

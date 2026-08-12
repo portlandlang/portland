@@ -664,6 +664,16 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "p \"abc\".slice (0)\n",
             "ambiguous without parens — write slice(...) with no space to call",
         ),
+        // ADR 0033: the negated base and the two integer edges.
+        (
+            "x = -2 ** 2\n",
+            "a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)",
+        ),
+        (
+            "x = 2 ** -1\n",
+            "2 ** -1 is a fraction, and integers have none — write 2.0 ** -1 for the float",
+        ),
+        ("x = 2 ** 100\n", "2 ** 100 overflows the 64-bit integers"),
         // ADR 0031: type functions, definable `new`, and `fields`.
         (
             "fields(x: 1)\n",
@@ -785,6 +795,17 @@ fn portland_evaluator_matches_the_seed_on_dotted_commands() {
     assert_evaluator_matches_seed(
         "evaluator_dotted_commands.pdx",
         "def eq(value)\n  value * 10\nend\nstruct Wrap\n  actual\n\n  def to(matcher)\n    matcher + actual\n  end\nend\np Wrap.new(actual: 1).to eq(4)\np Wrap.new(actual: 5).to 7\np Wrap.new(actual: 2).to Wrap.new(actual: 3).to eq(1)\nputs %w[rose city].join \"-\"\nputs \"portland\".slice 0, 4\nstruct Token\n  kind\n  text\nend\np Token.new(kind: \"word\", text: \"42\").with text: \"43\"\nfolded = [1, 2, 3].reduce 10 do |total, number|\n  total + number\nend\np folded\nfive = 6 - 1\np five\np Wrap.new(actual: 1).to 5 - 1\n",
+    );
+}
+
+/// ADR 0033: `**` and `pow` — right-associativity, precedence above `*`,
+/// the parenthesized escapes from the negated-base refusal, floats through
+/// `powf`, and the magnitude-one towers that must not hit the width check.
+#[test]
+fn portland_evaluator_matches_the_seed_on_exponents() {
+    assert_evaluator_matches_seed(
+        "evaluator_exponents.pdx",
+        "p 2 ** 8\np 2 ** 3 ** 2\np 4 * 2 ** 3\np 2 ** 0\np 0 ** 0\np 9 ** 0.5\np 2.0 ** -1\np((-2) ** 2)\np(-(2 ** 2))\np((-1) ** 9)\np 0 ** 99999999999999\np 2.pow(8)\np 2.pow(0.5)\np 6.25.pow(0.5)\n",
     );
 }
 

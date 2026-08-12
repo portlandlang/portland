@@ -88,6 +88,9 @@ pub enum BinaryOperator {
     Modulo,
     Multiply,
     NotEquals,
+    /// `**` (ADR 0033): right-associative, binding above `*`; a negated
+    /// base refuses rather than inheriting anyone's precedence guess.
+    Power,
     Subtract,
 }
 

@@ -1093,24 +1093,48 @@ def parse_addition(tokens, position)
 end
 
 def parse_multiplication(tokens, position)
-  mutable step = parse_unary(tokens, position)
+  mutable step = parse_exponent(tokens, position)
   while operator_at?(tokens, step.position, %w[* / %])
     operator = tokens[step.position].text
-    right = parse_unary(tokens, step.position + 1)
+    right = parse_exponent(tokens, step.position + 1)
     step = Step.new(node: binary_node(operator, step.node, right.node), position: right.position)
   end
   step
+end
+
+# `**` (ADR 0033): right-associative — `2 ** 3 ** 2` is the tower reading,
+# mathematics' own — and binding above `*`. The negated base never reaches
+# here; parse_unary refuses it first, with the seed's wording.
+def parse_exponent(tokens, position)
+  step = parse_unary(tokens, position)
+  if operator_at?(tokens, step.position, %w[**])
+    right = parse_exponent(tokens, step.position + 1)
+    return Step.new(node: binary_node("**", step.node, right.node), position: right.position)
+  end
+  step
+end
+
+# A negated base directly under `**` has two genuine readings, and the tools
+# people learn from disagree — every spreadsheet answers one way, every
+# programming language the other (ADR 0033).
+def negated_base_error
+  error_node("a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)")
 end
 
 def parse_unary(tokens, position)
   # Ruby-style: -5 is a negative literal, so -5.abs is (. -5 abs).
   if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].integer?
     literal = Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
-    return postfix_from(tokens, literal)
+    chained = postfix_from(tokens, literal)
+    return Step.new(node: negated_base_error, position: chained.position + 1) if operator_at?(tokens, chained.position, %w[**])
+    return chained
   end
   if operator_at?(tokens, position, %w[! -])
     operator = tokens[position].text
     operand = parse_unary(tokens, position + 1)
+    if operator == "-" && operator_at?(tokens, operand.position, %w[**])
+      return Step.new(node: negated_base_error, position: operand.position + 1)
+    end
     return Step.new(node: unary_node(operator, operand.node), position: operand.position)
   end
   # `not` is dead-identical to `!` (ADR 0007).
