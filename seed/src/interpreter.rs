@@ -1978,6 +1978,81 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Float(number), "round", []) => Value::Integer(number.round() as i64),
             (Value::Float(number), "truncate", []) => Value::Integer(number.trunc() as i64),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
+            (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
+            (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),
+            (Value::String(text), "rstrip", []) => Value::String(text.trim_end().to_string()),
+            // One trailing line ending comes off — `\r\n` as a unit, else one
+            // `\n` or `\r` — and a string without one passes through whole.
+            (Value::String(text), "chomp", []) => {
+                let trimmed = text
+                    .strip_suffix("\r\n")
+                    .or_else(|| text.strip_suffix('\n'))
+                    .or_else(|| text.strip_suffix('\r'))
+                    .unwrap_or(text);
+                Value::String(trimmed.to_string())
+            }
+            // Ruby's capitalize moves both ways: the first character up, all
+            // the rest down.
+            (Value::String(text), "capitalize", []) => {
+                let mut characters = text.chars();
+                match characters.next() {
+                    None => Value::String(String::new()),
+                    Some(first) => Value::String(
+                        first.to_uppercase().collect::<String>()
+                            + &characters.as_str().to_lowercase(),
+                    ),
+                }
+            }
+            (Value::String(text), "swapcase", []) => Value::String(
+                text.chars()
+                    .map(|character| {
+                        if character.is_uppercase() {
+                            character.to_lowercase().collect::<String>()
+                        } else if character.is_lowercase() {
+                            character.to_uppercase().collect::<String>()
+                        } else {
+                            character.to_string()
+                        }
+                    })
+                    .collect::<String>(),
+            ),
+            (Value::String(text), "lines", []) => {
+                let mut lines = Vec::new();
+                let mut current = String::new();
+                for character in text.chars() {
+                    current.push(character);
+                    if character == '\n' {
+                        lines.push(Value::String(std::mem::take(&mut current)));
+                    }
+                }
+                if !current.is_empty() {
+                    lines.push(Value::String(current));
+                }
+                Value::array(lines)
+            }
+            // Where a substring starts — a maybe, counted in characters the
+            // way `length` counts them.
+            (Value::String(text), "index", [Value::String(needle)]) => text
+                .find(needle.as_str())
+                .map_or(Value::Nil, |byte_position| {
+                    Value::Integer(text[..byte_position].chars().count() as i64)
+                }),
+            // One character only: Ruby's multi-character count is a
+            // character-set count, not a substring count, and following it
+            // quietly would be principle 5's exact shape — so more refuses.
+            (Value::String(text), "count", [Value::String(needle)]) => {
+                if needle.chars().count() != 1 {
+                    panic!(
+                        "count takes a single character — Ruby's multi-character count is a character set, not a substring, and Portland does not guess"
+                    );
+                }
+                let target = needle.chars().next().expect("exactly one character");
+                Value::Integer(
+                    text.chars()
+                        .filter(|character| *character == target)
+                        .count() as i64,
+                )
+            }
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")

@@ -16,6 +16,22 @@ puts word.end_with?("land").to_s
 puts word.slice(0, 4)
 puts "rose city pdx".split(" ").join("-")
 
+# The trimmers, the case moves, and the searches.
+puts "  rose  ".strip
+puts "  rose".lstrip
+puts "rose  ".rstrip
+puts "rose\n".chomp
+puts "pdx rules".capitalize
+puts "PdX".swapcase
+puts "banana".count("a").to_s
+land_at = "portland".index("land")
+rose_at = "portland".index("rose")
+puts land_at.to_s
+puts rose_at.nil?.to_s
+"first\nsecond\n".lines.each do |line|
+  puts line.chomp
+end
+
 # — integers —
 puts 0.zero?.to_s
 puts 7.positive?.to_s

@@ -1389,6 +1389,14 @@ def evaluate_method_call(node, mutable bindings)
   when "empty?" then receiver.empty?
   when "upcase" then receiver.upcase
   when "downcase" then receiver.downcase
+  # The trimmers, the case moves, and the line splitter ride the host.
+  when "strip" then receiver.strip
+  when "lstrip" then receiver.lstrip
+  when "rstrip" then receiver.rstrip
+  when "chomp" then receiver.chomp
+  when "capitalize" then receiver.capitalize
+  when "swapcase" then receiver.swapcase
+  when "lines" then receiver.lines
   when "reverse" then receiver.reverse
   when "chars" then receiver.chars
   when "abs" then receiver.abs

@@ -1,4 +1,4 @@
-# The whitespace trimmers — none built yet, held pending (#23).
+# The whitespace trimmers.
 #
 # From ruby/spec core/string/{strip,lstrip,rstrip,chomp}_spec.rb.
 
@@ -6,17 +6,18 @@ require_relative "../spec_helper"
 
 context "String" do
   describe "the trimmers" do
-    pending "String#strip — no builtin yet" do
+    specify "String#strip takes whitespace off both ends" do
       expect("  rose  ".strip).to eq("rose")
     end
 
-    pending "String#lstrip and #rstrip — no builtins yet" do
+    specify "String#lstrip and #rstrip take one end each" do
       expect("  rose".lstrip).to eq("rose")
       expect("rose  ".rstrip).to eq("rose")
     end
 
-    pending "String#chomp — no builtin yet; one trailing newline" do
+    specify "String#chomp takes one trailing line ending, crlf as a unit" do
       expect("rose\n".chomp).to eq("rose")
+      expect("rose\r\n".chomp).to eq("rose")
       expect("rose".chomp).to eq("rose")
     end
   end

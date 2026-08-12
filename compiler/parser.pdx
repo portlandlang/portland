@@ -1718,6 +1718,7 @@ end
 def decode_escape(character)
   case character
   when "n" then "\n"
+  when "r" then "\r"
   when "t" then "\t"
   else
     character

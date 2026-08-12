@@ -160,6 +160,7 @@ fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
         match character {
             '\\' => match characters.next() {
                 Some((_, 'n')) => literal.push('\n'),
+                Some((_, 'r')) => literal.push('\r'),
                 Some((_, 't')) => literal.push('\t'),
                 Some((_, '"')) => literal.push('"'),
                 Some((_, '\\')) => literal.push('\\'),

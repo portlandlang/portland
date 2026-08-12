@@ -1,25 +1,28 @@
-# Finding and counting inside a string — held pending where owed, noted
-# where blocked (#23).
+# Finding and counting inside a string.
 #
 # From ruby/spec core/string/{index,count,lines}_spec.rb. `sub` and `gsub`
 # stay behind with regex, which is undecided and a real hole — even their
-# plain-string arities lead straight to the pattern question.
+# plain-string arities lead straight to the pattern question. `count` takes
+# a single character only: Ruby's multi-character count is a character-set
+# count, not a substring count, and following it quietly would be principle
+# 5's exact shape — so more than one character refuses, naming the trap.
 
 require_relative "../spec_helper"
 
 context "String" do
   describe "the searches" do
-    pending "String#index of a substring — no builtin yet; a maybe" do
+    specify "String#index of a substring answers where it starts — a maybe" do
       expect("portland".index("land")).to eq(4)
       expect("portland".index("rose")).to be_nil
     end
 
-    pending "String#count — no builtin yet" do
+    specify "String#count counts one character's occurrences" do
       expect("banana".count("a")).to eq(3)
     end
 
-    pending "String#lines — no builtin yet; keeps the newlines" do
+    specify "String#lines keeps the newlines, and a last bare line arrives whole" do
       expect("a\nb\n".lines).to eq(["a\n", "b\n"])
+      expect("a\nb".lines).to eq(["a\n", "b"])
     end
   end
 end

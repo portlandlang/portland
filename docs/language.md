@@ -60,7 +60,7 @@ Arithmetic is `+ - * / % **` with unary minus and parens. `+` concatenates strin
 
 Comparison is `== != < <= > >=`. Equality works across all types, with mixed types simply unequal; ordering is integers-only for now.
 
-**Strings** are double-quoted, with `\n` `\t` `\"` `\\` `\#` escapes and `#{...}` interpolation that auto-`to_s`es and nests.
+**Strings** are double-quoted, with `\n` `\r` `\t` `\"` `\\` `\#` escapes and `#{...}` interpolation that auto-`to_s`es and nests.
 
 **Heredocs** are squiggly only — `<<~SQL`, SCREAMING_CAPS terminator (ADR 0020). `<<~'SQL'` suppresses interpolation. Indented terminators, attached method calls, and several per line all work. `<<EOS` and `<<-EOS` do not exist, and that is what lets `<<` stay unambiguously the append operator with no disambiguation rule anywhere.
 
