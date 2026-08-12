@@ -1,0 +1,38 @@
+# `+`, `-`, and `*` on integers stay integers; mixing with a float promotes,
+# and the promotion rules have their own home in spec/number/promotion_spec.
+#
+# Grown from ruby/spec core/integer/{plus,minus,multiply}_spec.rb (#23);
+# the coercion protocol stays behind — there is no `coerce`, and a wrong
+# operand type panics rather than negotiating. Underscored literals
+# (`5_280`) stay behind too: they do not lex yet, found by this import.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#+" do
+    specify "adds" do
+      expect(491 + 2).to eq(493)
+      expect(90210 + 10).to eq(90220)
+    end
+  end
+
+  describe "#-" do
+    specify "subtracts, below zero included" do
+      expect(5 - 10).to eq(-5)
+      expect(9237212 - 5280).to eq(9231932)
+    end
+  end
+
+  describe "#*" do
+    specify "multiplies" do
+      expect(4923 * 2).to eq(9846)
+      expect(1342177 * 800).to eq(1073741600)
+    end
+
+    specify "reaches past 32 bits without ceremony" do
+      expect(65536 * 65536).to eq(4294967296)
+    end
+  end
+end

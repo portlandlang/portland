@@ -1,0 +1,22 @@
+# `gcd` — not built yet, held pending (#23): the first entries in the
+# compatibility-hole inventory `script/spec | grep PENDING` keeps.
+#
+# From ruby/spec core/integer/gcd_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#gcd" do
+    pending "Integer#gcd — no builtin yet" do
+      expect(12.gcd(8)).to eq(4)
+      expect(100.gcd(17)).to eq(1)
+    end
+
+    pending "Integer#gcd of zero is the other magnitude" do
+      expect(0.gcd(5)).to eq(5)
+      expect(5.gcd(0)).to eq(5)
+    end
+  end
+end

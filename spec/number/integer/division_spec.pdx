@@ -1,4 +1,8 @@
 # Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/divide_spec.rb (#23); the
+# divide-by-zero half stays behind — the panic is the seed's whole error
+# story today, and a panic ends the file.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -10,6 +14,22 @@ context "Integer" do
   describe "#/" do
     specify "floors toward negative infinity" do
       expect((0 - 7) / 2).to eq(-4)
+    end
+
+    specify "answers self divided by the argument" do
+      expect(2 / 2).to eq(1)
+      expect(3 / 2).to eq(1)
+    end
+
+    specify "floors a small negative all the way down" do
+      expect((-1) / 10).to eq(-1)
+    end
+
+    specify "preserves sign across the four corners" do
+      expect(8 / 2).to eq(4)
+      expect(8 / (-2)).to eq(-4)
+      expect((-8) / 2).to eq(-4)
+      expect((-8) / (-2)).to eq(4)
     end
   end
 end

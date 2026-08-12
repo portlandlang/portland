@@ -1,4 +1,6 @@
 # Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/modulo_spec.rb (#23).
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -10,6 +12,25 @@ context "Integer" do
   describe "#%" do
     specify "takes the sign of the divisor" do
       expect((0 - 7) % 2).to eq(1)
+    end
+
+    specify "answers the modulus of dividing self by the argument" do
+      expect(13 % 4).to eq(1)
+      expect(4 % 13).to eq(4)
+    end
+
+    specify "floors below zero, where truncation would answer differently" do
+      expect((-200) % 256).to eq(56)
+      expect((-1000) % 512).to eq(24)
+    end
+
+    specify "keeps a negative divisor's sign" do
+      expect((-200) % (-256)).to eq(-200)
+      expect(200 % (-256)).to eq(-56)
+    end
+
+    specify "promotes against a float divisor" do
+      expect(13 % 4.0).to eq(1)
     end
   end
 end

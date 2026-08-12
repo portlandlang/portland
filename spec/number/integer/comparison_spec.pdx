@@ -1,0 +1,40 @@
+# The four orderings, each a boolean — never a truthy something.
+#
+# Grown from ruby/spec core/integer/{lt,lteq,gt,gteq}_spec.rb (#23).
+# The spaceship stays behind: `<=>` is not an operator Portland has, and a
+# missing operator is missing syntax — `pending` cannot hold it.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "#< and #<=" do
+    specify "order strictly and inclusively" do
+      expect(2 < 13).to be_true
+      expect(5 < 5).to be_false
+      expect(5 <= 5).to be_true
+      expect(5 <= 4).to be_false
+    end
+
+    specify "order below zero" do
+      expect((-600) < (-500)).to be_true
+      expect((-5) < 10).to be_true
+      expect((-5) <= (-5)).to be_true
+    end
+
+    specify "reach across the float line" do
+      expect(5 < 4.999).to be_false
+      expect(4 < 4.999).to be_true
+    end
+  end
+
+  describe "#> and #>=" do
+    specify "mirror them" do
+      expect(13 > 2).to be_true
+      expect(5 > 5).to be_false
+      expect(5 >= 5).to be_true
+      expect((-500) > (-600)).to be_true
+    end
+  end
+end

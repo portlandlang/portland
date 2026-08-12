@@ -1,4 +1,7 @@
 # `even?` and `odd?` partition the integers.
+#
+# Grown from ruby/spec core/integer/even_spec.rb and odd_spec.rb (#23);
+# the bignum halves stay behind — a literal past i64 is a parse refusal.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the trio) — not against `spec/`.
@@ -14,6 +17,14 @@ context "Integer" do
 
     specify "and zero is even" do
       expect(0.even?).to be_true
+      expect(0.odd?).to be_false
+    end
+
+    specify "reach below zero the same way" do
+      expect((-2).even?).to be_true
+      expect((-1).even?).to be_false
+      expect((-2).odd?).to be_false
+      expect((-1).odd?).to be_true
     end
   end
 end
