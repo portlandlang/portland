@@ -39,3 +39,5 @@ If the condition was a plain boolean all along, nothing changes — strict boole
 ## Migration
 
 This is the single biggest mechanical migration cost, accepted knowingly: every `if x` / `unless x` doing nil-work needs one of the rewrites above. All failures are loud (compile errors with suggestions), never behavioral. The polyfill linter can flag and autocorrect most cases in Ruby before the flip.
+
+The same cut reaches the verdict-taking blocks: `select`, `reject`, `any?`, `all?`, `none?`, and `find` require their block to answer `true` or `false`, and anything else refuses by name (`any? block must produce true or false, got …`). Ruby would accept a truthy return — `users.find { it.nickname }` — and that spelling needs the same predicate rewrite as a condition does (`it.nickname.some?`).

@@ -26,6 +26,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
 - [`class`: four jobs, four homes](classes.md) — the keyword is gone — declined, not deferred — and its four jobs re-homed: data-with-behavior is a `struct`, shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects wait on the concurrency story.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
+- [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Error handling: results, not raises](errors.md) — `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
@@ -41,6 +42,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
+- [`String#count` and character sets](string-count.md) — `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.
 - [Symbols](symbols.md) — `:foo` survives with its spelling intact, but the set can be declared and checked; no `to_sym`, and hash shorthand is the only symbol-key form.
 - [Truthiness](truthiness.md) — Conditions take booleans, and nothing else.
 - [Types](types.md) — Static and inferred, written only at public boundaries; duck typing becomes structural.
