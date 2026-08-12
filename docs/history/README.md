@@ -15,6 +15,7 @@ Nothing here records what has happened since it was written — not in the files
 - [Portland — design notes](2026-06-28-first-brainstorm.md) — The session that started Portland: the seed question, joy-first, "Ruby, the good parts", the bootstrap ladder, and the branding bank.
 - [Report: the decisions ahead](2026-07-22-open-decisions.md) — A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each.
 - [Symbols: first pass](2026-07-23-symbols-first-pass.md) — The audit that tabled symbols: which of their jobs Portland's ADRs had already reassigned, and why the residue is enum-shaped.
+- [pliron / MLIR hybrid — a backend architecture sketch](2026-07-24-pliron-mlir-hybrid.md) — A candidate #5 architecture: pliron hosts the Portland-specific middle IR in native Rust, real MLIR runs below a textual seam as pinned stock binaries and owns the hardware arrows.
 
 <!-- /generated -->
 
