@@ -179,7 +179,11 @@ fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
                 Some((_, '"')) => literal.push('"'),
                 Some((_, '\\')) => literal.push('\\'),
                 Some((_, '#')) => literal.push('#'),
-                other => panic!("unknown escape sequence \\{:?}", other.map(|(_, c)| c)),
+                // An escape Portland does not know is a refusal, not Ruby's
+                // pass-through: `\q` is far likelier a typo than an intent to
+                // write `q` the long way (recorded in docs/ruby/strings.md).
+                Some((_, unknown)) => panic!("unknown escape sequence \\{unknown}"),
+                None => panic!("a string ends with a lone backslash"),
             },
             '#' if matches!(characters.peek(), Some(&(_, '{'))) => {
                 characters.next(); // the `{`

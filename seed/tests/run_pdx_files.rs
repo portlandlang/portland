@@ -664,6 +664,10 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "p \"abc\".slice (0)\n",
             "ambiguous without parens — write slice(...) with no space to call",
         ),
+        // The escapes are a closed set. Until 2026-08-12 the compiler passed
+        // an unknown one through as its bare character — accepting a string
+        // the seed refused, and silently, since no fixture could hold one.
+        ("puts \"a\\qb\"\n", "unknown escape sequence \\q"),
         // ADR 0033: the chained-literal corner and the two integer edges.
         (
             "x = -2.abs ** 2\n",

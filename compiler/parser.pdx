@@ -1718,13 +1718,21 @@ end
 # holding its decoded value; interpolation desugars to a + chain with each
 # inner expression wrapped in .to_s.
 
+# The escapes are a closed set, and an unknown one refuses the way the seed
+# refuses it — Ruby would pass `\q` through as `q`, and that divergence is
+# ledgered (docs/ruby/string-escapes.md). Until 2026-08-12 this arm passed
+# the character through, so the compiler accepted strings the seed refused:
+# the harness never caught it because no fixture could contain one.
 def decode_escape(character)
   case character
   when "n" then "\n"
   when "r" then "\r"
   when "t" then "\t"
+  when "\"" then "\""
+  when "\\" then "\\"
+  when "#" then "#"
   else
-    character
+    panic "unknown escape sequence \\#{character}"
   end
 end
 
@@ -1778,7 +1786,8 @@ def string_expression(lexeme)
   mutable index = 0
   while index < characters.length
     character = characters[index]
-    if character == "\\" && index + 1 < characters.length
+    if character == "\\"
+      panic "a string ends with a lone backslash" if index + 1 >= characters.length
       literal << decode_escape(characters[index + 1])
       index += 2
       next
