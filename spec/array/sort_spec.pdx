@@ -1,4 +1,8 @@
 # `sort` answers a new array — values never mutate (ADR 0015).
+#
+# Grown from ruby/spec core/array/sort_spec.rb (#23). Mixed types refuse on
+# both oracles where Ruby raises its comparison error — no cross-type
+# ordering exists in either language.
 
 require_relative "../spec_helper"
 
@@ -13,6 +17,20 @@ context "Array" do
     specify "leaving the original alone" do
       numbers.sort
       expect(numbers).to eq([3, 1, 2])
+    end
+
+    specify "keeps duplicates" do
+      expect([2, 1, 2].sort).to eq([1, 2, 2])
+    end
+
+    specify "answers the trivial cases whole" do
+      expect([].sort).to eq([])
+      expect([5].sort).to eq([5])
+      expect([1, 2, 3].sort).to eq([1, 2, 3])
+    end
+
+    pending "Array#sort over strings — the builtin is integer-only today" do
+      expect(["banana", "apple"].sort).to eq(["apple", "banana"])
     end
   end
 end
