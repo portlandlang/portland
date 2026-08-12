@@ -1,0 +1,25 @@
+# The hash lookups beyond `[]` — held pending where owed, noted where
+# decided (#23).
+#
+# From ruby/spec core/hash/{dig,to_a}_spec.rb. Two upstream families are
+# not holes: `fetch` is dropped forever — ADR 0010 kept its stored-nil rule
+# without it, and the miss-takes-a-default spelling is the or-guard — and
+# the alias cluster (`size`, `has_key?`, `include?`, `member?`) waits on a
+# policy question rather than a build: whether Portland ships Ruby's alias
+# families at all, one name per job being the house lean.
+
+require_relative "../spec_helper"
+
+context "Hash" do
+  describe "the deeper lookups" do
+    pending "Hash#dig — no builtin yet; a maybe at every step" do
+      nested = {outer: {inner: 7}}
+      expect(nested.dig(:outer, :inner)).to eq(7)
+      expect(nested.dig(:outer, :nope)).to be_nil
+    end
+
+    pending "Hash#to_a — no builtin yet; pairs in insertion order" do
+      expect({a: 1, b: 2}.to_a).to eq([[:a, 1], [:b, 2]])
+    end
+  end
+end

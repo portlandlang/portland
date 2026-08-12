@@ -1,0 +1,21 @@
+# `merge` — the functional update writ large, not built yet, held pending
+# (#23): the natural companion to `[]=`'s one-pair rebinding sugar.
+#
+# From ruby/spec core/hash/merge_spec.rb. The bang twin stays behind
+# forever — values never mutate (ADR 0015).
+
+require_relative "../spec_helper"
+
+context "Hash" do
+  describe "#merge" do
+    pending "Hash#merge — no builtin yet; the right side wins collisions" do
+      expect({a: 1, b: 2}.merge({b: 9, c: 3})).to eq({a: 1, b: 9, c: 3})
+    end
+
+    pending "Hash#merge leaves both originals alone" do
+      base = {a: 1}
+      base.merge({b: 2})
+      expect(base).to eq({a: 1})
+    end
+  end
+end
