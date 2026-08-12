@@ -1,0 +1,28 @@
+# The parked pile (#23): every multibyte question waits on the
+# string-semantics ADR — the one language.md lists as "no ADR on Unicode,
+# length, or normalization" — because the *expected values* below are
+# unknowable until someone decides what a character is.
+#
+# What both oracles answer today, by accident of the Rust floor rather than
+# by decision (recorded 2026-08-11, byte-identical hosted and direct):
+#
+#   "café".length   → 4     scalar values, not graphemes or bytes
+#   "🇺🇸".length     → 2     a flag is two regional indicators
+#   "café".chars    → 4 one-scalar strings
+#
+# Ruby answers 4 and 1 respectively — grapheme-aware for the flag through
+# String#grapheme_clusters only, `length` itself being scalar-based like
+# ours. Normalization ("é" composed versus decomposed) is unhandled in both.
+# These pendings are the pull the ADR has been waiting for; their strings
+# carry the questions, and their bodies cannot be written yet.
+
+require_relative "../spec_helper"
+
+context "String" do
+  describe "beyond ASCII" do
+    pending "\"café\".length — is a character a scalar, a grapheme, or a byte? (the string-semantics ADR)"
+    pending "\"🇺🇸\".length — a flag is two scalars and one grapheme (the string-semantics ADR)"
+    pending "composed versus decomposed \"é\" equality — is comparison normalized? (the string-semantics ADR)"
+    pending "\"café\".upcase — casing beyond ASCII (the string-semantics ADR)"
+  end
+end

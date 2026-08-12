@@ -16,4 +16,14 @@ context "String" do
       expect(city.upcase.downcase).to eq("portland")
     end
   end
+
+  describe "the other case moves" do
+    pending "String#capitalize — no builtin yet" do
+      expect("portland".capitalize).to eq("Portland")
+    end
+
+    pending "String#swapcase — no builtin yet" do
+      expect("PdX".swapcase).to eq("pDx")
+    end
+  end
 end
