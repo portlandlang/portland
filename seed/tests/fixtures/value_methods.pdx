@@ -34,6 +34,30 @@ puts numbers.max.to_s
 puts numbers.sort.join(",")
 puts numbers.slice(1, 2).join(",")
 
+# The counting-and-finding family, and the answers-a-new-array family.
+# (Each array takes a name first: a bare `puts [` is the array-or-index
+# ambiguity the parser refuses.)
+puts %w[banana apple cherry].sort.join(",")
+counted = [1, 2, 2, 3]
+puts counted.count.to_s
+puts counted.count(2).to_s
+descending = [9, 8, 7]
+found_at = descending.index(8)
+missing_at = descending.index(5)
+puts found_at.to_s
+puts missing_at.nil?.to_s
+stairs = [1, 2, 3]
+puts stairs.first(2).join(",")
+puts stairs.last(2).join(",")
+shuffled = [3, 1, 2]
+puts shuffled.reverse.join(",")
+repeated = [1, 1, 3, 2, 3]
+puts repeated.uniq.join(",")
+nested_deep = [[1, [2]], [[3]]]
+puts nested_deep.flatten.join(",")
+gappy = [1, nil, 2]
+puts gappy.compact.join(",")
+
 # — hashes —
 config = {"name" => "pdx", "port" => "8080"}
 puts config.key?("name").to_s

@@ -64,6 +64,17 @@ fn as_float(value: &Value) -> f64 {
     }
 }
 
+/// `flatten`'s walk: arrays open, everything else lands (Ruby's one-call,
+/// all-depths rule).
+fn flatten_into(elements: &[Value], flat: &mut Vec<Value>) {
+    for element in elements {
+        match element {
+            Value::Array(inner) => flatten_into(inner, flat),
+            other => flat.push(other.clone()),
+        }
+    }
+}
+
 /// A whole number written in another base, 2 through 36 — lowercase digits,
 /// the sign out front, Ruby's shapes (probed on 4.0.6).
 fn integer_in_base(number: i64, base: i64) -> String {
@@ -1781,10 +1792,75 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
                 Value::array(elements.iter().skip(start).take(length).cloned().collect())
             }
+            // `sort` takes a uniform array — all integers or all strings —
+            // and refuses a mix, naming the first element that broke it.
             (Value::Array(elements), "sort", []) => {
-                let mut sorted = Self::integers_of(elements, "sort");
-                sorted.sort_unstable();
-                Value::array(sorted.into_iter().map(Value::Integer).collect())
+                if !elements.is_empty()
+                    && elements
+                        .iter()
+                        .all(|element| matches!(element, Value::String(_)))
+                {
+                    let mut sorted: Vec<String> = elements
+                        .iter()
+                        .map(|element| match element {
+                            Value::String(text) => text.clone(),
+                            _ => unreachable!("all elements are strings"),
+                        })
+                        .collect();
+                    sorted.sort_unstable();
+                    Value::array(sorted.into_iter().map(Value::String).collect())
+                } else {
+                    let mut sorted = Self::integers_of(elements, "sort");
+                    sorted.sort_unstable();
+                    Value::array(sorted.into_iter().map(Value::Integer).collect())
+                }
+            }
+            (Value::Array(elements), "reverse", []) => {
+                Value::array(elements.iter().rev().cloned().collect())
+            }
+            (Value::Array(elements), "uniq", []) => {
+                let mut kept: Vec<Value> = Vec::new();
+                for element in elements.iter() {
+                    if !kept.contains(element) {
+                        kept.push(element.clone());
+                    }
+                }
+                Value::array(kept)
+            }
+            // All the way down, Ruby's rule — one call, no depth argument.
+            (Value::Array(elements), "flatten", []) => {
+                let mut flat = Vec::new();
+                flatten_into(elements, &mut flat);
+                Value::array(flat)
+            }
+            (Value::Array(elements), "compact", []) => Value::array(
+                elements
+                    .iter()
+                    .filter(|element| !matches!(element, Value::Nil))
+                    .cloned()
+                    .collect(),
+            ),
+            (Value::Array(elements), "count", []) => Value::Integer(elements.len() as i64),
+            (Value::Array(elements), "count", [needle]) => {
+                Value::Integer(elements.iter().filter(|element| *element == needle).count() as i64)
+            }
+            // First position of a value — a maybe, like every partial lookup.
+            (Value::Array(elements), "index", [needle]) => elements
+                .iter()
+                .position(|element| element == needle)
+                .map_or(Value::Nil, |position| Value::Integer(position as i64)),
+            // The counted ends answer arrays, clamped at the edges — asking
+            // for more than there is answers what there is (Ruby's rule).
+            (Value::Array(elements), "first", [Value::Integer(count)]) => {
+                let wanted =
+                    usize::try_from(*count).unwrap_or_else(|_| panic!("negative array size"));
+                Value::array(elements.iter().take(wanted).cloned().collect())
+            }
+            (Value::Array(elements), "last", [Value::Integer(count)]) => {
+                let wanted =
+                    usize::try_from(*count).unwrap_or_else(|_| panic!("negative array size"));
+                let skipped = elements.len().saturating_sub(wanted);
+                Value::array(elements.iter().skip(skipped).cloned().collect())
             }
             (Value::Array(elements), "sum", []) => {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())

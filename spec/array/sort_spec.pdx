@@ -29,7 +29,7 @@ context "Array" do
       expect([1, 2, 3].sort).to eq([1, 2, 3])
     end
 
-    pending "Array#sort over strings — the builtin is integer-only today" do
+    specify "sorts strings too — a uniform array, integers or strings alike" do
       expect(["banana", "apple"].sort).to eq(["apple", "banana"])
     end
   end

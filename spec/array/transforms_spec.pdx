@@ -1,4 +1,4 @@
-# The answers-a-new-array family — none built yet, held pending (#23).
+# The answers-a-new-array family.
 #
 # From ruby/spec core/array/{reverse,uniq,flatten,compact}_spec.rb. Their
 # bang twins (`reverse!`, `uniq!`, ...) stay behind forever: values never
@@ -8,19 +8,20 @@ require_relative "../spec_helper"
 
 context "Array" do
   describe "the transforms" do
-    pending "Array#reverse — no builtin yet (the string twin exists)" do
+    specify "Array#reverse walks backward" do
       expect([3, 1, 2].reverse).to eq([2, 1, 3])
     end
 
-    pending "Array#uniq — no builtin yet; keeps first occurrences in order" do
+    specify "Array#uniq keeps first occurrences in order" do
       expect([1, 1, 3, 2, 3].uniq).to eq([1, 3, 2])
     end
 
-    pending "Array#flatten — no builtin yet" do
+    specify "Array#flatten opens every nesting in one call" do
       expect([[1], [2, 3]].flatten).to eq([1, 2, 3])
+      expect([[1, [2]], [[[3]]]].flatten).to eq([1, 2, 3])
     end
 
-    pending "Array#compact — no builtin yet; drops the nils" do
+    specify "Array#compact drops the nils" do
       expect([1, nil, 2].compact).to eq([1, 2])
     end
   end

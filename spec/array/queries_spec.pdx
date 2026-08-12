@@ -1,26 +1,31 @@
-# The counting-and-finding family — none built yet, held pending (#23).
+# The counting-and-finding family.
 #
 # From ruby/spec core/array/{count,index,first,last}_spec.rb. `first` and
-# `last` exist zero-argument (spec/array/ends_spec.pdx); the counted forms
-# do not.
+# `last` bare answer maybes (spec/array/ends_spec.pdx); the counted forms
+# answer arrays, clamped at the edges.
 
 require_relative "../spec_helper"
 
 context "Array" do
   describe "the queries" do
-    pending "Array#count — no builtin yet" do
+    specify "Array#count bare is the length, with a value its occurrences" do
       expect([1, 2, 2, 3].count).to eq(4)
       expect([1, 2, 2, 3].count(2)).to eq(2)
     end
 
-    pending "Array#index — no builtin yet; first position of a value, a maybe" do
+    specify "Array#index answers the first position of a value — a maybe" do
       expect([9, 8, 7].index(8)).to eq(1)
       expect([9, 8, 7].index(5)).to be_nil
     end
 
-    pending "Array#first and #last with a count — the builtins are zero-argument today" do
+    specify "Array#first and #last with a count answer arrays" do
       expect([1, 2, 3].first(2)).to eq([1, 2])
       expect([1, 2, 3].last(2)).to eq([2, 3])
+    end
+
+    specify "the counted ends clamp — asking for more answers what there is" do
+      expect([1, 2, 3].first(9)).to eq([1, 2, 3])
+      expect([1, 2, 3].last(9)).to eq([1, 2, 3])
     end
   end
 end

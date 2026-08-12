@@ -1047,6 +1047,23 @@ def dig_into(receiver, keys)
   dig_into(value, rest)
 end
 
+# The two-arity ends and counts: bare rides the maybe-answering builtin,
+# counted rides the array-answering one, both the host's.
+def first_of(receiver, arguments)
+  return receiver.first if arguments.empty?
+  receiver.first(arguments.first)
+end
+
+def last_of(receiver, arguments)
+  return receiver.last if arguments.empty?
+  receiver.last(arguments.first)
+end
+
+def count_of(receiver, arguments)
+  return receiver.count if arguments.empty?
+  receiver.count(arguments.first)
+end
+
 # One hash pair, written the way it would be typed (ADR 0023 §1).
 def rendered_pair(key, entry)
   if key in ["__symbol__", *]
@@ -1402,8 +1419,13 @@ def evaluate_method_call(node, mutable bindings)
   when "to_a" then receiver.to_a
   when "values" then receiver.values
   when "key?" then receiver.key?(arguments.first)
-  when "first" then receiver.first
-  when "last" then receiver.last
+  when "first" then first_of(receiver, arguments)
+  when "last" then last_of(receiver, arguments)
+  when "uniq" then receiver.uniq
+  when "flatten" then receiver.flatten
+  when "compact" then receiver.compact
+  when "count" then count_of(receiver, arguments)
+  when "index" then receiver.index(arguments.first)
   when "sum" then receiver.sum
   when "sort" then receiver.sort
   when "min" then receiver.min
