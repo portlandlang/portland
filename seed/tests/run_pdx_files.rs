@@ -664,10 +664,10 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "p \"abc\".slice (0)\n",
             "ambiguous without parens — write slice(...) with no space to call",
         ),
-        // ADR 0033: the negated base and the two integer edges.
+        // ADR 0033: the chained-literal corner and the two integer edges.
         (
-            "x = -2 ** 2\n",
-            "a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)",
+            "x = -2.abs ** 2\n",
+            "a chained negative literal under ** is ambiguous — write ((-2).abs) ** 2 or -(2.abs ** 2)",
         ),
         (
             "x = 2 ** -1\n",
@@ -798,14 +798,15 @@ fn portland_evaluator_matches_the_seed_on_dotted_commands() {
     );
 }
 
-/// ADR 0033: `**` and `pow` — right-associativity, precedence above `*`,
-/// the parenthesized escapes from the negated-base refusal, floats through
-/// `powf`, and the magnitude-one towers that must not hit the width check.
+/// ADR 0033: `**` and `pow` — right-associativity, precedence above `*` and
+/// below a leading minus (`-2 ** 2` is `-4`, Ruby's answer), floats through
+/// `powf`, the fused float literal, and the magnitude-one towers that must
+/// not hit the width check.
 #[test]
 fn portland_evaluator_matches_the_seed_on_exponents() {
     assert_evaluator_matches_seed(
         "evaluator_exponents.pdx",
-        "p 2 ** 8\np 2 ** 3 ** 2\np 4 * 2 ** 3\np 2 ** 0\np 0 ** 0\np 9 ** 0.5\np 2.0 ** -1\np((-2) ** 2)\np(-(2 ** 2))\np((-1) ** 9)\np 0 ** 99999999999999\np 2.pow(8)\np 2.pow(0.5)\np 6.25.pow(0.5)\n",
+        "p 2 ** 8\np 2 ** 3 ** 2\np 4 * 2 ** 3\np 2 ** 0\np 0 ** 0\np 9 ** 0.5\np 2.0 ** -1\np(-2 ** 2)\nx = 3\np(-x ** 2)\np(-(2) ** 2)\np((-2) ** 2)\np(-2 ** 2 * 3)\ny = 2.0\np 2 ** -y\np(-2.5 ** 2)\np(-2.5.abs)\np((-1) ** 9)\np 0 ** 99999999999999\np 2.pow(8)\np 2.pow(0.5)\np 6.25.pow(0.5)\n",
     );
 }
 

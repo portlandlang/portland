@@ -1093,48 +1093,70 @@ def parse_addition(tokens, position)
 end
 
 def parse_multiplication(tokens, position)
-  mutable step = parse_exponent(tokens, position)
+  mutable step = parse_unary(tokens, position)
   while operator_at?(tokens, step.position, %w[* / %])
     operator = tokens[step.position].text
-    right = parse_exponent(tokens, step.position + 1)
+    right = parse_unary(tokens, step.position + 1)
     step = Step.new(node: binary_node(operator, step.node, right.node), position: right.position)
   end
   step
 end
 
 # `**` (ADR 0033): right-associative — `2 ** 3 ** 2` is the tower reading,
-# mathematics' own — and binding above `*`. The negated base never reaches
-# here; parse_unary refuses it first, with the seed's wording.
-def parse_exponent(tokens, position)
-  step = parse_unary(tokens, position)
+# mathematics' own — binding above `*` and below a leading minus, so
+# `-2 ** 2` is `-4` here as it is in Ruby, Python, and Fortran. The right
+# side parses through parse_unary, which is what makes `2 ** -x` legal and
+# the tower right-associative at once.
+def parse_exponent_operand(tokens, position)
+  step = parse_postfix(tokens, position)
   if operator_at?(tokens, step.position, %w[**])
-    right = parse_exponent(tokens, step.position + 1)
+    right = parse_unary(tokens, step.position + 1)
     return Step.new(node: binary_node("**", step.node, right.node), position: right.position)
   end
   step
 end
 
-# A negated base directly under `**` has two genuine readings, and the tools
-# people learn from disagree — every spreadsheet answers one way, every
-# programming language the other (ADR 0033).
-def negated_base_error
-  error_node("a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)")
+# The one corner where Ruby's literal fusion and its precedence contradict
+# each other — `-5.abs ** 2` is 25 there while `-5 ** 2` is -25 — refuses
+# instead of picking a side (ADR 0033). The seed's wording.
+def chained_negative_error
+  error_node("a chained negative literal under ** is ambiguous — write ((-2).abs) ** 2 or -(2.abs ** 2)")
 end
 
 def parse_unary(tokens, position)
-  # Ruby-style: -5 is a negative literal, so -5.abs is (. -5 abs).
+  # Ruby-style: -5 is a negative literal, so -5.abs is (. -5 abs) — and the
+  # fusion yields to `**`: a minus before `**` applies last (ADR 0033), so
+  # `-2 ** 2` is `-(2 ** 2)`, one recitable rule shared with Ruby.
   if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].integer?
+    if operator_at?(tokens, position + 2, %w[**])
+      right = parse_unary(tokens, position + 3)
+      power = binary_node("**", integer_node(tokens[position + 1].text), right.node)
+      return Step.new(node: unary_node("-", power), position: right.position)
+    end
     literal = Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
     chained = postfix_from(tokens, literal)
-    return Step.new(node: negated_base_error, position: chained.position + 1) if operator_at?(tokens, chained.position, %w[**])
+    return Step.new(node: chained_negative_error, position: chained.position + 1) if operator_at?(tokens, chained.position, %w[**])
+    return chained
+  end
+  # The float twin of the branch above — the seed fuses `-2.5` the same way,
+  # and the trio silently did not until the `**` work made the gap loud.
+  if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].float?
+    if operator_at?(tokens, position + 2, %w[**])
+      right = parse_unary(tokens, position + 3)
+      power = binary_node("**", float_node(tokens[position + 1].text), right.node)
+      return Step.new(node: unary_node("-", power), position: right.position)
+    end
+    literal = Step.new(node: float_node("-" + tokens[position + 1].text), position: position + 2)
+    chained = postfix_from(tokens, literal)
+    return Step.new(node: chained_negative_error, position: chained.position + 1) if operator_at?(tokens, chained.position, %w[**])
     return chained
   end
   if operator_at?(tokens, position, %w[! -])
     operator = tokens[position].text
+    # A minus on anything else applies last too: `-x ** 2` is `-(x ** 2)`,
+    # exactly Ruby's answer — the recursion reaches the exponent level for
+    # plain operands and keeps stacked signs legal.
     operand = parse_unary(tokens, position + 1)
-    if operator == "-" && operator_at?(tokens, operand.position, %w[**])
-      return Step.new(node: negated_base_error, position: operand.position + 1)
-    end
     return Step.new(node: unary_node(operator, operand.node), position: operand.position)
   end
   # `not` is dead-identical to `!` (ADR 0007).
@@ -1142,7 +1164,7 @@ def parse_unary(tokens, position)
     operand = parse_unary(tokens, position + 1)
     return Step.new(node: unary_node("!", operand.node), position: operand.position)
   end
-  parse_postfix(tokens, position)
+  parse_exponent_operand(tokens, position)
 end
 
 def parse_postfix(tokens, position)

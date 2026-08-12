@@ -37,8 +37,9 @@ context "Integer" do
     end
   end
 
-  # ADR 0033 — `**` and its named twin. The negated base is a refusal, so
-  # the parenthesized spellings are the only ones with examples.
+  # ADR 0033 — `**` and its named twin. A minus before ** applies last,
+  # Ruby's answer and mathematics'; only the chained negative literal
+  # refuses, where Ruby's own rules contradict each other.
   describe "#** and #pow" do
     specify "raises to the power" do
       expect(2 ** 8).to eq(256)
@@ -53,14 +54,20 @@ context "Integer" do
       expect(4 * 2 ** 3).to eq(32)
     end
 
+    specify "applies a leading minus last — math's -x²" do
+      expect(-2 ** 2).to eq(-4)
+      bound = 3
+      expect(-bound ** 2).to eq(-9)
+    end
+
+    specify "while a parenthesized negative base raises whole" do
+      expect((-2) ** 2).to eq(4)
+      expect((-2) ** 3).to eq(-8)
+    end
+
     specify "answers one for a zero exponent, zero included" do
       expect(2 ** 0).to eq(1)
       expect(0 ** 0).to eq(1)
-    end
-
-    specify "takes a parenthesized negative base" do
-      expect((-2) ** 2).to eq(4)
-      expect((-2) ** 3).to eq(-8)
     end
 
     specify "crosses into floats for roots" do

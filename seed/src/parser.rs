@@ -2030,7 +2030,7 @@ impl<'source> Parser<'source> {
     }
 
     fn multiplication(&mut self) -> Expression {
-        let mut left = self.exponent();
+        let mut left = self.unary();
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::Percent) => Some(BinaryOperator::Modulo),
             Some(TokenKind::Slash) => Some(BinaryOperator::Divide),
@@ -2038,7 +2038,7 @@ impl<'source> Parser<'source> {
             _ => None,
         } {
             self.position += 1;
-            let right = self.exponent();
+            let right = self.unary();
             left = Expression::Binary {
                 left: Box::new(left),
                 operator,
@@ -2048,14 +2048,16 @@ impl<'source> Parser<'source> {
         left
     }
 
-    /// `**` (ADR 0033): right-associative — `2 ** 3 ** 2` is `2 ** 512`'s
-    /// tower reading, mathematics' own — and binding above `*`. The negated
-    /// base never reaches here: `unary` refuses it first.
-    fn exponent(&mut self) -> Expression {
-        let left = self.unary();
+    /// `**` (ADR 0033): right-associative — `2 ** 3 ** 2` is the tower
+    /// reading, mathematics' own — binding above `*` and below a leading
+    /// minus, so `-2 ** 2` is `-4` here as it is in Ruby, Python, and
+    /// Fortran. The right side parses through `unary`, which is what makes
+    /// `2 ** -x` legal and the tower right-associative at once.
+    fn exponent_operand(&mut self) -> Expression {
+        let left = self.postfix();
         if self.peek_kind() == Some(TokenKind::StarStar) {
             self.position += 1;
-            let right = self.exponent();
+            let right = self.unary();
             return Expression::Binary {
                 left: Box::new(left),
                 operator: BinaryOperator::Power,
@@ -2063,17 +2065,6 @@ impl<'source> Parser<'source> {
             };
         }
         left
-    }
-
-    /// A negated base directly under `**` has two genuine readings, and the
-    /// tools people learn from disagree: every spreadsheet answers `(-2) ** 2`
-    /// and every programming language answers `-(2 ** 2)` — Apple ships both,
-    /// depending on whether you asked Spotlight or Numbers. ES2016 saw the
-    /// same split and made the parenthesis mandatory; so does this (ADR 0033).
-    fn refuse_negated_base(&self) {
-        if self.peek_kind() == Some(TokenKind::StarStar) {
-            panic!("a negated base under ** is ambiguous — write (-2) ** 2 or -(2 ** 2)");
-        }
     }
 
     fn unary(&mut self) -> Expression {
@@ -2087,28 +2078,68 @@ impl<'source> Parser<'source> {
         if self.peek_kind() == Some(TokenKind::Minus) {
             self.position += 1;
             // Ruby-style: -5 is a negative literal, so -5.abs is 5, not -(5.abs).
+            //
+            // The fusion yields to `**` (ADR 0033): a minus before `**`
+            // applies last, so `-2 ** 2` is `-(2 ** 2)` — one recitable rule,
+            // shared with Ruby. The one corner where Ruby's fusion and its
+            // precedence contradict each other — `-5.abs ** 2` is 25 there,
+            // while `-5 ** 2` is -25 — refuses instead of picking a side.
             if self.peek_kind() == Some(TokenKind::Integer) {
                 let token = self.advance();
                 let value: i64 = token.text.parse().expect("integer literal out of range");
+                if self.peek_kind() == Some(TokenKind::StarStar) {
+                    self.position += 1;
+                    let right = self.unary();
+                    return Expression::Unary {
+                        operand: Box::new(Expression::Binary {
+                            left: Box::new(Expression::Integer(value)),
+                            operator: BinaryOperator::Power,
+                            right: Box::new(right),
+                        }),
+                        operator: UnaryOperator::Negate,
+                    };
+                }
                 let chained = self.postfix_from(Expression::Integer(-value));
-                self.refuse_negated_base();
+                if self.peek_kind() == Some(TokenKind::StarStar) {
+                    panic!(
+                        "a chained negative literal under ** is ambiguous — write ((-2).abs) ** 2 or -(2.abs ** 2)"
+                    );
+                }
                 return chained;
             }
             if self.peek_kind() == Some(TokenKind::Float) {
                 let token = self.advance();
                 let value: f64 = token.text.parse().expect("float literal out of range");
+                if self.peek_kind() == Some(TokenKind::StarStar) {
+                    self.position += 1;
+                    let right = self.unary();
+                    return Expression::Unary {
+                        operand: Box::new(Expression::Binary {
+                            left: Box::new(Expression::Float(value)),
+                            operator: BinaryOperator::Power,
+                            right: Box::new(right),
+                        }),
+                        operator: UnaryOperator::Negate,
+                    };
+                }
                 let chained = self.postfix_from(Expression::Float(-value));
-                self.refuse_negated_base();
+                if self.peek_kind() == Some(TokenKind::StarStar) {
+                    panic!(
+                        "a chained negative literal under ** is ambiguous — write ((-2).abs) ** 2 or -(2.abs ** 2)"
+                    );
+                }
                 return chained;
             }
-            let negated = Expression::Unary {
+            // A minus on anything else applies last too: `-x ** 2` is
+            // `-(x ** 2)`, exactly Ruby's answer — the recursion through
+            // `unary` reaches the exponent level for plain operands and
+            // keeps `--5` legal for stacked signs.
+            return Expression::Unary {
                 operand: Box::new(self.unary()),
                 operator: UnaryOperator::Negate,
             };
-            self.refuse_negated_base();
-            return negated;
         }
-        self.postfix()
+        self.exponent_operand()
     }
 
     /// Chained `.method` calls, binding tighter than any operator.

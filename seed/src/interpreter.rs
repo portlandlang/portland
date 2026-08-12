@@ -1217,6 +1217,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 let operand = self.value_of(operand);
                 match (operator, operand) {
                     (UnaryOperator::Negate, Value::Integer(value)) => Some(Value::Integer(-value)),
+                    (UnaryOperator::Negate, Value::Float(value)) => Some(Value::Float(-value)),
                     (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
                     (operator, operand) => {
                         panic!("cannot apply {operator:?} to {operand:?}")
