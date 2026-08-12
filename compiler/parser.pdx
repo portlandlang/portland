@@ -1202,7 +1202,11 @@ def parse_dot(tokens, receiver, mutable position, safe)
     return Step.new(node: error_node("expected method name after dot"), position: position)
   end
   token = tokens[position]
-  unless token.identifier?
+  # `next` is loop control as a statement but never a receiver's message, so
+  # after a dot it can only be a method name — admitted narrowly (#79), not
+  # keywords wholesale.
+  keyword_method = token.keyword? && token.text == "next"
+  unless token.identifier? || keyword_method
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end
   position += 1

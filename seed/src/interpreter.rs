@@ -1731,6 +1731,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose
             // (principle 3: one behavior may have many spellings; #79).
             (Value::Integer(number), "succ", []) => Value::Integer(number + 1),
+            (Value::Integer(number), "next", []) => Value::Integer(number + 1),
             (Value::Integer(number), "pred", []) => Value::Integer(number - 1),
             // `pow` is `**`'s named twin (ADR 0033), one arity; the modular
             // second argument waits to be pulled for.

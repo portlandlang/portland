@@ -202,7 +202,7 @@ There is no ternary operator — `?` is not an operator at all, it is part of a 
 
 **A branch that doesn't happen is nil** (ADR 0012): a branchless `if`, a finished `while`, and a call broken out of all produce nil, typed. `puts` alone produces _nothing_ — using its result is an error — because it could never have had an answer. That is the dividing rule: could this ever have produced a value?
 
-`return` exits the enclosing method, unwinding through loops _and_ blocks — the method the `return` was **written** in, so a helper that merely `yield`ed to the block is unwound through, never answered (ADR 0025, Ruby's rule). `break` and `next` control the enclosing `while` or block iteration.
+`return` exits the enclosing method, unwinding through loops _and_ blocks — the method the `return` was **written** in, so a helper that merely `yield`ed to the block is unwound through, never answered (ADR 0025, Ruby's rule). `break` and `next` control the enclosing `while` or block iteration. After a dot, though, `next` is a method name — `page.next` is `page.succ` — because loop control can never stand where a message goes, so the two readings never meet; `next` is the only keyword admitted there, on pull ([#79](https://github.com/portlandlang/portland/issues/79)), not keywords wholesale.
 
 ## Pattern matching
 

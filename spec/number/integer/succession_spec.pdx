@@ -18,6 +18,13 @@ context "Integer" do
     end
   end
 
+  describe "#next" do
+    specify "is succ's other name — a keyword everywhere but after a dot" do
+      expect(2.next).to eq(3)
+      expect(2.next).to eq(2.succ)
+    end
+  end
+
   describe "#pred" do
     specify "answers the next integer down" do
       expect(2.pred).to eq(1)

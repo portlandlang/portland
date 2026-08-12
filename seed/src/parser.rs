@@ -2166,7 +2166,12 @@ impl<'source> Parser<'source> {
                 Some(kind @ (TokenKind::Dot | TokenKind::AmpersandDot)) => {
                     self.position += 1; // the `.` or `&.`
                     let token = self.advance();
-                    if token.kind != TokenKind::Identifier {
+                    // `next` is loop control as a statement but never a
+                    // receiver's message, so after a dot it can only be a
+                    // method name — admitted narrowly (#79), not keywords
+                    // wholesale.
+                    let keyword_method = token.kind == TokenKind::Keyword && token.text == "next";
+                    if token.kind != TokenKind::Identifier && !keyword_method {
                         panic!("expected method name after dot, got {token:?}");
                     }
                     // `token.parse!` — the `!` wraps the call (ADR 0027),

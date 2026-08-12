@@ -54,9 +54,12 @@ puts counting.select { it.even? }.join(",")
 puts 2.pow(8).to_s
 
 # The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose (#79).
+# `next` is `succ`'s third spelling: a keyword everywhere else, a method
+# name after a dot, where loop control can never stand.
 below_zero = (-1).succ
 puts 41.succ.to_s
 puts below_zero.to_s
+puts 41.next.to_s
 puts 43.pred.to_s
 puts 0.pred.to_s
 tower = 2 ** 3 ** 2
