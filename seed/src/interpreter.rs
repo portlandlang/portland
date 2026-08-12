@@ -1728,6 +1728,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
             }
             (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
+            // The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose
+            // (principle 3: one behavior may have many spellings; #79).
+            (Value::Integer(number), "succ", []) => Value::Integer(number + 1),
+            (Value::Integer(number), "pred", []) => Value::Integer(number - 1),
             // `pow` is `**`'s named twin (ADR 0033), one arity; the modular
             // second argument waits to be pulled for.
             (Value::Integer(base), "pow", [Value::Integer(exponent)]) => {

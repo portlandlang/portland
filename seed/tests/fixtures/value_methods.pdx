@@ -52,6 +52,13 @@ puts counting.select { it.even? }.join(",")
 
 # `pow` is `**`'s named twin (ADR 0033).
 puts 2.pow(8).to_s
+
+# The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose (#79).
+below_zero = (-1).succ
+puts 41.succ.to_s
+puts below_zero.to_s
+puts 43.pred.to_s
+puts 0.pred.to_s
 tower = 2 ** 3 ** 2
 puts tower.to_s
 

@@ -1356,6 +1356,9 @@ def evaluate_method_call(node, mutable bindings)
   when "reverse" then receiver.reverse
   when "chars" then receiver.chars
   when "abs" then receiver.abs
+  # The neighbors ride the host's builtins, synonyms kept on purpose (#79).
+  when "succ" then receiver.succ
+  when "pred" then receiver.pred
   # `pow` is `**`'s named twin (ADR 0033), one arity, the host's edges.
   when "pow" then receiver ** arguments.first
   when "even?" then receiver.even?

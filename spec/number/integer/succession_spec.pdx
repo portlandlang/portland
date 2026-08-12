@@ -1,4 +1,5 @@
-# `succ` and `pred` — the neighbors, not built yet, held pending (#23).
+# `succ` and `pred` — the neighbors, synonyms for `+ 1` and `- 1` kept on
+# purpose (principle 3: one behavior may have many spellings; #79).
 #
 # From ruby/spec core/integer/succ_spec.rb and pred_spec.rb.
 
@@ -7,14 +8,22 @@
 require_relative "../../spec_helper"
 
 context "Integer" do
-  describe "#succ and #pred" do
-    pending "Integer#succ — no builtin yet" do
+  describe "#succ" do
+    specify "answers the next integer up" do
       expect(2.succ).to eq(3)
-      expect((-2).succ).to eq(-1)
     end
 
-    pending "Integer#pred — no builtin yet" do
+    specify "crosses zero from below" do
+      expect((-2).succ).to eq(-1)
+    end
+  end
+
+  describe "#pred" do
+    specify "answers the next integer down" do
       expect(2.pred).to eq(1)
+    end
+
+    specify "crosses zero from above" do
       expect(0.pred).to eq(-1)
     end
   end
