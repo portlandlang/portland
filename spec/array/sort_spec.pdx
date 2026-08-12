@@ -32,5 +32,10 @@ context "Array" do
     specify "sorts strings too — a uniform array, integers or strings alike" do
       expect(["banana", "apple"].sort).to eq(["apple", "banana"])
     end
+
+    specify "sorts floats, and mixes them with whole numbers" do
+      expect([1.5, 0.5, 2.25].sort).to eq([0.5, 1.5, 2.25])
+      expect([2.5, 1].sort).to eq([1, 2.5])
+    end
   end
 end

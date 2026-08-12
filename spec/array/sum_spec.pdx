@@ -11,5 +11,10 @@ context "Array" do
     specify "answers zero for the empty array" do
       expect([].sum).to eq(0)
     end
+
+    specify "adds floats, and one float makes the total a float" do
+      expect([1.5, 0.5, 2.25].sum).to eq(4.25)
+      expect([1, 2.5].sum).to eq(3.5)
+    end
   end
 end

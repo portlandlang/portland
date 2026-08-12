@@ -16,4 +16,26 @@ context "Array" do
       expect(numbers.max).to eq(3)
     end
   end
+
+  describe "the extremes beyond whole numbers" do
+    specify "compare floats numerically" do
+      expect([1.5, 0.5, 2.25].min).to eq(0.5)
+      expect([1.5, 0.5, 2.25].max).to eq(2.25)
+    end
+
+    specify "answer the element itself across the integer/float line" do
+      expect([1, 2.5].min).to eq(1)
+      expect([1, 2.5].max).to eq(2.5)
+    end
+
+    specify "compare strings alphabetically" do
+      expect(["pear", "apple"].min).to eq("apple")
+      expect(["pear", "apple"].max).to eq("pear")
+    end
+
+    specify "of nothing are absent" do
+      expect([].min).to be_nil
+      expect([].max).to be_nil
+    end
+  end
 end

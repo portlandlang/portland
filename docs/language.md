@@ -362,7 +362,7 @@ Read-only, and small on purpose.
 | String     | `length upcase downcase capitalize swapcase reverse empty? chars split strip lstrip rstrip chomp lines include? index count start_with? end_with? to_i to_f slice` and `[index]`               |
 | Integer    | `abs zero? positive? negative? even? odd? gcd pow succ pred next to_f` and `to_s(base)`                                                                                                        |
 | Float      | `abs zero? nan? finite? infinite? floor ceil round truncate to_i`                                                                                                                              |
-| Array      | `length first last empty? join include? index count sum min max sort reverse uniq flatten compact to_a tally zip each_slice slice` and `[index]`, negative indices included                     |
+| Array      | `length first last empty? join include? index count sum min max sort reverse uniq flatten compact to_a tally zip each_slice slice` and `[index]`, negative indices included — `sum`/`min`/`max`/`sort` take numbers or strings |
 | Hash       | `length empty? key? keys values merge dig to_a` and `[key]`                                                                                                                                    |
 | Range      | `include? to_a step min max`, and everything an array answers, by walking                                                                                                                      |
 | Everything | `to_s`, `nil?`, `some?`                                                                                                                                                                        |

@@ -145,6 +145,18 @@ puts single_digits.min.to_s
 before_nine = 1...9
 puts before_nine.max.to_s
 
+# The numeric family reaches past the whole numbers, and answers the
+# elements themselves — a mixed sort keeps its Integer.
+prices = [1.5, 0.5, 2.25]
+puts prices.sum.to_s
+puts prices.sort.join(",")
+puts prices.min.to_s
+mixed = [2.5, 1]
+puts mixed.sum.to_s
+puts mixed.sort.join(",")
+puts mixed.min.to_s
+puts %w[pear apple].min.to_s
+
 # Underscores group digits and change nothing (#71).
 puts 1_000_000.to_s
 puts 5_280.5.to_s

@@ -1898,14 +1898,10 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "include?", [needle]) => {
                 Value::Boolean(elements.contains(needle))
             }
-            (Value::Array(elements), "max", []) => Self::integers_of(elements, "max")
-                .into_iter()
-                .max()
-                .map_or(Value::Nil, Value::Integer),
-            (Value::Array(elements), "min", []) => Self::integers_of(elements, "min")
-                .into_iter()
-                .min()
-                .map_or(Value::Nil, Value::Integer),
+            // The extremes are maybes (ADR 0010) and answer the element
+            // itself, strings included.
+            (Value::Array(elements), "max", []) => Self::extreme(elements, "max"),
+            (Value::Array(elements), "min", []) => Self::extreme(elements, "min"),
             // An array already is one — the harmless end of Ruby's rule.
             (receiver @ Value::Array(_), "to_a", []) => receiver.clone(),
             // Counts into a hash, keys in first-seen order.
@@ -1981,12 +1977,12 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // `sort` takes a uniform array — all integers or all strings —
             // and refuses a mix, naming the first element that broke it.
+            // Sorts a uniform array — all strings, or any mix of numbers —
+            // and answers the elements themselves, so `[1, 2.5]` keeps its
+            // Integer where a float key would have rewritten it (Ruby's
+            // shape). A mix of kinds refuses, naming what broke it.
             (Value::Array(elements), "sort", []) => {
-                if !elements.is_empty()
-                    && elements
-                        .iter()
-                        .all(|element| matches!(element, Value::String(_)))
-                {
+                if Self::all_strings(elements) {
                     let mut sorted: Vec<String> = elements
                         .iter()
                         .map(|element| match element {
@@ -1997,9 +1993,13 @@ impl<W: std::io::Write> Interpreter<W> {
                     sorted.sort_unstable();
                     Value::array(sorted.into_iter().map(Value::String).collect())
                 } else {
-                    let mut sorted = Self::integers_of(elements, "sort");
-                    sorted.sort_unstable();
-                    Value::array(sorted.into_iter().map(Value::Integer).collect())
+                    let keys = Self::numbers_of(elements, "sort");
+                    let mut ordered: Vec<(f64, Value)> = keys
+                        .into_iter()
+                        .zip(elements.iter().cloned())
+                        .collect::<Vec<_>>();
+                    ordered.sort_by(|(left, _), (right, _)| left.total_cmp(right));
+                    Value::array(ordered.into_iter().map(|(_, element)| element).collect())
                 }
             }
             (Value::Array(elements), "reverse", []) => {
@@ -2049,8 +2049,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 let skipped = elements.len().saturating_sub(wanted);
                 Value::array(elements.iter().skip(skipped).cloned().collect())
             }
+            // Whole numbers stay whole; one float anywhere makes the total a
+            // float, the way `1 + 2.5` does (ADR 0018).
             (Value::Array(elements), "sum", []) => {
-                Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
+                if elements
+                    .iter()
+                    .all(|element| matches!(element, Value::Integer(_)))
+                {
+                    Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
+                } else {
+                    Value::Float(Self::numbers_of(elements, "sum").into_iter().sum())
+                }
             }
             (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
             // The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose
@@ -2301,6 +2310,64 @@ impl<W: std::io::Write> Interpreter<W> {
                 other => panic!("{method} needs an array of integers, found {other:?}"),
             })
             .collect()
+    }
+
+    /// Every element as an f64, for comparing and totalling across the
+    /// integer/float line (ADR 0018). The values themselves are answered
+    /// from the originals, so this is a key, never a replacement.
+    fn numbers_of(elements: &[Value], method: &str) -> Vec<f64> {
+        elements
+            .iter()
+            .map(|element| match element {
+                Value::Integer(value) => *value as f64,
+                Value::Float(value) => *value,
+                other => panic!("{method} needs an array of numbers, found {other:?}"),
+            })
+            .collect()
+    }
+
+    fn all_strings(elements: &[Value]) -> bool {
+        !elements.is_empty()
+            && elements
+                .iter()
+                .all(|element| matches!(element, Value::String(_)))
+    }
+
+    /// `min`/`max` over a uniform array — strings alphabetically, numbers
+    /// numerically — answering the element itself. Empty is absence, like
+    /// every other partial lookup (ADR 0010).
+    fn extreme(elements: &[Value], which: &str) -> Value {
+        if elements.is_empty() {
+            return Value::Nil;
+        }
+        if Self::all_strings(elements) {
+            let chosen = elements
+                .iter()
+                .map(|element| match element {
+                    Value::String(text) => text,
+                    _ => unreachable!("all elements are strings"),
+                })
+                .fold(None, |best: Option<&String>, text| match best {
+                    None => Some(text),
+                    Some(best) if (which == "min") == (text < best) => Some(text),
+                    Some(best) => Some(best),
+                })
+                .expect("the array is not empty");
+            return Value::present(Value::String(chosen.clone()));
+        }
+        let keys = Self::numbers_of(elements, which);
+        let mut chosen = 0;
+        for (position, key) in keys.iter().enumerate() {
+            let better = if which == "min" {
+                key.total_cmp(&keys[chosen]).is_lt()
+            } else {
+                key.total_cmp(&keys[chosen]).is_gt()
+            };
+            if better {
+                chosen = position;
+            }
+        }
+        Value::present(elements[chosen].clone())
     }
 
     /// After a block ran: `Some(outcome)` when the iteration must stop now.
