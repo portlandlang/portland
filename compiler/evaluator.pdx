@@ -1036,6 +1036,17 @@ def to_s_of(receiver, arguments)
   receiver.to_s(arguments.first)
 end
 
+# `dig`, one step at a time — each step is the host's own single-key dig, so
+# a miss answers nil, a found nil short-circuits, and a non-hash mid-chain
+# refuses with the host's wording.
+def dig_into(receiver, keys)
+  value = receiver.dig(keys.first)
+  rest = keys.slice(1, keys.length - 1)
+  return value if rest.empty?
+  return nil if value.nil?
+  dig_into(value, rest)
+end
+
 # One hash pair, written the way it would be typed (ADR 0023 §1).
 def rendered_pair(key, entry)
   if key in ["__symbol__", *]
@@ -1386,6 +1397,9 @@ def evaluate_method_call(node, mutable bindings)
   when "positive?" then receiver.positive?
   when "negative?" then receiver.negative?
   when "keys" then receiver.keys
+  when "merge" then receiver.merge(arguments.first)
+  when "dig" then dig_into(receiver, arguments)
+  when "to_a" then receiver.to_a
   when "values" then receiver.values
   when "key?" then receiver.key?(arguments.first)
   when "first" then receiver.first

@@ -1717,6 +1717,48 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Hash(pairs), "keys", []) => {
                 Value::array(pairs.iter().map(|(key, _)| key.clone()).collect())
             }
+            // The functional update writ large: the right side wins
+            // collisions in place, new keys append in the right's order, and
+            // both originals stay untouched (values never mutate, ADR 0015).
+            (Value::Hash(pairs), "merge", [Value::Hash(additions)]) => {
+                let mut merged = pairs.as_ref().clone();
+                for (key, value) in additions.iter() {
+                    match merged.iter_mut().find(|(existing, _)| existing == key) {
+                        Some(collision) => collision.1 = value.clone(),
+                        None => merged.push((key.clone(), value.clone())),
+                    }
+                }
+                Value::hash(merged)
+            }
+            // A maybe at every step, each step exactly `[]`: a miss answers
+            // nil, a found nil short-circuits the rest, and a found
+            // non-hash mid-chain refuses the way any dig on it would.
+            (Value::Hash(pairs), "dig", [first, rest @ ..]) => {
+                let mut current = pairs
+                    .iter()
+                    .find(|(existing, _)| existing == first)
+                    .map_or(Value::Nil, |(_, value)| Value::present(value.clone()));
+                for (position, key) in rest.iter().enumerate() {
+                    current = match current {
+                        Value::Nil => Value::Nil,
+                        Value::Hash(inner) => inner
+                            .iter()
+                            .find(|(existing, _)| existing == key)
+                            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
+                        other => panic!(
+                            "undefined method dig for {other:?} with {:?}",
+                            &rest[position..=position]
+                        ),
+                    };
+                }
+                current
+            }
+            (Value::Hash(pairs), "to_a", []) => Value::array(
+                pairs
+                    .iter()
+                    .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
+                    .collect(),
+            ),
             (Value::Hash(pairs), "length", []) => Value::Integer(pairs.len() as i64),
             (Value::Hash(pairs), "values", []) => {
                 Value::array(pairs.iter().map(|(_, value)| value.clone()).collect())

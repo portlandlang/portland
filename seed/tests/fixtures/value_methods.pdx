@@ -41,6 +41,20 @@ puts config.key?("missing").to_s
 puts config.keys.join(",")
 puts config.values.join(",")
 
+# The functional update, the deeper lookups, and the pairs written out.
+merged = config.merge({"port" => "3000", "tls" => "on"})
+puts merged.values.join(",")
+puts config.values.join(",")
+nested = {outer: {inner: 7}}
+dug = nested.dig(:outer, :inner)
+missed = nested.dig(:outer, :nope)
+puts dug.to_s
+puts missed.nil?.to_s
+pairs = {a: 1, b: 2}.to_a
+pairs.each do |pair|
+  puts pair.join(":")
+end
+
 # — block forms —
 %w[a b c].each_with_index do |letter, index|
   puts letter + index.to_s
