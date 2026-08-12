@@ -28,6 +28,8 @@ Where one spelling has two genuine readings, Portland refuses and names both rea
 
 Where the menu can be trimmed honestly, trim it — the parser peeks to drop the hash reading when a `|` rules it out. Peek to shorten the question, never to answer it.
 
+The rule is directional, and the direction matters: **one spelling never has two behaviors; one behavior may have many spellings.** Synonyms are a good part of Ruby that Portland keeps on purpose — sometimes the natural sentence says `total + 1`, sometimes `page.succ` — and that expressiveness is part of the joy this language is for, and a migration path besides (principle 2). What Ruby got wrong is the other direction: one word or one syntax that behaves one of many ways depending on context, resolved at runtime, and that is what Portland avoids where it can. "One name per job" is **not** a house principle and never was; it was once written down as if it were (in [#79](https://github.com/portlandlang/portland/issues/79)'s first framing and a CHANGELOG entry), and this paragraph is the correction. Which of Ruby's alias families ship is [#79](https://github.com/portlandlang/portland/issues/79)'s decision, family by family; whether synonyms are allowed at all is not a question.
+
 ### 4. Never guess, in the implementation either
 
 The same rule, turned inward, and the harder half.
