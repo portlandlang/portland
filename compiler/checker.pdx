@@ -7,7 +7,7 @@
 # can only refuse the code it reaches, and a compiler must refuse the code
 # it can read.
 #
-# One check family so far, the narrowest that exists (ADR 0022's closed
+# Two check families. First, the narrowest that exists (ADR 0022's closed
 # vocabularies, checked statically):
 #
 # - A payload-carrying construction `:paid(on: x)` must name a declared
@@ -20,10 +20,18 @@
 #   the compiler's first original diagnostic, pinned by ADR 0034 §3 and its
 #   tests rather than by any oracle.
 #
+# Second, coverage and reachability over a `case/in` (ADR 0035), which is
+# ADR 0013 §1 and §3 and ADR 0019's totality proof, as much of each as can
+# be had without types: a set the *arms themselves* establish — an enum
+# named by a payload-carrying arm, or the integers claimed by all-range
+# arms — can be proven uncovered, and an arm below a capture or below its
+# own case can be proven dead.
+#
 # Where the checker cannot tell, it declines to check (principle 4): any
-# node kind it does not recognize passes through silently, and a bare
-# symbol is never checked — a payload-free case is simply a symbol
-# (ADR 0022), and symbols are legal everywhere.
+# node kind it does not recognize passes through silently, a bare symbol is
+# never checked — a payload-free case is simply a symbol (ADR 0022), and
+# symbols are legal everywhere — and coverage refuses only what it can
+# disprove, never merely what it cannot prove.
 
 require_relative "parser"
 
@@ -43,7 +51,9 @@ def declarations_in(node)
   in EnumDefNode
     mutable found = []
     node.cases.each do |declared|
-      found << [declared.name, declared.labels]
+      # The third element is the owning enum: membership needs only the
+      # case, coverage (ADR 0035) needs the set it belongs to.
+      found << [declared.name, declared.labels, node.name]
     end
     found
   in ModuleDefNode(body:) then declared_cases(body)
@@ -164,6 +174,8 @@ def check_case_in(node, enums)
     check_body(branch.body, enums)
   end
   check_body(node.else_body, enums) unless node.else_body.nil?
+  check_unreachable_arms(node)
+  check_coverage(node, enums) if node.else_body.nil?
 end
 
 def check_call(node, enums)
@@ -240,6 +252,152 @@ def check_case_pattern(pattern, enums)
   pattern.payload.each do |entry|
     check_pattern(entry[1], enums)
   end
+end
+
+# — coverage and reachability (ADR 0035) —
+#
+# The checker has no types yet, so it refuses only where it can *prove*
+# non-coverage over a set the arms themselves establish, and stays silent
+# where it merely cannot prove coverage (ADR 0035 §1). Inference widens
+# where these apply; it does not gate whether they exist.
+
+# Guarded arms are outside the arithmetic in both directions (ADR 0035 §4):
+# they cover nothing, because the compiler cannot prove an `if`, and they
+# are never called unreachable, because the guard may be the reason they
+# are not.
+def unguarded_arms(node)
+  node.branches.select { it.guard.nil? }
+end
+
+# ADR 0013 §3. Two shapes need no types: everything below a bare capture,
+# and a case already matched whole by an arm above.
+def check_unreachable_arms(node)
+  mutable seen_capture = false
+  mutable seen_cases = []
+  unguarded_arms(node).each do |branch|
+    pattern = branch.pattern
+    panic "this arm can never match — the capture above binds every subject" if seen_capture
+    name = whole_case_name(pattern)
+    unless name.nil?
+      panic "in :#{name} can never match — an arm above already matches :#{name}" if seen_cases.include?(name)
+      seen_cases << name
+    end
+    seen_capture = true if pattern in IdentifierNode
+  end
+end
+
+# The case an arm matches *every* instance of — so a later arm naming it is
+# dead. A payload pattern qualifies only when every entry is a plain
+# capture; `in :paid(on: 1)` leaves the other payloads to later arms.
+def whole_case_name(pattern)
+  return pattern.value if pattern in SymbolNode
+  return nil unless pattern in EnumCasePatternNode
+  return nil unless pattern.payload.all? { it[1] in IdentifierNode }
+  pattern.name
+end
+
+def check_coverage(node, enums)
+  arms = unguarded_arms(node)
+  return if arms.empty?
+  check_enum_coverage(arms, enums)
+  check_range_coverage(arms)
+end
+
+# An enum is established by a payload-carrying arm and by nothing else
+# (ADR 0035 §2): a payload-free case is simply a symbol, and symbols are
+# legal everywhere, so plain-symbol arms are never second-guessed.
+def check_enum_coverage(arms, enums)
+  anchor = arms.find { it.pattern in EnumCasePatternNode }
+  return if anchor.nil?
+  owner = enum_owning(enums, anchor.pattern.name)
+  return if owner.nil?
+  mutable covered = []
+  arms.each do |branch|
+    name = arm_case_name(branch.pattern)
+    return if name.nil?
+    covered << name
+  end
+  missing = cases_of(enums, owner).reject { covered.include?(it) }
+  return if missing.empty?
+  named = missing.map { ":" + it }.join(", ")
+  panic "case/in does not cover #{named} — add the arm, or an else"
+end
+
+def arm_case_name(pattern)
+  return pattern.value if pattern in SymbolNode
+  return pattern.name if pattern in EnumCasePatternNode
+  nil
+end
+
+def enum_owning(enums, case_name)
+  found = enums.find { it[0] == case_name }
+  return nil if found.nil?
+  value_at_checked(found, 2)
+end
+
+def cases_of(enums, enum_name)
+  enums.select { value_at_checked(it, 2) == enum_name }.map { it[0] }
+end
+
+# ADR 0019's algorithm: range arms claim the integers, so a beginless first
+# and an endless last with no gaps between is the proof. Overlap is legal,
+# so coverage runs forward as a high-water mark rather than arm to arm.
+def check_range_coverage(arms)
+  mutable bounds = []
+  arms.each do |branch|
+    pair = range_bounds(branch.pattern)
+    return if pair.nil?
+    bounds << pair
+  end
+  return if bounds.empty?
+  beginless = bounds.select { low_of(it).nil? }
+  if beginless.empty?
+    lowest = bounds.map { low_of(it) }.min
+    panic "case/in leaves ..#{lowest - 1} uncovered — add the arm, or an else"
+  end
+  # An arm open at both ends is the whole line, and needs no walk.
+  return unless beginless.none? { high_of(it).nil? }
+  mutable covered_to = beginless.map { high_of(it) }.max
+  bounded = bounds.reject { low_of(it).nil? }
+  bounded.sort_by { low_of(it) }.each do |pair|
+    low = low_of(pair)
+    if low > covered_to + 1
+      panic "case/in leaves #{covered_to + 1}..#{low - 1} uncovered — add the arm, or an else"
+    end
+    high = high_of(pair)
+    return if high.nil?
+    covered_to = high if high > covered_to
+  end
+  panic "case/in leaves #{covered_to + 1}.. uncovered — add the arm, or an else"
+end
+
+# A bound is absent for a beginless or endless arm, and host indexing lifts
+# a stored nil into a present-but-absent maybe — so both ends are read the
+# raw way, like every other positional read in this file.
+def low_of(pair)
+  value_at_checked(pair, 0)
+end
+
+def high_of(pair)
+  value_at_checked(pair, 1)
+end
+
+# A range arm's closed bounds, or nil where a bound is anything but an
+# integer literal — a computed end is a decline, not a refusal.
+def range_bounds(pattern)
+  return nil unless pattern in RangeNode
+  low = literal_integer(pattern.start)
+  high = literal_integer(pattern.finish)
+  return nil if pattern.start.some? && low.nil?
+  return nil if pattern.finish.some? && high.nil?
+  return [low, high - 1] if pattern.exclusive && high.some?
+  [low, high]
+end
+
+def literal_integer(node)
+  return nil if node.nil?
+  return nil unless node in IntegerNode
+  node.value.to_i
 end
 
 # Raw positional read, mirroring the evaluator's value_at: a labels list in

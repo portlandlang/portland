@@ -83,13 +83,13 @@ What lives in `compiler/` is not a second implementation kept around for compari
 
 At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the compiler refuses to build it. Byte-equivalence breaks — **because the compiler got better**.
 
-So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the compiler, exactly as this section predicted.
+So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the compiler, exactly as this section predicted. A day later ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)) the sentence above stopped being hypothetical too: a `case/in` missing an enum case or leaving an integer gap is refused at build, on the same terms.
 
-|                             | seed    | compiler         | harness                                                                  |
-| --------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |
-| Both accept                 | runs    | runs             | byte-identical, forever — this is the fixture suite                      |
-| Trio cannot tell            | refuses | accepts silently | recorded as a gap, below                                                 |
-| **Trio refuses, seed runs** | runs    | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
+|                                 | seed    | compiler         | harness                                                                  |
+| ------------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |
+| Both accept                     | runs    | runs             | byte-identical, forever — this is the fixture suite                      |
+| Compiler cannot tell            | refuses | accepts silently | recorded as a gap, below                                                 |
+| **Compiler refuses, seed runs** | runs    | refuses to build | **nothing to compare** — the seed stops being an oracle for that program |
 
 The third row is progress, not drift. When it appears, the answer is not to weaken the compiler: it is that the seed's runtime behavior has stopped being evidence about a program the compiler has correctly rejected. The harness narrows to programs both accept, which stays the overwhelming majority.
 

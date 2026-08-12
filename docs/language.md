@@ -224,7 +224,7 @@ Struct patterns are **keyword-only**, and `text:` on its own binds a name of the
 
 Builtin type patterns are `in String`, `Integer`, `Array`, `Hash`, `Boolean`. **The type predicate is a pattern, not a reflection API** — `is_a?` and `.class` do not exist.
 
-No match and no `else` panics today. That is the runtime preview of what the checker will enforce statically: exhaustiveness. Range patterns count toward it — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`. Overlap is legal, first match wins, and gaps are an error.
+No match and no `else` panics on the seed. On the compiler that is now a **build** refusal wherever the arms say what the whole set is ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)): all-range arms claim the integers, and one payload-carrying arm names its enum. Range patterns count toward totality — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`; overlap is legal, first match wins, and a gap is named (`case/in leaves 10..19 uncovered`). Arms that can never fire — below a bare capture, or below a case already matched whole — are refused too. Everything the checker cannot yet reason about stays silent rather than demanding an `else`, and widens when inference lands ([#9](https://github.com/portlandlang/portland/issues/9)).
 
 Hash patterns and the find pattern (`in [*, x, *]`) are deliberately not built; they wait to be pulled for.
 
@@ -347,7 +347,7 @@ Nesting follows the rule that nests types in types, so `Purchase::Status` names 
 
 There are no generated predicates and no `Status.all`: an enum is a type, not a lookup table.
 
-**What the seed does not do yet.** Membership (`:pendign` is not a case of that enum) and exhaustiveness over cases are *static* — they need to know which enum a position expects, and the seed has no types. Both wait for [#9](https://github.com/portlandlang/portland/issues/9). The one check a runtime can make is here: a payload must name the labels its case declared, so `:paid(wrong: 1)` says `` `:paid` takes (on:) ``.
+**What the seed does not do.** Membership (`:pendign` is not a case of that enum) and exhaustiveness over cases are *static*, and the seed has no types — so both live in the compiler's checker instead ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), [ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)), which refuses programs the seed runs to completion. Coverage reaches as far as the arms reveal the enum today; the rest waits for inference ([#9](https://github.com/portlandlang/portland/issues/9)). The one check a runtime can make is here: a payload must name the labels its case declared, so `:paid(wrong: 1)` says `` `:paid` takes (on:) ``.
 
 ## Multi-file programs
 

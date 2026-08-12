@@ -848,6 +848,35 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "reached the end\n",
             "two enums declare :hit with different payloads — the seed cannot tell them apart",
         ),
+        // ADR 0035 — coverage, where the arms establish the set. The seed
+        // runs each of these to completion on the one input that happens to
+        // match; the hole is what it never reaches.
+        (
+            "enum Payment\n  :paid(on:)\n  :pending\n  :refunded\nend\nstatus = :paid(on: \"friday\")\ncase status\nin :paid(on: day) then puts day\nin :pending then puts \"waiting\"\nend\n",
+            "friday\n",
+            "case/in does not cover :refunded — add the arm, or an else",
+        ),
+        (
+            "score = 5\ncase score\nin ..0 then puts \"none\"\nin 1..9 then puts \"some\"\nin 20.. then puts \"lots\"\nend\n",
+            "some\n",
+            "case/in leaves 10..19 uncovered — add the arm, or an else",
+        ),
+        (
+            "score = 5\ncase score\nin ..0 then puts \"none\"\nin 1..9 then puts \"some\"\nend\n",
+            "some\n",
+            "case/in leaves 10.. uncovered — add the arm, or an else",
+        ),
+        // ADR 0013 §3's unreachable arms, both shapes.
+        (
+            "enum Payment\n  :paid(on:)\n  :pending\nend\nstatus = :pending\ncase status\nin :paid(on: day) then puts day\nin :pending then puts \"waiting\"\nin :pending then puts \"again\"\nend\n",
+            "waiting\n",
+            "in :pending can never match — an arm above already matches :pending",
+        ),
+        (
+            "value = 5\ncase value\nin anything then puts anything.to_s\nin 5 then puts \"five\"\nend\n",
+            "5\n",
+            "this arm can never match — the capture above binds every subject",
+        ),
     ];
     for (source, seed_output, refusal) in cases {
         let sample = std::env::temp_dir().join("checker_case.pdx");
