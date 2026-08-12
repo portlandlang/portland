@@ -1,0 +1,34 @@
+# The rounding family — none built yet, held pending (#23).
+#
+# From ruby/spec core/float/{floor,ceil,round,truncate}_spec.rb. The values
+# are Ruby 4.0.6's, run rather than recalled: `round` goes half away from
+# zero, `truncate` toward it.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "the rounding family" do
+    pending "Float#floor — no builtin yet" do
+      expect(1.5.floor).to eq(1)
+      expect((-1.5).floor).to eq(-2)
+    end
+
+    pending "Float#ceil — no builtin yet" do
+      expect(1.5.ceil).to eq(2)
+      expect((-1.5).ceil).to eq(-1)
+    end
+
+    pending "Float#round — no builtin yet; half goes away from zero" do
+      expect(2.5.round).to eq(3)
+      expect((-2.5).round).to eq(-3)
+      expect(2.4.round).to eq(2)
+    end
+
+    pending "Float#truncate — no builtin yet; toward zero" do
+      expect(1.9.truncate).to eq(1)
+      expect((-1.9).truncate).to eq(-1)
+    end
+  end
+end

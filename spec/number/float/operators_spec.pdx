@@ -1,0 +1,42 @@
+# Float arithmetic — and the edges Ruby answers with words: division by
+# zero is Infinity, zero by zero is NaN, and NaN equals nothing, itself
+# included.
+#
+# Grown from ruby/spec core/float/{plus,minus,multiply,divide}_spec.rb and
+# infinite_spec.rb (#23); the coerce and Rational rows stay behind with
+# their models.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "the operators" do
+    specify "add, subtract, multiply, divide" do
+      expect(5.5 + 4.2).to eq(9.7)
+      expect(9.0 - 2.5).to eq(6.5)
+      expect(3.5 * 2.0).to eq(7.0)
+      expect(7.5 / 2.5).to eq(3.0)
+    end
+
+    specify "carry IEEE's imprecision honestly" do
+      expect((0.1 + 0.2).to_s).to eq("0.30000000000000004")
+    end
+  end
+
+  describe "division by zero" do
+    specify "answers Infinity, signed" do
+      expect((1.0 / 0.0).to_s).to eq("Infinity")
+      expect((-1.0 / 0.0).to_s).to eq("-Infinity")
+    end
+
+    specify "and zero by zero answers NaN" do
+      expect((0.0 / 0.0).to_s).to eq("NaN")
+    end
+
+    specify "which equals nothing, itself included" do
+      quiet_nan = 0.0 / 0.0
+      expect(quiet_nan == quiet_nan).to be_false
+    end
+  end
+end

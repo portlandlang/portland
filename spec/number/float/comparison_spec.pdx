@@ -1,0 +1,33 @@
+# Float ordering, across the integer line included.
+#
+# Grown from ruby/spec core/float/{lt,lte,gt,gte}_spec.rb (#23); the hex
+# rows stay behind — 0x4fffffff does not lex, found by this import.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "#< and #<=" do
+    specify "order strictly and inclusively" do
+      expect(71.3 < 91.8).to be_true
+      expect(5.5 < 5.5).to be_false
+      expect(5.5 <= 5.5).to be_true
+    end
+
+    specify "reach across the integer line" do
+      expect(192.6 < -500).to be_false
+      expect(-0.12 < 100).to be_true
+      expect(2.5 <= 3).to be_true
+    end
+  end
+
+  describe "#> and #>=" do
+    specify "mirror them" do
+      expect(91.8 > 71.3).to be_true
+      expect(5.5 > 5.5).to be_false
+      expect(5.5 >= 5.5).to be_true
+      expect(-500 >= 192.6).to be_false
+    end
+  end
+end

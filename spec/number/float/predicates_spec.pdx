@@ -1,0 +1,27 @@
+# The float predicates — none built yet, held pending (#23): `zero?` exists
+# for integers only, and the infinity questions have no spellings at all.
+#
+# From ruby/spec core/float/{zero,finite,infinite,nan}_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the trio) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Float" do
+  describe "the predicates" do
+    pending "Float#zero? — the builtin is integer-only today" do
+      expect(0.0.zero?).to be_true
+      expect(0.1.zero?).to be_false
+    end
+
+    pending "Float#nan? — no builtin yet" do
+      expect((0.0 / 0.0).nan?).to be_true
+      expect(1.0.nan?).to be_false
+    end
+
+    pending "Float#finite? and #infinite? — no builtins yet" do
+      expect(1.0.finite?).to be_true
+      expect((1.0 / 0.0).finite?).to be_false
+    end
+  end
+end
