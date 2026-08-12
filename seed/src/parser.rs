@@ -79,6 +79,20 @@ struct ItFrame {
 /// The name inside a symbol token: `:paid` → `paid`, `:"odd key"` → `odd key`.
 /// No interpolation, so the quoted form needs no escape handling beyond the
 /// surrounding quotes (ADR 0023 §2).
+/// A numeric literal's digits, underscores shed — the lexer has already
+/// refused any underscore not sitting between digits (#71).
+fn integer_literal(text: &str) -> i64 {
+    text.replace('_', "")
+        .parse()
+        .expect("integer literal out of range")
+}
+
+fn float_literal(text: &str) -> f64 {
+    text.replace('_', "")
+        .parse()
+        .expect("float literal out of range")
+}
+
 fn symbol_name(text: &str) -> String {
     let after_colon = &text[1..];
     match after_colon.strip_prefix('"') {
@@ -1279,7 +1293,7 @@ impl<'source> Parser<'source> {
         let token = self.advance();
         match token.kind {
             TokenKind::Integer => {
-                let value: i64 = token.text.parse().expect("integer literal out of range");
+                let value: i64 = integer_literal(token.text);
                 if let Some(exclusive) = self.range_operator_here() {
                     self.position += 1;
                     return Pattern::Range {
@@ -1291,15 +1305,11 @@ impl<'source> Parser<'source> {
                 Pattern::Literal(Box::new(Expression::Integer(value)))
             }
             TokenKind::Float => {
-                let value = token.text.parse().expect("float literal out of range");
+                let value = float_literal(token.text);
                 Pattern::Literal(Box::new(Expression::Float(value)))
             }
             TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
-                let value: i64 = self
-                    .advance()
-                    .text
-                    .parse()
-                    .expect("integer literal out of range");
+                let value: i64 = integer_literal(self.advance().text);
                 Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
             TokenKind::String => {
@@ -1844,7 +1854,7 @@ impl<'source> Parser<'source> {
         if token.kind != TokenKind::Integer {
             panic!("range patterns take integer bounds, got {token:?}");
         }
-        let value: i64 = token.text.parse().expect("integer literal out of range");
+        let value: i64 = integer_literal(token.text);
         if negative { -value } else { value }
     }
 
@@ -2087,7 +2097,7 @@ impl<'source> Parser<'source> {
             // while `-5 ** 2` is -25 — refuses instead of picking a side.
             if self.peek_kind() == Some(TokenKind::Integer) {
                 let token = self.advance();
-                let value: i64 = token.text.parse().expect("integer literal out of range");
+                let value: i64 = integer_literal(token.text);
                 if self.peek_kind() == Some(TokenKind::StarStar) {
                     self.position += 1;
                     let right = self.unary();
@@ -2110,7 +2120,7 @@ impl<'source> Parser<'source> {
             }
             if self.peek_kind() == Some(TokenKind::Float) {
                 let token = self.advance();
-                let value: f64 = token.text.parse().expect("float literal out of range");
+                let value: f64 = float_literal(token.text);
                 if self.peek_kind() == Some(TokenKind::StarStar) {
                     self.position += 1;
                     let right = self.unary();
@@ -2253,11 +2263,11 @@ impl<'source> Parser<'source> {
         let token = self.advance();
         match token.kind {
             TokenKind::Integer => {
-                let value = token.text.parse().expect("integer literal out of range");
+                let value = integer_literal(token.text);
                 Expression::Integer(value)
             }
             TokenKind::Float => {
-                let value = token.text.parse().expect("float literal out of range");
+                let value = float_literal(token.text);
                 Expression::Float(value)
             }
             // `Foo::Bar` — naming a name inside a namespace (ADR 0021).

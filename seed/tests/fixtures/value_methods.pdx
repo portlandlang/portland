@@ -145,6 +145,10 @@ puts single_digits.min.to_s
 before_nine = 1...9
 puts before_nine.max.to_s
 
+# Underscores group digits and change nothing (#71).
+puts 1_000_000.to_s
+puts 5_280.5.to_s
+
 # Euclid on magnitudes, and `to_s` in another base.
 puts 12.gcd(8).to_s
 puts 255.to_s(16)

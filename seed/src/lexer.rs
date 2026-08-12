@@ -127,7 +127,11 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 });
             }
             '0'..='9' => {
-                let mut end = scan_while(&mut chars, |character| character.is_ascii_digit());
+                // Underscores group digits, Ruby's separators (#71) — legal
+                // only between digits, refused loose below.
+                let mut end = scan_while(&mut chars, |character| {
+                    character.is_ascii_digit() || character == '_'
+                });
                 // A `.` makes this a float only when a digit follows it
                 // (ADR 0018). That keeps `1.upto` a method call and leaves
                 // `1..5` for ranges (ADR 0019) — neither has a digit next.
@@ -136,13 +140,19 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     && source[end + 1..].starts_with(|character: char| character.is_ascii_digit())
                 {
                     chars.next(); // the `.`
-                    end = scan_while(&mut chars, |character| character.is_ascii_digit());
+                    end = scan_while(&mut chars, |character| {
+                        character.is_ascii_digit() || character == '_'
+                    });
                     kind = TokenKind::Float;
+                }
+                let text = &source[start..end];
+                if text.contains("__") || text.ends_with('_') || text.contains("_.") {
+                    panic!("an underscore in a number sits between digits — {text} has one loose");
                 }
                 tokens.push(Token {
                     leading_space: false,
                     kind,
-                    text: &source[start..end],
+                    text,
                 });
             }
             // `..` and `...` before the single `.` (ADR 0019).
@@ -493,6 +503,38 @@ mod tests {
     #[test]
     fn skips_spaces_and_tabs() {
         assert_eq!(texts("  1 \t 2  "), vec!["1", "2"]);
+    }
+
+    #[test]
+    fn underscores_group_digits_in_numbers() {
+        assert_eq!(kinds("5_280"), vec![TokenKind::Integer]);
+        assert_eq!(texts("5_280"), vec!["5_280"]);
+        assert_eq!(kinds("1_000.5_5"), vec![TokenKind::Float]);
+        // `1_000.to_s` stays a method call: the dot has no digit after it.
+        assert_eq!(
+            kinds("1_000.to_s"),
+            vec![TokenKind::Integer, TokenKind::Dot, TokenKind::Identifier]
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "an underscore in a number sits between digits — 5__280 has one loose"
+    )]
+    fn a_doubled_underscore_refuses() {
+        lex("5__280");
+    }
+
+    #[test]
+    #[should_panic(expected = "an underscore in a number sits between digits — 5_ has one loose")]
+    fn a_trailing_underscore_refuses() {
+        lex("5_ + 1");
+    }
+
+    #[test]
+    #[should_panic(expected = "an underscore in a number sits between digits — 5_.5 has one loose")]
+    fn an_underscore_against_the_dot_refuses() {
+        lex("5_.5");
     }
 
     #[test]

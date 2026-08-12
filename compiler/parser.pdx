@@ -822,12 +822,15 @@ def index_node(receiver, index)
   IndexNode.new(kind: "index", receiver: receiver, index: index)
 end
 
+# Both shed the underscores their token may carry (#71) — the lexer has
+# already refused any underscore not sitting between digits — so the stored
+# value and the S-expression dump hold bare digits, the seed's shape.
 def float_node(value)
-  FloatNode.new(kind: "float", value: value)
+  FloatNode.new(kind: "float", value: value.split("_").join(""))
 end
 
 def integer_node(value)
-  IntegerNode.new(kind: "integer", value: value)
+  IntegerNode.new(kind: "integer", value: value.split("_").join(""))
 end
 
 def range_node(start, finish, exclusive)

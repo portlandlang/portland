@@ -23,7 +23,11 @@ context "Integer" do
       expect(9237212 - 5280).to eq(9231932)
     end
 
-    pending "9237212 - 5_280 — underscored literals do not lex (#71)"
+    specify "underscores group digits and change nothing (#71)" do
+      expect(9237212 - 5_280).to eq(9231932)
+      expect(1_000_000).to eq(1000000)
+      expect(1_000.5).to eq(1000.5)
+    end
   end
 
   describe "#*" do

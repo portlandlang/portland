@@ -416,8 +416,10 @@ def lex(raw_source)
       next
     end
     if digit?(character)
+      # Underscores group digits, Ruby's separators (#71) — legal only
+      # between digits, refused loose below.
       mutable text = ""
-      while index < characters.length && digit?(characters[index])
+      while index < characters.length && (digit?(characters[index]) || characters[index] == "_")
         text << characters[index]
         index += 1
       end
@@ -427,11 +429,14 @@ def lex(raw_source)
       if index + 1 < characters.length && characters[index] == "." && digit?(characters[index + 1])
         text << characters[index]
         index += 1
-        while index < characters.length && digit?(characters[index])
+        while index < characters.length && (digit?(characters[index]) || characters[index] == "_")
           text << characters[index]
           index += 1
         end
         kind = "float"
+      end
+      if text.include?("__") || text.end_with?("_") || text.include?("_.")
+        panic "an underscore in a number sits between digits — #{text} has one loose"
       end
       tokens << Token.new(kind: kind, text: text, leading_space: leading)
       next
