@@ -7,6 +7,13 @@ pub struct Program {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
+    /// `alias fu foo` — a second name for an existing method (ADR 0039).
+    /// Pure compile-time machinery here, unlike Ruby's snapshot: with no
+    /// redefinition, the copy and the original can never diverge.
+    Alias {
+        new_name: String,
+        old_name: String,
+    },
     Assignment {
         /// `mutable name = ...` declares a rebindable name (ADR 0001);
         /// a bare assignment either creates an immutable binding or

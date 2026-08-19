@@ -1,0 +1,50 @@
+# `alias fu foo` — a second name for an existing method (ADR 0039, #81).
+# Ruby's order (new name first) and Ruby's bare words, but not Ruby's
+# semantics: with no redefinition there is nothing to snapshot, so the two
+# names are the same method forever — in the seed, literally the same Rc.
+# The symbol-taking `alias_method` stays gone with the metaprogramming.
+
+require_relative "../spec_helper"
+
+def double(number)
+  number * 2
+end
+
+alias twice double
+alias doubled twice
+
+def paid?
+  true
+end
+
+alias settled? paid?
+
+module Arithmetic
+  def mean(numbers)
+    numbers.sum / numbers.length
+  end
+
+  alias average mean
+end
+
+context "alias" do
+  describe "a second name for a method" do
+    specify "answers exactly what the original answers" do
+      expect(twice(21)).to eq(42)
+      expect(twice(21)).to eq(double(21))
+    end
+
+    specify "chains — an alias of an alias is still the one method" do
+      expect(doubled(21)).to eq(42)
+    end
+
+    specify "carries ? names" do
+      expect(settled?).to be_true
+    end
+
+    specify "works inside a module body, qualified like any def" do
+      expect(Arithmetic.average([2, 4, 6])).to eq(4)
+      expect(Arithmetic.average([2, 4, 6])).to eq(Arithmetic.mean([2, 4, 6]))
+    end
+  end
+end

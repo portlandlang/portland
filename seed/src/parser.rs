@@ -324,6 +324,12 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("loop") {
             return self.loop_statement();
         }
+        // `alias fu foo` (ADR 0039) — Ruby's order, new name first. Bare
+        // words only: the symbol-taking form was `alias_method`, and that
+        // went out with the metaprogramming.
+        if self.peek_is_keyword("alias") {
+            return self.alias_statement();
+        }
         if self.peek_is_keyword("together") {
             return self.together_block();
         }
@@ -1186,6 +1192,23 @@ impl<'source> Parser<'source> {
             }
             self.position += 1; // the `::`
         }
+    }
+
+    fn alias_statement(&mut self) -> Statement {
+        self.position += 1; // the `alias`
+        let new_name = self.alias_name();
+        let old_name = self.alias_name();
+        self.expect_statement_boundary();
+        Statement::Alias { new_name, old_name }
+    }
+
+    fn alias_name(&mut self) -> String {
+        let token = self.advance();
+        if token.kind != TokenKind::Identifier {
+            panic!("alias takes two method names — alias new_name old_name");
+        }
+        Self::refuse_bang_binding(token.text);
+        token.text.to_string()
     }
 
     fn loop_statement(&mut self) -> Statement {

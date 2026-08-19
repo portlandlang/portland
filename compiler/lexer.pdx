@@ -55,7 +55,7 @@ def name_character?(character)
 end
 
 def keyword?(word)
-  %w[and break case def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
+  %w[alias and break case def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
 end
 
 def two_character_operator?(pair)

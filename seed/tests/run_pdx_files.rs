@@ -95,8 +95,8 @@ fn runs_tour_pdx() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "hello, portland!\nhello, stranger\nodd sum: 25\nPDX is portland\n1 + 4 + 9 = 14\n\
-         lift off: 0\ndoubled to 16\ntrimmed to 3\nspun 5 times\n"
+        "hello, portland!\nhello, stranger\nhello, rose city!\nodd sum: 25\nPDX is portland\n\
+         1 + 4 + 9 = 14\nlift off: 0\ndoubled to 16\ntrimmed to 3\nspun 5 times\n"
     );
 }
 
@@ -679,6 +679,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         // false aliases, and the refusal names the real conversion.
         ("x = 5.to_int\n", "to_int is spelled to_i here"),
         ("x = \"5\".to_str\n", "to_str is spelled to_s here"),
+        // ADR 0039: an alias of nothing is a typo, not a plan.
+        (
+            "alias fu foo\n",
+            "alias points at nothing — no method foo defined yet",
+        ),
         // ADR 0033: the chained-literal corner and the two integer edges.
         (
             "x = -2.abs ** 2\n",

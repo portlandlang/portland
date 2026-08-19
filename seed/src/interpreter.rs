@@ -477,6 +477,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     .insert(self.qualified(name), std::rc::Rc::new(method));
                 None
             }
+            // A second name for an existing method (ADR 0039): the same Rc
+            // inserted twice, so "one body, two names" is the memory layout,
+            // not a promise. The target must already exist — the seed reads
+            // top to bottom, and an alias of nothing is a typo, not a plan.
+            Statement::Alias { new_name, old_name } => {
+                if self.variables.contains_key(new_name) {
+                    panic!("method {new_name} shadows local {new_name} — rename one");
+                }
+                let method = self.lookup_method(old_name).unwrap_or_else(|| {
+                    panic!("alias points at nothing — no method {old_name} defined yet")
+                });
+                self.methods.insert(self.qualified(new_name), method);
+                None
+            }
             Statement::Break => {
                 self.pending = Some(Pending::Break);
                 None

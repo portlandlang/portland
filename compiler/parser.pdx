@@ -204,6 +204,16 @@ struct CaseNode
   end
 end
 
+struct AliasNode
+  kind
+  new_name
+  old_name
+
+  def sexp
+    "(alias " + new_name + " " + old_name + ")"
+  end
+end
+
 struct DefNode
   kind
   name
@@ -1844,6 +1854,7 @@ def parse_statement(tokens, position)
     when "while" then return parse_while(tokens, position + 1, false)
     when "until" then return parse_while(tokens, position + 1, true)
     when "loop" then return parse_loop(tokens, position + 1)
+    when "alias" then return parse_alias(tokens, position + 1)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
@@ -2826,6 +2837,29 @@ def parse_unless(tokens, mutable position)
     return Step.new(node: if_node(condition.node, nil, body.node), position: position + 1)
   end
   Step.new(node: error_node("expected end to close unless"), position: position)
+end
+
+# `alias fu foo` (ADR 0039) — Ruby's order, new name first, bare words only:
+# the symbol-taking form was `alias_method`, and that went out with the
+# metaprogramming.
+def parse_alias(tokens, position)
+  first = parse_alias_name(tokens, position)
+  return first unless first.node in String
+  second = parse_alias_name(tokens, first.position)
+  return second unless second.node in String
+  Step.new(node: AliasNode.new(kind: "alias", new_name: first.node, old_name: second.node), position: second.position)
+end
+
+# One of alias's two names: Step.node is the name string, or an error node.
+def parse_alias_name(tokens, position)
+  if position >= tokens.length || !tokens[position].identifier?
+    return Step.new(node: error_node("alias takes two method names — alias new_name old_name"), position: position)
+  end
+  name = tokens[position].text
+  if bang_name?(name)
+    return Step.new(node: error_node("`!` is unwrap-or-propagate — a binding cannot take it; name it #{bang_base(name)}"), position: position + 1)
+  end
+  Step.new(node: name, position: position + 1)
 end
 
 # `loop do ... end` is `while true` in Ruby's favorite clothes (ADR 0037,

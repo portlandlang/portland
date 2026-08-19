@@ -105,6 +105,13 @@ def evaluate_statement(node, bindings)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
   in DefNode(name:, parameters:, body:)
     outcome([], [[name, "method", [parameters, body]]] + bindings)
+  # A second name for an existing method (ADR 0039): the same slot value
+  # bound twice, so the two names cannot drift. The target must already
+  # exist — top to bottom, the seed's rule.
+  in AliasNode(new_name:, old_name:)
+    found = lookup(bindings, old_name)
+    panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
+    outcome([], [[new_name, "method", found.first[2]]] + bindings)
   in ReturnNode(value:)
     return return_outcome([], bindings, frame_of(bindings)) if value.nil?
     step = evaluate_expression(value, bindings)
@@ -561,6 +568,10 @@ def register_in_namespace(statement, home, mutable bindings)
   case statement
   in DefNode(name:, parameters:, body:)
     [[qualify(home, name), "method", [parameters, body, home]]] + bindings
+  in AliasNode(new_name:, old_name:)
+    found = lookup(bindings, qualify(home, old_name))
+    panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
+    [[qualify(home, new_name), "method", found.first[2]]] + bindings
   in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch

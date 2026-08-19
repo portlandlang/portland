@@ -8,6 +8,10 @@ end
 puts greeting("portland")
 puts greeting("")
 
+# `alias` — a second name for the same method (ADR 0039).
+alias salutation greeting
+puts salutation("rose city")
+
 mutable odds = 0
 mutable number = 0
 while number < 10
