@@ -8,20 +8,20 @@
 
 The ruby/spec import kept meeting the same question at different types: does Portland ship Ruby's alias families — `size` beside `length`, `inject` beside `reduce`? The question stalled behind a philosophy error: "one name per job" had been written down as the house lean, and it never was one. Principle 3 now records the actual rule — **one spelling never has two behaviors; one behavior may have many spellings** — synonyms being one of Ruby's good parts, kept for joy and migration both. `succ`/`pred`/`next` shipped on exactly that argument.
 
-That left scope: which families? The menu had narrowed to shipping the famous pairs outright versus corpus-gating each family through [ruby_research](https://github.com/portlandlang/ruby_research). Corpus-gating was rejected for this call — it produces an uneven surface nobody can recite and re-litigates every future twin — though the corpus stays the tool for *individual* contested names later.
+That left scope: which families? The menu had narrowed to shipping the famous pairs outright versus corpus-gating each family through [ruby_research](https://github.com/portlandlang/ruby_research). Corpus-gating was rejected for this call — it produces an uneven surface nobody can recite and re-litigates every future twin — though the corpus stays the tool for _individual_ contested names later.
 
 ## Decision
 
 **The six families the import met ship as plain twin builtins**, no `alias` machinery:
 
-| job | survivor | twins shipped |
-| --- | --- | --- |
-| how many | `length` | `size` (String, Array, Hash, Range) |
-| is this key there | `key?` | `has_key?`, `include?`, `member?` (Hash) |
-| first block hit | `find` | `detect` |
-| transform each | `map` | `collect` |
-| fold | `reduce` | `inject` — takes the initial argument `reduce` takes; no first-element-as-seed form |
-| membership | `include?` | `member?` (Array) |
+| job               | survivor   | twins shipped                                                                       |
+| ----------------- | ---------- | ----------------------------------------------------------------------------------- |
+| how many          | `length`   | `size` (String, Array, Hash, Range)                                                 |
+| is this key there | `key?`     | `has_key?`, `include?`, `member?` (Hash)                                            |
+| first block hit   | `find`     | `detect`                                                                            |
+| transform each    | `map`      | `collect`                                                                           |
+| fold              | `reduce`   | `inject` — takes the initial argument `reduce` takes; no first-element-as-seed form |
+| membership        | `include?` | `member?` (Array)                                                                   |
 
 `count` on a Range joins `size` there (both answer the element count), since the import had noted both against this decision.
 
