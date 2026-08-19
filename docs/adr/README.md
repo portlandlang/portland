@@ -52,6 +52,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0038](0038-2026-08-19-what-a-character-is.md) — What a character is: graphemes, canonical equality, Unicode casing
 - [0039](0039-2026-08-19-alias-a-second-name-for-a-method.md) — `alias`: a second name for a method
 - [0040](0040-2026-08-19-inference-the-design-core.md) — Inference: the design core
+- [0041](0041-2026-08-19-return-annotations-are-arrow-comments.md) — Return annotations are arrow comments
 
 <!-- /generated -->
 

@@ -23,7 +23,7 @@ end                   # inferred: takes an Integer, returns a User?
 Type names appear in exactly three places:
 
 1. **Error messages** — where they do their best work.
-1. **Public boundary annotations**, optional, as documentation.
+1. **Public boundary annotations**, optional, as documentation — spelled as a trailing arrow comment, `def find_user(id) # -> User?` ([ADR 0041](../adr/0041-2026-08-19-return-annotations-are-arrow-comments.md)): rbs-inline's placement with RBS's own returns-arrow as the marker, valid Ruby verbatim (the one annotation form that is polyfill-_free_), and checked against inference the moment the checker can — an annotation can never lie. Return types only; input annotations are deliberately TBD.
 1. **Design conversations.**
 
 Duck typing becomes **structural typing**: "responds to `quack`" is still the contract, but checked at compile time. No nominal-interface ceremony; the duck test just stops being administered in production.
