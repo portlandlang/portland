@@ -675,6 +675,10 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "loop\n",
             "`loop` takes a `do` block — write loop do ... end",
         ),
+        // ADR 0036 (revised): the implicit-conversion protocol names are
+        // false aliases, and the refusal names the real conversion.
+        ("x = 5.to_int\n", "to_int is spelled to_i here"),
+        ("x = \"5\".to_str\n", "to_str is spelled to_s here"),
         // ADR 0033: the chained-literal corner and the two integer edges.
         (
             "x = -2.abs ** 2\n",

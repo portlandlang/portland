@@ -367,7 +367,7 @@ Read-only, and small on purpose.
 | Range      | `include? to_a step min max`, and everything an array answers, by walking                                                                                                                      |
 | Everything | `to_s`, `nil?`, `some?`                                                                                                                                                                        |
 
-The famous twins ride along ([ADR 0036](adr/0036-2026-08-18-the-famous-twins-ship.md)): `size` everywhere `length` answers, `collect` for `map`, `inject` for `reduce`, `detect` for `find`, `member?` for membership, and Hash's `has_key?`/`include?`/`member?` all asking `key?`'s question. Each shares its survivor's implementation — one behavior, many spellings, drift impossible.
+The twins ride along ([ADR 0036](adr/0036-2026-08-18-the-famous-twins-ship.md)): every pure Ruby synonym whose survivor exists here — `size` for `length`, `collect` for `map`, `inject` for `reduce`, `detect` for `find`, `filter`/`find_all` for `select`, `collect_concat` for `flat_map`, `entries` for `to_a`, `each_pair` for Hash's `each`, `magnitude` for `abs`, `member?` for membership, and Hash's `has_key?`/`include?`/`member?` all asking `key?`'s question. Each shares its survivor's implementation — one behavior, many spellings, drift impossible. The false aliases (`to_ary`, `to_int`, `to_str` — Ruby's implicit-conversion protocol, not spellings) refuse naming the real conversion.
 
 Method chains continue across newlines with a leading dot.
 

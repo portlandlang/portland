@@ -1401,7 +1401,7 @@ def evaluate_method_call(node, mutable bindings)
   when "lines" then receiver.lines
   when "reverse" then receiver.reverse
   when "chars" then receiver.chars
-  when "abs" then receiver.abs
+  when "abs", "magnitude" then receiver.abs
   # The neighbors ride the host's builtins, synonyms kept on purpose (#79).
   # `next` is `succ`'s third spelling; riding `succ` keeps this source free
   # of the keyword-after-dot form its own parser only just learned.
@@ -1426,7 +1426,7 @@ def evaluate_method_call(node, mutable bindings)
   when "keys" then receiver.keys
   when "merge" then receiver.merge(arguments.first)
   when "dig" then dig_into(receiver, arguments)
-  when "to_a" then receiver.to_a
+  when "to_a", "entries" then receiver.to_a
   when "values" then receiver.values
   when "key?", "has_key?" then receiver.key?(arguments.first)
   when "member?" then receiver.member?(arguments.first)
@@ -1445,7 +1445,6 @@ def evaluate_method_call(node, mutable bindings)
   when "min" then receiver.min
   when "max" then receiver.max
   when "step" then receiver.step(arguments.first)
-  when "to_a" then receiver.to_a
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   when "join"
@@ -1456,6 +1455,11 @@ def evaluate_method_call(node, mutable bindings)
   when "start_with?" then receiver.start_with?(arguments.first)
   when "end_with?" then receiver.end_with?(arguments.first)
   when "slice" then receiver.slice(arguments[0], arguments[1])
+  # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
+  # revised): the refusal names the real conversion, the host's words.
+  when "to_ary" then panic("to_ary is spelled to_a here")
+  when "to_int" then panic("to_int is spelled to_i here")
+  when "to_str" then panic("to_str is spelled to_s here")
   else
     # Anything else is a struct field read. On a non-struct that used to
     # index and fail with an unrelated message — `7.positive?` reported
@@ -1552,7 +1556,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   block = node.block
   mutable interrupt = nil
   case node.name
-  when "each"
+  when "each", "each_pair"
     if block.parameters.length == 2
       receiver.each do |first, second|
         step = run_guest_block(block, [first, second], scope)
@@ -1589,7 +1593,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
-  when "select"
+  when "select", "filter", "find_all"
     results = receiver.select do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1731,7 +1735,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
-  when "flat_map"
+  when "flat_map", "collect_concat"
     results = receiver.flat_map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)

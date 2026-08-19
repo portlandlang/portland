@@ -1,6 +1,6 @@
 # 0036 — The famous twins ship
 
-- **Status:** Accepted (built in both oracles, 2026-08-18)
+- **Status:** Accepted (built in both oracles, 2026-08-18; the "beyond the six" boundary was redrawn the same day — see its revision note)
 - **Date:** 2026-08-18
 - **Issue:** [#79](https://github.com/portlandlang/portland/issues/79)
 
@@ -27,7 +27,12 @@ That left scope: which families? The menu had narrowed to shipping the famous pa
 
 **Twins cannot drift, by construction.** In the seed each twin is an or-pattern on the survivor's own match arm (`"map" | "collect"`) — one body, two names. In the compiler each twin rides the survivor's host builtin, or the host twin where the survivor depends on the receiver's type (`member?`). There is no second implementation anywhere for behavior to hide in.
 
-**Beyond the six: an unshipped alias refuses by naming the survivor.** The wording shape is `detect is spelled find here` — the refusal is the documentation. New twins arrive one ruling at a time, corpus-in-hand where contested; the famous six needed no report because the reflex is the evidence.
+**Beyond the six, the line is categorical.** *Revised the same day: the first ruling drew the line at fame — the six ship, the tail refuses naming its survivor — and the deciding user asked the right question: why leave `find_all` behind at all? The fame line had only vocabulary-size taste behind it, and refusing a pure synonym costs more machinery than welcoming it. Redrawn at the categories:*
+
+1. **Every pure synonym whose survivor exists ships as a twin.** The sweep, each equivalence probed on Ruby 4.0.6: `filter` and `find_all` (`select`), `collect_concat` (`flat_map`), `entries` (`to_a`), `each_pair` (Hash `each`), `magnitude` (`abs`, floats included). A pure synonym missed by this enumeration refuses plainly as an undefined method and ships on notice — turning that refusal into a twin is a two-token or-pattern.
+1. **False aliases refuse by naming the real spelling.** Ruby's implicit-conversion protocol — `to_ary`, `to_int`, `to_str` — looks like spellings of the conversions but carries duck-typing semantics Portland does not have; shipping them as twins would be a lie wearing a synonym costume. The refusals (`to_int is spelled to_i here`) point at what the migrating author actually wants, and the wording test pins them.
+1. **Aliases of unbuilt survivors** (`has_value?`, and kin) have nothing to twin — they refuse as undefined until their survivor earns its way in, then ride rule 1.
+1. **Names cut by doctrine** — the `map!` mutator family (ADR 0015), reflection and `send` (the metaprogramming cut) — are refused for their own reasons, and their refusal wordings belong to those stories, not this one.
 
 **Separate and deliberately later:** the wish that Ruby's names weren't abbreviations (`succ`, `pred`). Unabbreviated spellings are a possible stdlib expansion someday; nothing here blocks or starts it.
 

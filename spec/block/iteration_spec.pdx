@@ -51,6 +51,11 @@ context "the block-taking library" do
       expect(numbers.collect { it * 2 }).to eq(numbers.map { it * 2 })
       expect(numbers.inject(10) { |total, number| total + number }).to eq(20)
     end
+
+    specify "filter and find_all are select's twins (ADR 0036, revised)" do
+      expect(numbers.filter { it.even? }).to eq(numbers.select { it.even? })
+      expect(numbers.find_all { it.even? }).to eq(numbers.select { it.even? })
+    end
   end
 
   describe "the number loops" do

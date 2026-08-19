@@ -12,9 +12,9 @@ Method aliases everywhere, made with `alias`/`alias_method` machinery: `size`/`l
 
 Synonyms are welcome — one behavior may have many spellings; one spelling never has two behaviors (principle 3). What Portland declines is the _runtime machinery_, not the twins: there is no `alias` keyword today and no runtime aliasing ever, so each shipped twin is a plain builtin sharing its survivor's implementation, drift impossible by construction. (Whether a *static* user-facing `alias` someday earns a keyword is [#81](https://github.com/portlandlang/portland/issues/81).)
 
-Shipped (ADR 0036): `size` everywhere `length` answers, `collect`, `inject` (with `reduce`'s explicit initial), `detect`, `member?` on arrays, and Hash's whole membership family — `has_key?`, `include?`, `member?` all asking about keys, as in Ruby. `succ`/`pred`/`next` shipped earlier on the same philosophy.
+The line is categorical (ADR 0036, revised the day it landed): **every pure synonym whose survivor exists ships as a twin.** Shipped: `size` everywhere `length` answers, `collect`, `inject` (with `reduce`'s explicit initial), `detect`, `filter` and `find_all` beside `select`, `collect_concat` beside `flat_map`, `entries` beside `to_a`, `each_pair` beside Hash's `each`, `magnitude` beside `abs`, `member?` on arrays, and Hash's whole membership family — `has_key?`, `include?`, `member?` all asking about keys, as in Ruby. `succ`/`pred`/`next` shipped earlier on the same philosophy. A pure synonym missed by the enumeration refuses plainly and ships on notice.
 
-Beyond those, an unshipped alias refuses by **naming the survivor** — the refusal is the documentation — and new twins arrive one ruling at a time, with [ruby_research](https://github.com/portlandlang/ruby_research) corpus numbers where a name is contested.
+What refuses **by naming the real spelling** is the false-alias set: Ruby's implicit-conversion protocol (`to_ary`, `to_int`, `to_str`) looks like conversion spellings but carries duck-typing semantics Portland does not have, so `to_int is spelled to_i here` points the migrating author at what they actually want. Aliases of unbuilt survivors refuse as undefined until the survivor exists; the mutator family's refusals belong to [mutability](mutability.md), not here.
 
 ## Migration
 

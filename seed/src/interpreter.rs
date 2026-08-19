@@ -64,6 +64,21 @@ fn as_float(value: &Value) -> f64 {
     }
 }
 
+/// The survivor a false alias refuses toward (ADR 0036, revised): every
+/// *pure* synonym whose survivor exists ships as a twin, so what remains
+/// here is Ruby's implicit-conversion protocol — names that look like
+/// spellings of the conversions but carry duck-typing semantics Portland
+/// does not have. The migrating intent still maps cleanly, so the refusal
+/// names the real conversion.
+fn alias_survivor(name: &str) -> Option<&'static str> {
+    match name {
+        "to_ary" => Some("to_a"),
+        "to_int" => Some("to_i"),
+        "to_str" => Some("to_s"),
+        _ => None,
+    }
+}
+
 /// `flatten`'s walk: arrays open, everything else lands (Ruby's one-call,
 /// all-depths rule).
 fn flatten_into(elements: &[Value], flat: &mut Vec<Value>) {
@@ -1578,7 +1593,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
-                (Value::Hash(pairs), "each", []) => {
+                (Value::Hash(pairs), "each" | "each_pair", []) => {
                     for (key, value) in pairs.iter().cloned() {
                         self.run_block(block, vec![key, value]);
                         if let Some(interrupted) = self.block_interrupt() {
@@ -1640,7 +1655,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(kept))
                 }
-                (Value::Array(elements), "select", []) => {
+                (Value::Array(elements), "select" | "filter" | "find_all", []) => {
                     let mut kept = Vec::new();
                     for element in elements.iter().cloned() {
                         let verdict = self.run_block(block, vec![element.clone()]);
@@ -1763,7 +1778,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // One level opens, Ruby's rule: an array splices, any other
                 // value lands whole.
-                (Value::Array(elements), "flat_map", []) => {
+                (Value::Array(elements), "flat_map" | "collect_concat", []) => {
                     let mut results = Vec::new();
                     for element in elements.iter().cloned() {
                         let result = self.run_block(block, vec![element]);
@@ -1808,6 +1823,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     Some(receiver)
                 }
                 (receiver, name, _) => {
+                    if let Some(survivor) = alias_survivor(name) {
+                        panic!("{name} is spelled {survivor} here");
+                    }
                     panic!("undefined block-taking method {name} for {receiver:?}")
                 }
             };
@@ -1894,7 +1912,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 current
             }
-            (Value::Hash(pairs), "to_a", []) => Value::array(
+            (Value::Hash(pairs), "to_a" | "entries", []) => Value::array(
                 pairs
                     .iter()
                     .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
@@ -1912,7 +1930,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "max", []) => Self::extreme(elements, "max"),
             (Value::Array(elements), "min", []) => Self::extreme(elements, "min"),
             // An array already is one — the harmless end of Ruby's rule.
-            (receiver @ Value::Array(_), "to_a", []) => receiver.clone(),
+            (receiver @ Value::Array(_), "to_a" | "entries", []) => receiver.clone(),
             // Counts into a hash, keys in first-seen order.
             (Value::Array(elements), "tally", []) => {
                 let mut counts: Vec<(Value, i64)> = Vec::new();
@@ -2070,7 +2088,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     Value::Float(Self::numbers_of(elements, "sum").into_iter().sum())
                 }
             }
-            (Value::Integer(number), "abs", []) => Value::Integer(number.abs()),
+            (Value::Integer(number), "abs" | "magnitude", []) => Value::Integer(number.abs()),
             // The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose
             // (principle 3: one behavior may have many spellings; #79).
             (Value::Integer(number), "succ", []) => Value::Integer(number + 1),
@@ -2169,7 +2187,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // Ruby's Float#to_i truncates toward zero — it is not the
             // floored division of ADR 0018.
             (Value::Float(number), "to_i", []) => Value::Integer(*number as i64),
-            (Value::Float(number), "abs", []) => Value::Float(number.abs()),
+            (Value::Float(number), "abs" | "magnitude", []) => Value::Float(number.abs()),
             (Value::Float(number), "zero?", []) => Value::Boolean(*number == 0.0),
             (Value::Float(number), "nan?", []) => Value::Boolean(number.is_nan()),
             (Value::Float(number), "finite?", []) => Value::Boolean(number.is_finite()),
@@ -2262,6 +2280,9 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
+                if let Some(survivor) = alias_survivor(name) {
+                    panic!("{name} is spelled {survivor} here");
+                }
                 panic!("undefined method {name} for {receiver:?} with {arguments:?}")
             }
         })

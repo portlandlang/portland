@@ -107,7 +107,8 @@ counting = [1, 2, 3, 4]
 puts counting.reject { it.even? }.join(",")
 puts counting.select { it.even? }.join(",")
 
-# The famous twins (ADR 0036) — each pinned beside its survivor.
+# The twins (ADR 0036, revised: every pure synonym whose survivor exists) —
+# each pinned beside its survivor.
 puts counting.size.to_s
 puts "pdx".size.to_s
 puts counting.member?(3).to_s
@@ -115,6 +116,17 @@ puts counting.collect { it + 1 }.join(",")
 puts counting.inject(0) { |total, number| total + number }.to_s
 first_odd = counting.detect { it.odd? }
 puts first_odd.to_s
+puts counting.filter { it.even? }.join(",")
+puts counting.find_all { it.odd? }.join(",")
+puts counting.collect_concat { [it, it] }.length.to_s
+puts counting.entries.join(",")
+below = (-5).magnitude
+puts below.to_s
+mutable pair_total = 0
+config.each_pair do |key, value|
+  pair_total += value.length
+end
+puts pair_total.to_s
 
 # The verdict trio, the finders, and the shapers.
 puts counting.any? { it > 3 }.to_s

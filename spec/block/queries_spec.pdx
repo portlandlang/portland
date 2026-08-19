@@ -56,5 +56,9 @@ context "the block-taking library" do
       expect([1, 2, 3, 4, 5].each_slice(2)).to eq([[1, 2], [3, 4], [5]])
       expect([1, 2].flat_map { [it, it] }).to eq([1, 1, 2, 2])
     end
+
+    specify "collect_concat is flat_map's twin (ADR 0036, revised)" do
+      expect([1, 2].collect_concat { [it, it] }).to eq([1, 1, 2, 2])
+    end
   end
 end

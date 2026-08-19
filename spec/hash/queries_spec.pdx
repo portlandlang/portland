@@ -41,5 +41,14 @@ context "Hash" do
       expect(counts.include?(:zed)).to be_false
       expect(counts.member?(:zed)).to be_false
     end
+
+    specify "entries is to_a's, and each_pair is each's (ADR 0036, revised)" do
+      expect(counts.entries).to eq(counts.to_a)
+      mutable total = 0
+      counts.each_pair do |key, value|
+        total += value
+      end
+      expect(total).to eq(3)
+    end
   end
 end

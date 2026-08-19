@@ -27,5 +27,10 @@ context "Integer" do
       expect(0.abs).to eq(0)
       expect((-0).abs).to eq(0)
     end
+
+    specify "magnitude is its twin, floats included (ADR 0036, revised)" do
+      expect((-5).magnitude).to eq(5)
+      expect((-2.5).magnitude).to eq(2.5)
+    end
   end
 end
