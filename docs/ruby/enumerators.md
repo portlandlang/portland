@@ -2,7 +2,7 @@
 
 **Summary:** There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 
-**Status:** decided in practice (the [#23](https://github.com/portlandlang/portland/issues/23) import, 2026-08-12); no ADR — laziness is a capability nothing has pulled for (principle 6), and the eager answers are pinned by spec so a future lazy tier must preserve them.
+**Status:** decided in practice (the [#23](https://github.com/portlandlang/portland/issues/23) import, 2026-08-12; ratified 2026-08-18); no ADR — laziness is a capability nothing has pulled for (principle 6), and the eager answers are pinned by spec so a future lazy tier must preserve them. Whether that tier ever arrives is now a tracked question, [#80](https://github.com/portlandlang/portland/issues/80).
 
 ## Ruby
 

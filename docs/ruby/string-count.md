@@ -2,7 +2,7 @@
 
 **Summary:** `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.
 
-**Status:** decided in practice (the [#23](https://github.com/portlandlang/portland/issues/23) import, 2026-08-12); no ADR — the refusal falls straight out of principle 5, and a future substring-count would be a new name, not a new reading of this one.
+**Status:** decided in practice (the [#23](https://github.com/portlandlang/portland/issues/23) import, 2026-08-12; ratified 2026-08-18); no ADR — the refusal falls straight out of principle 5, and a future substring-count would be a new name, not a new reading of this one. A corpus question is filed ([ruby_research#1](https://github.com/portlandlang/ruby_research/issues/1)): how often real code passes a multi-character argument, and which meaning it intends.
 
 ## Ruby
 
