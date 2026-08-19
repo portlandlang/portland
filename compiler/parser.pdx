@@ -2623,8 +2623,16 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[def enum include struct])
-    if keyword_at?(tokens, position, %w[include])
+  while keyword_at?(tokens, position, %w[alias def enum include struct])
+    if keyword_at?(tokens, position, %w[alias])
+      # `alias footprint area` (ADR 0039) — desugared right here: the body
+      # is self-contained, so the alias clones the def it points at, and
+      # every def-collision rule fires on the new name too.
+      aliased = parse_struct_alias(tokens, position + 1, name, fields, methods, type_functions)
+      return Step.new(node: aliased.node, position: aliased.position) if aliased.node in ErrorNode
+      methods << aliased.node
+      position = skip_newlines_at(tokens, aliased.position)
+    elsif keyword_at?(tokens, position, %w[include])
       unless position + 1 < tokens.length && tokens[position + 1].identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(tokens[position + 1].text.slice(0, 1))
         return Step.new(node: error_node("expected a trait name after include"), position: position + 1)
       end
@@ -2663,6 +2671,48 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+# One trait-body alias: same desugar, the trait's own wordings.
+def parse_trait_alias(tokens, position, trait_name, methods)
+  first = parse_alias_name(tokens, position)
+  return first unless first.node in String
+  second = parse_alias_name(tokens, first.position)
+  return second unless second.node in String
+  new_name = first.node
+  old_name = second.node
+  after = second.position
+  return Step.new(node: error_node("#{new_name} is reserved on structs, so a trait cannot carry it"), position: after) if %w[new nil? some? with].include?(new_name)
+  taken = methods.select { it.name == new_name }
+  return Step.new(node: error_node("duplicate method #{new_name} in trait #{trait_name}"), position: after) unless taken.empty?
+  target = methods.find { it.name == old_name }
+  if target.nil?
+    return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
+  end
+  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false)
+  Step.new(node: twin, position: after)
+end
+
+# One struct-body alias: Step.node is the cloned DefNode under the new
+# name, or an ErrorNode. Wordings are the seed's.
+def parse_struct_alias(tokens, position, struct_name, fields, methods, type_functions)
+  first = parse_alias_name(tokens, position)
+  return first unless first.node in String
+  second = parse_alias_name(tokens, first.position)
+  return second unless second.node in String
+  new_name = first.node
+  old_name = second.node
+  after = second.position
+  return Step.new(node: error_node("#{new_name} is reserved on structs"), position: after) if %w[new nil? some? with].include?(new_name)
+  return Step.new(node: error_node("#{new_name} is a field of #{struct_name} — a name is a field or a method, never both"), position: after) if fields.include?(new_name)
+  taken = methods.select { it.name == new_name } + type_functions.select { it.name == new_name }
+  return Step.new(node: error_node("duplicate method #{new_name} in struct #{struct_name}"), position: after) unless taken.empty?
+  target = methods.find { it.name == old_name }
+  if target.nil?
+    return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
+  end
+  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false)
+  Step.new(node: twin, position: after)
 end
 
 # The struct-body rules for one `def self.` (ADR 0031), each wording the
@@ -2723,7 +2773,14 @@ def parse_trait(tokens, mutable position)
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable methods = []
-  while keyword_at?(tokens, position, %w[def])
+  while keyword_at?(tokens, position, %w[alias def])
+    if keyword_at?(tokens, position, %w[alias])
+      aliased = parse_trait_alias(tokens, position + 1, name, methods)
+      return Step.new(node: aliased.node, position: aliased.position) if aliased.node in ErrorNode
+      methods << aliased.node
+      position = skip_newlines_at(tokens, aliased.position)
+      next
+    end
     method = parse_def(tokens, position + 1)
     # A trait is instance behavior with no state (ADR 0028); a type
     # function has no instance, so it cannot ride one (ADR 0031).

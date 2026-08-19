@@ -27,6 +27,26 @@ module Arithmetic
   alias average mean
 end
 
+trait Loud
+  def shout(word)
+    word.upcase
+  end
+
+  alias holler shout
+end
+
+struct Circle
+  radius
+
+  include Loud
+
+  def area
+    radius * radius * 3
+  end
+
+  alias footprint area
+end
+
 context "alias" do
   describe "a second name for a method" do
     specify "answers exactly what the original answers" do
@@ -45,6 +65,18 @@ context "alias" do
     specify "works inside a module body, qualified like any def" do
       expect(Arithmetic.average([2, 4, 6])).to eq(4)
       expect(Arithmetic.average([2, 4, 6])).to eq(Arithmetic.mean([2, 4, 6]))
+    end
+
+    specify "works inside a struct body — a second name for an instance method" do
+      circle = Circle.new(radius: 2)
+      expect(circle.footprint).to eq(12)
+      expect(circle.footprint).to eq(circle.area)
+    end
+
+    specify "works inside a trait body, and rides include like any method" do
+      circle = Circle.new(radius: 1)
+      expect(circle.holler("quiet")).to eq("QUIET")
+      expect(circle.holler("quiet")).to eq(circle.shout("quiet"))
     end
   end
 end

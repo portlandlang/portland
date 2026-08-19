@@ -1018,6 +1018,48 @@ impl<'source> Parser<'source> {
                 self.skip_newlines();
                 continue;
             }
+            // `alias footprint area` (ADR 0039) — desugared right here: the
+            // body is self-contained, so the alias clones the def it points
+            // at, and every def-collision rule fires on the new name too.
+            if self.peek_is_keyword("alias") {
+                self.position += 1; // the `alias`
+                let new_name = self.alias_name();
+                let old_name = self.alias_name();
+                self.expect_statement_boundary();
+                if matches!(new_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                    panic!("{new_name} is reserved on structs");
+                }
+                if fields.contains(&new_name) {
+                    panic!(
+                        "{new_name} is a field of {name} — a name is a field or a method, never both"
+                    );
+                }
+                if methods.iter().chain(type_functions.iter()).any(|existing| {
+                    matches!(existing, Statement::MethodDefinition { name, .. } if *name == new_name)
+                }) {
+                    panic!("duplicate method {new_name} in struct {name}");
+                }
+                let target = methods.iter().find_map(|existing| match existing {
+                    Statement::MethodDefinition {
+                        body,
+                        keyword_parameters,
+                        name,
+                        parameters,
+                    } if *name == old_name => Some(Statement::MethodDefinition {
+                        body: body.clone(),
+                        keyword_parameters: keyword_parameters.clone(),
+                        name: new_name.clone(),
+                        parameters: parameters.clone(),
+                    }),
+                    _ => None,
+                });
+                let Some(twin) = target else {
+                    panic!("alias points at nothing — no method {old_name} defined yet");
+                };
+                methods.push(twin);
+                self.skip_newlines();
+                continue;
+            }
             let token = self.advance();
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
@@ -1142,6 +1184,40 @@ impl<'source> Parser<'source> {
                     panic!("duplicate method {method_name} in trait {name}");
                 }
                 methods.push(method);
+                self.skip_newlines();
+                continue;
+            }
+            if self.peek_is_keyword("alias") {
+                self.position += 1; // the `alias`
+                let new_name = self.alias_name();
+                let old_name = self.alias_name();
+                self.expect_statement_boundary();
+                if matches!(new_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                    panic!("{new_name} is reserved on structs, so a trait cannot carry it");
+                }
+                if methods.iter().any(|existing| {
+                    matches!(existing, Statement::MethodDefinition { name, .. } if *name == new_name)
+                }) {
+                    panic!("duplicate method {new_name} in trait {name}");
+                }
+                let target = methods.iter().find_map(|existing| match existing {
+                    Statement::MethodDefinition {
+                        body,
+                        keyword_parameters,
+                        name,
+                        parameters,
+                    } if *name == old_name => Some(Statement::MethodDefinition {
+                        body: body.clone(),
+                        keyword_parameters: keyword_parameters.clone(),
+                        name: new_name.clone(),
+                        parameters: parameters.clone(),
+                    }),
+                    _ => None,
+                });
+                let Some(twin) = target else {
+                    panic!("alias points at nothing — no method {old_name} defined yet");
+                };
+                methods.push(twin);
                 self.skip_newlines();
                 continue;
             }
