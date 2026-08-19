@@ -2,7 +2,7 @@
 
 **Summary:** Static and inferred, written only at public boundaries; duck typing becomes structural.
 
-**Status:** design core decided ([ADR 0040](../adr/0040-2026-08-19-inference-the-design-core.md)): parameter contracts are structural from the body — the duck test at compile time, as promised — *sharpened* by concrete types flowed from call sites; traits double as names for shapes; `Maybe[T]` is a wrapper, never a union, with the narrowing forms inventoried. Annotation syntax, generics, and error voice wait deliberately; increments build in [#9](https://github.com/portlandlang/portland/issues/9).
+**Status:** design core decided ([ADR 0040](../adr/0040-2026-08-19-inference-the-design-core.md)): parameter contracts are structural from the body — the duck test at compile time, as promised — _sharpened_ by concrete types flowed from call sites; traits double as names for shapes; `Maybe[T]` is a wrapper, never a union, with the narrowing forms inventoried. Annotation syntax, generics, and error voice wait deliberately; increments build in [#9](https://github.com/portlandlang/portland/issues/9).
 
 ## Ruby
 
@@ -16,7 +16,7 @@ Statically typed, **inferred, not written** — the lean is bidirectional infere
 
 ```ruby
 def find_user(id)     # no annotations anywhere
-  ...
+  # ...
 end                   # inferred: takes an Integer, returns a User?
 ```
 
