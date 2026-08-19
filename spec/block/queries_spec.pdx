@@ -34,6 +34,11 @@ context "the block-taking library" do
       expect([1, 2, 3].find { it > 9 }).to be_nil
     end
 
+    specify "detect is find's twin (ADR 0036)" do
+      expect([1, 2, 3].detect { it > 1 }).to eq(2)
+      expect([1, 2, 3].detect { it > 9 }).to be_nil
+    end
+
     specify "sort_by sorts by the block's answers" do
       expect(%w[bb a ccc].sort_by { it.length }).to eq(["a", "bb", "ccc"])
     end

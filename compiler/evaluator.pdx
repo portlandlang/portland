@@ -1385,7 +1385,9 @@ def evaluate_method_call(node, mutable bindings)
   when "to_s" then to_s_of(receiver, arguments)
   when "gcd" then receiver.gcd(arguments.first)
   when "to_i" then receiver.to_i
-  when "length" then receiver.length
+  # Twins ride their survivor's builtin (ADR 0036); `member?` rides the
+  # host twin because its survivor depends on the receiver's type.
+  when "length", "size" then receiver.length
   when "empty?" then receiver.empty?
   when "upcase" then receiver.upcase
   when "downcase" then receiver.downcase
@@ -1426,7 +1428,8 @@ def evaluate_method_call(node, mutable bindings)
   when "dig" then dig_into(receiver, arguments)
   when "to_a" then receiver.to_a
   when "values" then receiver.values
-  when "key?" then receiver.key?(arguments.first)
+  when "key?", "has_key?" then receiver.key?(arguments.first)
+  when "member?" then receiver.member?(arguments.first)
   when "first" then first_of(receiver, arguments)
   when "last" then last_of(receiver, arguments)
   when "uniq" then receiver.uniq
@@ -1571,7 +1574,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
-  when "map"
+  when "map", "collect"
     results = receiver.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1632,7 +1635,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
-  when "reduce"
+  when "reduce", "inject"
     results = receiver.reduce(arguments.first) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1703,7 +1706,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
-  when "find"
+  when "find", "detect"
     result = receiver.find do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)

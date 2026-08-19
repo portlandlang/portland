@@ -11,5 +11,9 @@ context "String" do
     specify "answers zero for the empty string" do
       expect("").to have_length(0)
     end
+
+    specify "size is its twin (ADR 0036)" do
+      expect("portland".size).to eq(8)
+    end
   end
 end

@@ -11,5 +11,10 @@ context "Array" do
     specify "and misses a non-member" do
       expect([3, 1, 2]).not_to contain(9)
     end
+
+    specify "member? is its twin (ADR 0036)" do
+      expect([3, 1, 2].member?(1)).to be_true
+      expect([3, 1, 2].member?(9)).to be_false
+    end
   end
 end

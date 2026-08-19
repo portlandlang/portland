@@ -1,11 +1,10 @@
 # The hash lookups beyond `[]` — built where owed, noted where decided (#23).
 #
-# From ruby/spec core/hash/{dig,to_a}_spec.rb. Two upstream families are
-# not holes: `fetch` is dropped forever — ADR 0010 kept its stored-nil rule
-# without it, and the miss-takes-a-default spelling is the or-guard — and
-# the alias cluster (`size`, `has_key?`, `include?`, `member?`) waits on
-# #79's scope question: which of Ruby's alias families ship. (Synonyms
-# per se are welcome — principle 3.)
+# From ruby/spec core/hash/{dig,to_a}_spec.rb. One upstream family is not a
+# hole: `fetch` is dropped forever — ADR 0010 kept its stored-nil rule
+# without it, and the miss-takes-a-default spelling is the or-guard. The
+# alias cluster shipped with #79's ruling (ADR 0036): `size`, `has_key?`,
+# `include?`, and `member?` are twins, pinned below.
 
 require_relative "../spec_helper"
 
@@ -24,6 +23,23 @@ context "Hash" do
 
     specify "Hash#to_a answers pairs in insertion order" do
       expect({a: 1, b: 2}.to_a).to eq([[:a, 1], [:b, 2]])
+    end
+  end
+
+  describe "the twins (ADR 0036)" do
+    counts = {a: 1, b: 2}
+
+    specify "size is length's" do
+      expect(counts.size).to eq(2)
+    end
+
+    specify "has_key?, include?, and member? are key?'s — all four ask about keys" do
+      expect(counts.has_key?(:a)).to be_true
+      expect(counts.include?(:a)).to be_true
+      expect(counts.member?(:a)).to be_true
+      expect(counts.has_key?(:zed)).to be_false
+      expect(counts.include?(:zed)).to be_false
+      expect(counts.member?(:zed)).to be_false
     end
   end
 end

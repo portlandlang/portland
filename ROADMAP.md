@@ -76,7 +76,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>`, Comparable-as-a-trait, user types sorting
 - [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
 - [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story, and where the OS surface lives
-- [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: Ruby's other names
+- ✅ [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: the famous twins ship ([ADR 0036](docs/adr/0036-2026-08-18-the-famous-twins-ship.md)); an unshipped alias refuses by naming the survivor
 
 ### Toward the fixpoint
 

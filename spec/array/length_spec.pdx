@@ -11,5 +11,10 @@ context "Array" do
     specify "counts a nested array as one" do
       expect([1, [2, 3]]).to have_length(2)
     end
+
+    specify "size is its twin (ADR 0036)" do
+      expect([3, 1, 2].size).to eq(3)
+      expect([3, 1, 2].size).to eq([3, 1, 2].length)
+    end
   end
 end

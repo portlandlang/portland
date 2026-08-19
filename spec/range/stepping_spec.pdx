@@ -1,9 +1,9 @@
 # Walking a range in strides, and its extremes.
 #
-# From ruby/spec core/range/{step,min,max}_spec.rb. `size` and `count` ride
-# the alias-cluster policy question noted in spec/hash/queries_spec.pdx
-# rather than pending here. `step` answers an array outright — Portland has
-# no lazy enumerator to hand back — so `.to_a` on it is the identity.
+# From ruby/spec core/range/{step,min,max}_spec.rb. `size` and `count`
+# arrived with the alias ruling (ADR 0036) and are pinned below. `step`
+# answers an array outright — Portland has no lazy enumerator to hand back
+# (#80) — so `.to_a` on it is the identity.
 
 require_relative "../spec_helper"
 
@@ -23,6 +23,12 @@ context "Range" do
     specify "the extremes of an empty range are maybes" do
       expect((5..1).max).to be_nil
       expect((1...1).max).to be_nil
+    end
+
+    specify "size and count answer how many elements it walks (ADR 0036)" do
+      expect((1..9).size).to eq(9)
+      expect((1...9).size).to eq(8)
+      expect((1..9).count).to eq(9)
     end
   end
 end

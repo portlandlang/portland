@@ -46,6 +46,11 @@ context "the block-taking library" do
     specify "reduce folds from an initial value" do
       expect(numbers.reduce(10) { |total, number| total + number }).to eq(20)
     end
+
+    specify "collect and inject are the twins of map and reduce (ADR 0036)" do
+      expect(numbers.collect { it * 2 }).to eq(numbers.map { it * 2 })
+      expect(numbers.inject(10) { |total, number| total + number }).to eq(20)
+    end
   end
 
   describe "the number loops" do

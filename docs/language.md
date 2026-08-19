@@ -244,7 +244,7 @@ Implicit return of the last expression, arity-checked calls, trailing default pa
 
 ## Blocks
 
-`do |item| ... end` and `{ |item| ... }` are **dead-identical** (ADR 0016) — Ruby's braces-bind-tighter rule is gone. They work on `each` (arrays, and hashes with `|key, value|`), `each_with_index`, `map`, `select`, `reject`, `reduce(initial)`, `any?`, `all?`, `none?`, `find`, `sort_by`, `flat_map`, `times`, `upto`, `downto`. Blocks are closures; their parameters are block-local.
+`do |item| ... end` and `{ |item| ... }` are **dead-identical** (ADR 0016) — Ruby's braces-bind-tighter rule is gone. They work on `each` (arrays, and hashes with `|key, value|`), `each_with_index`, `map`/`collect`, `select`, `reject`, `reduce(initial)`/`inject`, `any?`, `all?`, `none?`, `find`/`detect`, `sort_by`, `flat_map`, `times`, `upto`, `downto`. Blocks are closures; their parameters are block-local.
 
 Naming **`it`** declares the implicit parameter (ADR 0017):
 
@@ -366,6 +366,8 @@ Read-only, and small on purpose.
 | Hash       | `length empty? key? keys values merge dig to_a` and `[key]`                                                                                                                                    |
 | Range      | `include? to_a step min max`, and everything an array answers, by walking                                                                                                                      |
 | Everything | `to_s`, `nil?`, `some?`                                                                                                                                                                        |
+
+The famous twins ride along ([ADR 0036](adr/0036-2026-08-18-the-famous-twins-ship.md)): `size` everywhere `length` answers, `collect` for `map`, `inject` for `reduce`, `detect` for `find`, `member?` for membership, and Hash's `has_key?`/`include?`/`member?` all asking `key?`'s question. Each shares its survivor's implementation — one behavior, many spellings, drift impossible.
 
 Method chains continue across newlines with a leading dot.
 

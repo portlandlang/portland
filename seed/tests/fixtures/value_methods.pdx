@@ -78,6 +78,9 @@ puts gappy.compact.join(",")
 config = {"name" => "pdx", "port" => "8080"}
 puts config.key?("name").to_s
 puts config.key?("missing").to_s
+puts config.has_key?("name").to_s
+puts config.include?("name").to_s
+puts config.member?("missing").to_s
 puts config.keys.join(",")
 puts config.values.join(",")
 
@@ -103,6 +106,15 @@ end
 counting = [1, 2, 3, 4]
 puts counting.reject { it.even? }.join(",")
 puts counting.select { it.even? }.join(",")
+
+# The famous twins (ADR 0036) — each pinned beside its survivor.
+puts counting.size.to_s
+puts "pdx".size.to_s
+puts counting.member?(3).to_s
+puts counting.collect { it + 1 }.join(",")
+puts counting.inject(0) { |total, number| total + number }.to_s
+first_odd = counting.detect { it.odd? }
+puts first_odd.to_s
 
 # The verdict trio, the finders, and the shapers.
 puts counting.any? { it > 3 }.to_s

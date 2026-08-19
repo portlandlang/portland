@@ -1554,7 +1554,9 @@ impl<W: std::io::Write> Interpreter<W> {
             if name == "to_a" && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
             }
-            if block.is_some() || matches!(name, "length" | "sum" | "first" | "last") {
+            if block.is_some()
+                || matches!(name, "length" | "size" | "count" | "sum" | "first" | "last")
+            {
                 let elements = range_elements(&receiver);
                 return self.method_call(
                     Value::array(elements),
@@ -1585,7 +1587,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
-                (Value::Array(elements), "map", []) => {
+                // Twins share their survivor's arm (ADR 0036): one body, two
+                // names, drift impossible.
+                (Value::Array(elements), "map" | "collect", []) => {
                     let mut results = Vec::new();
                     for element in elements.iter().cloned() {
                         let result = self.run_block(block, vec![element]);
@@ -1607,7 +1611,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
-                (Value::Array(elements), "reduce", [initial]) => {
+                (Value::Array(elements), "reduce" | "inject", [initial]) => {
                     let mut accumulator = initial.clone();
                     for element in elements.iter().cloned() {
                         let result = self.run_block(block, vec![accumulator.clone(), element]);
@@ -1702,7 +1706,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     Some(Value::Boolean(true))
                 }
                 // The first hit — a maybe, like every partial lookup.
-                (Value::Array(elements), "find", []) => {
+                (Value::Array(elements), "find" | "detect", []) => {
                     for element in elements.iter().cloned() {
                         let verdict = self.run_block(block, vec![element.clone()]);
                         if let Some(interrupted) = self.block_interrupt() {
@@ -1841,9 +1845,14 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "last", []) => {
                 elements.last().cloned().map_or(Value::Nil, Value::present)
             }
-            (Value::Array(elements), "length", []) => Value::Integer(elements.len() as i64),
+            // `size` shares `length`'s arm everywhere (ADR 0036).
+            (Value::Array(elements), "length" | "size", []) => {
+                Value::Integer(elements.len() as i64)
+            }
             (Value::Hash(pairs), "empty?", []) => Value::Boolean(pairs.is_empty()),
-            (Value::Hash(pairs), "key?", [key]) => {
+            // Four spellings, one question (ADR 0036) — Ruby's Hash
+            // membership family all asks about keys.
+            (Value::Hash(pairs), "key?" | "has_key?" | "include?" | "member?", [key]) => {
                 Value::Boolean(pairs.iter().any(|(existing, _)| existing == key))
             }
             (Value::Hash(pairs), "keys", []) => {
@@ -1891,11 +1900,11 @@ impl<W: std::io::Write> Interpreter<W> {
                     .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
                     .collect(),
             ),
-            (Value::Hash(pairs), "length", []) => Value::Integer(pairs.len() as i64),
+            (Value::Hash(pairs), "length" | "size", []) => Value::Integer(pairs.len() as i64),
             (Value::Hash(pairs), "values", []) => {
                 Value::array(pairs.iter().map(|(_, value)| value.clone()).collect())
             }
-            (Value::Array(elements), "include?", [needle]) => {
+            (Value::Array(elements), "include?" | "member?", [needle]) => {
                 Value::Boolean(elements.contains(needle))
             }
             // The extremes are maybes (ADR 0010) and answer the element
@@ -2125,7 +2134,9 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "include?", [Value::String(needle)]) => {
                 Value::Boolean(text.contains(needle))
             }
-            (Value::String(text), "length", []) => Value::Integer(text.chars().count() as i64),
+            (Value::String(text), "length" | "size", []) => {
+                Value::Integer(text.chars().count() as i64)
+            }
             (Value::String(text), "reverse", []) => Value::String(text.chars().rev().collect()),
             (Value::String(text), "slice", [Value::Integer(start), Value::Integer(length)]) => {
                 let start = usize::try_from(*start)
