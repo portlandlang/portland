@@ -4,8 +4,12 @@ use std::fmt;
 
 /// No `Eq`: floats are values now (ADR 0018), and IEEE equality is only
 /// partial. Nothing keys a std collection by `Value`, so `PartialEq` is
-/// all the seed needs.
-#[derive(Clone, Debug, PartialEq)]
+/// all the seed needs. Hand-written rather than derived for one arm's sake:
+/// string equality is canonical equivalence (ADR 0038) — composed and
+/// decomposed é are the same text — and it must be canonical *everywhere*
+/// a string can hide (array elements, hash keys, payloads), which is what
+/// the recursion through the other arms buys.
+#[derive(Clone, Debug)]
 pub enum Value {
     /// Rc because Portland values are immutable: sharing is invisible, and
     /// cloning a value must never mean copying a whole collection.
@@ -56,6 +60,74 @@ pub enum Value {
         fields: Vec<(String, Value)>,
         name: String,
     },
+}
+
+/// Two strings are equal when they are the same *text*, not the same bytes
+/// (ADR 0038): NFC-normalized comparison, with the byte-equal and all-ASCII
+/// fast paths taken first. Storage is never normalized — only the question.
+pub fn canonically_equal(left: &str, right: &str) -> bool {
+    if left == right {
+        return true;
+    }
+    if left.is_ascii() && right.is_ascii() {
+        return false;
+    }
+    use unicode_normalization::UnicodeNormalization;
+    left.nfc().eq(right.nfc())
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::String(left), Value::String(right)) => canonically_equal(left, right),
+            (Value::Array(left), Value::Array(right)) => left == right,
+            (Value::Boolean(left), Value::Boolean(right)) => left == right,
+            (
+                Value::EnumCase {
+                    name: left_name,
+                    payload: left_payload,
+                },
+                Value::EnumCase {
+                    name: right_name,
+                    payload: right_payload,
+                },
+            ) => left_name == right_name && left_payload == right_payload,
+            (Value::Float(left), Value::Float(right)) => left == right,
+            (Value::Hash(left), Value::Hash(right)) => left == right,
+            (Value::Integer(left), Value::Integer(right)) => left == right,
+            (Value::Nil, Value::Nil) => true,
+            (
+                Value::Range {
+                    end: left_end,
+                    exclusive: left_exclusive,
+                    start: left_start,
+                },
+                Value::Range {
+                    end: right_end,
+                    exclusive: right_exclusive,
+                    start: right_start,
+                },
+            ) => {
+                left_end == right_end
+                    && left_exclusive == right_exclusive
+                    && left_start == right_start
+            }
+            (Value::Some(left), Value::Some(right)) => left == right,
+            (Value::Failure(left), Value::Failure(right)) => left == right,
+            (Value::Symbol(left), Value::Symbol(right)) => left == right,
+            (
+                Value::Struct {
+                    fields: left_fields,
+                    name: left_name,
+                },
+                Value::Struct {
+                    fields: right_fields,
+                    name: right_name,
+                },
+            ) => left_name == right_name && left_fields == right_fields,
+            _ => false,
+        }
+    }
 }
 
 impl Value {

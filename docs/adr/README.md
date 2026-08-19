@@ -49,6 +49,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0035](0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md) — Exhaustiveness over what the arms reveal
 - [0036](0036-2026-08-18-the-famous-twins-ship.md) — The famous twins ship
 - [0037](0037-2026-08-18-the-loop-spellings.md) — The loop spellings: `until` in, postfix loops in, `loop` in after all
+- [0038](0038-2026-08-19-what-a-character-is.md) — What a character is: graphemes, canonical equality, Unicode casing
 
 <!-- /generated -->
 

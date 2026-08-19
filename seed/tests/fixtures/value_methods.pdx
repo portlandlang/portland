@@ -16,6 +16,12 @@ puts word.end_with?("land").to_s
 puts word.slice(0, 4)
 puts "rose city pdx".split(" ").join("-")
 
+# A character is a grapheme cluster (ADR 0038): one flag, one é.
+puts "🇺🇸".length.to_s
+puts "café".length.to_s
+puts "café".upcase
+puts "🇺🇸ok".reverse
+
 # The trimmers, the case moves, and the searches.
 puts "  rose  ".strip
 puts "  rose".lstrip

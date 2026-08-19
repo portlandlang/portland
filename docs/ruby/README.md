@@ -25,6 +25,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 
 - [Aliases](aliases.md) — The famous twins ship with Ruby's meanings; the long tail of Ruby's remaining aliases refuses by naming the surviving spelling.
 - [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
+- [Characters](characters.md) — A character is a grapheme cluster and string equality is canonical — `"🇺🇸".length` is 1 and composed `é` equals decomposed `é`, where Ruby counts scalars and compares bytes.
 - [`class`: four jobs, four homes](classes.md) — the keyword is gone — declined, not deferred — and its four jobs re-homed: data-with-behavior is a `struct`, shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects wait on the concurrency story.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.

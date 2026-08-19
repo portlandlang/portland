@@ -9,6 +9,7 @@ use crate::ast::{
 };
 use crate::parser;
 use crate::value::Value;
+use unicode_segmentation::UnicodeSegmentation;
 
 /// The integers a range covers. Endless and beginless ranges have no
 /// element list, so asking for one is an error rather than a hang.
@@ -1022,9 +1023,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         Some(Value::array(elements[from..to].to_vec()))
                     }
                     (Value::String(text), Value::Range { .. }) => {
-                        let characters: Vec<char> = text.chars().collect();
-                        let (from, to) = slice_bounds(&index, characters.len());
-                        Some(Value::String(characters[from..to].iter().collect()))
+                        let graphemes: Vec<&str> = text.graphemes(true).collect();
+                        let (from, to) = slice_bounds(&index, graphemes.len());
+                        Some(Value::String(graphemes[from..to].concat()))
                     }
                     (Value::Hash(pairs), key) => Some(
                         pairs
@@ -2139,9 +2140,12 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Integer(number), "odd?", []) => Value::Boolean(number % 2 != 0),
             (Value::Integer(number), "positive?", []) => Value::Boolean(*number > 0),
             (Value::Integer(number), "zero?", []) => Value::Boolean(*number == 0),
+            // A character is a grapheme cluster (ADR 0038): `chars`,
+            // `length`, `reverse`, `slice`, and `index` all count what a
+            // human sees — one flag, one é, however encoded.
             (Value::String(text), "chars", []) => Value::array(
-                text.chars()
-                    .map(|character| Value::String(character.to_string()))
+                text.graphemes(true)
+                    .map(|grapheme| Value::String(grapheme.to_string()))
                     .collect(),
             ),
             (Value::String(text), "downcase", []) => Value::String(text.to_lowercase()),
@@ -2153,15 +2157,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Boolean(text.contains(needle))
             }
             (Value::String(text), "length" | "size", []) => {
-                Value::Integer(text.chars().count() as i64)
+                Value::Integer(text.graphemes(true).count() as i64)
             }
-            (Value::String(text), "reverse", []) => Value::String(text.chars().rev().collect()),
+            (Value::String(text), "reverse", []) => {
+                Value::String(text.graphemes(true).rev().collect())
+            }
             (Value::String(text), "slice", [Value::Integer(start), Value::Integer(length)]) => {
                 let start = usize::try_from(*start)
                     .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                Value::String(text.chars().skip(start).take(length).collect())
+                Value::String(text.graphemes(true).skip(start).take(length).collect())
             }
             (Value::String(text), "split", [Value::String(separator)]) => Value::array(
                 text.split(separator.as_str())
@@ -2260,21 +2266,20 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "index", [Value::String(needle)]) => text
                 .find(needle.as_str())
                 .map_or(Value::Nil, |byte_position| {
-                    Value::Integer(text[..byte_position].chars().count() as i64)
+                    Value::Integer(text[..byte_position].graphemes(true).count() as i64)
                 }),
             // One character only: Ruby's multi-character count is a
             // character-set count, not a substring count, and following it
             // quietly would be principle 5's exact shape — so more refuses.
             (Value::String(text), "count", [Value::String(needle)]) => {
-                if needle.chars().count() != 1 {
+                if needle.graphemes(true).count() != 1 {
                     panic!(
                         "count takes a single character — Ruby's multi-character count is a character set, not a substring, and Portland does not guess"
                     );
                 }
-                let target = needle.chars().next().expect("exactly one character");
                 Value::Integer(
-                    text.chars()
-                        .filter(|character| *character == target)
+                    text.graphemes(true)
+                        .filter(|grapheme| crate::value::canonically_equal(grapheme, needle))
                         .count() as i64,
                 )
             }

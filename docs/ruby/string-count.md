@@ -10,7 +10,7 @@
 
 ## Portland
 
-`count` takes exactly one character and counts its occurrences — the reading both languages agree on:
+`count` takes exactly one character — one *grapheme*, per [ADR 0038](../adr/0038-2026-08-19-what-a-character-is.md), so `count("🇺🇸")` is legal — and counts its occurrences, canonically. The reading both languages agree on:
 
 ```ruby
 "banana".count("a")    # 3, same as Ruby

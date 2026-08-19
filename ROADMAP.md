@@ -72,7 +72,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
 - [#74](https://github.com/portlandlang/portland/issues/74) — regex: literals, engine, and what a match answers
-- [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: what is a character; the Unicode pile is the pull
+- ✅ [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: a character is a grapheme, equality is canonical, casing is full Unicode ([ADR 0038](docs/adr/0038-2026-08-19-what-a-character-is.md)); canonical *search* is the recorded follow-on
 - [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>`, Comparable-as-a-trait, user types sorting
 - [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
 - [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story, and where the OS surface lives

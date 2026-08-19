@@ -1,28 +1,50 @@
-# The parked pile (#23): every multibyte question waits on the
-# string-semantics ADR — the one language.md lists as "no ADR on Unicode,
-# length, or normalization" — because the *expected values* below are
-# unknowable until someone decides what a character is.
+# The character model, decided (ADR 0038): a character is a grapheme
+# cluster — what a human sees — string equality is canonical equivalence
+# — the same text, not the same bytes — and casing is full Unicode,
+# locale-independent. This file held four blockless pendings from the
+# import, parked until someone decided what a character is; these are
+# their answers.
 #
-# What both oracles answer today, by accident of the Rust floor rather than
-# by decision (recorded 2026-08-11, byte-identical hosted and direct):
-#
-#   "café".length   → 4     scalar values, not graphemes or bytes
-#   "🇺🇸".length     → 2     a flag is two regional indicators
-#   "café".chars    → 4 one-scalar strings
-#
-# Ruby answers 4 and 1 respectively — grapheme-aware for the flag through
-# String#grapheme_clusters only, `length` itself being scalar-based like
-# ours. Normalization ("é" composed versus decomposed) is unhandled in both.
-# These pendings are the pull the ADR has been waiting for; their strings
-# carry the questions, and their bodies cannot be written yet.
+# Invisible ink, made visible: the two spellings of café below render
+# identically, but the first é is one composed scalar (U+00E9) and the
+# second is e plus a combining accent (U+0065 U+0301). The whole point
+# of the ADR is that the difference stops being observable.
 
 require_relative "../spec_helper"
 
 context "String" do
-  describe "beyond ASCII" do
-    pending "\"café\".length — is a character a scalar, a grapheme, or a byte? (the string-semantics ADR)"
-    pending "\"🇺🇸\".length — a flag is two scalars and one grapheme (the string-semantics ADR)"
-    pending "composed versus decomposed \"é\" equality — is comparison normalized? (the string-semantics ADR)"
-    pending "\"café\".upcase — casing beyond ASCII (the string-semantics ADR)"
+  describe "what a character is" do
+    specify "a character is what a human sees, however encoded" do
+      expect("café".length).to eq(4)
+      expect("café".length).to eq(4)
+    end
+
+    specify "a flag is one character, not two scalars" do
+      expect("🇺🇸".length).to eq(1)
+      expect("🇺🇸".chars).to have_length(1)
+      expect("🇺🇸".reverse).to eq("🇺🇸")
+    end
+  end
+
+  describe "when two strings are equal" do
+    specify "composed and decomposed é are the same text" do
+      expect("café" == "café").to be_true
+    end
+
+    specify "count sees through the encodings too" do
+      expect("café".count("é")).to eq(1)
+      expect("café".count("é")).to eq(1)
+    end
+  end
+
+  describe "casing beyond ASCII" do
+    specify "is full Unicode, locale-independent" do
+      expect("café".upcase).to eq("CAFÉ")
+      expect("ß".upcase).to eq("SS")
+    end
+
+    specify "and can therefore change a string.length" do
+      expect("ß".upcase.length).to eq(2)
+    end
   end
 end
