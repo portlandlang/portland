@@ -2053,6 +2053,9 @@ def evaluate_call(node, mutable bindings)
     evaluate_require(slot_value(arguments), bindings)
   when "panic"
     panic(slot_value(arguments))
+  when "loop"
+    # Declined with its rewrite in hand (ADR 0037) — the host's words.
+    panic("loop is spelled while true here")
   else
     puts "evaluator: undefined method #{node.name}"
     outcome([], bindings)

@@ -1,0 +1,47 @@
+# `until` — `while`'s negated twin (ADR 0037), the way `unless` is `if`'s.
+# Parses as a `while` with the condition wrapped in `not`; no new node, no
+# new semantics. Ruby's `begin ... end until` do-while mode cannot import:
+# there is no `begin` for it to attach to, so every until is pre-checked.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "until" do
+    specify "loops while its condition stays false" do
+      mutable count = 0
+      until count > 2
+        count += 1
+      end
+      expect(count).to eq(3)
+    end
+
+    specify "whose condition starts true never runs" do
+      mutable touched = false
+      until true
+        touched = true
+      end
+      expect(touched).to be_false
+    end
+  end
+
+  describe "the postfix loop modifiers" do
+    specify "while repeats the one statement" do
+      mutable index = 0
+      index += 1 while index < 3
+      expect(index).to eq(3)
+    end
+
+    specify "until repeats it toward the condition" do
+      mutable back = 5
+      back -= 1 until back < 3
+      expect(back).to eq(2)
+    end
+
+    specify "are pre-checked, never do-while" do
+      mutable ran = false
+      ran = true while false
+      ran = true until true
+      expect(ran).to be_false
+    end
+  end
+end

@@ -311,7 +311,12 @@ impl<'source> Parser<'source> {
             );
         }
         if self.peek_is_keyword("while") {
-            return self.while_statement();
+            return self.while_statement(false);
+        }
+        // `until` is `while`'s negated twin (ADR 0037), the way `unless` is
+        // `if`'s — same loop, condition wrapped in `not`.
+        if self.peek_is_keyword("until") {
+            return self.while_statement(true);
         }
         if self.peek_is_keyword("together") {
             return self.together_block();
@@ -725,6 +730,24 @@ impl<'source> Parser<'source> {
 
     /// Ruby's postfix guards: `puts(x) if ready`, `return 0 unless valid`.
     fn postfix_modifier(&mut self, statement: Statement) -> Statement {
+        // The loop modifiers (ADR 0037): the statement becomes the whole
+        // body of a plain pre-checked loop. Ruby's hidden do-while mode
+        // cannot arise — there is no `begin` for it to attach to.
+        if self.peek_is_keyword("while") || self.peek_is_keyword("until") {
+            let negated = self.peek_is_keyword("until");
+            self.position += 1; // the `while` / `until`
+            let mut condition = self.expression();
+            if negated {
+                condition = Expression::Unary {
+                    operand: Box::new(condition),
+                    operator: UnaryOperator::Not,
+                };
+            }
+            return Statement::While {
+                body: vec![statement],
+                condition,
+            };
+        }
         let negated = if self.peek_is_keyword("if") {
             false
         } else if self.peek_is_keyword("unless") {
@@ -1159,9 +1182,15 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn while_statement(&mut self) -> Statement {
-        self.position += 1; // the `while`
-        let condition = self.expression();
+    fn while_statement(&mut self, negated: bool) -> Statement {
+        self.position += 1; // the `while` or `until`
+        let mut condition = self.expression();
+        if negated {
+            condition = Expression::Unary {
+                operand: Box::new(condition),
+                operator: UnaryOperator::Not,
+            };
+        }
         self.expect_statement_boundary();
         self.skip_newlines();
         let body = self.body_until(&["end"], "while");

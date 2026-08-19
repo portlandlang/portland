@@ -16,19 +16,20 @@
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never learned them and nothing has missed them.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was invented to replace (ADR 0017). `it` covers one parameter; names cover the rest. The polyfill autocorrects `_1 → it` for free.
 - **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase terminators** — squiggly `<<~SQL` is the only opener and terminators are SCREAMING_CAPS; see [heredocs](heredocs.md).
+- **`loop do`** — declined for now ([ADR 0037](../adr/0037-2026-08-18-the-loop-spellings.md)): the refusal says its rewrite, `loop is spelled while true here`. The word can return as a plain stdlib def ([#78](https://github.com/portlandlang/portland/issues/78)) with no grammar cost; Ruby's quiet `StopIteration` rescue rides the enumerator question ([#80](https://github.com/portlandlang/portland/issues/80)) and does not import regardless.
 
 ## Kept, to be clear
 
-Postfix guards, `unless`, `?`/`!` suffixes, `%w[]`, string interpolation, heredocs ([squiggly only](heredocs.md)), blocks, pattern matching. Keyword arguments keep Ruby 3 semantics exactly — labels, defaults referencing earlier parameters, strict positional/keyword separation, and no Ruby 2 hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)). The joy surface is the point; only the footguns and the redundancies die.
+Postfix guards, `unless`, `until` and the postfix loop modifiers ([ADR 0037](../adr/0037-2026-08-18-the-loop-spellings.md) — always pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to), `?`/`!` suffixes, `%w[]`, string interpolation, heredocs ([squiggly only](heredocs.md)), blocks, pattern matching. Keyword arguments keep Ruby 3 semantics exactly — labels, defaults referencing earlier parameters, strict positional/keyword separation, and no Ruby 2 hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)). The joy surface is the point; only the footguns and the redundancies die.
 
 ## Deferred, not removed
 
 Not yet buildable is different from ruled out. These currently give parse errors and are expected to arrive:
 
 - **Splats (`*args`, `**kwargs`)** — deferred by ADR 0014, which shipped the rest of Ruby 3's keyword-argument story. Ruby code using them gets a clean parse error until they land.
-- **Floats** and **ranges** — decided (ADRs 0018, 0019, and [ranges](ranges.md)), not yet built.
-- **Brace blocks** and **`it`** — decided (ADRs 0016, 0017, and [parentheses](parentheses.md)), not yet built.
-- **Symbols** — genuinely undecided and [tabled](../history/2026-07-23-symbols-first-pass.md), entangled with the enum/sum-type question.
+- **`||=`** and **subjectless `case`** — probed by the import, skipped rather than ruled ([#73](https://github.com/portlandlang/portland/issues/73) stays open holding exactly these two).
+
+(Floats, ranges, brace blocks, `it`, and symbols once sat here as undecided or decided-not-built; all are long since decided — symbols by ADR 0023, after the [first-pass tabling](../history/2026-07-23-symbols-first-pass.md) — built, and specced.)
 
 ## Migration
 

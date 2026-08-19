@@ -26,3 +26,17 @@ squares = [1, 2, 3].map do |number|
   number * number
 end
 puts(squares.join(" + ") + " = #{squares.sum}")
+
+# `until` and the postfix loop modifiers (ADR 0037) — while's negated twin,
+# and the one-line loops, all pre-checked.
+mutable countdown = 3
+until countdown.zero?
+  countdown -= 1
+end
+puts "lift off: #{countdown}"
+mutable doubled = 1
+doubled *= 2 while doubled < 10
+puts "doubled to #{doubled}"
+mutable trimmed = 9
+trimmed -= 2 until trimmed < 4
+puts "trimmed to #{trimmed}"

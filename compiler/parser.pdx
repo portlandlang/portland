@@ -1841,7 +1841,8 @@ def parse_statement(tokens, position)
     when "return" then return parse_return(tokens, position + 1)
     when "break" then return Step.new(node: break_node, position: position + 1)
     when "next" then return Step.new(node: next_node, position: position + 1)
-    when "while" then return parse_while(tokens, position + 1)
+    when "while" then return parse_while(tokens, position + 1, false)
+    when "until" then return parse_while(tokens, position + 1, true)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
@@ -2188,7 +2189,9 @@ def brace_ambiguity_message(name, argument, tokens, position)
   "`{` after a command call is a block — but whose? parenthesize the one you mean:\n  a block for #{inner}:  #{name}(#{inner} { ... })\n  a block for #{name}:  #{name}(#{inner}) { ... }"
 end
 
-# Ruby's postfix guards: `puts(x) if ready`, `return unless valid`.
+# Ruby's postfix guards: `puts(x) if ready`, `return unless valid` — and the
+# loop modifiers (ADR 0037), where the statement becomes the whole body of a
+# plain pre-checked loop.
 def parse_statement_with_guard(tokens, position)
   step = parse_statement(tokens, position)
   if keyword_at?(tokens, step.position, %w[if])
@@ -2198,6 +2201,14 @@ def parse_statement_with_guard(tokens, position)
   if keyword_at?(tokens, step.position, %w[unless])
     condition = parse_expression(tokens, step.position + 1)
     return Step.new(node: if_node(condition.node, nil, [step.node]), position: condition.position)
+  end
+  if keyword_at?(tokens, step.position, %w[while])
+    condition = parse_expression(tokens, step.position + 1)
+    return Step.new(node: while_node(condition.node, [step.node]), position: condition.position)
+  end
+  if keyword_at?(tokens, step.position, %w[until])
+    condition = parse_expression(tokens, step.position + 1)
+    return Step.new(node: while_node(unary_node("!", condition.node), [step.node]), position: condition.position)
   end
   step
 end
@@ -2816,11 +2827,15 @@ def parse_unless(tokens, mutable position)
   Step.new(node: error_node("expected end to close unless"), position: position)
 end
 
-def parse_while(tokens, position)
+# `until` is `while`'s negated twin (ADR 0037), the way `unless` is `if`'s —
+# same loop node, condition wrapped in `not`.
+def parse_while(tokens, position, negated)
   condition = parse_expression(tokens, position)
+  mutable test = condition.node
+  test = unary_node("!", test) if negated
   body = parse_body(tokens, condition.position, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: while_node(condition.node, body.node), position: body.position + 1)
+    return Step.new(node: while_node(test, body.node), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close while"), position: body.position)
 end

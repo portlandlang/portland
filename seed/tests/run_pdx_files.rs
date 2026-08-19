@@ -95,7 +95,8 @@ fn runs_tour_pdx() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "hello, portland!\nhello, stranger\nodd sum: 25\nPDX is portland\n1 + 4 + 9 = 14\n"
+        "hello, portland!\nhello, stranger\nodd sum: 25\nPDX is portland\n1 + 4 + 9 = 14\n\
+         lift off: 0\ndoubled to 16\ntrimmed to 3\n"
     );
 }
 
@@ -668,6 +669,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         // an unknown one through as its bare character — accepting a string
         // the seed refused, and silently, since no fixture could hold one.
         ("puts \"a\\qb\"\n", "unknown escape sequence \\q"),
+        // ADR 0037: `loop` is declined with its rewrite in hand.
+        (
+            "loop do\n  puts \"forever\"\nend\n",
+            "loop is spelled while true here",
+        ),
         // ADR 0033: the chained-literal corner and the two integer edges.
         (
             "x = -2.abs ** 2\n",

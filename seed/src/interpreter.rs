@@ -3059,9 +3059,15 @@ impl<W: std::io::Write> Interpreter<W> {
             }
         }
 
-        let method = self
-            .lookup_method(name)
-            .unwrap_or_else(|| panic!("undefined method {name}"));
+        let method = self.lookup_method(name).unwrap_or_else(|| {
+            // Declined with its rewrite in hand (ADR 0037): the word buys a
+            // synonym for a spelling that is already clear, and user code
+            // can define it the day it wants it.
+            if name == "loop" {
+                panic!("loop is spelled while true here");
+            }
+            panic!("undefined method {name}")
+        });
         let required = method
             .parameters
             .iter()
