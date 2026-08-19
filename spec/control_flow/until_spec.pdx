@@ -2,6 +2,7 @@
 # Parses as a `while` with the condition wrapped in `not`; no new node, no
 # new semantics. Ruby's `begin ... end until` do-while mode cannot import:
 # there is no `begin` for it to attach to, so every until is pre-checked.
+# `loop do` lives in loop_spec.pdx.
 
 require_relative "../spec_helper"
 

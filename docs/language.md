@@ -198,7 +198,7 @@ return 0 if count < 0
 
 There is no ternary operator — `?` is not an operator at all, it is part of a name. `then` belongs to `case`, not to `if`.
 
-`if` / `elsif` / `else` / `end`, `unless`, `while` and its negated twin `until` ([ADR 0037](adr/0037-2026-08-18-the-loop-spellings.md)), `case/when` with aligned `when x then y` one-liners, and the postfix modifiers — guards (`return if done?`) and loops (`i += 1 while i < 3`) both. Every loop is pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to. `loop do` is declined — the refusal says its rewrite, `loop is spelled while true here`. Conditions are strict booleans — there is no truthiness, because there is no nil to be falsy.
+`if` / `elsif` / `else` / `end`, `unless`, `while` with its negated twin `until` and `loop do` — `while true` in Ruby's favorite clothes, desugared at parse ([ADR 0037](adr/0037-2026-08-18-the-loop-spellings.md)) — `case/when` with aligned `when x then y` one-liners, and the postfix modifiers: guards (`return if done?`) and loops (`i += 1 while i < 3`) both. Every loop is pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to. Conditions are strict booleans — there is no truthiness, because there is no nil to be falsy.
 
 **A branch that doesn't happen is nil** (ADR 0012): a branchless `if`, a finished `while`, and a call broken out of all produce nil, typed. `puts` alone produces _nothing_ — using its result is an error — because it could never have had an answer. That is the dividing rule: could this ever have produced a value?
 

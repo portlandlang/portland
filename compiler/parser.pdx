@@ -1843,6 +1843,7 @@ def parse_statement(tokens, position)
     when "next" then return Step.new(node: next_node, position: position + 1)
     when "while" then return parse_while(tokens, position + 1, false)
     when "until" then return parse_while(tokens, position + 1, true)
+    when "loop" then return parse_loop(tokens, position + 1)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
     when "struct" then return parse_struct(tokens, position + 1)
@@ -2825,6 +2826,20 @@ def parse_unless(tokens, mutable position)
     return Step.new(node: if_node(condition.node, nil, body.node), position: position + 1)
   end
   Step.new(node: error_node("expected end to close unless"), position: position)
+end
+
+# `loop do ... end` is `while true` in Ruby's favorite clothes (ADR 0037,
+# revised same-day): a keyword form, not a method, so the desugar makes the
+# sameness structural.
+def parse_loop(tokens, position)
+  unless keyword_at?(tokens, position, %w[do])
+    return Step.new(node: error_node("`loop` takes a `do` block — write loop do ... end"), position: position)
+  end
+  body = parse_body(tokens, position + 1, %w[end])
+  if keyword_at?(tokens, body.position, %w[end])
+    return Step.new(node: while_node(boolean_node("true"), body.node), position: body.position + 1)
+  end
+  Step.new(node: error_node("expected end to close loop"), position: body.position)
 end
 
 # `until` is `while`'s negated twin (ADR 0037), the way `unless` is `if`'s —

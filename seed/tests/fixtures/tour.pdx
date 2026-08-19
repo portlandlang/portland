@@ -40,3 +40,11 @@ puts "doubled to #{doubled}"
 mutable trimmed = 9
 trimmed -= 2 until trimmed < 4
 puts "trimmed to #{trimmed}"
+
+# `loop do` — `while true` in Ruby's favorite clothes, left by `break`.
+mutable spins = 0
+loop do
+  spins += 1
+  break if spins > 4
+end
+puts "spun #{spins} times"

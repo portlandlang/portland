@@ -16,11 +16,10 @@
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never learned them and nothing has missed them.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was invented to replace (ADR 0017). `it` covers one parameter; names cover the rest. The polyfill autocorrects `_1 → it` for free.
 - **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase terminators** — squiggly `<<~SQL` is the only opener and terminators are SCREAMING_CAPS; see [heredocs](heredocs.md).
-- **`loop do`** — declined for now ([ADR 0037](../adr/0037-2026-08-18-the-loop-spellings.md)): the refusal says its rewrite, `loop is spelled while true here`. The word can return as a plain stdlib def ([#78](https://github.com/portlandlang/portland/issues/78)) with no grammar cost; Ruby's quiet `StopIteration` rescue rides the enumerator question ([#80](https://github.com/portlandlang/portland/issues/80)) and does not import regardless.
 
 ## Kept, to be clear
 
-Postfix guards, `unless`, `until` and the postfix loop modifiers ([ADR 0037](../adr/0037-2026-08-18-the-loop-spellings.md) — always pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to), `?`/`!` suffixes, `%w[]`, string interpolation, heredocs ([squiggly only](heredocs.md)), blocks, pattern matching. Keyword arguments keep Ruby 3 semantics exactly — labels, defaults referencing earlier parameters, strict positional/keyword separation, and no Ruby 2 hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)). The joy surface is the point; only the footguns and the redundancies die.
+Postfix guards, `unless`, `until`, the postfix loop modifiers, and `loop do` ([ADR 0037](../adr/0037-2026-08-18-the-loop-spellings.md) — every loop pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to; `loop` is a keyword here rather than `Kernel#loop`, so `def loop`, assigning a loop, and the blockless form refuse), `?`/`!` suffixes, `%w[]`, string interpolation, heredocs ([squiggly only](heredocs.md)), blocks, pattern matching. Keyword arguments keep Ruby 3 semantics exactly — labels, defaults referencing earlier parameters, strict positional/keyword separation, and no Ruby 2 hash-to-kwargs autoconversion ([ADR 0014](../adr/0014-2026-07-22-keyword-arguments.md)). The joy surface is the point; only the footguns and the redundancies die.
 
 ## Deferred, not removed
 

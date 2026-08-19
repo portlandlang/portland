@@ -318,6 +318,12 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("until") {
             return self.while_statement(true);
         }
+        // `loop do ... end` is `while true` in Ruby's favorite clothes
+        // (ADR 0037, revised same-day): a keyword form, not a method, so
+        // the desugar makes the sameness structural.
+        if self.peek_is_keyword("loop") {
+            return self.loop_statement();
+        }
         if self.peek_is_keyword("together") {
             return self.together_block();
         }
@@ -1179,6 +1185,22 @@ impl<'source> Parser<'source> {
                 return path;
             }
             self.position += 1; // the `::`
+        }
+    }
+
+    fn loop_statement(&mut self) -> Statement {
+        self.position += 1; // the `loop`
+        if !self.peek_is_keyword("do") {
+            panic!("`loop` takes a `do` block — write loop do ... end");
+        }
+        self.position += 1; // the `do`
+        self.expect_statement_boundary();
+        self.skip_newlines();
+        let body = self.body_until(&["end"], "loop");
+        self.position += 1; // the `end`
+        Statement::While {
+            body,
+            condition: Expression::Boolean(true),
         }
     }
 

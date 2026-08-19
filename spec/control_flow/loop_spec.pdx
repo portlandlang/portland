@@ -1,0 +1,32 @@
+# `loop do ... end` — `while true` in Ruby's favorite clothes (ADR 0037,
+# revised same-day: first declined, then wanted). A keyword form, not a
+# method, desugared at parse to the while node — so break, next, and the
+# per-iteration scope rule are `while`'s by construction, and only the
+# `do` block shape exists (`loop` alone refuses naming the rewrite).
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "loop" do
+    specify "runs until break leaves it" do
+      mutable count = 0
+      loop do
+        count += 1
+        break if count > 2
+      end
+      expect(count).to eq(3)
+    end
+
+    specify "next skips to the following spin" do
+      mutable evens = 0
+      mutable seen = 0
+      loop do
+        seen += 1
+        break if seen > 6
+        next if seen.odd?
+        evens += 1
+      end
+      expect(evens).to eq(3)
+    end
+  end
+end

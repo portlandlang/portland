@@ -1,6 +1,5 @@
-# `while` and its negated twin `until` (ADR 0037); everything else iterates
-# with a block. `loop do` is declined — its refusal names the rewrite
-# (`loop is spelled while true here`), pinned in the seed-wording test.
+# `while`, its negated twin `until`, and `loop do` — `while true` in Ruby's
+# favorite clothes (ADR 0037); everything else iterates with a block.
 
 require_relative "../spec_helper"
 

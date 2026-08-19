@@ -1,6 +1,6 @@
-# 0037 — The loop spellings: `until` in, postfix loops in, `loop` declined
+# 0037 — The loop spellings: `until` in, postfix loops in, `loop` in after all
 
-- **Status:** Accepted (built in both oracles, 2026-08-18)
+- **Status:** Accepted (built in both oracles, 2026-08-18; §3 reversed the same day — see its revision note)
 - **Date:** 2026-08-18
 - **Issue:** [#73](https://github.com/portlandlang/portland/issues/73) — three of its five spellings; `||=` and subjectless `case` stay open there, deliberately unruled
 
@@ -14,13 +14,19 @@ The ruby/spec import probed five spellings Portland had never ruled on ([#73](ht
 
 **2. The postfix loop modifiers ship, both words.** `i += 1 while i < 3` and `attempt until connected?` parse as the block-form loop wrapping the one statement, joining postfix `if`/`unless` so the modifier family is whole. Same wart-shield as above: with no `begin`, a postfix loop is always a plain pre-checked loop — Ruby's hidden do-while mode has nothing to attach to. (This was the batch's weakest call, accepted for family completeness; it is one grammar production per parser and reverts cheaply if real Portland style never uses it.)
 
-**3. `loop do … end` is declined for now, with a survivor-naming refusal:** `loop is spelled while true here`. The word buys a synonym for a spelling that is already clear, at the cost of a new dispatch shape (the first block-only free function). And it is the one spelling in the batch user code can simply define when it wants it — `def loop` + `while true` + `yield` works today, `break` already unwinds correctly through a yielding method (ADR 0025) — so its natural home is the stdlib story ([#78](https://github.com/portlandlang/portland/issues/78)), not the grammar. Ruby's `loop` also quietly rescues `StopIteration`; that attachment rides the enumerator question ([#80](https://github.com/portlandlang/portland/issues/80)) and does not import regardless.
+**3. `loop do … end` ships — as a keyword form desugaring to `while true`.** *Revised the same day it was decided: a first ruling declined it toward the rewrite (`loop is spelled while true here`), and the deciding user reversed within hours — the word is genuinely useful Ruby, liked, and wanted. The decline's own framing supplied the build: the rewrite it named is now the desugar.*
 
-The refusal wording is stated here because no oracle produces it (ADR 0034 §1) — both oracles must say it byte-for-byte, and the wording test pins it.
+`loop` is a keyword, not a method (a departure from Ruby, where it is `Kernel#loop`), and `loop do … end` parses in both oracles to the `while` node with a `true` condition. That shape makes the sameness structural rather than promised: `break`, `next`, the per-iteration scope rule, and a `yield` in the body reaching the enclosing method's block are all `while`'s behaviors because it *is* a `while` — no new dispatch shape, no evaluator work, nothing to drift. Three consequences of the keyword choice, named:
+
+- `def loop` is impossible — the word is reserved, like every loop-control word (`while`, `break`, `next`).
+- `loop` is statement-position like `while`, so `x = loop do … end` refuses. Ruby's answers the `break` value; Portland's `break` carries none, so nothing real is lost.
+- Only the `do` block shape exists; bare `loop` refuses with the wording both oracles share: `` `loop` takes a `do` block — write loop do ... end `` (stated here per ADR 0034 §1, pinned by the wording test).
+
+Ruby's `loop` also quietly rescues `StopIteration`; that attachment rides the enumerator question ([#80](https://github.com/portlandlang/portland/issues/80)) and does not import.
 
 ## Consequences
 
-- The import's probes for `until` and the postfix modifiers flip from refusals into examples; `loop`'s flips into a pinned refusal.
-- `until` and postfix loops are non-differences from Ruby (same meaning, verbatim); `loop`'s decline is the difference, recorded in [removed-syntax.md](../ruby/removed-syntax.md) with its rewrite.
+- The import's probes for all three flip from refusals into examples.
+- `until` and postfix loops are non-differences from Ruby (same meaning, verbatim); `loop`'s differences are the edges of the keyword choice — no `def loop`, no assigning the loop, no blockless form — recorded in [removed-syntax.md](../ruby/removed-syntax.md).
 - Checker: nothing new — both spellings desugar to the `While` node the walker already visits.
 - `||=` and subjectless `case` remain open in #73 on purpose: skipped, not decided, so the issue stays open holding exactly those two.
