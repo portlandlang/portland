@@ -1,0 +1,13 @@
+# The inference debug dump (#9 increment 3a, ADR 0040): one line per
+# top-level binding, `name: Type`. This rendering is a debug surface, not
+# ratified error vocabulary — the error-voice decision owns the real one.
+#
+# Usage: pdx compiler/types.pdx some_file.pdx
+
+require_relative "inference"
+
+source = read_file(argv.first) or panic "types.pdx: cannot read #{argv.first}"
+bindings = infer_program(parse_program(lex(source)))
+bindings.each do |pair|
+  puts "#{pair.first}: #{render_type(type_at(pair, 1))}"
+end

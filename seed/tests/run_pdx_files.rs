@@ -924,6 +924,30 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
     }
 }
 
+/// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
+/// synthesis only, silent by doctrine, and this is the one place a type is
+/// visible. The rendering is a tool surface, not ratified error vocabulary.
+#[test]
+fn portland_types_dumps_synthesized_bindings() {
+    let sample = std::env::temp_dir().join("inference_sample.pdx");
+    std::fs::write(
+        &sample,
+        "count = 42\nname = \"pdx\"\nscores = [1, 2, 3]\nfirst_score = scores.first\ntotal = count + 8\nshouted = \"#{name}!\"\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "types.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "count: Integer\nname: String\nscores: [Integer]\nfirst_score: Integer?\ntotal: Integer\nshouted: String\n"
+    );
+}
+
 /// `check.pdx` — the checker's own door: silence-then-ok on a clean
 /// program, nothing evaluated.
 #[test]

@@ -51,6 +51,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0037](0037-2026-08-18-the-loop-spellings.md) — The loop spellings: `until` in, postfix loops in, `loop` in after all
 - [0038](0038-2026-08-19-what-a-character-is.md) — What a character is: graphemes, canonical equality, Unicode casing
 - [0039](0039-2026-08-19-alias-a-second-name-for-a-method.md) — `alias`: a second name for a method
+- [0040](0040-2026-08-19-inference-the-design-core.md) — Inference: the design core
 
 <!-- /generated -->
 

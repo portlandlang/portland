@@ -1,0 +1,259 @@
+# Stage 1, act four: inference — increment 3a of #9 (ADR 0040).
+#
+# A library: require_relative "inference", then infer_program(nodes) answers
+# [name, type] pairs for the program's top-level bindings. Synthesis only —
+# types are read off literals, locals, operators, and builtin results —
+# and SILENT by doctrine: nothing here refuses anything, the checker does
+# not consume these yet, and the only way to see a type is the debug
+# driver (types.pdx). Inference widens where checks apply; it never gates
+# their existence (ADR 0034 §4).
+#
+# A type is a tagged array, the same crude-on-purpose shape the evaluator
+# uses for values:
+#
+#   ["integer"] ["float"] ["string"] ["boolean"] ["symbol"] ["nil"]
+#   ["range"]
+#   ["array", element]         — element is a type, or ["unknown"]
+#   ["hash", key, value]
+#   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
+#   ["struct", "Name"]
+#   ["unknown"]                — the honest answer, and the default
+#
+# ["unknown"] is principle 4 wearing a type: anything this increment cannot
+# tell stays unknown, and later increments narrow it. Unknown is never an
+# error — it is the absence of an opinion.
+
+require_relative "parser"
+
+# The one entry point: [name, type] pairs for top-level bindings, in
+# binding order, later bindings shadowing earlier ones the way scope does.
+def infer_program(nodes)
+  mutable types = []
+  nodes.each do |node|
+    if node in AssignmentNode
+      inferred = synthesize(node.value, types)
+      types = [[node.name, inferred]] + types
+    end
+  end
+  mutable seen = []
+  mutable ordered = []
+  nodes.each do |node|
+    if (node in AssignmentNode) && !seen.include?(node.name)
+      seen << node.name
+      found = types.find { it[0] == node.name }
+      ordered << [node.name, type_at(found, 1)]
+    end
+  end
+  ordered
+end
+
+# Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
+# checking mode is 3b): every arm answers what it can prove from the node
+# alone plus the bindings already typed.
+def synthesize(node, types)
+  case node
+  in IntegerNode then ["integer"]
+  in FloatNode then ["float"]
+  # Interpolation needs no arm: it desugared to a `+` chain of strings at
+  # parse, and the binary rule answers string for string + string.
+  in StringNode then ["string"]
+  in BooleanNode then ["boolean"]
+  in SymbolNode then ["symbol"]
+  in NilNode then ["nil"]
+  in RangeNode then ["range"]
+  in WordArrayNode then ["array", ["string"]]
+  in ArrayNode then synthesize_array(node, types)
+  in HashNode then synthesize_hash(node, types)
+  in IdentifierNode then synthesize_identifier(node, types)
+  in BinaryNode then synthesize_binary(node, types)
+  in LogicalNode then synthesize_logical(node, types)
+  in UnaryNode then synthesize_unary(node, types)
+  in MethodCallNode then synthesize_call(node, types)
+  else
+    ["unknown"]
+  end
+end
+
+def synthesize_array(node, types)
+  return ["array", ["unknown"]] if node.elements.empty?
+  first = synthesize(node.elements.first, types)
+  mutable uniform = true
+  node.elements.each do |element|
+    uniform = false unless synthesize(element, types) == first
+  end
+  return ["array", first] if uniform
+  ["array", ["unknown"]]
+end
+
+def synthesize_hash(node, types)
+  return ["hash", ["unknown"], ["unknown"]] if node.pairs.empty?
+  first = node.pairs.first
+  key = synthesize(first.key, types)
+  entry = synthesize(first.value, types)
+  mutable uniform = true
+  node.pairs.each do |pair|
+    uniform = false unless synthesize(pair.key, types) == key
+    uniform = false unless synthesize(pair.value, types) == entry
+  end
+  return ["hash", key, entry] if uniform
+  ["hash", ["unknown"], ["unknown"]]
+end
+
+def synthesize_identifier(node, types)
+  found = types.find { it[0] == node.name }
+  return ["unknown"] if found.nil?
+  type_at(found, 1)
+end
+
+# The arithmetic and comparison operators, ADR 0018's shapes: whole numbers
+# stay whole, one float anywhere makes a float, comparisons answer booleans.
+def synthesize_binary(node, types)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  case node.operator
+  when "==", "!=", "<", "<=", ">", ">=" then ["boolean"]
+  when "+", "-", "*", "%"
+    return ["integer"] if left == ["integer"] && right == ["integer"]
+    return ["float"] if numeric?(left) && numeric?(right)
+    return ["string"] if left == ["string"] && right == ["string"]
+    return left if (left in ["array", *]) && (right in ["array", *])
+    ["unknown"]
+  when "/"
+    return ["integer"] if left == ["integer"] && right == ["integer"]
+    return ["float"] if numeric?(left) && numeric?(right)
+    ["unknown"]
+  when "**"
+    # ADR 0033: integer bases stay integers (edges refuse at runtime);
+    # any float anywhere answers a float.
+    return ["integer"] if left == ["integer"] && right == ["integer"]
+    return ["float"] if numeric?(left) && numeric?(right)
+    ["unknown"]
+  else
+    ["unknown"]
+  end
+end
+
+def synthesize_logical(node, types)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  # `a or b` on a maybe answers the plain type (ADR 0040 §3's inventory);
+  # on booleans it stays boolean. Without knowing which, agreement is the
+  # only safe read.
+  return left if left == right
+  return right if left in ["maybe", *]
+  ["unknown"]
+end
+
+def synthesize_unary(node, types)
+  operand = synthesize(node.operand, types)
+  return ["boolean"] if node.operator == "!"
+  return operand if numeric?(operand)
+  ["unknown"]
+end
+
+def numeric?(type)
+  type == ["integer"] || type == ["float"]
+end
+
+# Builtin results, by receiver type and name — the signatures the evaluator
+# already lives by, read back as types. Partial lookups answer maybes
+# (ADR 0040 §3). Unlisted names answer unknown, never an error.
+def synthesize_call(node, types)
+  receiver = synthesize(node.receiver, types)
+  name = node.name
+  case name
+  when "length", "size", "count", "index", "gcd", "pow", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate"
+    synthesize_numeric_answer(receiver, name)
+  when "to_f" then ["float"]
+  when "to_s", "upcase", "downcase", "capitalize", "swapcase", "reverse", "strip", "lstrip", "rstrip", "chomp", "join", "inspect"
+    synthesize_text_answer(receiver, name)
+  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?"
+    ["boolean"]
+  when "chars", "split", "lines" then ["array", ["string"]]
+  when "keys"
+    return ["array", type_at(receiver, 1)] if receiver in ["hash", *]
+    ["array", ["unknown"]]
+  when "values"
+    return ["array", type_at(receiver, 2)] if receiver in ["hash", *]
+    ["array", ["unknown"]]
+  when "first", "last", "min", "max"
+    return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
+    return ["maybe", ["integer"]] if receiver == ["range"]
+    ["unknown"]
+  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries"
+    synthesize_shape_answer(receiver, name)
+  else
+    ["unknown"]
+  end
+end
+
+def synthesize_numeric_answer(receiver, name)
+  case name
+  when "abs", "magnitude", "succ", "pred", "next", "gcd"
+    return receiver if numeric?(receiver)
+    return ["integer"] if name == "gcd"
+    ["unknown"]
+  when "index"
+    return ["maybe", ["integer"]] if receiver == ["string"] || (receiver in ["array", *])
+    ["unknown"]
+  when "sum"
+    # Whole numbers stay whole; anything else about the elements is 3b.
+    return ["integer"] if receiver == ["array", ["integer"]]
+    ["unknown"]
+  when "pow" then receiver
+  when "to_i", "floor", "ceil", "round", "truncate" then ["integer"]
+  else
+    ["integer"]
+  end
+end
+
+def synthesize_text_answer(receiver, name)
+  return ["string"] if name == "to_s" || name == "join" || name == "inspect"
+  return ["string"] if receiver == ["string"]
+  return receiver if receiver in ["array", *]
+  ["unknown"]
+end
+
+def synthesize_shape_answer(receiver, name)
+  case name
+  when "sort", "uniq", "compact", "flatten", "slice"
+    return receiver if receiver in ["array", *]
+    return ["string"] if receiver == ["string"] && name == "slice"
+    ["unknown"]
+  when "merge"
+    return receiver if receiver in ["hash", *]
+    ["unknown"]
+  when "step" then ["array", ["integer"]]
+  when "to_a", "entries"
+    return receiver if receiver in ["array", *]
+    return ["array", ["integer"]] if receiver == ["range"]
+    ["unknown"]
+  else
+    ["unknown"]
+  end
+end
+
+# How a type is written back out, for the debug driver. This rendering is
+# NOT ratified surface — the error-voice decision owns the real spelling —
+# it is the plainest thing that could work in a dump.
+def render_type(type)
+  case type
+  in ["array", element] then "[" + render_type(element) + "]"
+  in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
+  in ["maybe", inner] then render_type(inner) + "?"
+  in ["struct", name] then name
+  else
+    label = type_at(type, 0)
+    label.slice(0, 1).upcase + label.slice(1, label.length - 1)
+  end
+end
+
+# Raw positional read: host indexing lifts nil, and a type cell can hold
+# ["nil"] legitimately.
+def type_at(list, target_index)
+  mutable result = nil
+  list.each_with_index do |element, index|
+    result = element if index == target_index
+  end
+  result
+end
