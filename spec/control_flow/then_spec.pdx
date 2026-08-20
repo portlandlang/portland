@@ -30,6 +30,11 @@ context "control flow" do
       fell = if false then else "fell through" end
       expect(fell).to eq("fell through")
     end
+
+    specify "a one-liner whose condition fails answers nil" do
+      answered = if false then "foo" end
+      expect(answered).to be_nil
+    end
   end
 
   describe "then as a bare separator" do

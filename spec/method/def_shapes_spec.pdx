@@ -23,6 +23,8 @@ end
 
 def answer = 42
 
+def blank() = 42
+
 def double(number) = number * 2
 
 def cautious = "ran" if false
@@ -64,6 +66,10 @@ context "the def shapes" do
   describe "endless defs" do
     specify "hold one expression" do
       expect(answer).to eq(42)
+    end
+
+    specify "take empty parens" do
+      expect(blank).to eq(42)
     end
 
     specify "take parenthesized parameters" do

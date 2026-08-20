@@ -27,6 +27,12 @@ context "or-equals" do
       greeting ||= "hi"
       expect(greeting.upcase).to eq("HI")
     end
+
+    specify "never evaluates the right side of a hit" do
+      mutable found = [7].first
+      found ||= panic("unreachable")
+      expect(found).to eq(7)
+    end
   end
 
   describe "on a slot" do
@@ -56,6 +62,12 @@ context "or-equals" do
       key = "a"
       counts[key.upcase] ||= 1
       expect(counts["A"]).to eq(1)
+    end
+
+    specify "a present slot never evaluates the right side" do
+      mutable counts = {"a" => 1}
+      counts["a"] ||= panic("unreachable")
+      expect(counts["a"]).to eq(1)
     end
   end
 
