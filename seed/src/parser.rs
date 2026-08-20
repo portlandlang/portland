@@ -997,7 +997,7 @@ impl<'source> Parser<'source> {
                 if type_function {
                     // `new` is definable on the type (ADR 0031); the rest of
                     // the reserved set stays reserved on both sides.
-                    if matches!(method_name.as_str(), "nil?" | "some?" | "with") {
+                    if matches!(method_name.as_str(), "failure?" | "nil?" | "some?" | "with") {
                         panic!("{method_name} is reserved on structs");
                     }
                     if instance_taken {
@@ -1010,7 +1010,10 @@ impl<'source> Parser<'source> {
                     }
                     type_functions.push(method);
                 } else {
-                    if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                    if matches!(
+                        method_name.as_str(),
+                        "failure?" | "new" | "nil?" | "some?" | "with"
+                    ) {
                         panic!("{method_name} is reserved on structs");
                     }
                     if type_taken {
@@ -1034,7 +1037,10 @@ impl<'source> Parser<'source> {
                 let new_name = self.alias_name();
                 let old_name = self.alias_name();
                 self.expect_statement_boundary();
-                if matches!(new_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                if matches!(
+                    new_name.as_str(),
+                    "failure?" | "new" | "nil?" | "some?" | "with"
+                ) {
                     panic!("{new_name} is reserved on structs");
                 }
                 if fields.contains(&new_name) {
@@ -1183,7 +1189,10 @@ impl<'source> Parser<'source> {
                         "a trait cannot define def self.{method_name} — a type function lives on the struct that includes it"
                     );
                 }
-                if matches!(method_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                if matches!(
+                    method_name.as_str(),
+                    "failure?" | "new" | "nil?" | "some?" | "with"
+                ) {
                     panic!("{method_name} is reserved on structs, so a trait cannot carry it");
                 }
                 if methods.iter().any(|existing| {
@@ -1200,7 +1209,10 @@ impl<'source> Parser<'source> {
                 let new_name = self.alias_name();
                 let old_name = self.alias_name();
                 self.expect_statement_boundary();
-                if matches!(new_name.as_str(), "new" | "nil?" | "some?" | "with") {
+                if matches!(
+                    new_name.as_str(),
+                    "failure?" | "new" | "nil?" | "some?" | "with"
+                ) {
                     panic!("{new_name} is reserved on structs, so a trait cannot carry it");
                 }
                 if methods.iter().any(|existing| {

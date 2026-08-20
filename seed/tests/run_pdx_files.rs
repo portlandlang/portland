@@ -588,6 +588,12 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "it = 1\n[2].each { puts it }\n",
             "`it` is a local here and a block parameter there — rename one",
         ),
+        // ADR 0044: the propagation predicate cannot be lied about — a
+        // struct defining its own failure? would corrupt every guard.
+        (
+            "struct Liar\n  text\n\n  def failure?\n    true\n  end\nend\n",
+            "failure? is reserved on structs",
+        ),
         // ADR 0044: `!` belongs to method names (Ruby's rule) and a failure
         // demands handling before use.
         (
