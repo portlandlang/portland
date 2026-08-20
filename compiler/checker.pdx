@@ -88,10 +88,14 @@ def check_node(node, enums)
     check_parameters(parameters, enums)
     check_body(body, enums)
   in StructDefNode(methods:, nested:, type_functions:)
+    check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs")
+    check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs")
     check_body(methods, enums)
     check_body(type_functions, enums)
     check_body(nested, enums)
-  in TraitDefNode(methods:) then check_body(methods, enums)
+  in TraitDefNode(methods:)
+    check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it")
+    check_body(methods, enums)
   in ModuleDefNode(body:) then check_body(body, enums)
   in WhileNode(condition:, body:)
     check_node(condition, enums)
@@ -216,6 +220,22 @@ def check_pattern(pattern, enums)
 end
 
 # — the checks themselves —
+
+# Family three (#86): the reserved names, one list in one place. The seed
+# refuses these at parse — its refusals stay, as the runtime preview — but
+# the compiler's parser used to carry five separate copies of this list,
+# which is how `failure?` missed every one of them for three weeks and how
+# instance defs missed the check entirely. `new` is reserved on instances
+# and definable as a type function (ADR 0031), which is why the two calls
+# pass different lists. Aliases need no case of their own: a struct or
+# trait alias desugars at parse into a clone of the def it points at, so
+# the clone walks through here like any def.
+def check_reserved(methods, names, wording)
+  methods.each do |method|
+    next unless method in DefNode
+    panic "#{method.name} #{wording}" if names.include?(method.name)
+  end
+end
 
 def cases_named(enums, name)
   enums.select { it[0] == name }

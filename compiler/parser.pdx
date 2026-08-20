@@ -2613,13 +2613,7 @@ def parse_struct(tokens, mutable position)
         return Step.new(node: checked, position: method.position) if checked in ErrorNode
         type_functions << method.node
       else
-        # The universal predicates and `with` are reserved on instances too
-        # — a struct that defines its own failure? could lie to every
-        # propagation guard (ADR 0044). The seed's wording; this path was a
-        # silent hosted gap until the failure? probe found it.
-        if (method.node in DefNode) && %w[failure? new nil? some? with].include?(method.node.name)
-          return Step.new(node: error_node("#{method.node.name} is reserved on structs"), position: method.position)
-        end
+        # Reserved names are the checker's job now (#86) — one list, one walk.
         if (method.node in DefNode) && !type_functions.select { it.name == method.node.name }.empty?
           return Step.new(node: error_node("#{method.node.name} is defined on #{name} instances and on the type — rename one"), position: method.position)
         end
@@ -2654,7 +2648,6 @@ def parse_trait_alias(tokens, position, trait_name, methods)
   new_name = first.node
   old_name = second.node
   after = second.position
-  return Step.new(node: error_node("#{new_name} is reserved on structs, so a trait cannot carry it"), position: after) if %w[failure? new nil? some? with].include?(new_name)
   taken = methods.select { it.name == new_name }
   return Step.new(node: error_node("duplicate method #{new_name} in trait #{trait_name}"), position: after) unless taken.empty?
   target = methods.find { it.name == old_name }
@@ -2675,7 +2668,6 @@ def parse_struct_alias(tokens, position, struct_name, fields, methods, type_func
   new_name = first.node
   old_name = second.node
   after = second.position
-  return Step.new(node: error_node("#{new_name} is reserved on structs"), position: after) if %w[failure? new nil? some? with].include?(new_name)
   return Step.new(node: error_node("#{new_name} is a field of #{struct_name} — a name is a field or a method, never both"), position: after) if fields.include?(new_name)
   taken = methods.select { it.name == new_name } + type_functions.select { it.name == new_name }
   return Step.new(node: error_node("duplicate method #{new_name} in struct #{struct_name}"), position: after) unless taken.empty?
@@ -2691,7 +2683,6 @@ end
 # seed's: the node back when it passes, an ErrorNode when it refuses.
 def check_type_function(struct_name, fields, methods, type_functions, node)
   return error_node("#{node.name} is a field of #{struct_name} — a name is a field or a method, never both") if fields.include?(node.name)
-  return error_node("#{node.name} is reserved on structs") if %w[failure? nil? some? with].include?(node.name)
   return error_node("#{node.name} is defined on #{struct_name} instances and on the type — rename one") unless methods.select { (it in DefNode) && it.name == node.name }.empty?
   return error_node("duplicate method #{node.name} in struct #{struct_name}") unless type_functions.select { it.name == node.name }.empty?
   node
@@ -2758,9 +2749,6 @@ def parse_trait(tokens, mutable position)
     # function has no instance, so it cannot ride one (ADR 0031).
     if (method.node in DefNode) && method.node.type_function
       return Step.new(node: error_node("a trait cannot define def self.#{method.node.name} — a type function lives on the struct that includes it"), position: method.position)
-    end
-    if (method.node in DefNode) && %w[failure? new nil? some? with].include?(method.node.name)
-      return Step.new(node: error_node("#{method.node.name} is reserved on structs, so a trait cannot carry it"), position: method.position)
     end
     methods << method.node
     position = skip_newlines_at(tokens, method.position)
