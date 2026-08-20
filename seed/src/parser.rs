@@ -427,6 +427,27 @@ impl<'source> Parser<'source> {
                 value,
             };
         }
+        // `x ||= e` desugars to `x = x || e` (ADR 0043): the or-guard's
+        // question as a rebind — absent takes the fallback, a Boolean left
+        // refuses (ADR 0007, the false-clobbering trap dying loudly), and
+        // `mutable` is required like every compound.
+        if self.peek_kind() == Some(TokenKind::Identifier)
+            && self.peek_kind_at(1) == Some(TokenKind::PipePipeEqual)
+        {
+            let name = self.advance().text.to_string();
+            Self::refuse_bang_binding(&name);
+            self.position += 1; // the `||=`
+            let value = Expression::Logical {
+                left: Box::new(Expression::Variable(name.clone())),
+                operator: LogicalOperator::Or,
+                right: Box::new(self.expression()),
+            };
+            return Statement::Assignment {
+                mutable: false,
+                name,
+                value,
+            };
+        }
         // `name << value` — rebinding append (ADR 0015), statement position
         // only, so Ruby's three-way `<<` lexer pileup never returns.
         if self.peek_kind() == Some(TokenKind::Identifier)

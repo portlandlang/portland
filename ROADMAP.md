@@ -77,7 +77,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
 - [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story, and where the OS surface lives
 - ✅ [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: the famous twins ship ([ADR 0036](docs/adr/0036-2026-08-18-the-famous-twins-ship.md)); an unshipped alias refuses by naming the survivor
-- [#73](https://github.com/portlandlang/portland/issues/73) — five probed spellings: `until`, the postfix loops, and `loop do` shipped ([ADR 0037](docs/adr/0037-2026-08-18-the-loop-spellings.md), §3 reversed same-day); `||=` and subjectless `case` still open there
+- ✅ [#73](https://github.com/portlandlang/portland/issues/73) — five probed spellings, all resolved: `until`, the postfix loops, `loop do` ([ADR 0037](docs/adr/0037-2026-08-18-the-loop-spellings.md)), and `||=` ([ADR 0043](docs/adr/0043-2026-08-19-or-equals.md)) shipped; subjectless `case` declined with [#84](https://github.com/portlandlang/portland/issues/84) standing
 
 ### Toward the fixpoint
 

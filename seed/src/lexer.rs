@@ -40,6 +40,8 @@ pub enum TokenKind {
     PercentEqual,
     Pipe,
     PipePipe,
+    /// `||=` — or-equals, the compound family's last member (ADR 0043).
+    PipePipeEqual,
     Plus,
     PlusEqual,
     RightBrace,
@@ -272,7 +274,13 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
                     ('&', Some('.')) => (TokenKind::AmpersandDot, 2),
                     ('&', _) => panic!("unexpected character '&' at byte {start}"),
-                    ('|', Some('|')) => (TokenKind::PipePipe, 2),
+                    ('|', Some('|')) => {
+                        if source[start..].starts_with("||=") {
+                            (TokenKind::PipePipeEqual, 3)
+                        } else {
+                            (TokenKind::PipePipe, 2)
+                        }
+                    }
                     ('|', _) => (TokenKind::Pipe, 1),
                     ('=', Some('=')) => (TokenKind::EqualEqual, 2),
                     ('=', Some('>')) => (TokenKind::FatArrow, 2),
@@ -302,7 +310,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('^', _) => (TokenKind::Caret, 1),
                     _ => unreachable!(),
                 };
-                if length == 2 {
+                for _ in 1..length {
                     chars.next();
                 }
                 tokens.push(Token {

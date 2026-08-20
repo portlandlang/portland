@@ -1904,6 +1904,14 @@ def parse_statement(tokens, position)
     desugared = binary_node(operator, identifier_node(token.text), value.node)
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
+  # `x ||= e` desugars to `x = x || e` (ADR 0043): the or-guard's question
+  # as a rebind — absent takes the fallback, a Boolean left refuses
+  # (ADR 0007), and `mutable` is required like every compound.
+  if token.identifier? && operator_at?(tokens, position + 1, %w[||=])
+    value = parse_expression(tokens, position + 2)
+    desugared = logical_node("||", identifier_node(token.text), value.node)
+    return Step.new(node: assignment_node(token.text, desugared), position: value.position)
+  end
   step = parse_expression(tokens, position)
   # `name[index] = value` — a functional update rebound on the name.
   if operator_at?(tokens, step.position, %w[=]) && (step.node in IndexNode) && (step.node.receiver in IdentifierNode)

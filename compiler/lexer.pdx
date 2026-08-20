@@ -64,7 +64,7 @@ end
 
 # `...` and `<<~` — the only three-character operators (ADRs 0019, 0020).
 def three_character_operator?(triple)
-  %w[... <<~].include?(triple)
+  %w[... <<~ ||=].include?(triple)
 end
 
 def one_character_operator?(character)

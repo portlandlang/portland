@@ -1,0 +1,39 @@
+# `||=` — or-equals (ADR 0043, the last of #73's five spellings): sugar for
+# `x = x || fallback`. On a maybe it is the or-guard's question as a rebind
+# — absent takes the fallback, present is kept. On a plain Boolean it is
+# boolean-or, well-typed and Ruby-identical in outcome; the guard against
+# Ruby's false-clobbering trap is the *static* Boolean?-under-or check,
+# deliberately deferred with the rest of the maybe refusals (ADR 0040 §3).
+# `mutable` is required like every compound; an unbound name refuses.
+
+require_relative "../spec_helper"
+
+context "or-equals" do
+  describe "on a maybe" do
+    specify "fills absence with the fallback" do
+      mutable name = [].first
+      name ||= "friend"
+      expect(name).to eq("friend")
+    end
+
+    specify "keeps a present value" do
+      mutable found = [7].first
+      found ||= 0
+      expect(found).to eq(7)
+    end
+
+    specify "narrows — the binding is plain below" do
+      mutable greeting = [].first
+      greeting ||= "hi"
+      expect(greeting.upcase).to eq("HI")
+    end
+  end
+
+  describe "on a plain Boolean" do
+    specify "is boolean-or, stated as fact" do
+      mutable flag = false
+      flag ||= true
+      expect(flag).to be_true
+    end
+  end
+end

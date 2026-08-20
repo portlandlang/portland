@@ -96,8 +96,8 @@ fn runs_tour_pdx() {
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
         "hello, portland!\nhello, stranger\nhello, rose city!\nodd sum: 25\nPDX is portland\n\
-         1 + 4 + 9 = 14\nlift off: 0\ndoubled to 16\ntrimmed to 3\nbracket: medium\n\
-         parity: even\nspun 5 times\n"
+         1 + 4 + 9 = 14\nlift off: 0\ndoubled to 16\ntrimmed to 3\naka stumptown\n\
+         bracket: medium\nparity: even\nspun 5 times\n"
     );
 }
 
@@ -680,6 +680,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         // false aliases, and the refusal names the real conversion.
         ("x = 5.to_int\n", "to_int is spelled to_i here"),
         ("x = \"5\".to_str\n", "to_str is spelled to_s here"),
+        // `||=` is a compound like any other (ADR 0043): mutable required.
+        (
+            "name = \"set\"\nname ||= \"other\"\n",
+            "name is immutable — declare it `mutable name = ...` if it needs to change",
+        ),
         // Subjectless case declines toward if/elsif (#84).
         (
             "case\nwhen true then puts \"x\"\nend\n",

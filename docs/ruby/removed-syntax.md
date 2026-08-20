@@ -27,7 +27,7 @@ Postfix guards, `unless`, `until`, the postfix loop modifiers, and `loop do` ([A
 Not yet buildable is different from ruled out. These currently give parse errors and are expected to arrive:
 
 - **Splats (`*args`, `**kwargs`)** — deferred by ADR 0014, which shipped the rest of Ruby 3's keyword-argument story. Ruby code using them gets a clean parse error until they land.
-- **`||=`** — probed by the import, skipped rather than ruled ([#73](https://github.com/portlandlang/portland/issues/73) stays open holding exactly this one).
+- **`&&=`** — undecided on purpose: its maybe personality would silently decide `and`-on-a-maybe semantics, and [ruby_research#2](https://github.com/portlandlang/ruby_research/issues/2) sizes whether the idiom outlived `&.` at all. (`||=` shipped — [ADR 0043](../adr/0043-2026-08-19-or-equals.md).)
 
 (Floats, ranges, brace blocks, `it`, and symbols once sat here as undecided or decided-not-built; all are long since decided — symbols by ADR 0023, after the [first-pass tabling](../history/2026-07-23-symbols-first-pass.md) — built, and specced.)
 
