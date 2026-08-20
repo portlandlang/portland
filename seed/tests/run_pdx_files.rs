@@ -1001,6 +1001,35 @@ fn portland_types_dumps_synthesized_bindings() {
     );
 }
 
+/// Increment 3b (#9): method returns read off bodies — defaults lend
+/// their parameter types, early returns must agree with the last
+/// statement, a missing else makes a maybe — block parameters bound from
+/// receivers, an empty literal's element refined by its first append,
+/// user calls flowing their computed returns, and the def lines carrying
+/// ADR 0041's annotation echoed only on disagreement. Dump-only: the
+/// lying annotation refuses nothing here; the error-voice session gates
+/// the first refusals.
+#[test]
+fn portland_types_dumps_method_returns() {
+    let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "types.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\n"
+    );
+}
+
 /// `check.pdx` — the checker's own door: silence-then-ok on a clean
 /// program, nothing evaluated.
 #[test]

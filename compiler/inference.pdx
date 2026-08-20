@@ -1,12 +1,14 @@
-# Stage 1, act four: inference — increment 3a of #9 (ADR 0040).
+# Stage 1, act four: inference — increments 3a and 3b of #9 (ADR 0040).
 #
 # A library: require_relative "inference", then infer_program(nodes) answers
-# [name, type] pairs for the program's top-level bindings. Synthesis only —
-# types are read off literals, locals, operators, and builtin results —
-# and SILENT by doctrine: nothing here refuses anything, the checker does
-# not consume these yet, and the only way to see a type is the debug
-# driver (types.pdx). Inference widens where checks apply; it never gates
-# their existence (ADR 0034 §4).
+# [name, type] pairs for the program's top-level bindings, and
+# infer_methods(nodes) the same for its top-level defs' return types (3b).
+# Synthesis only — types are read off literals, locals, operators, builtin
+# results, def bodies, and block bodies with parameters bound from their
+# receivers — and SILENT by doctrine: nothing here refuses anything, the
+# checker does not consume these yet, and the only way to see a type is the
+# debug driver (types.pdx). Inference widens where checks apply; it never
+# gates their existence (ADR 0034 §4).
 #
 # A type is a tagged array, the same crude-on-purpose shape the evaluator
 # uses for values:
@@ -25,24 +27,46 @@
 
 require_relative "parser"
 
-# The one entry point: [name, type] pairs for top-level bindings, in
-# binding order, later bindings shadowing earlier ones the way scope does.
+# The entry points: [name, type] pairs in first-appearance order — the
+# program's top-level bindings, and (3b) its top-level defs' return types.
+# One scan feeds both. A method's name can share the list with the locals
+# because the no-shadow rule already promises a name is never both.
 def infer_program(nodes)
+  ordered_pairs(nodes, scan_program(nodes), "assignment")
+end
+
+def infer_methods(nodes)
+  ordered_pairs(nodes, scan_program(nodes), "def")
+end
+
+def scan_program(nodes)
   mutable types = []
   nodes.each do |node|
     if node in AssignmentNode
       inferred = synthesize(node.value, types)
       types = [[node.name, inferred]] + types
+    elsif node in DefNode
+      types = [[node.name, synthesize_def_return(node, types)]] + types
+    elsif node in StructDefNode
+      types = [[node.name, ["struct", node.name]]] + types
+    elsif node in EnumDefNode
+      # Recorded so a later increment can hang membership and
+      # exhaustiveness off the name; nothing reads it yet.
+      types = [[node.name, ["enum", node.name]]] + types
     end
   end
+  types
+end
+
+def ordered_pairs(nodes, types, kind)
   mutable seen = []
   mutable ordered = []
   nodes.each do |node|
-    if (node in AssignmentNode) && !seen.include?(node.name)
-      seen << node.name
-      found = types.find { it[0] == node.name }
-      ordered << [node.name, type_at(found, 1)]
-    end
+    next unless node.kind == kind
+    next if seen.include?(node.name)
+    seen << node.name
+    found = types.find { it[0] == node.name }
+    ordered << [node.name, type_at(found, 1)]
   end
   ordered
 end
@@ -69,6 +93,11 @@ def synthesize(node, types)
   in LogicalNode then synthesize_logical(node, types)
   in UnaryNode then synthesize_unary(node, types)
   in MethodCallNode then synthesize_call(node, types)
+  # A bare call reaches a def the scan already typed (3b); its name shares
+  # the list with the locals under the no-shadow rule.
+  in CallNode then synthesize_name(node.name, types)
+  in IfNode then synthesize_if(node, types)
+  in AppendNode then synthesize_append(node, types)
   else
     ["unknown"]
   end
@@ -99,8 +128,141 @@ def synthesize_hash(node, types)
   ["hash", ["unknown"], ["unknown"]]
 end
 
+# A def's return type (3b): parameters enter as unknown — the hybrid
+# caller-flow half of ADR 0040 is a later increment — except that a
+# default lends its type. The body reads in order; early returns and the
+# last statement must agree, a lone nil among them makes a maybe, and any
+# other disagreement is an opinion withheld.
+def synthesize_def_return(node, mutable types)
+  node.parameters.each do |parameter|
+    types = [[parameter.name, parameter_type(parameter, types)]] + types
+  end
+  synthesize_body(node.body, types)
+end
+
+def parameter_type(parameter, types)
+  if (parameter in AssignmentNode) && parameter.value.some?
+    return synthesize(parameter.value, types)
+  end
+  if (parameter in KeywordParameterNode) && parameter.default.some?
+    return synthesize(parameter.default, types)
+  end
+  ["unknown"]
+end
+
+# A statement body's answer: assignments thread their types, early returns
+# join the last statement as candidates, and merge_candidates rules.
+def synthesize_body(body, mutable types)
+  mutable early = []
+  mutable last = ["nil"]
+  body.each do |statement|
+    early += return_types_in(statement, types)
+    if statement in AssignmentNode
+      last = synthesize(statement.value, types)
+      types = [[statement.name, last]] + types
+    elsif statement in ReturnNode
+      last = return_answer(statement, types)
+    else
+      last = synthesize(statement, types)
+    end
+  end
+  merge_candidates(early + [last])
+end
+
+def return_answer(statement, types)
+  return ["nil"] if statement.value.nil?
+  synthesize(statement.value, types)
+end
+
+# Every `return`'s type inside a statement, walking the branching forms.
+def return_types_in(node, types)
+  case node
+  in ReturnNode then [return_answer(node, types)]
+  in IfNode
+    mutable found = []
+    found += returns_in_body(node.then_body, types)
+    found += returns_in_body(node.else_body, types)
+    found
+  in WhileNode then returns_in_body(node.body, types)
+  in CaseNode | CaseInNode
+    mutable found = []
+    node.branches.each do |branch|
+      found += returns_in_body(branch.body, types)
+    end
+    found += returns_in_body(node.else_body, types)
+    found
+  else
+    []
+  end
+end
+
+def returns_in_body(body, types)
+  return [] if body.nil?
+  mutable found = []
+  body.each do |statement|
+    found += return_types_in(statement, types)
+  end
+  found
+end
+
+# Agreement answers the type; a lone nil among agreeing others makes a
+# maybe (the branch that answers nothing, ADR 0012); anything else is
+# unknown.
+def merge_candidates(candidates)
+  mutable unique = []
+  candidates.each do |candidate|
+    unique << candidate unless unique.include?(candidate)
+  end
+  if unique.length <= 1
+    only = unique.first or ["unknown"]
+    return only
+  end
+  if unique.length == 2 && unique.include?(["nil"])
+    other = unique.find { it != ["nil"] } or ["unknown"]
+    return maybe_of(other)
+  end
+  ["unknown"]
+end
+
+def maybe_of(type)
+  return type if (type in ["maybe", *]) || type == ["nil"] || type == ["unknown"]
+  ["maybe", type]
+end
+
+# An if in value position (the ternary desugars here too, ADR 0046):
+# agreeing branches answer their type, an absent or nil branch makes a
+# maybe of the other.
+def synthesize_if(node, types)
+  yes = branch_answer(node.then_body, types)
+  no = branch_answer(node.else_body, types)
+  merge_candidates([yes, no])
+end
+
+def branch_answer(body, types)
+  return ["nil"] if body.nil? || body.empty?
+  synthesize_body(body, types)
+end
+
+# `name << value` (3b): the append that first fills an empty literal names
+# its element type — `mutable box = []` then `box << 3` reads as
+# [Integer]. Strings stay strings; a disagreeing element widens back to
+# unknown elements.
+def synthesize_append(node, types)
+  current = synthesize_name(node.name, types)
+  return ["string"] if current == ["string"]
+  value = synthesize(node.value, types)
+  return ["array", value] if current == ["array", ["unknown"]]
+  return current if (current in ["array", *]) && type_at(current, 1) == value
+  return ["array", ["unknown"]] if current in ["array", *]
+  ["unknown"]
+end
+
 def synthesize_identifier(node, types)
-  found = types.find { it[0] == node.name }
+  synthesize_name(node.name, types)
+end
+
+def synthesize_name(name, types)
+  found = types.find { it[0] == name }
   return ["unknown"] if found.nil?
   type_at(found, 1)
 end
@@ -160,8 +322,14 @@ end
 # (ADR 0040 §3). Unlisted names answer unknown, never an error.
 def synthesize_call(node, types)
   receiver = synthesize(node.receiver, types)
+  return synthesize_block_call(node, receiver, types) if node.block.some?
   name = node.name
   case name
+  when "new"
+    # `Name.new(...)` — the scan bound the struct's name (3b); the name is
+    # not a value, so the binding can only mean this.
+    return receiver if receiver in ["struct", *]
+    ["unknown"]
   when "length", "size", "count", "index", "gcd", "pow", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate"
     synthesize_numeric_answer(receiver, name)
   when "to_f" then ["float"]
@@ -233,6 +401,43 @@ def synthesize_shape_answer(receiver, name)
   end
 end
 
+# Block calls (3b): the parameters' types are read off the receiver — an
+# array lends its element, a hash its key then value, a range integers —
+# the body is synthesized with them bound, and the shape methods answer
+# accordingly. Unlisted names answer unknown, never an error.
+def synthesize_block_call(node, receiver, types)
+  mutable inner = types
+  node.block.parameters.each_with_index do |parameter, index|
+    inner = [[parameter, block_parameter_type(receiver, index)]] + inner
+  end
+  body = synthesize_body(node.block.body, inner)
+  case node.name
+  when "map", "collect" then ["array", body]
+  when "find", "detect", "min_by", "max_by"
+    return ["maybe", block_parameter_type(receiver, 0)] if receiver in ["array", *]
+    ["unknown"]
+  when "count", "sum", "index" then synthesize_numeric_answer(receiver, node.name)
+  when "all?", "any?", "none?", "one?" then ["boolean"]
+  when "select", "filter", "reject", "sort_by", "each", "each_with_index"
+    return receiver if (receiver in ["array", *]) || (receiver in ["hash", *])
+    ["unknown"]
+  else
+    ["unknown"]
+  end
+end
+
+def block_parameter_type(receiver, index)
+  if receiver in ["hash", *]
+    return type_at(receiver, 1) if index == 0
+    return type_at(receiver, 2) if index == 1
+    return ["unknown"]
+  end
+  return ["unknown"] unless index == 0
+  return type_at(receiver, 1) if receiver in ["array", *]
+  return ["integer"] if receiver == ["range"]
+  ["unknown"]
+end
+
 # How a type is written back out, for the debug driver. This rendering is
 # NOT ratified surface — the error-voice decision owns the real spelling —
 # it is the plainest thing that could work in a dump.
@@ -242,6 +447,7 @@ def render_type(type)
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in ["maybe", inner] then render_type(inner) + "?"
   in ["struct", name] then name
+  in ["enum", name] then name
   else
     label = type_at(type, 0)
     label.slice(0, 1).upcase + label.slice(1, label.length - 1)
