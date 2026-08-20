@@ -388,6 +388,24 @@ struct AppendNode
   end
 end
 
+# `name[index] += v` / `name[index] ||= v` — the compound family on a
+# slot (ADR 0043). Its own node because a desugar would mention the index
+# twice and Ruby evaluates it once — a bare name can be a zero-arg call,
+# so no syntactic guard makes the double run unobservable. `operator` is
+# nil for the or-form.
+struct SlotCompoundNode
+  kind
+  name
+  index
+  operator
+  right
+
+  def sexp
+    symbol = operator or "||"
+    "(#{symbol}= #{name} #{index.sexp} #{right.sexp})"
+  end
+end
+
 # `name[index] = value` — a functional update rebound on the name.
 struct IndexUpdateNode
   kind
@@ -807,6 +825,10 @@ end
 
 def index_update_node(name, index, value)
   IndexUpdateNode.new(kind: "index_update", name: name, index: index, value: value)
+end
+
+def slot_compound_node(name, index, operator, right)
+  SlotCompoundNode.new(kind: "slot_compound", name: name, index: index, operator: operator, right: right)
 end
 
 def in_branch_node(pattern, guard, body)
@@ -1884,6 +1906,19 @@ def parse_statement(tokens, position)
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
   step = parse_expression(tokens, position)
+  # The compound family on a slot (ADR 0043): `name[index] += v` and
+  # `name[index] ||= v`. A dedicated node, not a desugar: the desugar
+  # would mention the index twice and Ruby evaluates it once.
+  if (step.node in IndexNode) && (step.node.receiver in IdentifierNode) && operator_at?(tokens, step.position, %w[+= -= *= /= %= ||=])
+    name = step.node.receiver.name
+    operator = if operator_at?(tokens, step.position, %w[||=])
+      nil
+    else
+      tokens[step.position].text.slice(0, 1)
+    end
+    value = parse_expression(tokens, step.position + 1)
+    return Step.new(node: assignment_node(name, slot_compound_node(name, step.node.index, operator, value.node)), position: value.position)
+  end
   # `name[index] = value` — a functional update rebound on the name.
   if operator_at?(tokens, step.position, %w[=]) && (step.node in IndexNode) && (step.node.receiver in IdentifierNode)
     name = step.node.receiver.name

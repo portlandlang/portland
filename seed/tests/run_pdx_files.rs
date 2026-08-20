@@ -502,6 +502,29 @@ fn portland_evaluator_matches_the_seed_on_optionals() {
     );
 }
 
+/// The compound family on a slot (ADR 0043): the pinned run proves the
+/// seed evaluates the index exactly once ("key" prints once); the
+/// differential twin below holds the hosted evaluator to the same bytes.
+#[test]
+fn slot_compounds_evaluate_the_index_once() {
+    let output = run_fixture("slot_compounds.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "key\n[10, 20]\n{\"a\" => 11}\n{\"b\" => nil}\n[5, 2, 6]\n"
+    );
+}
+
+#[test]
+fn portland_evaluator_matches_the_seed_on_slot_compounds() {
+    let fixture = format!(
+        "{}/tests/fixtures/slot_compounds.pdx",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let source = std::fs::read_to_string(fixture).unwrap();
+    assert_evaluator_matches_seed("evaluator_slot_compounds.pdx", &source);
+}
+
 /// Where the compiler can diagnose, it must say exactly what the seed says.
 /// These four used to reach the evaluator as an unhelpful "cannot
 /// evaluate error yet"; now the message survives to stderr verbatim.

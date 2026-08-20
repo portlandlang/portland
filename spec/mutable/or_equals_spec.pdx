@@ -29,6 +29,36 @@ context "or-equals" do
     end
   end
 
+  describe "on a slot" do
+    specify "fills a missing hash key and keeps a present one" do
+      mutable counts = {"a" => 1}
+      counts["b"] ||= 0
+      counts["a"] ||= 9
+      expect(counts["b"]).to eq(0)
+      expect(counts["a"]).to eq(1)
+    end
+
+    specify "the arithmetic compounds work on slots too" do
+      mutable scores = [10, 20]
+      scores[0] += 1
+      scores[1] -= 5
+      expect(scores).to eq([11, 15])
+    end
+
+    specify "a stored nil beats the fallback — fetch's rule" do
+      mutable stock = {"b" => nil}
+      stock["b"] ||= 3
+      expect(stock["b"]).to eq(some(nil))
+    end
+
+    specify "the index is any expression, evaluated once" do
+      mutable counts = {}
+      key = "a"
+      counts[key.upcase] ||= 1
+      expect(counts["A"]).to eq(1)
+    end
+  end
+
   describe "on a plain Boolean" do
     specify "is boolean-or, stated as fact" do
       mutable flag = false

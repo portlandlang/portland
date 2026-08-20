@@ -162,6 +162,143 @@ fn floored_modulo(left: i64, right: i64) -> i64 {
     }
 }
 
+/// The read half of `[]` — shared by Index and SlotCompound so the compound
+/// family cannot drift from plain indexing.
+fn index_read(receiver: &Value, index: &Value) -> Value {
+    match (receiver, index) {
+        (Value::Array(elements), Value::Integer(index)) => {
+            // Partial operations return maybes (ADR 0010): negative
+            // indices stay Ruby-style, out of range is nil.
+            let length = elements.len() as i64;
+            let position = if *index < 0 { length + index } else { *index };
+            if position < 0 || position >= length {
+                return Value::Nil;
+            }
+            Value::present(elements[position as usize].clone())
+        }
+        (Value::String(text), Value::Integer(index)) => {
+            // Indexing a string yields a one-character string.
+            let length = text.chars().count() as i64;
+            let position = if *index < 0 { length + index } else { *index };
+            if position < 0 || position >= length {
+                return Value::Nil;
+            }
+            let character = text.chars().nth(position as usize).unwrap();
+            Value::String(character.to_string())
+        }
+        // A slice is always a collection, never a maybe (ADR 0019 §2): the
+        // start clamps the way Ruby already clamps the end, so out of range
+        // is empty, not nil.
+        (Value::Array(elements), Value::Range { .. }) => {
+            let (from, to) = slice_bounds(index, elements.len());
+            Value::array(elements[from..to].to_vec())
+        }
+        (Value::String(text), Value::Range { .. }) => {
+            let graphemes: Vec<&str> = text.graphemes(true).collect();
+            let (from, to) = slice_bounds(index, graphemes.len());
+            Value::String(graphemes[from..to].concat())
+        }
+        (Value::Hash(pairs), key) => pairs
+            .iter()
+            .find(|(existing, _)| existing == key)
+            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
+        _ => panic!("cannot index {receiver:?} with {index:?}"),
+    }
+}
+
+/// The application half of a binary operator — shared by Binary and
+/// SlotCompound so `h[k] += v` cannot drift from `h[k] + v`.
+fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
+    match (left, operator, right) {
+        (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
+            Value::Integer(left + right)
+        }
+        (Value::Integer(left), BinaryOperator::Divide, Value::Integer(right)) => {
+            Value::Integer(floored_divide(left, right))
+        }
+        (Value::Integer(left), BinaryOperator::Modulo, Value::Integer(right)) => {
+            Value::Integer(floored_modulo(left, right))
+        }
+        (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
+            Value::Integer(left * right)
+        }
+        (Value::Integer(left), BinaryOperator::Power, Value::Integer(right)) => {
+            integer_power(left, right)
+        }
+        (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
+            Value::Integer(left - right)
+        }
+        // Mixed arithmetic promotes to float, Ruby's rule
+        // (ADR 0018). `/` is real division once a float is
+        // involved — only integer `/` integer floors. Equality
+        // compares across the two numeric types, so `1.0 == 1`.
+        (ref left_value, _, ref right_value)
+            if matches!(
+                (left_value, right_value),
+                (Value::Float(_), Value::Float(_))
+                    | (Value::Float(_), Value::Integer(_))
+                    | (Value::Integer(_), Value::Float(_))
+            ) =>
+        {
+            let (left, right) = (as_float(left_value), as_float(right_value));
+            match operator {
+                BinaryOperator::Add => Value::Float(left + right),
+                BinaryOperator::Divide => Value::Float(left / right),
+                BinaryOperator::Modulo => Value::Float(left - right * (left / right).floor()),
+                BinaryOperator::Multiply => Value::Float(left * right),
+                BinaryOperator::Power => Value::Float(left.powf(right)),
+                BinaryOperator::Subtract => Value::Float(left - right),
+                BinaryOperator::Greater => Value::Boolean(left > right),
+                BinaryOperator::GreaterOrEqual => Value::Boolean(left >= right),
+                BinaryOperator::Less => Value::Boolean(left < right),
+                BinaryOperator::LessOrEqual => Value::Boolean(left <= right),
+                BinaryOperator::Equals => Value::Boolean(left == right),
+                BinaryOperator::NotEquals => Value::Boolean(left != right),
+            }
+        }
+        (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
+            Value::String(left + &right)
+        }
+        (Value::Array(left), BinaryOperator::Add, Value::Array(right)) => {
+            let mut combined = left.as_ref().clone();
+            combined.extend(right.iter().cloned());
+            Value::array(combined)
+        }
+        (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
+            let count = usize::try_from(count)
+                .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
+            Value::String(text.repeat(count))
+        }
+        (Value::Array(elements), BinaryOperator::Multiply, Value::Integer(count)) => {
+            let count = usize::try_from(count)
+                .unwrap_or_else(|_| panic!("cannot repeat an array {count} times"));
+            let mut repeated = Vec::with_capacity(elements.len() * count);
+            for _ in 0..count {
+                repeated.extend(elements.iter().cloned());
+            }
+            Value::array(repeated)
+        }
+        (Value::Integer(left), BinaryOperator::Greater, Value::Integer(right)) => {
+            Value::Boolean(left > right)
+        }
+        (Value::Integer(left), BinaryOperator::GreaterOrEqual, Value::Integer(right)) => {
+            Value::Boolean(left >= right)
+        }
+        (Value::Integer(left), BinaryOperator::Less, Value::Integer(right)) => {
+            Value::Boolean(left < right)
+        }
+        (Value::Integer(left), BinaryOperator::LessOrEqual, Value::Integer(right)) => {
+            Value::Boolean(left <= right)
+        }
+        // Equality is defined for every value pair; mixed types are just unequal.
+        (left, BinaryOperator::Equals, right) => Value::Boolean(left == right),
+        (left, BinaryOperator::NotEquals, right) => Value::Boolean(left != right),
+        (left, operator, right) => {
+            panic!("cannot apply {operator:?} to {left:?} and {right:?}")
+        }
+    }
+}
+
 #[derive(Clone)]
 struct Method {
     body: Vec<Statement>,
@@ -864,35 +1001,48 @@ impl<W: std::io::Write> Interpreter<W> {
                 // Both sides first, for the same reason as Append above.
                 let index = self.value_of(index);
                 let value = self.value_of(value);
-                let current = self.take_for_update(name);
-                match (current, index) {
-                    (Value::Array(mut elements), Value::Integer(index)) => {
-                        let length = elements.len() as i64;
-                        let position = if index < 0 { length + index } else { index };
-                        if position == length {
-                            std::rc::Rc::make_mut(&mut elements).push(value);
-                        } else if position >= 0 && position < length {
-                            std::rc::Rc::make_mut(&mut elements)[position as usize] = value;
-                        } else {
-                            self.restore(name, Value::Array(elements));
-                            panic!("index {index} out of range for assignment to {name}");
+                self.write_slot(name, index, value)
+            }
+            // `name[index] += v` / `name[index] ||= v` (ADR 0043): the
+            // compound family on a slot. Its own node so the index runs
+            // once. The read is plain Index, the or-form follows the
+            // Logical arm's rules (short-circuit included), the write is
+            // IndexUpdate's.
+            Expression::SlotCompound {
+                index,
+                name,
+                operator,
+                right,
+            } => {
+                let index = self.value_of(index);
+                // Read before taking (Append's both-sides-first rule): the
+                // right side may mention the same name.
+                let current = {
+                    let binding = self
+                        .variables
+                        .get(name)
+                        .unwrap_or_else(|| panic!("undefined variable {name}"));
+                    index_read(&binding.value, &index)
+                };
+                let value = match operator {
+                    Some(operator) => {
+                        let right = self.value_of(right);
+                        apply_binary(current, operator, right)
+                    }
+                    None => match current {
+                        Value::Nil | Value::Failure(_) => self.value_of(right),
+                        // Present-but-wrapped: unwrap one layer — a stored
+                        // nil beats the default, exactly fetch's rule
+                        // (ADR 0010).
+                        Value::Some(inner) => *inner,
+                        Value::Boolean(true) => Value::Boolean(true),
+                        Value::Boolean(false) => {
+                            Value::Boolean(self.boolean_of(right, "|| operands"))
                         }
-                        Some(Value::Array(elements))
-                    }
-                    (Value::Hash(mut pairs), key) => {
-                        let entries = std::rc::Rc::make_mut(&mut pairs);
-                        match entries.iter_mut().find(|(existing, _)| *existing == key) {
-                            Some(pair) => pair.1 = value,
-                            None => entries.push((key, value)),
-                        }
-                        Some(Value::Hash(pairs))
-                    }
-                    (current, index) => {
-                        let message = format!("cannot index-assign {current:?} with {index:?}");
-                        self.restore(name, current);
-                        panic!("{message}")
-                    }
-                }
+                        present => present,
+                    },
+                };
+                self.write_slot(name, index, value)
             }
             // Only reached when an or-guard's left side was absent: divert
             // control and produce no value; the unwinding machinery takes over.
@@ -1008,47 +1158,7 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::Index { index, receiver } => {
                 let receiver = self.value_of(receiver);
                 let index = self.value_of(index);
-                match (&receiver, &index) {
-                    (Value::Array(elements), Value::Integer(index)) => {
-                        // Partial operations return maybes (ADR 0010): negative
-                        // indices stay Ruby-style, out of range is nil.
-                        let length = elements.len() as i64;
-                        let position = if *index < 0 { length + index } else { *index };
-                        if position < 0 || position >= length {
-                            return Some(Value::Nil);
-                        }
-                        Some(Value::present(elements[position as usize].clone()))
-                    }
-                    (Value::String(text), Value::Integer(index)) => {
-                        // Indexing a string yields a one-character string.
-                        let length = text.chars().count() as i64;
-                        let position = if *index < 0 { length + index } else { *index };
-                        if position < 0 || position >= length {
-                            return Some(Value::Nil);
-                        }
-                        let character = text.chars().nth(position as usize).unwrap();
-                        Some(Value::String(character.to_string()))
-                    }
-                    // A slice is always a collection, never a maybe
-                    // (ADR 0019 §2): the start clamps the way Ruby already
-                    // clamps the end, so out of range is empty, not nil.
-                    (Value::Array(elements), Value::Range { .. }) => {
-                        let (from, to) = slice_bounds(&index, elements.len());
-                        Some(Value::array(elements[from..to].to_vec()))
-                    }
-                    (Value::String(text), Value::Range { .. }) => {
-                        let graphemes: Vec<&str> = text.graphemes(true).collect();
-                        let (from, to) = slice_bounds(&index, graphemes.len());
-                        Some(Value::String(graphemes[from..to].concat()))
-                    }
-                    (Value::Hash(pairs), key) => Some(
-                        pairs
-                            .iter()
-                            .find(|(existing, _)| existing == key)
-                            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
-                    ),
-                    _ => panic!("cannot index {receiver:?} with {index:?}"),
-                }
+                Some(index_read(&receiver, &index))
             }
             Expression::If {
                 condition,
@@ -1088,98 +1198,7 @@ impl<W: std::io::Write> Interpreter<W> {
             } => {
                 let left = self.value_of(left);
                 let right = self.value_of(right);
-                match (left, operator, right) {
-                    (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
-                        Some(Value::Integer(left + right))
-                    }
-                    (Value::Integer(left), BinaryOperator::Divide, Value::Integer(right)) => {
-                        Some(Value::Integer(floored_divide(left, right)))
-                    }
-                    (Value::Integer(left), BinaryOperator::Modulo, Value::Integer(right)) => {
-                        Some(Value::Integer(floored_modulo(left, right)))
-                    }
-                    (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
-                        Some(Value::Integer(left * right))
-                    }
-                    (Value::Integer(left), BinaryOperator::Power, Value::Integer(right)) => {
-                        Some(integer_power(left, right))
-                    }
-                    (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
-                        Some(Value::Integer(left - right))
-                    }
-                    // Mixed arithmetic promotes to float, Ruby's rule
-                    // (ADR 0018). `/` is real division once a float is
-                    // involved — only integer `/` integer floors. Equality
-                    // compares across the two numeric types, so `1.0 == 1`.
-                    (ref left_value, _, ref right_value)
-                        if matches!(
-                            (left_value, right_value),
-                            (Value::Float(_), Value::Float(_))
-                                | (Value::Float(_), Value::Integer(_))
-                                | (Value::Integer(_), Value::Float(_))
-                        ) =>
-                    {
-                        let (left, right) = (as_float(left_value), as_float(right_value));
-                        Some(match operator {
-                            BinaryOperator::Add => Value::Float(left + right),
-                            BinaryOperator::Divide => Value::Float(left / right),
-                            BinaryOperator::Modulo => {
-                                Value::Float(left - right * (left / right).floor())
-                            }
-                            BinaryOperator::Multiply => Value::Float(left * right),
-                            BinaryOperator::Power => Value::Float(left.powf(right)),
-                            BinaryOperator::Subtract => Value::Float(left - right),
-                            BinaryOperator::Greater => Value::Boolean(left > right),
-                            BinaryOperator::GreaterOrEqual => Value::Boolean(left >= right),
-                            BinaryOperator::Less => Value::Boolean(left < right),
-                            BinaryOperator::LessOrEqual => Value::Boolean(left <= right),
-                            BinaryOperator::Equals => Value::Boolean(left == right),
-                            BinaryOperator::NotEquals => Value::Boolean(left != right),
-                        })
-                    }
-                    (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
-                        Some(Value::String(left + &right))
-                    }
-                    (Value::Array(left), BinaryOperator::Add, Value::Array(right)) => {
-                        let mut combined = left.as_ref().clone();
-                        combined.extend(right.iter().cloned());
-                        Some(Value::array(combined))
-                    }
-                    (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
-                        let count = usize::try_from(count)
-                            .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
-                        Some(Value::String(text.repeat(count)))
-                    }
-                    (Value::Array(elements), BinaryOperator::Multiply, Value::Integer(count)) => {
-                        let count = usize::try_from(count)
-                            .unwrap_or_else(|_| panic!("cannot repeat an array {count} times"));
-                        let mut repeated = Vec::with_capacity(elements.len() * count);
-                        for _ in 0..count {
-                            repeated.extend(elements.iter().cloned());
-                        }
-                        Some(Value::array(repeated))
-                    }
-                    (Value::Integer(left), BinaryOperator::Greater, Value::Integer(right)) => {
-                        Some(Value::Boolean(left > right))
-                    }
-                    (
-                        Value::Integer(left),
-                        BinaryOperator::GreaterOrEqual,
-                        Value::Integer(right),
-                    ) => Some(Value::Boolean(left >= right)),
-                    (Value::Integer(left), BinaryOperator::Less, Value::Integer(right)) => {
-                        Some(Value::Boolean(left < right))
-                    }
-                    (Value::Integer(left), BinaryOperator::LessOrEqual, Value::Integer(right)) => {
-                        Some(Value::Boolean(left <= right))
-                    }
-                    // Equality is defined for every value pair; mixed types are just unequal.
-                    (left, BinaryOperator::Equals, right) => Some(Value::Boolean(left == right)),
-                    (left, BinaryOperator::NotEquals, right) => Some(Value::Boolean(left != right)),
-                    (left, operator, right) => {
-                        panic!("cannot apply {operator:?} to {left:?} and {right:?}")
-                    }
-                }
+                Some(apply_binary(left, operator, right))
             }
             Expression::MethodCall {
                 arguments,
@@ -2540,6 +2559,41 @@ impl<W: std::io::Write> Interpreter<W> {
             std::mem::replace(&mut binding.value, Value::Nil)
         } else {
             binding.value.clone()
+        }
+    }
+
+    /// The write half of `name[index] = value` — shared by IndexUpdate and
+    /// SlotCompound: arrays replace in range (or append at the end), hashes
+    /// replace or add the pair.
+    fn write_slot(&mut self, name: &str, index: Value, value: Value) -> Option<Value> {
+        let current = self.take_for_update(name);
+        match (current, index) {
+            (Value::Array(mut elements), Value::Integer(index)) => {
+                let length = elements.len() as i64;
+                let position = if index < 0 { length + index } else { index };
+                if position == length {
+                    std::rc::Rc::make_mut(&mut elements).push(value);
+                } else if position >= 0 && position < length {
+                    std::rc::Rc::make_mut(&mut elements)[position as usize] = value;
+                } else {
+                    self.restore(name, Value::Array(elements));
+                    panic!("index {index} out of range for assignment to {name}");
+                }
+                Some(Value::Array(elements))
+            }
+            (Value::Hash(mut pairs), key) => {
+                let entries = std::rc::Rc::make_mut(&mut pairs);
+                match entries.iter_mut().find(|(existing, _)| *existing == key) {
+                    Some(pair) => pair.1 = value,
+                    None => entries.push((key, value)),
+                }
+                Some(Value::Hash(pairs))
+            }
+            (current, index) => {
+                let message = format!("cannot index-assign {current:?} with {index:?}");
+                self.restore(name, current);
+                panic!("{message}")
+            }
         }
     }
 

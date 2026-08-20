@@ -1,0 +1,28 @@
+# The compound family on a slot (ADR 0043): `||=` fills absence and keeps
+# presence (a stored nil beats the default), the arithmetic forms ride
+# along, and the index — any expression, a zero-arg call included —
+# evaluates exactly once: "key" prints once.
+
+def noisy
+  puts "key"
+  1
+end
+
+mutable pair = [10, 20]
+pair[noisy] ||= 99
+p pair
+
+mutable counts = {}
+counts["a"] ||= 1
+counts["a"] ||= 5
+counts["a"] += 10
+p counts
+
+mutable stock = {"b" => nil}
+stock["b"] ||= 3
+p stock
+
+mutable scores = [1, 2, 3]
+scores[0] += 4
+scores[-1] *= 2
+p scores

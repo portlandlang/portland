@@ -715,6 +715,7 @@ def evaluate_expression(node, bindings)
   in IfNode then evaluate_if(node, bindings)
   in IndexNode then evaluate_index(node, bindings)
   in IndexUpdateNode then evaluate_index_update(node, bindings)
+  in SlotCompoundNode then evaluate_slot_compound(node, bindings)
   in IntegerNode(value:) then outcome([value.to_i], bindings)
   in FloatNode(value:) then outcome([value.to_f], bindings)
   in RangeNode then evaluate_range(node, bindings)
@@ -906,15 +907,57 @@ def evaluate_index_update(node, mutable bindings)
   value_step = evaluate_expression(node.value, bindings)
   bindings = value_step.bindings
   value = slot_value(value_step.value)
-  if plain_array?(current)
-    return outcome([updated_array(current, key, value, node.name)], bindings)
-  end
+  outcome([written_slot(current, key, value, node.name)], bindings)
+end
+
+# The write half of `name[index] = value` — shared by IndexUpdate and the
+# slot compounds: arrays replace in range (or append at the end), hashes
+# replace or add the pair.
+def written_slot(collection, key, value, name)
+  return updated_array(collection, key, value, name) if plain_array?(collection)
   mutable rebuilt = {}
-  current.each do |existing_key, existing_value|
+  collection.each do |existing_key, existing_value|
     rebuilt[existing_key] = existing_value
   end
   rebuilt[key] = value
-  outcome([rebuilt], bindings)
+  rebuilt
+end
+
+# `name[index] += v` / `name[index] ||= v` (ADR 0043): the compound family
+# on a slot. Its own node so the index runs once. The read rides the host's
+# `[]`, the or-form follows evaluate_logical's rules (short-circuit
+# included), the write is IndexUpdate's.
+def evaluate_slot_compound(node, bindings)
+  index_step = evaluate_expression(node.index, bindings)
+  key = slot_value(index_step.value)
+  slot = lookup(index_step.bindings, node.name)
+  panic("undefined variable #{node.name}") if slot.empty?
+  collection = value_at(slot.first, 2)
+  combined = slot_combined(node, collection[key], index_step.bindings)
+  outcome([written_slot(collection, key, slot_value(combined.value), node.name)], combined.bindings)
+end
+
+# The combine half of a slot compound: the slot's current value is already
+# read, the right side only runs when it can matter.
+def slot_combined(node, current, bindings)
+  if node.operator.nil?
+    return evaluate_expression(node.right, bindings) if current.nil? || current.failure?
+    return outcome([true], bindings) if current == true
+    return evaluate_expression(node.right, bindings) if current == false
+    # Present-but-wrapped: unwrap one layer — a stored nil beats the
+    # default, exactly fetch's rule (ADR 0010).
+    return outcome([current or nil], bindings)
+  end
+  right_step = evaluate_expression(node.right, bindings)
+  right = slot_value(right_step.value)
+  result = case node.operator
+  when "%" then current % right
+  when "*" then current * right
+  when "+" then current + right
+  when "-" then current - right
+  else current / right
+  end
+  outcome([result], right_step.bindings)
 end
 
 # A host array that is a guest array — not one of the tagged shapes standing

@@ -469,6 +469,37 @@ impl<'source> Parser<'source> {
             return command;
         }
         let expression = self.expression();
+        // `name[index] += v` and `name[index] ||= v` — the compound family
+        // on a slot (ADR 0043 promised the or-form; the arithmetic forms
+        // ride along for Ruby parity). A dedicated node, not a desugar:
+        // the desugar would mention the index twice and Ruby evaluates it
+        // once.
+        let compound = match self.peek_kind() {
+            Some(TokenKind::MinusEqual) => Some(Some(BinaryOperator::Subtract)),
+            Some(TokenKind::PercentEqual) => Some(Some(BinaryOperator::Modulo)),
+            Some(TokenKind::PlusEqual) => Some(Some(BinaryOperator::Add)),
+            Some(TokenKind::SlashEqual) => Some(Some(BinaryOperator::Divide)),
+            Some(TokenKind::StarEqual) => Some(Some(BinaryOperator::Multiply)),
+            Some(TokenKind::PipePipeEqual) => Some(None),
+            _ => None,
+        };
+        if let Some(operator) = compound
+            && let Expression::Index { index, receiver } = &expression
+            && let Expression::Variable(name) = receiver.as_ref()
+        {
+            self.position += 1; // the compound operator
+            let right = Box::new(self.expression());
+            return Statement::Assignment {
+                mutable: false,
+                name: name.clone(),
+                value: Expression::SlotCompound {
+                    index: index.clone(),
+                    name: name.clone(),
+                    operator,
+                    right,
+                },
+            };
+        }
         // `name[index] = value` — a functional update rebound on the name.
         if self.peek_kind() == Some(TokenKind::Equal) {
             if let Expression::Index { index, receiver } = &expression

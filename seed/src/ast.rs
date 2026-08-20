@@ -244,6 +244,17 @@ pub enum Expression {
         name: String,
         value: Box<Expression>,
     },
+    /// `name[index] += v` / `name[index] ||= v` — the compound family on a
+    /// slot (ADR 0043). Its own node because a desugar would mention the
+    /// index twice and Ruby evaluates it once — a bare name can be a
+    /// zero-arg call, so no syntactic guard makes the double run
+    /// unobservable. `operator` is None for the or-form.
+    SlotCompound {
+        index: Box<Expression>,
+        name: String,
+        operator: Option<BinaryOperator>,
+        right: Box<Expression>,
+    },
     /// `expr => pattern` — match or panic; rightward destructuring
     /// (ADR 0013 §4). Produces nil.
     MatchAssert {
