@@ -28,7 +28,7 @@ Closure rules kill Ruby's accidental-clobber footgun. Assigning `name = x` insid
 - outer immutable `name` → error, with the fix named
 - no outer `name` → fresh block-local, dies at `end`
 
-And the values question is answered (ADR 0015): **values never mutate; names do.** No `push`, no `map!`, no aliased buffers. `<<` and index assignment survive as _rebinding_ sugar in the `+=` family — joined by `||=` ([ADR 0043](../adr/0043-2026-08-19-or-equals.md)), the or-guard's question as a rebind: absent takes the fallback, present is kept, `mutable` required like every compound. (`&&=` waits on [ruby_research#2](https://github.com/portlandlang/ruby_research/issues/2).)
+And the values question is answered (ADR 0015): **values never mutate; names do.** No `push`, no `map!`, no aliased buffers. `<<` and index assignment survive as _rebinding_ sugar in the `+=` family — joined by `||=` ([ADR 0043](../adr/0043-2026-08-19-or-equals.md)), the or-guard's question as a rebind: absent takes the fallback, present is kept, `mutable` required like every compound. One corner is deferred honestly: on a maybe-of-Boolean, `||=` clobbers an explicit `false` today exactly as Ruby does, until the static `Boolean?`-under-`or` check lands ([word-operators.md](word-operators.md) carries that story). (`&&=` waits on [ruby_research#2](https://github.com/portlandlang/ruby_research/issues/2).)
 
 ```ruby
 mutable line = ""

@@ -23,13 +23,13 @@ user = find_user(id) or return                       # bind-or-bail
 row  = lookup(key) or panic "row #{key} must exist"  # assert, loudly
 ```
 
-Two never-guess compile errors where the idiom is genuinely ambiguous:
+Two never-guess compile errors where the idiom is genuinely ambiguous — both **decided (ADR 0007) but not yet enforced**: they are static checks awaiting inference ([#9](https://github.com/portlandlang/portland/issues/9); [ADR 0040](../adr/0040-2026-08-19-inference-the-design-core.md) deliberately holds them until narrowing proves itself). Until they land, both cases compute silently, Ruby's way — the honest current state, not the promised one:
 
-- **`Boolean?` on the left.** The one type with two different "no"s (`nil` and `false`). Ruby's reading steamrolls an explicit `false` into the default — the `@enabled ||= true` bug class. Portland refuses and offers unambiguous spellings (`if x.nil? ...` / `x == true`).
-- **A left side that can never be absent.** The right side is unreachable — dead code, named as such.
+- **`Boolean?` on the left.** The one type with two different "no"s (`nil` and `false`). Ruby's reading steamrolls an explicit `false` into the default — the `@enabled ||= true` bug class — and *today Portland's runtime reproduces that outcome*, because a present `false` is indistinguishable from a plain one without types. When the check lands: refusal with unambiguous rewrites (`enabled = true if enabled.nil?` fills only genuine absence), while `or` on a *plain* Boolean stays legal boolean algebra — a split Ruby structurally cannot make.
+- **A left side that can never be absent.** The right side is unreachable — dead code, named as such when the same increment lands.
 
 ## Migration
 
 - **Compiles verbatim, same meaning:** `nickname || "friend"`, boolean logic, `find_user(id) or return`, `... or raise`-shaped guards.
 - **Parses differently, behaves identically:** `x = a or return` — Ruby binds it `(x = a) or return`, Portland `x = (a or return)`; the guard idiom is observably the same. Exotic uses that depended on Ruby's loose precedence are the linter's job to flag.
-- **Loud errors:** `||` on a `Boolean?` or on a never-absent left side.
+- **Loud errors, once the static checks land (#9):** `||` on a `Boolean?` or on a never-absent left side. Until then these compute silently with Ruby's outcomes — migrating code hits no wall today and a designed one later, in that order on purpose.
