@@ -96,7 +96,8 @@ fn runs_tour_pdx() {
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
         "hello, portland!\nhello, stranger\nhello, rose city!\nodd sum: 25\nPDX is portland\n\
-         1 + 4 + 9 = 14\nlift off: 0\ndoubled to 16\ntrimmed to 3\nspun 5 times\n"
+         1 + 4 + 9 = 14\nlift off: 0\ndoubled to 16\ntrimmed to 3\nbracket: medium\n\
+         parity: even\nspun 5 times\n"
     );
 }
 
@@ -1466,11 +1467,12 @@ fn parse_only_does_not_evaluate() {
 
 #[test]
 fn parse_only_rejects_invented_syntax() {
-    // Each of these was written into docs/language.md from memory and does
-    // not exist: an endless method, a one-line if/then/else, a ternary.
+    // Each of these was once written into docs/language.md from memory and
+    // does not exist yet: an endless method (#82), a ternary (#83). The
+    // one-line if/then/else that used to sit beside them became real
+    // Portland (ADR 0042) and moved to the tests that prove it parses.
     let cases = [
         ("def integer? = kind == \"x\"\n", "endless method"),
-        ("y = if true then 1 else 2 end\n", "one-line if/then/else"),
         ("y = true ? 1 : 2\n", "ternary"),
     ];
     for (source, what) in cases {

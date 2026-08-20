@@ -1,0 +1,65 @@
+# `then` rows everywhere (ADR 0042): `if`/`elsif`/`unless` take the same
+# one-line row typography `when` always had, `else` takes a same-line body,
+# `then` may stand as a bare separator, and whole constructs fit on one
+# line — Ruby's shapes, all of them, pure typography over the same nodes.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "then rows on if" do
+    specify "make a decision table" do
+      total = 60
+      discount = if total > 100 then 20
+      elsif total > 50 then 10
+      else 0
+      end
+      expect(discount).to eq(10)
+    end
+
+    specify "fit on one line" do
+      label = if 1 > 2 then "big" else "small" end
+      expect(label).to eq("small")
+    end
+
+    specify "take unless too" do
+      quiet = unless 1 > 2 then "hushed" else "loud" end
+      expect(quiet).to eq("hushed")
+    end
+
+    specify "an empty then branch is nil, typed (ADR 0012)" do
+      fell = if false then else "fell through" end
+      expect(fell).to eq("fell through")
+    end
+  end
+
+  describe "then as a bare separator" do
+    specify "before an indented body" do
+      mutable seen = ""
+      if true then
+        seen = "ran"
+      end
+      expect(seen).to eq("ran")
+    end
+  end
+
+  describe "one-line case" do
+    specify "with when arms" do
+      word = case 2 when 2 then "two" else "no" end
+      expect(word).to eq("two")
+    end
+
+    specify "with in arms — the subject does not eat the first in" do
+      status = :paid
+      note = case status in :paid then "receipt" else "other" end
+      expect(note).to eq("receipt")
+    end
+
+    specify "else takes a same-line body in the block forms too" do
+      grade = case 7
+      when 9 then "high"
+      else "plain"
+      end
+      expect(grade).to eq("plain")
+    end
+  end
+end

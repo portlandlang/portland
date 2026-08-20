@@ -2335,7 +2335,7 @@ def parse_case_in(tokens, subject, mutable position)
     position = skip_newlines_at(tokens, branch.position)
   end
   if keyword_at?(tokens, position, %w[else])
-    else_body = parse_body(tokens, position + 1, %w[end])
+    else_body = parse_else_body(tokens, position + 1, %w[end])
     position = else_body.position
     if keyword_at?(tokens, position, %w[end])
       return Step.new(node: case_in_node(subject, branches, else_body.node), position: position + 1)
@@ -2357,11 +2357,7 @@ def parse_in_branch(tokens, mutable position)
     guard = guard_step.node
     position = guard_step.position
   end
-  if keyword_at?(tokens, position, %w[then])
-    body_statement = parse_statement(tokens, position + 1)
-    return Step.new(node: in_branch_node(pattern.node, guard, [body_statement.node]), position: body_statement.position)
-  end
-  body = parse_body(tokens, position, %w[in else end])
+  body = parse_branch_body(tokens, position, %w[in else end])
   Step.new(node: in_branch_node(pattern.node, guard, body.node), position: body.position)
 end
 
@@ -2852,9 +2848,52 @@ end
 
 # — control flow —
 
+# A branch body (ADR 0042): a `then` row holding one statement on the same
+# line, `then` as a bare separator before an indented body, or the indented
+# body alone. `then` against a terminator is an empty branch — ADR 0012's
+# nil wearing a `then`. Step.node is the statement array (an error node
+# rides inside it, so evaluation says the words).
+def parse_branch_body(tokens, mutable position, terminators)
+  if keyword_at?(tokens, position, %w[then])
+    after = position + 1
+    return Step.new(node: [], position: after) if keyword_at?(tokens, after, terminators)
+    unless statement_boundary?(tokens, after)
+      row = parse_statement(tokens, after)
+      boundary = parse_branch_boundary(tokens, row.position, terminators)
+      return Step.new(node: [boundary.node], position: boundary.position) if boundary.node in ErrorNode
+      return Step.new(node: [row.node], position: boundary.position)
+    end
+    position = after
+  end
+  parse_body(tokens, position, terminators)
+end
+
+# An `else` body: a same-line row (`else 0`), an empty `else end`, or an
+# indented body.
+def parse_else_body(tokens, position, terminators)
+  return Step.new(node: [], position: position) if keyword_at?(tokens, position, terminators)
+  unless statement_boundary?(tokens, position)
+    row = parse_statement(tokens, position)
+    boundary = parse_branch_boundary(tokens, row.position, terminators)
+    return Step.new(node: [boundary.node], position: boundary.position) if boundary.node in ErrorNode
+    return Step.new(node: [row.node], position: boundary.position)
+  end
+  parse_body(tokens, position, terminators)
+end
+
+# After a same-line row: a newline, or one of the branch keywords directly.
+# Anything else is one statement trying to be two.
+def parse_branch_boundary(tokens, position, terminators)
+  if statement_boundary?(tokens, position)
+    return Step.new(node: nil, position: skip_newlines_at(tokens, position))
+  end
+  return Step.new(node: nil, position: position) if keyword_at?(tokens, position, terminators)
+  Step.new(node: error_node("a then row takes one statement — expected a newline or #{terminators.join("/")} next, got #{tokens[position].text}"), position: position)
+end
+
 def parse_if(tokens, mutable position)
   condition = parse_expression(tokens, position)
-  then_body = parse_body(tokens, condition.position, %w[else elsif end])
+  then_body = parse_branch_body(tokens, condition.position, %w[else elsif end])
   position = then_body.position
   if keyword_at?(tokens, position, %w[elsif])
     # Sugar for else + nested if; the chain shares one end, which the
@@ -2863,7 +2902,7 @@ def parse_if(tokens, mutable position)
     return Step.new(node: if_node(condition.node, then_body.node, [nested.node]), position: nested.position)
   end
   if keyword_at?(tokens, position, %w[else])
-    else_body = parse_body(tokens, position + 1, %w[end])
+    else_body = parse_else_body(tokens, position + 1, %w[end])
     if keyword_at?(tokens, else_body.position, %w[end])
       return Step.new(node: if_node(condition.node, then_body.node, else_body.node), position: else_body.position + 1)
     end
@@ -2880,10 +2919,10 @@ end
 # `unless c ... else ... end`, desugared to an if with swapped branches.
 def parse_unless(tokens, mutable position)
   condition = parse_expression(tokens, position)
-  body = parse_body(tokens, condition.position, %w[else end])
+  body = parse_branch_body(tokens, condition.position, %w[else end])
   position = body.position
   if keyword_at?(tokens, position, %w[else])
-    else_body = parse_body(tokens, position + 1, %w[end])
+    else_body = parse_else_body(tokens, position + 1, %w[end])
     position = else_body.position
     if keyword_at?(tokens, position, %w[end])
       return Step.new(node: if_node(condition.node, else_body.node, body.node), position: position + 1)
@@ -2953,7 +2992,11 @@ def parse_case(tokens, mutable position)
   if position < tokens.length && tokens[position].kind == "newline"
     return Step.new(node: error_node("case takes a subject — a subjectless case is an if/elsif chain here"), position: position)
   end
-  subject = parse_expression(tokens, position)
+  # The subject parses one notch below parse_expression, which would
+  # greedily take a following `in` as the one-line match test — after a
+  # case subject, `in` is the first arm (Ruby's own carve-out). A genuinely
+  # match-test subject can still be written with parens.
+  subject = parse_range(tokens, position)
   position = skip_newlines_at(tokens, subject.position)
   return parse_case_in(tokens, subject.node, position) if keyword_at?(tokens, position, %w[in])
   mutable branches = []
@@ -2966,21 +3009,15 @@ def parse_case(tokens, mutable position)
       values << step.node
       position = step.position
     end
-    if keyword_at?(tokens, position, %w[then])
-      body_statement = parse_statement(tokens, position + 1)
-      branches << when_node(values, [body_statement.node])
-      position = skip_newlines_at(tokens, body_statement.position)
-    else
-      body = parse_body(tokens, position, %w[when else end])
-      branches << when_node(values, body.node)
-      position = body.position
-    end
+    body = parse_branch_body(tokens, position, %w[when else end])
+    branches << when_node(values, body.node)
+    position = body.position
   end
   if branches.empty?
     return Step.new(node: error_node("case needs at least one when"), position: position)
   end
   if keyword_at?(tokens, position, %w[else])
-    else_body = parse_body(tokens, position + 1, %w[end])
+    else_body = parse_else_body(tokens, position + 1, %w[end])
     position = else_body.position
     if keyword_at?(tokens, position, %w[end])
       return Step.new(node: case_node(subject.node, branches, else_body.node), position: position + 1)

@@ -1328,8 +1328,16 @@ impl<'source> Parser<'source> {
         if self.peek_kind() == Some(TokenKind::Newline) {
             panic!("case takes a subject — a subjectless case is an if/elsif chain here");
         }
-        let subject = Box::new(self.expression());
-        self.expect_statement_boundary();
+        // The subject parses one notch below `expression()`, which would
+        // greedily take a following `in` as the one-line match test — but
+        // after a case subject, `in` is the first arm (Ruby's own carve-out
+        // for `case x in :a then ...`). A genuinely match-test subject can
+        // still be written with parens.
+        let subject = Box::new(self.range());
+        // One-line cases put the first arm right after the subject.
+        if !(self.peek_is_keyword("when") || self.peek_is_keyword("in")) {
+            self.expect_statement_boundary();
+        }
         self.skip_newlines();
         if self.peek_is_keyword("in") {
             return self.case_in_branches(subject);
@@ -1342,17 +1350,7 @@ impl<'source> Parser<'source> {
                 self.position += 1;
                 values.push(self.expression());
             }
-            let body;
-            if self.peek_is_keyword("then") {
-                self.position += 1; // the `then`
-                body = vec![self.simple_statement()];
-                self.expect_statement_boundary();
-                self.skip_newlines();
-            } else {
-                self.expect_statement_boundary();
-                self.skip_newlines();
-                body = self.body_until(&["when", "else", "end"], "when");
-            }
+            let body = self.branch_body(&["when", "else", "end"], "when");
             branches.push(CaseBranch { body, values });
         }
         if branches.is_empty() {
@@ -1363,9 +1361,7 @@ impl<'source> Parser<'source> {
         }
         let else_body = if self.peek_is_keyword("else") {
             self.position += 1; // the `else`
-            self.expect_statement_boundary();
-            self.skip_newlines();
-            self.body_until(&["end"], "else")
+            self.else_body(&["end"])
         } else {
             Vec::new()
         };
@@ -1390,17 +1386,7 @@ impl<'source> Parser<'source> {
             } else {
                 None
             };
-            let body;
-            if self.peek_is_keyword("then") {
-                self.position += 1; // the `then`
-                body = vec![self.simple_statement()];
-                self.expect_statement_boundary();
-                self.skip_newlines();
-            } else {
-                self.expect_statement_boundary();
-                self.skip_newlines();
-                body = self.body_until(&["in", "else", "end"], "in");
-            }
+            let body = self.branch_body(&["in", "else", "end"], "in");
             branches.push(InBranch {
                 body,
                 guard,
@@ -1412,9 +1398,7 @@ impl<'source> Parser<'source> {
         }
         let else_body = if self.peek_is_keyword("else") {
             self.position += 1; // the `else`
-            self.expect_statement_boundary();
-            self.skip_newlines();
-            self.body_until(&["end"], "else")
+            self.else_body(&["end"])
         } else {
             Vec::new()
         };
@@ -1626,14 +1610,10 @@ impl<'source> Parser<'source> {
     /// `unless c ... else ... end`, desugared to an `if` with swapped branches.
     fn unless_expression(&mut self) -> Expression {
         let condition = Box::new(self.expression());
-        self.expect_statement_boundary();
-        self.skip_newlines();
-        let unless_body = self.body_until(&["else", "end"], "unless");
+        let unless_body = self.branch_body(&["else", "end"], "unless");
         let else_body = if self.peek_is_keyword("else") {
             self.position += 1; // the `else`
-            self.expect_statement_boundary();
-            self.skip_newlines();
-            self.body_until(&["end"], "else")
+            self.else_body(&["end"])
         } else {
             Vec::new()
         };
@@ -1827,11 +1807,61 @@ impl<'source> Parser<'source> {
         }
     }
 
-    fn if_expression(&mut self) -> Expression {
-        let condition = Box::new(self.expression());
+    /// A branch body (ADR 0042): a `then` row holding one statement on the
+    /// same line, a `then` acting as a bare separator before an indented
+    /// body, or the indented body alone. After a row the next branch
+    /// keyword may follow directly — the one-line forms — or on its own
+    /// line. `then` directly against a terminator is an empty branch,
+    /// which is ADR 0012's nil wearing a `then`.
+    fn branch_body(&mut self, terminators: &[&str], label: &str) -> Vec<Statement> {
+        if self.peek_is_keyword("then") {
+            self.position += 1; // the `then`
+            if terminators.iter().any(|word| self.peek_is_keyword(word)) {
+                return Vec::new();
+            }
+            if self.peek_kind() != Some(TokenKind::Newline) {
+                let row = vec![self.simple_statement()];
+                self.branch_boundary(terminators);
+                return row;
+            }
+        }
         self.expect_statement_boundary();
         self.skip_newlines();
-        let then_body = self.body_until(&["else", "elsif", "end"], "if");
+        self.body_until(terminators, label)
+    }
+
+    /// An `else` body: a same-line row (`else 0`), an empty `else end`, or
+    /// an indented body.
+    fn else_body(&mut self, terminators: &[&str]) -> Vec<Statement> {
+        if terminators.iter().any(|word| self.peek_is_keyword(word)) {
+            return Vec::new();
+        }
+        if self.peek_kind() != Some(TokenKind::Newline) {
+            let row = vec![self.simple_statement()];
+            self.branch_boundary(terminators);
+            return row;
+        }
+        self.skip_newlines();
+        self.body_until(terminators, "else")
+    }
+
+    /// After a same-line row: a newline, or one of the branch keywords
+    /// directly. Anything else is one statement trying to be two.
+    fn branch_boundary(&mut self, terminators: &[&str]) {
+        match self.peek_kind() {
+            None | Some(TokenKind::Newline) => self.skip_newlines(),
+            _ if terminators.iter().any(|word| self.peek_is_keyword(word)) => {}
+            _ => panic!(
+                "a then row takes one statement — expected a newline or {} next, got {:?}",
+                terminators.join("/"),
+                self.tokens.get(self.position)
+            ),
+        }
+    }
+
+    fn if_expression(&mut self) -> Expression {
+        let condition = Box::new(self.expression());
+        let then_body = self.branch_body(&["else", "elsif", "end"], "if");
         let else_body;
         if self.peek_is_keyword("elsif") {
             // Sugar for `else` holding a nested `if`; the chain shares one `end`,
@@ -1841,9 +1871,7 @@ impl<'source> Parser<'source> {
         } else {
             else_body = if self.peek_is_keyword("else") {
                 self.position += 1; // the `else`
-                self.expect_statement_boundary();
-                self.skip_newlines();
-                self.body_until(&["end"], "else")
+                self.else_body(&["end"])
             } else {
                 Vec::new()
             };

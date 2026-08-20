@@ -45,6 +45,16 @@ mutable trimmed = 9
 trimmed -= 2 until trimmed < 4
 puts "trimmed to #{trimmed}"
 
+# `then` rows (ADR 0042) — the decision-table typography, if included.
+size = 60
+bracket = if size > 100 then "large"
+elsif size > 50 then "medium"
+else "small"
+end
+puts "bracket: #{bracket}"
+parity = case size % 2 when 0 then "even" else "odd" end
+puts "parity: #{parity}"
+
 # `loop do` — `while true` in Ruby's favorite clothes, left by `break`.
 mutable spins = 0
 loop do
