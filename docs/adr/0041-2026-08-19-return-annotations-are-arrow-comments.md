@@ -24,7 +24,25 @@ end
 
 1. **The marker is `# ->` trailing a `def` signature line, followed by one type expression.** rbs-inline's placement with the arrow as the marker itself — one glyph swapped from `#:`, and the honest one: in RBS's own grammar the arrow already *means* "returns," where `#=>` conventionally introduces a **value** (`3 + 4 #=> 7`). `def handle #=> String` would read "evaluates to the constant String" — a small lie; `# -> String` reads "returns a String" — the true sentence.
 1. **Position-restricted, strictly.** The form is live *only* trailing a `def` signature line. `# ->` anywhere else is an ordinary comment, and `#=>` is an ordinary comment *everywhere* — pasted irb transcripts (`total = 3 + 4 #=> 7`) stay the inert prose they always were. One position, one meaning (principle 3).
-1. **The def's own first line, always.** If parameter lists ever span lines (they do not parse today — this is ruled ahead so their arrival re-litigates nothing), the annotation still trails the line the `def` starts on: `def foo(bar, # -> String` with the remaining parameters below. One rule covers both shapes — the single-line def is its degenerate case — where the closing-paren home would need a rule of its own. Deciding evidence: the first line is the stable anchor (parameter lists reflow and grow; appending a parameter must not touch the annotation's line), the return type reads beside the method's *name* rather than at the bottom of an indentation well, and the marker keeps the adjacency unambiguous — `# ->` always speaks for the def, never for a parameter. Exactly one home; the aesthetic double-allowance was declined on principle 3's spirit.
+1. **The annotation trails the line where the parameter list ends — every shape.** *Ruled twice the same day: a first ruling chose the def's opening line (stable anchor, return-beside-the-name), was accepted on a misread, and re-ruled to the deciding user's actual preference once the multiline shapes were drawn out.* "Where the parens close" is conceptual, not literal — for a paren-less list it means where the args end. One rule, four shapes, ruled ahead of the grammar (none of the multiline or paren-less shapes parse today):
+
+   <!-- not-portland: signature-shape sketches, bodies elided -->
+
+   ```ruby
+   def foo(bar, baz) # -> String
+
+   def foo(bar,
+           baz) # -> String
+
+   def foo bar, baz # -> String
+
+   def foo bar,
+           baz # -> String
+
+   def foo = @bar # -> String
+   ```
+
+   For an endless def the parameter list and body share the one line, and a comment runs to end-of-line, so the annotation trails the whole line. The accepted costs, named: appending a parameter touches the annotation's line, and in a long list the return type reads at the bottom rather than beside the name. The gains: the arrow lands where every function-type notation puts it — after the inputs, `(args) -> Return` — and for paren-less multiline lists the annotation *may* additionally serve the parser as an args-end anchor, though the trailing-comma continuation rule already decides that without it. Exactly one home; `# ->` always speaks for the def, never for a parameter.
 1. **The type grammar is the debug dump's, round-trippable.** Bare names (`String`, `Token`), trait names as shapes (ADR 0040 §2), `?` for maybes (`User?` = `Maybe[User]`), `[Integer]` for arrays, `{Symbol => Integer}` for hashes — exactly what `types.pdx` renders, so an annotation is literally *writing down what the dump would have said*. The vocabulary grows with the rendering, one decision covering both.
 1. **Annotations are checked docs — they can never lie.** The compiler verifies each annotation against the inferred return type; a mismatch refuses (wording owed to the error-voice decision, per ADR 0034 §1). Because of that, **recognition ships with verification**: until the inference increment that can compute method returns, the form is an inert comment — YARD-tier, explicitly temporary — rather than a parsed-but-unchecked promise.
 1. **Input annotations stay open, unblocked.** Return types are the highest-value annotation (what a README reader wants; the direction inference is worst at communicating) and this form needs no parameter story — the kwarg-colon collision that entangled the inline options never arises. If input annotations ever earn their way in, nothing here constrains their shape.
