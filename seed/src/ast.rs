@@ -290,11 +290,6 @@ pub enum Expression {
     },
     /// `yield` — run the block handed to the enclosing method.
     Yield(Vec<Expression>),
-    /// `read_file!(path)` — unwrap-or-propagate (ADR 0027): the inner
-    /// expression's value passes through unless it is a failure, which
-    /// returns from the enclosing method instead. One character per frame a
-    /// failure may cross; `grep '!'` audits every propagation path.
-    Propagate(Box<Expression>),
     MethodCall {
         arguments: Vec<Expression>,
         block: Option<Block>,

@@ -588,15 +588,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "it = 1\n[2].each { puts it }\n",
             "`it` is a local here and a block parameter there — rename one",
         ),
-        // ADR 0027's refusals: `!` marks call sites only, and a failure
+        // ADR 0044: `!` belongs to method names (Ruby's rule) and a failure
         // demands handling before use.
         (
-            "def save!\n  1\nend\n",
-            "`!` is unwrap-or-propagate and belongs to call sites — define save and write save! where its failure should propagate",
-        ),
-        (
             "content! = 1\n",
-            "`!` is unwrap-or-propagate — a binding cannot take it; name it content",
+            "`!` belongs to a method's name — a binding cannot take it; name it content",
         ),
         (
             "sad = failure(\"why\")\nputs sad.upcase\n",
@@ -650,7 +646,7 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "a task cannot rebind an outer mutable — bind a name and combine after the join",
         ),
         (
-            "def risky\n  failure(\"down\")\nend\ndef f\n  together do\n    ~ x = risky!\n  end\nend\nf\n",
+            "def f\n  together do\n    ~ x = [1].map { return 1 }\n  end\nend\nf\n",
             "a task cannot unwind across the join — bind a name and handle it after end",
         ),
         // ADR 0032 (#68): the never-guess shapes after a dot call's name.
@@ -1057,13 +1053,13 @@ fn portland_evaluator_matches_the_seed_on_traits() {
 
 /// Typed results (ADR 0027, #59): `failure` boxes a reason, `failure?` is
 /// universal, `or` unwraps-or-else, patterns are transparent to the box,
-/// `!` propagates to the write site — through blocks and yields like any
+/// Failures return early at the write site — through blocks like any
 /// return — and `read_file` answers a failure for a missing path.
 #[test]
 fn portland_evaluator_matches_the_seed_on_failures() {
     assert_evaluator_matches_seed(
         "evaluator_failures.pdx",
-        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs(\"present\" or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky!(flag)\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky!(flag)\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs read_file(\"/tmp/portland-definitely-missing\").failure?\n",
+        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs(\"present\" or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky(flag)\n  return value if value.failure?\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky(flag)\n    return checked if checked.failure?\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs read_file(\"/tmp/portland-definitely-missing\").failure?\n",
     );
 }
 

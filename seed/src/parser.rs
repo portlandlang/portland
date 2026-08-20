@@ -342,12 +342,12 @@ impl<'source> Parser<'source> {
         self.postfix_modifier(statement)
     }
 
-    /// A binding site cannot take the `!` suffix (ADR 0027): a reference
-    /// ending in `!` always reads as unwrap-or-propagate, so the name could
-    /// never be reached again.
+    /// A binding site cannot take the `!` suffix (ADR 0044, keeping Ruby's
+    /// own rule): `!` belongs to method names, and `x! = 5` is not an
+    /// lvalue in either language.
     fn refuse_bang_binding(name: &str) {
         if let Some(base) = name.strip_suffix('!') {
-            panic!("`!` is unwrap-or-propagate — a binding cannot take it; name it {base}");
+            panic!("`!` belongs to a method's name — a binding cannot take it; name it {base}");
         }
     }
 
@@ -636,20 +636,14 @@ impl<'source> Parser<'source> {
                  a block for {name}:  {name}({inner}) {{ ... }}"
             );
         }
-        // `save_config! path` — the `!` wraps the command call (ADR 0027).
-        let (name, propagates) = match name.strip_suffix('!') {
-            Some(base) => (base.to_string(), true),
-            None => (name, false),
-        };
+        // A `!` in the name is just the name (ADR 0044): Ruby's suffix
+        // convention, back whole — propagation is the explicit toolkit.
         let call = Expression::Call {
             arguments,
             block,
             keyword_arguments,
             name,
         };
-        if propagates {
-            return Some(Statement::Expression(Expression::Propagate(Box::new(call))));
-        }
         Some(Statement::Expression(call))
     }
 
@@ -819,13 +813,6 @@ impl<'source> Parser<'source> {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
-        // `!` belongs to call sites, never to methods (ADR 0027): a method
-        // named with it could not be told apart from a propagated call.
-        if let Some(base) = name.strip_suffix('!') {
-            panic!(
-                "`!` is unwrap-or-propagate and belongs to call sites — define {base} and write {name} where its failure should propagate"
-            );
-        }
         let (parameters, keyword_parameters) = if self.peek_kind() == Some(TokenKind::LeftParen) {
             self.position += 1;
             self.parameters()
@@ -1304,7 +1291,6 @@ impl<'source> Parser<'source> {
         if token.kind != TokenKind::Identifier {
             panic!("alias takes two method names — alias new_name old_name");
         }
-        Self::refuse_bang_binding(token.text);
         token.text.to_string()
     }
 
@@ -2394,12 +2380,8 @@ impl<'source> Parser<'source> {
                     if token.kind != TokenKind::Identifier && !keyword_method {
                         panic!("expected method name after dot, got {token:?}");
                     }
-                    // `token.parse!` — the `!` wraps the call (ADR 0027),
-                    // exactly as it does on a bare name.
-                    let (name, propagates) = match token.text.strip_suffix('!') {
-                        Some(base) => (base.to_string(), true),
-                        None => (token.text.to_string(), false),
-                    };
+                    // A `!` in the name is just the name (ADR 0044).
+                    let name = token.text.to_string();
                     let attached_paren = self.peek_kind() == Some(TokenKind::LeftParen)
                         && self
                             .tokens
@@ -2434,9 +2416,6 @@ impl<'source> Parser<'source> {
                         receiver: Box::new(expression),
                         safe: kind == TokenKind::AmpersandDot,
                     };
-                    if propagates {
-                        expression = Expression::Propagate(Box::new(expression));
-                    }
                 }
                 Some(TokenKind::LeftBracket) => {
                     self.position += 1; // the `[`
@@ -2504,14 +2483,10 @@ impl<'source> Parser<'source> {
                 Expression::Path(path)
             }
             TokenKind::Identifier => {
-                // `!` is unwrap-or-propagate (ADR 0027): `name!` is the plain
-                // `name` expression wrapped in a Propagate, so the suffix
-                // marks call sites and never methods.
-                let (name, propagates) = match token.text.strip_suffix('!') {
-                    Some(base) => (base.to_string(), true),
-                    None => (token.text.to_string(), false),
-                };
-                let expression = if self.peek_kind() == Some(TokenKind::LeftParen) {
+                // A `!` in the name is just the name (ADR 0044) — Ruby's
+                // suffix convention; propagation is the explicit toolkit.
+                let name = token.text.to_string();
+                if self.peek_kind() == Some(TokenKind::LeftParen) {
                     self.position += 1; // the `(`
                     let (arguments, keyword_arguments) = self.call_arguments();
                     // ADR 0024: parens closed the argument list, so a block
@@ -2555,11 +2530,6 @@ impl<'source> Parser<'source> {
                         frame.named_here = true;
                     }
                     Expression::Variable(name)
-                };
-                if propagates {
-                    Expression::Propagate(Box::new(expression))
-                } else {
-                    expression
                 }
             }
             TokenKind::String => string_expression(token.text, &mut self.it_frames),

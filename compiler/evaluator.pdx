@@ -723,7 +723,6 @@ def evaluate_expression(node, bindings)
   in MatchTestNode then evaluate_match_test(node, bindings)
   in MethodCallNode | SafeMethodCallNode then evaluate_method_call(node, bindings)
   in NilNode then outcome([nil], bindings)
-  in PropagateNode then evaluate_propagate(node, bindings)
   in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
   # Guest symbols are tagged arrays, like guest structs — the compiler cannot
@@ -968,17 +967,6 @@ end
 def failure_payload(value)
   value in unwrapped
   unwrapped
-end
-
-# `!` — unwrap-or-propagate (ADR 0027): a failure returns from the
-# enclosing method, aimed like a `return` at the frame the `!` was written
-# in; anything else passes through untouched.
-def evaluate_propagate(node, bindings)
-  step = evaluate_expression(node.value, bindings)
-  return step unless step.signal == "none"
-  value = slot_value(step.value)
-  return return_outcome([value], step.bindings, frame_of(step.bindings)) if value.failure?
-  step
 end
 
 # The seed's Display: what `puts`, `to_s`, `join`, and interpolation show.
@@ -1266,7 +1254,11 @@ end
 
 # The struct method `method_name` for a tagged-array instance, if any.
 # The struct-shape test is a pattern — the compiler's first type predicate.
+# A failure is checked first because patterns are failure-transparent
+# (ADR 0027): the shape test would see through the wrapper, but a failure
+# has no methods beyond its predicate — the sad path stays opaque.
 def struct_method_for(receiver, method_name, bindings)
+  return nil if receiver.failure?
   return nil unless receiver in ["__struct__", *]
   slot = lookup(bindings, value_at(receiver, 1))
   return nil if slot.empty?
@@ -1390,6 +1382,10 @@ def evaluate_method_call(node, mutable bindings)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
+  # The failure predicate rides the host like its presence siblings —
+  # before ADR 0044 it was reachable only through `!`, so this arm was a
+  # green-but-never-covered hosted gap.
+  when "failure?" then receiver.failure?
   when "failure?" then receiver.failure?
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.

@@ -1349,25 +1349,6 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.current_block = outer;
                 result
             }
-            // `!` — unwrap-or-propagate (ADR 0027): a failure returns from
-            // the enclosing method, aimed like a `return` at the frame the
-            // `!` was written in; anything else passes through untouched.
-            Expression::Propagate(inner) => {
-                let value = self.expression(inner);
-                if self.pending.is_some() {
-                    return None;
-                }
-                match value {
-                    Some(Value::Failure(failure)) => {
-                        self.pending = Some(Pending::Return {
-                            target: self.home_depth,
-                            value: Some(Value::Failure(failure)),
-                        });
-                        None
-                    }
-                    other => other,
-                }
-            }
             // `yield` — run the block this method was handed, in the scope,
             // frame, and block context that block was written in.
             Expression::Yield(_) => {
