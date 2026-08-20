@@ -30,6 +30,7 @@ What changes from Ruby:
 - **Captures are Ruby's**, fenced by no-shadow (collision = error), exhaustiveness (catch-alls make later arms unreachable = error), and an unused-capture lint. The silent-capture typo class dies.
 - **Struct patterns are keyword-only** and ceremony-free — no `deconstruct_keys`; fields are the pattern surface.
 - **In:** pin `^`, guards, alternatives `|`, one-line `=>` and `in`. **Out for now:** the find pattern (`in [*, x, *]`), until demanded. **Out:** positional struct patterns.
+- **One superset edge** ([ADR 0042](../adr/0042-2026-08-19-then-rows-everywhere.md)): the whole-construct one-liner `case status in :paid then "receipt" end` parses here and not in Ruby, whose subject eats `status in :paid` as the match test and errors. Portland's case subject parses one notch below full expression, so a following `in` is always the first arm; a match-test *subject* takes parens.
 - `pair => [a, b]` is Portland's destructuring; `a, b = pair` multiple assignment stays out.
 
 ## Migration
