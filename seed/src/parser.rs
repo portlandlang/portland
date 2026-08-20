@@ -1322,6 +1322,12 @@ impl<'source> Parser<'source> {
     /// `case subject ... when a, b [then one-liner | body] ... else ... end`.
     /// Matching is by equality (no ranges or classes to `===` against yet).
     fn case_expression(&mut self) -> Expression {
+        // Subjectless case is declined for now (#84): without a subject,
+        // `when` flips from ===-matching to truth-testing — one arm shape,
+        // two readings. The refusal names the rewrite.
+        if self.peek_kind() == Some(TokenKind::Newline) {
+            panic!("case takes a subject — a subjectless case is an if/elsif chain here");
+        }
         let subject = Box::new(self.expression());
         self.expect_statement_boundary();
         self.skip_newlines();

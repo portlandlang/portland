@@ -679,6 +679,11 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         // false aliases, and the refusal names the real conversion.
         ("x = 5.to_int\n", "to_int is spelled to_i here"),
         ("x = \"5\".to_str\n", "to_str is spelled to_s here"),
+        // Subjectless case declines toward if/elsif (#84).
+        (
+            "case\nwhen true then puts \"x\"\nend\n",
+            "case takes a subject — a subjectless case is an if/elsif chain here",
+        ),
         // ADR 0039: an alias of nothing is a typo, not a plan.
         (
             "alias fu foo\n",

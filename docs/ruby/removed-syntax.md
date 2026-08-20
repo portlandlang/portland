@@ -16,6 +16,7 @@
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never learned them and nothing has missed them.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was invented to replace (ADR 0017). `it` covers one parameter; names cover the rest. The polyfill autocorrects `_1 → it` for free.
 - **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase terminators** — squiggly `<<~SQL` is the only opener and terminators are SCREAMING_CAPS; see [heredocs](heredocs.md).
+- **Subjectless `case`** — declined for now, with [#84](https://github.com/portlandlang/portland/issues/84) as the standing reconsideration: without a subject, `when` flips from `===`-matching to truth-testing — one arm shape, two readings — and Ruby's own default linter (`Style/EmptyCaseCondition`) autocorrects the form away. The refusal names the rewrite: `case takes a subject — a subjectless case is an if/elsif chain here`. Reopens on corpus evidence, user demand, or Portland's own code wanting it.
 
 ## Kept, to be clear
 
@@ -26,7 +27,7 @@ Postfix guards, `unless`, `until`, the postfix loop modifiers, and `loop do` ([A
 Not yet buildable is different from ruled out. These currently give parse errors and are expected to arrive:
 
 - **Splats (`*args`, `**kwargs`)** — deferred by ADR 0014, which shipped the rest of Ruby 3's keyword-argument story. Ruby code using them gets a clean parse error until they land.
-- **`||=`** and **subjectless `case`** — probed by the import, skipped rather than ruled ([#73](https://github.com/portlandlang/portland/issues/73) stays open holding exactly these two).
+- **`||=`** — probed by the import, skipped rather than ruled ([#73](https://github.com/portlandlang/portland/issues/73) stays open holding exactly this one).
 
 (Floats, ranges, brace blocks, `it`, and symbols once sat here as undecided or decided-not-built; all are long since decided — symbols by ADR 0023, after the [first-pass tabling](../history/2026-07-23-symbols-first-pass.md) — built, and specced.)
 

@@ -2946,7 +2946,13 @@ def parse_while(tokens, position, negated)
   Step.new(node: error_node("expected end to close while"), position: body.position)
 end
 
+# Subjectless case is declined for now (#84): without a subject, `when`
+# flips from ===-matching to truth-testing — one arm shape, two readings.
+# The refusal names the rewrite, the seed's words.
 def parse_case(tokens, mutable position)
+  if position < tokens.length && tokens[position].kind == "newline"
+    return Step.new(node: error_node("case takes a subject — a subjectless case is an if/elsif chain here"), position: position)
+  end
   subject = parse_expression(tokens, position)
   position = skip_newlines_at(tokens, subject.position)
   return parse_case_in(tokens, subject.node, position) if keyword_at?(tokens, position, %w[in])
