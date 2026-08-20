@@ -1,0 +1,36 @@
+# The ternary (#83, ADR 0046): `cond ? yes : no`, sugar over the same If
+# node as its wordy twin `if cond then yes else no end` (ADR 0042). The
+# spacing is declared grammar, not a heuristic: a spaced ? is the ternary,
+# an attached ? ends a name like ready?, an attached : makes a symbol like
+# :ready. Nesting refuses toward parens.
+
+require_relative "../spec_helper"
+
+context "the ternary" do
+  describe "cond ? yes : no" do
+    specify "answers the then side on true" do
+      expect(1 < 2 ? "yes" : "no").to eq("yes")
+    end
+
+    specify "answers the else side on false" do
+      expect(1 > 2 ? "yes" : "no").to eq("no")
+    end
+
+    specify "takes symbol operands — their colons are attached" do
+      expect(true ? :x : :y).to eq(:x)
+    end
+
+    specify "reads a predicate's ? and its own apart" do
+      found = [7].first
+      expect(found.nil? ? 0 : 1).to eq(1)
+    end
+
+    specify "the untaken side never runs" do
+      expect(true ? 1 : panic("unreachable")).to eq(1)
+    end
+
+    specify "nests with parens, and only with parens" do
+      expect(false ? 1 : (true ? 2 : 3)).to eq(2)
+    end
+  end
+end

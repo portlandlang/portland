@@ -196,7 +196,7 @@ puts "quiet" unless loud?
 return 0 if count < 0
 ```
 
-The ternary is committed but unbuilt ([#83](https://github.com/portlandlang/portland/issues/83)): today `?` is part of a name and nothing else, and the build waits on the collision design between `x ? :a : :b`, `?`-suffix predicates, and symbol literals. Until it lands, its honest spelling is the one-line `if a then b else c end`.
+The ternary is built ([ADR 0046](adr/0046-2026-08-20-the-ternary.md)): `cond ? yes : no`, the same If node as the one-line `if cond then yes else no end` underneath. The collision design is declared spacing — a spaced `?` is the ternary, an attached `?` ends a name like `ready?`, an attached `:` makes a symbol like `:ready` — and nesting refuses toward parens: `a ? b : (c ? d : e)`, never bare.
 
 `if` / `elsif` / `else` / `end`, `unless`, `while` with its negated twin `until` and `loop do` — `while true` in Ruby's favorite clothes, desugared at parse ([ADR 0037](adr/0037-2026-08-18-the-loop-spellings.md)) — `case/when`, and the postfix modifiers: guards (`return if done?`) and loops (`i += 1 while i < 3`) both. **`then` rows work everywhere** ([ADR 0042](adr/0042-2026-08-19-then-rows-everywhere.md)): `if`/`elsif`/`unless` take the same aligned `then` one-liners `when` and `in` always had, `else` takes a same-line body, and whole constructs fit on one line — `if a then b else c end` is the decision table's row form and the ternary's interim spelling. Every loop is pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to. Conditions are strict booleans — there is no truthiness, because there is no nil to be falsy.
 

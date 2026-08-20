@@ -1006,12 +1006,53 @@ def statement_boundary?(tokens, position)
 end
 
 def parse_expression(tokens, position)
-  step = parse_range(tokens, position)
+  mutable step = parse_range(tokens, position)
+  # `cond ? yes : no` (#83): sugar over the same If node as the one-line
+  # if. Binds looser than everything but `in`.
+  step = parse_ternary(tokens, step) if operator_at?(tokens, step.position, %w[?])
   # One-line pattern test (ADR 0013 §4): `expr in pattern` is a boolean,
   # binding its captures on a hit. Binds loosest of all.
   return step unless keyword_at?(tokens, step.position, %w[in])
   pattern = parse_pattern(tokens, step.position + 1)
   Step.new(node: match_test_node(step.node, pattern.node), position: pattern.position)
+end
+
+# `cond ? yes : no` (#83): the ternary, desugared to the If node the
+# one-line `if cond then yes else no end` already produces. The spacing is
+# declared grammar, not a heuristic (ADR 0032's shape): a spaced `?` is the
+# ternary, an attached `?` ends a name, an attached `:` makes a symbol or a
+# label. Operands parse one notch below the ternary itself, so nesting
+# refuses toward parens.
+def parse_ternary(tokens, step)
+  unless tokens[step.position].leading_space && spaced_after?(tokens, step.position)
+    return Step.new(node: error_node("a ternary spaces its ? on both sides — an attached ? ends a name like ready?"), position: skip_line_at(tokens, step.position))
+  end
+  yes = parse_range(tokens, step.position + 1)
+  if operator_at?(tokens, yes.position, %w[?])
+    return Step.new(node: error_node("ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)"), position: skip_line_at(tokens, yes.position))
+  end
+  # `x :y` — the colon glued right became a symbol token.
+  if yes.position < tokens.length && tokens[yes.position].symbol?
+    return Step.new(node: error_node("a ternary spaces its : on both sides — an attached : makes a symbol like :ready"), position: skip_line_at(tokens, yes.position))
+  end
+  unless operator_at?(tokens, yes.position, %w[:])
+    return Step.new(node: error_node("a ternary needs its else — write cond ? yes : no"), position: skip_line_at(tokens, yes.position))
+  end
+  unless tokens[yes.position].leading_space && spaced_after?(tokens, yes.position)
+    return Step.new(node: error_node("a ternary spaces its : on both sides — an attached : makes a symbol like :ready"), position: skip_line_at(tokens, yes.position))
+  end
+  no = parse_range(tokens, yes.position + 1)
+  if operator_at?(tokens, no.position, %w[?])
+    return Step.new(node: error_node("ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)"), position: skip_line_at(tokens, no.position))
+  end
+  Step.new(node: if_node(step.node, [yes.node], [no.node]), position: no.position)
+end
+
+# Does the token after this one carry a leading space? The end of input
+# counts as spaced — the missing-else refusal owns that story.
+def spaced_after?(tokens, position)
+  return true if position + 1 >= tokens.length
+  tokens[position + 1].leading_space
 end
 
 # `1..5` / `1...5`, plus endless and beginless (ADR 0019). Binds looser

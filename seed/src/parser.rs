@@ -2087,6 +2087,11 @@ impl<'source> Parser<'source> {
             panic!("expression nesting deeper than {MAXIMUM_NESTING} levels");
         }
         let mut expression = self.range();
+        // `cond ? yes : no` (#83): sugar over the same If node as the
+        // one-line if. Binds looser than everything but `in`.
+        if self.peek_kind() == Some(TokenKind::Question) {
+            expression = self.ternary(expression);
+        }
         // One-line pattern test (ADR 0013 §4): `expr in pattern` is a
         // boolean, binding its captures on a hit. Binds loosest of all.
         if self.peek_is_keyword("in") {
@@ -2126,6 +2131,57 @@ impl<'source> Parser<'source> {
             exclusive,
             start: Some(Box::new(left)),
         }
+    }
+
+    /// `cond ? yes : no` (#83): the ternary, desugared to the If node the
+    /// one-line `if cond then yes else no end` already produces. The
+    /// spacing is declared grammar, not a heuristic (ADR 0032's shape):
+    /// a spaced `?` is the ternary, an attached `?` ends a name, an
+    /// attached `:` makes a symbol or a label. Operands parse one notch
+    /// below the ternary itself, so nesting refuses toward parens.
+    fn ternary(&mut self, condition: Expression) -> Expression {
+        if !self.tokens[self.position].leading_space || !self.next_has_leading_space() {
+            panic!("a ternary spaces its ? on both sides — an attached ? ends a name like ready?");
+        }
+        self.position += 1; // the `?`
+        let then_value = self.range();
+        match self.peek_kind() {
+            Some(TokenKind::Question) => {
+                panic!("ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)")
+            }
+            // `x :y` — the colon glued right became a symbol token.
+            Some(TokenKind::Symbol) => {
+                panic!(
+                    "a ternary spaces its : on both sides — an attached : makes a symbol like :ready"
+                )
+            }
+            Some(TokenKind::Colon) => {
+                if !self.tokens[self.position].leading_space || !self.next_has_leading_space() {
+                    panic!(
+                        "a ternary spaces its : on both sides — an attached : makes a symbol like :ready"
+                    );
+                }
+            }
+            _ => panic!("a ternary needs its else — write cond ? yes : no"),
+        }
+        self.position += 1; // the `:`
+        let else_value = self.range();
+        if self.peek_kind() == Some(TokenKind::Question) {
+            panic!("ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)");
+        }
+        Expression::If {
+            condition: Box::new(condition),
+            else_body: vec![Statement::Expression(else_value)],
+            then_body: vec![Statement::Expression(then_value)],
+        }
+    }
+
+    /// Does the token after the cursor carry a leading space? The end of
+    /// input counts as spaced — the following refusal owns that story.
+    fn next_has_leading_space(&self) -> bool {
+        self.tokens
+            .get(self.position + 1)
+            .is_none_or(|token| token.leading_space)
     }
 
     /// One integer bound of a range pattern, negative allowed.

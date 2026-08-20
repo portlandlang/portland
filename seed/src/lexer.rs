@@ -44,6 +44,9 @@ pub enum TokenKind {
     PipePipeEqual,
     Plus,
     PlusEqual,
+    /// `?` standing alone — the ternary's question mark (#83). A `?` glued
+    /// to a name's tail stays part of the identifier (`ready?`).
+    Question,
     RightBrace,
     RightBracket,
     RightParen,
@@ -266,11 +269,15 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..=closing],
                 });
             }
-            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' | '~' => {
+            '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' | '~' | '?' => {
                 chars.next();
                 let next = chars.peek().map(|&(_, following)| following);
                 let (kind, length) = match (character, next) {
                     ('~', _) => (TokenKind::Tilde, 1),
+                    // A `?` that is not a name's suffix (#83): the ternary's
+                    // question mark. The identifier arm below claims `ready?`
+                    // before this arm ever sees the character.
+                    ('?', _) => (TokenKind::Question, 1),
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
                     ('&', Some('.')) => (TokenKind::AmpersandDot, 2),
                     ('&', _) => panic!("unexpected character '&' at byte {start}"),

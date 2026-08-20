@@ -67,8 +67,11 @@ def three_character_operator?(triple)
   %w[... <<~ ||=].include?(triple)
 end
 
+# `?` joined for the ternary (#83): a `?` that is not a name's suffix
+# stands alone. The identifier and symbol arms claim `ready?` and `:ok?`
+# before the operator arm ever sees the character.
 def one_character_operator?(character)
-  "(){}[],.:+-*/%<>=!|&^~".include?(character)
+  "(){}[],.:+-*/%<>=!|&^~?".include?(character)
 end
 
 # Does the colon at `index` open a symbol (ADR 0023)?

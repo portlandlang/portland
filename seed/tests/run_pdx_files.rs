@@ -710,6 +710,23 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "name = \"set\"\nname ||= \"other\"\n",
             "name is immutable — declare it `mutable name = ...` if it needs to change",
         ),
+        // The ternary (#83): declared spacing, nesting refuses toward parens.
+        (
+            "y = true ?1 : 2\n",
+            "a ternary spaces its ? on both sides — an attached ? ends a name like ready?",
+        ),
+        (
+            "y = true ? 1: 2\n",
+            "a ternary spaces its : on both sides — an attached : makes a symbol like :ready",
+        ),
+        (
+            "y = true ? 1\n",
+            "a ternary needs its else — write cond ? yes : no",
+        ),
+        (
+            "y = true ? 1 : false ? 2 : 3\n",
+            "ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)",
+        ),
         // Subjectless case declines toward if/elsif (#84).
         (
             "case\nwhen true then puts \"x\"\nend\n",
@@ -1495,21 +1512,10 @@ fn parse_only_does_not_evaluate() {
     );
 }
 
-#[test]
-fn parse_only_rejects_invented_syntax() {
-    // Each of these was once written into docs/language.md from memory
-    // before it existed. The one-line if/then/else became real in ADR 0042
-    // and the endless method in #82; only the ternary (#83) remains
-    // invented, and it is committed.
-    let cases = [("y = true ? 1 : 2\n", "ternary")];
-    for (source, what) in cases {
-        let output = parse_only(source, "parse_only_invalid.pdx");
-        assert!(
-            !output.status.success(),
-            "--parse accepted {what}, which is not Portland"
-        );
-    }
-}
+// The invented-syntax test lived here from the day docs/language.md wrote
+// three forms from memory before they existed. All three became real —
+// one-line if/then/else (ADR 0042), endless methods (#82), and finally the
+// ternary (#83) — so the test retired with its last row.
 
 #[test]
 fn parse_only_needs_a_file() {

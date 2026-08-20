@@ -17,7 +17,7 @@ The [polyfill promise](README.md) grades every difference: _free_ (valid Ruby, s
 - **Payload-carrying case patterns** — `in :paid(on:)` ([pattern-matching.md](pattern-matching.md)).
 - **The one-line `case/in`** — `case status in :paid then "receipt" end`; Ruby's subject eats the `in` as a match test and errors ([pattern-matching.md](pattern-matching.md), ADR 0042).
 
-Committed but unbuilt forms stay off this list until they exist; when the ternary (#83) lands it will be Ruby-parity, and the `# -> Type` annotations (ADR 0041) were chosen precisely because they never join this page.
+Committed but unbuilt forms stay off this list until they exist. The ternary landed Ruby-parity as predicted ([ADR 0046](../adr/0046-2026-08-20-the-ternary.md) — every accepted spelling is legal Ruby; the divergences are refusals), and the `# -> Type` annotations (ADR 0041) were chosen precisely because they never join this page.
 
 ## Two forms that surprisingly do NOT belong here
 
