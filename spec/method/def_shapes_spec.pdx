@@ -1,0 +1,82 @@
+# The def shapes (#82, ADR 0045): multiline parenthesized parameter lists,
+# Seattle.rb paren-less parameters (a trailing comma continues past the
+# newline, the boundary ends the list), and endless defs — one guarded
+# statement, no `end`, parens required around any parameters (which falls
+# out of Ruby's own carve-out: after a bare list, `=` was already a
+# default). All Ruby-parity, probed on 4.0.6.
+
+require_relative "../spec_helper"
+
+def add(first,
+        second)
+  first + second
+end
+
+def greet name, punctuation
+  "hi #{name}#{punctuation}"
+end
+
+def label kind,
+          text
+  "#{kind}: #{text}"
+end
+
+def answer = 42
+
+def double(number) = number * 2
+
+def cautious = "ran" if false
+
+def fallback bar = 9
+  bar
+end
+
+struct Circle
+  radius
+
+  def area = radius * radius * 3
+
+  def self.tau = 6
+end
+
+context "the def shapes" do
+  describe "multiline parenthesized parameters" do
+    specify "continue past commas and close on their own line" do
+      expect(add(1, 2)).to eq(3)
+    end
+  end
+
+  describe "paren-less parameters" do
+    specify "take a comma-separated list to the end of the line" do
+      expect(greet("pdx", "!")).to eq("hi pdx!")
+    end
+
+    specify "continue past a trailing comma" do
+      expect(label("word", "rose")).to eq("word: rose")
+    end
+
+    specify "take defaults, which is why endless defs require parens" do
+      expect(fallback).to eq(9)
+      expect(fallback(3)).to eq(3)
+    end
+  end
+
+  describe "endless defs" do
+    specify "hold one expression" do
+      expect(answer).to eq(42)
+    end
+
+    specify "take parenthesized parameters" do
+      expect(double(21)).to eq(42)
+    end
+
+    specify "take a postfix guard, answering nil when it fails" do
+      expect(cautious).to be_nil
+    end
+
+    specify "work as struct methods and type functions" do
+      expect(Circle.new(radius: 2).area).to eq(12)
+      expect(Circle.tau).to eq(6)
+    end
+  end
+end

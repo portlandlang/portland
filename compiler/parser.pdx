@@ -2234,15 +2234,30 @@ def parse_def(tokens, mutable position)
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text
-  # `!` belongs to call sites, never to methods (ADR 0027).
   position += 1
   mutable parameters = []
+  mutable had_parens = false
   if operator_at?(tokens, position, %w[(])
+    had_parens = true
     parameter_step = parse_parameters(tokens, position + 1)
     # A refusal in the parameter list stands in for the whole def.
     return parameter_step if parameter_step.node in ErrorNode
     parameters = parameter_step.node
     position = parameter_step.position
+  elsif position < tokens.length && (tokens[position].identifier? || keyword_at?(tokens, position, %w[mutable]))
+    # Seattle.rb-style paren-less parameters (#82).
+    parameter_step = parse_parameter_list(tokens, position, false)
+    return parameter_step if parameter_step.node in ErrorNode
+    parameters = parameter_step.node
+    position = parameter_step.position
+  end
+  # `def foo = expr` — the endless def (#82): one guarded statement, no
+  # `end`. Parens are required around any parameters, which falls out
+  # rather than being enforced: after a bare list an `=` was already a
+  # default (Ruby's own carve-out).
+  if (had_parens || parameters.empty?) && operator_at?(tokens, position, %w[=])
+    body_step = parse_statement_with_guard(tokens, position + 1)
+    return Step.new(node: def_node(name, parameters, [body_step.node], type_function), position: body_step.position)
   end
   body = parse_body(tokens, position, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
@@ -2253,8 +2268,16 @@ end
 
 # Parameter names: `name`, `name = default`, and Ruby-3-style keyword
 # parameters `label:` / `label: default`; consumes the closing paren.
-def parse_parameters(tokens, mutable position)
+def parse_parameters(tokens, position)
+  parse_parameter_list(tokens, position, true)
+end
+
+# With `parens`, newlines flow after the opener, after commas, and before
+# the close (#82's multiline shape); without, this is the paren-less list —
+# a trailing comma continues past the newline, the boundary ends it.
+def parse_parameter_list(tokens, mutable position, parens)
   mutable parameters = []
+  position = skip_newlines_at(tokens, position) if parens
   while position < tokens.length && (tokens[position].identifier? || keyword_at?(tokens, position, %w[mutable]))
     # A parameter is a binding site (ADR 0001), so `mutable` marks it
     # rebindable — carried on the node since #45. A `mutable` before a
@@ -2266,7 +2289,7 @@ def parse_parameters(tokens, mutable position)
     position += 1
     if operator_at?(tokens, position, %w[:])
       position += 1
-      if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
+      if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)]) || statement_boundary?(tokens, position)
         parameters << keyword_parameter_node(name, nil)
       else
         default = parse_expression(tokens, position)
@@ -2286,8 +2309,15 @@ def parse_parameters(tokens, mutable position)
     else
       parameters << identifier_node(name)
     end
-    position += 1 if operator_at?(tokens, position, %w[,])
+    if operator_at?(tokens, position, %w[,])
+      # Either shape continues past a newline after the comma — parens
+      # because they make newlines free, the bare list because a trailing
+      # comma means more args (Ruby's rule).
+      position = skip_newlines_at(tokens, position + 1)
+    end
   end
+  return Step.new(node: parameters, position: position) unless parens
+  position = skip_newlines_at(tokens, position)
   if operator_at?(tokens, position, %w[)])
     return Step.new(node: parameters, position: position + 1)
   end

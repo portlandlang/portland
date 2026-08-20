@@ -56,6 +56,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0042](0042-2026-08-19-then-rows-everywhere.md) — `then` rows everywhere
 - [0043](0043-2026-08-19-or-equals.md) — `||=`: the or-guard's question as a rebind
 - [0044](0044-2026-08-19-propagation-is-the-toolkit.md) — Propagation is the toolkit, and `!` goes back to being a name
+- [0045](0045-2026-08-20-the-def-shapes.md) — The def shapes: multiline, paren-less, endless
 
 <!-- /generated -->
 

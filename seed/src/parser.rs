@@ -813,12 +813,38 @@ impl<'source> Parser<'source> {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
+        let mut had_parens = false;
         let (parameters, keyword_parameters) = if self.peek_kind() == Some(TokenKind::LeftParen) {
+            had_parens = true;
             self.position += 1;
             self.parameters()
+        } else if self.peek_kind() == Some(TokenKind::Identifier) || self.peek_is_keyword("mutable")
+        {
+            // Seattle.rb-style paren-less parameters (#82).
+            self.parameter_list(false)
         } else {
             (Vec::new(), Vec::new())
         };
+        // `def foo = expr` — the endless def (#82): the body is one guarded
+        // statement, no `end`. Parens are required around any parameters,
+        // which falls out rather than being enforced: after a bare list an
+        // `=` was already a default (Ruby's own carve-out).
+        if (had_parens || parameters.is_empty() && keyword_parameters.is_empty())
+            && self.peek_kind() == Some(TokenKind::Equal)
+        {
+            self.position += 1; // the `=`
+            let statement = self.simple_statement();
+            let body = vec![self.postfix_modifier(statement)];
+            return (
+                Statement::MethodDefinition {
+                    body,
+                    keyword_parameters,
+                    name,
+                    parameters,
+                },
+                type_function,
+            );
+        }
         self.expect_statement_boundary();
         self.skip_newlines();
         let body = self.body_until(&["end"], &format!("def {name}"));
@@ -1904,10 +1930,22 @@ impl<'source> Parser<'source> {
     }
 
     /// Parse a comma-separated parameter list (with optional trailing
-    /// `name = default` entries), consuming the closing paren.
+    /// `name = default` entries). With `parens`, newlines flow after the
+    /// opening paren, after commas, and before the close (#82's multiline
+    /// shape — the trailing comma continues the list); the closing paren is
+    /// consumed. Without, this is the Seattle.rb paren-less list: a
+    /// trailing comma continues past the newline exactly as Ruby's
+    /// line-end reasoning does, and the statement boundary ends it.
     fn parameters(&mut self) -> (Vec<Parameter>, Vec<Parameter>) {
+        self.parameter_list(true)
+    }
+
+    fn parameter_list(&mut self, parens: bool) -> (Vec<Parameter>, Vec<Parameter>) {
         let mut parameters: Vec<Parameter> = Vec::new();
         let mut keyword_parameters: Vec<Parameter> = Vec::new();
+        if parens {
+            self.skip_newlines();
+        }
         if self.peek_kind() == Some(TokenKind::Identifier) || self.peek_is_keyword("mutable") {
             loop {
                 let mutable = if self.peek_is_keyword("mutable") {
@@ -1934,7 +1972,8 @@ impl<'source> Parser<'source> {
                     // keyword parameters, Ruby 3 style.
                     self.position += 1; // the `:`
                     let default = match self.peek_kind() {
-                        Some(TokenKind::Comma | TokenKind::RightParen) => None,
+                        Some(TokenKind::Comma | TokenKind::RightParen | TokenKind::Newline)
+                        | None => None,
                         _ => Some(self.expression()),
                     };
                     keyword_parameters.push(Parameter {
@@ -1970,15 +2009,22 @@ impl<'source> Parser<'source> {
                     break;
                 }
                 self.position += 1; // the `,`
+                // Either shape continues past a newline after the comma —
+                // parens because they make newlines free, the bare list
+                // because a trailing comma means more args (Ruby's rule).
+                self.skip_newlines();
             }
         }
-        if self.peek_kind() != Some(TokenKind::RightParen) {
-            panic!(
-                "expected closing paren after parameters, got {:?}",
-                self.tokens.get(self.position)
-            );
+        if parens {
+            self.skip_newlines();
+            if self.peek_kind() != Some(TokenKind::RightParen) {
+                panic!(
+                    "expected closing paren after parameters, got {:?}",
+                    self.tokens.get(self.position)
+                );
+            }
+            self.position += 1;
         }
-        self.position += 1;
         (parameters, keyword_parameters)
     }
 

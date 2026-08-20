@@ -238,7 +238,7 @@ def greet(name, greeting: "hello", loud: false)
 end
 ```
 
-Implicit return of the last expression, arity-checked calls, trailing default parameter values that may reference earlier parameters, and Ruby 3 keyword parameters (ADR 0014) — `label:` required, `label: default` optional, strictly separate from positionals, accepted on both paren and command calls. Splats are deferred. Method bodies get a fresh scope and see no outer locals, which is Ruby's rule, kept.
+Implicit return of the last expression, arity-checked calls, trailing default parameter values that may reference earlier parameters, and Ruby 3 keyword parameters (ADR 0014) — `label:` required, `label: default` optional, strictly separate from positionals, accepted on both paren and command calls. Splats are deferred. Method bodies get a fresh scope and see no outer locals, which is Ruby's rule, kept. **Every Ruby def shape parses** ([ADR 0045](adr/0045-2026-08-20-the-def-shapes.md)): parameter lists span lines inside parens, the Seattle.rb paren-less list works (a trailing comma continues it), and `def answer = 42` is the endless form — one guarded statement, no `end`, parens required around any parameters.
 
 **`alias hail greet`** gives a method a second name ([ADR 0039](adr/0039-2026-08-19-alias-a-second-name-for-a-method.md)) — Ruby's spelling, new name first, but with no redefinition there is nothing to snapshot: the two names are the same method forever. The target must already be defined; works at top level, in module bodies, and in struct and trait bodies (where a trait's alias rides `include` like any method).
 

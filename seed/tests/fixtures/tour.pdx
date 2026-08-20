@@ -8,6 +8,15 @@ end
 puts greeting("portland")
 puts greeting("")
 
+# The def shapes (ADR 0045): paren-less parameters and an endless def.
+def cheer name, mark
+  "go #{name}#{mark}"
+end
+puts cheer("pdx", "!")
+
+def lucky = 7
+puts lucky.to_s
+
 # `alias` — a second name for the same method (ADR 0039).
 alias salutation greeting
 puts salutation("rose city")
