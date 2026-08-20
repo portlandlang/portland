@@ -196,7 +196,7 @@ puts "quiet" unless loud?
 return 0 if count < 0
 ```
 
-There is no ternary operator — `?` is not an operator at all, it is part of a name. `then` belongs to `case`, not to `if`.
+The ternary is committed but unbuilt ([#83](https://github.com/portlandlang/portland/issues/83)): today `?` is part of a name and nothing else, and the build waits on the collision design between `x ? :a : :b`, `?`-suffix predicates, and symbol literals. `then` belongs to `case`, not to `if`.
 
 `if` / `elsif` / `else` / `end`, `unless`, `while` with its negated twin `until` and `loop do` — `while true` in Ruby's favorite clothes, desugared at parse ([ADR 0037](adr/0037-2026-08-18-the-loop-spellings.md)) — `case/when` with aligned `when x then y` one-liners, and the postfix modifiers: guards (`return if done?`) and loops (`i += 1 while i < 3`) both. Every loop is pre-checked: with no `begin`, Ruby's hidden do-while mode has nothing to attach to. Conditions are strict booleans — there is no truthiness, because there is no nil to be falsy.
 
