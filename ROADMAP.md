@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The compiler — `lexer.pdx`, `parser.pdx`, `evaluator.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, and the evaluator matches the seed byte-for-byte. There is no compiler emitting binaries yet.
 
-**Next:** the `%` zoo (#29), smart constructors (job 3 of [#61](https://github.com/portlandlang/portland/issues/61)), or the parallel runtime that ADR 0029's serial oracle now waits for (#12/#13 territory). The 2026-07-27 wave landed ADRs 0025–0029 decided _and_ built — write-site `return`, `inspect()`, typed results with `!`, traits, and serial `together` — the decisions by competing draft PRs, the roads not taken recorded in closed siblings. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
+**Next:** the inference error-voice session ([#9](https://github.com/portlandlang/portland/issues/9), user-gated) — increments 3a and 3b are on main silent by doctrine, and the first inference-backed refusals, 3c narrowing, and 3d exhaustiveness widening all wait on ratified wordings; ADR 0035's tripwire fires in the same session. The 2026-08-19/20 wave landed ADRs 0040–0046 — the inference core, arrow-comment return annotations, `then` rows, or-equals, propagation as the toolkit, the def shapes, the ternary. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
 
 ## Done 🎉
 
