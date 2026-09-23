@@ -1,6 +1,6 @@
 # 0048 — Contracts: the spelling, traits as names, no inheritance, agreement sharpens
 
-- **Status:** Accepted (rulings ratified 2026-09-23; step one — contracts in the dump — builds against this; caller flow waits for a whole-program checker, see Consequences)
+- **Status:** Accepted (rulings ratified 2026-09-23; built the same day — contracts in the dump, and the call-site refusal for struct arguments; caller flow waits for a whole-program checker, see Consequences)
 - **Date:** 2026-09-23
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — increment 3c, the rulings ADR 0040 §1's hybrid model left open
 
@@ -16,6 +16,17 @@ Working out how the second half — caller flow — would compute exposed one th
 1. **A trait's name may stand in for the set — in errors only, on an exact match only.** ADR 0040 §2 lets an error say `Describable` for that method set as a shape; it does so when the demand set equals a declared trait's method names, never on a partial overlap (`needs Describable` would then claim methods the body never used), and never in the dump, which stays the raw list so the reader can always see what the body asked for.
 1. **A contract is the body's own demand; nothing is inherited.** A body that hands its parameter to another def does not inherit that def's contract. Transitive demand is the whole-program road ADR 0040 named as Crystal's cost, and where errors surface far from their cause. Deferred, not refused.
 1. **Agreeing call sites sharpen; disagreeing ones decline.** When every reachable call passes one known type, the body reads its parameter at that type and the ordinary shapes fire inside it. When callers disagree, the parameter stays at its contract — unknown to shapes 1–4 — and nothing refuses. Refusing the call that fails the contract is the call-site wording's job, a later session.
+
+## The call-site wording
+
+Ratified 2026-09-23, once step one was in. A call that hands a def something its body cannot use refuses at the call — the place the mistake was made, where the runtime would fail inside the def:
+
+```text
+'token' is a Token, but 'greet' needs '.upcase'
+'box' is a Box, but 'show' needs Describable
+```
+
+The argument as written, its type, the def, and what it wanted. No hint: fixing the argument and fixing the def are two rewrites. Only the demands the argument lacks are named — the whole contract is in the dump; a trait's name stands in when the whole contract is exactly its method set (ruling 2). Struct arguments only until the method table ([#88](https://github.com/portlandlang/portland/issues/88)); an argument the renderer cannot spell declines.
 
 ## Consequences
 

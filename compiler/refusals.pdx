@@ -16,6 +16,8 @@
 #   ["annotation", name, computed, written]   — an annotation that lies; written is the source's text
 #   ["arity", name, expected, got]            — the wrong argument count
 #   ["coverage", missing]                     — a case/in over a maybe leaving a case (ADR 0035's tripwire)
+#   ["contract", spelling, type, def, wanted] — a call handing a def what its body cannot use (ADR 0048);
+#                                               wanted is ["trait", name] or ["demands", [...]]
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -47,6 +49,7 @@ def render_refusal(refusal)
   in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{written}", "change one")
   in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"
   in ["coverage", missing] then sentence("case/in does not cover #{missing}", "add the arm, or an else")
+  in ["contract", spelling, type, def_name, wanted] then "#{spelled(spelling)} is #{a_type(type)}, but #{spelled(def_name)} needs #{render_wanted(wanted)}"
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end
@@ -93,6 +96,18 @@ end
 def plural(noun, expected)
   return noun if expected == "1"
   noun + "s"
+end
+
+# ADR 0048 §2 — what a call-site sentence names: the trait whose method
+# set is exactly the whole contract, bare like any type name, else the
+# demands the argument lacks, each in its quotes.
+def render_wanted(wanted)
+  case wanted
+  in ["trait", name] then name
+  in ["demands", demands] then demands.map { spelled(it) }.join(", ")
+  else
+    panic "refusals: no rendering for #{wanted.inspect}"
+  end
 end
 
 # ADR 0048 §1 — a def's parameters for the dump, `(name: Type, other:

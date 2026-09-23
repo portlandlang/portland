@@ -54,10 +54,12 @@ require_relative "refusals"
 # inference.pdx reads.
 struct Scope
   arities
+  contracts
   enums
   globals
   locals
   shapes
+  traits
 end
 
 # Every enum declaration in the program, as [name, labels] pairs — all of
@@ -92,9 +94,25 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes, source)
-  scope = Scope.new(arities: declared_arities(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes))
+  scope = Scope.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
   check_annotations(nodes, source, scope)
   check_body(nodes, scope)
+end
+
+# Every top-level def's parameters with their contracts (ADR 0048), as
+# [name, parameters] where each parameter is [name, keyword?, entry] and
+# an entry is a default's type or ["needs", demands]. A name defined twice
+# is left out, as for arities.
+def declared_contracts(nodes)
+  defs = nodes.select { it in DefNode }
+  types = scan_program(nodes)
+  mutable contracts = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    parameters = node.parameters.map { [it.name, (it in KeywordParameterNode), parameter_entry(it, node.body, types)] }
+    contracts << [node.name, parameters]
+  end
+  contracts
 end
 
 # Every top-level def's positional arity, as [name, required, total] —
@@ -269,7 +287,7 @@ end
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
   type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
-  def_scope(node, scope.with(arities: [], globals: type_names))
+  def_scope(node, scope.with(arities: [], contracts: [], globals: type_names))
 end
 
 # A block keeps the locals around it and binds its parameters from the
@@ -469,6 +487,7 @@ end
 def check_call(node, scope)
   check_body(node.arguments, scope)
   check_arity(node, scope)
+  check_contracts(node, scope)
   check_block(node, ["unknown"], scope)
 end
 
@@ -613,6 +632,70 @@ def check_operands(node, scope)
   return unless node.operator == "||"
   return unless left == ["boolean"]
   refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+end
+
+# ADR 0048's call-site refusal — a call handing a def something its body
+# cannot use. The argument's type, the struct's declared method set, and
+# the body's demand all come from the file in hand, so this is provable
+# per file where caller flow (#94) is not. Struct arguments only, until
+# the method table (#88) says what a builtin answers. Each parameter is
+# paired with its argument by position, or by label for a keyword one.
+def check_contracts(node, scope)
+  contract = scope.contracts.find { it[0] == node.name }
+  return if contract.nil?
+  positional = node.arguments.reject { it in KeywordArgumentNode }
+  mutable position = 0
+  value_at_checked(contract, 1).each do |parameter|
+    keyword = value_at_checked(parameter, 1)
+    argument = if keyword then keyword_argument(node, parameter[0]) else positional[position] end
+    position += 1 unless keyword
+    next if argument.nil?
+    check_argument(node.name, argument, value_at_checked(parameter, 2), scope)
+  end
+end
+
+def keyword_argument(node, label)
+  found = node.arguments.find { (it in KeywordArgumentNode) && it.label == label }
+  return nil if found.nil?
+  found.value
+end
+
+def check_argument(def_name, argument, entry, scope)
+  return unless entry in ["needs", *]
+  demands = type_at(entry, 1)
+  type = synthesize(argument, known_types(scope))
+  return unless type in ["struct", *]
+  shape = scope.shapes.find { it[0] == type_at(type, 1) }
+  return if shape.nil?
+  methods = value_at_checked(shape, 1)
+  missing = demands.reject { struct_answers?(methods, it) }
+  return if missing.empty?
+  spelling = spell_node(argument)
+  return if spelling.nil?
+  refuse(["contract", spelling, type, def_name, wanted_by(demands, missing, scope)])
+end
+
+# A struct answers a dotted demand by its method set, `==` and `!=` by
+# nature, and no other operator or index at all.
+def struct_answers?(methods, demand)
+  return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
+  demand == "==" || demand == "!="
+end
+
+# What the sentence names (ADR 0048 §2): the trait whose method set is
+# exactly the whole contract, else only the demands the argument lacks —
+# the whole contract is in the dump for anyone who wants it.
+def wanted_by(demands, missing, scope)
+  scope.traits.each do |declared|
+    names = def_names(declared.methods).map { "." + it }
+    return ["trait", declared.name] if same_set?(names, demands)
+  end
+  ["demands", missing]
+end
+
+def same_set?(left, right)
+  return false unless left.length == right.length
+  left.all? { right.include?(it) }
 end
 
 # Shape 3 — a maybe used as plain: ADR 0005's static half. At runtime a

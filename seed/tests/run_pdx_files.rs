@@ -1018,6 +1018,26 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "one\n",
             "case/in does not cover nil — add the arm, or an else",
         ),
+        // ADR 0048's call-site refusal: a call hands a def what its body
+        // cannot use. The calls that satisfy their contracts run first.
+        (
+            "trait Describable\n  def describe = \"thing\"\nend\nstruct Token\n  kind\nend\nstruct Box\n  size\n  include Describable\nend\ndef greet(name)\n  \"hi \" + name.upcase\nend\ndef show(thing) = thing.describe\ndef label(token) = token.kind\ntoken = Token.new(kind: \"word\")\nbox = Box.new(size: 1)\nputs label(token)\nputs show(box)\nif false\n  greet(token)\nend\nputs \"reached the end\"\n",
+            "word\nthing\nreached the end\n",
+            "'token' is a Token, but 'greet' needs '.upcase'",
+        ),
+        (
+            // The whole contract is exactly a trait's set, so the trait's name
+            // stands in (ADR 0048 §2).
+            "trait Describable\n  def describe = \"thing\"\nend\nstruct Token\n  kind\nend\ndef show(thing) = thing.describe\ntoken = Token.new(kind: \"word\")\nif false\n  show(token)\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'token' is a Token, but 'show' needs Describable",
+        ),
+        (
+            // A keyword parameter pairs with its argument by label.
+            "struct Box\n  size\nend\ndef tag(item:)\n  item.kind\nend\nbox = Box.new(size: 1)\nif false\n  tag(item: box)\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'box' is a Box, but 'tag' needs '.kind'",
+        ),
         // The sixth wording — arity, the seed's own moved to build time with
         // its plural fixed. Keyword arguments stand outside the count.
         (
@@ -1226,6 +1246,8 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
              puts render_refusal([\"coverage\", \"nil\"])\n\
              puts render_refusal([\"coverage\", \"the present case\"])\n\
+             puts render_refusal([\"contract\", \"token\", [\"struct\", \"Token\"], \"greet\", [\"demands\", [\".upcase\", \"+\"]]])\n\
+             puts render_refusal([\"contract\", \"box\", [\"struct\", \"Box\"], \"show\", [\"trait\", \"Describable\"]])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1263,6 +1285,8 @@ fn portland_refusals_render_the_house_voice() {
          greet expects 1 to 2 arguments, got 0\n\
          case/in does not cover nil — add the arm, or an else\n\
          case/in does not cover the present case — add the arm, or an else\n\
+         'token' is a Token, but 'greet' needs '.upcase', '+'\n\
+         'box' is a Box, but 'show' needs Describable\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\
