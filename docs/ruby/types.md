@@ -2,7 +2,7 @@
 
 **Summary:** Static and inferred, written only at public boundaries; duck typing becomes structural.
 
-**Status:** design core decided ([ADR 0040](../adr/0040-2026-08-19-inference-the-design-core.md)): parameter contracts are structural from the body — the duck test at compile time, as promised — _sharpened_ by concrete types flowed from call sites; traits double as names for shapes; `Maybe[T]` is a wrapper, never a union, with the narrowing forms inventoried. Annotation syntax, generics, and error voice wait deliberately; increments build in [#9](https://github.com/portlandlang/portland/issues/9).
+**Status:** design core decided ([ADR 0040](../adr/0040-2026-08-19-inference-the-design-core.md)): parameter contracts are structural from the body — the duck test at compile time, as promised — _sharpened_ by concrete types flowed from call sites; traits double as names for shapes; `Maybe[T]` is a wrapper, never a union, with the narrowing forms inventoried and built. Contracts have their rulings ([ADR 0048](../adr/0048-2026-09-23-contracts-the-rulings.md)): a contract is spelled `needs '.upcase', '.length'`, is the body's own demand with nothing inherited, and a trait's name may stand in for it in errors on an exact match; caller-flow sharpening waits for a whole-program checker. Return annotations are decided ([ADR 0041](../adr/0041-2026-08-19-return-annotations-are-arrow-comments.md)) and checked; the error voice is decided ([ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)) and its refusals built; generics wait deliberately; increments build in [#9](https://github.com/portlandlang/portland/issues/9).
 
 ## Ruby
 
@@ -26,7 +26,7 @@ Type names appear in exactly three places:
 1. **Public boundary annotations**, optional, as documentation — spelled as a trailing arrow comment, `def find_user(id) # -> User?` ([ADR 0041](../adr/0041-2026-08-19-return-annotations-are-arrow-comments.md)): rbs-inline's placement with RBS's own returns-arrow as the marker, valid Ruby verbatim (the one annotation form that is polyfill-_free_), and checked against inference the moment the checker can — an annotation can never lie. Return types only; input annotations are deliberately TBD.
 1. **Design conversations.**
 
-Duck typing becomes **structural typing**: "responds to `quack`" is still the contract, but checked at compile time. No nominal-interface ceremony; the duck test just stops being administered in production.
+Duck typing becomes **structural typing**: "responds to `quack`" is still the contract, but checked at compile time. No nominal-interface ceremony; the duck test just stops being administered in production. Written down, a contract is what the body demands, spelled as the source spells it — `needs '.quack', '.waddle'`, an operator bare of the dot ([ADR 0048](../adr/0048-2026-09-23-contracts-the-rulings.md)); `types.pdx` shows one per parameter, and an error names a matching trait instead when one fits exactly.
 
 ## Migration
 
