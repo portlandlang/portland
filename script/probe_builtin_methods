@@ -67,8 +67,11 @@ end
 
 catch_all = ["undefined method", "undefined block-taking method", "unexpected token", "expected"]
 
+# Progress goes to stderr so a caller reading the table off stdout — the
+# check script — still sees a type land every fifteen seconds or so.
 Dir.mktmpdir do |directory|
   receivers.each do |type, receiver|
+    warn "probing #{type} (#{candidates.length} names)…"
     found = candidates.select do |name|
       shapes.call(receiver, name).any? do |call|
         path = File.join(directory, "probe.pdx")
