@@ -2,7 +2,7 @@
 
 **Summary:** Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 
-**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The rest of [#9](https://github.com/portlandlang/portland/issues/9)'s inventory (flow narrowing, unhandled maybes, the full exhaustiveness rule) lands here as it arrives.
+**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The third family, inference-backed refusals, has its voice and its first five wordings decided ([ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)) and builds next. The rest of [#9](https://github.com/portlandlang/portland/issues/9)'s inventory (flow narrowing, the full exhaustiveness rule) lands here as it arrives.
 
 ## Ruby
 
@@ -20,6 +20,14 @@ Second family, from [ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-t
 - **Enum cases**, when a payload-carrying arm establishes which enum is being matched: `case/in does not cover :refunded — add the arm, or an else`.
 - **The integers**, when every arm is a range: ADR 0019's proof (beginless first, endless last, no gaps) decides it, and a failure names the hole — `case/in leaves 10..19 uncovered — add the arm, or an else`.
 - **Arms that can never fire** (ADR 0013 §3): one below a bare capture, or a case a higher arm already matches whole — `in :paid can never match — an arm above already matches :paid`.
+
+Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — refusals inference makes possible, decided before any is built. Every refusal is structured and rendered by one walker, so the voice lives in one file; the sentence is fact, dash, next step, with a hint only where exactly one exists; source spellings are single-quoted, types and values bare. The five wordings, each pinned to the ADR's text:
+
+- **A non-boolean condition** — Ruby's truthiness reflex, refused at build: `'if' condition must be true or false, got String`; a maybe gets the one honest hint, `— write 'user.some?'`.
+- **A method the type does not have** — `'token' is a Token, which has no method 'knd'`, the receiver named as written so the reader has the particular one in question. No did-you-mean, on purpose.
+- **A maybe used as plain** — `'users.first' is a String? — handle the nil case before '.upcase'`; Ruby raises `NoMethodError` only when the array happens to be empty. Waits for narrowing, so a guarded program is never refused.
+- **An operator on mismatched types** — `cannot apply '+' to String and Integer`, where Ruby says `no implicit conversion of Integer into String` at runtime.
+- **An annotation that lies** — `'handle' answers Integer, not the annotated String — change one`; Ruby has nothing to say, since the annotation is a comment.
 
 The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about yet is silence, not a demand for `else`, and inference is what widens that later.
 

@@ -58,6 +58,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0044](0044-2026-08-19-propagation-is-the-toolkit.md) — Propagation is the toolkit, and `!` goes back to being a name
 - [0045](0045-2026-08-20-the-def-shapes.md) — The def shapes: multiline, paren-less, endless
 - [0046](0046-2026-08-20-the-ternary.md) — The ternary: declared spacing, nesting refuses toward parens
+- [0047](0047-2026-09-22-the-error-voice.md) — The error voice: structured refusals, one renderer, five wordings
 
 <!-- /generated -->
 
