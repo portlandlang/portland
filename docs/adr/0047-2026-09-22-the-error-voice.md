@@ -79,6 +79,13 @@ Runtime: `cannot apply '+' to "total: " and 3`.
 'handle' answers Integer, not the annotated String — change one
 ```
 
+**ADR 0035's tripwire, ratified the same day once narrowing was built:** a `case/in` over a maybe-typed subject with no `else` must take both cases — nil by an `in nil` arm or a bare capture, the present case by a bare capture or a pattern that matches every present value. ADR 0035's own sentence shape, with the case named:
+
+```text
+case/in does not cover nil — add the arm, or an else
+case/in does not cover the present case — add the arm, or an else
+```
+
 **A sixth that needed no session:** arity at call sites already has a runtime wording, `greet expects 1 argument(s), got 0`. It moves to build time as is, except the `argument(s)` hedge becomes a real plural while both oracles are being touched.
 
 ### Below the sentence

@@ -15,6 +15,7 @@
 #   ["unary", operator, operand]              — a mismatched unary operand
 #   ["annotation", name, computed, written]   — an annotation that lies; written is the source's text
 #   ["arity", name, expected, got]            — the wrong argument count
+#   ["coverage", missing]                     — a case/in over a maybe leaving a case (ADR 0035's tripwire)
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -45,6 +46,7 @@ def render_refusal(refusal)
   in ["unary", operator, operand] then "cannot apply #{spelled(operator)} to #{render_type(operand)}"
   in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{written}", "change one")
   in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"
+  in ["coverage", missing] then sentence("case/in does not cover #{missing}", "add the arm, or an else")
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end

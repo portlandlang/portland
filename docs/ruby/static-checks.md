@@ -20,6 +20,7 @@ Second family, from [ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-t
 - **Enum cases**, when a payload-carrying arm establishes which enum is being matched: `case/in does not cover :refunded — add the arm, or an else`.
 - **The integers**, when every arm is a range: ADR 0019's proof (beginless first, endless last, no gaps) decides it, and a failure names the hole — `case/in leaves 10..19 uncovered — add the arm, or an else`.
 - **Arms that can never fire** (ADR 0013 §3): one below a bare capture, or a case a higher arm already matches whole — `in :paid can never match — an arm above already matches :paid`.
+- **A maybe's two cases** (ADR 0035's tripwire, fired by [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) once narrowing existed): over a subject inference knows to be a maybe, `case/in does not cover nil — add the arm, or an else`, and `the present case` likewise. Ruby's `case/in` over a nilable value raises `NoMatchingPatternError` on the input that happened to arrive.
 
 Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — refusals inference makes possible, decided before any was built and landing one at a time. Every refusal is structured and rendered by one walker, so the voice lives in one file; the sentence is fact, dash, next step, with a hint only where exactly one exists; source spellings are single-quoted, types and values bare. Each fires only where the type is fully known — an unknown anywhere is silence. The five wordings, each pinned to the ADR's text:
 

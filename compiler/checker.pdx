@@ -409,7 +409,50 @@ def check_case_in(node, scope)
   end
   check_body(node.else_body, scope) unless node.else_body.nil?
   check_unreachable_arms(node)
-  check_coverage(node, scope.enums) if node.else_body.nil?
+  return unless node.else_body.nil?
+  check_maybe_coverage(node, scope)
+  check_coverage(node, scope.enums)
+end
+
+# ADR 0035's tripwire, fired by ADR 0047 once narrowing existed: over a
+# subject inference knows to be a maybe, the unguarded arms must take nil
+# — an `in nil` arm, or a bare capture — and the present case — a bare
+# capture, or a pattern every present value matches: the plain type's
+# name, or a struct pattern of it whose fields are all captures. The
+# absent case is named first, being the one people forget.
+def check_maybe_coverage(node, scope)
+  subject = synthesize(node.subject, known_types(scope))
+  return unless subject in ["maybe", *]
+  return unless known?(subject)
+  patterns = unguarded_arms(node).map { it.pattern }
+  refuse(["coverage", "nil"]) unless patterns.any? { covers_nil?(it) }
+  inner = type_at(subject, 1)
+  refuse(["coverage", "the present case"]) unless patterns.any? { covers_present?(it, inner) }
+end
+
+def covers_nil?(pattern)
+  case pattern
+  in NilNode | IdentifierNode then true
+  in AlternativePatternNode(options:) then options.any? { covers_nil?(it) }
+  else
+    false
+  end
+end
+
+def covers_present?(pattern, inner)
+  case pattern
+  in IdentifierNode then true
+  in AlternativePatternNode(options:) then options.any? { covers_present?(it, inner) }
+  # `in Integer` and `in User(name:)` are one node: a name with fields. Bare,
+  # it matches every value of the named type, builtin or struct; with
+  # fields, every value whose named struct it is when each field is a
+  # plain capture.
+  in StructPatternNode(name:, fields:)
+    return false unless render_type(inner) == name
+    fields.all? { it[1] in IdentifierNode }
+  else
+    false
+  end
 end
 
 def check_methods(methods, scope)

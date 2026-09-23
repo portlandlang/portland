@@ -1,6 +1,6 @@
 # 0035 — Exhaustiveness over what the arms reveal
 
-- **Status:** Accepted (built in the compiler, 2026-08-12; ratified with a tripwire 2026-08-18) — the refuse-only-disprovable boundary of §1 is **revisited when #9's inference-core design session opens**, and if back-end work ([#5](https://github.com/portlandlang/portland/issues/5)) begins before coverage has widened, it is relitigated first rather than carried forward by inertia
+- **Status:** Accepted (built in the compiler, 2026-08-12; ratified with a tripwire 2026-08-18; **the tripwire fired 2026-09-22** — with narrowing built, a `case/in` over a maybe-typed subject demands both cases, wordings in [ADR 0047](0047-2026-09-22-the-error-voice.md)) — the refuse-only-disprovable boundary of §1 stands: the checker still refuses only what it can disprove, and inference is what lets it disprove more
 - **Date:** 2026-08-12
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) increment 2
 

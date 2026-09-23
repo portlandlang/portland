@@ -1004,6 +1004,20 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "2\n2\n2\n2\n2\n3\nROSE\nreached the end\n",
             "'words.first' is a String? — handle the nil case before '.upcase'",
         ),
+        // ADR 0035's tripwire, fired: a case/in over a maybe-typed subject
+        // must take both cases. The seed runs each on the input that matches.
+        (
+            // `first` is present and `none` absent at runtime; both are Integer?
+            // to the checker. The two covered cases pass, the third refuses.
+            "first = [1].first\ncase first\nin nil then puts 0\nin present then puts present\nend\nnone = [1].select { it > 5 }.first\nlabel = case none\nin nil then \"none\"\nelse \"some\"\nend\nputs label\ncase none\nin nil then puts 0\nend\n",
+            "1\nnone\n0\n",
+            "case/in does not cover the present case — add the arm, or an else",
+        ),
+        (
+            "top = [1].first\ncase top\nin 1 then puts \"one\"\nend\n",
+            "one\n",
+            "case/in does not cover nil — add the arm, or an else",
+        ),
         // The sixth wording — arity, the seed's own moved to build time with
         // its plural fixed. Keyword arguments stand outside the count.
         (
@@ -1207,6 +1221,8 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"annotation\", \"handle\", [\"integer\"], \"String\"])\n\
              puts render_refusal([\"arity\", \"greet\", \"1\", 0])\n\
              puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
+             puts render_refusal([\"coverage\", \"nil\"])\n\
+             puts render_refusal([\"coverage\", \"the present case\"])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1242,6 +1258,8 @@ fn portland_refusals_render_the_house_voice() {
          'handle' answers Integer, not the annotated String — change one\n\
          greet expects 1 argument, got 0\n\
          greet expects 1 to 2 arguments, got 0\n\
+         case/in does not cover nil — add the arm, or an else\n\
+         case/in does not cover the present case — add the arm, or an else\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\
