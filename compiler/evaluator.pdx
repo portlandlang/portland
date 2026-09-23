@@ -1991,7 +1991,10 @@ end
 def required_path(bindings, name)
   target = canonical_path("#{directory_of(file_of(bindings))}/#{name}")
   parts = target.split("/")
-  return target if parts.last.include?(".")
+  # `last` is a maybe (ADR 0010) even though a split always yields a part —
+  # the or-guard says so where the checker can see it (ADR 0047 shape 3).
+  last_part = parts.last or return "#{target}.pdx"
+  return target if last_part.include?(".")
   "#{target}.pdx"
 end
 

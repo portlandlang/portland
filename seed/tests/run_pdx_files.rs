@@ -997,6 +997,13 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "1\nreached the end\n",
             "'first' is an Order, which has no method 'total'",
         ),
+        // ADR 0047 shape 3 — a maybe used as plain, ADR 0005's static half.
+        // Every narrowing form of ADR 0040 §3 passes above the one bare use.
+        (
+            "words = %w[rose city]\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found.succ\nend\ndef branched(top = [1].first)\n  if top.some?\n    top + 1\n  else\n    0\n  end\nend\ndef compared(top = [1].first)\n  if top != nil then top.succ else 0 end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present.succ\n  end\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\nputs guarded\nputs bailed\nputs branched\nputs compared\nputs matched\nputs both\nputs words.first&.upcase\nif false\n  puts words.first.upcase\nend\nputs \"reached the end\"\n",
+            "2\n2\n2\n2\n2\n3\nROSE\nreached the end\n",
+            "'words.first' is a String? — handle the nil case before '.upcase'",
+        ),
         // The sixth wording — arity, the seed's own moved to build time with
         // its plural fixed. Keyword arguments stand outside the count.
         (
@@ -1140,8 +1147,13 @@ fn portland_types_dumps_method_returns() {
 #[test]
 fn the_checker_passes_the_compilers_own_source() {
     let compiler = format!("{}/../compiler", env!("CARGO_MANIFEST_DIR"));
-    let mut files: Vec<_> = std::fs::read_dir(&compiler)
-        .unwrap()
+    // The fixtures ride along: every one is a program the seed runs, and a
+    // `reduce(0) { |count, line| … }` among them was the first false
+    // positive this run did not cover.
+    let fixtures = format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR"));
+    let mut files: Vec<_> = [&compiler, &fixtures]
+        .iter()
+        .flat_map(|directory| std::fs::read_dir(directory).unwrap())
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
         .collect();

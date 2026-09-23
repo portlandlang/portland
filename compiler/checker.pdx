@@ -275,10 +275,11 @@ end
 # A block keeps the locals around it and binds its parameters from the
 # receiver's type, as inference does — an array lends its element, a hash
 # its key then value, a range integers, anything else unknown.
-def block_scope(block, receiver, scope)
+def block_scope(node, receiver, scope)
   mutable bound = scope
-  block.parameters.each_with_index do |parameter, index|
-    bound = bind_local(bound, parameter, block_parameter_type(receiver, index))
+  argument_types = node.arguments.map { synthesize(it, known_types(scope)) }
+  node.block.parameters.each_with_index do |parameter, index|
+    bound = bind_local(bound, parameter, block_parameter_type(receiver, index, node.name, argument_types))
   end
   bound
 end
@@ -425,7 +426,7 @@ end
 def check_call(node, scope)
   check_body(node.arguments, scope)
   check_arity(node, scope)
-  check_block(node.block, ["unknown"], scope)
+  check_block(node, ["unknown"], scope)
 end
 
 # The sixth wording, the seed's own moved to build time (ADR 0034 §2,
@@ -447,15 +448,17 @@ def check_method_call(node, scope)
   check_node(node.receiver, scope)
   check_body(node.arguments, scope)
   receiver = synthesize(node.receiver, known_types(scope))
+  check_maybe_method(node, receiver) if node in MethodCallNode
   check_struct_method(node, receiver, scope) if node in MethodCallNode
-  check_block(node.block, receiver, scope)
+  check_block(node, receiver, scope)
 end
 
 # A block body may run many times or never, so — like a loop's — it is
 # walked with the names it rebinds already forgotten.
-def check_block(block, receiver, scope)
+def check_block(node, receiver, scope)
+  block = node.block
   return if block.nil?
-  entered = block_scope(block, receiver, scope)
+  entered = block_scope(node, receiver, scope)
   check_body(block.body, forget(entered, assigned_names_in_body(block.body)))
 end
 
@@ -567,6 +570,21 @@ def check_operands(node, scope)
   return unless node.operator == "||"
   return unless left == ["boolean"]
   refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+end
+
+# Shape 3 — a maybe used as plain: ADR 0005's static half. At runtime a
+# present value answers any method and only the absent path fails; here
+# the type says the absent path exists, so anything but the predicates
+# and `to_s` refuses until one of the narrowing forms has handled nil.
+# `&.` is the other answer and is never this node. The receiver must be
+# spellable, since the hint is written from it.
+def check_maybe_method(node, receiver)
+  return unless receiver in ["maybe", *]
+  return unless known?(receiver)
+  return if %w[failure? nil? some? to_s].include?(node.name)
+  spelling = spell_node(node.receiver)
+  return if spelling.nil?
+  refuse(["unhandled_maybe", spelling, receiver, node.name])
 end
 
 # Shape 2 — a method the receiver's type does not have, for struct

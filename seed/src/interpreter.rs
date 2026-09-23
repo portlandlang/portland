@@ -1873,7 +1873,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // an answer.
             (_, "failure?", []) => Value::Boolean(matches!(receiver, Value::Failure(_))),
             (Value::Nil, name, _) => {
-                panic!("nil has no method {name} — handle the nil case first")
+                panic!("nil has no method '{name}' — handle the nil case first")
             }
             // A failure answers the predicates above and renders under
             // `inspect`/`p`; everything else waits for the handler.
@@ -5421,7 +5421,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "nil has no method upcase")]
+    #[should_panic(expected = "nil has no method 'upcase' — handle the nil case first")]
     fn nil_refuses_ordinary_methods() {
         evaluate("nil.upcase");
     }

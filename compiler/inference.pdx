@@ -414,6 +414,9 @@ def call_answer(receiver, node, types)
     return ["array", type_at(receiver, 2)] if receiver in ["hash", *]
     ["array", ["unknown"]]
   when "first", "last", "min", "max"
+    # With a count, `first(2)` answers a slice, not a maybe; the survey for
+    # ADR 0047 shape 3 found this arm calling one an Integer?.
+    return ["unknown"] unless node.arguments.empty?
     return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
     return ["maybe", ["integer"]] if receiver == ["range"]
     ["unknown"]
@@ -476,8 +479,9 @@ end
 # accordingly. Unlisted names answer unknown, never an error.
 def synthesize_block_call(node, receiver, types)
   mutable inner = types
+  argument_types = node.arguments.map { synthesize(it, types) }
   node.block.parameters.each_with_index do |parameter, index|
-    inner = [[parameter, block_parameter_type(receiver, index)]] + inner
+    inner = [[parameter, block_parameter_type(receiver, index, node.name, argument_types)]] + inner
   end
   # A block body may run many times or never — like a loop's, it is read
   # with the names it rebinds already forgotten.
@@ -485,7 +489,7 @@ def synthesize_block_call(node, receiver, types)
   case node.name
   when "map", "collect" then ["array", body]
   when "find", "detect", "min_by", "max_by"
-    return ["maybe", block_parameter_type(receiver, 0)] if receiver in ["array", *]
+    return ["maybe", element_type(receiver)] if receiver in ["array", *]
     ["unknown"]
   when "count", "sum", "index" then synthesize_numeric_answer(receiver, node.name)
   when "all?", "any?", "none?", "one?" then ["boolean"]
@@ -497,13 +501,39 @@ def synthesize_block_call(node, receiver, types)
   end
 end
 
-def block_parameter_type(receiver, index)
+# A block parameter's type, by the receiver and the method: the element
+# for most, a hash's key then value. `reduce` and `inject` bind the
+# accumulator first — its type is the initial argument's, or unknown
+# without one — and `each_with_index` the element then an integer. Found
+# by a fixture whose `reduce(0) { |count, line| count + … }` read `count`
+# as the element and refused a working `+`.
+def block_parameter_type(receiver, index, name, argument_types)
+  if name == "reduce" || name == "inject"
+    return accumulator_type(argument_types) if index == 0
+    return element_type(receiver) if index == 1
+    return ["unknown"]
+  end
+  if name == "each_with_index"
+    return element_type(receiver) if index == 0
+    return ["integer"] if index == 1
+    return ["unknown"]
+  end
   if receiver in ["hash", *]
     return type_at(receiver, 1) if index == 0
     return type_at(receiver, 2) if index == 1
     return ["unknown"]
   end
   return ["unknown"] unless index == 0
+  element_type(receiver)
+end
+
+def accumulator_type(argument_types)
+  initial = type_at(argument_types, 0)
+  return ["unknown"] if initial.nil?
+  initial
+end
+
+def element_type(receiver)
   return type_at(receiver, 1) if receiver in ["array", *]
   return ["integer"] if receiver == ["range"]
   ["unknown"]
