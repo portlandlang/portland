@@ -35,6 +35,19 @@
 
 require_relative "parser"
 
+# What the walk carries into every node: the program's enum declarations,
+# and — for the inference-backed checks (ADR 0047) — the types it knows.
+# `globals` holds the program-wide names (struct and enum types, top-level
+# def returns); `locals` the bindings of the body being walked. A def body
+# starts its locals fresh, since a def cannot see the locals around it,
+# while a block keeps them. Both lists are [name, type] pairs in the shape
+# inference.pdx reads.
+struct Scope
+  enums
+  globals
+  locals
+end
+
 # Every enum declaration in the program, as [name, labels] pairs — all of
 # them, not just the textually-earlier ones: a build reads the whole file
 # before judging any line of it.
@@ -67,155 +80,155 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes)
-  enums = declared_cases(nodes)
-  check_body(nodes, enums)
+  scope = Scope.new(enums: declared_cases(nodes), globals: [], locals: [])
+  check_body(nodes, scope)
 end
 
-def check_body(nodes, enums)
+def check_body(nodes, scope)
   nodes.each do |node|
-    check_node(node, enums)
+    check_node(node, scope)
   end
 end
 
 # The walk. Dispatch mirrors the evaluator's, but visits everything —
 # bodies that would never run included — and checks only what it knows.
-def check_node(node, enums)
+def check_node(node, scope)
   case node
-  in EnumCaseNode then check_construction(node, enums)
-  in EnumCasePatternNode then check_case_pattern(node, enums)
-  in AssignmentNode(value:) then check_node(value, enums)
+  in EnumCaseNode then check_construction(node, scope)
+  in EnumCasePatternNode then check_case_pattern(node, scope)
+  in AssignmentNode(value:) then check_node(value, scope)
   in DefNode(parameters:, body:)
-    check_parameters(parameters, enums)
-    check_body(body, enums)
+    check_parameters(parameters, scope)
+    check_body(body, scope)
   in StructDefNode(methods:, nested:, type_functions:)
     check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs")
     check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs")
-    check_body(methods, enums)
-    check_body(type_functions, enums)
-    check_body(nested, enums)
+    check_body(methods, scope)
+    check_body(type_functions, scope)
+    check_body(nested, scope)
   in TraitDefNode(methods:)
     check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it")
-    check_body(methods, enums)
-  in ModuleDefNode(body:) then check_body(body, enums)
+    check_body(methods, scope)
+  in ModuleDefNode(body:) then check_body(body, scope)
   in WhileNode(condition:, body:)
-    check_node(condition, enums)
-    check_body(body, enums)
-  in TogetherNode(lines:) then check_together(lines, enums)
+    check_node(condition, scope)
+    check_body(body, scope)
+  in TogetherNode(lines:) then check_together(lines, scope)
   in ReturnNode(value:)
-    check_node(value, enums) unless value.nil?
+    check_node(value, scope) unless value.nil?
   in IfNode
-    check_node(node.condition, enums)
+    check_node(node.condition, scope)
     # `unless` parses as an if with no then-side, so either body may be nil.
-    check_body(node.then_body, enums) unless node.then_body.nil?
-    check_body(node.else_body, enums) unless node.else_body.nil?
-  in CaseNode then check_case(node, enums)
-  in CaseInNode then check_case_in(node, enums)
-  in CallNode then check_call(node, enums)
-  in MethodCallNode | SafeMethodCallNode then check_method_call(node, enums)
-  in ArrayNode(elements:) then check_body(elements, enums)
-  in HashNode(pairs:) then check_pairs(node.pairs, enums)
+    check_body(node.then_body, scope) unless node.then_body.nil?
+    check_body(node.else_body, scope) unless node.else_body.nil?
+  in CaseNode then check_case(node, scope)
+  in CaseInNode then check_case_in(node, scope)
+  in CallNode then check_call(node, scope)
+  in MethodCallNode | SafeMethodCallNode then check_method_call(node, scope)
+  in ArrayNode(elements:) then check_body(elements, scope)
+  in HashNode(pairs:) then check_pairs(node.pairs, scope)
   in BinaryNode(left:, right:)
-    check_node(left, enums)
-    check_node(right, enums)
+    check_node(left, scope)
+    check_node(right, scope)
   in LogicalNode(left:, right:)
-    check_node(left, enums)
-    check_node(right, enums)
-  in UnaryNode(operand:) then check_node(operand, enums)
+    check_node(left, scope)
+    check_node(right, scope)
+  in UnaryNode(operand:) then check_node(operand, scope)
   in IndexNode(receiver:, index:)
-    check_node(receiver, enums)
-    check_node(index, enums)
+    check_node(receiver, scope)
+    check_node(index, scope)
   in IndexUpdateNode(index: update_index, value: update_value)
-    check_node(update_index, enums)
-    check_node(update_value, enums)
+    check_node(update_index, scope)
+    check_node(update_value, scope)
   in SlotCompoundNode(index: compound_index, right: compound_right)
-    check_node(compound_index, enums)
-    check_node(compound_right, enums)
-  in AppendNode(value:) then check_node(value, enums)
+    check_node(compound_index, scope)
+    check_node(compound_right, scope)
+  in AppendNode(value:) then check_node(value, scope)
   in MatchAssertNode(subject:, pattern:)
-    check_node(subject, enums)
-    check_pattern(pattern, enums)
+    check_node(subject, scope)
+    check_pattern(pattern, scope)
   in MatchTestNode(subject: test_subject, pattern: test_pattern)
-    check_node(test_subject, enums)
-    check_pattern(test_pattern, enums)
-  in KeywordArgumentNode(value:) then check_node(value, enums)
+    check_node(test_subject, scope)
+    check_pattern(test_pattern, scope)
+  in KeywordArgumentNode(value:) then check_node(value, scope)
   else
     nil
   end
 end
 
-def check_parameters(parameters, enums)
+def check_parameters(parameters, scope)
   parameters.each do |parameter|
     if parameter in KeywordParameterNode
-      check_node(parameter.default, enums) unless parameter.default.nil?
+      check_node(parameter.default, scope) unless parameter.default.nil?
     elsif (parameter in AssignmentNode) && parameter.value.some?
-      check_node(parameter.value, enums)
+      check_node(parameter.value, scope)
     end
   end
 end
 
-def check_together(lines, enums)
+def check_together(lines, scope)
   lines.each do |line|
     if line in TaskLineNode
-      check_node(line.value, enums)
+      check_node(line.value, scope)
     else
-      check_node(line, enums)
+      check_node(line, scope)
     end
   end
 end
 
-def check_case(node, enums)
-  check_node(node.subject, enums)
+def check_case(node, scope)
+  check_node(node.subject, scope)
   node.branches.each do |branch|
-    check_body(branch.values, enums)
-    check_body(branch.body, enums)
+    check_body(branch.values, scope)
+    check_body(branch.body, scope)
   end
-  check_body(node.else_body, enums) unless node.else_body.nil?
+  check_body(node.else_body, scope) unless node.else_body.nil?
 end
 
-def check_case_in(node, enums)
-  check_node(node.subject, enums)
+def check_case_in(node, scope)
+  check_node(node.subject, scope)
   node.branches.each do |branch|
-    check_pattern(branch.pattern, enums)
-    check_node(branch.guard, enums) unless branch.guard.nil?
-    check_body(branch.body, enums)
+    check_pattern(branch.pattern, scope)
+    check_node(branch.guard, scope) unless branch.guard.nil?
+    check_body(branch.body, scope)
   end
-  check_body(node.else_body, enums) unless node.else_body.nil?
+  check_body(node.else_body, scope) unless node.else_body.nil?
   check_unreachable_arms(node)
-  check_coverage(node, enums) if node.else_body.nil?
+  check_coverage(node, scope.enums) if node.else_body.nil?
 end
 
-def check_call(node, enums)
-  check_body(node.arguments, enums)
-  check_block(node.block, enums)
+def check_call(node, scope)
+  check_body(node.arguments, scope)
+  check_block(node.block, scope)
 end
 
-def check_method_call(node, enums)
-  check_node(node.receiver, enums)
-  check_body(node.arguments, enums)
-  check_block(node.block, enums)
+def check_method_call(node, scope)
+  check_node(node.receiver, scope)
+  check_body(node.arguments, scope)
+  check_block(node.block, scope)
 end
 
-def check_block(block, enums)
+def check_block(block, scope)
   return if block.nil?
-  check_body(block.body, enums)
+  check_body(block.body, scope)
 end
 
-def check_pairs(pairs, enums)
+def check_pairs(pairs, scope)
   pairs.each do |pair|
-    check_node(pair.key, enums)
-    check_node(pair.value, enums)
+    check_node(pair.key, scope)
+    check_node(pair.value, scope)
   end
 end
 
 # Patterns hold sub-patterns and, in two places, expressions.
-def check_pattern(pattern, enums)
+def check_pattern(pattern, scope)
   case pattern
-  in EnumCasePatternNode then check_case_pattern(pattern, enums)
-  in AlternativePatternNode(options:) then options.each { check_pattern(it, enums) }
-  in ArrayPatternNode(elements:) then elements.each { check_pattern(it, enums) }
+  in EnumCasePatternNode then check_case_pattern(pattern, scope)
+  in AlternativePatternNode(options:) then options.each { check_pattern(it, scope) }
+  in ArrayPatternNode(elements:) then elements.each { check_pattern(it, scope) }
   in StructPatternNode(fields:)
     fields.each do |field|
-      check_pattern(field[1], enums)
+      check_pattern(field[1], scope)
     end
   else
     nil
@@ -247,8 +260,8 @@ end
 # `:paid(on: x)` — the seed's three runtime refusals, made at build time
 # with the same words (ADR 0034 §2). The seed reaches them only when the
 # line runs; this reaches them because the line was written.
-def check_construction(node, enums)
-  declarations = cases_named(enums, node.name)
+def check_construction(node, scope)
+  declarations = cases_named(scope.enums, node.name)
   panic("no enum declares a case :#{node.name}") if declarations.empty?
   labels = value_at_checked(declarations.first, 1)
   declarations.each do |declaration|
@@ -260,19 +273,19 @@ def check_construction(node, enums)
     panic("`:#{node.name}` takes (#{wanted})")
   end
   node.payload.each do |argument|
-    check_node(argument.value, enums)
+    check_node(argument.value, scope)
   end
 end
 
 # `in :paid(on:)` naming an undeclared case — the seed says nothing and the
 # pattern silently never matches, which is how a typo becomes a branch that
 # cannot fire. The first refusal with no oracle behind it (ADR 0034 §3).
-def check_case_pattern(pattern, enums)
-  if cases_named(enums, pattern.name).empty?
+def check_case_pattern(pattern, scope)
+  if cases_named(scope.enums, pattern.name).empty?
     panic("in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}")
   end
   pattern.payload.each do |entry|
-    check_pattern(entry[1], enums)
+    check_pattern(entry[1], scope)
   end
 end
 
