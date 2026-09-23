@@ -1,0 +1,139 @@
+# Stage 1, act five: the refusal renderer — the one place the checker's
+# voice lives (#9, ADR 0047 §4).
+#
+# A library: require_relative "refusals", then refuse(refusal) to panic
+# with a refusal's sentence, or render_refusal(refusal) to read it without
+# panicking. A refusal is a tagged array, the checker's private shape — no
+# check builds a sentence of its own, so every ruling in ADR 0047 is a
+# line here rather than a habit spread across call sites:
+#
+#   ["condition", construct, type, spelling]  — a non-boolean condition
+#   ["operand", operator, type]               — a non-boolean && or || side
+#   ["no_method", spelling, type, name]       — a method the type lacks
+#   ["unhandled_maybe", spelling, type, name] — a maybe used as plain
+#   ["operator", operator, left, right]       — mismatched binary operands
+#   ["unary", operator, operand]              — a mismatched unary operand
+#   ["annotation", name, computed, written]   — an annotation that lies
+#   ["arity", name, expected, got]            — the wrong argument count
+#
+# A spelling is the offending expression written back as source, or nil
+# where spell_node cannot write it faithfully — and a refusal that wants a
+# spelling it does not have is a decline, never a guess (principle 4).
+#
+# The rulings, each one line to change: types render as the dump does
+# (§1, render_type in inference.pdx); a sentence is fact, dash, next step,
+# and the hint appears only where exactly one exists (§2, sentence);
+# source spellings wear single quotes, types and values go bare (§5,
+# spelled); a long spelling truncates inside its quotes (§6, shorten).
+# Runtime refusals are the seed's, which say the same sentences with
+# values for nouns — edited by hand there, since the seed never learns
+# this file.
+
+require_relative "inference"
+
+def refuse(refusal)
+  panic render_refusal(refusal)
+end
+
+def render_refusal(refusal)
+  case refusal
+  in ["condition", construct, type, spelling] then render_condition(construct, type, spelling)
+  in ["operand", operator, type] then "#{spelled(operator)} needs true or false, got #{render_type(type)}"
+  in ["no_method", spelling, type, name] then "#{spelled(spelling)} is #{a_type(type)}, which has no method #{spelled(name)}"
+  in ["unhandled_maybe", spelling, type, name] then sentence("#{spelled(spelling)} is #{a_type(type)}", "handle the nil case before #{spelled("." + name)}")
+  in ["operator", operator, left, right] then "cannot apply #{spelled(operator)} to #{render_type(left)} and #{render_type(right)}"
+  in ["unary", operator, operand] then "cannot apply #{spelled(operator)} to #{render_type(operand)}"
+  in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{render_type(written)}", "change one")
+  in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"
+  else
+    panic "refusals: no sentence for #{refusal.inspect}"
+  end
+end
+
+# A maybe has exactly one honest boolean question, so it alone gets the
+# hint — and only when the checker could spell the receiver to write it.
+def render_condition(construct, type, spelling)
+  fact = "#{spelled(construct)} condition must be true or false, got #{render_type(type)}"
+  return fact unless type in ["maybe", *]
+  return fact if spelling.nil?
+  sentence(fact, "write #{spelled(spelling + ".some?")}")
+end
+
+# ADR 0047 §2 — fact, dash, next step. The dash is this line.
+def sentence(fact, hint) = "#{fact} — #{hint}"
+
+# ADR 0047 §5 — a source spelling wears single quotes.
+def spelled(text) = "'" + shorten(text) + "'"
+
+# ADR 0047 §6 — a long spelling truncates, and a quoted string keeps its
+# closing mark so the ellipsis reads as inside it. The limit is the one
+# number this file holds.
+def spelling_limit = 40
+
+def shorten(text)
+  return text if text.length <= spelling_limit
+  cut = text.slice(0, spelling_limit - 1) + "…"
+  return cut + "\"" if text.start_with?("\"") && text.end_with?("\"")
+  cut
+end
+
+# `a Token`, `an Integer`, `a [Integer]` — the article follows the
+# rendering's first letter, so no wording ever hard-codes one.
+def a_type(type)
+  rendered = render_type(type)
+  first = rendered.slice(0, 1)
+  return "an " + rendered if %w[A E I O U].include?(first)
+  "a " + rendered
+end
+
+# `expected` is the seed's own count spelling — `1`, or `1 to 2` — and
+# only a lone 1 is singular.
+def plural(noun, expected)
+  return noun if expected == "1"
+  noun + "s"
+end
+
+# A node written back as source, for the spelling in a refusal. Only the
+# shapes that can be written faithfully from the tree are spelled — a
+# name, a literal, a dotted chain with no arguments, an index — and
+# anything else answers nil, which the checker treats as a decline.
+def spell_node(node)
+  case node
+  in IdentifierNode(name:) then name
+  in IntegerNode(value:) then value
+  in FloatNode(value:) then value
+  in BooleanNode(value:) then value
+  in StringNode(value:) then encode_string(value)
+  in SymbolNode(value:) then ":" + value
+  in NilNode then "nil"
+  in SelfNode then "self"
+  in CallNode(name:, arguments:, block:) then spell_bare_call(name, arguments, block)
+  in MethodCallNode then spell_chain(node, ".")
+  in SafeMethodCallNode then spell_chain(node, "&.")
+  in IndexNode(receiver:, index:) then spell_index(receiver, index)
+  else
+    nil
+  end
+end
+
+def spell_bare_call(name, arguments, block)
+  return nil unless arguments.empty?
+  return nil unless block.nil?
+  name
+end
+
+def spell_chain(node, dot)
+  return nil unless node.arguments.empty?
+  return nil unless node.block.nil?
+  receiver = spell_node(node.receiver)
+  return nil if receiver.nil?
+  receiver + dot + node.name
+end
+
+def spell_index(receiver, index)
+  outer = spell_node(receiver)
+  return nil if outer.nil?
+  inner = spell_node(index)
+  return nil if inner.nil?
+  outer + "[" + inner + "]"
+end

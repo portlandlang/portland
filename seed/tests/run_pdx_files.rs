@@ -1030,6 +1030,79 @@ fn portland_types_dumps_method_returns() {
     );
 }
 
+/// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
+/// Every sentence shape the ADR pins, rendered from its tagged refusal, plus
+/// the rulings the renderer owns: the dump's type spelling, fact–dash–hint
+/// with the hint only where one exists, single quotes on source spellings,
+/// the article by first letter, the plural by count, and truncation inside
+/// the quotes. The pinned text is the ADR's — no oracle produces it.
+#[test]
+fn portland_refusals_render_the_house_voice() {
+    let library = format!("{}/../compiler/refusals", env!("CARGO_MANIFEST_DIR"));
+    let driver = std::env::temp_dir().join("refusals_driver.pdx");
+    std::fs::write(
+        &driver,
+        format!(
+            "require_relative \"{library}\"\n\
+             puts render_refusal([\"condition\", \"if\", [\"string\"], \"name\"])\n\
+             puts render_refusal([\"condition\", \"if\", [\"maybe\", [\"struct\", \"User\"]], \"user\"])\n\
+             puts render_refusal([\"condition\", \"if\", [\"maybe\", [\"integer\"]], nil])\n\
+             puts render_refusal([\"condition\", \"while\", [\"integer\"], nil])\n\
+             puts render_refusal([\"operand\", \"&&\", [\"string\"]])\n\
+             puts render_refusal([\"no_method\", \"token\", [\"struct\", \"Token\"], \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"count\", [\"integer\"], \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"\\\"Shane\\\"\", [\"string\"], \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"\\\"Lorem ipsum dolor sit amet, consectetur adipiscing elit\\\"\", [\"string\"], \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"orders.select.map.first.second.third.fourth.fifth\", [\"string\"], \"knd\"])\n\
+             puts render_refusal([\"unhandled_maybe\", \"users.first\", [\"maybe\", [\"string\"]], \"upcase\"])\n\
+             puts render_refusal([\"operator\", \"+\", [\"string\"], [\"integer\"]])\n\
+             puts render_refusal([\"unary\", \"-\", [\"string\"]])\n\
+             puts render_refusal([\"annotation\", \"handle\", [\"integer\"], [\"string\"]])\n\
+             puts render_refusal([\"arity\", \"greet\", \"1\", 0])\n\
+             puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
+             nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
+             nodes.each do |node|\n\
+             \x20 spelling = spell_node(node) or \"nil\"\n\
+             \x20 puts spelling\n\
+             end\n"
+        ),
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        output.status.success(),
+        "the refusals driver should run:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "'if' condition must be true or false, got String\n\
+         'if' condition must be true or false, got User? — write 'user.some?'\n\
+         'if' condition must be true or false, got Integer?\n\
+         'while' condition must be true or false, got Integer\n\
+         '&&' needs true or false, got String\n\
+         'token' is a Token, which has no method 'knd'\n\
+         'count' is an Integer, which has no method 'knd'\n\
+         '\"Shane\"' is a String, which has no method 'knd'\n\
+         '\"Lorem ipsum dolor sit amet, consectetu…\"' is a String, which has no method 'knd'\n\
+         'orders.select.map.first.second.third.fo…' is a String, which has no method 'knd'\n\
+         'users.first' is a String? — handle the nil case before '.upcase'\n\
+         cannot apply '+' to String and Integer\n\
+         cannot apply '-' to String\n\
+         'handle' answers Integer, not the annotated String — change one\n\
+         greet expects 1 argument, got 0\n\
+         greet expects 1 to 2 arguments, got 0\n\
+         users.first.name\n\
+         items[0]\n\
+         x&.y\n\
+         \"hi\"\n\
+         nil\n"
+    );
+}
+
 /// `check.pdx` — the checker's own door: silence-then-ok on a clean
 /// program, nothing evaluated.
 #[test]
