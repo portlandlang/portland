@@ -239,6 +239,11 @@ def bind_local(scope, name, type)
   scope.with(locals: [[name, type]] + scope.locals)
 end
 
+# A branch's scope: the pairs a condition proved, before the locals.
+def with_proof(scope, pairs)
+  scope.with(locals: pairs + scope.locals)
+end
+
 # The names a nested body rebinds are unknown wherever that body may have
 # run — inference's forget_types, over the scope's locals.
 def forget(scope, names)
@@ -302,17 +307,23 @@ def check_node(node, scope)
     check_node(condition, scope)
     check_condition("while", condition, scope)
     # The body may have run before the condition is read again, so the
-    # names it rebinds are unknown throughout it too.
-    check_body(body, forget(scope, assigned_names_in_body(body)))
+    # names it rebinds are unknown throughout it too — and what the
+    # condition proves is read over those, never over the first pass.
+    forgotten = forget(scope, assigned_names_in_body(body))
+    proof = narrowings(condition, known_types(forgotten))
+    check_body(body, with_proof(forgotten, when_true(proof)))
   in TogetherNode(lines:) then check_together(lines, scope)
   in ReturnNode(value:)
     check_node(value, scope) unless value.nil?
   in IfNode
     check_node(node.condition, scope)
     check_condition("if", node.condition, scope)
-    # `unless` parses as an if with no then-side, so either body may be nil.
-    check_body(node.then_body, scope) unless node.then_body.nil?
-    check_body(node.else_body, scope) unless node.else_body.nil?
+    # Each branch sees what the condition proved on its side (ADR 0040 §3's
+    # narrowing forms, in inference). `unless` parses as an if with no
+    # then-side, so either body may be nil.
+    proof = narrowings(node.condition, known_types(scope))
+    check_body(node.then_body, with_proof(scope, when_true(proof))) unless node.then_body.nil?
+    check_body(node.else_body, with_proof(scope, when_false(proof))) unless node.else_body.nil?
   in CaseNode then check_case(node, scope)
   in CaseInNode then check_case_in(node, scope)
   in CallNode then check_call(node, scope)
@@ -325,7 +336,11 @@ def check_node(node, scope)
     check_operator(node, scope)
   in LogicalNode(left:, right:)
     check_node(left, scope)
-    check_node(right, scope)
+    # The right side runs only where the left decided it: under the left's
+    # proof for `&&`, its disproof for `||`.
+    proof = narrowings(left, known_types(scope))
+    right_side = if node.operator == "&&" then when_true(proof) else when_false(proof) end
+    check_node(right, with_proof(scope, right_side))
     check_operands(node, scope)
   in UnaryNode(operand:)
     check_node(operand, scope)
@@ -383,10 +398,13 @@ end
 
 def check_case_in(node, scope)
   check_node(node.subject, scope)
+  mutable nil_seen = false
   node.branches.each do |branch|
     check_pattern(branch.pattern, scope)
-    check_node(branch.guard, scope) unless branch.guard.nil?
-    check_body(branch.body, scope)
+    arm = with_proof(scope, arm_bindings(node, branch, nil_seen, known_types(scope)))
+    check_node(branch.guard, arm) unless branch.guard.nil?
+    check_body(branch.body, arm)
+    nil_seen = true if nil_arm?(branch)
   end
   check_body(node.else_body, scope) unless node.else_body.nil?
   check_unreachable_arms(node)

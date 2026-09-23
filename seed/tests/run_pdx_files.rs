@@ -1109,7 +1109,7 @@ fn portland_types_dumps_method_returns() {
     let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
     std::fs::write(
         &sample,
-        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\n",
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found\nend\ndef presence(top = [1].first) = top.some? ? top : 0\ndef compared(top = [1].first)\n  if top == nil then 0 else top end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present\n  end\nend\ndef negated(top = [1].first)\n  return 0 unless top.some?\n  top\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\ndef safe(words = %w[a]) = words.first&.upcase\ndef unguarded(top = [1].first) = top + 1\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1124,7 +1124,10 @@ fn portland_types_dumps_method_returns() {
         // `last_of` and `mode` are the forgetting rule: a name rebound inside
         // a block or a branch is unknown after it, never the type it started
         // as — `mutable result = nil` rebound in an `each` once read as Nil.
-        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\nmode: Unknown\nunit: Order\nbigger: Order\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\ndef last_of # -> Unknown\n"
+        // `guarded` through `safe` are the seven narrowing forms of ADR 0040
+        // §3, each reading a plain Integer below its guard; `unguarded` is
+        // the control — a maybe plus one is an opinion withheld.
+        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\nmode: Unknown\nunit: Order\nbigger: Order\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\ndef last_of # -> Unknown\ndef guarded # -> Integer\ndef bailed # -> Integer\ndef presence # -> Integer\ndef compared # -> Integer\ndef matched # -> Integer\ndef negated # -> Integer\ndef both # -> Integer\ndef safe # -> String?\ndef unguarded # -> Unknown\n"
     );
 }
 

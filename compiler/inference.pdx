@@ -107,10 +107,12 @@ def synthesize(node, types)
   in LogicalNode then synthesize_logical(node, types)
   in UnaryNode then synthesize_unary(node, types)
   in MethodCallNode then synthesize_call(node, types)
+  in SafeMethodCallNode then synthesize_safe_call(node, types)
   # A bare call reaches a def the scan already typed (3b); its name shares
   # the list with the locals under the no-shadow rule.
   in CallNode then synthesize_name(node.name, types)
   in IfNode then synthesize_if(node, types)
+  in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
   else
     ["unknown"]
@@ -194,17 +196,27 @@ def return_types_in(node, types)
   case node
   in ReturnNode then [return_answer(node, types)]
   in IfNode
+    proof = narrowings(node.condition, types)
     mutable found = []
-    found += returns_in_body(node.then_body, types)
-    found += returns_in_body(node.else_body, types)
+    found += returns_in_body(node.then_body, when_true(proof) + types)
+    found += returns_in_body(node.else_body, when_false(proof) + types)
     found
   # A loop body may have run before any statement in it is read again, so
   # it is walked with its own rebindings already forgotten.
   in WhileNode then returns_in_body(node.body, forget_types(types, assigned_names_in_body(node.body)))
-  in CaseNode | CaseInNode
+  in CaseNode
     mutable found = []
     node.branches.each do |branch|
       found += returns_in_body(branch.body, types)
+    end
+    found += returns_in_body(node.else_body, types)
+    found
+  in CaseInNode
+    mutable found = []
+    mutable nil_seen = false
+    node.branches.each do |branch|
+      found += returns_in_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+      nil_seen = true if nil_arm?(branch)
     end
     found += returns_in_body(node.else_body, types)
     found
@@ -249,11 +261,28 @@ end
 
 # An if in value position (the ternary desugars here too, ADR 0046):
 # agreeing branches answer their type, an absent or nil branch makes a
-# maybe of the other.
+# maybe of the other. Each branch is read under what the condition proved
+# on its side (narrowings).
 def synthesize_if(node, types)
-  yes = branch_answer(node.then_body, types)
-  no = branch_answer(node.else_body, types)
+  proof = narrowings(node.condition, types)
+  yes = branch_answer(node.then_body, when_true(proof) + types)
+  no = branch_answer(node.else_body, when_false(proof) + types)
   merge_candidates([yes, no])
+end
+
+# A `case/in` in value position: the arms' answers must agree, each arm
+# read with its captures bound (arm_bindings). An absent else answers nil
+# (ADR 0012) — unless an unguarded bare capture makes the arms total.
+def synthesize_case_in(node, types)
+  mutable answers = []
+  mutable nil_seen = false
+  node.branches.each do |branch|
+    answers << synthesize_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+    nil_seen = true if nil_arm?(branch)
+  end
+  total = node.branches.any? { (it.pattern in IdentifierNode) && it.guard.nil? }
+  answers << branch_answer(node.else_body, types) unless node.else_body.nil? && total
+  merge_candidates(answers)
 end
 
 def branch_answer(body, types)
@@ -315,12 +344,20 @@ end
 
 def synthesize_logical(node, types)
   left = synthesize(node.left, types)
-  right = synthesize(node.right, types)
-  # `a or b` on a maybe answers the plain type (ADR 0040 §3's inventory);
-  # on booleans it stays boolean. Without knowing which, agreement is the
-  # only safe read.
+  # The right side is read under what the left proved — `x.some? && x + 1`
+  # sees a plain x; `x.nil? || x + 1` likewise.
+  proof = narrowings(node.left, types)
+  right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
+  right = synthesize(node.right, right_types)
   return left if left == right
-  return right if left in ["maybe", *]
+  return ["unknown"] unless left in ["maybe", *]
+  # `maybe or default` answers the plain type when the default is one of
+  # it, and `maybe or return` the plain type outright — below the guard
+  # the name is plain (the third form of ADR 0040 §3). Anything else is
+  # an opinion withheld.
+  inner = type_at(left, 1)
+  return inner if exit?(node.right)
+  return inner if right == inner
   ["unknown"]
 end
 
@@ -339,7 +376,18 @@ end
 # already lives by, read back as types. Partial lookups answer maybes
 # (ADR 0040 §3). Unlisted names answer unknown, never an error.
 def synthesize_call(node, types)
+  call_answer(synthesize(node.receiver, types), node, types)
+end
+
+# `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
+# form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
+def synthesize_safe_call(node, types)
   receiver = synthesize(node.receiver, types)
+  plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
+  maybe_of(call_answer(plain, node, types))
+end
+
+def call_answer(receiver, node, types)
   return synthesize_block_call(node, receiver, types) if node.block.some?
   name = node.name
   # On a struct's name: `new` answers an instance, and any other name is a
@@ -531,6 +579,130 @@ def signature_continues?(line)
   stripped.end_with?(",") || stripped.end_with?("(")
 end
 
+# — narrowing (ADR 0040 §3, the seven forms) —
+#
+# A condition proves something about a maybe-typed name on each side of a
+# branch: `x.some?` holding makes x its plain type and failing makes it
+# nil; `x.nil?` and `x == nil` the other way round; `!` swaps the sides;
+# `&&` proves both halves when it holds and `||` both when it fails. A
+# proof is [when_true, when_false], each a list of [name, type] pairs
+# bound over the branch that sees it. Only an identifier narrows, since
+# only a name can be rebound — `users.first.nil?` proves nothing about a
+# later `users.first`. The exit guard and the or-guard bind below the
+# statement (bind_after, synthesize_logical); `&.` is synthesize_safe_call;
+# `case/in` over nil is arm_bindings.
+
+def narrowings(condition, types)
+  case condition
+  in MethodCallNode then predicate_proof(condition, types)
+  in BinaryNode then comparison_proof(condition, types)
+  in UnaryNode(operator:, operand:)
+    return no_proof unless operator == "!"
+    proof = narrowings(operand, types)
+    [when_false(proof), when_true(proof)]
+  in LogicalNode(operator:, left:, right:)
+    left_proof = narrowings(left, types)
+    right_proof = narrowings(right, types)
+    return [when_true(left_proof) + when_true(right_proof), []] if operator == "&&"
+    return [[], when_false(left_proof) + when_false(right_proof)] if operator == "||"
+    no_proof
+  else
+    no_proof
+  end
+end
+
+def no_proof = [[], []]
+
+def when_true(proof) = type_at(proof, 0)
+
+def when_false(proof) = type_at(proof, 1)
+
+# `x.some?` and `x.nil?` on a maybe-typed name.
+def predicate_proof(node, types)
+  return no_proof unless node.arguments.empty? && node.block.nil?
+  return no_proof unless node.receiver in IdentifierNode
+  name = node.receiver.name
+  inner = maybe_inner(name, types)
+  return no_proof if inner.nil?
+  return [[[name, inner]], [[name, ["nil"]]]] if node.name == "some?"
+  return [[[name, ["nil"]]], [[name, inner]]] if node.name == "nil?"
+  no_proof
+end
+
+# `x == nil` and `x != nil`, either way round.
+def comparison_proof(node, types)
+  return no_proof unless node.operator == "==" || node.operator == "!="
+  name = nil_comparison_name(node.left, node.right)
+  return no_proof if name.nil?
+  inner = maybe_inner(name, types)
+  return no_proof if inner.nil?
+  return [[[name, ["nil"]]], [[name, inner]]] if node.operator == "=="
+  [[[name, inner]], [[name, ["nil"]]]]
+end
+
+def nil_comparison_name(left, right)
+  return left.name if (left in IdentifierNode) && (right in NilNode)
+  return right.name if (right in IdentifierNode) && (left in NilNode)
+  nil
+end
+
+# The plain type under a maybe-typed name, or nil for anything else.
+def maybe_inner(name, types)
+  found = synthesize_name(name, types)
+  return nil unless found in ["maybe", *]
+  type_at(found, 1)
+end
+
+# What holds below an `if` whose one branch always leaves: the proof for
+# the branch that stays. Nothing where both leave, or neither.
+def guard_proof(node, types)
+  proof = narrowings(node.condition, types)
+  then_exits = body_exits?(node.then_body)
+  else_exits = body_exits?(node.else_body)
+  return when_false(proof) if then_exits && !else_exits
+  return when_true(proof) if else_exits && !then_exits
+  []
+end
+
+# A body that always leaves: its last statement returns, panics, or steps
+# out of a loop.
+def body_exits?(body)
+  return false if body.nil? || body.empty?
+  exit?(body.last)
+end
+
+def exit?(node)
+  case node
+  in ReturnNode | BreakNode | NextNode then true
+  in CallNode(name:) then name == "panic"
+  else
+    false
+  end
+end
+
+# What an arm of a `case/in` binds, as pairs to put before the types: a
+# bare capture takes the subject's type — the plain type once an unguarded
+# `in nil` arm above has taken the absent case (the fifth form; `in
+# some(v)` is not a pattern either oracle parses), and an identifier
+# subject narrows alongside it; `in nil` narrows an identifier subject to
+# nil; every other capture is unknown.
+def arm_bindings(node, branch, nil_seen, types)
+  subject = synthesize(node.subject, types)
+  pattern = branch.pattern
+  plain = if (subject in ["maybe", *]) && nil_seen then type_at(subject, 1) else subject end
+  if pattern in IdentifierNode
+    mutable pairs = [[pattern.name, plain]]
+    pairs = [[node.subject.name, plain]] + pairs if node.subject in IdentifierNode
+    return pairs
+  end
+  if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in ["maybe", *])
+    return [[node.subject.name, ["nil"]]]
+  end
+  pattern_names(pattern).map { [it, ["unknown"]] }
+end
+
+def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
+
 # — what a statement leaves behind —
 #
 # Every body walk here, and the checker's, threads bindings through
@@ -555,6 +727,12 @@ def bind_after(statement, locals, globals)
   in MatchAssertNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
   in MatchTestNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
   in TogetherNode(lines:) then bind_unknowns(locals, task_line_names(lines))
+  # An `if` whose one branch always leaves is a guard: what its condition
+  # proved for the branch that stays holds below it (the first form —
+  # `return if x.nil?`, plain x after). A rebinding inside still wins.
+  in IfNode
+    guarded = guard_proof(statement, locals + globals) + locals
+    forget_types(guarded, assigned_names_in(statement))
   else
     forget_types(locals, assigned_names_in(statement))
   end
