@@ -31,6 +31,8 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Tick issue-body checklists as parts land**, so an issue's state is readable without reading its comments.
 
+**Adding, removing, or renaming a builtin in the seed changes the method table.** The checker's shape 2 and contract check read each builtin receiver's method set from the table in `compiler/inference.pdx`, which is derived from the seed's behavior, not from its Rust: run `script/probe_builtin_methods`, paste its eight lines over the table, and commit the two together. `script/check_builtin_table` diffs the two and runs from the pre-push hook whenever `seed/src` changed; the table retires with the seed at Stage 3, when the stdlib becomes Portland source.
+
 ## Running things
 
 |                        |                                                                                 |

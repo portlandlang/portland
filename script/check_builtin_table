@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+# The builtin method table in compiler/inference.pdx must match what the
+# seed actually answers (#88). This runs script/probe_builtin_methods and
+# diffs its eight lines against the table, type by type, so a builtin
+# added, removed, or renamed in the seed cannot leave the checker with a
+# stale set. Two minutes; the pre-push hook runs it only when seed/src
+# changed, and AGENT.md's recipe says when to run it by hand.
+#
+# Usage: script/check_builtin_table            (needs target/debug/pdx)
+
+repo = File.expand_path("..", __dir__)
+table_source = File.read(File.join(repo, "compiler", "inference.pdx"))
+
+# `  in ["array", *] then %w[...]` — the table's own lines, inside
+# builtin_methods. The receiver tag is the type's first element.
+tabled = {}
+table_source.each_line do |line|
+  match = line.match(/\A\s+in \["(\w+)"(?:, \*)?\] then %w\[(.*)\]\s*\z/)
+  next if match.nil?
+  tabled[match[1]] = match[2].split.sort
+end
+abort "check_builtin_table: found no table in compiler/inference.pdx" if tabled.empty?
+
+probed = {}
+IO.popen([File.join(repo, "script", "probe_builtin_methods")]) do |output|
+  output.each_line do |line|
+    type, names = line.chomp.split(": ", 2)
+    probed[type] = (names || "").split.sort
+  end
+end
+abort "check_builtin_table: the probe printed nothing — is the seed built?" if probed.empty?
+
+failures = []
+(tabled.keys | probed.keys).sort.each do |type|
+  table = tabled.fetch(type, [])
+  seed = probed.fetch(type, [])
+  next if table == seed
+  missing = seed - table
+  extra = table - seed
+  failures << "#{type}:"
+  failures << "  the seed answers but the table lacks: #{missing.join(" ")}" unless missing.empty?
+  failures << "  the table lists but the seed refuses: #{extra.join(" ")}" unless extra.empty?
+end
+
+if failures.empty?
+  puts "builtin table ok — #{tabled.size} types agree with the seed"
+else
+  puts "builtin table stale — run script/probe_builtin_methods and paste its lines over the table in compiler/inference.pdx"
+  puts failures
+  exit 1
+end
