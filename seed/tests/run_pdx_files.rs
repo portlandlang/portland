@@ -544,6 +544,28 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "module names start with a capital letter",
         ),
         ("p([\"a\"].map { |w| it.upcase })\n", "use one or the other"),
+        // #90 — a struct miss the checker could not see (the receiver comes
+        // through a def parameter) says the seed's sentence, and fails.
+        (
+            "struct Token\n  kind\nend\ndef poke(thing) = thing.knd\npoke(Token.new(kind: \"w\"))\n",
+            "Token(kind: \"w\") is a Token, which has no method 'knd'",
+        ),
+        // #87 — the boolean `||` and `&&` check both sides hosted as the
+        // seed does, where a false left once answered whatever came next.
+        // The operand comes through a parameter so the checker declines
+        // and the runtime speaks; a literal would refuse at build first.
+        (
+            "def pick(flag) = false || flag\nputs pick(5)\n",
+            "'||' needs true or false, got 5",
+        ),
+        (
+            "def both(flag) = flag && true\nputs both(1)\n",
+            "'&&' needs true or false, got 1",
+        ),
+        (
+            "def either(word) = true && word\nputs either(\"yes\")\n",
+            "'&&' needs true or false, got \"yes\"",
+        ),
         // #91 — the seed's argument count at every hosted binding site: a
         // struct's method, a type function, a defined `new`, a block. (A
         // top-level def's bare call refuses at build first, so its row is

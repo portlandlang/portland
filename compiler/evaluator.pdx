@@ -13,6 +13,9 @@
 # To run a file, see run.pdx.
 
 require_relative "parser"
+# The renderer's helpers (ADR 0047) — the runtime rows of its sentences
+# are spelled with the same quoting, article, and truncation as the build's.
+require_relative "refusals"
 
 # signal is "none", or an unwinding "break" / "next" / "return"
 # (a return's value rides in the value slot). A return also carries the
@@ -798,15 +801,35 @@ def evaluate_logical(node, bindings)
   left_step = evaluate_expression(node.left, bindings)
   left = slot_value(left_step.value)
   if node.operator == "&&"
-    return outcome([false], left_step.bindings) unless left
-    return evaluate_expression(node.right, left_step.bindings)
+    # Both sides must be booleans — the seed's rule and sentence (#87);
+    # the host's own `unless` used to answer for the left with the wrong
+    # words, and the right went unchecked.
+    refuse_operand("&&", left) unless left == true || left == false
+    return outcome([false], left_step.bindings) if left == false
+    right_step = evaluate_expression(node.right, left_step.bindings)
+    right = slot_value(right_step.value)
+    refuse_operand("&&", right) unless right == true || right == false
+    return right_step
   end
   # A failure takes the fallback exactly as nil does (ADR 0027): failure is
   # absence with a reason, and `or` is its unwrap-or-else.
   return evaluate_statement(node.right, left_step.bindings) if left.nil? || left.failure?
   return outcome([true], left_step.bindings) if left == true
-  return evaluate_expression(node.right, left_step.bindings) if left == false
+  if left == false
+    # A false left makes this the boolean `||`, and the right must answer
+    # in kind — the check the hosted side skipped (#87).
+    right_step = evaluate_expression(node.right, left_step.bindings)
+    right = slot_value(right_step.value)
+    refuse_operand("||", right) unless right == true || right == false
+    return right_step
+  end
   outcome([left or nil], left_step.bindings)
+end
+
+# The seed's sentence for a logical operand that is not a boolean, with the
+# value shown as the seed shows it (ADR 0047 §5–6).
+def refuse_operand(operator, value)
+  panic("#{spelled(operator)} needs true or false, got #{shorten(render_inspect(value))}")
 end
 
 def evaluate_unary(node, bindings)
@@ -1286,8 +1309,11 @@ def struct_field(instance, field)
     return value_at(pairs[index], 1) if pairs[index][0] == field
     index += 1
   end
-  puts "evaluator: no field #{field}"
-  ""
+  # A miss is the seed's sentence (ADR 0047 shape 2's runtime row, #90):
+  # the value shown, its struct with the article, the name in quotes.
+  # Reached only where the checker could not see the receiver's type — a
+  # known struct refuses at build first.
+  panic("#{shorten(render_inspect(instance))} is #{a_type(["struct", value_at(instance, 1)])}, which has no method #{spelled(field)}")
 end
 
 def evaluate_self(bindings)
