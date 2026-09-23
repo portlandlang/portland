@@ -58,8 +58,8 @@ The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stac
 | `lexer.pdx`     | 446   | source → tokens                     |
 | `parser.pdx`    | 1,961 | tokens → AST, with `sexp` rendering |
 | `evaluator.pdx` | 963   | walks the AST                       |
-| `checker.pdx`   | 250   | static checks before evaluation (#9, ADR 0034) — the first walker the seed will never have |
-| `inference.pdx` | 250   | type synthesis (#9 increment 3a, ADR 0040) — silent so far; the checker consumes it in later increments |
+| `checker.pdx`   | 800   | static checks before evaluation (#9, ADR 0034) — the first walker the seed will never have; the inference-backed refusals (ADR 0047) live here |
+| `inference.pdx` | 700   | type synthesis (#9 increments 3a–3b, ADR 0040) — the checker reads it; `unknown` is an opinion withheld, never an error |
 | `refusals.pdx`  | 140   | the refusal renderer (ADR 0047 §4) — the one place the checker's voice lives; a check hands it a tagged refusal, never a sentence |
 
 Plus five small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `check.pdx` checks without running, `types.pdx` dumps inferred binding types, `run.pdx` checks and evaluates a file. Each is a handful of lines around one composed expression — `evaluate_program(parse_program(lex(read_file(argv.first))))`.

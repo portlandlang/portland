@@ -1,6 +1,6 @@
 # 0047 — The error voice: structured refusals, one renderer, five wordings
 
-- **Status:** Accepted (rulings and wordings ratified 2026-09-22; the renderer and the first refusals build against this, renderer first)
+- **Status:** Accepted (rulings and wordings ratified 2026-09-22; built the same day — the renderer, shapes 1, 2 (struct receivers), 4, 5, and arity; shape 3 waits for 3d narrowing, shape 2 on builtins for a method table)
 - **Date:** 2026-09-22
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — decision 6 of the design ladder, the session ADR 0040 held the first refusals for
 
@@ -84,6 +84,8 @@ Runtime: `cannot apply '+' to "total: " and 3`.
 ### Below the sentence
 
 The renderer prints the offending source line and its location beneath every refusal, Elm-style, if the trio's nodes carry a line — verified at build time, never assumed. Not a wording; recorded here because it is what stops the quoted expression from carrying the whole context load, for every future shape too.
+
+**Build note (2026-09-22):** verified — the trio's nodes carry no line, so the source line beneath a refusal waits for the parser to record positions. The quoted spelling carries the context alone for now. Three more findings from the build, each recorded in the changelog rather than hidden: the first refusal fired on the evaluator's own source and exposed a 3b inference bug (`mutable result = nil` rebound inside an `each` read as Nil), so the rule that a nested body's rebindings are unknown afterward now lives in inference for every walk; the seed's builtin catch-all cannot tell "no such method" from "wrong arguments" without a method table, so shape 2's runtime row for builtins waits with its build-time half; and the hosted runtime already says its own words for a missing method and counts no arguments at all, pre-existing divergences the build-time checks now reach first where the receiver or def is known.
 
 ## Consequences
 
