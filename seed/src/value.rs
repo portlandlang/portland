@@ -192,6 +192,16 @@ impl Value {
         }
     }
 
+    /// `1 argument`, `2 arguments`, `1 to 2 arguments` — the noun by the
+    /// count as the sentence spells it; only a lone 1 is singular.
+    pub fn arguments_word(expected: &str) -> &'static str {
+        if expected == "1" {
+            "argument"
+        } else {
+            "arguments"
+        }
+    }
+
     /// A value as a refusal names it: its inspect form, cut past forty
     /// characters with the ellipsis inside a string's quotes (ADR 0047 §6).
     /// The compiler's renderer holds the same limit for source spellings.

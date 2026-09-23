@@ -997,6 +997,18 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "1\nreached the end\n",
             "'first' is an Order, which has no method 'total'",
         ),
+        // The sixth wording — arity, the seed's own moved to build time with
+        // its plural fixed. Keyword arguments stand outside the count.
+        (
+            "def greet(name, greeting = \"hi\", loud: false)\n  greeting + \" \" + name\nend\nputs greet(\"pdx\", loud: true)\nif false\n  greet()\nend\nputs \"reached the end\"\n",
+            "hi pdx\nreached the end\n",
+            "greet expects 1 to 2 arguments, got 0",
+        ),
+        (
+            "def shout(word)\n  word.upcase\nend\nif false\n  shout(\"a\", \"b\")\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "shout expects 1 argument, got 2",
+        ),
         // ADR 0047 shape 5 — an annotation that lies (ADR 0041 §5 gets its
         // teeth). A comment to the seed; a checked promise to the compiler.
         // The truthful annotations above it, every shape, stay silent.

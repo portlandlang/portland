@@ -2453,9 +2453,10 @@ impl<W: std::io::Write> Interpreter<W> {
     /// inside the block die at `end` (ADR 0001's third closure rule).
     fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
         if block.parameters.len() > arguments.len() {
+            let expected = block.parameters.len().to_string();
             panic!(
-                "block expects {} argument(s), got {}",
-                block.parameters.len(),
+                "block expects {expected} {}, got {}",
+                Value::arguments_word(&expected),
                 arguments.len()
             );
         }
@@ -2880,7 +2881,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 format!("{required} to {total}")
             };
             panic!(
-                "{struct_name} method expects {expected} argument(s), got {}",
+                "{struct_name} method expects {expected} {}, got {}",
+                Value::arguments_word(&expected),
                 arguments.len()
             );
         }
@@ -3164,7 +3166,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 format!("{required} to {total}")
             };
             panic!(
-                "{name} expects {expected} argument(s), got {}",
+                "{name} expects {expected} {}, got {}",
+                Value::arguments_word(&expected),
                 arguments.len()
             );
         }
@@ -3829,7 +3832,7 @@ end
     /// itself the proof that the `{ |item|` parsed and attached to `each_one` —
     /// before ADR 0024 this was a parse error instead.
     #[test]
-    #[should_panic(expected = "block expects 1 argument(s), got 0")]
+    #[should_panic(expected = "block expects 1 argument, got 0")]
     fn a_brace_block_with_parameters_attaches_to_a_paren_less_call() {
         evaluate("def each_one\n  yield\nend\neach_one { |item| puts(item) }\n");
     }
@@ -5321,7 +5324,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "expects 1 to 2 argument(s)")]
+    #[should_panic(expected = "f expects 1 to 2 arguments, got 3")]
     fn panics_when_over_the_optional_arity() {
         evaluate("def f(required, extra = 1)\n  required\nend\nf(1, 2, 3)\n");
     }

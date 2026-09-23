@@ -53,6 +53,7 @@ require_relative "refusals"
 # while a block keeps them. Both lists are [name, type] pairs in the shape
 # inference.pdx reads.
 struct Scope
+  arities
   enums
   globals
   locals
@@ -91,9 +92,31 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes, source)
-  scope = Scope.new(enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes))
+  scope = Scope.new(arities: declared_arities(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes))
   check_annotations(nodes, source, scope)
   check_body(nodes, scope)
+end
+
+# Every top-level def's positional arity, as [name, required, total] —
+# the seed's own count: parameters up to the first default are required,
+# keyword parameters stand outside the count. A name defined twice is
+# left out (a second def silently wins at runtime, #70's open question).
+def declared_arities(nodes)
+  defs = nodes.select { it in DefNode }
+  mutable arities = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    positional = node.parameters.reject { it in KeywordParameterNode }
+    required = positional.select { required_parameter?(it) }.length
+    arities << [node.name, required, positional.length]
+  end
+  arities
+end
+
+# A bare name, or a `mutable` one with no default, must be passed.
+def required_parameter?(parameter)
+  return true if parameter in IdentifierNode
+  (parameter in AssignmentNode) && parameter.value.nil?
 end
 
 # Shape 5 — an annotation that lies (ADR 0041 §5; the words are ADR
@@ -240,8 +263,8 @@ end
 # def returns either — a bare call inside a struct may reach the struct's
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
-  type_names = scope.globals.select { (it[1] in ["struct", *]) || (it[1] in ["enum", *]) }
-  def_scope(node, scope.with(globals: type_names))
+  type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
+  def_scope(node, scope.with(arities: [], globals: type_names))
 end
 
 # A block keeps the locals around it and binds its parameters from the
@@ -383,7 +406,23 @@ end
 
 def check_call(node, scope)
   check_body(node.arguments, scope)
+  check_arity(node, scope)
   check_block(node.block, ["unknown"], scope)
+end
+
+# The sixth wording, the seed's own moved to build time (ADR 0034 §2,
+# ADR 0047): a bare call to a top-level def with the wrong number of
+# positional arguments. Keyword arguments stand outside the count, as in
+# the seed; inside a struct's methods no bare call is judged (method_scope).
+def check_arity(node, scope)
+  arity = scope.arities.find { it[0] == node.name }
+  return if arity.nil?
+  required = value_at_checked(arity, 1)
+  total = value_at_checked(arity, 2)
+  given = node.arguments.reject { it in KeywordArgumentNode }.length
+  return if given >= required && given <= total
+  expected = if required == total then required.to_s else "#{required} to #{total}" end
+  refuse(["arity", node.name, expected, given])
 end
 
 def check_method_call(node, scope)

@@ -28,6 +28,7 @@ Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — ref
 - **A maybe used as plain** — `'users.first' is a String? — handle the nil case before '.upcase'`; Ruby raises `NoMethodError` only when the array happens to be empty. Waits for narrowing, so a guarded program is never refused.
 - **An operator on mismatched types** (built) — `cannot apply '+' to String and Integer`, where Ruby says `no implicit conversion of Integer into String` at runtime. The legal pairs are the seed's own; a maybe, struct, or enum operand declines.
 - **An annotation that lies** (built, top-level defs) — `'handle' answers Integer, not the annotated String — change one`; Ruby has nothing to say, since the annotation is a comment.
+- **The wrong number of arguments** (built, bare calls to top-level defs) — the seed's own runtime sentence, moved earlier with its plural fixed: `greet expects 1 to 2 arguments, got 0`. Ruby raises `ArgumentError` when the call runs.
 
 The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about yet is silence, not a demand for `else`, and inference is what widens that later.
 
