@@ -981,6 +981,22 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "reached the end\n",
             "'if' condition must be true or false, got String",
         ),
+        // ADR 0047 shape 2 — a method a struct does not have. Everything a
+        // struct answers is used first — a field, a def, a trait's def, an
+        // alias, `with`, `to_s`, the predicates — and only the typo refuses.
+        (
+            "trait Loud\n  def yell = \"!\"\nend\nstruct Token\n  kind\n  include Loud\n  def shout = kind.upcase\n  alias holler shout\nend\ntoken = Token.new(kind: \"word\")\nputs token.kind\nputs token.shout\nputs token.holler\nputs token.yell\nputs token.with(kind: \"other\").kind\nputs token.to_s\nputs token.some?\nif false\n  puts token.knd\nend\nputs \"reached the end\"\n",
+            "word\nWORD\nWORD\n!\nother\nToken(kind: \"word\")\ntrue\nreached the end\n",
+            "'token' is a Token, which has no method 'knd'",
+        ),
+        (
+            // A type function is on the type, not the instance — `Order.unit`
+            // is not a miss; `Order.new.total` is an instance call, and Order
+            // takes `an`.
+            "struct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nfirst = Order.unit\nputs first.size\nif false\n  puts first.total\nend\nputs \"reached the end\"\n",
+            "1\nreached the end\n",
+            "'first' is an Order, which has no method 'total'",
+        ),
         // ADR 0047 shape 4 — an operator on operands it cannot take, the
         // legal pairs being the seed's own match arms read as types.
         (
@@ -1073,7 +1089,7 @@ fn portland_types_dumps_method_returns() {
     let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
     std::fs::write(
         &sample,
-        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\n",
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1088,7 +1104,7 @@ fn portland_types_dumps_method_returns() {
         // `last_of` and `mode` are the forgetting rule: a name rebound inside
         // a block or a branch is unknown after it, never the type it started
         // as — `mutable result = nil` rebound in an `each` once read as Nil.
-        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\nmode: Unknown\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\ndef last_of # -> Unknown\n"
+        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\nmode: Unknown\nunit: Order\nbigger: Order\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\ndef last_of # -> Unknown\n"
     );
 }
 

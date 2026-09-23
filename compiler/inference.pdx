@@ -18,7 +18,9 @@
 #   ["array", element]         — element is a type, or ["unknown"]
 #   ["hash", key, value]
 #   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
-#   ["struct", "Name"]
+#   ["struct", "Name"]         — an instance
+#   ["type", "Name"]           — the struct's name itself, what `new` is called on
+#   ["enum", "Name"]
 #   ["unknown"]                — the honest answer, and the default
 #
 # ["unknown"] is principle 4 wearing a type: anything this increment cannot
@@ -45,7 +47,7 @@ def scan_program(nodes)
     if node in DefNode
       types = [[node.name, synthesize_def_return(node, types)]] + types
     elsif node in StructDefNode
-      types = [[node.name, ["struct", node.name]]] + types
+      types = register_struct(node, types)
     elsif node in EnumDefNode
       # Recorded so a later increment can hang membership and
       # exhaustiveness off the name; nothing reads it yet.
@@ -53,6 +55,19 @@ def scan_program(nodes)
     else
       types = bind_after(node, types, [])
     end
+  end
+  types
+end
+
+# A struct declaration binds its name to its type — what `new` is called
+# on — and each type function (`def self.unit`, ADR 0031) under the dotted
+# name `Order.unit`, which no identifier can spell, so the one list holds
+# both. The checker's program-wide scan registers structs the same way.
+def register_struct(node, mutable types)
+  types = [[node.name, ["type", node.name]]] + types
+  node.type_functions.each do |function|
+    next unless function in DefNode
+    types = [[node.name + "." + function.name, synthesize_def_return(function, types)]] + types
   end
   types
 end
@@ -327,10 +342,13 @@ def synthesize_call(node, types)
   receiver = synthesize(node.receiver, types)
   return synthesize_block_call(node, receiver, types) if node.block.some?
   name = node.name
+  # On a struct's name: `new` answers an instance, and any other name is a
+  # type function the scan registered under `Name.function` (register_struct).
+  return ["struct", type_at(receiver, 1)] if name == "new" && (receiver in ["type", *])
+  return synthesize_name(type_at(receiver, 1) + "." + name, types) if receiver in ["type", *]
   case name
-  when "new"
-    # `Name.new(...)` — the scan bound the struct's name (3b); the name is
-    # not a value, so the binding can only mean this.
+  when "with"
+    # An updated copy is the same struct.
     return receiver if receiver in ["struct", *]
     ["unknown"]
   when "length", "size", "count", "index", "gcd", "pow", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate"
@@ -452,6 +470,7 @@ def render_type(type)
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in ["maybe", inner] then render_type(inner) + "?"
   in ["struct", name] then name
+  in ["type", name] then name
   in ["enum", name] then name
   else
     label = type_at(type, 0)

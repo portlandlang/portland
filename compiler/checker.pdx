@@ -55,6 +55,7 @@ struct Scope
   enums
   globals
   locals
+  shapes
 end
 
 # Every enum declaration in the program, as [name, labels] pairs — all of
@@ -89,8 +90,74 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes)
-  scope = Scope.new(enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [])
+  scope = Scope.new(enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes))
   check_body(nodes, scope)
+end
+
+# Every struct's instance method set, as [name, methods] pairs: its
+# fields, its defs (alias clones included, since they arrive as defs), the
+# defs of each trait it includes, and the five every struct answers. A
+# struct is left out where the tree cannot state its set whole — its name
+# declared twice anywhere (a nested struct sharing a top-level one's), or
+# an included trait not declared exactly once in this file, which may
+# well live in a required one.
+def declared_shapes(nodes)
+  structs = struct_declarations_in(nodes)
+  traits = trait_declarations_in(nodes)
+  mutable shapes = []
+  structs.each do |declaration|
+    name = declaration.name
+    next if structs.select { it.name == name }.length > 1
+    methods = shape_methods(declaration, traits)
+    shapes << [name, methods] unless methods.nil?
+  end
+  shapes
+end
+
+def shape_methods(declaration, traits)
+  mutable methods = %w[failure? nil? some? to_s with] + declaration.fields
+  methods += def_names(declaration.methods)
+  declaration.includes.each do |trait_name|
+    matching = traits.select { it.name == trait_name }
+    return nil unless matching.length == 1
+    methods += def_names(matching.first.methods)
+  end
+  methods
+end
+
+def def_names(methods)
+  mutable names = []
+  methods.each do |method|
+    names << method.name if method in DefNode
+  end
+  names
+end
+
+def struct_declarations_in(nodes)
+  mutable found = []
+  nodes.each do |node|
+    if node in StructDefNode
+      found << node
+      found += struct_declarations_in(node.nested)
+    elsif node in ModuleDefNode
+      found += struct_declarations_in(node.body)
+    end
+  end
+  found
+end
+
+def trait_declarations_in(nodes)
+  mutable found = []
+  nodes.each do |node|
+    if node in TraitDefNode
+      found << node
+    elsif node in ModuleDefNode
+      found += trait_declarations_in(node.body)
+    elsif node in StructDefNode
+      found += trait_declarations_in(node.nested)
+    end
+  end
+  found
 end
 
 # The program-wide names, in the shape inference reads: struct and enum
@@ -100,7 +167,7 @@ end
 def declared_globals(nodes)
   mutable globals = []
   nodes.each do |node|
-    globals = [[node.name, ["struct", node.name]]] + globals if node in StructDefNode
+    globals = register_struct(node, globals) if node in StructDefNode
     globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
   end
   nodes.each do |node|
@@ -302,7 +369,9 @@ end
 def check_method_call(node, scope)
   check_node(node.receiver, scope)
   check_body(node.arguments, scope)
-  check_block(node.block, synthesize(node.receiver, known_types(scope)), scope)
+  receiver = synthesize(node.receiver, known_types(scope))
+  check_struct_method(node, receiver, scope) if node in MethodCallNode
+  check_block(node.block, receiver, scope)
 end
 
 # A block body may run many times or never, so — like a loop's — it is
@@ -421,6 +490,21 @@ def check_operands(node, scope)
   return unless node.operator == "||"
   return unless left == ["boolean"]
   refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+end
+
+# Shape 2 — a method the receiver's type does not have, for struct
+# receivers: the one receiver kind whose method set a declaration states
+# completely (declared_shapes). Builtin receivers wait for a method table
+# the seed does not have yet. The receiver must be spellable — no
+# spelling, no sentence, so a computed receiver declines.
+def check_struct_method(node, receiver, scope)
+  return unless receiver in ["struct", *]
+  shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
+  return if shape.nil?
+  return if value_at_checked(shape, 1).include?(node.name)
+  spelling = spell_node(node.receiver)
+  return if spelling.nil?
+  refuse(["no_method", spelling, receiver, node.name])
 end
 
 # Shape 4 — an operator on operands it cannot take. The legal pairs are

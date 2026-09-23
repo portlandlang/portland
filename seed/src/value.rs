@@ -183,6 +183,15 @@ impl Value {
     }
 
     /// The developer-facing rendering: strings keep their quotes, like irb.
+    /// `a Token`, `an Order` — the article a refusal puts before a type
+    /// name, by its first letter (ADR 0047), so no wording hard-codes one.
+    pub fn article_for(name: &str) -> &'static str {
+        match name.chars().next() {
+            Some('A' | 'E' | 'I' | 'O' | 'U') => "an",
+            _ => "a",
+        }
+    }
+
     /// A value as a refusal names it: its inspect form, cut past forty
     /// characters with the ellipsis inside a string's quotes (ADR 0047 §6).
     /// The compiler's renderer holds the same limit for source spellings.

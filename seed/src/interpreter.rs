@@ -1565,7 +1565,11 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // to_s and the maybe predicates fall through to the generic arms.
             if !matches!(name, "nil?" | "some?" | "to_s") {
-                panic!("{struct_name} has no field {name}");
+                panic!(
+                    "{} is {} {struct_name}, which has no method '{name}'",
+                    receiver.shown(),
+                    Value::article_for(struct_name)
+                );
             }
         }
         // A range behaves as its elements do: `(1..n).each` is the counted
@@ -4354,6 +4358,14 @@ end
     #[should_panic(expected = "missing field text")]
     fn panics_on_a_missing_struct_field() {
         evaluate("struct Token\n  kind\n  text\nend\nToken.new(kind: \"value\")\n");
+    }
+
+    /// ADR 0047 shape 2's runtime row: the receiver shown, its type with
+    /// the article by first letter, the method in quotes.
+    #[test]
+    #[should_panic(expected = "Order(size: 1) is an Order, which has no method 'total'")]
+    fn names_the_struct_and_the_missing_method() {
+        evaluate("struct Order\n  size\nend\nOrder.new(size: 1).total\n");
     }
 
     #[test]
