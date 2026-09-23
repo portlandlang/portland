@@ -566,6 +566,118 @@ def type_at(list, target_index)
   result
 end
 
+# — contracts (ADR 0048, step one) —
+#
+# What a body demands of a parameter, read off the body alone: each
+# dotted call on the name with its dot, each operator applied to it bare,
+# an index as '[]' — first-appearance order, no repeats. A default lends
+# its type instead, as it does for returns. Dump-only: nothing here is
+# read by a check yet, and caller flow waits for a whole-program view
+# (#94).
+
+# Each top-level def's parameters, as [name, entry] pairs — an entry is a
+# type where a default gives one, or ["needs", demands].
+def infer_contracts(nodes)
+  types = scan_program(nodes)
+  mutable contracts = []
+  nodes.each do |node|
+    next unless node in DefNode
+    entries = node.parameters.map { [it.name, parameter_entry(it, node.body, types)] }
+    contracts << [node.name, entries]
+  end
+  contracts
+end
+
+def parameter_entry(parameter, body, types)
+  typed = parameter_type(parameter, types)
+  return typed unless typed == ["unknown"]
+  ["needs", demands_in(body, parameter.name)]
+end
+
+def demands_in(nodes, name)
+  mutable found = []
+  nodes.each do |node|
+    found = add_demands(node, name, found)
+  end
+  found
+end
+
+def add_demands(node, name, mutable found)
+  return found if node.nil?
+  demand = demand_of(node, name)
+  found << demand unless demand.nil? || found.include?(demand)
+  children_of(node).each do |child|
+    found = add_demands(child, name, found)
+  end
+  found
+end
+
+def demand_of(node, name)
+  if (node in MethodCallNode) || (node in SafeMethodCallNode)
+    return "." + node.name if names?(node.receiver, name)
+    return nil
+  end
+  if node in BinaryNode
+    return node.operator if names?(node.left, name) || names?(node.right, name)
+    return nil
+  end
+  return node.operator if (node in UnaryNode) && names?(node.operand, name)
+  return "[]" if (node in IndexNode) && names?(node.receiver, name)
+  nil
+end
+
+def names?(node, name) = (node in IdentifierNode) && node.name == name
+
+# A node's direct children — every expression and statement it holds,
+# blocks and branches included, patterns excluded — for a walk that looks
+# for something anywhere inside a body. Defs, structs, traits, and modules
+# are not descended into: their bodies bind their own names.
+def children_of(node)
+  case node
+  in AssignmentNode(value:) then [value]
+  in AppendNode(value:) then [value]
+  in WhileNode(condition:, body:) then [condition] + body
+  in IfNode(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
+  in CaseNode(subject:, branches:, else_body:)
+    mutable found = [subject]
+    branches.each do |branch|
+      found += branch.values + branch.body
+    end
+    found + (else_body or [])
+  in CaseInNode(subject:, branches:, else_body:)
+    mutable found = [subject]
+    branches.each do |branch|
+      found << branch.guard unless branch.guard.nil?
+      found += branch.body
+    end
+    found + (else_body or [])
+  in TogetherNode(lines:) then lines.map { if it in TaskLineNode then it.value else it end }
+  in ReturnNode(value:) then [value]
+  in CallNode(arguments:, block:) then arguments + block_body(block)
+  in MethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
+  in SafeMethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
+  in ArrayNode(elements:) then elements
+  in HashNode(pairs:) then pairs.map { it.key } + pairs.map { it.value }
+  in BinaryNode(left:, right:) then [left, right]
+  in LogicalNode(left:, right:) then [left, right]
+  in UnaryNode(operand:) then [operand]
+  in IndexNode(receiver:, index:) then [receiver, index]
+  in IndexUpdateNode(index: update_index, value: update_value) then [update_index, update_value]
+  in SlotCompoundNode(index: compound_index, right: compound_right) then [compound_index, compound_right]
+  in MatchAssertNode(subject:) then [subject]
+  in MatchTestNode(subject: test_subject) then [test_subject]
+  in KeywordArgumentNode(value:) then [value]
+  in EnumCaseNode(payload:) then payload.map { it.value }
+  else
+    []
+  end
+end
+
+def block_body(block)
+  return [] if block.nil?
+  block.body
+end
+
 # — return annotations (ADR 0041) —
 #
 # The written annotation for a def, if its signature carries one: the

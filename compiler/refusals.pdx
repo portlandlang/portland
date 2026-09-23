@@ -95,6 +95,21 @@ def plural(noun, expected)
   noun + "s"
 end
 
+# ADR 0048 §1 — a def's parameters for the dump, `(name: Type, other:
+# needs '.upcase', '+')`, empty for none: a contract's demands are source
+# spellings and wear the quotes, an empty contract says so in words.
+def render_parameters(entries)
+  return "" if entries.empty?
+  "(" + entries.map { "#{it[0]}: #{render_entry(type_at(it, 1))}" }.join(", ") + ")"
+end
+
+def render_entry(entry)
+  return render_type(entry) unless entry in ["needs", *]
+  demands = type_at(entry, 1)
+  return "needs nothing" if demands.empty?
+  "needs " + demands.map { spelled(it) }.join(", ")
+end
+
 # A node written back as source, for the spelling in a refusal. Only the
 # shapes that can be written faithfully from the tree are spelled — a
 # name, a literal, a dotted chain with no arguments, an index — and

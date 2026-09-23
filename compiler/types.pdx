@@ -1,7 +1,9 @@
-# The inference debug dump (#9 increments 3a and 3b, ADR 0040): one line
-# per top-level binding, `name: Type`, then one per top-level def,
-# `def name # -> Type` — with the source's own `# -> ` annotation
-# (ADR 0041) echoed beside the computed answer when the two disagree.
+# The inference debug dump (#9 increments 3a–3c, ADR 0040): one line per
+# top-level binding, `name: Type`, then one per top-level def,
+# `def name(param: needs '.upcase') # -> Type` — each parameter with its
+# default's type or its contract (ADR 0048), and the source's own `# -> `
+# annotation (ADR 0041) echoed beside the computed answer when the two
+# disagree.
 # Dump-only: agreement and disagreement alike refuse nothing here — the
 # checker refuses a lying annotation (ADR 0047 shape 5) and this dump
 # shows every answer regardless. The type rendering is ratified error
@@ -9,19 +11,28 @@
 #
 # Usage: pdx compiler/types.pdx some_file.pdx
 
-require_relative "inference"
+require_relative "refusals"
 
 source = read_file(argv.first) or panic "types.pdx: cannot read #{argv.first}"
 nodes = parse_program(lex(source))
 infer_program(nodes).each do |pair|
   puts "#{pair.first}: #{render_type(type_at(pair, 1))}"
 end
-infer_methods(nodes).each do |pair|
-  computed = render_type(type_at(pair, 1))
-  written = annotation_for(source, pair.first)
+# One def line per name, first appearance winning as infer_methods does,
+# its parameters in parens with their contracts (ADR 0048) and its return.
+returns = infer_methods(nodes)
+mutable printed = []
+infer_contracts(nodes).each do |contract|
+  name = contract.first
+  next if printed.include?(name)
+  printed << name
+  found = returns.find { it[0] == name }
+  computed = render_type(type_at(found, 1))
+  written = annotation_for(source, name)
+  signature = "def #{name}#{render_parameters(type_at(contract, 1))}"
   if written.nil? || written == computed
-    puts "def #{pair.first} # -> #{computed}"
+    puts "#{signature} # -> #{computed}"
   else
-    puts "def #{pair.first} # -> #{computed} (annotated #{written})"
+    puts "#{signature} # -> #{computed} (annotated #{written})"
   end
 end
