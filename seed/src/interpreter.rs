@@ -1563,8 +1563,11 @@ impl<W: std::io::Write> Interpreter<W> {
             if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
                 return Some(value.clone());
             }
-            // to_s and the maybe predicates fall through to the generic arms.
-            if !matches!(name, "nil?" | "some?" | "to_s") {
+            // to_s and the three predicates fall through to the generic arms —
+            // `failure?` included, since `return value if value.failure?` is
+            // the propagation toolkit (ADR 0044) and a struct is the commonest
+            // thing a fallible def answers (#92).
+            if !matches!(name, "failure?" | "nil?" | "some?" | "to_s") {
                 panic!(
                     "{} is {} {struct_name}, which has no method '{name}'",
                     receiver.shown(),
@@ -4369,6 +4372,16 @@ end
     #[should_panic(expected = "Order(size: 1) is an Order, which has no method 'total'")]
     fn names_the_struct_and_the_missing_method() {
         evaluate("struct Order\n  size\nend\nOrder.new(size: 1).total\n");
+    }
+
+    /// #92: the propagation predicate answers on a struct like on any value
+    /// — a struct is the commonest thing a fallible def returns.
+    #[test]
+    fn failure_predicate_answers_false_on_a_struct() {
+        assert_eq!(
+            evaluate("struct Token\n  kind\nend\nToken.new(kind: \"w\").failure?\n"),
+            Some(Value::Boolean(false))
+        );
     }
 
     #[test]

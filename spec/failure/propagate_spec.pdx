@@ -28,6 +28,21 @@ def bang_named!
   "loud and proud"
 end
 
+struct Receipt
+  total
+end
+
+def issue(flag)
+  return failure("declined") if flag
+  Receipt.new(total: 7)
+end
+
+def collected(flag)
+  receipt = issue(flag)
+  return receipt if receipt.failure?
+  "charged #{receipt.total}"
+end
+
 context "failure propagation, spelled out" do
   describe "a call whose value is sound" do
     specify "passes the guard untouched" do
@@ -43,6 +58,17 @@ context "failure propagation, spelled out" do
     specify "unwinds through blocks to its write site" do
       expect(through_a_block(false)).to eq("walked all 2 elements")
       expect(through_a_block(true)).to be_failure
+    end
+  end
+
+  describe "a struct crossing the guard" do
+    # #92: the predicate answers on a struct like on any value — the
+    # commonest thing a fallible def returns is exactly the value the
+    # seed once refused it on.
+    specify "passes as itself when sound, propagates when not" do
+      expect(collected(false)).to eq("charged 7")
+      expect(collected(true)).to be_failure
+      expect(Receipt.new(total: 1).failure?).to eq(false)
     end
   end
 

@@ -1429,7 +1429,6 @@ def evaluate_method_call(node, mutable bindings)
   # before ADR 0044 it was reachable only through `!`, so this arm was a
   # green-but-never-covered hosted gap.
   when "failure?" then receiver.failure?
-  when "failure?" then receiver.failure?
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
