@@ -212,11 +212,14 @@ def check_node(node, scope)
   in BinaryNode(left:, right:)
     check_node(left, scope)
     check_node(right, scope)
+    check_operator(node, scope)
   in LogicalNode(left:, right:)
     check_node(left, scope)
     check_node(right, scope)
     check_operands(node, scope)
-  in UnaryNode(operand:) then check_node(operand, scope)
+  in UnaryNode(operand:)
+    check_node(operand, scope)
+    check_unary(node, scope)
   in IndexNode(receiver:, index:)
     check_node(receiver, scope)
     check_node(index, scope)
@@ -418,6 +421,64 @@ def check_operands(node, scope)
   return unless node.operator == "||"
   return unless left == ["boolean"]
   refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+end
+
+# Shape 4 — an operator on operands it cannot take. The legal pairs are
+# the seed's own match arms, read as types: numbers with numbers for the
+# arithmetic and ordering operators, string with string and array with
+# array for `+`, string or array times an integer, and anything at all for
+# `==` and `!=`. Both operands must be plain builtin values for the
+# refusal to fire — a maybe is transparent at runtime (some(x) is x) and a
+# struct or enum is not this shape's to judge — so everything else
+# declines.
+def check_operator(node, scope)
+  types = known_types(scope)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  return unless plain_value?(left) && plain_value?(right)
+  return if operator_takes?(node.operator, left, right)
+  refuse(["operator", node.operator, left, right])
+end
+
+def operator_takes?(operator, left, right)
+  case operator
+  when "==", "!=" then true
+  when "<", "<=", ">", ">=" then numeric?(left) && numeric?(right)
+  when "+"
+    return true if numeric?(left) && numeric?(right)
+    return true if left == ["string"] && right == ["string"]
+    (left in ["array", *]) && (right in ["array", *])
+  when "*"
+    return true if numeric?(left) && numeric?(right)
+    return true if left == ["string"] && right == ["integer"]
+    (left in ["array", *]) && right == ["integer"]
+  when "-", "/", "%", "**" then numeric?(left) && numeric?(right)
+  else
+    # An operator this table does not know is not one it may refuse.
+    true
+  end
+end
+
+# `!` takes a boolean and `-` a number; the seed refuses the rest.
+def check_unary(node, scope)
+  operand = synthesize(node.operand, known_types(scope))
+  return unless plain_value?(operand)
+  return if node.operator == "!" && operand == ["boolean"]
+  return if node.operator == "-" && numeric?(operand)
+  return unless node.operator == "!" || node.operator == "-"
+  refuse(["unary", node.operator, operand])
+end
+
+# A fully known builtin value type — never a maybe, struct, or enum.
+def plain_value?(type)
+  return false unless known?(type)
+  case type
+  in ["maybe", *] then false
+  in ["struct", *] then false
+  in ["enum", *] then false
+  else
+    true
+  end
 end
 
 # Fully known: no unknown at any depth. A refusal never names a type it

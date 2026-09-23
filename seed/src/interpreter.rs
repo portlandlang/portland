@@ -294,7 +294,12 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
         (left, BinaryOperator::Equals, right) => Value::Boolean(left == right),
         (left, BinaryOperator::NotEquals, right) => Value::Boolean(left != right),
         (left, operator, right) => {
-            panic!("cannot apply {operator:?} to {left:?} and {right:?}")
+            panic!(
+                "cannot apply '{}' to {} and {}",
+                operator.glyph(),
+                left.shown(),
+                right.shown()
+            )
         }
     }
 }
@@ -1304,7 +1309,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     (UnaryOperator::Negate, Value::Float(value)) => Some(Value::Float(-value)),
                     (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
                     (operator, operand) => {
-                        panic!("cannot apply {operator:?} to {operand:?}")
+                        panic!("cannot apply '{}' to {}", operator.glyph(), operand.shown())
                     }
                 }
             }
@@ -3460,7 +3465,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "cannot apply")]
+    #[should_panic(expected = "cannot apply '+' to 1 and \"one\"")]
     fn panics_on_adding_a_string_to_an_integer() {
         evaluate(r#"1 + "one""#);
     }
@@ -4696,7 +4701,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "cannot apply")]
+    #[should_panic(expected = "cannot apply '-' to \"pdx\"")]
     fn panics_on_negating_a_string() {
         evaluate(r#"-"pdx""#);
     }
@@ -4723,7 +4728,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "cannot apply")]
+    #[should_panic(expected = "cannot apply '<' to \"a\" and \"b\"")]
     fn panics_on_ordering_strings() {
         evaluate(r#""a" < "b""#);
     }

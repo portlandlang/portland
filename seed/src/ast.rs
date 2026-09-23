@@ -101,6 +101,27 @@ pub enum BinaryOperator {
     Subtract,
 }
 
+impl BinaryOperator {
+    /// The operator as the source spells it — what a refusal names it by
+    /// (ADR 0047 §5), never the variant's Rust name.
+    pub fn glyph(self) -> &'static str {
+        match self {
+            BinaryOperator::Add => "+",
+            BinaryOperator::Divide => "/",
+            BinaryOperator::Equals => "==",
+            BinaryOperator::Greater => ">",
+            BinaryOperator::GreaterOrEqual => ">=",
+            BinaryOperator::Less => "<",
+            BinaryOperator::LessOrEqual => "<=",
+            BinaryOperator::Modulo => "%",
+            BinaryOperator::Multiply => "*",
+            BinaryOperator::NotEquals => "!=",
+            BinaryOperator::Power => "**",
+            BinaryOperator::Subtract => "-",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LogicalOperator {
     And,
@@ -111,6 +132,16 @@ pub enum LogicalOperator {
 pub enum UnaryOperator {
     Negate,
     Not,
+}
+
+impl UnaryOperator {
+    /// The operator as the source spells it (ADR 0047 §5).
+    pub fn glyph(self) -> &'static str {
+        match self {
+            UnaryOperator::Negate => "-",
+            UnaryOperator::Not => "!",
+        }
+    }
 }
 
 /// One line of a `together` block (ADR 0029): a task declares independence

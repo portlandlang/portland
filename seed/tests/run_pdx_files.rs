@@ -981,6 +981,30 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "reached the end\n",
             "'if' condition must be true or false, got String",
         ),
+        // ADR 0047 shape 4 — an operator on operands it cannot take, the
+        // legal pairs being the seed's own match arms read as types.
+        (
+            "count = 3\nif false\n  label = \"total: \" + count\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "cannot apply '+' to String and Integer",
+        ),
+        (
+            "if false\n  ordered = \"a\" < \"b\"\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "cannot apply '<' to String and String",
+        ),
+        (
+            "name = \"pdx\"\nif false\n  negated = -name\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "cannot apply '-' to String",
+        ),
+        (
+            // `"ab" * 2` and `[1] * 2` are legal; a mutable widened by a
+            // branch is unknown and declines. Only the last line refuses.
+            "mutable count = 1\nif true\n  count = \"one\"\nend\ndoubled = \"ab\" * 2\nrepeated = [1] * 2\nwidened = count == 1\nif false\n  bad = 1 - \"one\"\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "cannot apply '-' to Integer and String",
+        ),
     ];
     for (source, seed_output, refusal) in cases {
         let sample = std::env::temp_dir().join("checker_case.pdx");
