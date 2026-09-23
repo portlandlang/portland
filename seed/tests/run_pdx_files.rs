@@ -997,6 +997,14 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "1\nreached the end\n",
             "'first' is an Order, which has no method 'total'",
         ),
+        // ADR 0047 shape 5 — an annotation that lies (ADR 0041 §5 gets its
+        // teeth). A comment to the seed; a checked promise to the compiler.
+        // The truthful annotations above it, every shape, stay silent.
+        (
+            "def answer = 42 # -> Integer\ndef greet(name = \"friend\") # -> String\n  \"hi \" + name\nend\ndef pair(first,\n         second = 2) # -> [Integer]\n  [first.to_i, second]\nend\ndef maybe_ran(flag) = \"ran\" if flag # -> String?\ndef handle # -> String\n  42\nend\nputs handle\n",
+            "42\n",
+            "'handle' answers Integer, not the annotated String — change one",
+        ),
         // ADR 0047 shape 4 — an operator on operands it cannot take, the
         // legal pairs being the seed's own match arms read as types.
         (
@@ -1169,7 +1177,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"unhandled_maybe\", \"users.first\", [\"maybe\", [\"string\"]], \"upcase\"])\n\
              puts render_refusal([\"operator\", \"+\", [\"string\"], [\"integer\"]])\n\
              puts render_refusal([\"unary\", \"-\", [\"string\"]])\n\
-             puts render_refusal([\"annotation\", \"handle\", [\"integer\"], [\"string\"]])\n\
+             puts render_refusal([\"annotation\", \"handle\", [\"integer\"], \"String\"])\n\
              puts render_refusal([\"arity\", \"greet\", \"1\", 0])\n\
              puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\

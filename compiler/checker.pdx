@@ -1,8 +1,9 @@
 # Stage 1, act three: the checker — the first walker the seed will never
 # have (#9, ADR 0034).
 #
-# A library: require_relative "checker", then check_program(nodes) before
-# evaluating. It walks the whole tree, so a refusal fires whether or not
+# A library: require_relative "checker", then check_program(nodes, source)
+# before evaluating — the source text rides along for the one check that
+# reads a comment (ADR 0041's return annotations). It walks the whole tree, so a refusal fires whether or not
 # the offending line would ever run — which is the entire point: the seed
 # can only refuse the code it reaches, and a compiler must refuse the code
 # it can read.
@@ -89,9 +90,28 @@ end
 # The one entry point: refuse or stay silent. Panics with the first
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
-def check_program(nodes)
+def check_program(nodes, source)
   scope = Scope.new(enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes))
+  check_annotations(nodes, source, scope)
   check_body(nodes, scope)
+end
+
+# Shape 5 — an annotation that lies (ADR 0041 §5; the words are ADR
+# 0047's). A top-level def's `# -> Type` is read off the source the way
+# the dump reads it and compared, as text, with the rendering of the
+# return inference computed — the annotation grammar *is* the dump's
+# rendering (ADR 0041 §4), so byte equality is the rule. Agreement and an
+# unknown answer are both silence; only a known disagreement refuses.
+def check_annotations(nodes, source, scope)
+  nodes.each do |node|
+    next unless node in DefNode
+    written = annotation_for(source, node.name)
+    next if written.nil?
+    computed = synthesize_name(node.name, scope.globals)
+    next unless known?(computed)
+    next if render_type(computed) == written
+    refuse(["annotation", node.name, computed, written])
+  end
 end
 
 # Every struct's instance method set, as [name, methods] pairs: its

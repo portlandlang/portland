@@ -13,7 +13,7 @@
 #   ["unhandled_maybe", spelling, type, name] — a maybe used as plain
 #   ["operator", operator, left, right]       — mismatched binary operands
 #   ["unary", operator, operand]              — a mismatched unary operand
-#   ["annotation", name, computed, written]   — an annotation that lies
+#   ["annotation", name, computed, written]   — an annotation that lies; written is the source's text
 #   ["arity", name, expected, got]            — the wrong argument count
 #
 # A spelling is the offending expression written back as source, or nil
@@ -43,7 +43,7 @@ def render_refusal(refusal)
   in ["unhandled_maybe", spelling, type, name] then sentence("#{spelled(spelling)} is #{a_type(type)}", "handle the nil case before #{spelled("." + name)}")
   in ["operator", operator, left, right] then "cannot apply #{spelled(operator)} to #{render_type(left)} and #{render_type(right)}"
   in ["unary", operator, operand] then "cannot apply #{spelled(operator)} to #{render_type(operand)}"
-  in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{render_type(written)}", "change one")
+  in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{written}", "change one")
   in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"
   else
     panic "refusals: no sentence for #{refusal.inspect}"

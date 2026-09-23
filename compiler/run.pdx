@@ -12,5 +12,5 @@ require_relative "evaluator"
 # input has nothing to do but say so.
 source = read_file(argv.first) or panic "run.pdx: cannot read #{argv.first}"
 program = parse_program(lex(source))
-check_program(program)
+check_program(program, source)
 evaluate_program(program)

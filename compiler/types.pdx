@@ -2,52 +2,14 @@
 # per top-level binding, `name: Type`, then one per top-level def,
 # `def name # -> Type` — with the source's own `# -> ` annotation
 # (ADR 0041) echoed beside the computed answer when the two disagree.
-# Dump-only: agreement and disagreement alike refuse nothing here; the
-# error-voice session gates the first refusals. This rendering is a debug
-# surface, not ratified error vocabulary.
+# Dump-only: agreement and disagreement alike refuse nothing here — the
+# checker refuses a lying annotation (ADR 0047 shape 5) and this dump
+# shows every answer regardless. The type rendering is ratified error
+# vocabulary since ADR 0047 §1; the dump's line shapes are not.
 #
 # Usage: pdx compiler/types.pdx some_file.pdx
 
 require_relative "inference"
-
-# The written annotation for a def, if its signature carries one: the
-# arrow trails the line where the parameter list ends (ADR 0041), which a
-# trailing comma or a bare opener continues past (ADR 0045's shapes).
-def annotation_for(source, name)
-  lines = source.lines
-  mutable found = nil
-  lines.each_with_index do |line, index|
-    next unless def_line_for?(line, name)
-    found = signature_end_line(lines, index)
-  end
-  return nil if found.nil?
-  marker = found.index("# -> ")
-  return nil if marker.nil?
-  tail = found.slice(marker + 5, found.length - marker - 5)
-  tail.strip
-end
-
-def def_line_for?(line, name)
-  stripped = line.strip
-  prefix = "def #{name}"
-  return false unless stripped.start_with?(prefix)
-  return true if stripped == prefix
-  boundary = stripped.slice(prefix.length, 1)
-  boundary == "(" || boundary == " " || boundary == "="
-end
-
-def signature_end_line(lines, mutable index)
-  while index + 1 < lines.length && signature_continues?(lines[index])
-    index += 1
-  end
-  line = lines[index] or ""
-  line
-end
-
-def signature_continues?(line)
-  stripped = line.strip
-  stripped.end_with?(",") || stripped.end_with?("(")
-end
 
 source = read_file(argv.first) or panic "types.pdx: cannot read #{argv.first}"
 nodes = parse_program(lex(source))

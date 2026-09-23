@@ -8,5 +8,5 @@
 require_relative "checker"
 
 source = read_file(argv.first) or panic "check.pdx: cannot read #{argv.first}"
-check_program(parse_program(lex(source)))
+check_program(parse_program(lex(source)), source)
 puts "ok"

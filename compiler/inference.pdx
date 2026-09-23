@@ -488,6 +488,49 @@ def type_at(list, target_index)
   result
 end
 
+# — return annotations (ADR 0041) —
+#
+# The written annotation for a def, if its signature carries one: the
+# arrow trails the line where the parameter list ends, which a trailing
+# comma or a bare opener continues past (ADR 0045's shapes). Read off the
+# source by line, since the lexer drops comments — the debug-tool version;
+# when annotations want positions too, they become lexer trivia.
+def annotation_for(source, name)
+  lines = source.lines
+  mutable found = nil
+  lines.each_with_index do |line, index|
+    next unless def_line_for?(line, name)
+    found = signature_end_line(lines, index)
+  end
+  return nil if found.nil?
+  marker = found.index("# -> ")
+  return nil if marker.nil?
+  tail = found.slice(marker + 5, found.length - marker - 5)
+  tail.strip
+end
+
+def def_line_for?(line, name)
+  stripped = line.strip
+  prefix = "def #{name}"
+  return false unless stripped.start_with?(prefix)
+  return true if stripped == prefix
+  boundary = stripped.slice(prefix.length, 1)
+  boundary == "(" || boundary == " " || boundary == "="
+end
+
+def signature_end_line(lines, mutable index)
+  while index + 1 < lines.length && signature_continues?(lines[index])
+    index += 1
+  end
+  line = lines[index] or ""
+  line
+end
+
+def signature_continues?(line)
+  stripped = line.strip
+  stripped.end_with?(",") || stripped.end_with?("(")
+end
+
 # — what a statement leaves behind —
 #
 # Every body walk here, and the checker's, threads bindings through
