@@ -946,6 +946,41 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "5\n",
             "this arm can never match — the capture above binds every subject",
         ),
+        // ADR 0047 shape 1 — a non-boolean condition, in a branch the seed
+        // never takes. Ruby's truthiness reflex, refused where it is written.
+        (
+            "name = \"shane\"\nif false\n  if name\n    puts \"hello\"\n  end\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'if' condition must be true or false, got String",
+        ),
+        (
+            // The maybe alone carries the rewrite, spelled from the receiver.
+            "users = [\"a\"]\nuser = users.first\nif false\n  if user\n    puts \"hello\"\n  end\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'if' condition must be true or false, got String? — write 'user.some?'",
+        ),
+        (
+            "mutable count = 3\nif false\n  while count\n    count -= 1\n  end\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'while' condition must be true or false, got Integer",
+        ),
+        (
+            "name = \"shane\"\nif false\n  ready = name && true\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'&&' needs true or false, got String",
+        ),
+        (
+            "if false\n  ready = false || 5\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'||' needs true or false, got Integer",
+        ),
+        (
+            // Inside a def the check sees the parameters' defaults and the
+            // locals bound above the line — and nothing from outside.
+            "def greet(name = \"friend\")\n  if name\n    \"hi\"\n  end\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'if' condition must be true or false, got String",
+        ),
     ];
     for (source, seed_output, refusal) in cases {
         let sample = std::env::temp_dir().join("checker_case.pdx");
@@ -1014,7 +1049,7 @@ fn portland_types_dumps_method_returns() {
     let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
     std::fs::write(
         &sample,
-        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\n",
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1026,8 +1061,45 @@ fn portland_types_dumps_method_returns() {
     assert!(output.status.success(), "types.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\n"
+        // `last_of` and `mode` are the forgetting rule: a name rebound inside
+        // a block or a branch is unknown after it, never the type it started
+        // as — `mutable result = nil` rebound in an `each` once read as Nil.
+        "box: [Integer]\ndoubled: [Integer]\nevens: [Integer]\nlabel: String\npicked: String\nmode: Unknown\ndef answer # -> Integer\ndef greet # -> String\ndef pick # -> String\ndef maybe_ran # -> String?\ndef liar # -> String (annotated Integer)\ndef last_of # -> Unknown\n"
     );
+}
+
+/// The checker's own source passes its own checks — every compiler file,
+/// through `check.pdx`. The inference-backed refusals (ADR 0047) fire on
+/// types read off real code, and this ~6,000-line corpus is the standing
+/// proof that they refuse nothing that runs: a false positive here is a
+/// checker bug by doctrine (ADR 0040), and the first one was caught by
+/// exactly this run — `mutable result = nil` rebound inside an `each`.
+#[test]
+fn the_checker_passes_the_compilers_own_source() {
+    let compiler = format!("{}/../compiler", env!("CARGO_MANIFEST_DIR"));
+    let mut files: Vec<_> = std::fs::read_dir(&compiler)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
+        .collect();
+    files.sort();
+    assert!(
+        files.len() > 5,
+        "the compiler directory should hold the trio"
+    );
+    for file in files {
+        let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(format!("{compiler}/check.pdx"))
+            .arg(&file)
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            checked.status.success(),
+            "{} should pass the checker, got: {}",
+            file.display(),
+            String::from_utf8_lossy(&checked.stderr)
+        );
+    }
 }
 
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).

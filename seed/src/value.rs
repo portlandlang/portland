@@ -183,6 +183,25 @@ impl Value {
     }
 
     /// The developer-facing rendering: strings keep their quotes, like irb.
+    /// A value as a refusal names it: its inspect form, cut past forty
+    /// characters with the ellipsis inside a string's quotes (ADR 0047 §6).
+    /// The compiler's renderer holds the same limit for source spellings.
+    pub fn shown(&self) -> String {
+        use unicode_segmentation::UnicodeSegmentation;
+        const SPELLING_LIMIT: usize = 40;
+        let text = self.inspect();
+        let graphemes: Vec<&str> = text.graphemes(true).collect();
+        if graphemes.len() <= SPELLING_LIMIT {
+            return text;
+        }
+        let mut cut: String = graphemes[..SPELLING_LIMIT - 1].concat();
+        cut.push('…');
+        if text.starts_with('"') && text.ends_with('"') {
+            cut.push('"');
+        }
+        cut
+    }
+
     pub fn inspect(&self) -> String {
         match self {
             Value::Array(elements) => {

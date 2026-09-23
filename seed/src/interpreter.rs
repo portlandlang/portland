@@ -882,7 +882,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 loop {
                     let condition = self.value_of(condition);
                     let Value::Boolean(condition) = condition else {
-                        panic!("while condition must be true or false, got {condition:?}")
+                        panic!(
+                            "'while' condition must be true or false, got {}",
+                            condition.shown()
+                        )
                     };
                     if !condition {
                         break;
@@ -1036,9 +1039,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         // (ADR 0010).
                         Value::Some(inner) => *inner,
                         Value::Boolean(true) => Value::Boolean(true),
-                        Value::Boolean(false) => {
-                            Value::Boolean(self.boolean_of(right, "|| operands"))
-                        }
+                        Value::Boolean(false) => Value::Boolean(self.boolean_of(right, "'||'")),
                         present => present,
                     },
                 };
@@ -1168,7 +1169,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 let condition = self.value_of(condition);
                 // Strict booleans, no truthiness — Portland has no nil to be falsy.
                 let Value::Boolean(condition) = condition else {
-                    panic!("if condition must be true or false, got {condition:?}")
+                    panic!(
+                        "'if' condition must be true or false, got {}",
+                        condition.shown()
+                    )
                 };
                 let body = if condition { then_body } else { else_body };
                 if body.is_empty() {
@@ -1281,15 +1285,15 @@ impl<W: std::io::Write> Interpreter<W> {
                     (LogicalOperator::Or, Value::Some(inner)) => Some(*inner),
                     (LogicalOperator::Or, Value::Boolean(true)) => Some(Value::Boolean(true)),
                     (LogicalOperator::Or, Value::Boolean(false)) => {
-                        Some(Value::Boolean(self.boolean_of(right, "|| operands")))
+                        Some(Value::Boolean(self.boolean_of(right, "'||'")))
                     }
                     (LogicalOperator::Or, present) => Some(present),
                     (LogicalOperator::And, Value::Boolean(false)) => Some(Value::Boolean(false)),
                     (LogicalOperator::And, Value::Boolean(true)) => {
-                        Some(Value::Boolean(self.boolean_of(right, "&& operands")))
+                        Some(Value::Boolean(self.boolean_of(right, "'&&'")))
                     }
                     (LogicalOperator::And, other) => {
-                        panic!("&& needs true or false, got {other:?}")
+                        panic!("'&&' needs true or false, got {}", other.shown())
                     }
                 }
             }
@@ -2826,11 +2830,12 @@ impl<W: std::io::Write> Interpreter<W> {
             .unwrap_or_else(|| panic!("{expression:?} produced no value"))
     }
 
-    /// Evaluate an expression that must be a strict boolean.
+    /// Evaluate an expression that must be a strict boolean — the right
+    /// side of a logical operator, named by its quoted glyph (ADR 0047).
     fn boolean_of(&mut self, expression: &Expression, context: &str) -> bool {
         match self.value_of(expression) {
             Value::Boolean(value) => value,
-            other => panic!("{context} must be true or false, got {other:?}"),
+            other => panic!("{context} needs true or false, got {}", other.shown()),
         }
     }
 
@@ -3531,7 +3536,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "&& needs true or false")]
+    #[should_panic(expected = "'&&' needs true or false, got 1")]
     fn panics_on_a_non_boolean_logical_operand() {
         evaluate("1 && true");
     }
@@ -4812,9 +4817,19 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "must be true or false")]
+    #[should_panic(expected = "'if' condition must be true or false, got 1")]
     fn panics_on_a_non_boolean_condition() {
         evaluate("if 1\n  2\nend\n");
+    }
+
+    /// ADR 0047 §6: the offending value is shown by inspect, cut past forty
+    /// characters with the ellipsis inside the string's own quotes.
+    #[test]
+    #[should_panic(
+        expected = "'if' condition must be true or false, got \"Lorem ipsum dolor sit amet, consectetu…\""
+    )]
+    fn shows_a_long_condition_value_truncated_inside_its_quotes() {
+        evaluate("if \"Lorem ipsum dolor sit amet, consectetur adipiscing elit\"\n  2\nend\n");
     }
 
     #[test]
@@ -4836,7 +4851,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "while condition must be true or false")]
+    #[should_panic(expected = "'while' condition must be true or false, got 1")]
     fn panics_on_a_non_boolean_while_condition() {
         evaluate("while 1\n  2\nend\n");
     }
@@ -5403,13 +5418,13 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "must be true or false")]
+    #[should_panic(expected = "'||' needs true or false, got 5")]
     fn or_on_false_needs_a_boolean_right_side() {
         evaluate("false || 5");
     }
 
     #[test]
-    #[should_panic(expected = "&& needs true or false")]
+    #[should_panic(expected = "'&&' needs true or false, got nil")]
     fn and_refuses_nil() {
         evaluate("nil && true");
     }

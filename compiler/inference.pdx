@@ -42,10 +42,7 @@ end
 def scan_program(nodes)
   mutable types = []
   nodes.each do |node|
-    if node in AssignmentNode
-      inferred = synthesize(node.value, types)
-      types = [[node.name, inferred]] + types
-    elsif node in DefNode
+    if node in DefNode
       types = [[node.name, synthesize_def_return(node, types)]] + types
     elsif node in StructDefNode
       types = [[node.name, ["struct", node.name]]] + types
@@ -53,6 +50,8 @@ def scan_program(nodes)
       # Recorded so a later increment can hang membership and
       # exhaustiveness off the name; nothing reads it yet.
       types = [[node.name, ["enum", node.name]]] + types
+    else
+      types = bind_after(node, types, [])
     end
   end
   types
@@ -150,23 +149,24 @@ def parameter_type(parameter, types)
   ["unknown"]
 end
 
-# A statement body's answer: assignments thread their types, early returns
-# join the last statement as candidates, and merge_candidates rules.
+# A statement body's answer: each statement is read with the bindings the
+# ones above it left (bind_after), early returns join the last statement
+# as candidates, and merge_candidates rules.
 def synthesize_body(body, mutable types)
   mutable early = []
   mutable last = ["nil"]
   body.each do |statement|
     early += return_types_in(statement, types)
-    if statement in AssignmentNode
-      last = synthesize(statement.value, types)
-      types = [[statement.name, last]] + types
-    elsif statement in ReturnNode
-      last = return_answer(statement, types)
-    else
-      last = synthesize(statement, types)
-    end
+    last = statement_answer(statement, types)
+    types = bind_after(statement, types, [])
   end
   merge_candidates(early + [last])
+end
+
+def statement_answer(statement, types)
+  return synthesize(statement.value, types) if statement in AssignmentNode
+  return return_answer(statement, types) if statement in ReturnNode
+  synthesize(statement, types)
 end
 
 def return_answer(statement, types)
@@ -183,7 +183,9 @@ def return_types_in(node, types)
     found += returns_in_body(node.then_body, types)
     found += returns_in_body(node.else_body, types)
     found
-  in WhileNode then returns_in_body(node.body, types)
+  # A loop body may have run before any statement in it is read again, so
+  # it is walked with its own rebindings already forgotten.
+  in WhileNode then returns_in_body(node.body, forget_types(types, assigned_names_in_body(node.body)))
   in CaseNode | CaseInNode
     mutable found = []
     node.branches.each do |branch|
@@ -196,11 +198,12 @@ def return_types_in(node, types)
   end
 end
 
-def returns_in_body(body, types)
+def returns_in_body(body, mutable types)
   return [] if body.nil?
   mutable found = []
   body.each do |statement|
     found += return_types_in(statement, types)
+    types = bind_after(statement, types, [])
   end
   found
 end
@@ -410,7 +413,9 @@ def synthesize_block_call(node, receiver, types)
   node.block.parameters.each_with_index do |parameter, index|
     inner = [[parameter, block_parameter_type(receiver, index)]] + inner
   end
-  body = synthesize_body(node.block.body, inner)
+  # A block body may run many times or never — like a loop's, it is read
+  # with the names it rebinds already forgotten.
+  body = synthesize_body(node.block.body, forget_types(inner, assigned_names_in_body(node.block.body)))
   case node.name
   when "map", "collect" then ["array", body]
   when "find", "detect", "min_by", "max_by"
@@ -462,4 +467,179 @@ def type_at(list, target_index)
     result = element if index == target_index
   end
   result
+end
+
+# — what a statement leaves behind —
+#
+# Every body walk here, and the checker's, threads bindings through
+# bind_after. The rule that keeps the walks honest: a name a *nested* body
+# rebinds — a branch, a loop, a block — is unknown after that statement,
+# because whether the body ran is not the tree's to say, and a wrong type
+# is worse than none (principle 4). Found the hard way: `mutable result =
+# nil` rebound inside an `each` read as Nil, and the first refusal built
+# on that read fired on the evaluator's own source.
+
+# The bindings a statement leaves for the statements after it. `locals`
+# is the list written to; `globals` is read alongside it and never
+# written — the checker keeps the two apart, this file's own walks pass
+# one list and an empty other.
+def bind_after(statement, locals, globals)
+  case statement
+  in AssignmentNode(name:, value:)
+    return locals if value.nil?
+    widened = forget_types(locals, assigned_names_in(value))
+    [[name, synthesize(value, widened + globals)]] + widened
+  in AppendNode(name:) then [[name, synthesize(statement, locals + globals)]] + locals
+  in MatchAssertNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
+  in MatchTestNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
+  in TogetherNode(lines:) then bind_unknowns(locals, task_line_names(lines))
+  else
+    forget_types(locals, assigned_names_in(statement))
+  end
+end
+
+def task_line_names(lines)
+  mutable names = []
+  lines.each do |line|
+    names << line.name if line in TaskLineNode
+  end
+  names
+end
+
+def bind_unknowns(locals, names)
+  mutable bound = locals
+  names.each do |name|
+    bound = [[name, ["unknown"]]] + bound
+  end
+  bound
+end
+
+# A name already bound, rebound somewhere inside a nested body, is unknown
+# from here on. A name new to that body dies with it (ADR 0001) and needs
+# nothing.
+def forget_types(locals, names)
+  mutable widened = locals
+  names.each do |name|
+    next if locals.none? { it[0] == name }
+    widened = [[name, ["unknown"]]] + widened
+  end
+  widened
+end
+
+# Every name an assignment or append inside this node binds, at any depth
+# short of a def, struct, trait, or module — those bind their own.
+def assigned_names_in(node)
+  case node
+  in AssignmentNode(name:, value:)
+    return [name] if value.nil?
+    [name] + assigned_names_in(value)
+  # `box << 3` is rebind sugar — the assignment around it is the binding,
+  # and the append itself names nothing new.
+  in AppendNode(value:) then assigned_names_in(value)
+  in WhileNode(condition:, body:) then assigned_names_in(condition) + assigned_names_in_body(body)
+  in IfNode(condition:, then_body:, else_body:)
+    assigned_names_in(condition) + assigned_names_in_body(then_body) + assigned_names_in_body(else_body)
+  in CaseNode(subject:, branches:, else_body:)
+    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
+    branches.each do |branch|
+      found += assigned_names_in_body(branch.values) + assigned_names_in_body(branch.body)
+    end
+    found
+  in CaseInNode(subject:, branches:, else_body:)
+    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
+    branches.each do |branch|
+      found += assigned_names_in_body(branch.body)
+      found += assigned_names_in(branch.guard) unless branch.guard.nil?
+    end
+    found
+  in TogetherNode(lines:)
+    mutable found = []
+    lines.each do |line|
+      found += [line.name] + assigned_names_in(line.value) if line in TaskLineNode
+      found += assigned_names_in(line) unless line in TaskLineNode
+    end
+    found
+  in ReturnNode(value:) then assigned_names_in_body([value])
+  in CallNode(arguments:, block:) then assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in MethodCallNode(receiver:, arguments:, block:)
+    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in SafeMethodCallNode(receiver:, arguments:, block:)
+    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in ArrayNode(elements:) then assigned_names_in_body(elements)
+  in HashNode(pairs:)
+    mutable found = []
+    pairs.each do |pair|
+      found += assigned_names_in(pair.key) + assigned_names_in(pair.value)
+    end
+    found
+  in BinaryNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
+  in LogicalNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
+  in UnaryNode(operand:) then assigned_names_in(operand)
+  in IndexNode(receiver:, index:) then assigned_names_in(receiver) + assigned_names_in(index)
+  in IndexUpdateNode(index: update_index, value: update_value)
+    assigned_names_in(update_index) + assigned_names_in(update_value)
+  in SlotCompoundNode(index: compound_index, right: compound_right)
+    assigned_names_in(compound_index) + assigned_names_in(compound_right)
+  in MatchAssertNode(subject:, pattern:) then assigned_names_in(subject) + pattern_names(pattern)
+  in MatchTestNode(subject: test_subject, pattern: test_pattern)
+    assigned_names_in(test_subject) + pattern_names(test_pattern)
+  in KeywordArgumentNode(value:) then assigned_names_in(value)
+  in EnumCaseNode(payload:)
+    mutable found = []
+    payload.each do |argument|
+      found += assigned_names_in(argument.value)
+    end
+    found
+  else
+    []
+  end
+end
+
+def assigned_names_in_body(body)
+  return [] if body.nil?
+  mutable found = []
+  body.each do |statement|
+    found += assigned_names_in(statement) unless statement.nil?
+  end
+  found
+end
+
+def assigned_names_in_block(block)
+  return [] if block.nil?
+  assigned_names_in_body(block.body)
+end
+
+# The names a pattern captures. Every capture is a plain identifier, a
+# pin reads rather than binds, and the shapes hold sub-patterns.
+def pattern_names(pattern)
+  case pattern
+  in IdentifierNode(name:) then [name]
+  in AlternativePatternNode(options:)
+    mutable found = []
+    options.each do |option|
+      found += pattern_names(option)
+    end
+    found
+  in ArrayPatternNode(elements:, rest_name:)
+    mutable found = []
+    elements.each do |element|
+      found += pattern_names(element)
+    end
+    found << rest_name unless rest_name.nil?
+    found
+  in StructPatternNode(fields:)
+    mutable found = []
+    fields.each do |field|
+      found += pattern_names(field[1])
+    end
+    found
+  in EnumCasePatternNode(payload:)
+    mutable found = []
+    payload.each do |entry|
+      found += pattern_names(entry[1])
+    end
+    found
+  else
+    []
+  end
 end

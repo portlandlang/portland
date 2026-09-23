@@ -32,8 +32,17 @@
 # never checked — a payload-free case is simply a symbol (ADR 0022), and
 # symbols are legal everywhere — and coverage refuses only what it can
 # disprove, never merely what it cannot prove.
+#
+# Third, the inference-backed checks (ADR 0047), which read types off
+# inference.pdx and refuse through refusals.pdx — never with a sentence of
+# their own. Each fires only where every type it names is fully known;
+# `unknown` anywhere is silence (ADR 0034 §4). The walk threads a scope of
+# bindings the way inference's own scan does, and forgets — to unknown —
+# any mutable name a nested body rebinds, since the body may or may not
+# have run by the time the name is read again (principle 4: a type the
+# checker cannot prove is not a type it may refuse on).
 
-require_relative "parser"
+require_relative "refusals"
 
 # What the walk carries into every node: the program's enum declarations,
 # and — for the inference-backed checks (ADR 0047) — the types it knows.
@@ -80,14 +89,83 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes)
-  scope = Scope.new(enums: declared_cases(nodes), globals: [], locals: [])
+  scope = Scope.new(enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [])
   check_body(nodes, scope)
 end
 
-def check_body(nodes, scope)
+# The program-wide names, in the shape inference reads: struct and enum
+# types first (their order never matters), then the top-level defs' return
+# types in source order — a def that calls a later def reads that call as
+# unknown, which is a decline, not a wrong answer.
+def declared_globals(nodes)
+  mutable globals = []
+  nodes.each do |node|
+    globals = [[node.name, ["struct", node.name]]] + globals if node in StructDefNode
+    globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
+  end
+  nodes.each do |node|
+    next unless node in DefNode
+    globals = [[node.name, synthesize_def_return(node, globals)]] + globals
+  end
+  globals
+end
+
+# A body is walked in order, each statement seen with the bindings the
+# statements above it left behind.
+def check_body(nodes, mutable scope)
   nodes.each do |node|
     check_node(node, scope)
+    scope = bind_statement(node, scope)
   end
+end
+
+# The bindings a statement leaves for the statements after it — inference's
+# bind_after, writing the locals and reading the globals beside them.
+def bind_statement(node, scope)
+  scope.with(locals: bind_after(node, scope.locals, scope.globals))
+end
+
+def bind_local(scope, name, type)
+  scope.with(locals: [[name, type]] + scope.locals)
+end
+
+# The names a nested body rebinds are unknown wherever that body may have
+# run — inference's forget_types, over the scope's locals.
+def forget(scope, names)
+  scope.with(locals: forget_types(scope.locals, names))
+end
+
+# What inference may read at this point: the body's own bindings, then
+# the program's. The no-shadow rule keeps the two from ever overlapping.
+def known_types(scope) = scope.locals + scope.globals
+
+# A def cannot see the locals around it — its body starts from its
+# parameters alone (a default lends its type, as in inference).
+def def_scope(node, scope)
+  mutable locals = []
+  node.parameters.each do |parameter|
+    locals = [[parameter.name, parameter_type(parameter, scope.globals)]] + locals
+  end
+  scope.with(locals: locals)
+end
+
+# A struct's or trait's method body: parameters only, and no top-level
+# def returns either — a bare call inside a struct may reach the struct's
+# own methods before the program's, which this increment does not model.
+def method_scope(node, scope)
+  type_names = scope.globals.select { (it[1] in ["struct", *]) || (it[1] in ["enum", *]) }
+  def_scope(node, scope.with(globals: type_names))
+end
+
+# A block keeps the locals around it and binds its parameters from the
+# receiver's type, as inference does — an array lends its element, a hash
+# its key then value, a range integers, anything else unknown.
+def block_scope(block, receiver, scope)
+  mutable bound = scope
+  block.parameters.each_with_index do |parameter, index|
+    bound = bind_local(bound, parameter, block_parameter_type(receiver, index))
+  end
+  bound
 end
 
 # The walk. Dispatch mirrors the evaluator's, but visits everything —
@@ -99,25 +177,29 @@ def check_node(node, scope)
   in AssignmentNode(value:) then check_node(value, scope)
   in DefNode(parameters:, body:)
     check_parameters(parameters, scope)
-    check_body(body, scope)
+    check_body(body, def_scope(node, scope))
   in StructDefNode(methods:, nested:, type_functions:)
     check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs")
     check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs")
-    check_body(methods, scope)
-    check_body(type_functions, scope)
+    check_methods(methods, scope)
+    check_methods(type_functions, scope)
     check_body(nested, scope)
   in TraitDefNode(methods:)
     check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it")
-    check_body(methods, scope)
+    check_methods(methods, scope)
   in ModuleDefNode(body:) then check_body(body, scope)
   in WhileNode(condition:, body:)
     check_node(condition, scope)
-    check_body(body, scope)
+    check_condition("while", condition, scope)
+    # The body may have run before the condition is read again, so the
+    # names it rebinds are unknown throughout it too.
+    check_body(body, forget(scope, assigned_names_in_body(body)))
   in TogetherNode(lines:) then check_together(lines, scope)
   in ReturnNode(value:)
     check_node(value, scope) unless value.nil?
   in IfNode
     check_node(node.condition, scope)
+    check_condition("if", node.condition, scope)
     # `unless` parses as an if with no then-side, so either body may be nil.
     check_body(node.then_body, scope) unless node.then_body.nil?
     check_body(node.else_body, scope) unless node.else_body.nil?
@@ -133,6 +215,7 @@ def check_node(node, scope)
   in LogicalNode(left:, right:)
     check_node(left, scope)
     check_node(right, scope)
+    check_operands(node, scope)
   in UnaryNode(operand:) then check_node(operand, scope)
   in IndexNode(receiver:, index:)
     check_node(receiver, scope)
@@ -197,20 +280,34 @@ def check_case_in(node, scope)
   check_coverage(node, scope.enums) if node.else_body.nil?
 end
 
+def check_methods(methods, scope)
+  methods.each do |method|
+    if method in DefNode
+      check_parameters(method.parameters, scope)
+      check_body(method.body, method_scope(method, scope))
+    else
+      check_node(method, scope)
+    end
+  end
+end
+
 def check_call(node, scope)
   check_body(node.arguments, scope)
-  check_block(node.block, scope)
+  check_block(node.block, ["unknown"], scope)
 end
 
 def check_method_call(node, scope)
   check_node(node.receiver, scope)
   check_body(node.arguments, scope)
-  check_block(node.block, scope)
+  check_block(node.block, synthesize(node.receiver, known_types(scope)), scope)
 end
 
-def check_block(block, scope)
+# A block body may run many times or never, so — like a loop's — it is
+# walked with the names it rebinds already forgotten.
+def check_block(block, receiver, scope)
   return if block.nil?
-  check_body(block.body, scope)
+  entered = block_scope(block, receiver, scope)
+  check_body(block.body, forget(entered, assigned_names_in_body(block.body)))
 end
 
 def check_pairs(pairs, scope)
@@ -286,6 +383,53 @@ def check_case_pattern(pattern, scope)
   end
   pattern.payload.each do |entry|
     check_pattern(entry[1], scope)
+  end
+end
+
+# — the inference-backed checks (ADR 0047) —
+#
+# Each reads a type off inference and refuses through the renderer, and
+# each fires only where the type is fully known: an unknown anywhere in it
+# is a decline. The seed says the same sentences at runtime, with the
+# value where these say the type.
+
+# Shape 1 — a condition that is not a boolean, Ruby's truthiness reflex.
+# A boolean passes; an unknown declines; anything else refuses, and a
+# maybe alone carries the one honest rewrite.
+def check_condition(construct, condition, scope)
+  type = synthesize(condition, known_types(scope))
+  return if type == ["boolean"]
+  return unless known?(type)
+  refuse(["condition", construct, type, spell_node(condition)])
+end
+
+# The logical operators' operands. `&&` takes booleans on both sides. `||`
+# takes any left — it is the or-guard on a maybe, and a plain value on the
+# left is the dead guard ADR 0040 §3 deliberately left unrefused — but once
+# the left is a boolean the right must be one too.
+def check_operands(node, scope)
+  types = known_types(scope)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  if node.operator == "&&"
+    refuse(["operand", "&&", left]) if known?(left) && left != ["boolean"]
+    refuse(["operand", "&&", right]) if known?(right) && right != ["boolean"]
+  end
+  return unless node.operator == "||"
+  return unless left == ["boolean"]
+  refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+end
+
+# Fully known: no unknown at any depth. A refusal never names a type it
+# would have to render as Unknown.
+def known?(type)
+  case type
+  in ["unknown"] then false
+  in ["array", element] then known?(element)
+  in ["hash", key, entry] then known?(key) && known?(entry)
+  in ["maybe", inner] then known?(inner)
+  else
+    true
   end
 end
 
