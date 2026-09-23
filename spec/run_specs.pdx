@@ -24,16 +24,25 @@
 # per-file tallies. It is printed before the file runs, so a spec that panics
 # still names itself.
 
+require_relative "../compiler/checker"
 require_relative "../compiler/evaluator"
 
+# The checker runs before each file, as `run.pdx` runs it before a program
+# (#93): a green spec suite means the checker agrees, and the spec corpus
+# is a checker corpus. A spec the checker refuses stops the run with its
+# sentence, which is a refusal of the spec, never a wrong example.
 harness_path = argv.first
 harness_source = read_file(harness_path) or panic "run_specs.pdx: cannot read #{harness_path}"
-harness = run_body(parse_program(lex(harness_source)), [["__file__", "file", harness_path]])
+harness_program = parse_program(lex(harness_source))
+check_program(harness_program, harness_source)
+harness = run_body(harness_program, [["__file__", "file", harness_path]])
 already_loaded = [["__loaded__", "loaded", [canonical_path(harness_path)]]]
 
 argv.slice(1, argv.length - 1).each do |path|
   puts "=== #{path}"
   source = read_file(path) or panic "run_specs.pdx: cannot read #{path}"
+  program = parse_program(lex(source))
+  check_program(program, source)
   scope = [["__file__", "file", path]] + already_loaded + harness.bindings
-  run_body(parse_program(lex(source)), scope)
+  run_body(program, scope)
 end

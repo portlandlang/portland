@@ -29,6 +29,7 @@ context "an enum" do
       day = case purchase.status
       in :pending   then "never"
       in :paid(on:) then on
+      else "later"
       end
       expect(day).to eq("tuesday")
     end

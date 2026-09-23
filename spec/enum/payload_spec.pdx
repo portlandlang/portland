@@ -18,6 +18,7 @@ context "an enum" do
       day = case paid
       in :pending   then "never"
       in :paid(on:) then on
+      else "later"
       end
       expect(day).to eq("tuesday")
     end
@@ -27,6 +28,7 @@ context "an enum" do
       why = case refund
       in :paid(on:)         then on
       in :refunded(reason:) then reason
+      else "no reason"
       end
       expect(why).to eq("damaged")
     end
@@ -35,6 +37,7 @@ context "an enum" do
       refund = :refunded(on: "friday", reason: "damaged")
       both = case refund
       in :refunded(on:, reason:) then "#{reason} on #{on}"
+      else "not a refund"
       end
       expect(both).to eq("damaged on friday")
     end
