@@ -544,6 +544,30 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "module names start with a capital letter",
         ),
         ("p([\"a\"].map { |w| it.upcase })\n", "use one or the other"),
+        // #91 — the seed's argument count at every hosted binding site: a
+        // struct's method, a type function, a defined `new`, a block. (A
+        // top-level def's bare call refuses at build first, so its row is
+        // the checker's.)
+        (
+            "struct T\n  kind\n  def shout(word)\n    word\n  end\nend\nT.new(kind: \"a\").shout\n",
+            "T method expects 1 argument, got 0",
+        ),
+        (
+            "struct T\n  kind\n  def self.unit(n) = T.new(kind: \"u\")\nend\nT.unit\n",
+            "T::unit expects 1 argument, got 0",
+        ),
+        (
+            "struct T\n  kind\n  def self.new(n)\n    fields(kind: \"x\")\n  end\nend\nT.new\n",
+            "T::new expects 1 argument, got 0",
+        ),
+        (
+            "[1].each do |a, b, c|\n  puts a\nend\n",
+            "block expects 3 arguments, got 1",
+        ),
+        (
+            "struct T\n  kind\n  def pair(first, second = 2)\n    first\n  end\nend\nT.new(kind: \"a\").pair(1, 2, 3)\n",
+            "T method expects 1 to 2 arguments, got 3",
+        ),
         // The brace menu, both widths — the peek that drops the hash
         // reading has to agree too.
         (

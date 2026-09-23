@@ -1226,6 +1226,7 @@ def evaluate_new(node, mutable bindings)
         arguments += step.value
       end
     end
+    check_call_count("#{slot.first[0]}::new", value_at(new_slot.first[2], 0), arguments.length)
     return invoke_with_block(new_slot.first[2], arguments, keyword_values, nil, slot.first[0], bindings)
   end
   fields = value_at(slot.first[2], 0)
@@ -1331,6 +1332,7 @@ def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
   # This frame's depth, for `return` to aim at (ADR 0025).
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
+  check_call_count("#{value_at(receiver, 1)} method", method.parameters, arguments.length)
   scope = bind_parameters(method.parameters, arguments, keyword_values, scope)
   result = run_body(method.body, scope)
   panic("break outside of a loop") if result.signal == "break"
@@ -1376,6 +1378,7 @@ def evaluate_method_call(node, mutable bindings)
             arguments += step.value
           end
         end
+        check_call_count("#{struct_slot.first[0]}::#{node.name}", value_at(function_slot.first[2], 0), arguments.length)
         return invoke_with_block(function_slot.first[2], arguments, keyword_values, nil, nil, bindings)
       end
     end
@@ -1544,12 +1547,48 @@ def flow_back(bindings, scope, block_bindings)
   result
 end
 
+# The seed's argument count, byte for byte (#91): positional parameters up
+# to the first default are required and all of them the total; keyword
+# parameters stand outside it. `label` is the seed's own subject — the
+# def's name, or `Token method`. Reached only where the checker could not
+# see the def (a struct's method, a def from a required file); a top-level
+# def's bare call refuses at build first.
+def check_call_count(label, parameters, given)
+  positional = parameters.reject { it in KeywordParameterNode }
+  mutable required = 0
+  mutable counting = true
+  positional.each do |parameter|
+    counting = false if (parameter in AssignmentNode) && parameter.value.some?
+    required += 1 if counting
+  end
+  total = positional.length
+  return if given >= required && given <= total
+  expected = if required == total then required.to_s else "#{required} to #{total}" end
+  panic("#{label} expects #{expected} #{arguments_word(expected)}, got #{given}")
+end
+
+# A block refuses only when it names more parameters than it is handed —
+# the seed's rule; extra arguments are dropped. The implicit `it` is not
+# counted: the parser finds it by a flat token scan that cannot tell an
+# inner block's `it` from the outer's (principle 4), so an outer block can
+# wear an `it` it never uses, and refusing on that would refuse the seed's
+# own spec suite.
+def check_block_count(parameters, given)
+  return if parameters == ["it"]
+  return unless parameters.length > given
+  expected = parameters.length.to_s
+  panic("block expects #{expected} #{arguments_word(expected)}, got #{given}")
+end
+
+def arguments_word(expected) = if expected == "1" then "argument" else "arguments" end
+
 # Blocks see the enclosing scope; parameters are prepended for the call.
 #
 # The bindings handed back are at the *caller's* level, already flowed back —
 # so every call site can thread `result.bindings` on without knowing which of
 # the names inside belonged to the block.
 def run_guest_block(block, arguments, bindings)
+  check_block_count(block.parameters, arguments.length)
   mutable scope = bindings
   mutable index = 0
   block.parameters.each do |parameter|
@@ -2075,6 +2114,7 @@ def evaluate_call(node, mutable bindings)
   mutable slot = lookup(bindings, node.name)
   slot = resolve(bindings, node.name) if slot.empty?
   if !slot.empty? && slot.first[1] == "method"
+    check_call_count(node.name, value_at(slot.first[2], 0), arguments.length)
     return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings)
   end
   case node.name
