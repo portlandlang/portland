@@ -394,11 +394,14 @@ def call_answer(receiver, node, types)
   # type function the scan registered under `Name.function` (register_struct).
   return ["struct", type_at(receiver, 1)] if name == "new" && (receiver in ["type", *])
   return synthesize_name(type_at(receiver, 1) + "." + name, types) if receiver in ["type", *]
+  # An updated copy is the same struct.
+  return receiver if name == "with" && (receiver in ["struct", *])
+  # The signatures below are the builtins'. On anything else — an unknown,
+  # a struct, a maybe — only the names every value answers have a type;
+  # a struct may define `length` or `lines` to answer whatever it likes,
+  # and the method table (#88) caught `node.lines` reading as strings.
+  return universal_answer(name) if builtin_methods(receiver).nil?
   case name
-  when "with"
-    # An updated copy is the same struct.
-    return receiver if receiver in ["struct", *]
-    ["unknown"]
   when "length", "size", "count", "index", "gcd", "pow", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate"
     synthesize_numeric_answer(receiver, name)
   when "to_f" then ["float"]
@@ -425,6 +428,14 @@ def call_answer(receiver, node, types)
   else
     ["unknown"]
   end
+end
+
+# The four names every value answers, and nothing else, on a receiver
+# whose methods are its own to define.
+def universal_answer(name)
+  return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?"
+  return ["string"] if name == "to_s"
+  ["unknown"]
 end
 
 def synthesize_numeric_answer(receiver, name)
@@ -478,6 +489,9 @@ end
 # the body is synthesized with them bound, and the shape methods answer
 # accordingly. Unlisted names answer unknown, never an error.
 def synthesize_block_call(node, receiver, types)
+  # A block method's answer is a builtin's; on any other receiver it is
+  # whatever that receiver's own method says, which is unknown here.
+  return ["unknown"] if builtin_methods(receiver).nil?
   mutable inner = types
   argument_types = node.arguments.map { synthesize(it, types) }
   node.block.parameters.each_with_index do |parameter, index|
@@ -564,6 +578,43 @@ def type_at(list, target_index)
     result = element if index == target_index
   end
   result
+end
+
+# — the builtin method table (#88) —
+#
+# What each builtin receiver answers, derived from the seed's *behavior*
+# by script/probe_builtin_methods rather than from a reading of its Rust —
+# run the script and paste, so the seed stays the oracle (principle 7) and
+# the spec suite, which exercises every builtin, stands guard over a name
+# gone missing. The four names every value answers are in each list. Nil
+# is left out on purpose: the runtime's own sentence handles it.
+def builtin_methods(type)
+  case type
+  in ["string"] then %w[capitalize chars chomp count downcase empty? end_with? failure? include? index length lines lstrip nil? reverse rstrip size slice some? split start_with? strip swapcase to_f to_i to_s upcase]
+  in ["integer"] then %w[abs downto even? failure? gcd magnitude negative? next nil? odd? positive? pow pred some? succ times to_f to_s upto zero?]
+  in ["float"] then %w[abs ceil failure? finite? floor infinite? magnitude nan? nil? pow round some? to_f to_i to_s truncate zero?]
+  in ["boolean"] then %w[failure? nil? some? to_s]
+  in ["symbol"] then %w[failure? nil? some? to_s]
+  in ["array", *] then %w[all? any? collect collect_concat compact count detect each each_slice each_with_index empty? entries failure? filter find find_all first flat_map flatten include? index inject join last length map max member? min nil? none? reduce reject reverse select size slice some? sort sort_by sum tally to_a to_s uniq zip]
+  in ["hash", *] then %w[dig each each_pair empty? entries failure? has_key? include? key? keys length member? merge nil? size some? to_a to_s values]
+  in ["range"] then %w[all? any? collect collect_concat count detect each each_with_index failure? filter find find_all first flat_map include? inject last length map max min nil? none? reduce reject select size some? sort_by step sum to_a to_s]
+  else
+    nil
+  end
+end
+
+# The false aliases (ADR 0036): Ruby's implicit-conversion protocol wears
+# conversion spellings, and each refuses by naming its survivor — the
+# seed's table, so the checker says the seed's sentence where the table
+# above would otherwise call the name missing.
+def alias_survivor(name)
+  case name
+  when "to_ary" then "to_a"
+  when "to_int" then "to_i"
+  when "to_str" then "to_s"
+  else
+    nil
+  end
 end
 
 # — contracts (ADR 0048, step one) —

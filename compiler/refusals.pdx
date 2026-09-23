@@ -18,6 +18,7 @@
 #   ["coverage", missing]                     — a case/in over a maybe leaving a case (ADR 0035's tripwire)
 #   ["contract", spelling, type, def, wanted] — a call handing a def what its body cannot use (ADR 0048);
 #                                               wanted is ["trait", name] or ["demands", [...]]
+#   ["alias", name, survivor]                 — a false alias (ADR 0036), the seed's sentence moved earlier
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -50,6 +51,8 @@ def render_refusal(refusal)
   in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"
   in ["coverage", missing] then sentence("case/in does not cover #{missing}", "add the arm, or an else")
   in ["contract", spelling, type, def_name, wanted] then "#{spelled(spelling)} is #{a_type(type)}, but #{spelled(def_name)} needs #{render_wanted(wanted)}"
+  # The seed's own words, moved to build time (ADR 0034 §2): no quotes.
+  in ["alias", name, survivor] then "#{name} is spelled #{survivor} here"
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end

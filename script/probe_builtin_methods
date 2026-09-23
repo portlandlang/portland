@@ -1,0 +1,82 @@
+#!/usr/bin/env ruby
+# Derive the builtin method table from the seed's behavior (#88): for each
+# builtin receiver, which names answer. A name exists when some call shape —
+# no arguments, one, two, an array, a hash, a block, an argument and a
+# block — fails with anything other than the seed's catch-all "undefined
+# method" / "undefined block-taking method", or does not fail at all. The
+# seed is the oracle (principle 7), so the table in `compiler/inference.pdx`
+# is pinned to this script's output rather than to a reading of the Rust.
+#
+# Usage: script/probe_builtin_methods            (needs target/debug/pdx)
+#
+# Candidates are the names the seed's dispatch arms mention plus the Ruby
+# names a migrating reader might reach for; add to the list to widen the
+# probe. Prints one line per type, sorted, in the shape inference.pdx keeps.
+
+require "open3"
+require "tmpdir"
+
+repo = File.expand_path("..", __dir__)
+pdx = File.join(repo, "target", "debug", "pdx")
+abort "build the seed first: cargo build" unless File.executable?(pdx)
+
+receivers = {
+  "string" => '"pdx"',
+  "integer" => "5",
+  "float" => "2.5",
+  "boolean" => "true",
+  "symbol" => ":sym",
+  "array" => "[1, 2, 3]",
+  "hash" => '{"a" => 1}',
+  "range" => "(1..3)",
+}
+
+candidates = %w[
+  abs magnitude downto even? gcd negative? next odd? positive? pow pred succ times to_f to_s upto zero?
+  all? any? compact count each each_slice each_with_index empty? find detect first flat_map collect_concat
+  flatten include? member? index join last length size map collect max min none? reduce inject reject
+  reverse select filter find_all slice sort sort_by sum tally uniq zip
+  dig each_pair key? has_key? keys merge to_a entries values
+  ceil finite? floor infinite? nan? round to_i truncate
+  capitalize chars chomp downcase end_with? lines lstrip rstrip split start_with? strip swapcase upcase
+  nil? some? failure? to_s
+  each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
+  take drop push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
+  fetch values_at transform_values invert
+  step clamp digits between? divmod modulo remainder fdiv
+  inspect class hash is_a? respond_to? send tap then itself instance_of?
+  append prepend concat replace
+].uniq.sort
+
+shapes = lambda do |receiver, name|
+  [
+    "#{receiver}.#{name}",
+    "#{receiver}.#{name}(1)",
+    "#{receiver}.#{name}(\"a\")",
+    "#{receiver}.#{name}(1, 2)",
+    "#{receiver}.#{name}([1])",
+    "#{receiver}.#{name}({\"a\" => 1})",
+    "#{receiver}.#{name} { it }",
+    "#{receiver}.#{name} { |a, b| a }",
+    "#{receiver}.#{name}(1) { it }",
+    "#{receiver}.#{name}(1) { |a, b| a }",
+    "#{receiver}.#{name}(\"a\") { it }",
+    "#{receiver}.#{name}([1]) { it }",
+  ]
+end
+
+catch_all = ["undefined method", "undefined block-taking method", "unexpected token", "expected"]
+
+Dir.mktmpdir do |directory|
+  receivers.each do |type, receiver|
+    found = candidates.select do |name|
+      shapes.call(receiver, name).any? do |call|
+        path = File.join(directory, "probe.pdx")
+        File.write(path, "x = #{call}\n")
+        _out, err, _status = Open3.capture3(pdx, path)
+        catch_all.none? { |phrase| err.include?(phrase) }
+      end
+    end
+    puts "#{type}: #{found.join(" ")}"
+  end
+end

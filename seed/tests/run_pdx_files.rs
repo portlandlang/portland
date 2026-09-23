@@ -1104,6 +1104,24 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "42\n",
             "'handle' answers Integer, not the annotated String — change one",
         ),
+        // ADR 0047 shape 2 for builtin receivers (#88): the seed's own
+        // answers, tabled from its behavior. The methods that exist run.
+        (
+            "name = \"pdx\"\nputs name.upcase\nputs name.length\nputs([1, 2].reduce(0) { |sum, n| sum + n })\nputs((1..3).sum)\nif false\n  puts name.knd\nend\nputs \"reached the end\"\n",
+            "PDX\n3\n3\n6\nreached the end\n",
+            "'name' is a String, which has no method 'knd'",
+        ),
+        (
+            "count = 5\nif false\n  puts count.upcase\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "'count' is an Integer, which has no method 'upcase'",
+        ),
+        (
+            // The call-site contract check reaches builtin arguments too.
+            "def greet(name)\n  \"hi \" + name.upcase\nend\nputs greet(\"pdx\")\nif false\n  greet(5)\nend\nputs \"reached the end\"\n",
+            "hi PDX\nreached the end\n",
+            "'5' is an Integer, but 'greet' needs '.upcase'",
+        ),
         // ADR 0047 shape 4 — an operator on operands it cannot take, the
         // legal pairs being the seed's own match arms read as types.
         (
@@ -1294,6 +1312,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"coverage\", \"the present case\"])\n\
              puts render_refusal([\"contract\", \"token\", [\"struct\", \"Token\"], \"greet\", [\"demands\", [\".upcase\", \"+\"]]])\n\
              puts render_refusal([\"contract\", \"box\", [\"struct\", \"Box\"], \"show\", [\"trait\", \"Describable\"]])\n\
+             puts render_refusal([\"alias\", \"to_int\", \"to_i\"])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1333,6 +1352,7 @@ fn portland_refusals_render_the_house_voice() {
          case/in does not cover the present case — add the arm, or an else\n\
          'token' is a Token, but 'greet' needs '.upcase', '+'\n\
          'box' is a Box, but 'show' needs Describable\n\
+         to_int is spelled to_i here\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\

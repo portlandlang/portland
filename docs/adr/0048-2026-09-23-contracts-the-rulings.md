@@ -26,7 +26,7 @@ Ratified 2026-09-23, once step one was in. A call that hands a def something its
 'box' is a Box, but 'show' needs Describable
 ```
 
-The argument as written, its type, the def, and what it wanted. No hint: fixing the argument and fixing the def are two rewrites. Only the demands the argument lacks are named — the whole contract is in the dump; a trait's name stands in when the whole contract is exactly its method set (ruling 2). Struct arguments only until the method table ([#88](https://github.com/portlandlang/portland/issues/88)); an argument the renderer cannot spell declines.
+The argument as written, its type, the def, and what it wanted. No hint: fixing the argument and fixing the def are two rewrites. Only the demands the argument lacks are named — the whole contract is in the dump; a trait's name stands in when the whole contract is exactly its method set (ruling 2). Struct arguments by their declaration, builtin arguments by the method table ([#88](https://github.com/portlandlang/portland/issues/88), built the same day); an argument the renderer cannot spell declines.
 
 ## Consequences
 

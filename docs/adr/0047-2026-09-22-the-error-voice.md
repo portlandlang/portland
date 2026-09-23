@@ -1,6 +1,6 @@
 # 0047 — The error voice: structured refusals, one renderer, five wordings
 
-- **Status:** Accepted (rulings and wordings ratified 2026-09-22; built the same day — the renderer, shapes 1, 2 (struct receivers), 4, 5, and arity; shape 3 waits for 3d narrowing, shape 2 on builtins for a method table)
+- **Status:** Accepted (rulings and wordings ratified 2026-09-22; built the same day — the renderer, shapes 1, 2 (struct receivers), 4, 5, and arity; shape 3 followed with 3d narrowing, and shape 2 on builtins with the method table, 2026-09-23)
 - **Date:** 2026-09-22
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — decision 6 of the design ladder, the session ADR 0040 held the first refusals for
 

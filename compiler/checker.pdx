@@ -512,6 +512,7 @@ def check_method_call(node, scope)
   receiver = synthesize(node.receiver, known_types(scope))
   check_maybe_method(node, receiver) if node in MethodCallNode
   check_struct_method(node, receiver, scope) if node in MethodCallNode
+  check_builtin_method(node, receiver) if node in MethodCallNode
   check_block(node, receiver, scope)
 end
 
@@ -664,22 +665,37 @@ def check_argument(def_name, argument, entry, scope)
   return unless entry in ["needs", *]
   demands = type_at(entry, 1)
   type = synthesize(argument, known_types(scope))
-  return unless type in ["struct", *]
-  shape = scope.shapes.find { it[0] == type_at(type, 1) }
-  return if shape.nil?
-  methods = value_at_checked(shape, 1)
-  missing = demands.reject { struct_answers?(methods, it) }
+  methods = argument_methods(type, scope)
+  return if methods.nil?
+  missing = demands.reject { answers_demand?(type, methods, it) }
   return if missing.empty?
   spelling = spell_node(argument)
   return if spelling.nil?
   refuse(["contract", spelling, type, def_name, wanted_by(demands, missing, scope)])
 end
 
-# A struct answers a dotted demand by its method set, `==` and `!=` by
-# nature, and no other operator or index at all.
-def struct_answers?(methods, demand)
+# The method set an argument's type states whole: a declared struct's
+# (declared_shapes), or a builtin's (the table, #88). Nil for anything
+# else — a maybe, an unknown, a struct declared elsewhere.
+def argument_methods(type, scope)
+  return nil unless known?(type)
+  if type in ["struct", *]
+    shape = scope.shapes.find { it[0] == type_at(type, 1) }
+    return nil if shape.nil?
+    return value_at_checked(shape, 1)
+  end
+  builtin_methods(type)
+end
+
+# A dotted demand is answered by the method set; `==` and `!=` by every
+# value; an index by a string, array, or hash; any other operator is a
+# builtin's to decide with its right operand, so a builtin is taken to
+# answer it, and a struct — which has no operators — is not.
+def answers_demand?(type, methods, demand)
   return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
-  demand == "==" || demand == "!="
+  return true if demand == "==" || demand == "!="
+  return (type == ["string"]) || (type in ["array", *]) || (type in ["hash", *]) if demand == "[]"
+  !(type in ["struct", *])
 end
 
 # What the sentence names (ADR 0048 §2): the trait whose method set is
@@ -713,10 +729,25 @@ def check_maybe_method(node, receiver)
   refuse(["unhandled_maybe", spelling, receiver, node.name])
 end
 
+# Shape 2 for builtin receivers (#88): the seed's own answers, tabled in
+# inference.pdx from its behavior. A fully known builtin type whose table
+# lacks the name refuses; anything without a table declines.
+def check_builtin_method(node, receiver)
+  return unless known?(receiver)
+  methods = builtin_methods(receiver)
+  return if methods.nil?
+  return if methods.include?(node.name)
+  # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
+  survivor = alias_survivor(node.name)
+  refuse(["alias", node.name, survivor]) unless survivor.nil?
+  spelling = spell_node(node.receiver)
+  return if spelling.nil?
+  refuse(["no_method", spelling, receiver, node.name])
+end
+
 # Shape 2 — a method the receiver's type does not have, for struct
 # receivers: the one receiver kind whose method set a declaration states
-# completely (declared_shapes). Builtin receivers wait for a method table
-# the seed does not have yet. The receiver must be spellable — no
+# completely (declared_shapes). The receiver must be spellable — no
 # spelling, no sentence, so a computed receiver declines.
 def check_struct_method(node, receiver, scope)
   return unless receiver in ["struct", *]
