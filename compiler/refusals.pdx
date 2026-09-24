@@ -43,8 +43,15 @@ end
 
 # ADR 0047's "below the sentence", built 2026-09-24 (#89): the line's
 # number, a bar, the line as written less its indentation, indented under
-# the sentence. One function, so the shape is one edit.
-def render_location(location) = "  #{location.first} | #{location.last.lstrip}"
+# the sentence — and the file before the number where a program spans
+# more than one (#94). One function, so the shape is one edit.
+def render_location(location)
+  line = location.first
+  text = type_at(location, 1) or ""
+  file = type_at(location, 2)
+  return "  #{line} | #{text.lstrip}" if file.nil?
+  "  #{file}:#{line} | #{text.lstrip}"
+end
 
 def render_refusal(refusal)
   case refusal

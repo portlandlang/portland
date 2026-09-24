@@ -32,6 +32,8 @@ Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — ref
 - **An argument the def cannot use** (built, [ADR 0048](../adr/0048-2026-09-23-contracts-the-rulings.md)) — `'token' is a Token, but 'greet' needs '.upcase'`, at the call rather than inside the def where Ruby's `NoMethodError` would land; a trait's name stands in when the whole contract is exactly its set, `but 'show' needs Describable`.
 - **The wrong number of arguments** (built, bare calls to top-level defs) — the seed's own runtime sentence, moved earlier with its plural fixed: `greet expects 1 to 2 arguments, got 0`. Ruby raises `ArgumentError` when the call runs.
 
+The checker sees a whole program ([ADR 0049](../adr/0049-2026-09-24-the-whole-program-door.md)): an entry file and everything `require_relative` pulls in, each file checked once with the declarations of its requires in view — where Ruby's `require_relative` loads at runtime and checks nothing. A required file's locals never cross; a computed require path is declined. A refusal in a required file names it: `lib.pdx:7 | puts name.knd`.
+
 The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about yet is silence, not a demand for `else`, and inference is what widens that later.
 
 ## Migration

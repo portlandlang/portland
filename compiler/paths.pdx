@@ -1,0 +1,49 @@
+# Paths, as both the evaluator and the checker need them: where a file's
+# `require_relative` points. Shared so the two resolve a require the same
+# way — the checker's whole-program door (#94) walks the same closure the
+# runtime loads.
+
+# The directory a path sits in, `.` for a bare name.
+def directory_of(path)
+  parts = path.split("/")
+  return "." if parts.length < 2
+  parts[0..-2].join("/")
+end
+
+# Resolve `.` and `..` segments textually, so every spelling of one file
+# shares a load-once key: `spec/string/../spec_helper.pdx` and
+# `spec/spec_helper.pdx` name the same file and now compare equal.
+#
+# The seed asks the filesystem to canonicalise; the compiler has no call that can,
+# but a `..` following a named segment cancels it without one. The only case a
+# text walk answers differently is a `..` that crosses a symlink, which the
+# filesystem would resolve and this does not.
+def canonical_path(path)
+  absolute = path.start_with?("/")
+  mutable parts = []
+  path.split("/").each do |part|
+    next if part.empty? || part == "."
+    if part == ".." && !parts.empty? && parts.last != ".."
+      parts = parts.slice(0, parts.length - 1)
+    else
+      parts << part
+    end
+  end
+  joined = parts.join("/")
+  return "/#{joined}" if absolute
+  joined
+end
+
+# Where `require_relative name` from `from` points: relative to the
+# requiring file's directory, `.pdx` assumed unless the last segment brought
+# its own extension — a dot in an earlier segment does not count, so
+# `a.b/c` still becomes `a.b/c.pdx`. The seed's rule, and the evaluator's.
+def required_path_from(from, name)
+  target = canonical_path("#{directory_of(from)}/#{name}")
+  parts = target.split("/")
+  # `last` is a maybe (ADR 0010) even though a split always yields a part —
+  # the or-guard says so where the checker can see it (ADR 0047 shape 3).
+  last_part = parts.last or return "#{target}.pdx"
+  return target if last_part.include?(".")
+  "#{target}.pdx"
+end

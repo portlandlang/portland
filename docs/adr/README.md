@@ -60,6 +60,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0046](0046-2026-08-20-the-ternary.md) — The ternary: declared spacing, nesting refuses toward parens
 - [0047](0047-2026-09-22-the-error-voice.md) — The error voice: structured refusals, one renderer, five wordings
 - [0048](0048-2026-09-23-contracts-the-rulings.md) — Contracts: the spelling, traits as names, no inheritance, agreement sharpens
+- [0049](0049-2026-09-24-the-whole-program-door.md) — The whole-program door: a program is its require closure
 
 <!-- /generated -->
 

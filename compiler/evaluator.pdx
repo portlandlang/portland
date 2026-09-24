@@ -13,6 +13,7 @@
 # To run a file, see run.pdx.
 
 require_relative "parser"
+require_relative "paths"
 # The renderer's helpers (ADR 0047) — the runtime rows of its sentences
 # are spelled with the same quoting, article, and truncation as the build's.
 require_relative "refusals"
@@ -2064,49 +2065,9 @@ def file_of(bindings)
   value_at(slot.first, 2)
 end
 
-# The directory holding a path, or "." when the path names none.
-def directory_of(path)
-  parts = path.split("/")
-  return "." if parts.length < 2
-  parts[0..-2].join("/")
-end
 
-# Resolve `.` and `..` segments textually, so every spelling of one file
-# shares a load-once key: `spec/string/../spec_helper.pdx` and
-# `spec/spec_helper.pdx` name the same file and now compare equal.
-#
-# The seed asks the filesystem to canonicalise; the compiler has no call that can,
-# but a `..` following a named segment cancels it without one. The only case a
-# text walk answers differently is a `..` that crosses a symlink, which the
-# filesystem would resolve and this does not.
-def canonical_path(path)
-  absolute = path.start_with?("/")
-  mutable parts = []
-  path.split("/").each do |part|
-    next if part.empty? || part == "."
-    if part == ".." && !parts.empty? && parts.last != ".."
-      parts = parts.slice(0, parts.length - 1)
-    else
-      parts << part
-    end
-  end
-  joined = parts.join("/")
-  return "/#{joined}" if absolute
-  joined
-end
-
-# A dot in the last segment means the name brought its own extension, which is
-# what the seed's `Path::extension` is asking too — a dot in an earlier segment
-# does not count, so `a.b/c` still becomes `a.b/c.pdx`.
-def required_path(bindings, name)
-  target = canonical_path("#{directory_of(file_of(bindings))}/#{name}")
-  parts = target.split("/")
-  # `last` is a maybe (ADR 0010) even though a split always yields a part —
-  # the or-guard says so where the checker can see it (ADR 0047 shape 3).
-  last_part = parts.last or return "#{target}.pdx"
-  return target if last_part.include?(".")
-  "#{target}.pdx"
-end
+# Where a require points, by the rule paths.pdx holds for the checker too.
+def required_path(bindings, name) = required_path_from(file_of(bindings), name)
 
 def loaded_paths(bindings)
   slot = lookup(bindings, "__loaded__")

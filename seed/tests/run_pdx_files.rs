@@ -1280,19 +1280,20 @@ fn the_checker_passes_the_compilers_own_source() {
         files.len() > 5,
         "the compiler directory should hold the trio"
     );
-    for file in files {
-        let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(format!("{compiler}/check.pdx"))
-            .arg(&file)
-            .output()
-            .expect("failed to run pdx");
-        assert!(
-            checked.status.success(),
-            "{} should pass the checker, got: {}",
-            file.display(),
-            String::from_utf8_lossy(&checked.stderr)
-        );
-    }
+    // One process for the whole corpus: `check.pdx` follows each file's
+    // requires (#94) and shares its memo across the files it is handed, so
+    // the compiler is checked once rather than once per file that requires
+    // it.
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!("{compiler}/check.pdx"))
+        .args(&files)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        checked.status.success(),
+        "the compiler and fixtures should pass the checker, got: {}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
 }
 
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
@@ -1377,6 +1378,61 @@ fn portland_refusals_render_the_house_voice() {
          x&.y\n\
          \"hi\"\n\
          nil\n"
+    );
+}
+
+/// The whole-program door (#94, ADR 0049): a program is its entry file and
+/// everything `require_relative` pulls in, each file checked once with the
+/// declarations of its requires in view. The first program is the one the
+/// per-file checker used to refuse — an enum declared in the required file —
+/// and now runs; the second calls across the boundary with the wrong count
+/// and refuses, the location naming the file.
+#[test]
+fn the_checker_follows_requires() {
+    let directory = std::env::temp_dir().join("checker_door");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("lib.pdx"),
+        "def helper = 2\nstruct Box\n  size\nend\nenum Status\n  :pending\n  :paid(on:)\nend\n",
+    )
+    .unwrap();
+    let good = directory.join("good.pdx");
+    std::fs::write(
+        &good,
+        "require_relative \"lib\"\nputs helper\nputs :paid(on: 1).nil?\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&good)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        hosted.status.success(),
+        "a program using its require's declarations should run: {}",
+        String::from_utf8_lossy(&hosted.stderr)
+    );
+    assert_eq!(String::from_utf8(hosted.stdout).unwrap(), "2\nfalse\n");
+
+    let bad = directory.join("bad.pdx");
+    std::fs::write(&bad, "require_relative \"lib\"\nputs helper(1, 2)\n").unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&bad)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !hosted.status.success(),
+        "the cross-file miss should refuse"
+    );
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    let expected = format!(
+        "helper expects 0 arguments, got 2\n  {}:2 | puts helper(1, 2)",
+        bad.display()
+    );
+    assert!(
+        stderr.contains(&expected),
+        "the checker should say {expected:?}, got: {stderr}"
     );
 }
 

@@ -43,6 +43,7 @@
 # have run by the time the name is read again (principle 4: a type the
 # checker cannot prove is not a type it may refuse on).
 
+require_relative "paths"
 require_relative "refusals"
 
 # What the walk carries into every node: the program's enum declarations,
@@ -56,10 +57,23 @@ struct Scope
   arities
   contracts
   enums
+  file
   globals
   locals
   shapes
   source
+  traits
+end
+
+# What one file declares for the files that require it (#94): the same
+# six lists a Scope carries program-wide, without the locals — a required
+# file's locals stay unknown to its requirer on purpose (#95).
+struct Declarations
+  arities
+  contracts
+  enums
+  globals
+  shapes
   traits
 end
 
@@ -95,9 +109,83 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes, source)
-  scope = Scope.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes), source: source.lines, traits: trait_declarations_in(nodes))
+  check_program_with(nodes, source, nil, empty_declarations)
+end
+
+# One file, with what its requires declare in view (#94): its own
+# declarations first, so a name declared on both sides resolves to its own.
+def check_program_with(nodes, source, file, imports)
+  own = declarations_of(nodes)
+  whole = merge_declarations(own, imports)
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, locals: [], shapes: whole.shapes, source: source.lines, traits: whole.traits)
   check_annotations(nodes, source, scope)
   check_body(nodes, scope)
+end
+
+# — the whole-program door (#94, ADR 0049) —
+#
+# A program is an entry file and everything `require_relative` pulls in,
+# transitively, resolved as the runtime resolves it (paths.pdx). Each file
+# is checked once, in dependency order, with the declarations of its
+# transitive requires in view; a required file's locals never cross; a
+# computed require path is an edge the walk declines; a cycle finds the
+# file it came from still in progress and takes nothing from it, which is
+# what the runtime's load-once does too.
+
+# Check the closure of `path`. `checked` is the memo of files already
+# checked in this process — the spec harness checks a hundred specs that
+# share one helper — as [key, declarations] pairs, `nil` while a file is
+# in progress; the updated memo comes back.
+def check_closure(path, checked)
+  walk_closure(path, checked, false)
+end
+
+# `required` says whether some file requires this one — then the program
+# spans more than one file and a refusal here names its file (ADR 0049
+# §5); an entry names its file only when it requires something itself.
+def walk_closure(path, mutable checked, required)
+  key = canonical_path(path)
+  return checked if checked.any? { it[0] == key }
+  source = read_file(path) or panic "check: cannot read #{path}"
+  nodes = parse_program(lex(source))
+  checked = [[key, nil]] + checked
+  requires = required_files(nodes, path)
+  mutable imports = empty_declarations
+  requires.each do |name|
+    checked = walk_closure(name, checked, true)
+    found = checked.find { it[0] == canonical_path(name) }
+    declared = if found.nil? then nil else value_at_checked(found, 1) end
+    imports = merge_declarations(imports, declared) unless declared.nil?
+  end
+  named = if required || !requires.empty? then path else nil end
+  check_program_with(nodes, source, named, imports)
+  exported = merge_declarations(declarations_of(nodes), imports)
+  [[key, exported]] + checked.reject { it[0] == key }
+end
+
+# The files a program's top-level `require_relative "name"` lines name,
+# in order. Only a literal string resolves; anything else is declined.
+def required_files(nodes, path)
+  mutable found = []
+  nodes.each do |node|
+    next unless node in CallNode
+    next unless node.name == "require_relative"
+    next unless node.arguments.length == 1
+    argument = node.arguments.first
+    next unless argument in StringNode
+    found << required_path_from(path, argument.value)
+  end
+  found
+end
+
+def declarations_of(nodes)
+  Declarations.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
+end
+
+def empty_declarations = Declarations.new(arities: [], contracts: [], enums: [], globals: [], shapes: [], traits: [])
+
+def merge_declarations(first, second)
+  Declarations.new(arities: first.arities + second.arities, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, shapes: first.shapes + second.shapes, traits: first.traits + second.traits)
 end
 
 # Where a refusal points (#89): the node's line and that line of the
@@ -107,7 +195,7 @@ def locate(node, scope)
   line = line_of(node)
   return nil if line.nil?
   text = value_at_checked(scope.source, line - 1) or ""
-  [line, text.chomp]
+  [line, text.chomp, scope.file]
 end
 
 # The node kinds a refusal can point at carry their line (the ruling of

@@ -1,12 +1,18 @@
 # Check a Portland file without running it (#9, ADR 0034).
 #
-# Usage: pdx compiler/check.pdx <file.pdx>
+# Usage: pdx compiler/check.pdx <file.pdx> [more.pdx ...]
 #
 # Silence is a pass; a refusal panics with its wording. The seed has no
 # counterpart on purpose — this is the first door only the compiler has.
 
 require_relative "checker"
 
-source = read_file(argv.first) or panic "check.pdx: cannot read #{argv.first}"
-check_program(parse_program(lex(source)), source)
+# Each file and everything it requires (#94), each file with the
+# declarations of its requires in view; the file's own locals are its own.
+# Several files share one memo, so a corpus that requires the same library
+# from many entries checks it once: `pdx compiler/check.pdx a.pdx b.pdx`.
+mutable checked = []
+argv.each do |path|
+  checked = check_closure(path, checked)
+end
 puts "ok"

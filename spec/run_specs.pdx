@@ -34,7 +34,9 @@ require_relative "../compiler/evaluator"
 harness_path = argv.first
 harness_source = read_file(harness_path) or panic "run_specs.pdx: cannot read #{harness_path}"
 harness_program = parse_program(lex(harness_source))
-check_program(harness_program, harness_source)
+# The checker's memo of files already checked rides across the specs, so
+# the helper every spec requires is checked once here, not a hundred times.
+mutable checked = check_closure(harness_path, [])
 harness = run_body(harness_program, [["__file__", "file", harness_path]])
 already_loaded = [["__loaded__", "loaded", [canonical_path(harness_path)]]]
 
@@ -42,7 +44,7 @@ argv.slice(1, argv.length - 1).each do |path|
   puts "=== #{path}"
   source = read_file(path) or panic "run_specs.pdx: cannot read #{path}"
   program = parse_program(lex(source))
-  check_program(program, source)
+  checked = check_closure(path, checked)
   scope = [["__file__", "file", path]] + already_loaded + harness.bindings
   run_body(program, scope)
 end
