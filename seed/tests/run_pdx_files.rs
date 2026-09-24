@@ -1299,6 +1299,18 @@ fn the_checker_passes_the_compilers_own_source() {
     );
 }
 
+/// A struct's field named like a builtin is the field, not the builtin (#96):
+/// hosted, a guest struct is a tagged host array, and `size` on one once
+/// answered its three elements. The seed's order — methods, fields, then
+/// the four every value answers — is the trio's now.
+#[test]
+fn portland_evaluator_matches_the_seed_on_fields_named_like_builtins() {
+    assert_evaluator_matches_seed(
+        "evaluator_field_shadow.pdx",
+        "struct Box\n  size\n  first\n  keys\nend\nbox = Box.new(size: 1, first: \"a\", keys: [2])\nputs box.size\nputs box.first\nputs box.keys.size\nputs([1, 2, 3].size)\nputs box.to_s\nputs box.some?\n",
+    );
+}
+
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
 /// Every sentence shape the ADR pins, rendered from its tagged refusal, plus
 /// the rulings the renderer owns: the dump's type spelling, fact–dash–hint

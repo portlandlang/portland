@@ -1452,6 +1452,13 @@ def evaluate_method_call(node, mutable bindings)
   # Struct methods dispatch before builtins and field access (#27).
   own = struct_method_for(receiver, node.name, bindings)
   return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
+  # A struct answers its own field before any builtin arm can — the seed's
+  # order: `with`, its methods, its fields, then only the four names every
+  # value answers. A guest struct is a tagged host array, so `size` on one
+  # used to answer 3 (#96). A name that is neither is the miss sentence.
+  if (receiver in ["__struct__", *]) && arguments.empty? && node.block.nil? && !%w[failure? nil? some? to_s].include?(node.name)
+    return outcome([struct_field(receiver, node.name)], bindings)
+  end
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).
   check_builtin_count(receiver, node.name, arguments.length)
