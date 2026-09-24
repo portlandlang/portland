@@ -35,9 +35,16 @@
 
 require_relative "inference"
 
-def refuse(refusal)
-  panic render_refusal(refusal)
+def refuse(refusal, location = nil)
+  words = render_refusal(refusal)
+  panic words if location.nil?
+  panic words + "\n" + render_location(location)
 end
+
+# ADR 0047's "below the sentence", built 2026-09-24 (#89): the line's
+# number, a bar, the line as written less its indentation, indented under
+# the sentence. One function, so the shape is one edit.
+def render_location(location) = "  #{location.first} | #{location.last.lstrip}"
 
 def render_refusal(refusal)
   case refusal

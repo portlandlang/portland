@@ -92,7 +92,16 @@ case/in does not cover the present case — add the arm, or an else
 
 The renderer prints the offending source line and its location beneath every refusal, Elm-style, if the trio's nodes carry a line — verified at build time, never assumed. Not a wording; recorded here because it is what stops the quoted expression from carrying the whole context load, for every future shape too.
 
-**Build note (2026-09-22):** verified — the trio's nodes carry no line ([#89](https://github.com/portlandlang/portland/issues/89)), so the quoted spelling carries the context alone for now. The build also fixed one thing and filed four: the first refusal fired on the evaluator's own source and exposed a 3b inference bug (`mutable result = nil` rebound inside an `each` read as Nil), fixed in inference so every walk forgets a nested body's rebindings; shape 2's builtin half and the seed's runtime row for it wait on a method table ([#88](https://github.com/portlandlang/portland/issues/88)); the hosted runtime's own wording for a missing method ([#90](https://github.com/portlandlang/portland/issues/90)) and its missing argument count ([#91](https://github.com/portlandlang/portland/issues/91)) are pre-existing; and `failure?` refusing on a plain struct ([#92](https://github.com/portlandlang/portland/issues/92)) is why shape 2 counts it among the names every struct answers.
+**Ruled and built (2026-09-24, [#89](https://github.com/portlandlang/portland/issues/89)):** a node's line is the line of the first token that begins it — the `if` keyword, a binary's left operand, the `def` — one rule, no per-node taste. The shape beneath the sentence is the number, a bar, and the line as written, indented two spaces:
+
+```text
+'name' is a String, which has no method 'knd'
+  7 | puts name.knd
+```
+
+It is one function in the renderer, so the shape is one edit. Tokens carry their line (heredoc bodies padded back in so the count holds), the thirteen node kinds a refusal can point at carry theirs, and a node built by a desugar with no token in hand prints no location rather than a wrong one. The rule bends in one place: a dotted call takes its name's line rather than its receiver's start, since the receiver's start is the caller's and `.knd` is where a reader looks in a chain anyway.
+
+**Build note (2026-09-22):** verified — the trio's nodes carried no line ([#89](https://github.com/portlandlang/portland/issues/89)), so the quoted spelling carried the context alone until the ruling above. The build also fixed one thing and filed four: the first refusal fired on the evaluator's own source and exposed a 3b inference bug (`mutable result = nil` rebound inside an `each` read as Nil), fixed in inference so every walk forgets a nested body's rebindings; shape 2's builtin half and the seed's runtime row for it wait on a method table ([#88](https://github.com/portlandlang/portland/issues/88)); the hosted runtime's own wording for a missing method ([#90](https://github.com/portlandlang/portland/issues/90)) and its missing argument count ([#91](https://github.com/portlandlang/portland/issues/91)) are pre-existing; and `failure?` refusing on a plain struct ([#92](https://github.com/portlandlang/portland/issues/92)) is why shape 2 counts it among the names every struct answers.
 
 ## Consequences
 

@@ -8,6 +8,9 @@ struct Token
   kind
   text
   leading_space
+  # The source line the token starts on, 1-based (#89): what a refusal
+  # points at. Heredoc bodies are padded back in so the count holds.
+  line
 
   def identifier?
     kind == "identifier"
@@ -370,6 +373,11 @@ def expand_heredocs(source)
   while index < lines.length
     expanded = expand_heredoc_line(lines, index)
     output << expanded.text
+    # The body lines a heredoc folded into its literal come back as blank
+    # lines, so every token after it still knows its source line (#89).
+    expanded.consumed.times do
+      output << ""
+    end
     index += 1 + expanded.consumed
   end
   output.join("\n")
@@ -380,6 +388,7 @@ def lex(raw_source)
   characters = source.chars
   mutable tokens = []
   mutable index = 0
+  mutable line = 1
   while index < characters.length
     character = characters[index]
     if character == " " || character == "\t"
@@ -396,25 +405,29 @@ def lex(raw_source)
       next
     end
     if character == "\n"
-      tokens << Token.new(kind: "newline", text: "", leading_space: leading)
+      tokens << Token.new(kind: "newline", text: "", leading_space: leading, line: line)
+      line += 1
       index += 1
       next
     end
     if character == "\""
       text = read_double_quoted(characters, index)
-      tokens << Token.new(kind: "string", text: text, leading_space: leading)
+      tokens << Token.new(kind: "string", text: text, leading_space: leading, line: line)
+      line += text.count("\n")
       index += text.length
       next
     end
     if character == "'"
       text = read_simple_string(characters, index, "'")
-      tokens << Token.new(kind: "string", text: text, leading_space: leading)
+      tokens << Token.new(kind: "string", text: text, leading_space: leading, line: line)
+      line += text.count("\n")
       index += text.length
       next
     end
     if character == "%" && index + 2 < characters.length && characters[index + 1] == "w" && characters[index + 2] == "["
       text = read_word_array(characters, index)
-      tokens << Token.new(kind: "word_array", text: text, leading_space: leading)
+      tokens << Token.new(kind: "word_array", text: text, leading_space: leading, line: line)
+      line += text.count("\n")
       index += text.length
       next
     end
@@ -441,7 +454,7 @@ def lex(raw_source)
       if text.include?("__") || text.end_with?("_") || text.include?("_.")
         panic "an underscore in a number sits between digits — #{text} has one loose"
       end
-      tokens << Token.new(kind: kind, text: text, leading_space: leading)
+      tokens << Token.new(kind: kind, text: text, leading_space: leading, line: line)
       next
     end
     if name_start?(character)
@@ -462,7 +475,7 @@ def lex(raw_source)
       else
         "identifier"
       end
-      tokens << Token.new(kind: kind, text: text, leading_space: leading)
+      tokens << Token.new(kind: kind, text: text, leading_space: leading, line: line)
       next
     end
     # `:name` and `:"quoted"` — a symbol literal (ADR 0023), before `::` and
@@ -491,25 +504,25 @@ def lex(raw_source)
           index += 1
         end
       end
-      tokens << Token.new(kind: "symbol", text: text, leading_space: leading)
+      tokens << Token.new(kind: "symbol", text: text, leading_space: leading, line: line)
       next
     end
     if index + 2 < characters.length && three_character_operator?(character + characters[index + 1] + characters[index + 2])
-      tokens << Token.new(kind: "operator", text: character + characters[index + 1] + characters[index + 2], leading_space: leading)
+      tokens << Token.new(kind: "operator", text: character + characters[index + 1] + characters[index + 2], leading_space: leading, line: line)
       index += 3
       next
     end
     if index + 1 < characters.length && two_character_operator?(character + characters[index + 1])
-      tokens << Token.new(kind: "operator", text: character + characters[index + 1], leading_space: leading)
+      tokens << Token.new(kind: "operator", text: character + characters[index + 1], leading_space: leading, line: line)
       index += 2
       next
     end
     if one_character_operator?(character)
-      tokens << Token.new(kind: "operator", text: character, leading_space: leading)
+      tokens << Token.new(kind: "operator", text: character, leading_space: leading, line: line)
       index += 1
       next
     end
-    tokens << Token.new(kind: "error", text: character, leading_space: leading)
+    tokens << Token.new(kind: "error", text: character, leading_space: leading, line: line)
     index += 1
   end
   tokens

@@ -116,6 +116,7 @@ struct BinaryNode
   operator
   left
   right
+  line
 
   def sexp
     "(#{operator} #{left.sexp} #{right.sexp})"
@@ -150,6 +151,7 @@ struct CallNode
   name
   arguments
   block
+  line
 
   include Sexp
 
@@ -173,6 +175,7 @@ struct CaseInNode
   subject
   branches
   else_body
+  line
 
   include Sexp
 
@@ -220,6 +223,7 @@ struct DefNode
   parameters
   body
   type_function
+  line
 
   include Sexp
 
@@ -271,6 +275,7 @@ struct IfNode
   condition
   then_body
   else_body
+  line
 
   include Sexp
 
@@ -302,6 +307,7 @@ struct IndexNode
   kind
   receiver
   index
+  line
 
   def sexp
     "([] #{receiver.sexp} #{index.sexp})"
@@ -371,6 +377,7 @@ struct LogicalNode
   operator
   left
   right
+  line
 
   def sexp
     "(#{operator} #{left.sexp} #{right.sexp})"
@@ -448,6 +455,7 @@ struct MethodCallNode
   name
   arguments
   block
+  line
 
   include Sexp
 
@@ -523,6 +531,7 @@ struct SafeMethodCallNode
   name
   arguments
   block
+  line
 
   include Sexp
 
@@ -556,6 +565,7 @@ struct EnumCaseNode
   kind
   name
   payload
+  line
 
   include Sexp
 
@@ -679,6 +689,7 @@ struct EnumCasePatternNode
   kind
   name
   payload
+  line
 
   def sexp
     parts = payload.map do |entry|
@@ -707,6 +718,7 @@ struct UnaryNode
   kind
   operator
   operand
+  line
 
   def sexp
     "(#{operator} #{operand.sexp})"
@@ -723,6 +735,7 @@ struct WhileNode
   kind
   condition
   body
+  line
 
   include Sexp
 
@@ -767,8 +780,8 @@ def mutable_assignment_node(name, value)
   AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: true)
 end
 
-def binary_node(operator, left, right)
-  BinaryNode.new(kind: "binary", operator: operator, left: left, right: right)
+def binary_node(operator, left, right, line: nil)
+  BinaryNode.new(kind: "binary", operator: operator, left: left, right: right, line: line)
 end
 
 def block_node(parameters, body)
@@ -783,28 +796,36 @@ def break_node
   BreakNode.new(kind: "break")
 end
 
-def call_node(name, arguments)
-  CallNode.new(kind: "call", name: name, arguments: arguments, block: nil)
+def call_node(name, arguments, line: nil)
+  CallNode.new(kind: "call", name: name, arguments: arguments, block: nil, line: line)
 end
 
-def call_with_block_node(name, arguments, block)
-  CallNode.new(kind: "call", name: name, arguments: arguments, block: block)
+def call_with_block_node(name, arguments, block, line: nil)
+  CallNode.new(kind: "call", name: name, arguments: arguments, block: block, line: line)
+end
+
+# The source line a node begins on (#89): the line of the first token that
+# begins it, the ruling of 2026-09-24. Nil past the end — and nil on every
+# node built by a desugar with no token in hand, which prints no location.
+def line_at(tokens, position)
+  return nil if position >= tokens.length
+  tokens[position].line
 end
 
 def yield_node
   YieldNode.new(kind: "yield")
 end
 
-def case_in_node(subject, branches, else_body)
-  CaseInNode.new(kind: "case_in", subject: subject, branches: branches, else_body: else_body)
+def case_in_node(subject, branches, else_body, line: nil)
+  CaseInNode.new(kind: "case_in", subject: subject, branches: branches, else_body: else_body, line: line)
 end
 
 def case_node(subject, branches, else_body)
   CaseNode.new(kind: "case", subject: subject, branches: branches, else_body: else_body)
 end
 
-def def_node(name, parameters, body, type_function)
-  DefNode.new(kind: "def", name: name, parameters: parameters, body: body, type_function: type_function)
+def def_node(name, parameters, body, type_function, line: nil)
+  DefNode.new(kind: "def", name: name, parameters: parameters, body: body, type_function: type_function, line: line)
 end
 
 def error_node(message)
@@ -819,8 +840,8 @@ def identifier_node(name)
   IdentifierNode.new(kind: "identifier", name: name)
 end
 
-def if_node(condition, then_body, else_body)
-  IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body)
+def if_node(condition, then_body, else_body, line: nil)
+  IfNode.new(kind: "if", condition: condition, then_body: then_body, else_body: else_body, line: line)
 end
 
 def index_update_node(name, index, value)
@@ -835,8 +856,8 @@ def in_branch_node(pattern, guard, body)
   InBranchNode.new(kind: "in_branch", pattern: pattern, guard: guard, body: body)
 end
 
-def index_node(receiver, index)
-  IndexNode.new(kind: "index", receiver: receiver, index: index)
+def index_node(receiver, index, line: nil)
+  IndexNode.new(kind: "index", receiver: receiver, index: index, line: line)
 end
 
 # Both shed the underscores their token may carry (#71) — the lexer has
@@ -862,8 +883,8 @@ def keyword_parameter_node(name, default)
   KeywordParameterNode.new(kind: "keyword_parameter", name: name, default: default)
 end
 
-def logical_node(operator, left, right)
-  LogicalNode.new(kind: "logical", operator: operator, left: left, right: right)
+def logical_node(operator, left, right, line: nil)
+  LogicalNode.new(kind: "logical", operator: operator, left: left, right: right, line: line)
 end
 
 def match_assert_node(subject, pattern)
@@ -874,8 +895,8 @@ def match_test_node(subject, pattern)
   MatchTestNode.new(kind: "match_test", subject: subject, pattern: pattern)
 end
 
-def method_call_node(receiver, name, arguments, block)
-  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+def method_call_node(receiver, name, arguments, block, line: nil)
+  MethodCallNode.new(kind: "method_call", receiver: receiver, name: name, arguments: arguments, block: block, line: line)
 end
 
 def next_node
@@ -902,8 +923,8 @@ def return_node(value)
   ReturnNode.new(kind: "return", value: value)
 end
 
-def safe_method_call_node(receiver, name, arguments, block)
-  SafeMethodCallNode.new(kind: "safe_method_call", receiver: receiver, name: name, arguments: arguments, block: block)
+def safe_method_call_node(receiver, name, arguments, block, line: nil)
+  SafeMethodCallNode.new(kind: "safe_method_call", receiver: receiver, name: name, arguments: arguments, block: block, line: line)
 end
 
 def string_node(value)
@@ -914,8 +935,8 @@ def symbol_node(value)
   SymbolNode.new(kind: "symbol", value: value)
 end
 
-def enum_case_node(name, payload)
-  EnumCaseNode.new(kind: "enum_case", name: name, payload: payload)
+def enum_case_node(name, payload, line: nil)
+  EnumCaseNode.new(kind: "enum_case", name: name, payload: payload, line: line)
 end
 
 def enum_def_node(name, cases)
@@ -966,20 +987,20 @@ def struct_pattern_node(name, fields)
   StructPatternNode.new(kind: "struct_pattern", name: name, fields: fields)
 end
 
-def enum_case_pattern_node(name, payload)
-  EnumCasePatternNode.new(kind: "enum_case_pattern", name: name, payload: payload)
+def enum_case_pattern_node(name, payload, line: nil)
+  EnumCasePatternNode.new(kind: "enum_case_pattern", name: name, payload: payload, line: line)
 end
 
-def unary_node(operator, operand)
-  UnaryNode.new(kind: "unary", operator: operator, operand: operand)
+def unary_node(operator, operand, line: nil)
+  UnaryNode.new(kind: "unary", operator: operator, operand: operand, line: line)
 end
 
 def when_node(values, body)
   WhenNode.new(kind: "when", values: values, body: body)
 end
 
-def while_node(condition, body)
-  WhileNode.new(kind: "while", condition: condition, body: body)
+def while_node(condition, body, line: nil)
+  WhileNode.new(kind: "while", condition: condition, body: body, line: line)
 end
 
 def word_array_node(text)
@@ -1045,7 +1066,9 @@ def parse_ternary(tokens, step)
   if operator_at?(tokens, no.position, %w[?])
     return Step.new(node: error_node("ternaries do not nest — parenthesize the inner one: a ? b : (c ? d : e)"), position: skip_line_at(tokens, no.position))
   end
-  Step.new(node: if_node(step.node, [yes.node], [no.node]), position: no.position)
+  # The `?` names the line: the condition's own start is the caller's, and
+  # the declared spacing keeps a ternary on one line in practice.
+  Step.new(node: if_node(step.node, [yes.node], [no.node], line: line_at(tokens, step.position)), position: no.position)
 end
 
 # Does the token after this one carry a leading space? The end of input
@@ -1091,7 +1114,7 @@ def parse_logical_or(tokens, position)
   mutable step = parse_logical_and(tokens, position)
   while operator_at?(tokens, step.position, %w[||]) || keyword_at?(tokens, step.position, %w[or])
     right = parse_or_right(tokens, step.position + 1)
-    step = Step.new(node: logical_node("||", step.node, right.node), position: right.position)
+    step = Step.new(node: logical_node("||", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1112,7 +1135,7 @@ def parse_or_right(tokens, position)
   end
   if or_panic_command?(tokens, position)
     message = parse_expression(tokens, position + 1)
-    return Step.new(node: call_node("panic", [message.node]), position: message.position)
+    return Step.new(node: call_node("panic", [message.node], line: line_at(tokens, position)), position: message.position)
   end
   parse_logical_and(tokens, position)
 end
@@ -1128,7 +1151,7 @@ def parse_logical_and(tokens, position)
   mutable step = parse_comparison(tokens, position)
   while operator_at?(tokens, step.position, %w[&&]) || keyword_at?(tokens, step.position, %w[and])
     right = parse_comparison(tokens, step.position + 1)
-    step = Step.new(node: logical_node("&&", step.node, right.node), position: right.position)
+    step = Step.new(node: logical_node("&&", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1138,7 +1161,7 @@ def parse_comparison(tokens, position)
   while operator_at?(tokens, step.position, %w[== != < <= > >=])
     operator = tokens[step.position].text
     right = parse_addition(tokens, step.position + 1)
-    step = Step.new(node: binary_node(operator, step.node, right.node), position: right.position)
+    step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1148,7 +1171,7 @@ def parse_addition(tokens, position)
   while operator_at?(tokens, step.position, %w[+ -])
     operator = tokens[step.position].text
     right = parse_multiplication(tokens, step.position + 1)
-    step = Step.new(node: binary_node(operator, step.node, right.node), position: right.position)
+    step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1158,7 +1181,7 @@ def parse_multiplication(tokens, position)
   while operator_at?(tokens, step.position, %w[* / %])
     operator = tokens[step.position].text
     right = parse_unary(tokens, step.position + 1)
-    step = Step.new(node: binary_node(operator, step.node, right.node), position: right.position)
+    step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1172,7 +1195,7 @@ def parse_exponent_operand(tokens, position)
   step = parse_postfix(tokens, position)
   if operator_at?(tokens, step.position, %w[**])
     right = parse_unary(tokens, step.position + 1)
-    return Step.new(node: binary_node("**", step.node, right.node), position: right.position)
+    return Step.new(node: binary_node("**", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
 end
@@ -1191,8 +1214,8 @@ def parse_unary(tokens, position)
   if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].integer?
     if operator_at?(tokens, position + 2, %w[**])
       right = parse_unary(tokens, position + 3)
-      power = binary_node("**", integer_node(tokens[position + 1].text), right.node)
-      return Step.new(node: unary_node("-", power), position: right.position)
+      power = binary_node("**", integer_node(tokens[position + 1].text), right.node, line: line_at(tokens, position))
+      return Step.new(node: unary_node("-", power, line: line_at(tokens, position)), position: right.position)
     end
     literal = Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
     chained = postfix_from(tokens, literal)
@@ -1204,8 +1227,8 @@ def parse_unary(tokens, position)
   if operator_at?(tokens, position, %w[-]) && position + 1 < tokens.length && tokens[position + 1].float?
     if operator_at?(tokens, position + 2, %w[**])
       right = parse_unary(tokens, position + 3)
-      power = binary_node("**", float_node(tokens[position + 1].text), right.node)
-      return Step.new(node: unary_node("-", power), position: right.position)
+      power = binary_node("**", float_node(tokens[position + 1].text), right.node, line: line_at(tokens, position))
+      return Step.new(node: unary_node("-", power, line: line_at(tokens, position)), position: right.position)
     end
     literal = Step.new(node: float_node("-" + tokens[position + 1].text), position: position + 2)
     chained = postfix_from(tokens, literal)
@@ -1218,12 +1241,12 @@ def parse_unary(tokens, position)
     # exactly Ruby's answer — the recursion reaches the exponent level for
     # plain operands and keeps stacked signs legal.
     operand = parse_unary(tokens, position + 1)
-    return Step.new(node: unary_node(operator, operand.node), position: operand.position)
+    return Step.new(node: unary_node(operator, operand.node, line: line_at(tokens, position)), position: operand.position)
   end
   # `not` is dead-identical to `!` (ADR 0007).
   if keyword_at?(tokens, position, %w[not])
     operand = parse_unary(tokens, position + 1)
-    return Step.new(node: unary_node("!", operand.node), position: operand.position)
+    return Step.new(node: unary_node("!", operand.node, line: line_at(tokens, position)), position: operand.position)
   end
   parse_exponent_operand(tokens, position)
 end
@@ -1259,6 +1282,10 @@ def postfix_from(tokens, mutable step)
 end
 
 def parse_dot(tokens, receiver, mutable position, safe)
+  # The name token's line, not the receiver's first: the receiver's start
+  # is the caller's, and `.knd` is where a reader looks in a chain anyway —
+  # the one place the ruling bends, and only across a multi-line chain.
+  line = line_at(tokens, position)
   if position >= tokens.length
     return Step.new(node: error_node("expected method name after dot"), position: position)
   end
@@ -1304,9 +1331,9 @@ def parse_dot(tokens, receiver, mutable position, safe)
       if keyword_at?(tokens, opener, %w[do])
         handed_block = parse_block(tokens, opener + 1, false)
         handed = if safe
-          safe_method_call_node(receiver, name, arguments, handed_block.node)
+          safe_method_call_node(receiver, name, arguments, handed_block.node, line: line)
         else
-          method_call_node(receiver, name, arguments, handed_block.node)
+          method_call_node(receiver, name, arguments, handed_block.node, line: line)
         end
         return Step.new(node: handed, position: handed_block.position)
       end
@@ -1316,9 +1343,9 @@ def parse_dot(tokens, receiver, mutable position, safe)
       return Step.new(node: error_node(message), position: skip_line_at(tokens, opener))
     end
     node = if safe
-      safe_method_call_node(receiver, name, arguments, nil)
+      safe_method_call_node(receiver, name, arguments, nil, line: line)
     else
-      method_call_node(receiver, name, arguments, nil)
+      method_call_node(receiver, name, arguments, nil, line: line)
     end
     return Step.new(node: node, position: position)
   end
@@ -1332,9 +1359,9 @@ def parse_dot(tokens, receiver, mutable position, safe)
     position = block_step.position
   end
   node = if safe
-    safe_method_call_node(receiver, name, arguments, block)
+    safe_method_call_node(receiver, name, arguments, block, line: line)
   else
-    method_call_node(receiver, name, arguments, block)
+    method_call_node(receiver, name, arguments, block, line: line)
   end
   Step.new(node: node, position: position)
 end
@@ -1523,7 +1550,7 @@ end
 def parse_index(tokens, receiver, position)
   inner = parse_expression(tokens, position)
   if operator_at?(tokens, inner.position, ["]"])
-    return Step.new(node: index_node(receiver, inner.node), position: inner.position + 1)
+    return Step.new(node: index_node(receiver, inner.node, line: line_at(tokens, position)), position: inner.position + 1)
   end
   Step.new(node: error_node("expected closing bracket"), position: inner.position)
 end
@@ -1572,6 +1599,7 @@ end
 # `{key => value, ...}` — position already past the opening brace.
 # `:paid(on: expr)` — keyword-only payload arguments (ADR 0022 §1).
 def parse_enum_case(tokens, name, mutable position)
+  line = line_at(tokens, position)
   mutable payload = []
   while true
     label = tokens[position]
@@ -1586,7 +1614,7 @@ def parse_enum_case(tokens, name, mutable position)
       next
     end
     if operator_at?(tokens, position, [")"])
-      return Step.new(node: enum_case_node(name, payload), position: position + 1)
+      return Step.new(node: enum_case_node(name, payload, line: line), position: position + 1)
     end
     return Step.new(node: error_node("expected ) to close an enum payload"), position: position)
   end
@@ -1682,12 +1710,12 @@ def parse_identifier_primary(tokens, position, name)
     # one owner and `{` is as good as `do`.
     if keyword_at?(tokens, arguments.position, %w[do])
       block = parse_block(tokens, arguments.position + 1, false)
-      Step.new(node: call_with_block_node(name, arguments.node, block.node), position: block.position)
+      Step.new(node: call_with_block_node(name, arguments.node, block.node, line: line_at(tokens, position)), position: block.position)
     elsif operator_at?(tokens, arguments.position, %w[{])
       block = parse_block(tokens, arguments.position + 1, true)
-      Step.new(node: call_with_block_node(name, arguments.node, block.node), position: block.position)
+      Step.new(node: call_with_block_node(name, arguments.node, block.node, line: line_at(tokens, position)), position: block.position)
     else
-      Step.new(node: call_node(name, arguments.node), position: arguments.position)
+      Step.new(node: call_node(name, arguments.node, line: line_at(tokens, position)), position: arguments.position)
     end
   elsif keyword_at?(tokens, after, %w[do])
     # A bare name followed by `do` is a call handed a block, which
@@ -1935,7 +1963,7 @@ def parse_statement(tokens, position)
     # `x += e` desugars to `x = x + e`, as in the seed.
     operator = tokens[position + 1].text.slice(0, 1)
     value = parse_expression(tokens, position + 2)
-    desugared = binary_node(operator, identifier_node(token.text), value.node)
+    desugared = binary_node(operator, identifier_node(token.text), value.node, line: line_at(tokens, position))
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
   # `x ||= e` desugars to `x = x || e` (ADR 0043): the or-guard's question
@@ -1943,7 +1971,7 @@ def parse_statement(tokens, position)
   # (ADR 0007), and `mutable` is required like every compound.
   if token.identifier? && operator_at?(tokens, position + 1, %w[||=])
     value = parse_expression(tokens, position + 2)
-    desugared = logical_node("||", identifier_node(token.text), value.node)
+    desugared = logical_node("||", identifier_node(token.text), value.node, line: line_at(tokens, position))
     return Step.new(node: assignment_node(token.text, desugared), position: value.position)
   end
   step = parse_expression(tokens, position)
@@ -2125,6 +2153,7 @@ def matching_paren_before(tokens, position)
 end
 
 def parse_command(tokens, mutable position)
+  line = line_at(tokens, position)
   # A `!` in the name is just the name (ADR 0044).
   name = tokens[position].text
   # An opener past these arguments belongs to this call, never to an argument.
@@ -2149,7 +2178,7 @@ def parse_command(tokens, mutable position)
   unless opener < 0
     if keyword_at?(tokens, opener, %w[do])
       block = parse_block(tokens, opener + 1, false)
-      handed = call_with_block_node(name, arguments, block.node)
+      handed = call_with_block_node(name, arguments, block.node, line: line)
       return Step.new(node: handed, position: block.position)
     end
     # ADR 0016: a bare `{` here has two or three genuine readings. Name them
@@ -2157,7 +2186,7 @@ def parse_command(tokens, mutable position)
     message = brace_ambiguity_message(name, arguments.last, tokens, opener)
     return Step.new(node: error_node(message), position: skip_line_at(tokens, opener))
   end
-  Step.new(node: call_node(name, arguments), position: position)
+  Step.new(node: call_node(name, arguments, line: line), position: position)
 end
 
 # The name of the inner call the braces might belong to.
@@ -2256,19 +2285,19 @@ def parse_statement_with_guard(tokens, position)
   step = parse_statement(tokens, position)
   if keyword_at?(tokens, step.position, %w[if])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: if_node(condition.node, [step.node], nil), position: condition.position)
+    return Step.new(node: if_node(condition.node, [step.node], nil, line: line_at(tokens, position)), position: condition.position)
   end
   if keyword_at?(tokens, step.position, %w[unless])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: if_node(condition.node, nil, [step.node]), position: condition.position)
+    return Step.new(node: if_node(condition.node, nil, [step.node], line: line_at(tokens, position)), position: condition.position)
   end
   if keyword_at?(tokens, step.position, %w[while])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: while_node(condition.node, [step.node]), position: condition.position)
+    return Step.new(node: while_node(condition.node, [step.node], line: line_at(tokens, position)), position: condition.position)
   end
   if keyword_at?(tokens, step.position, %w[until])
     condition = parse_expression(tokens, step.position + 1)
-    return Step.new(node: while_node(unary_node("!", condition.node), [step.node]), position: condition.position)
+    return Step.new(node: while_node(unary_node("!", condition.node, line: line_at(tokens, position)), [step.node], line: line_at(tokens, position)), position: condition.position)
   end
   step
 end
@@ -2298,6 +2327,7 @@ end
 # — definitions —
 
 def parse_def(tokens, mutable position)
+  line = line_at(tokens, position)
   # `def self.name` — a type function (ADR 0031). The flag rides the node;
   # each context decides what it means: a struct body registers it on the
   # type, a module body accepts it as a plain def, the rest refuse.
@@ -2333,11 +2363,11 @@ def parse_def(tokens, mutable position)
   # default (Ruby's own carve-out).
   if (had_parens || parameters.empty?) && operator_at?(tokens, position, %w[=])
     body_step = parse_statement_with_guard(tokens, position + 1)
-    return Step.new(node: def_node(name, parameters, [body_step.node], type_function), position: body_step.position)
+    return Step.new(node: def_node(name, parameters, [body_step.node], type_function, line: line), position: body_step.position)
   end
   body = parse_body(tokens, position, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: def_node(name, parameters, body.node, type_function), position: body.position + 1)
+    return Step.new(node: def_node(name, parameters, body.node, type_function, line: line), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close def #{name}"), position: body.position)
 end
@@ -2402,7 +2432,7 @@ end
 
 # — patterns (ADR 0013) —
 
-def parse_case_in(tokens, subject, mutable position)
+def parse_case_in(tokens, subject, mutable position, line)
   mutable branches = []
   while keyword_at?(tokens, position, %w[in])
     branch = parse_in_branch(tokens, position + 1)
@@ -2413,12 +2443,12 @@ def parse_case_in(tokens, subject, mutable position)
     else_body = parse_else_body(tokens, position + 1, %w[end])
     position = else_body.position
     if keyword_at?(tokens, position, %w[end])
-      return Step.new(node: case_in_node(subject, branches, else_body.node), position: position + 1)
+      return Step.new(node: case_in_node(subject, branches, else_body.node, line: line), position: position + 1)
     end
     return Step.new(node: error_node("expected end to close case"), position: position)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: case_in_node(subject, branches, nil), position: position + 1)
+    return Step.new(node: case_in_node(subject, branches, nil, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close case"), position: position)
 end
@@ -2571,6 +2601,7 @@ end
 # `in :paid(on:)` — the same keyword-only shape as a struct pattern, so
 # `on:` alone binds a name of the same name (ADR 0022 §1).
 def parse_enum_case_pattern(tokens, name, mutable position)
+  line = line_at(tokens, position)
   mutable payload = []
   while true
     token = tokens[position]
@@ -2592,7 +2623,7 @@ def parse_enum_case_pattern(tokens, name, mutable position)
   unless operator_at?(tokens, position, %w[)])
     return Step.new(node: error_node("expected ) to close an enum payload pattern"), position: position)
   end
-  Step.new(node: enum_case_pattern_node(name, payload), position: position + 1)
+  Step.new(node: enum_case_pattern_node(name, payload, line: line), position: position + 1)
 end
 
 def parse_struct_pattern(tokens, name, mutable position)
@@ -2760,7 +2791,7 @@ def parse_trait_alias(tokens, position, trait_name, methods)
   if target.nil?
     return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
   end
-  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false)
+  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false, line: target.line)
   Step.new(node: twin, position: after)
 end
 
@@ -2781,7 +2812,7 @@ def parse_struct_alias(tokens, position, struct_name, fields, methods, type_func
   if target.nil?
     return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
   end
-  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false)
+  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false, line: target.line)
   Step.new(node: twin, position: after)
 end
 
@@ -2965,6 +2996,7 @@ def parse_branch_boundary(tokens, position, terminators)
 end
 
 def parse_if(tokens, mutable position)
+  line = line_at(tokens, position)
   condition = parse_expression(tokens, position)
   then_body = parse_branch_body(tokens, condition.position, %w[else elsif end])
   position = then_body.position
@@ -2972,25 +3004,26 @@ def parse_if(tokens, mutable position)
     # Sugar for else + nested if; the chain shares one end, which the
     # recursive call consumes.
     nested = parse_if(tokens, position + 1)
-    return Step.new(node: if_node(condition.node, then_body.node, [nested.node]), position: nested.position)
+    return Step.new(node: if_node(condition.node, then_body.node, [nested.node], line: line), position: nested.position)
   end
   if keyword_at?(tokens, position, %w[else])
     else_body = parse_else_body(tokens, position + 1, %w[end])
     if keyword_at?(tokens, else_body.position, %w[end])
-      return Step.new(node: if_node(condition.node, then_body.node, else_body.node), position: else_body.position + 1)
+      return Step.new(node: if_node(condition.node, then_body.node, else_body.node, line: line), position: else_body.position + 1)
     end
     return Step.new(node: error_node("expected end to close if"), position: else_body.position)
   end
   if keyword_at?(tokens, position, %w[end])
     # Exhibit B, resolved: an absent else is nil — no longer conflated
     # with a present, empty else.
-    return Step.new(node: if_node(condition.node, then_body.node, nil), position: position + 1)
+    return Step.new(node: if_node(condition.node, then_body.node, nil, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close if"), position: position)
 end
 
 # `unless c ... else ... end`, desugared to an if with swapped branches.
 def parse_unless(tokens, mutable position)
+  line = line_at(tokens, position)
   condition = parse_expression(tokens, position)
   body = parse_branch_body(tokens, condition.position, %w[else end])
   position = body.position
@@ -2998,12 +3031,12 @@ def parse_unless(tokens, mutable position)
     else_body = parse_else_body(tokens, position + 1, %w[end])
     position = else_body.position
     if keyword_at?(tokens, position, %w[end])
-      return Step.new(node: if_node(condition.node, else_body.node, body.node), position: position + 1)
+      return Step.new(node: if_node(condition.node, else_body.node, body.node, line: line), position: position + 1)
     end
     return Step.new(node: error_node("expected end to close unless"), position: position)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: if_node(condition.node, nil, body.node), position: position + 1)
+    return Step.new(node: if_node(condition.node, nil, body.node, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close unless"), position: position)
 end
@@ -3037,7 +3070,7 @@ def parse_loop(tokens, position)
   end
   body = parse_body(tokens, position + 1, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: while_node(boolean_node("true"), body.node), position: body.position + 1)
+    return Step.new(node: while_node(boolean_node("true"), body.node, line: line_at(tokens, position)), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close loop"), position: body.position)
 end
@@ -3047,10 +3080,10 @@ end
 def parse_while(tokens, position, negated)
   condition = parse_expression(tokens, position)
   mutable test = condition.node
-  test = unary_node("!", test) if negated
+  test = unary_node("!", test, line: line_at(tokens, position)) if negated
   body = parse_body(tokens, condition.position, %w[end])
   if keyword_at?(tokens, body.position, %w[end])
-    return Step.new(node: while_node(test, body.node), position: body.position + 1)
+    return Step.new(node: while_node(test, body.node, line: line_at(tokens, position)), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close while"), position: body.position)
 end
@@ -3059,6 +3092,7 @@ end
 # flips from ===-matching to truth-testing — one arm shape, two readings.
 # The refusal names the rewrite, the seed's words.
 def parse_case(tokens, mutable position)
+  line = line_at(tokens, position)
   if position < tokens.length && tokens[position].kind == "newline"
     return Step.new(node: error_node("case takes a subject — a subjectless case is an if/elsif chain here"), position: position)
   end
@@ -3068,7 +3102,7 @@ def parse_case(tokens, mutable position)
   # match-test subject can still be written with parens.
   subject = parse_range(tokens, position)
   position = skip_newlines_at(tokens, subject.position)
-  return parse_case_in(tokens, subject.node, position) if keyword_at?(tokens, position, %w[in])
+  return parse_case_in(tokens, subject.node, position, line) if keyword_at?(tokens, position, %w[in])
   mutable branches = []
   while keyword_at?(tokens, position, %w[when])
     mutable step = parse_expression(tokens, position + 1)

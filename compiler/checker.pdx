@@ -59,6 +59,7 @@ struct Scope
   globals
   locals
   shapes
+  source
   traits
 end
 
@@ -94,9 +95,30 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes, source)
-  scope = Scope.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
+  scope = Scope.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), locals: [], shapes: declared_shapes(nodes), source: source.lines, traits: trait_declarations_in(nodes))
   check_annotations(nodes, source, scope)
   check_body(nodes, scope)
+end
+
+# Where a refusal points (#89): the node's line and that line of the
+# source, for the renderer to print beneath the sentence — or nil, and no
+# location, for a node built by a desugar with no token in hand.
+def locate(node, scope)
+  line = line_of(node)
+  return nil if line.nil?
+  text = value_at_checked(scope.source, line - 1) or ""
+  [line, text.chomp]
+end
+
+# The node kinds a refusal can point at carry their line (the ruling of
+# 2026-09-24: the first token that begins the node); the rest do not yet.
+def line_of(node)
+  case node
+  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode
+    node.line
+  else
+    nil
+  end
 end
 
 # Every top-level def's parameters with their contracts (ADR 0048), as
@@ -151,7 +173,7 @@ def check_annotations(nodes, source, scope)
     computed = synthesize_name(node.name, scope.globals)
     next unless known?(computed)
     next if render_type(computed) == written
-    refuse(["annotation", node.name, computed, written])
+    refuse(["annotation", node.name, computed, written], locate(node, scope))
   end
 end
 
@@ -324,7 +346,7 @@ def check_node(node, scope)
   in ModuleDefNode(body:) then check_body(body, scope)
   in WhileNode(condition:, body:)
     check_node(condition, scope)
-    check_condition("while", condition, scope)
+    check_condition("while", node, scope)
     # The body may have run before the condition is read again, so the
     # names it rebinds are unknown throughout it too — and what the
     # condition proves is read over those, never over the first pass.
@@ -336,7 +358,7 @@ def check_node(node, scope)
     check_node(value, scope) unless value.nil?
   in IfNode
     check_node(node.condition, scope)
-    check_condition("if", node.condition, scope)
+    check_condition("if", node, scope)
     # Each branch sees what the condition proved on its side (ADR 0040 §3's
     # narrowing forms, in inference). `unless` parses as an if with no
     # then-side, so either body may be nil.
@@ -443,9 +465,9 @@ def check_maybe_coverage(node, scope)
   return unless subject in ["maybe", *]
   return unless known?(subject)
   patterns = unguarded_arms(node).map { it.pattern }
-  refuse(["coverage", "nil"]) unless patterns.any? { covers_nil?(it) }
+  refuse(["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
   inner = type_at(subject, 1)
-  refuse(["coverage", "the present case"]) unless patterns.any? { covers_present?(it, inner) }
+  refuse(["coverage", "the present case"], locate(node, scope)) unless patterns.any? { covers_present?(it, inner) }
 end
 
 def covers_nil?(pattern)
@@ -503,16 +525,16 @@ def check_arity(node, scope)
   given = node.arguments.reject { it in KeywordArgumentNode }.length
   return if given >= required && given <= total
   expected = if required == total then required.to_s else "#{required} to #{total}" end
-  refuse(["arity", node.name, expected, given])
+  refuse(["arity", node.name, expected, given], locate(node, scope))
 end
 
 def check_method_call(node, scope)
   check_node(node.receiver, scope)
   check_body(node.arguments, scope)
   receiver = synthesize(node.receiver, known_types(scope))
-  check_maybe_method(node, receiver) if node in MethodCallNode
+  check_maybe_method(node, receiver, scope) if node in MethodCallNode
   check_struct_method(node, receiver, scope) if node in MethodCallNode
-  check_builtin_method(node, receiver) if node in MethodCallNode
+  check_builtin_method(node, receiver, scope) if node in MethodCallNode
   check_block(node, receiver, scope)
 end
 
@@ -611,11 +633,12 @@ end
 # Shape 1 — a condition that is not a boolean, Ruby's truthiness reflex.
 # A boolean passes; an unknown declines; anything else refuses, and a
 # maybe alone carries the one honest rewrite.
-def check_condition(construct, condition, scope)
+def check_condition(construct, node, scope)
+  condition = node.condition
   type = synthesize(condition, known_types(scope))
   return if type == ["boolean"]
   return unless known?(type)
-  refuse(["condition", construct, type, spell_node(condition)])
+  refuse(["condition", construct, type, spell_node(condition)], locate(node, scope))
 end
 
 # The logical operators' operands. `&&` takes booleans on both sides. `||`
@@ -627,12 +650,12 @@ def check_operands(node, scope)
   left = synthesize(node.left, types)
   right = synthesize(node.right, types)
   if node.operator == "&&"
-    refuse(["operand", "&&", left]) if known?(left) && left != ["boolean"]
-    refuse(["operand", "&&", right]) if known?(right) && right != ["boolean"]
+    refuse(["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
+    refuse(["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
   end
   return unless node.operator == "||"
   return unless left == ["boolean"]
-  refuse(["operand", "||", right]) if known?(right) && right != ["boolean"]
+  refuse(["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
 end
 
 # ADR 0048's call-site refusal — a call handing a def something its body
@@ -651,7 +674,7 @@ def check_contracts(node, scope)
     argument = if keyword then keyword_argument(node, parameter[0]) else positional[position] end
     position += 1 unless keyword
     next if argument.nil?
-    check_argument(node.name, argument, value_at_checked(parameter, 2), scope)
+    check_argument(node, argument, value_at_checked(parameter, 2), scope)
   end
 end
 
@@ -661,7 +684,8 @@ def keyword_argument(node, label)
   found.value
 end
 
-def check_argument(def_name, argument, entry, scope)
+def check_argument(call, argument, entry, scope)
+  def_name = call.name
   return unless entry in ["needs", *]
   demands = type_at(entry, 1)
   type = synthesize(argument, known_types(scope))
@@ -671,7 +695,7 @@ def check_argument(def_name, argument, entry, scope)
   return if missing.empty?
   spelling = spell_node(argument)
   return if spelling.nil?
-  refuse(["contract", spelling, type, def_name, wanted_by(demands, missing, scope)])
+  refuse(["contract", spelling, type, def_name, wanted_by(demands, missing, scope)], locate(call, scope))
 end
 
 # The method set an argument's type states whole: a declared struct's
@@ -720,29 +744,29 @@ end
 # and `to_s` refuses until one of the narrowing forms has handled nil.
 # `&.` is the other answer and is never this node. The receiver must be
 # spellable, since the hint is written from it.
-def check_maybe_method(node, receiver)
+def check_maybe_method(node, receiver, scope)
   return unless receiver in ["maybe", *]
   return unless known?(receiver)
   return if %w[failure? nil? some? to_s].include?(node.name)
   spelling = spell_node(node.receiver)
   return if spelling.nil?
-  refuse(["unhandled_maybe", spelling, receiver, node.name])
+  refuse(["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 2 for builtin receivers (#88): the seed's own answers, tabled in
 # inference.pdx from its behavior. A fully known builtin type whose table
 # lacks the name refuses; anything without a table declines.
-def check_builtin_method(node, receiver)
+def check_builtin_method(node, receiver, scope)
   return unless known?(receiver)
   methods = builtin_methods(receiver)
   return if methods.nil?
   return if methods.include?(node.name)
   # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
   survivor = alias_survivor(node.name)
-  refuse(["alias", node.name, survivor]) unless survivor.nil?
+  refuse(["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
   spelling = spell_node(node.receiver)
   return if spelling.nil?
-  refuse(["no_method", spelling, receiver, node.name])
+  refuse(["no_method", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 2 — a method the receiver's type does not have, for struct
@@ -756,7 +780,7 @@ def check_struct_method(node, receiver, scope)
   return if value_at_checked(shape, 1).include?(node.name)
   spelling = spell_node(node.receiver)
   return if spelling.nil?
-  refuse(["no_method", spelling, receiver, node.name])
+  refuse(["no_method", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 4 — an operator on operands it cannot take. The legal pairs are
@@ -773,7 +797,7 @@ def check_operator(node, scope)
   right = synthesize(node.right, types)
   return unless plain_value?(left) && plain_value?(right)
   return if operator_takes?(node.operator, left, right)
-  refuse(["operator", node.operator, left, right])
+  refuse(["operator", node.operator, left, right], locate(node, scope))
 end
 
 def operator_takes?(operator, left, right)
@@ -802,7 +826,7 @@ def check_unary(node, scope)
   return if node.operator == "!" && operand == ["boolean"]
   return if node.operator == "-" && numeric?(operand)
   return unless node.operator == "!" || node.operator == "-"
-  refuse(["unary", node.operator, operand])
+  refuse(["unary", node.operator, operand], locate(node, scope))
 end
 
 # A fully known builtin value type — never a maybe, struct, or enum.

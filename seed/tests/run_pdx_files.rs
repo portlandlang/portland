@@ -1330,6 +1330,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"contract\", \"token\", [\"struct\", \"Token\"], \"greet\", [\"demands\", [\".upcase\", \"+\"]]])\n\
              puts render_refusal([\"contract\", \"box\", [\"struct\", \"Box\"], \"show\", [\"trait\", \"Describable\"]])\n\
              puts render_refusal([\"alias\", \"to_int\", \"to_i\"])\n\
+             puts render_location([12, \"puts name.knd\"])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1370,12 +1371,50 @@ fn portland_refusals_render_the_house_voice() {
          'token' is a Token, but 'greet' needs '.upcase', '+'\n\
          'box' is a Box, but 'show' needs Describable\n\
          to_int is spelled to_i here\n\
+         \x20 12 | puts name.knd\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\
          \"hi\"\n\
          nil\n"
     );
+}
+
+/// A refusal points at its line (#89): the number and the source line
+/// beneath the sentence, from the first token that begins the node — a
+/// heredoc above keeps the count honest, and a desugar with no token in
+/// hand prints no location rather than a wrong one.
+#[test]
+fn refusals_point_at_their_line() {
+    let cases = [
+        (
+            "name = \"pdx\"\nnote = <<~EOS\n  one\n  two\nEOS\nif false\n  puts name.knd\nend\n",
+            "'name' is a String, which has no method 'knd'\n  7 | puts name.knd",
+        ),
+        (
+            "count = 5\nif false\n  if count\n    puts 1\n  end\nend\n",
+            "'if' condition must be true or false, got Integer\n  3 | if count",
+        ),
+        (
+            "def greet(name)\n  \"hi \" + name.upcase\nend\nif false\n  greet(5)\nend\n",
+            "'5' is an Integer, but 'greet' needs '.upcase'\n  5 | greet(5)",
+        ),
+    ];
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("refusal_location.pdx");
+        std::fs::write(&sample, source).unwrap();
+        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!hosted.status.success(), "the checker should refuse");
+        let stderr = String::from_utf8(hosted.stderr).unwrap();
+        assert!(
+            stderr.contains(expected),
+            "the checker should say {expected:?} with its location, got: {stderr}"
+        );
+    }
 }
 
 /// The seed marks each kind of refusal with a machine line before its
