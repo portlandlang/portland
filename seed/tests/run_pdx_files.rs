@@ -1378,6 +1378,35 @@ fn portland_refusals_render_the_house_voice() {
     );
 }
 
+/// The seed marks each kind of refusal with a machine line before its
+/// sentence (#88), so the probe that derives the builtin table reads a
+/// signal rather than prose. One program per kind.
+#[test]
+fn the_seed_marks_its_refusals_for_the_probe() {
+    let cases = [
+        ("x = \"pdx\".knd\n", "refusal: missing"),
+        ("x = \"pdx\".include?\n", "refusal: arity"),
+        ("x = \"pdx\".include?(1)\n", "refusal: arguments"),
+        ("x = 5.to_int\n", "refusal: alias"),
+        ("x = 5.then\n", "refusal: parse"),
+        ("x = [1].knd { it }\n", "refusal: missing"),
+    ];
+    for (source, marker) in cases {
+        let sample = std::env::temp_dir().join("refusal_marker.pdx");
+        std::fs::write(&sample, source).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!output.status.success(), "{source:?} should refuse");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.lines().any(|line| line == marker),
+            "{source:?} should mark {marker:?}, got: {stderr}"
+        );
+    }
+}
+
 /// `check.pdx` — the checker's own door: silence-then-ok on a clean
 /// program, nothing evaluated.
 #[test]

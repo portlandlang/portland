@@ -71,6 +71,16 @@ fn as_float(value: &Value) -> f64 {
 /// spellings of the conversions but carry duck-typing semantics Portland
 /// does not have. The migrating intent still maps cleanly, so the refusal
 /// names the real conversion.
+/// A machine-readable line before a refusal's sentence, for tools that run
+/// the seed and need to know *what kind* of refusal happened without
+/// reading its prose (#88's probe): `refusal: missing`, `refusal: arity`,
+/// `refusal: arguments`, `refusal: alias`, `refusal: parse`. The sentence
+/// stays the human's; this rides beside it the way the spec harness's
+/// `===` marker rides beside a spec's output.
+pub fn refusal(kind: &str) {
+    eprintln!("refusal: {kind}");
+}
+
 fn alias_survivor(name: &str) -> Option<&'static str> {
     match name {
         "to_ary" => Some("to_a"),
@@ -1855,8 +1865,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 (receiver, name, _) => {
                     if let Some(survivor) = alias_survivor(name) {
+                        refusal("alias");
                         panic!("{name} is spelled {survivor} here");
                     }
+                    refusal("missing");
                     panic!("undefined block-taking method {name} for {receiver:?}")
                 }
             };
@@ -2316,6 +2328,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
             (receiver, name, arguments) => {
                 if let Some(survivor) = alias_survivor(name) {
+                    refusal("alias");
                     panic!("{name} is spelled {survivor} here");
                 }
                 // The table (#88) tells three things apart here: no such
@@ -2328,6 +2341,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .and_then(|tag| crate::builtins::signature(tag, name));
                 match (receiver.type_tag(), signature) {
                     (Some(_), None) => {
+                        refusal("missing");
                         let type_name = receiver.type_name();
                         panic!(
                             "{} is {} {type_name}, which has no method '{name}'",
@@ -2338,6 +2352,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     (Some(_), Some((low, high)))
                         if arguments.len() < low || arguments.len() > high =>
                     {
+                        refusal("arity");
                         let expected = if low == high {
                             low.to_string()
                         } else {
@@ -2349,7 +2364,18 @@ impl<W: std::io::Write> Interpreter<W> {
                             arguments.len()
                         )
                     }
-                    _ => {
+                    (Some(_), Some(_)) => {
+                        refusal("arguments");
+                        let shown: Vec<String> =
+                            arguments.iter().map(|argument| argument.shown()).collect();
+                        panic!(
+                            "undefined method {name} for {} with [{}]",
+                            receiver.shown(),
+                            shown.join(", ")
+                        )
+                    }
+                    (None, _) => {
+                        refusal("missing");
                         let shown: Vec<String> =
                             arguments.iter().map(|argument| argument.shown()).collect();
                         panic!(

@@ -1,15 +1,17 @@
 #!/usr/bin/env ruby
 # Derive the builtin method table from the seed's behavior (#88): for each
 # builtin receiver, which names answer, with how many positional arguments,
-# and whether with a block. A name exists when some call shape — no
-# arguments, one, two, an array, a hash, a block, an argument and a block —
-# fails with anything other than the seed's catch-all "undefined method" /
-# "undefined block-taking method", or does not fail at all; the counts of
-# the shapes that pass are its arity, and a passing block shape marks it
-# block-taking. The seed is the oracle (principle 7), so the table in
-# `compiler/inference.pdx` — which the seed itself reads at build for its
-# own wordings — is pinned to this script's output rather than to a
-# reading of the Rust.
+# and whether with a block. The seed marks every refusal it makes with a
+# machine line on stderr before the sentence — `refusal: missing`,
+# `refusal: alias`, `refusal: parse`, `refusal: arity`, `refusal:
+# arguments` — and this reads only that line, never the prose: a shape
+# fails when the seed says `missing`, `alias`, or `parse`, and passes when
+# it runs or refuses for any other reason (a wrong count still proves the
+# name exists). The counts of the passing shapes are a name's arity; a
+# passing block shape marks it block-taking. The seed is the oracle
+# (principle 7), so the table in `compiler/inference.pdx` — which the seed
+# itself reads at build for its own wordings — is pinned to this script's
+# output rather than to a reading of the Rust.
 #
 # Usage: script/probe_builtin_methods            (needs target/debug/pdx)
 #
@@ -50,7 +52,7 @@ candidates = %w[
   fetch values_at transform_values invert
   step clamp digits between? divmod modulo remainder fdiv
   inspect class hash is_a? respond_to? send tap then itself instance_of?
-  append prepend concat replace
+  append prepend concat replace to_ary to_int to_str to_sym
 ].uniq.sort
 
 # [call text, positional count, block?]
@@ -71,7 +73,17 @@ shapes = lambda do |receiver, name|
   ]
 end
 
-catch_all = ["undefined method", "undefined block-taking method", "unexpected token", "expected", "takes", "has no method"]
+# The kinds of refusal that say a shape is not this receiver's to answer.
+not_answered = %w[missing alias parse]
+
+# A seed that does not mark its refusals would pass every shape and hand
+# back a table of everything — refuse to probe one.
+Dir.mktmpdir do |directory|
+  path = File.join(directory, "marker.pdx")
+  File.write(path, "x = \"pdx\".knd\n")
+  _out, err, _status = Open3.capture3(pdx, path)
+  abort "probe_builtin_methods: the seed did not mark its refusal (`refusal: missing`) — rebuild it" unless err.lines.any? { |line| line.strip == "refusal: missing" }
+end
 
 # Progress goes to stderr so a caller reading the table off stdout — the
 # check script — still sees a type land every fifteen seconds or so.
@@ -79,16 +91,37 @@ Dir.mktmpdir do |directory|
   receivers.each do |type, receiver|
     warn "probing #{type} (#{candidates.length} names)…"
     entries = candidates.filter_map do |name|
-      passing = shapes.call(receiver, name).select do |call, _count, _block|
+      # Each shape's verdict: :ran (exit zero), :reached (a refusal with no
+      # marker — the seed's own arm took the call and refused it on its
+      # merits, so the count reached the method), a marked kind, or nil.
+      verdicts = shapes.call(receiver, name).map do |call, count, block|
         path = File.join(directory, "probe.pdx")
         File.write(path, "x = #{call}\n")
-        _out, err, _status = Open3.capture3(pdx, path)
-        catch_all.none? { |phrase| err.include?(phrase) }
+        _out, err, status = Open3.capture3(pdx, path)
+        marker = err.lines.find { |line| line.start_with?("refusal: ") }
+        kind = if status.success?
+          "ran"
+        elsif marker.nil?
+          "reached"
+        else
+          marker.delete_prefix("refusal: ").strip
+        end
+        [kind, count, block]
       end
-      next if passing.empty?
-      counts = passing.map { |_call, count, _block| count }.uniq.sort
-      arity = counts.length == 1 ? counts.first.to_s : "#{counts.min}-#{counts.max}"
-      block = passing.any? { |_call, _count, takes_block| takes_block } ? "&" : ""
+      # A name exists when any shape was not refused as missing, alias, or
+      # parse — a wrong count or wrong arguments still proves it exists.
+      next if verdicts.all? { |kind, _count, _block| not_answered.include?(kind) }
+      # Its arity is the counts of the shapes that reached the method.
+      reaching = verdicts.select { |kind, _count, _block| kind == "ran" || kind == "reached" }
+      counts = reaching.map { |_kind, count, _block| count }.uniq.sort
+      arity = if counts.empty?
+        "0"
+      elsif counts.length == 1
+        counts.first.to_s
+      else
+        "#{counts.min}-#{counts.max}"
+      end
+      block = reaching.any? { |_kind, _count, takes_block| takes_block } ? "&" : ""
       "#{name}/#{arity}#{block}"
     end
     puts "#{type}: #{entries.join(" ")}"

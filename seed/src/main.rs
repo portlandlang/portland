@@ -61,7 +61,15 @@ fn read_source(path: &str) -> String {
 
 fn run_file(path: &str) {
     let source = read_source(path);
-    let program = parser::parse(&source);
+    // A parse refusal gets its machine line (#88's probe) before it unwinds
+    // on as the panic it always was.
+    let program = match catch_unwind(|| parser::parse(&source)) {
+        Ok(program) => program,
+        Err(payload) => {
+            portland_seed::interpreter::refusal("parse");
+            std::panic::resume_unwind(payload);
+        }
+    };
     let mut interpreter = Interpreter::new();
     interpreter.set_arguments(std::env::args().skip(2).collect());
     interpreter.set_current_file(std::path::PathBuf::from(path));

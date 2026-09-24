@@ -32,16 +32,24 @@ IO.popen([File.join(repo, "script", "probe_builtin_methods")]) do |output|
 end
 abort "check_builtin_table: the probe printed nothing — is the seed built?" if probed.empty?
 
+# Entries are `name/arity`; diff by name first, then by arity for the
+# names both sides have, so a changed count reads as what it is.
+by_name = ->(entries) { entries.to_h { |entry| [entry.split("/").first, entry] } }
+
 failures = []
 (tabled.keys | probed.keys).sort.each do |type|
-  table = tabled.fetch(type, [])
-  seed = probed.fetch(type, [])
+  table = by_name.call(tabled.fetch(type, []))
+  seed = by_name.call(probed.fetch(type, []))
   next if table == seed
-  missing = seed - table
-  extra = table - seed
+  missing = seed.keys - table.keys
+  extra = table.keys - seed.keys
+  changed = (table.keys & seed.keys).reject { |name| table[name] == seed[name] }
   failures << "#{type}:"
-  failures << "  the seed answers but the table lacks: #{missing.join(" ")}" unless missing.empty?
-  failures << "  the table lists but the seed refuses: #{extra.join(" ")}" unless extra.empty?
+  failures << "  the seed answers but the table lacks: #{missing.map { |name| seed[name] }.join(" ")}" unless missing.empty?
+  failures << "  the table lists but the seed refuses: #{extra.map { |name| table[name] }.join(" ")}" unless extra.empty?
+  changed.each do |name|
+    failures << "  #{name}: the table says #{table[name]}, the seed answers #{seed[name]}"
+  end
 end
 
 if failures.empty?
