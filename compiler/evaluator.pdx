@@ -755,8 +755,8 @@ def evaluate_expression(node, bindings)
     joined = parts.join("::")
     slot = lookup(bindings, joined)
     if slot.empty?
-      puts "evaluator: undefined name #{joined}"
-      outcome([], bindings)
+      # The seed's wording for a missing `::` name, and a failure (#98).
+      panic("undefined name #{joined}")
     else
       outcome([value_at(slot.first, 2)], bindings)
     end
@@ -2189,7 +2189,9 @@ def evaluate_call(node, mutable bindings)
   when "panic"
     panic(slot_value(arguments))
   else
-    puts "evaluator: undefined method #{node.name}"
-    outcome([], bindings)
+    # The seed's sentence, and a failure rather than a debug line (#98) —
+    # reached only where the checker could not judge the name, a struct's
+    # method body or a module's.
+    panic("#{spelled(node.name)} is not defined")
   end
 end

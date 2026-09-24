@@ -809,16 +809,35 @@ end
 # `case/in` over nil is arm_bindings.
 
 def narrowings(condition, types)
+  proof = proof_of(condition, types)
+  # A match test in a condition — `if x in [head, tail]` — binds its
+  # captures on both sides, since the runtime binds them regardless.
+  captured = condition_captures(condition).map { [it, ["unknown"]] }
+  [captured + when_true(proof), captured + when_false(proof)]
+end
+
+# The names every match test anywhere in an expression captures.
+def condition_captures(node)
+  return [] if node.nil?
+  mutable names = []
+  names += pattern_names(node.pattern) if node in MatchTestNode
+  children_of(node).each do |child|
+    names += condition_captures(child)
+  end
+  names
+end
+
+def proof_of(condition, types)
   case condition
   in MethodCallNode then predicate_proof(condition, types)
   in BinaryNode then comparison_proof(condition, types)
   in UnaryNode(operator:, operand:)
     return no_proof unless operator == "!"
-    proof = narrowings(operand, types)
+    proof = proof_of(operand, types)
     [when_false(proof), when_true(proof)]
   in LogicalNode(operator:, left:, right:)
-    left_proof = narrowings(left, types)
-    right_proof = narrowings(right, types)
+    left_proof = proof_of(left, types)
+    right_proof = proof_of(right, types)
     return [when_true(left_proof) + when_true(right_proof), []] if operator == "&&"
     return [[], when_false(left_proof) + when_false(right_proof)] if operator == "||"
     no_proof
@@ -934,6 +953,13 @@ def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
 # written — the checker keeps the two apart, this file's own walks pass
 # one list and an empty other.
 def bind_after(statement, locals, globals)
+  # A match test anywhere in a statement — `hit = scores in [low, high]`,
+  # `if x in [head, tail]` — binds its captures below it (one_line_spec and
+  # capture_spec pin it), as unknowns: whether it hit is not the tree's to say.
+  bind_unknowns(bind_after_core(statement, locals, globals), condition_captures(statement))
+end
+
+def bind_after_core(statement, locals, globals)
   case statement
   in AssignmentNode(name:, value:)
     return locals if value.nil?
@@ -949,6 +975,14 @@ def bind_after(statement, locals, globals)
   in IfNode
     guarded = guard_proof(statement, locals + globals) + locals
     forget_types(guarded, assigned_names_in(statement))
+  # A `case/in` arm's captures outlive the case (capture_spec pins it), as
+  # unknowns — which arm ran is not the tree's to say.
+  in CaseInNode(branches:)
+    mutable captured = []
+    branches.each do |branch|
+      captured += pattern_names(branch.pattern)
+    end
+    bind_unknowns(forget_types(locals, assigned_names_in(statement)), captured)
   else
     forget_types(locals, assigned_names_in(statement))
   end

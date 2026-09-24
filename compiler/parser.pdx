@@ -262,6 +262,7 @@ end
 struct IdentifierNode
   kind
   name
+  line
 
   def sexp
     name
@@ -836,8 +837,8 @@ def hash_node(pairs)
   HashNode.new(kind: "hash", pairs: pairs)
 end
 
-def identifier_node(name)
-  IdentifierNode.new(kind: "identifier", name: name)
+def identifier_node(name, line: nil)
+  IdentifierNode.new(kind: "identifier", name: name, line: line)
 end
 
 def if_node(condition, then_body, else_body, line: nil)
@@ -1729,7 +1730,7 @@ def parse_identifier_primary(tokens, position, name)
     block = parse_block(tokens, after + 1, true)
     Step.new(node: call_with_block_node(name, [], block.node), position: block.position)
   else
-    Step.new(node: identifier_node(name), position: after)
+    Step.new(node: identifier_node(name, line: line_at(tokens, position)), position: after)
   end
 end
 
@@ -1751,7 +1752,7 @@ def parse_primary(tokens, position)
   when "identifier"
     # A `!` in the name is just the name (ADR 0044).
     parse_identifier_primary(tokens, position, token.text)
-  when "string" then Step.new(node: string_expression(token.text), position: after)
+  when "string" then Step.new(node: string_expression(token.text, line: token.line), position: after)
   when "word_array" then Step.new(node: word_array_node(token.text), position: after)
   when "keyword"
     case token.text
@@ -1832,7 +1833,7 @@ def read_inner_source(characters, start)
   Step.new(node: inner, position: index)
 end
 
-def string_expression(lexeme)
+def string_expression(lexeme, line: nil)
   content = lexeme.slice(1, lexeme.length - 2)
   characters = content.chars
   if lexeme.slice(0, 1) == "'"
@@ -1868,7 +1869,7 @@ def string_expression(lexeme)
       parts << string_node(literal) unless literal.empty?
       literal = ""
       inner = read_inner_source(characters, index + 2)
-      inner_step = parse_expression(lex(inner.node), 0)
+      inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
       parts << method_call_node(inner_step.node, "to_s", [], nil)
       index = inner.position
       next
@@ -2511,7 +2512,7 @@ def parse_pattern_primary(tokens, position)
     return Step.new(node: integer_node("-" + tokens[position + 1].text), position: position + 2)
   end
   if token.string?
-    return Step.new(node: string_expression(token.text), position: position + 1)
+    return Step.new(node: string_expression(token.text, line: token.line), position: position + 1)
   end
   # `in :paid(on:)` destructures a payload; `in :paid` matches a bare case.
   if token.symbol?

@@ -21,6 +21,7 @@
 #                                               wanted is ["trait", name] or ["demands", [...]]
 #   ["alias", name, survivor]                 — a false alias (ADR 0036), the seed's sentence moved earlier
 #   ["sentence", words]                       — a sentence an earlier ADR pinned whole (0034, 0035)
+#   ["undefined", name]                       — a bare name no local, def, builtin, or type answers (#98)
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -92,6 +93,7 @@ def render_refusal(refusal)
   in ["alias", name, survivor] then "#{name} is spelled #{survivor} here"
   # A sentence pinned by an earlier ADR (0034, 0035), carried whole.
   in ["sentence", words] then words
+  in ["undefined", name] then "#{spelled(name)} is not defined"
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end

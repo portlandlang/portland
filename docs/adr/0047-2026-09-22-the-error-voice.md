@@ -86,6 +86,14 @@ case/in does not cover nil — add the arm, or an else
 case/in does not cover the present case — add the arm, or an else
 ```
 
+**A seventh, ratified 2026-09-24 ([#98](https://github.com/portlandlang/portland/issues/98)) once the whole-program door made it provable:** a bare name that no local, def, builtin, struct, enum, or module answers. No hint — the fix could be a local, a def, or spelling, and ruling 3 declined did-you-mean.
+
+```text
+'SOME_SIGNIFICANT_NUMBER' is not defined
+```
+
+Runtime, both oracles, the same sentence where the seed once said `undefined variable or method x`. Declines inside a struct's or module's body, whose own defs a bare name reaches first, and in a file with a require the walk could not resolve.
+
 **A sixth that needed no session:** arity at call sites already has a runtime wording, `greet expects 1 argument(s), got 0`. It moves to build time as is, except the `argument(s)` hedge becomes a real plural while both oracles are being touched.
 
 ### Below the sentence

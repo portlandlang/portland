@@ -64,6 +64,7 @@ struct Scope
   enums
   file
   globals
+  judging
   locals
   shapes
   sharpened
@@ -131,7 +132,10 @@ end
 def check_program_with(nodes, source, file, imports, sharpened)
   own = declarations_of(nodes)
   whole = merge_declarations(own, imports)
-  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
+  # A bare name is judged (#98) only where every name the file can see is
+  # in view: a require the walk could not resolve may declare anything.
+  judging = nodes.none? { computed_require?(it) }
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, judging: judging, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
   found = check_annotations(nodes, source, scope, [])
   in_source_order(check_body(nodes, scope, found))
 end
@@ -236,6 +240,14 @@ def required_files(nodes, path)
   found
 end
 
+# A `require_relative` whose path is not a literal string.
+def computed_require?(node)
+  return false unless node in CallNode
+  return false unless node.name == "require_relative"
+  return true unless node.arguments.length == 1
+  !(node.arguments.first in StringNode)
+end
+
 def declarations_of(nodes)
   Declarations.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
 end
@@ -260,7 +272,7 @@ end
 # 2026-09-24: the first token that begins the node); the rest do not yet.
 def line_of(node)
   case node
-  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode
+  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode
     node.line
   else
     nil
@@ -399,12 +411,24 @@ def declared_globals(nodes)
   nodes.each do |node|
     globals = register_struct(node, globals) if node in StructDefNode
     globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
+    # A module's name is a name a bare reference may use as a receiver
+    # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
+    globals = [[module_name(node), ["module", module_name(node)]]] + globals if node in ModuleDefNode
   end
   nodes.each do |node|
-    next unless node in DefNode
-    globals = [[node.name, synthesize_def_return(node, globals)]] + globals
+    globals = [[node.name, synthesize_def_return(node, globals)]] + globals if node in DefNode
+    # A top-level `alias new old` (ADR 0039) is a second name for the def,
+    # answering what the def answers — found by the corpus, where a tour
+    # fixture's alias read as a name nothing defined (#98).
+    globals = [[node.new_name, synthesize_name(node.old_name, globals)]] + globals if node in AliasNode
   end
   globals
+end
+
+# A module's first path segment: `module A::B` is reached as `A`.
+def module_name(node)
+  first = node.path.first or ""
+  first
 end
 
 # A body is walked in order, each statement seen with the bindings the
@@ -462,7 +486,7 @@ end
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
   type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
-  def_scope(node, scope.with(arities: [], contracts: [], globals: type_names))
+  def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
 end
 
 # A block keeps the locals around it and binds its parameters from the
@@ -483,9 +507,11 @@ def check_node(node, scope, mutable found)
   case node
   in EnumCaseNode then check_construction(node, scope, found)
   in EnumCasePatternNode then check_case_pattern(node, scope, found)
+  in IdentifierNode(name:) then check_defined(name, node, scope, found)
   in AssignmentNode(value:) then check_node(value, scope, found)
   in DefNode(parameters:, body:)
-    found = check_parameters(parameters, scope, found)
+    # Defaults are read with the parameters bound — `def f(a, b = a)`.
+    found = check_parameters(parameters, def_scope(node, scope), found)
     check_body(body, def_scope(node, scope), found)
   in StructDefNode(methods:, nested:, type_functions:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs", scope, found)
@@ -496,7 +522,9 @@ def check_node(node, scope, mutable found)
   in TraitDefNode(methods:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it", scope, found)
     check_methods(methods, scope, found)
-  in ModuleDefNode(body:) then check_body(body, scope, found)
+  # A module's bare names may reach its own defs by lexical scope (ADR
+  # 0021), which the globals do not hold — so names are not judged inside.
+  in ModuleDefNode(body:) then check_body(body, scope.with(judging: false), found)
   in WhileNode(condition:, body:)
     found = check_node(condition, scope, found)
     found = check_condition("while", node, scope, found)
@@ -574,13 +602,16 @@ def check_parameters(parameters, scope, mutable found)
   found
 end
 
-def check_together(lines, scope, mutable found)
+# A `together` block's lines run in order (ADR 0029), so a plain line's
+# binding is in view for the lines below it, as in any body.
+def check_together(lines, mutable scope, mutable found)
   lines.each do |line|
     found = if line in TaskLineNode
       check_node(line.value, scope, found)
     else
       check_node(line, scope, found)
     end
+    scope = bind_statement(line, scope)
   end
   found
 end
@@ -657,7 +688,7 @@ end
 def check_methods(methods, scope, mutable found)
   methods.each do |method|
     if method in DefNode
-      found = check_parameters(method.parameters, scope, found)
+      found = check_parameters(method.parameters, method_scope(method, scope), found)
       found = check_body(method.body, method_scope(method, scope), found)
     else
       found = check_node(method, scope, found)
@@ -667,6 +698,7 @@ def check_methods(methods, scope, mutable found)
 end
 
 def check_call(node, scope, mutable found)
+  found = check_defined(node.name, node, scope, found)
   found = check_body(node.arguments, scope, found)
   found = check_arity(node, scope, found)
   found = check_contracts(node, scope, found)
@@ -966,6 +998,24 @@ end
 
 # — the inference-backed checks (ADR 0047) —
 #
+# The seventh wording (#98, ratified 2026-09-24): a bare name that no
+# local, def, builtin, type, enum, or module answers. Provable only where
+# every name the file can see is in view — never inside a struct's or
+# module's body, whose own defs a bare name reaches first, and never in a
+# file with a require the walk could not resolve.
+def check_defined(name, node, scope, found)
+  return found unless scope.judging
+  return found if scope.locals.any? { it[0] == name }
+  return found if scope.globals.any? { it[0] == name }
+  return found if builtin_function?(name)
+  noted(found, ["undefined", name], locate(node, scope))
+end
+
+# The seed's own list (`builtin_name`): the bare functions every program
+# can call without defining — and `fields`, which outside `def self.new`
+# has a designed refusal of its own (ADR 0031) that the runtime keeps.
+def builtin_function?(name) = %w[argv failure fields inspect p panic puts read_file require_relative some write_file].include?(name)
+
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it
 # is a decline. The seed says the same sentences at runtime, with the

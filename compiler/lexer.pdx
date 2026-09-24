@@ -383,12 +383,15 @@ def expand_heredocs(source)
   output.join("\n")
 end
 
-def lex(raw_source)
+# `first_line` is where the count starts: 1 for a file, and a string's own
+# line for the source inside its interpolation, which is lexed on its own
+# (#98 — an identifier inside `"#{greeting}"` points at the right line).
+def lex(raw_source, first_line: 1)
   source = expand_heredocs(raw_source)
   characters = source.chars
   mutable tokens = []
   mutable index = 0
-  mutable line = 1
+  mutable line = first_line
   while index < characters.length
     character = characters[index]
     if character == " " || character == "\t"

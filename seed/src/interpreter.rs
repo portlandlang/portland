@@ -1340,7 +1340,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 } else if self.lookup_method(name).is_some() || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
                 } else {
-                    panic!("undefined variable or method {name}")
+                    // ADR 0047's seventh wording (ratified 2026-09-24, #98):
+                    // the checker says it at build; this is its runtime row.
+                    panic!("'{name}' is not defined")
                 }
             }
             Expression::Call {
@@ -3221,7 +3223,7 @@ impl<W: std::io::Write> Interpreter<W> {
 
         let method = self
             .lookup_method(name)
-            .unwrap_or_else(|| panic!("undefined method {name}"));
+            .unwrap_or_else(|| panic!("'{name}' is not defined"));
         let required = method
             .parameters
             .iter()
@@ -5252,7 +5254,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "undefined variable")]
+    #[should_panic(expected = "'nope' is not defined")]
     fn panics_on_an_undefined_variable() {
         evaluate("nope");
     }
@@ -5442,13 +5444,13 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "undefined variable")]
+    #[should_panic(expected = "'value' is not defined")]
     fn method_bodies_cannot_see_outer_locals() {
         evaluate("value = 1\ndef f\n  value\nend\nf()\n");
     }
 
     #[test]
-    #[should_panic(expected = "undefined method")]
+    #[should_panic(expected = "'nope' is not defined")]
     fn panics_on_an_undefined_method() {
         evaluate("nope()");
     }
@@ -5974,7 +5976,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "undefined variable or method current")]
+    #[should_panic(expected = "'current' is not defined")]
     fn while_body_locals_die_at_loop_end() {
         evaluate("mutable index = 0\nwhile index < 2\n  current = 1\n  index += 1\nend\ncurrent\n");
     }
@@ -6018,7 +6020,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "undefined variable or method scratch")]
+    #[should_panic(expected = "'scratch' is not defined")]
     fn fresh_block_locals_die_at_end() {
         evaluate("[1].each do |n|\n  scratch = n\nend\nscratch\n");
     }

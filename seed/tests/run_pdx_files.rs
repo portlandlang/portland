@@ -586,6 +586,14 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def either(word) = true && word\nputs either([].first or \"yes\")\n",
             "'&&' needs true or false, got \"yes\"",
         ),
+        // #98 — a bare name nothing answers fails hosted with the seed's
+        // sentence, where it once printed a debug line and carried on. Inside
+        // a struct's method the checker does not judge names, so the runtime
+        // speaks.
+        (
+            "struct T\n  kind\n  def go = nope\nend\nT.new(kind: 1).go\n",
+            "'nope' is not defined",
+        ),
         // #91 — the seed's argument count at every hosted binding site: a
         // struct's method, a type function, a defined `new`, a block. (A
         // top-level def's bare call refuses at build first, so its row is
@@ -1104,6 +1112,14 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "reached the end\n",
             "'box' is a Box, but 'tag' needs '.kind'",
         ),
+        // The seventh wording (#98) — a bare name nothing answers. Every kind
+        // of name that is defined passes above it: a local, a def, a struct,
+        // an enum, a module, a builtin, a block's `it`, a pattern's capture.
+        (
+            "SOME_SIGNIFICANT_NUMBER = 8_675_309\nstruct Token\n  kind\nend\nenum Status\n  :pending\nend\nmodule Stats\n  def mean = 1\nend\ndef twice(n) = n * 2\nputs twice(SOME_SIGNIFICANT_NUMBER)\nputs Token.new(kind: \"w\").kind\nputs Stats.mean\n[1].each { puts it }\ncase 5\nin found then puts found\nend\ndef foo(bar:)\n  if false\n    bar * SOME_SIGNIFICANT_NUMBER\n  end\nend\nputs \"reached the end\"\n",
+            "17350618\nw\n1\n1\n5\nreached the end\n",
+            "'SOME_SIGNIFICANT_NUMBER' is not defined\n  21 | bar * SOME_SIGNIFICANT_NUMBER",
+        ),
         // The sixth wording — arity, the seed's own moved to build time with
         // its plural fixed. Keyword arguments stand outside the count.
         (
@@ -1348,6 +1364,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"alias\", \"to_int\", \"to_i\"])\n\
              puts render_location([12, \"puts name.knd\"])\n\
              puts render_report([[[\"coverage\", \"nil\"], [3, \"case top\", nil]], [[\"arity\", \"greet\", \"1\", 0], nil]])\n\
+             puts render_refusal([\"undefined\", \"SOME_SIGNIFICANT_NUMBER\"])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1395,6 +1412,7 @@ fn portland_refusals_render_the_house_voice() {
          greet expects 1 argument, got 0\n\
          \n\
          2 refusals\n\
+         'SOME_SIGNIFICANT_NUMBER' is not defined\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\
@@ -2007,7 +2025,7 @@ fn repl_reports_errors_and_continues() {
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("undefined variable or method nope")
+            .contains("'nope' is not defined")
     );
 }
 
