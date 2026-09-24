@@ -550,6 +550,23 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "struct Token\n  kind\nend\ndef poke(thing) = thing.knd\npoke(Token.new(kind: \"w\"))\n",
             "Token(kind: \"w\") is a Token, which has no method 'knd'",
         ),
+        // #88/#90 — a builtin miss and a builtin's wrong count say the
+        // seed's sentences hosted; the receiver comes through a parameter so
+        // the checker declines and the runtime speaks.
+        (
+            // A literal argument would refuse at build (ADR 0048's contract
+            // check); `[].first or "pdx"` is a String only at runtime.
+            "def poke(thing) = thing.knd\npoke([].first or \"pdx\")\n",
+            "\"pdx\" is a String, which has no method 'knd'",
+        ),
+        (
+            "def poke(thing) = thing.include?\npoke(\"pdx\")\n",
+            "'include?' takes 1 argument, got 0",
+        ),
+        (
+            "def poke(thing) = thing.first(1, 2)\npoke([1, 2])\n",
+            "'first' takes 0 to 1 arguments, got 2",
+        ),
         // #87 — the boolean `||` and `&&` check both sides hosted as the
         // seed does, where a false left once answered whatever came next.
         // The operand comes through a parameter so the checker declines

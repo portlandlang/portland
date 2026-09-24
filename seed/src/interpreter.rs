@@ -2318,7 +2318,47 @@ impl<W: std::io::Write> Interpreter<W> {
                 if let Some(survivor) = alias_survivor(name) {
                     panic!("{name} is spelled {survivor} here");
                 }
-                panic!("undefined method {name} for {receiver:?} with {arguments:?}")
+                // The table (#88) tells three things apart here: no such
+                // method — ADR 0047 shape 2's runtime row; a real method with
+                // the wrong count — the arity sentence, ratified 2026-09-23;
+                // and a real method given arguments it cannot take, which has
+                // no wording yet and keeps the catch-all's.
+                let signature = receiver
+                    .type_tag()
+                    .and_then(|tag| crate::builtins::signature(tag, name));
+                match (receiver.type_tag(), signature) {
+                    (Some(_), None) => {
+                        let type_name = receiver.type_name();
+                        panic!(
+                            "{} is {} {type_name}, which has no method '{name}'",
+                            receiver.shown(),
+                            Value::article_for(&type_name)
+                        )
+                    }
+                    (Some(_), Some((low, high)))
+                        if arguments.len() < low || arguments.len() > high =>
+                    {
+                        let expected = if low == high {
+                            low.to_string()
+                        } else {
+                            format!("{low} to {high}")
+                        };
+                        panic!(
+                            "'{name}' takes {expected} {}, got {}",
+                            Value::arguments_word(&expected),
+                            arguments.len()
+                        )
+                    }
+                    _ => {
+                        let shown: Vec<String> =
+                            arguments.iter().map(|argument| argument.shown()).collect();
+                        panic!(
+                            "undefined method {name} for {} with [{}]",
+                            receiver.shown(),
+                            shown.join(", ")
+                        )
+                    }
+                }
             }
         })
     }
@@ -3344,7 +3384,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "undefined method to_sym")]
+    #[should_panic(expected = "\"paid\" is a String, which has no method 'to_sym'")]
     fn there_is_no_to_sym() {
         // The load-bearing omission (ADR 0023 §3): a symbol built from a
         // string at runtime could never be checked against a vocabulary.
@@ -4467,9 +4507,36 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "undefined method shout")]
+    #[should_panic(expected = "\"pdx\" is a String, which has no method 'shout'")]
     fn panics_on_an_undefined_value_method() {
         evaluate(r#""pdx".shout"#);
+    }
+
+    /// The table (#88) tells a missing method from a real one called with
+    /// the wrong count — the arity sentence ratified 2026-09-23 — and from
+    /// one given arguments it cannot take, which keeps the catch-all's words.
+    #[test]
+    #[should_panic(expected = "'include?' takes 1 argument, got 0")]
+    fn names_the_count_a_builtin_takes() {
+        evaluate(r#""pdx".include?"#);
+    }
+
+    #[test]
+    #[should_panic(expected = "'first' takes 0 to 1 arguments, got 2")]
+    fn names_the_range_a_builtin_takes() {
+        evaluate("[1, 2].first(1, 2)");
+    }
+
+    #[test]
+    #[should_panic(expected = "undefined method include? for \"pdx\" with [1]")]
+    fn keeps_the_catch_all_for_arguments_a_builtin_cannot_take() {
+        evaluate(r#""pdx".include?(1)"#);
+    }
+
+    #[test]
+    #[should_panic(expected = "5 is an Integer, which has no method 'upcase'")]
+    fn names_the_builtin_type_with_its_article() {
+        evaluate("5.upcase");
     }
 
     #[test]

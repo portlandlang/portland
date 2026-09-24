@@ -1,17 +1,22 @@
 #!/usr/bin/env ruby
 # Derive the builtin method table from the seed's behavior (#88): for each
-# builtin receiver, which names answer. A name exists when some call shape —
-# no arguments, one, two, an array, a hash, a block, an argument and a
-# block — fails with anything other than the seed's catch-all "undefined
-# method" / "undefined block-taking method", or does not fail at all. The
-# seed is the oracle (principle 7), so the table in `compiler/inference.pdx`
-# is pinned to this script's output rather than to a reading of the Rust.
+# builtin receiver, which names answer, with how many positional arguments,
+# and whether with a block. A name exists when some call shape — no
+# arguments, one, two, an array, a hash, a block, an argument and a block —
+# fails with anything other than the seed's catch-all "undefined method" /
+# "undefined block-taking method", or does not fail at all; the counts of
+# the shapes that pass are its arity, and a passing block shape marks it
+# block-taking. The seed is the oracle (principle 7), so the table in
+# `compiler/inference.pdx` — which the seed itself reads at build for its
+# own wordings — is pinned to this script's output rather than to a
+# reading of the Rust.
 #
 # Usage: script/probe_builtin_methods            (needs target/debug/pdx)
 #
-# Candidates are the names the seed's dispatch arms mention plus the Ruby
-# names a migrating reader might reach for; add to the list to widen the
-# probe. Prints one line per type, sorted, in the shape inference.pdx keeps.
+# Each line is `type: name/arity name/arity …`, sorted: `include?/1`,
+# `slice/1-2`, `each/0&` (block-taking), `first/0-1`. Candidates are the
+# names the seed's dispatch arms mention plus the Ruby names a migrating
+# reader might reach for; add to the list to widen the probe.
 
 require "open3"
 require "tmpdir"
@@ -48,38 +53,44 @@ candidates = %w[
   append prepend concat replace
 ].uniq.sort
 
+# [call text, positional count, block?]
 shapes = lambda do |receiver, name|
   [
-    "#{receiver}.#{name}",
-    "#{receiver}.#{name}(1)",
-    "#{receiver}.#{name}(\"a\")",
-    "#{receiver}.#{name}(1, 2)",
-    "#{receiver}.#{name}([1])",
-    "#{receiver}.#{name}({\"a\" => 1})",
-    "#{receiver}.#{name} { it }",
-    "#{receiver}.#{name} { |a, b| a }",
-    "#{receiver}.#{name}(1) { it }",
-    "#{receiver}.#{name}(1) { |a, b| a }",
-    "#{receiver}.#{name}(\"a\") { it }",
-    "#{receiver}.#{name}([1]) { it }",
+    ["#{receiver}.#{name}", 0, false],
+    ["#{receiver}.#{name}(1)", 1, false],
+    ["#{receiver}.#{name}(\"a\")", 1, false],
+    ["#{receiver}.#{name}([1])", 1, false],
+    ["#{receiver}.#{name}({\"a\" => 1})", 1, false],
+    ["#{receiver}.#{name}(1, 2)", 2, false],
+    ["#{receiver}.#{name} { it }", 0, true],
+    ["#{receiver}.#{name} { |a, b| a }", 0, true],
+    ["#{receiver}.#{name}(1) { it }", 1, true],
+    ["#{receiver}.#{name}(1) { |a, b| a }", 1, true],
+    ["#{receiver}.#{name}(\"a\") { it }", 1, true],
+    ["#{receiver}.#{name}([1]) { it }", 1, true],
   ]
 end
 
-catch_all = ["undefined method", "undefined block-taking method", "unexpected token", "expected"]
+catch_all = ["undefined method", "undefined block-taking method", "unexpected token", "expected", "takes", "has no method"]
 
 # Progress goes to stderr so a caller reading the table off stdout — the
 # check script — still sees a type land every fifteen seconds or so.
 Dir.mktmpdir do |directory|
   receivers.each do |type, receiver|
     warn "probing #{type} (#{candidates.length} names)…"
-    found = candidates.select do |name|
-      shapes.call(receiver, name).any? do |call|
+    entries = candidates.filter_map do |name|
+      passing = shapes.call(receiver, name).select do |call, _count, _block|
         path = File.join(directory, "probe.pdx")
         File.write(path, "x = #{call}\n")
         _out, err, _status = Open3.capture3(pdx, path)
         catch_all.none? { |phrase| err.include?(phrase) }
       end
+      next if passing.empty?
+      counts = passing.map { |_call, count, _block| count }.uniq.sort
+      arity = counts.length == 1 ? counts.first.to_s : "#{counts.min}-#{counts.max}"
+      block = passing.any? { |_call, _count, takes_block| takes_block } ? "&" : ""
+      "#{name}/#{arity}#{block}"
     end
-    puts "#{type}: #{found.join(" ")}"
+    puts "#{type}: #{entries.join(" ")}"
   end
 end

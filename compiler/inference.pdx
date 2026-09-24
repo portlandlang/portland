@@ -582,26 +582,49 @@ end
 
 # — the builtin method table (#88) —
 #
-# What each builtin receiver answers, derived from the seed's *behavior*
+# What each builtin receiver answers, with what: `include?/1`, `slice/2`,
+# `first/0-1`, `each/0&` (block-taking). Derived from the seed's *behavior*
 # by script/probe_builtin_methods rather than from a reading of its Rust —
 # run the script and paste, so the seed stays the oracle (principle 7) and
 # the spec suite, which exercises every builtin, stands guard over a name
-# gone missing. The four names every value answers are in each list. Nil
-# is left out on purpose: the runtime's own sentence handles it.
-def builtin_methods(type)
+# gone missing. The seed reads these same eight lines at build for its own
+# wordings, so this is the table's one home. The four names every value
+# answers are in each list; nil is left out on purpose, the runtime's own
+# sentence handling it.
+def builtin_table(type)
   case type
-  in ["string"] then %w[capitalize chars chomp count downcase empty? end_with? failure? include? index length lines lstrip nil? reverse rstrip size slice some? split start_with? strip swapcase to_f to_i to_s upcase]
-  in ["integer"] then %w[abs downto even? failure? gcd magnitude negative? next nil? odd? positive? pow pred some? succ times to_f to_s upto zero?]
-  in ["float"] then %w[abs ceil failure? finite? floor infinite? magnitude nan? nil? pow round some? to_f to_i to_s truncate zero?]
-  in ["boolean"] then %w[failure? nil? some? to_s]
-  in ["symbol"] then %w[failure? nil? some? to_s]
-  in ["array", *] then %w[all? any? collect collect_concat compact count detect each each_slice each_with_index empty? entries failure? filter find find_all first flat_map flatten include? index inject join last length map max member? min nil? none? reduce reject reverse select size slice some? sort sort_by sum tally to_a to_s uniq zip]
-  in ["hash", *] then %w[dig each each_pair empty? entries failure? has_key? include? key? keys length member? merge nil? size some? to_a to_s values]
-  in ["range"] then %w[all? any? collect collect_concat count detect each each_with_index failure? filter find find_all first flat_map include? inject last length map max min nil? none? reduce reject select size some? sort_by step sum to_a to_s]
+  in ["string"] then %w[capitalize/0 chars/0 chomp/0 count/1 downcase/0 empty?/0 end_with?/1 failure?/0 include?/1 index/1 length/0 lines/0 lstrip/0 nil?/0 reverse/0 rstrip/0 size/0 slice/2 some?/0 split/1 start_with?/1 strip/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0]
+  in ["integer"] then %w[abs/0 downto/1& even?/0 failure?/0 gcd/1 magnitude/0 negative?/0 next/0 nil?/0 odd?/0 positive?/0 pow/1 pred/0 some?/0 succ/0 times/0& to_f/0 to_s/0-1 upto/1& zero?/0]
+  in ["float"] then %w[abs/0 ceil/0 failure?/0 finite?/0 floor/0 infinite?/0 magnitude/0 nan?/0 nil?/0 pow/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
+  in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
+  in ["symbol"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
+  in ["array", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& compact/0 count/0-1 detect/0& each/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& flatten/0 include?/1 index/1 inject/1& join/1 last/0-1 length/0 map/0& max/0 member?/1 min/0 nil?/0 none?/0& reduce/1& reject/0& reverse/0 select/0& size/0 slice/2 some?/0 sort/0 sort_by/0& sum/0 tally/0 to_a/0 to_s/0 uniq/0 zip/1]
+  in ["hash", *] then %w[dig/1-2 each/0& each_pair/0& empty?/0 entries/0 failure?/0 has_key?/1 include?/1 key?/1 keys/0 length/0 member?/1 merge/1 nil?/0 size/0 some?/0 to_a/0 to_s/0 values/0]
+  in ["range"] then %w[all?/0& any?/0& collect/0& collect_concat/0& count/0-1 detect/0& each/0& each_with_index/0& failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0 min/0 nil?/0 none?/0& reduce/1& reject/0& select/0& size/0 some?/0 sort_by/0& step/1 sum/0 to_a/0& to_s/0]
   else
     nil
   end
 end
+
+# The names alone, for membership.
+def builtin_methods(type)
+  table = builtin_table(type)
+  return nil if table.nil?
+  table.map { entry_name(it) }
+end
+
+# An entry's arity as [low, high], or nil where the type has no such name.
+def builtin_arity(type, name)
+  table = builtin_table(type)
+  return nil if table.nil?
+  entry = table.find { entry_name(it) == name }
+  return nil if entry.nil?
+  arity = entry.split("/").last.split("&").first
+  bounds = arity.split("-").map { it.to_i }
+  [bounds.first, bounds.last]
+end
+
+def entry_name(entry) = entry.split("/").first
 
 # The false aliases (ADR 0036): Ruby's implicit-conversion protocol wears
 # conversion spellings, and each refuses by naming its survivor — the

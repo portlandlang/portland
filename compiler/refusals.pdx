@@ -89,9 +89,15 @@ end
 # rendering's first letter, so no wording ever hard-codes one.
 def a_type(type)
   rendered = render_type(type)
-  first = rendered.slice(0, 1)
-  return "an " + rendered if %w[A E I O U].include?(first)
-  "a " + rendered
+  "#{article(rendered)} #{rendered}"
+end
+
+# The article alone, for a name that is not a type in the dump's shape —
+# the runtime's `Array` where the build would say `[Integer]`.
+def article(name)
+  first = name.slice(0, 1)
+  return "an" if %w[A E I O U].include?(first)
+  "a"
 end
 
 # `expected` is the seed's own count spelling — `1`, or `1 to 2` — and

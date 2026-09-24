@@ -1451,6 +1451,9 @@ def evaluate_method_call(node, mutable bindings)
   # Struct methods dispatch before builtins and field access (#27).
   own = struct_method_for(receiver, node.name, bindings)
   return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
+  # A builtin called with the wrong count says so before any host arm can
+  # fail on a missing argument with the wrong words (#88).
+  check_builtin_count(receiver, node.name, arguments.length)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
@@ -1544,6 +1547,10 @@ def evaluate_method_call(node, mutable bindings)
     # "cannot index Integer(7) with Integer(2)" — which is how nine missing
     # methods stayed hidden. Say what actually happened instead.
     unless receiver in ["__struct__", *]
+      # The table (#88) says which: a name no builtin of this type answers
+      # is the seed's sentence (ADR 0047 shape 2's runtime row); a name the
+      # seed answers is a builtin this evaluator has not learned, said so.
+      refuse_missing_builtin(receiver, node.name)
       panic("no method #{node.name} on this value — the compiler may be missing a builtin the seed has")
     end
     struct_field(receiver, node.name)
@@ -1607,6 +1614,44 @@ def check_block_count(parameters, given)
 end
 
 def arguments_word(expected) = if expected == "1" then "argument" else "arguments" end
+
+# The builtin table's type for a host value (#88), or nil for a value it
+# does not cover — a struct, a symbol's tagged array, a range or float the
+# host patterns cannot name yet — which declines both checks below.
+def builtin_type_of(value)
+  return ["string"] if value in String
+  return ["integer"] if value in Integer
+  return ["boolean"] if value in Boolean
+  return ["hash", ["unknown"], ["unknown"]] if value in Hash
+  return ["array", ["unknown"]] if plain_array?(value)
+  nil
+end
+
+# A real builtin called with a count outside its arity: the sentence
+# ratified 2026-09-23, the seed's (#88).
+def check_builtin_count(receiver, name, given)
+  type = builtin_type_of(receiver)
+  return if type.nil?
+  arity = builtin_arity(type, name)
+  return if arity.nil?
+  low = value_at(arity, 0)
+  high = value_at(arity, 1)
+  return if given >= low && given <= high
+  expected = if low == high then low.to_s else "#{low} to #{high}" end
+  panic("#{spelled(name)} takes #{expected} #{arguments_word(expected)}, got #{given}")
+end
+
+# A name no builtin of the receiver's type answers: ADR 0047 shape 2's
+# runtime row, the seed's sentence. A name the seed does answer falls
+# through to the caller's honest "not learned yet" sentence.
+def refuse_missing_builtin(receiver, name)
+  type = builtin_type_of(receiver)
+  return if type.nil?
+  methods = builtin_methods(type)
+  return if methods.include?(name)
+  runtime_name = type_at(type, 0).capitalize
+  panic("#{shorten(render_inspect(receiver))} is #{article(runtime_name)} #{runtime_name}, which has no method #{spelled(name)}")
+end
 
 # Blocks see the enclosing scope; parameters are prepended for the call.
 #

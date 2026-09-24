@@ -192,6 +192,41 @@ impl Value {
         }
     }
 
+    /// The builtin table's tag for this value (#88), or `None` for a value
+    /// the table does not cover — a struct, an enum case, a wrapper, nil.
+    pub fn type_tag(&self) -> Option<&'static str> {
+        match self {
+            Value::Array(_) => Some("array"),
+            Value::Boolean(_) => Some("boolean"),
+            Value::Float(_) => Some("float"),
+            Value::Hash(_) => Some("hash"),
+            Value::Integer(_) => Some("integer"),
+            Value::Range { .. } => Some("range"),
+            Value::String(_) => Some("string"),
+            Value::Symbol(_) => Some("symbol"),
+            _ => None,
+        }
+    }
+
+    /// The type's name as a refusal says it (ADR 0047 §1): the builtin's
+    /// capitalized name, a struct's own.
+    pub fn type_name(&self) -> String {
+        match self {
+            Value::Array(_) => "Array".to_string(),
+            Value::Boolean(_) => "Boolean".to_string(),
+            Value::EnumCase { name, .. } => format!(":{name}"),
+            Value::Float(_) => "Float".to_string(),
+            Value::Hash(_) => "Hash".to_string(),
+            Value::Integer(_) => "Integer".to_string(),
+            Value::Nil => "nil".to_string(),
+            Value::Range { .. } => "Range".to_string(),
+            Value::String(_) => "String".to_string(),
+            Value::Struct { name, .. } => name.clone(),
+            Value::Symbol(_) => "Symbol".to_string(),
+            other => format!("{other:?}"),
+        }
+    }
+
     /// `1 argument`, `2 arguments`, `1 to 2 arguments` — the noun by the
     /// count as the sentence spells it; only a lone 1 is singular.
     pub fn arguments_word(expected: &str) -> &'static str {

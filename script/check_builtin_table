@@ -1,10 +1,12 @@
 #!/usr/bin/env ruby
 # The builtin method table in compiler/inference.pdx must match what the
 # seed actually answers (#88). This runs script/probe_builtin_methods and
-# diffs its eight lines against the table, type by type, so a builtin
-# added, removed, or renamed in the seed cannot leave the checker with a
-# stale set. Two minutes; the pre-push hook runs it only when seed/src
-# changed, and AGENT.md's recipe says when to run it by hand.
+# diffs its eight lines against the table, type by type and entry by entry
+# — `include?/1`, `each/0&` — so a builtin added, removed, renamed, or
+# given a new arity in the seed cannot leave the checker, or the seed's
+# own wordings (which read the same table at build), with a stale set.
+# Two minutes; the pre-push hook runs it only when seed/src changed, and
+# AGENT.md's recipe says when to run it by hand.
 #
 # Usage: script/check_builtin_table            (needs target/debug/pdx)
 
