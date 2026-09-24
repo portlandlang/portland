@@ -353,7 +353,7 @@ There are no generated predicates and no `Status.all`: an enum is a type, not a 
 
 ## Multi-file programs
 
-`require_relative "lexer"` — resolved against the requiring file's directory, `.pdx` implied, loaded once and returning false on a repeat.
+`require_relative "lexer"` — resolved against the requiring file's directory, `.pdx` implied, loaded once and returning false on a repeat. A required file gets the scope a method call gets: its defs, structs, enums, traits, and namespace constants cross into the requirer, and bare locals do not, in either direction ([#95](https://github.com/portlandlang/portland/issues/95)). A require is not a paste.
 
 ## The library, so far
 

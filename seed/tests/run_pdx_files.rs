@@ -1476,6 +1476,98 @@ fn the_checker_follows_requires() {
     );
 }
 
+/// A required file's locals stay in it (#95, ruled 2026-09-24). Defs, structs,
+/// enums, traits, and namespace constants cross a require; a bare local does
+/// not, in either direction — a require is not a paste. Both oracles say so:
+/// the checker at build with the line beneath, the seed at runtime, in ADR
+/// 0047's seventh wording.
+#[test]
+fn locals_do_not_cross_a_require() {
+    let directory = std::env::temp_dir().join("require_locals");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("lib.pdx"),
+        "helper_local = 41\ndef helper = 2\nmodule Limits\n  MOST = 3\nend\n",
+    )
+    .unwrap();
+    let reader = directory.join("reader.pdx");
+    std::fs::write(
+        &reader,
+        "require_relative \"lib\"\nputs helper\nputs Limits::MOST\nputs helper_local\n",
+    )
+    .unwrap();
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&reader)
+        .output()
+        .expect("failed to run pdx");
+    assert!(!seed.status.success(), "the seed should refuse the local");
+    assert_eq!(
+        String::from_utf8(seed.stdout).unwrap(),
+        "2\n3\n",
+        "the def and the namespace constant should cross"
+    );
+    let stderr = String::from_utf8(seed.stderr).unwrap();
+    assert!(
+        stderr.contains("'helper_local' is not defined"),
+        "the seed said: {stderr}"
+    );
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&reader)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !hosted.status.success(),
+        "the checker should refuse the local"
+    );
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    let expected = format!(
+        "'helper_local' is not defined\n  {}:4 | puts helper_local",
+        reader.display()
+    );
+    assert!(
+        stderr.contains(&expected),
+        "the checker should say {expected:?}, got: {stderr}"
+    );
+
+    // And the other way: the required file does not see the requirer's local.
+    std::fs::write(directory.join("peeks.pdx"), "puts requirer_local\n").unwrap();
+    let requirer = directory.join("requirer.pdx");
+    std::fs::write(
+        &requirer,
+        "requirer_local = 1\nrequire_relative \"peeks\"\n",
+    )
+    .unwrap();
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&requirer)
+        .output()
+        .expect("failed to run pdx");
+    assert!(!seed.status.success(), "the seed should refuse the peek");
+    let stderr = String::from_utf8(seed.stderr).unwrap();
+    assert!(
+        stderr.contains("'requirer_local' is not defined"),
+        "the seed said: {stderr}"
+    );
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&requirer)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !hosted.status.success(),
+        "the checker should refuse the peek"
+    );
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    let expected = format!(
+        "'requirer_local' is not defined\n  {}:1 | puts requirer_local",
+        directory.join("peeks.pdx").display()
+    );
+    assert!(
+        stderr.contains(&expected),
+        "the checker should say {expected:?}, got: {stderr}"
+    );
+}
+
 /// Sharpening (ADR 0048 ruling 4, ADR 0049 §4): in run mode a parameter
 /// every caller passes the same type is read at that type inside the def,
 /// so the ordinary shapes reach the body. Callers that disagree leave it

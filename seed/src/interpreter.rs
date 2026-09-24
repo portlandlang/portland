@@ -2432,7 +2432,24 @@ impl<W: std::io::Write> Interpreter<W> {
             .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
         let program = parser::parse(&source);
         let previous_file = self.current_file.replace(resolved);
+        // A required file gets the scope a method call gets (#95): namespace
+        // constants cross, bare locals do not — in either direction. Its
+        // defs, structs, enums, and traits live in their own tables and
+        // cross on their own; what it binds under a namespace is copied back.
+        let mut scope: HashMap<String, Binding> = self
+            .variables
+            .iter()
+            .filter(|(name, _)| name.contains("::"))
+            .map(|(name, binding)| (name.clone(), binding.clone()))
+            .collect();
+        std::mem::swap(&mut self.variables, &mut scope);
         self.run_body(&program.statements);
+        std::mem::swap(&mut self.variables, &mut scope);
+        for (name, binding) in scope {
+            if name.contains("::") {
+                self.variables.insert(name, binding);
+            }
+        }
         self.current_file = previous_file;
         true
     }

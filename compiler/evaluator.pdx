@@ -2090,18 +2090,26 @@ def evaluate_require(name, bindings)
   # itself answers false the second time instead of recursing until the stack
   # gives out. The seed inserts before running for the same reason.
   loaded = [["__loaded__", "loaded", loaded_paths(bindings) + [target]]]
-  scope = [["__file__", "file", target]] + loaded + bindings
+  # A required file gets the scope a method call gets (#95): everything
+  # declared crosses, bare locals do not — in either direction. A require is
+  # not a paste.
+  scope = [["__file__", "file", target]] + loaded + bindings.reject { local?(it) }
   # `read_file` answers a failure now (ADR 0027), which lets this refusal
   # finally wear the seed's wording — one recorded divergence retired. The
   # message names the *requested* path, as the seed's does.
   source = read_file(target) or panic "require_relative #{inspect(name)}: No such file or directory (os error 2)"
   result = run_body(parse_program(lex(source)), scope)
-  # Everything the file defined stays in scope — that is the point of a require,
-  # and the opposite of a method call. Only `__file__` is put back, so the rest
-  # of the requiring file resolves its own relative paths, not the required
-  # file's.
-  outcome([true], [["__file__", "file", file_of(bindings)]] + result.bindings)
+  # Everything the file declared stays in scope — that is the point of a
+  # require. Its locals drop, the requirer's come back, and `__file__` is put
+  # back so the rest of the requiring file resolves its own relative paths, not
+  # the required file's.
+  declared = result.bindings.reject { local?(it) }
+  outcome([true], [["__file__", "file", file_of(bindings)]] + declared + bindings.select { local?(it) })
 end
+
+# A binding that belongs to one file or one frame: a local, the rebindable
+# kind included, and the `__fields__` marker (ADR 0031).
+def local?(triple) = triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
 
 def evaluate_call(node, mutable bindings)
   mutable arguments = []
