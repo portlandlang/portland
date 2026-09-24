@@ -42,6 +42,11 @@
 # any mutable name a nested body rebinds, since the body may or may not
 # have run by the time the name is read again (principle 4: a type the
 # checker cannot prove is not a type it may refuse on).
+#
+# Every refusal is reported at once (the ruling of 2026-09-24): the walk
+# threads a list of what it found — `found`, in and out of every check —
+# and the closure refuses once at the end with the whole report, in
+# source order, each file in dependency order. Nothing panics mid-walk.
 
 require_relative "paths"
 require_relative "refusals"
@@ -115,21 +120,33 @@ def declarations_in(node)
   end
 end
 
-# The one entry point: refuse or stay silent. Panics with the first
-# refusal — reporting every refusal at once is the diagnostics arc's job,
-# not this increment's.
+# The one-file entry point: refuse with everything found, or stay silent.
 def check_program(nodes, source)
-  check_program_with(nodes, source, nil, empty_declarations, [])
+  report(check_program_with(nodes, source, nil, empty_declarations, []))
 end
 
 # One file, with what its requires declare in view (#94): its own
 # declarations first, so a name declared on both sides resolves to its own.
+# Answers what it found, in source order.
 def check_program_with(nodes, source, file, imports, sharpened)
   own = declarations_of(nodes)
   whole = merge_declarations(own, imports)
   scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
-  check_annotations(nodes, source, scope)
-  check_body(nodes, scope)
+  found = check_annotations(nodes, source, scope, [])
+  in_source_order(check_body(nodes, scope, found))
+end
+
+# Refusals in the order the source has them: by line, with the walk's own
+# order breaking ties and standing in where a node carries no line. One
+# integer key per entry, since the sort need not be stable.
+def in_source_order(found)
+  mutable keyed = []
+  found.each_with_index do |entry, index|
+    location = type_at(entry, 1)
+    line = if location.nil? then 0 else location.first end
+    keyed << [line * 100000 + index, entry]
+  end
+  keyed.sort_by { it.first }.map { type_at(it, 1) }
 end
 
 # — the whole-program door (#94, ADR 0049) —
@@ -165,10 +182,12 @@ def check_closure_with(path, mutable checked, sharpen)
   files = value_at_checked(resolution, 1)
   entry = files.last
   sharpened = if sharpen && entry.some? then sharpen_parameters(entry, files) else [] end
+  mutable found = []
   files.each do |file|
     own = if entry.some? && file.path == entry.path then sharpened else [] end
-    check_program_with(file.nodes, file.source, file.named, file.imports, own)
+    found += check_program_with(file.nodes, file.source, file.named, file.imports, own)
   end
+  report(found)
   checked
 end
 
@@ -292,7 +311,7 @@ end
 # return inference computed — the annotation grammar *is* the dump's
 # rendering (ADR 0041 §4), so byte equality is the rule. Agreement and an
 # unknown answer are both silence; only a known disagreement refuses.
-def check_annotations(nodes, source, scope)
+def check_annotations(nodes, source, scope, mutable found)
   nodes.each do |node|
     next unless node in DefNode
     written = annotation_for(source, node.name)
@@ -300,8 +319,9 @@ def check_annotations(nodes, source, scope)
     computed = synthesize_name(node.name, scope.globals)
     next unless known?(computed)
     next if render_type(computed) == written
-    refuse(["annotation", node.name, computed, written], locate(node, scope))
+    found = noted(found, ["annotation", node.name, computed, written], locate(node, scope))
   end
+  found
 end
 
 # Every struct's instance method set, as [name, methods] pairs: its
@@ -388,12 +408,14 @@ def declared_globals(nodes)
 end
 
 # A body is walked in order, each statement seen with the bindings the
-# statements above it left behind.
-def check_body(nodes, mutable scope)
+# statements above it left behind. Every walk function takes what has
+# been found so far and answers it with its own findings appended.
+def check_body(nodes, mutable scope, mutable found)
   nodes.each do |node|
-    check_node(node, scope)
+    found = check_node(node, scope, found)
     scope = bind_statement(node, scope)
   end
+  found
 end
 
 # The bindings a statement leaves for the statements after it — inference's
@@ -457,132 +479,137 @@ end
 
 # The walk. Dispatch mirrors the evaluator's, but visits everything —
 # bodies that would never run included — and checks only what it knows.
-def check_node(node, scope)
+def check_node(node, scope, mutable found)
   case node
-  in EnumCaseNode then check_construction(node, scope)
-  in EnumCasePatternNode then check_case_pattern(node, scope)
-  in AssignmentNode(value:) then check_node(value, scope)
+  in EnumCaseNode then check_construction(node, scope, found)
+  in EnumCasePatternNode then check_case_pattern(node, scope, found)
+  in AssignmentNode(value:) then check_node(value, scope, found)
   in DefNode(parameters:, body:)
-    check_parameters(parameters, scope)
-    check_body(body, def_scope(node, scope))
+    found = check_parameters(parameters, scope, found)
+    check_body(body, def_scope(node, scope), found)
   in StructDefNode(methods:, nested:, type_functions:)
-    check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs")
-    check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs")
-    check_methods(methods, scope)
-    check_methods(type_functions, scope)
-    check_body(nested, scope)
+    found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs", scope, found)
+    found = check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs", scope, found)
+    found = check_methods(methods, scope, found)
+    found = check_methods(type_functions, scope, found)
+    check_body(nested, scope, found)
   in TraitDefNode(methods:)
-    check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it")
-    check_methods(methods, scope)
-  in ModuleDefNode(body:) then check_body(body, scope)
+    found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it", scope, found)
+    check_methods(methods, scope, found)
+  in ModuleDefNode(body:) then check_body(body, scope, found)
   in WhileNode(condition:, body:)
-    check_node(condition, scope)
-    check_condition("while", node, scope)
+    found = check_node(condition, scope, found)
+    found = check_condition("while", node, scope, found)
     # The body may have run before the condition is read again, so the
     # names it rebinds are unknown throughout it too — and what the
     # condition proves is read over those, never over the first pass.
     forgotten = forget(scope, assigned_names_in_body(body))
     proof = narrowings(condition, known_types(forgotten))
-    check_body(body, with_proof(forgotten, when_true(proof)))
-  in TogetherNode(lines:) then check_together(lines, scope)
+    check_body(body, with_proof(forgotten, when_true(proof)), found)
+  in TogetherNode(lines:) then check_together(lines, scope, found)
   in ReturnNode(value:)
-    check_node(value, scope) unless value.nil?
+    return found if value.nil?
+    check_node(value, scope, found)
   in IfNode
-    check_node(node.condition, scope)
-    check_condition("if", node, scope)
+    found = check_node(node.condition, scope, found)
+    found = check_condition("if", node, scope, found)
     # Each branch sees what the condition proved on its side (ADR 0040 §3's
     # narrowing forms, in inference). `unless` parses as an if with no
     # then-side, so either body may be nil.
     proof = narrowings(node.condition, known_types(scope))
-    check_body(node.then_body, with_proof(scope, when_true(proof))) unless node.then_body.nil?
-    check_body(node.else_body, with_proof(scope, when_false(proof))) unless node.else_body.nil?
-  in CaseNode then check_case(node, scope)
-  in CaseInNode then check_case_in(node, scope)
-  in CallNode then check_call(node, scope)
-  in MethodCallNode | SafeMethodCallNode then check_method_call(node, scope)
-  in ArrayNode(elements:) then check_body(elements, scope)
-  in HashNode(pairs:) then check_pairs(node.pairs, scope)
+    found = check_body(node.then_body, with_proof(scope, when_true(proof)), found) unless node.then_body.nil?
+    found = check_body(node.else_body, with_proof(scope, when_false(proof)), found) unless node.else_body.nil?
+    found
+  in CaseNode then check_case(node, scope, found)
+  in CaseInNode then check_case_in(node, scope, found)
+  in CallNode then check_call(node, scope, found)
+  in MethodCallNode | SafeMethodCallNode then check_method_call(node, scope, found)
+  in ArrayNode(elements:) then check_body(elements, scope, found)
+  in HashNode(pairs:) then check_pairs(node.pairs, scope, found)
   in BinaryNode(left:, right:)
-    check_node(left, scope)
-    check_node(right, scope)
-    check_operator(node, scope)
+    found = check_node(left, scope, found)
+    found = check_node(right, scope, found)
+    check_operator(node, scope, found)
   in LogicalNode(left:, right:)
-    check_node(left, scope)
+    found = check_node(left, scope, found)
     # The right side runs only where the left decided it: under the left's
     # proof for `&&`, its disproof for `||`.
     proof = narrowings(left, known_types(scope))
     right_side = if node.operator == "&&" then when_true(proof) else when_false(proof) end
-    check_node(right, with_proof(scope, right_side))
-    check_operands(node, scope)
+    found = check_node(right, with_proof(scope, right_side), found)
+    check_operands(node, scope, found)
   in UnaryNode(operand:)
-    check_node(operand, scope)
-    check_unary(node, scope)
+    found = check_node(operand, scope, found)
+    check_unary(node, scope, found)
   in IndexNode(receiver:, index:)
-    check_node(receiver, scope)
-    check_node(index, scope)
+    found = check_node(receiver, scope, found)
+    check_node(index, scope, found)
   in IndexUpdateNode(index: update_index, value: update_value)
-    check_node(update_index, scope)
-    check_node(update_value, scope)
+    found = check_node(update_index, scope, found)
+    check_node(update_value, scope, found)
   in SlotCompoundNode(index: compound_index, right: compound_right)
-    check_node(compound_index, scope)
-    check_node(compound_right, scope)
-  in AppendNode(value:) then check_node(value, scope)
+    found = check_node(compound_index, scope, found)
+    check_node(compound_right, scope, found)
+  in AppendNode(value:) then check_node(value, scope, found)
   in MatchAssertNode(subject:, pattern:)
-    check_node(subject, scope)
-    check_pattern(pattern, scope)
+    found = check_node(subject, scope, found)
+    check_pattern(pattern, scope, found)
   in MatchTestNode(subject: test_subject, pattern: test_pattern)
-    check_node(test_subject, scope)
-    check_pattern(test_pattern, scope)
-  in KeywordArgumentNode(value:) then check_node(value, scope)
+    found = check_node(test_subject, scope, found)
+    check_pattern(test_pattern, scope, found)
+  in KeywordArgumentNode(value:) then check_node(value, scope, found)
   else
-    nil
+    found
   end
 end
 
-def check_parameters(parameters, scope)
+def check_parameters(parameters, scope, mutable found)
   parameters.each do |parameter|
     if parameter in KeywordParameterNode
-      check_node(parameter.default, scope) unless parameter.default.nil?
+      found = check_node(parameter.default, scope, found) unless parameter.default.nil?
     elsif (parameter in AssignmentNode) && parameter.value.some?
-      check_node(parameter.value, scope)
+      found = check_node(parameter.value, scope, found)
     end
   end
+  found
 end
 
-def check_together(lines, scope)
+def check_together(lines, scope, mutable found)
   lines.each do |line|
-    if line in TaskLineNode
-      check_node(line.value, scope)
+    found = if line in TaskLineNode
+      check_node(line.value, scope, found)
     else
-      check_node(line, scope)
+      check_node(line, scope, found)
     end
   end
+  found
 end
 
-def check_case(node, scope)
-  check_node(node.subject, scope)
+def check_case(node, scope, mutable found)
+  found = check_node(node.subject, scope, found)
   node.branches.each do |branch|
-    check_body(branch.values, scope)
-    check_body(branch.body, scope)
+    found = check_body(branch.values, scope, found)
+    found = check_body(branch.body, scope, found)
   end
-  check_body(node.else_body, scope) unless node.else_body.nil?
+  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
+  found
 end
 
-def check_case_in(node, scope)
-  check_node(node.subject, scope)
+def check_case_in(node, scope, mutable found)
+  found = check_node(node.subject, scope, found)
   mutable nil_seen = false
   node.branches.each do |branch|
-    check_pattern(branch.pattern, scope)
+    found = check_pattern(branch.pattern, scope, found)
     arm = with_proof(scope, arm_bindings(node, branch, nil_seen, known_types(scope)))
-    check_node(branch.guard, arm) unless branch.guard.nil?
-    check_body(branch.body, arm)
+    found = check_node(branch.guard, arm, found) unless branch.guard.nil?
+    found = check_body(branch.body, arm, found)
     nil_seen = true if nil_arm?(branch)
   end
-  check_body(node.else_body, scope) unless node.else_body.nil?
-  check_unreachable_arms(node)
-  return unless node.else_body.nil?
-  check_maybe_coverage(node, scope)
-  check_coverage(node, scope.enums)
+  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
+  found = check_unreachable_arms(node, scope, found)
+  return found unless node.else_body.nil?
+  found = check_maybe_coverage(node, scope, found)
+  check_coverage(node, scope, found)
 end
 
 # ADR 0035's tripwire, fired by ADR 0047 once narrowing existed: over a
@@ -591,14 +618,15 @@ end
 # capture, or a pattern every present value matches: the plain type's
 # name, or a struct pattern of it whose fields are all captures. The
 # absent case is named first, being the one people forget.
-def check_maybe_coverage(node, scope)
+def check_maybe_coverage(node, scope, mutable found)
   subject = synthesize(node.subject, known_types(scope))
-  return unless subject in ["maybe", *]
-  return unless known?(subject)
+  return found unless subject in ["maybe", *]
+  return found unless known?(subject)
   patterns = unguarded_arms(node).map { it.pattern }
-  refuse(["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
+  found = noted(found, ["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
   inner = type_at(subject, 1)
-  refuse(["coverage", "the present case"], locate(node, scope)) unless patterns.any? { covers_present?(it, inner) }
+  found = noted(found, ["coverage", "the present case"], locate(node, scope)) unless patterns.any? { covers_present?(it, inner) }
+  found
 end
 
 def covers_nil?(pattern)
@@ -626,77 +654,88 @@ def covers_present?(pattern, inner)
   end
 end
 
-def check_methods(methods, scope)
+def check_methods(methods, scope, mutable found)
   methods.each do |method|
     if method in DefNode
-      check_parameters(method.parameters, scope)
-      check_body(method.body, method_scope(method, scope))
+      found = check_parameters(method.parameters, scope, found)
+      found = check_body(method.body, method_scope(method, scope), found)
     else
-      check_node(method, scope)
+      found = check_node(method, scope, found)
     end
   end
+  found
 end
 
-def check_call(node, scope)
-  check_body(node.arguments, scope)
-  check_arity(node, scope)
-  check_contracts(node, scope)
-  check_block(node, ["unknown"], scope)
+def check_call(node, scope, mutable found)
+  found = check_body(node.arguments, scope, found)
+  found = check_arity(node, scope, found)
+  found = check_contracts(node, scope, found)
+  check_block(node, ["unknown"], scope, found)
 end
 
 # The sixth wording, the seed's own moved to build time (ADR 0034 §2,
 # ADR 0047): a bare call to a top-level def with the wrong number of
 # positional arguments. Keyword arguments stand outside the count, as in
 # the seed; inside a struct's methods no bare call is judged (method_scope).
-def check_arity(node, scope)
+def check_arity(node, scope, found)
   arity = scope.arities.find { it[0] == node.name }
-  return if arity.nil?
+  return found if arity.nil?
   required = value_at_checked(arity, 1)
   total = value_at_checked(arity, 2)
   given = node.arguments.reject { it in KeywordArgumentNode }.length
-  return if given >= required && given <= total
+  return found if given >= required && given <= total
   expected = if required == total then required.to_s else "#{required} to #{total}" end
-  refuse(["arity", node.name, expected, given], locate(node, scope))
+  noted(found, ["arity", node.name, expected, given], locate(node, scope))
 end
 
-def check_method_call(node, scope)
-  check_node(node.receiver, scope)
-  check_body(node.arguments, scope)
+def check_method_call(node, scope, mutable found)
+  found = check_node(node.receiver, scope, found)
+  found = check_body(node.arguments, scope, found)
   receiver = synthesize(node.receiver, known_types(scope))
-  check_maybe_method(node, receiver, scope) if node in MethodCallNode
-  check_struct_method(node, receiver, scope) if node in MethodCallNode
-  check_builtin_method(node, receiver, scope) if node in MethodCallNode
-  check_block(node, receiver, scope)
+  found = check_maybe_method(node, receiver, scope, found) if node in MethodCallNode
+  found = check_struct_method(node, receiver, scope, found) if node in MethodCallNode
+  found = check_builtin_method(node, receiver, scope, found) if node in MethodCallNode
+  check_block(node, receiver, scope, found)
 end
 
 # A block body may run many times or never, so — like a loop's — it is
 # walked with the names it rebinds already forgotten.
-def check_block(node, receiver, scope)
+def check_block(node, receiver, scope, found)
   block = node.block
-  return if block.nil?
+  return found if block.nil?
   entered = block_scope(node, receiver, scope)
-  check_body(block.body, forget(entered, assigned_names_in_body(block.body)))
+  check_body(block.body, forget(entered, assigned_names_in_body(block.body)), found)
 end
 
-def check_pairs(pairs, scope)
+def check_pairs(pairs, scope, mutable found)
   pairs.each do |pair|
-    check_node(pair.key, scope)
-    check_node(pair.value, scope)
+    found = check_node(pair.key, scope, found)
+    found = check_node(pair.value, scope, found)
   end
+  found
 end
 
 # Patterns hold sub-patterns and, in two places, expressions.
-def check_pattern(pattern, scope)
+def check_pattern(pattern, scope, mutable found)
   case pattern
-  in EnumCasePatternNode then check_case_pattern(pattern, scope)
-  in AlternativePatternNode(options:) then options.each { check_pattern(it, scope) }
-  in ArrayPatternNode(elements:) then elements.each { check_pattern(it, scope) }
+  in EnumCasePatternNode then check_case_pattern(pattern, scope, found)
+  in AlternativePatternNode(options:)
+    options.each do |option|
+      found = check_pattern(option, scope, found)
+    end
+    found
+  in ArrayPatternNode(elements:)
+    elements.each do |element|
+      found = check_pattern(element, scope, found)
+    end
+    found
   in StructPatternNode(fields:)
     fields.each do |field|
-      check_pattern(field[1], scope)
+      found = check_pattern(field[1], scope, found)
     end
+    found
   else
-    nil
+    found
   end
 end
 
@@ -711,11 +750,12 @@ end
 # pass different lists. Aliases need no case of their own: a struct or
 # trait alias desugars at parse into a clone of the def it points at, so
 # the clone walks through here like any def.
-def check_reserved(methods, names, wording)
+def check_reserved(methods, names, wording, scope, mutable found)
   methods.each do |method|
     next unless method in DefNode
-    panic "#{method.name} #{wording}" if names.include?(method.name)
+    found = noted(found, ["sentence", "#{method.name} #{wording}"], locate(method, scope)) if names.include?(method.name)
   end
+  found
 end
 
 def cases_named(enums, name)
@@ -725,33 +765,35 @@ end
 # `:paid(on: x)` — the seed's three runtime refusals, made at build time
 # with the same words (ADR 0034 §2). The seed reaches them only when the
 # line runs; this reaches them because the line was written.
-def check_construction(node, scope)
+def check_construction(node, scope, mutable found)
   declarations = cases_named(scope.enums, node.name)
-  panic("no enum declares a case :#{node.name}") if declarations.empty?
+  return noted(found, ["sentence", "no enum declares a case :#{node.name}"], locate(node, scope)) if declarations.empty?
   labels = value_at_checked(declarations.first, 1)
   declarations.each do |declaration|
-    panic("two enums declare :#{node.name} with different payloads — the seed cannot tell them apart") unless value_at_checked(declaration, 1) == labels
+    return noted(found, ["sentence", "two enums declare :#{node.name} with different payloads — the seed cannot tell them apart"], locate(node, scope)) unless value_at_checked(declaration, 1) == labels
   end
   given = node.payload.map { it.label }
   unless given == labels
     wanted = labels.map { it + ":" }.join(", ")
-    panic("`:#{node.name}` takes (#{wanted})")
+    return noted(found, ["sentence", "`:#{node.name}` takes (#{wanted})"], locate(node, scope))
   end
   node.payload.each do |argument|
-    check_node(argument.value, scope)
+    found = check_node(argument.value, scope, found)
   end
+  found
 end
 
 # `in :paid(on:)` naming an undeclared case — the seed says nothing and the
 # pattern silently never matches, which is how a typo becomes a branch that
 # cannot fire. The first refusal with no oracle behind it (ADR 0034 §3).
-def check_case_pattern(pattern, scope)
+def check_case_pattern(pattern, scope, mutable found)
   if cases_named(scope.enums, pattern.name).empty?
-    panic("in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}")
+    found = noted(found, ["sentence", "in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}"], locate(pattern, scope))
   end
   pattern.payload.each do |entry|
-    check_pattern(entry[1], scope)
+    found = check_pattern(entry[1], scope, found)
   end
+  found
 end
 
 # — sharpening (ADR 0048 ruling 4, ADR 0049 §4) —
@@ -932,29 +974,30 @@ end
 # Shape 1 — a condition that is not a boolean, Ruby's truthiness reflex.
 # A boolean passes; an unknown declines; anything else refuses, and a
 # maybe alone carries the one honest rewrite.
-def check_condition(construct, node, scope)
+def check_condition(construct, node, scope, found)
   condition = node.condition
   type = synthesize(condition, known_types(scope))
-  return if type == ["boolean"]
-  return unless known?(type)
-  refuse(["condition", construct, type, spell_node(condition)], locate(node, scope))
+  return found if type == ["boolean"]
+  return found unless known?(type)
+  noted(found, ["condition", construct, type, spell_node(condition)], locate(node, scope))
 end
 
 # The logical operators' operands. `&&` takes booleans on both sides. `||`
 # takes any left — it is the or-guard on a maybe, and a plain value on the
 # left is the dead guard ADR 0040 §3 deliberately left unrefused — but once
 # the left is a boolean the right must be one too.
-def check_operands(node, scope)
+def check_operands(node, scope, mutable found)
   types = known_types(scope)
   left = synthesize(node.left, types)
   right = synthesize(node.right, types)
   if node.operator == "&&"
-    refuse(["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
-    refuse(["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+    found = noted(found, ["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
+    found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
   end
-  return unless node.operator == "||"
-  return unless left == ["boolean"]
-  refuse(["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+  return found unless node.operator == "||"
+  return found unless left == ["boolean"]
+  found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+  found
 end
 
 # ADR 0048's call-site refusal — a call handing a def something its body
@@ -963,9 +1006,9 @@ end
 # per file where caller flow (#94) is not. Struct arguments only, until
 # the method table (#88) says what a builtin answers. Each parameter is
 # paired with its argument by position, or by label for a keyword one.
-def check_contracts(node, scope)
+def check_contracts(node, scope, mutable found)
   contract = scope.contracts.find { it[0] == node.name }
-  return if contract.nil?
+  return found if contract.nil?
   positional = node.arguments.reject { it in KeywordArgumentNode }
   mutable position = 0
   value_at_checked(contract, 1).each do |parameter|
@@ -973,8 +1016,9 @@ def check_contracts(node, scope)
     argument = if keyword then keyword_argument(node, parameter[0]) else positional[position] end
     position += 1 unless keyword
     next if argument.nil?
-    check_argument(node, argument, value_at_checked(parameter, 2), scope)
+    found = check_argument(node, argument, value_at_checked(parameter, 2), scope, found)
   end
+  found
 end
 
 def keyword_argument(node, label)
@@ -983,18 +1027,18 @@ def keyword_argument(node, label)
   found.value
 end
 
-def check_argument(call, argument, entry, scope)
+def check_argument(call, argument, entry, scope, found)
   def_name = call.name
-  return unless entry in ["needs", *]
+  return found unless entry in ["needs", *]
   demands = type_at(entry, 1)
   type = synthesize(argument, known_types(scope))
   methods = argument_methods(type, scope)
-  return if methods.nil?
+  return found if methods.nil?
   missing = demands.reject { answers_demand?(type, methods, it) }
-  return if missing.empty?
+  return found if missing.empty?
   spelling = spell_node(argument)
-  return if spelling.nil?
-  refuse(["contract", spelling, type, def_name, wanted_by(demands, missing, scope)], locate(call, scope))
+  return found if spelling.nil?
+  noted(found, ["contract", spelling, type, def_name, wanted_by(demands, missing, scope)], locate(call, scope))
 end
 
 # The method set an argument's type states whole: a declared struct's
@@ -1043,43 +1087,43 @@ end
 # and `to_s` refuses until one of the narrowing forms has handled nil.
 # `&.` is the other answer and is never this node. The receiver must be
 # spellable, since the hint is written from it.
-def check_maybe_method(node, receiver, scope)
-  return unless receiver in ["maybe", *]
-  return unless known?(receiver)
-  return if %w[failure? nil? some? to_s].include?(node.name)
+def check_maybe_method(node, receiver, scope, found)
+  return found unless receiver in ["maybe", *]
+  return found unless known?(receiver)
+  return found if %w[failure? nil? some? to_s].include?(node.name)
   spelling = spell_node(node.receiver)
-  return if spelling.nil?
-  refuse(["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
+  return found if spelling.nil?
+  noted(found, ["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 2 for builtin receivers (#88): the seed's own answers, tabled in
 # inference.pdx from its behavior. A fully known builtin type whose table
 # lacks the name refuses; anything without a table declines.
-def check_builtin_method(node, receiver, scope)
-  return unless known?(receiver)
+def check_builtin_method(node, receiver, scope, found)
+  return found unless known?(receiver)
   methods = builtin_methods(receiver)
-  return if methods.nil?
-  return if methods.include?(node.name)
+  return found if methods.nil?
+  return found if methods.include?(node.name)
   # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
   survivor = alias_survivor(node.name)
-  refuse(["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
+  return noted(found, ["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
   spelling = spell_node(node.receiver)
-  return if spelling.nil?
-  refuse(["no_method", spelling, receiver, node.name], locate(node, scope))
+  return found if spelling.nil?
+  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 2 — a method the receiver's type does not have, for struct
 # receivers: the one receiver kind whose method set a declaration states
 # completely (declared_shapes). The receiver must be spellable — no
 # spelling, no sentence, so a computed receiver declines.
-def check_struct_method(node, receiver, scope)
-  return unless receiver in ["struct", *]
+def check_struct_method(node, receiver, scope, found)
+  return found unless receiver in ["struct", *]
   shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
-  return if shape.nil?
-  return if value_at_checked(shape, 1).include?(node.name)
+  return found if shape.nil?
+  return found if value_at_checked(shape, 1).include?(node.name)
   spelling = spell_node(node.receiver)
-  return if spelling.nil?
-  refuse(["no_method", spelling, receiver, node.name], locate(node, scope))
+  return found if spelling.nil?
+  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
 end
 
 # Shape 4 — an operator on operands it cannot take. The legal pairs are
@@ -1090,13 +1134,13 @@ end
 # refusal to fire — a maybe is transparent at runtime (some(x) is x) and a
 # struct or enum is not this shape's to judge — so everything else
 # declines.
-def check_operator(node, scope)
+def check_operator(node, scope, found)
   types = known_types(scope)
   left = synthesize(node.left, types)
   right = synthesize(node.right, types)
-  return unless plain_value?(left) && plain_value?(right)
-  return if operator_takes?(node.operator, left, right)
-  refuse(["operator", node.operator, left, right], locate(node, scope))
+  return found unless plain_value?(left) && plain_value?(right)
+  return found if operator_takes?(node.operator, left, right)
+  noted(found, ["operator", node.operator, left, right], locate(node, scope))
 end
 
 def operator_takes?(operator, left, right)
@@ -1119,13 +1163,13 @@ def operator_takes?(operator, left, right)
 end
 
 # `!` takes a boolean and `-` a number; the seed refuses the rest.
-def check_unary(node, scope)
+def check_unary(node, scope, found)
   operand = synthesize(node.operand, known_types(scope))
-  return unless plain_value?(operand)
-  return if node.operator == "!" && operand == ["boolean"]
-  return if node.operator == "-" && numeric?(operand)
-  return unless node.operator == "!" || node.operator == "-"
-  refuse(["unary", node.operator, operand], locate(node, scope))
+  return found unless plain_value?(operand)
+  return found if node.operator == "!" && operand == ["boolean"]
+  return found if node.operator == "-" && numeric?(operand)
+  return found unless node.operator == "!" || node.operator == "-"
+  noted(found, ["unary", node.operator, operand], locate(node, scope))
 end
 
 # A fully known builtin value type — never a maybe, struct, or enum.
@@ -1170,19 +1214,20 @@ end
 
 # ADR 0013 §3. Two shapes need no types: everything below a bare capture,
 # and a case already matched whole by an arm above.
-def check_unreachable_arms(node)
+def check_unreachable_arms(node, scope, mutable found)
   mutable seen_capture = false
   mutable seen_cases = []
   unguarded_arms(node).each do |branch|
     pattern = branch.pattern
-    panic "this arm can never match — the capture above binds every subject" if seen_capture
+    found = noted(found, ["sentence", "this arm can never match — the capture above binds every subject"], locate(node, scope)) if seen_capture
     name = whole_case_name(pattern)
     unless name.nil?
-      panic "in :#{name} can never match — an arm above already matches :#{name}" if seen_cases.include?(name)
+      found = noted(found, ["sentence", "in :#{name} can never match — an arm above already matches :#{name}"], locate(node, scope)) if seen_cases.include?(name)
       seen_cases << name
     end
     seen_capture = true if pattern in IdentifierNode
   end
+  found
 end
 
 # The case an arm matches *every* instance of — so a later arm naming it is
@@ -1195,31 +1240,32 @@ def whole_case_name(pattern)
   pattern.name
 end
 
-def check_coverage(node, enums)
+def check_coverage(node, scope, mutable found)
   arms = unguarded_arms(node)
-  return if arms.empty?
-  check_enum_coverage(arms, enums)
-  check_range_coverage(arms)
+  return found if arms.empty?
+  found = check_enum_coverage(node, arms, scope, found)
+  check_range_coverage(node, arms, scope, found)
 end
 
 # An enum is established by a payload-carrying arm and by nothing else
 # (ADR 0035 §2): a payload-free case is simply a symbol, and symbols are
 # legal everywhere, so plain-symbol arms are never second-guessed.
-def check_enum_coverage(arms, enums)
+def check_enum_coverage(node, arms, scope, found)
+  enums = scope.enums
   anchor = arms.find { it.pattern in EnumCasePatternNode }
-  return if anchor.nil?
+  return found if anchor.nil?
   owner = enum_owning(enums, anchor.pattern.name)
-  return if owner.nil?
+  return found if owner.nil?
   mutable covered = []
   arms.each do |branch|
     name = arm_case_name(branch.pattern)
-    return if name.nil?
+    return found if name.nil?
     covered << name
   end
   missing = cases_of(enums, owner).reject { covered.include?(it) }
-  return if missing.empty?
+  return found if missing.empty?
   named = missing.map { ":" + it }.join(", ")
-  panic "case/in does not cover #{named} — add the arm, or an else"
+  noted(found, ["sentence", "case/in does not cover #{named} — add the arm, or an else"], locate(node, scope))
 end
 
 def arm_case_name(pattern)
@@ -1241,33 +1287,33 @@ end
 # ADR 0019's algorithm: range arms claim the integers, so a beginless first
 # and an endless last with no gaps between is the proof. Overlap is legal,
 # so coverage runs forward as a high-water mark rather than arm to arm.
-def check_range_coverage(arms)
+def check_range_coverage(node, arms, scope, found)
   mutable bounds = []
   arms.each do |branch|
     pair = range_bounds(branch.pattern)
-    return if pair.nil?
+    return found if pair.nil?
     bounds << pair
   end
-  return if bounds.empty?
+  return found if bounds.empty?
   beginless = bounds.select { low_of(it).nil? }
   if beginless.empty?
     lowest = bounds.map { low_of(it) }.min
-    panic "case/in leaves ..#{lowest - 1} uncovered — add the arm, or an else"
+    return noted(found, ["sentence", "case/in leaves ..#{lowest - 1} uncovered — add the arm, or an else"], locate(node, scope))
   end
   # An arm open at both ends is the whole line, and needs no walk.
-  return unless beginless.none? { high_of(it).nil? }
+  return found unless beginless.none? { high_of(it).nil? }
   mutable covered_to = beginless.map { high_of(it) }.max
   bounded = bounds.reject { low_of(it).nil? }
   bounded.sort_by { low_of(it) }.each do |pair|
     low = low_of(pair)
     if low > covered_to + 1
-      panic "case/in leaves #{covered_to + 1}..#{low - 1} uncovered — add the arm, or an else"
+      return noted(found, ["sentence", "case/in leaves #{covered_to + 1}..#{low - 1} uncovered — add the arm, or an else"], locate(node, scope))
     end
     high = high_of(pair)
-    return if high.nil?
+    return found if high.nil?
     covered_to = high if high > covered_to
   end
-  panic "case/in leaves #{covered_to + 1}.. uncovered — add the arm, or an else"
+  noted(found, ["sentence", "case/in leaves #{covered_to + 1}.. uncovered — add the arm, or an else"], locate(node, scope))
 end
 
 # A bound is absent for a beginless or endless arm, and host indexing lifts

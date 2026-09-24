@@ -101,6 +101,22 @@ The renderer prints the offending source line and its location beneath every ref
 
 It is one function in the renderer, so the shape is one edit. Tokens carry their line (heredoc bodies padded back in so the count holds), the thirteen node kinds a refusal can point at carry theirs, and a node built by a desugar with no token in hand prints no location rather than a wrong one. The rule bends in one place: a dotted call takes its name's line rather than its receiver's start, since the receiver's start is the caller's and `.knd` is where a reader looks in a chain anyway.
 
+### The report
+
+**Ruled and built (2026-09-24):** every refusal is reported at once. The checker's walk collects what it finds and refuses once at the end — in source order, each file in dependency order — one block per refusal in the form it already has, a blank line between blocks, and a closing count when there is more than one, so a lone refusal reads exactly as it always did:
+
+```text
+'if' condition must be true or false, got Integer
+  3 | if count
+
+'name' is a String, which has no method 'knd'
+  9 | puts name.knd
+
+2 refusals
+```
+
+The exit is still one panic with the whole report as its message, so every tool that reads a refusal off stderr reads the report the same way. The seed's own runtime refusals are untouched; this is the checker's.
+
 **Build note (2026-09-22):** verified — the trio's nodes carried no line ([#89](https://github.com/portlandlang/portland/issues/89)), so the quoted spelling carried the context alone until the ruling above. The build also fixed one thing and filed four: the first refusal fired on the evaluator's own source and exposed a 3b inference bug (`mutable result = nil` rebound inside an `each` read as Nil), fixed in inference so every walk forgets a nested body's rebindings; shape 2's builtin half and the seed's runtime row for it wait on a method table ([#88](https://github.com/portlandlang/portland/issues/88)); the hosted runtime's own wording for a missing method ([#90](https://github.com/portlandlang/portland/issues/90)) and its missing argument count ([#91](https://github.com/portlandlang/portland/issues/91)) are pre-existing; and `failure?` refusing on a plain struct ([#92](https://github.com/portlandlang/portland/issues/92)) is why shape 2 counts it among the names every struct answers.
 
 ## Consequences

@@ -1,9 +1,10 @@
 # Stage 1, act five: the refusal renderer — the one place the checker's
 # voice lives (#9, ADR 0047 §4).
 #
-# A library: require_relative "refusals", then refuse(refusal) to panic
-# with a refusal's sentence, or render_refusal(refusal) to read it without
-# panicking. A refusal is a tagged array, the checker's private shape — no
+# A library: require_relative "refusals", then noted(found, refusal,
+# location) to add a refusal to what a walk has found, report(found) to
+# refuse with all of it at once, or render_refusal(refusal) to read one
+# sentence. A refusal is a tagged array, the checker's private shape — no
 # check builds a sentence of its own, so every ruling in ADR 0047 is a
 # line here rather than a habit spread across call sites:
 #
@@ -19,6 +20,7 @@
 #   ["contract", spelling, type, def, wanted] — a call handing a def what its body cannot use (ADR 0048);
 #                                               wanted is ["trait", name] or ["demands", [...]]
 #   ["alias", name, survivor]                 — a false alias (ADR 0036), the seed's sentence moved earlier
+#   ["sentence", words]                       — a sentence an earlier ADR pinned whole (0034, 0035)
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -35,10 +37,31 @@
 
 require_relative "inference"
 
-def refuse(refusal, location = nil)
-  words = render_refusal(refusal)
-  panic words if location.nil?
-  panic words + "\n" + render_location(location)
+# A refusal noted for the report: the checker's walk threads a list of
+# these and refuses once at the end (the ruling of 2026-09-24).
+def noted(found, refusal, location) = found + [[refusal, location]]
+
+# Refuse with everything found, or nothing. The report is one panic, so
+# every tool that reads a refusal off stderr reads the report the same way.
+def report(found)
+  return if found.empty?
+  panic render_report(found)
+end
+
+# The report: each refusal as its block — the sentence, and its location
+# beneath where it has one — a blank line between blocks, and a count when
+# there is more than one, so a lone refusal reads exactly as it always did.
+def render_report(found)
+  body = found.map { render_block(it) }.join("\n\n")
+  return body if found.length == 1
+  "#{body}\n\n#{found.length} refusals"
+end
+
+def render_block(entry)
+  words = render_refusal(entry.first)
+  location = type_at(entry, 1)
+  return words if location.nil?
+  words + "\n" + render_location(location)
 end
 
 # ADR 0047's "below the sentence", built 2026-09-24 (#89): the line's
@@ -67,6 +90,8 @@ def render_refusal(refusal)
   in ["contract", spelling, type, def_name, wanted] then "#{spelled(spelling)} is #{a_type(type)}, but #{spelled(def_name)} needs #{render_wanted(wanted)}"
   # The seed's own words, moved to build time (ADR 0034 §2): no quotes.
   in ["alias", name, survivor] then "#{name} is spelled #{survivor} here"
+  # A sentence pinned by an earlier ADR (0034, 0035), carried whole.
+  in ["sentence", words] then words
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end

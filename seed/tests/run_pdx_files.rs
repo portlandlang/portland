@@ -1347,6 +1347,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"contract\", \"box\", [\"struct\", \"Box\"], \"show\", [\"trait\", \"Describable\"]])\n\
              puts render_refusal([\"alias\", \"to_int\", \"to_i\"])\n\
              puts render_location([12, \"puts name.knd\"])\n\
+             puts render_report([[[\"coverage\", \"nil\"], [3, \"case top\", nil]], [[\"arity\", \"greet\", \"1\", 0], nil]])\n\
              nodes = parse_program(lex(\"users.first.name\\nitems[0]\\nx&.y\\n\\\"hi\\\"\\ngreet(1)\\n\"))\n\
              nodes.each do |node|\n\
              \x20 spelling = spell_node(node) or \"nil\"\n\
@@ -1388,6 +1389,12 @@ fn portland_refusals_render_the_house_voice() {
          'box' is a Box, but 'show' needs Describable\n\
          to_int is spelled to_i here\n\
          \x20 12 | puts name.knd\n\
+         case/in does not cover nil — add the arm, or an else\n\
+         \x20 3 | case top\n\
+         \n\
+         greet expects 1 argument, got 0\n\
+         \n\
+         2 refusals\n\
          users.first.name\n\
          items[0]\n\
          x&.y\n\
@@ -1509,6 +1516,31 @@ fn run_mode_sharpens_the_entrys_parameters() {
         String::from_utf8_lossy(&hosted.stderr)
     );
     assert_eq!(String::from_utf8(hosted.stdout).unwrap(), "some\n");
+}
+
+/// Every refusal at once (the ruling of 2026-09-24): the checker collects
+/// what it finds and refuses once, in source order, one block per refusal
+/// with a blank line between and a count when there is more than one.
+#[test]
+fn the_checker_reports_every_refusal_at_once() {
+    let sample = std::env::temp_dir().join("refusal_report.pdx");
+    std::fs::write(
+        &sample,
+        "count = 5\ndef greet(name)\n  \"hi \" + name.upcase\nend\nname = \"pdx\"\nputs \"start\"\nif false\n  greet(5)\n  if count\n    puts name.knd\n  end\nend\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(!hosted.status.success(), "the checker should refuse");
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    let expected = "'5' is an Integer, but 'greet' needs '.upcase'\n  8 | greet(5)\n\n'if' condition must be true or false, got Integer\n  9 | if count\n\n'name' is a String, which has no method 'knd'\n  10 | puts name.knd\n\n3 refusals";
+    assert!(
+        stderr.contains(expected),
+        "the checker should report all three in source order, got: {stderr}"
+    );
 }
 
 /// A refusal points at its line (#89): the number and the source line
