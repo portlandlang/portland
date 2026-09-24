@@ -544,10 +544,12 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "module names start with a capital letter",
         ),
         ("p([\"a\"].map { |w| it.upcase })\n", "use one or the other"),
-        // #90 — a struct miss the checker could not see (the receiver comes
-        // through a def parameter) says the seed's sentence, and fails.
+        // #90 — a struct miss the checker could not see says the seed's
+        // sentence, and fails. Run mode sharpens a parameter from its
+        // callers (ADR 0049), so the value comes through `[].first or …`,
+        // a Token only at runtime.
         (
-            "struct Token\n  kind\nend\ndef poke(thing) = thing.knd\npoke(Token.new(kind: \"w\"))\n",
+            "struct Token\n  kind\nend\ndef poke(thing) = thing.knd\npoke([].first or Token.new(kind: \"w\"))\n",
             "Token(kind: \"w\") is a Token, which has no method 'knd'",
         ),
         // #88/#90 — a builtin miss and a builtin's wrong count say the
@@ -569,18 +571,19 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         ),
         // #87 — the boolean `||` and `&&` check both sides hosted as the
         // seed does, where a false left once answered whatever came next.
-        // The operand comes through a parameter so the checker declines
-        // and the runtime speaks; a literal would refuse at build first.
+        // The operand comes through a parameter, and through `[].first or …`
+        // so run mode cannot sharpen it (ADR 0049); the checker declines and
+        // the runtime speaks. A literal would refuse at build first.
         (
-            "def pick(flag) = false || flag\nputs pick(5)\n",
+            "def pick(flag) = false || flag\nputs pick([].first or 5)\n",
             "'||' needs true or false, got 5",
         ),
         (
-            "def both(flag) = flag && true\nputs both(1)\n",
+            "def both(flag) = flag && true\nputs both([].first or 1)\n",
             "'&&' needs true or false, got 1",
         ),
         (
-            "def either(word) = true && word\nputs either(\"yes\")\n",
+            "def either(word) = true && word\nputs either([].first or \"yes\")\n",
             "'&&' needs true or false, got \"yes\"",
         ),
         // #91 — the seed's argument count at every hosted binding site: a
@@ -1434,6 +1437,66 @@ fn the_checker_follows_requires() {
         stderr.contains(&expected),
         "the checker should say {expected:?}, got: {stderr}"
     );
+}
+
+/// Sharpening (ADR 0048 ruling 4, ADR 0049 §4): in run mode a parameter
+/// every caller passes the same type is read at that type inside the def,
+/// so the ordinary shapes reach the body. Callers that disagree leave it
+/// unknown, and `check.pdx` — which may be handed a library — never
+/// sharpens at all.
+#[test]
+fn run_mode_sharpens_the_entrys_parameters() {
+    let sample = std::env::temp_dir().join("sharpen_agree.pdx");
+    std::fs::write(
+        &sample,
+        "def label(count)\n  if count\n    \"some\"\n  end\nend\nputs \"start\"\nif false\n  label(1)\n  label(2)\nend\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !hosted.status.success(),
+        "run mode should sharpen and refuse"
+    );
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    assert!(
+        stderr.contains("'if' condition must be true or false, got Integer\n  2 | if count"),
+        "the body should refuse under the sharpened type, got: {stderr}"
+    );
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        checked.status.success(),
+        "check.pdx never sharpens, got: {}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+
+    let disagreeing = std::env::temp_dir().join("sharpen_disagree.pdx");
+    std::fs::write(
+        &disagreeing,
+        "def label(flag)\n  if flag\n    \"some\"\n  end\nend\nputs label(true)\nif false\n  label(1)\nend\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&disagreeing)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        hosted.status.success(),
+        "disagreeing callers leave the parameter unknown, got: {}",
+        String::from_utf8_lossy(&hosted.stderr)
+    );
+    assert_eq!(String::from_utf8(hosted.stdout).unwrap(), "some\n");
 }
 
 /// A refusal points at its line (#89): the number and the source line

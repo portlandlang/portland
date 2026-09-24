@@ -44,7 +44,9 @@ argv.slice(1, argv.length - 1).each do |path|
   puts "=== #{path}"
   source = read_file(path) or panic "run_specs.pdx: cannot read #{path}"
   program = parse_program(lex(source))
-  checked = check_closure(path, checked)
+  # Each spec is a program about to run — run mode, so its own defs are
+  # read with what every caller passes (ADR 0049 §4).
+  checked = check_program_closure(path, checked)
   scope = [["__file__", "file", path]] + already_loaded + harness.bindings
   run_body(program, scope)
 end

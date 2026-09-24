@@ -14,5 +14,7 @@ require_relative "evaluator"
 # input has nothing to do but say so.
 source = read_file(argv.first) or panic "run.pdx: cannot read #{argv.first}"
 program = parse_program(lex(source))
-check_closure(argv.first, [])
+# Run mode: a program about to run is a closed world, so the entry's own
+# defs are read with what every caller passes (ADR 0049 §4).
+check_program_closure(argv.first, [])
 evaluate_program(program)

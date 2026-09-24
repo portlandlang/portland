@@ -61,8 +61,18 @@ struct Scope
   globals
   locals
   shapes
+  sharpened
   source
   traits
+end
+
+# One file of a resolved closure (#94): what to check it with.
+struct Resolved
+  imports
+  named
+  nodes
+  path
+  source
 end
 
 # What one file declares for the files that require it (#94): the same
@@ -109,15 +119,15 @@ end
 # refusal — reporting every refusal at once is the diagnostics arc's job,
 # not this increment's.
 def check_program(nodes, source)
-  check_program_with(nodes, source, nil, empty_declarations)
+  check_program_with(nodes, source, nil, empty_declarations, [])
 end
 
 # One file, with what its requires declare in view (#94): its own
 # declarations first, so a name declared on both sides resolves to its own.
-def check_program_with(nodes, source, file, imports)
+def check_program_with(nodes, source, file, imports, sharpened)
   own = declarations_of(nodes)
   whole = merge_declarations(own, imports)
-  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, locals: [], shapes: whole.shapes, source: source.lines, traits: whole.traits)
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
   check_annotations(nodes, source, scope)
   check_body(nodes, scope)
 end
@@ -137,30 +147,59 @@ end
 # share one helper — as [key, declarations] pairs, `nil` while a file is
 # in progress; the updated memo comes back.
 def check_closure(path, checked)
-  walk_closure(path, checked, false)
+  check_closure_with(path, checked, false)
 end
 
-# `required` says whether some file requires this one — then the program
-# spans more than one file and a refusal here names its file (ADR 0049
-# §5); an entry names its file only when it requires something itself.
-def walk_closure(path, mutable checked, required)
+# Run mode (ADR 0049 §4): the closure is a closed world, so the entry
+# file's own defs have every caller in view, and a parameter every caller
+# agrees on is read at that type inside its body (ADR 0048 ruling 4).
+# Only the entry's defs: a required file is a library by nature, and its
+# defs may have callers outside this closure.
+def check_program_closure(path, checked)
+  check_closure_with(path, checked, true)
+end
+
+def check_closure_with(path, mutable checked, sharpen)
+  resolution = resolve_closure(path, checked, [], false)
+  checked = value_at_checked(resolution, 0)
+  files = value_at_checked(resolution, 1)
+  entry = files.last
+  sharpened = if sharpen && entry.some? then sharpen_parameters(entry, files) else [] end
+  files.each do |file|
+    own = if entry.some? && file.path == entry.path then sharpened else [] end
+    check_program_with(file.nodes, file.source, file.named, file.imports, own)
+  end
+  checked
+end
+
+# Resolve a closure into the files to check, children before parents, and
+# what each is checked with. `checked` is the memo of files already
+# checked in this process — the spec harness checks a hundred specs that
+# share one helper — as [key, exports] pairs, `nil` while a file is in
+# progress. Answers [checked, files]. `required` says whether some file
+# requires this one — then the program spans more than one file and a
+# refusal here names its file (ADR 0049 §5); an entry names its file only
+# when it requires something itself.
+def resolve_closure(path, mutable checked, mutable files, required)
   key = canonical_path(path)
-  return checked if checked.any? { it[0] == key }
+  return [checked, files] if checked.any? { it[0] == key }
   source = read_file(path) or panic "check: cannot read #{path}"
   nodes = parse_program(lex(source))
   checked = [[key, nil]] + checked
   requires = required_files(nodes, path)
   mutable imports = empty_declarations
   requires.each do |name|
-    checked = walk_closure(name, checked, true)
+    resolution = resolve_closure(name, checked, files, true)
+    checked = value_at_checked(resolution, 0)
+    files = value_at_checked(resolution, 1)
     found = checked.find { it[0] == canonical_path(name) }
     declared = if found.nil? then nil else value_at_checked(found, 1) end
     imports = merge_declarations(imports, declared) unless declared.nil?
   end
   named = if required || !requires.empty? then path else nil end
-  check_program_with(nodes, source, named, imports)
+  files << Resolved.new(imports: imports, named: named, nodes: nodes, path: path, source: source)
   exported = merge_declarations(declarations_of(nodes), imports)
-  [[key, exported]] + checked.reject { it[0] == key }
+  [[[key, exported]] + checked.reject { it[0] == key }, files]
 end
 
 # The files a program's top-level `require_relative "name"` lines name,
@@ -385,9 +424,13 @@ def known_types(scope) = scope.locals + scope.globals
 # A def cannot see the locals around it — its body starts from its
 # parameters alone (a default lends its type, as in inference).
 def def_scope(node, scope)
+  agreed = scope.sharpened.find { it[0] == node.name }
+  agreed_pairs = if agreed.nil? then [] else value_at_checked(agreed, 1) end
   mutable locals = []
   node.parameters.each do |parameter|
-    locals = [[parameter.name, parameter_type(parameter, scope.globals)]] + locals
+    sharpened = agreed_pairs.find { it[0] == parameter.name }
+    type = if sharpened.nil? then parameter_type(parameter, scope.globals) else value_at_checked(sharpened, 1) end
+    locals = [[parameter.name, type]] + locals
   end
   scope.with(locals: locals)
 end
@@ -709,6 +752,174 @@ def check_case_pattern(pattern, scope)
   pattern.payload.each do |entry|
     check_pattern(entry[1], scope)
   end
+end
+
+# — sharpening (ADR 0048 ruling 4, ADR 0049 §4) —
+#
+# In run mode every caller of the entry file's defs is in view. A
+# parameter every caller passes the same fully known type is read at that
+# type inside its body, and the ordinary shapes reach a place they could
+# not see. Callers that disagree, a parameter no one passes, an unknown
+# anywhere, a def defined twice, a call with the wrong count — each leaves
+# the parameter at its default's type or unknown, exactly as today.
+
+# [def_name, [[parameter, type]]] for the entry's top-level defs.
+def sharpen_parameters(entry, files)
+  mutable calls = []
+  files.each do |file|
+    globals = merge_declarations(declarations_of(file.nodes), file.imports).globals
+    calls = calls_in(file.nodes, [], globals, calls)
+  end
+  defs = entry.nodes.select { it in DefNode }
+  entry_declarations = merge_declarations(declarations_of(entry.nodes), entry.imports)
+  mutable sharpened = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    pairs = agreed_parameters(node, calls.select { it[0] == node.name }, entry_declarations)
+    sharpened << [node.name, pairs] unless pairs.empty?
+  end
+  sharpened
+end
+
+# The parameters of one def every caller agrees on. A caller that omits an
+# optional parameter passes its default; a caller with the wrong count, or
+# one whose argument fails the parameter's contract, is a refusal at its
+# own call site — the better sentence, where the mistake was made — and
+# disqualifies the parameter here, so the body never refuses first with
+# a lesser one.
+def agreed_parameters(node, calls, declarations)
+  return [] if calls.empty?
+  globals = declarations.globals
+  positional = node.parameters.reject { it in KeywordParameterNode }
+  mutable pairs = []
+  node.parameters.each do |parameter|
+    contract = parameter_entry(parameter, node.body, globals)
+    mutable seen = []
+    mutable disqualified = false
+    calls.each do |call|
+      passed = argument_passed(parameter, positional.index(parameter), call, globals)
+      disqualified = true if passed.nil? || !satisfies?(passed, contract, declarations)
+      seen << passed unless passed.nil? || seen.include?(passed)
+    end
+    next if disqualified || seen.length != 1
+    agreed = seen.first or ["unknown"]
+    next unless known?(agreed)
+    pairs << [parameter.name, agreed]
+  end
+  pairs
+end
+
+# Whether an argument's type answers a parameter's contract — the same
+# question the call-site check asks (check_argument), asked ahead of it.
+# A type whose method set is not stated whole cannot fail here.
+def satisfies?(type, contract, declarations)
+  return true unless contract in ["needs", *]
+  methods = argument_methods(type, declarations)
+  return true if methods.nil?
+  type_at(contract, 1).all? { answers_demand?(type, methods, it) }
+end
+
+# What one call passes for one parameter: by position, by label for a
+# keyword parameter, the default's type when omitted — or nil where the
+# call cannot be paired with it.
+def argument_passed(parameter, position, call, globals)
+  positional_types = value_at_checked(call, 1)
+  keyword_types = value_at_checked(call, 2)
+  if parameter in KeywordParameterNode
+    given = keyword_types.find { it[0] == parameter.name }
+    return value_at_checked(given, 1) unless given.nil?
+    return parameter_type(parameter, globals) if parameter.default.some?
+    return nil
+  end
+  return nil if position.nil?
+  return value_at_checked(positional_types, position) if position < positional_types.length
+  return parameter_type(parameter, globals) if (parameter in AssignmentNode) && parameter.value.some?
+  nil
+end
+
+# Every bare call in a body with its argument types — [name, positional
+# types, [[label, type]]] — read with the scoping the checks use: a def
+# body from its parameters, a loop or block body with its rebindings
+# forgotten, a nested body's captures unknown. Struct, trait, and module
+# bodies are skipped, since a bare call inside them may reach their own
+# defs first. Narrowing is not applied — a maybe stays a maybe here,
+# which can only make callers disagree.
+def calls_in(nodes, mutable locals, globals, mutable found)
+  nodes.each do |node|
+    found = calls_in_node(node, locals, globals, found)
+    locals = bind_after(node, locals, globals)
+  end
+  found
+end
+
+def calls_in_node(node, locals, globals, mutable found)
+  return found if node.nil?
+  case node
+  in DefNode
+    mutable inner = []
+    node.parameters.each do |parameter|
+      inner = [[parameter.name, parameter_type(parameter, globals)]] + inner
+    end
+    calls_in(node.body, inner, globals, found)
+  in StructDefNode | TraitDefNode | ModuleDefNode then found
+  in WhileNode(condition:, body:)
+    found = calls_in_node(condition, locals, globals, found)
+    calls_in(body, forget_types(locals, assigned_names_in_body(body)), globals, found)
+  in IfNode(condition:, then_body:, else_body:)
+    found = calls_in_node(condition, locals, globals, found)
+    found = calls_in(then_body or [], locals, globals, found)
+    calls_in(else_body or [], locals, globals, found)
+  in CaseNode(subject:, branches:, else_body:)
+    found = calls_in_node(subject, locals, globals, found)
+    branches.each do |branch|
+      found = calls_in(branch.values, locals, globals, found)
+      found = calls_in(branch.body, locals, globals, found)
+    end
+    calls_in(else_body or [], locals, globals, found)
+  in CaseInNode(subject:, branches:, else_body:)
+    found = calls_in_node(subject, locals, globals, found)
+    branches.each do |branch|
+      captured = bind_unknowns(locals, pattern_names(branch.pattern))
+      found = calls_in_node(branch.guard, captured, globals, found) unless branch.guard.nil?
+      found = calls_in(branch.body, captured, globals, found)
+    end
+    calls_in(else_body or [], locals, globals, found)
+  in CallNode(name:, arguments:, block:)
+    mutable positional = []
+    mutable keywords = []
+    arguments.each do |argument|
+      found = calls_in_node(argument, locals, globals, found)
+      if argument in KeywordArgumentNode
+        keywords << [argument.label, synthesize(argument.value, locals + globals)]
+      else
+        positional << synthesize(argument, locals + globals)
+      end
+    end
+    found << [name, positional, keywords]
+    calls_in_block(node, ["unknown"], locals, globals, found)
+  in MethodCallNode | SafeMethodCallNode
+    found = calls_in_node(node.receiver, locals, globals, found)
+    node.arguments.each do |argument|
+      found = calls_in_node(argument, locals, globals, found)
+    end
+    calls_in_block(node, synthesize(node.receiver, locals + globals), locals, globals, found)
+  else
+    children_of(node).each do |child|
+      found = calls_in_node(child, locals, globals, found)
+    end
+    found
+  end
+end
+
+def calls_in_block(node, receiver, locals, globals, found)
+  block = node.block
+  return found if block.nil?
+  argument_types = node.arguments.map { synthesize(it, locals + globals) }
+  mutable inner = locals
+  block.parameters.each_with_index do |parameter, index|
+    inner = [[parameter, block_parameter_type(receiver, index, node.name, argument_types)]] + inner
+  end
+  calls_in(block.body, forget_types(inner, assigned_names_in_body(block.body)), globals, found)
 end
 
 # — the inference-backed checks (ADR 0047) —
