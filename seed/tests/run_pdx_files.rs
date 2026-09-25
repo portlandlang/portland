@@ -1595,6 +1595,31 @@ fn one_definition_per_name_on_both_oracles() {
     }
 }
 
+/// Exponent literals (#100): Ruby's rule on both oracles — `e` or `E`, an
+/// optional sign, digits, a float with or without a dot — and one sentence
+/// per refusal.
+#[test]
+fn exponent_literals_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_exponents.pdx",
+        "puts(1.2e-3 == 0.0012)\np(1e3)\np(5E+2)\np(1_000e3 == 1000000.0)\np(1e1_0 == 10000000000.0)\np(0e5)\np(-2.5e2)\n",
+    );
+    let cases = [
+        ("x = 1e\n", "'1e' has no digits in its exponent"),
+        ("x = 1e- 2\n", "'1e-' has no digits in its exponent"),
+        (
+            "x = 1e_3\n",
+            "an underscore in a number sits between digits — 1e_3 has one loose",
+        ),
+        (
+            "x = 1_e3\n",
+            "an underscore in a number sits between digits — 1_e3 has one loose",
+        ),
+        ("x = 01e5\n", "'01e5' has a leading zero — write 1e5"),
+    ];
+    assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
+}
+
 /// Three corrections to ADR 0054's build, each caught by an upstream
 /// ruby/spec example: NaN does not order, backwards clamp bounds refuse
 /// (on a Comparable struct too), and the two zeros are equal under `<=>`.

@@ -1,8 +1,8 @@
-# A number literal (ADRs 0018, 0050, and #71).
+# A number literal (ADRs 0018, 0050, #71, and #100).
 #
 # From ruby/spec language/numbers_spec.rb. What stays behind: `0377` as octal
 # (ADR 0050 refuses a leading zero, naming both readings — `0o377` is the
-# spelling); the exponent form `1.2e-3`, which does not lex yet (#100); the `r` and `i` suffixes (no Rational, no Complex); and the
+# spelling); the `r` and `i` suffixes (no Rational, no Complex); and the
 # three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
 # name here as there, and `.75` a parse refusal.
 
@@ -26,6 +26,16 @@ context "A number literal" do
 
     specify "must have a digit before the decimal point" do
       expect(0.75).to eq(0.75)
+    end
+
+    specify "can have an exponent" do
+      expect(1.2e-3).to eq(0.0012)
+    end
+
+    specify "is a float with an exponent, dot or no dot, either case of e" do
+      expect(1e3).to eq(1000.0)
+      expect(5E+2).to eq(500.0)
+      expect(1_000e3).to eq(1000000.0)
     end
   end
 

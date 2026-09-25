@@ -181,8 +181,39 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     });
                     kind = TokenKind::Float;
                 }
+                // An exponent (#100): `e` or `E`, an optional sign, then
+                // digits — Ruby's rule, and it makes a float with or without
+                // a dot. `1.e3` never reaches here: the dot above needs a
+                // digit after it, so that stays a method call.
+                if source[end..].starts_with(['e', 'E']) {
+                    let after = &source[end + 1..];
+                    let signed = after.starts_with(['+', '-']);
+                    let digits = if signed { &after[1..] } else { after };
+                    if digits.starts_with(|character: char| {
+                        character.is_ascii_digit() || character == '_'
+                    }) {
+                        chars.next(); // the `e`
+                        if signed {
+                            chars.next(); // the sign
+                        }
+                        end = scan_while(&mut chars, |character| {
+                            character.is_ascii_digit() || character == '_'
+                        });
+                        kind = TokenKind::Float;
+                    } else if !after.starts_with(|character: char| character.is_ascii_alphabetic())
+                    {
+                        let written = &source[start..end + 1 + usize::from(signed)];
+                        panic!("'{written}' has no digits in its exponent");
+                    }
+                }
                 let text = &source[start..end];
-                if text.contains("__") || text.ends_with('_') || text.contains("_.") {
+                if text.contains("__")
+                    || text.ends_with('_')
+                    || text.contains("_.")
+                    || ["_e", "_E", "e_", "E_", "+_", "-_"]
+                        .iter()
+                        .any(|pair| text.contains(pair))
+                {
                     panic!("an underscore in a number sits between digits — {text} has one loose");
                 }
                 check_leading_zero(text, kind);
@@ -727,6 +758,45 @@ mod tests {
     #[should_panic(expected = "'01.5' has a leading zero — write 1.5")]
     fn a_leading_zero_on_a_float_refuses() {
         lex("01.5");
+    }
+
+    #[test]
+    fn an_exponent_makes_a_float() {
+        // #100: `e` or `E`, an optional sign, digits — with or without a dot.
+        assert_eq!(
+            texts("1.2e-3 1e3 5E+2 1_000e3 1e1_0 0e5"),
+            vec!["1.2e-3", "1e3", "5E+2", "1_000e3", "1e1_0", "0e5"]
+        );
+        assert_eq!(kinds("1e3"), vec![TokenKind::Float]);
+        // `1.e3` stays a method call: the dot needs a digit after it.
+        assert_eq!(
+            kinds("1.e3"),
+            vec![TokenKind::Integer, TokenKind::Dot, TokenKind::Identifier]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "'1e' has no digits in its exponent")]
+    fn an_exponent_without_digits_refuses() {
+        lex("x = 1e");
+    }
+
+    #[test]
+    #[should_panic(expected = "'1e-' has no digits in its exponent")]
+    fn a_signed_exponent_without_digits_refuses() {
+        lex("x = 1e- 2");
+    }
+
+    #[test]
+    #[should_panic(expected = "an underscore in a number sits between digits — 1e_3 has one loose")]
+    fn an_underscore_against_the_exponent_refuses() {
+        lex("1e_3");
+    }
+
+    #[test]
+    #[should_panic(expected = "an underscore in a number sits between digits — 1_e3 has one loose")]
+    fn an_underscore_before_the_exponent_refuses() {
+        lex("1_e3");
     }
 
     #[test]

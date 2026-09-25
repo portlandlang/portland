@@ -585,7 +585,31 @@ def lex(raw_source, first_line: 1)
         end
         kind = "float"
       end
-      if text.include?("__") || text.end_with?("_") || text.include?("_.")
+      # An exponent (#100): `e` or `E`, an optional sign, then digits —
+      # Ruby's rule, and it makes a float with or without a dot. `1.e3`
+      # never reaches here: the dot above needs a digit after it.
+      if index < characters.length && (characters[index] == "e" || characters[index] == "E")
+        signed = index + 1 < characters.length && (characters[index + 1] == "+" || characters[index + 1] == "-")
+        first = index + (signed ? 2 : 1)
+        following = first < characters.length ? characters[first] : ""
+        if digit?(following) || following == "_"
+          text << characters[index]
+          text << characters[index + 1] if signed
+          index = first
+          while index < characters.length && (digit?(characters[index]) || characters[index] == "_")
+            text << characters[index]
+            index += 1
+          end
+          kind = "float"
+        else
+          after = index + 1 < characters.length ? characters[index + 1] : ""
+          unless name_start?(after) && after != "_"
+            written = text + characters[index] + (signed ? characters[index + 1] : "")
+            panic "'#{written}' has no digits in its exponent"
+          end
+        end
+      end
+      if text.include?("__") || text.end_with?("_") || text.include?("_.") || %w[_e _E e_ E_ +_ -_].any? { text.include?(it) }
         panic "an underscore in a number sits between digits — #{text} has one loose"
       end
       check_leading_zero(text, kind)
