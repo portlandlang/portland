@@ -293,7 +293,17 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
                 BinaryOperator::LessOrEqual => Value::Boolean(left <= right),
                 BinaryOperator::Equals => Value::Boolean(left == right),
                 BinaryOperator::NotEquals => Value::Boolean(left != right),
-                BinaryOperator::Spaceship => Value::Integer(ordering_value(left.total_cmp(&right))),
+                // `partial_cmp`, not `total_cmp`: the two zeros are equal
+                // (Ruby's answer), and NaN has no order at all, so it
+                // refuses where Ruby would answer nil.
+                BinaryOperator::Spaceship => match left.partial_cmp(&right) {
+                    Some(ordering) => Value::Integer(ordering_value(ordering)),
+                    None => panic!(
+                        "cannot apply '<=>' to {} and {}",
+                        left_value.shown(),
+                        right_value.shown()
+                    ),
+                },
             }
         }
         (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
@@ -2628,6 +2638,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Boolean(above_low && below_high)
             }
             (receiver, "clamp", [low, high]) if orderable(receiver) => {
+                // Bounds given backwards refuse, as Ruby raises for them,
+                // rather than answering whichever bound was checked first.
+                if self.ordering_of(low, high) > 0 {
+                    panic!(
+                        "'clamp' takes the low bound first, got {} then {}",
+                        low.shown(),
+                        high.shown()
+                    );
+                }
                 if self.ordering_of(receiver, low) < 0 {
                     low.clone()
                 } else if self.ordering_of(receiver, high) > 0 {
@@ -5190,6 +5209,31 @@ end
             evaluate("\"e\u{301}\" <=> \"\u{e9}\""),
             Some(Value::Integer(0))
         );
+    }
+
+    /// Upstream `core/float/comparison_spec.rb`: the two zeros are equal
+    /// under `<=>`, as they are under `==`.
+    #[test]
+    fn negative_zero_orders_equal_to_zero() {
+        assert_eq!(evaluate("-0.0 <=> 0.0"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("-0.0 <=> 0"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("0.0 <=> 0"), Some(Value::Integer(0)));
+    }
+
+    /// Ruby's `<=>` answers nil when a side is NaN; Portland has no nil
+    /// there, so it refuses, as for any pair it cannot order.
+    #[test]
+    #[should_panic(expected = "cannot apply '<=>' to NaN and 1.0")]
+    fn panics_on_ordering_nan() {
+        evaluate("(0.0 / 0.0) <=> 1.0");
+    }
+
+    /// Upstream `core/comparable/clamp_spec.rb`: bounds given backwards
+    /// refuse rather than answer one of them.
+    #[test]
+    #[should_panic(expected = "'clamp' takes the low bound first, got 9 then 1")]
+    fn panics_on_clamp_bounds_given_backwards() {
+        evaluate("5.clamp(9, 1)");
     }
 
     #[test]

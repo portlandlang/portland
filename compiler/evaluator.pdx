@@ -946,6 +946,10 @@ end
 def ordered_answer(name, receiver, arguments, bindings)
   low = value_at(arguments, 0)
   high = value_at(arguments, 1)
+  # Bounds given backwards refuse — the seed's rule and sentence.
+  if name == "clamp" && guest_ordering(low, high, bindings) > 0
+    panic("'clamp' takes the low bound first, got #{shorten(render_inspect(low))} then #{shorten(render_inspect(high))}")
+  end
   above_low = guest_ordering(receiver, low, bindings) >= 0
   below_high = guest_ordering(receiver, high, bindings) <= 0
   return above_low && below_high if name == "between?"

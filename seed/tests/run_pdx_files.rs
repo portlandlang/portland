@@ -1595,6 +1595,32 @@ fn one_definition_per_name_on_both_oracles() {
     }
 }
 
+/// Three corrections to ADR 0054's build, each caught by an upstream
+/// ruby/spec example: NaN does not order, backwards clamp bounds refuse
+/// (on a Comparable struct too), and the two zeros are equal under `<=>`.
+#[test]
+fn ordering_refusals_on_both_oracles() {
+    let cases = [
+        (
+            "puts((0.0 / 0.0) <=> 1.0)\n",
+            "cannot apply '<=>' to NaN and 1.0",
+        ),
+        (
+            "puts 5.clamp(9, 1)\n",
+            "'clamp' takes the low bound first, got 9 then 1",
+        ),
+        (
+            "struct Box\n  size\n  include Comparable\n  def <=>(other) = size <=> other.size\nend\nputs Box.new(size: 5).clamp(Box.new(size: 9), Box.new(size: 1)).size\n",
+            "'clamp' takes the low bound first, got Box(size: 9) then Box(size: 1)",
+        ),
+    ];
+    assert_both_oracles_refuse("ordering_refusal.pdx", None, &cases);
+    assert_evaluator_matches_seed(
+        "evaluator_zero_ordering.pdx",
+        "puts(-0.0 <=> 0.0)\nputs(-0.0 <=> 0)\nputs(0.0 <=> 0)\nputs 5.clamp(5, 5)\n",
+    );
+}
+
 /// Constants (ADR 0053): a def's reach — inside defs, struct methods, and
 /// blocks, beside a module's constant of the same name — on both oracles.
 #[test]

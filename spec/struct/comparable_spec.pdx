@@ -27,6 +27,11 @@ context "Ordering" do
       expect(2.5 <=> 1).to eq(1)
     end
 
+    specify "holds the two zeros equal" do
+      expect(-0.0 <=> 0.0).to eq(0)
+      expect(-0.0 <=> 0).to eq(0)
+    end
+
     specify "orders strings by their text" do
       expect("apple" <=> "banana").to eq(-1)
       expect("pear" <=> "pear").to eq(0)

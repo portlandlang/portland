@@ -28,7 +28,8 @@ Version.new(major: 1, minor: 2) < Version.new(major: 1, minor: 10)   # true
 
 The differences, each small:
 
-- **`<=>` never answers `nil`.** Two values it cannot order refuse, `cannot apply '<=>' to 1 and "a"`, since Portland has no ambient nil.
+- **`<=>` never answers `nil`.** Two values it cannot order refuse, `cannot apply '<=>' to 1 and "a"`, since Portland has no ambient nil. NaN is one of them: `cannot apply '<=>' to NaN and 1.0`.
+- **`clamp` with its bounds backwards refuses**, `'clamp' takes the low bound first, got 9 then 1`, where Ruby raises `ArgumentError`.
 - **Strings order by canonical text**, not bytes — a decomposed `é` equals the composed one ([characters.md](characters.md)).
 - **`Comparable` does not derive `==`.** Struct equality is already field-by-field; a `<=>` that disagrees with it would make two definitions of "equal".
 - **`include Comparable` without a `<=>` refuses at the include**, not on the first comparison: `Box includes Comparable but defines no '<=>' — define it`. And `a < b` on a struct without the include names the fix: `— include Comparable in Box`.
