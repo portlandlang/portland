@@ -1,0 +1,45 @@
+# A number literal (ADRs 0018, 0050, and #71).
+#
+# From ruby/spec language/numbers_spec.rb. What stays behind: `0377` as octal
+# (ADR 0050 refuses a leading zero, naming both readings — `0o377` is the
+# spelling); the exponent form `1.2e-3`, which does not lex yet (#100); the `r` and `i` suffixes (no Rational, no Complex); and the
+# three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
+# name here as there, and `.75` a parse refusal.
+
+# Up one, because `require_relative` resolves against this file's own
+# directory (the seed's rule, matched by the compiler) — not against `spec/`.
+require_relative "../spec_helper"
+
+context "A number literal" do
+  describe "decimal" do
+    specify "can be a sequence of decimal digits" do
+      expect(435).to eq(435)
+    end
+
+    specify "can have '_' characters between digits" do
+      expect(4_3_5_7).to eq(4357)
+    end
+
+    specify "can have a decimal point" do
+      expect(4.35).to eq(4.35)
+    end
+
+    specify "must have a digit before the decimal point" do
+      expect(0.75).to eq(0.75)
+    end
+  end
+
+  describe "prefixed" do
+    specify "can be a sequence of hexadecimal digits with a leading '0x'" do
+      expect(0xffff).to eq(65535)
+    end
+
+    specify "can be a sequence of binary digits with a leading '0b'" do
+      expect(0b01011).to eq(11)
+    end
+
+    specify "spells octal with '0o', where Ruby also reads a bare leading '0'" do
+      expect(0o377).to eq(255)
+    end
+  end
+end

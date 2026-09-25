@@ -33,6 +33,22 @@ context "Array" do
       expect(%w{rose city}).to eq(["rose", "city"])
     end
 
+    # From ruby/spec language/array_spec.rb, "Bareword array literal". The
+    # `%W` rows stay behind: ADR 0051 declines the interpolating form.
+    specify "%w() transforms unquoted barewords into an array, never interpolating" do
+      expect(%w(a #{3+a} 3)).to eq(["a", "\#{3+a}", "3"])
+    end
+
+    specify "treats consecutive whitespace characters the same as one" do
+      expect(%w(a  b c  d)).to eq(["a", "b", "c", "d"])
+    end
+
+    specify "treats whitespace as literal characters when escaped by a backslash" do
+      expect(%w(a b\ c d e)).to eq(["a", "b c", "d", "e"])
+      expect(%w(a b\
+c d)).to eq(["a", "b\nc", "d"])
+    end
+
     specify "escapes and nests the pair it opened with, and only that pair" do
       expect(%w(a \) b (c) d)).to eq(["a", ")", "b", "(c)", "d"])
       expect(%w{a \] b}.last).to have_length(1)
