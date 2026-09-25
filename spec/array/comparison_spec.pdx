@@ -1,0 +1,56 @@
+# `Array#<=>` orders element by element, the first differing pair deciding and
+# a shorter array first when every pair agrees (ADR 0054).
+#
+# From ruby/spec core/array/comparison_spec.rb. The mock-driven rows become
+# struct elements whose `<=>` is written out, which is the same question asked
+# without `should_receive`. What stays behind: a nil or non-integer answer
+# from an element (refused here, not propagated), recursive arrays (values
+# never mutate, so an array cannot contain itself), and `to_ary`.
+
+require_relative "../spec_helper"
+
+struct Rank
+  level
+
+  def <=>(other) = level <=> other.level
+end
+
+context "Array" do
+  describe "#<=>" do
+    specify "returns 0 if the arrays are equal" do
+      expect([] <=> []).to eq(0)
+      expect([1, 2, 3, 4, 5, 6] <=> [1, 2, 3, 4, 5.0, 6.0]).to eq(0)
+    end
+
+    specify "returns -1 if the array is shorter than the other array" do
+      expect([] <=> [1]).to eq(-1)
+      expect([1, 1] <=> [1, 1, 1]).to eq(-1)
+    end
+
+    specify "returns +1 if the array is longer than the other array" do
+      expect([1] <=> []).to eq(1)
+      expect([1, 1, 1] <=> [1, 1]).to eq(1)
+    end
+
+    specify "returns -1 if the arrays have same length and a pair of corresponding elements returns -1 for <=>" do
+      equal = Rank.new(level: 5)
+      rest = Rank.new(level: 9)
+      left = [equal, equal, Rank.new(level: 1), rest]
+      right = [equal, equal, Rank.new(level: 2), rest]
+      expect(left <=> right).to eq(-1)
+    end
+
+    specify "returns +1 if the arrays have same length and a pair of corresponding elements returns +1 for <=>" do
+      equal = Rank.new(level: 5)
+      rest = Rank.new(level: 9)
+      left = [equal, equal, Rank.new(level: 2), rest]
+      right = [equal, equal, Rank.new(level: 1), rest]
+      expect(left <=> right).to eq(1)
+    end
+
+    specify "returns the first non-0 result, left to right" do
+      expect([1, 2, 9] <=> [1, 3, 0]).to eq(-1)
+      expect(["b", "a"] <=> ["a", "z"]).to eq(1)
+    end
+  end
+end

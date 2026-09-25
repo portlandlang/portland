@@ -1,0 +1,40 @@
+# `Comparable#between?` — the builtin trait's derived bounds check (ADR 0054).
+#
+# From ruby/spec core/comparable/between_spec.rb. Upstream's `Weird` fixture
+# is a class including Comparable over a `value`; here it is the struct that
+# spells the same thing.
+
+require_relative "../spec_helper"
+
+struct Weird
+  value
+
+  include Comparable
+
+  def <=>(other) = value <=> other.value
+end
+
+context "Comparable" do
+  describe "#between?" do
+    specify "returns true if self is greater than or equal to the first and less than or equal to the second argument" do
+      a = Weird.new(value: -1)
+      b = Weird.new(value: 0)
+      c = Weird.new(value: 1)
+      d = Weird.new(value: 2)
+
+      expect(a.between?(a, a)).to be_true
+      expect(a.between?(a, b)).to be_true
+      expect(a.between?(a, c)).to be_true
+      expect(a.between?(a, d)).to be_true
+      expect(c.between?(c, d)).to be_true
+      expect(d.between?(d, d)).to be_true
+      expect(c.between?(a, d)).to be_true
+
+      expect(a.between?(b, b)).to be_false
+      expect(a.between?(b, c)).to be_false
+      expect(a.between?(b, d)).to be_false
+      expect(c.between?(a, a)).to be_false
+      expect(c.between?(a, b)).to be_false
+    end
+  end
+end

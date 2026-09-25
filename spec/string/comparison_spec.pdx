@@ -1,0 +1,50 @@
+# `String#<=>` and the four orderings: strings order by their text (ADR 0054).
+#
+# From ruby/spec core/string/comparison_spec.rb, "with String". What stays
+# behind: the 256-character `x.chr` table (no `Array.new` with a block, no
+# `chr`), the subclass and encoding rows (no subclasses; one encoding), and
+# the `to_str`/inverse-`<=>` rows (no conversion protocol). Where Ruby compares
+# bytes Portland compares canonical text; the two agree on every row here, and
+# spec/struct/comparable_spec.pdx holds the canonical-equality case.
+
+require_relative "../spec_helper"
+
+context "String" do
+  describe "#<=>" do
+    specify "returns -1 when self is less than other" do
+      expect("this" <=> "those").to eq(-1)
+    end
+
+    specify "returns 0 when self is equal to other" do
+      expect("yep" <=> "yep").to eq(0)
+    end
+
+    specify "returns 1 when self is greater than other" do
+      expect("yoddle" <=> "griddle").to eq(1)
+    end
+
+    specify "considers string that comes lexicographically first to be less if strings have same size" do
+      expect("aba" <=> "abc").to eq(-1)
+      expect("abc" <=> "aba").to eq(1)
+    end
+
+    specify "doesn't consider shorter string to be less if longer string starts with shorter one" do
+      expect("abc" <=> "abcd").to eq(-1)
+      expect("abcd" <=> "abc").to eq(1)
+    end
+
+    specify "compares shorter string with corresponding number of first chars of longer string" do
+      expect("abx" <=> "abcd").to eq(1)
+      expect("abcd" <=> "abx").to eq(-1)
+    end
+  end
+
+  describe "the four orderings" do
+    specify "follow <=>" do
+      expect("aba" < "abc").to be_true
+      expect("abc" <= "abc").to be_true
+      expect("abx" > "abcd").to be_true
+      expect("abcd" >= "abx").to be_false
+    end
+  end
+end

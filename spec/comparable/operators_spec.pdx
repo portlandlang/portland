@@ -1,0 +1,75 @@
+# `Comparable#<`, `#<=`, `#>`, `#>=` — derived from the struct's `<=>`
+# (ADR 0054).
+#
+# From ruby/spec core/comparable/{lt,lte,gt,gte}_spec.rb. Upstream rigs
+# `<=>` with `should_receive(:<=>).and_return(n)`; here `Rigged` answers
+# whatever its field holds, which asks the same question without a mock. What
+# stays behind: `<=>` answering a float (`-0.1`, `1.0`) or nil — both refuse
+# here, `'<=>' answers -1, 0, or 1, got ...`, pinned by a two-oracle test —
+# and `"foo" < 7`'s message, which is Portland's own mixed-kinds sentence.
+
+require_relative "../spec_helper"
+
+struct Rigged
+  answer
+
+  include Comparable
+
+  def <=>(other) = answer
+end
+
+def rigged(answer) = Rigged.new(answer: answer)
+
+context "Comparable" do
+  other = rigged(0)
+
+  describe "#<" do
+    specify "returns true if #<=> returns any Integer less than 0" do
+      expect(rigged(-1) < other).to be_true
+      expect(rigged(-10000000) < other).to be_true
+    end
+
+    specify "returns false if #<=> returns 0 or any Integer greater than 0" do
+      expect(rigged(0) < other).to be_false
+      expect(rigged(10000000) < other).to be_false
+    end
+  end
+
+  describe "#<=" do
+    specify "returns true if #<=> returns 0 or any Integer less than 0" do
+      expect(rigged(0) <= other).to be_true
+      expect(rigged(-1) <= other).to be_true
+      expect(rigged(-10000000) <= other).to be_true
+    end
+
+    specify "returns false if #<=> returns any Integer greater than 0" do
+      expect(rigged(1) <= other).to be_false
+      expect(rigged(10000000) <= other).to be_false
+    end
+  end
+
+  describe "#>" do
+    specify "returns true if #<=> returns any Integer greater than 0" do
+      expect(rigged(1) > other).to be_true
+      expect(rigged(10000000) > other).to be_true
+    end
+
+    specify "returns false if #<=> returns 0 or any Integer less than 0" do
+      expect(rigged(0) > other).to be_false
+      expect(rigged(-10000000) > other).to be_false
+    end
+  end
+
+  describe "#>=" do
+    specify "returns true if #<=> returns 0 or any Integer greater than 0" do
+      expect(rigged(0) >= other).to be_true
+      expect(rigged(1) >= other).to be_true
+      expect(rigged(10000000) >= other).to be_true
+    end
+
+    specify "returns false if #<=> returns any Integer less than 0" do
+      expect(rigged(-1) >= other).to be_false
+      expect(rigged(-10000000) >= other).to be_false
+    end
+  end
+end

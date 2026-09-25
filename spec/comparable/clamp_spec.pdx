@@ -1,0 +1,50 @@
+# `Comparable#clamp` with two bounds (ADR 0054).
+#
+# From ruby/spec core/comparable/clamp_spec.rb, the two-argument half. Ruby's
+# `should.equal?` asks identity; Portland values have none, and a struct is
+# equal field by field, so these ask `==`. What stays behind: bounds given
+# backwards refuse rather than raise (a spec never refuses — the seed's unit
+# tests and a two-oracle test pin it); nil as either bound (no ambient nil);
+# and the range-argument forms, `clamp(1..3)` with its endless and beginless
+# variants, which are not built (#101).
+
+require_relative "../spec_helper"
+
+struct Weird
+  value
+
+  include Comparable
+
+  def <=>(other) = value <=> other.value
+end
+
+context "Comparable" do
+  describe "#clamp" do
+    one = Weird.new(value: 1)
+    two = Weird.new(value: 2)
+    three = Weird.new(value: 3)
+
+    specify "returns self if within the given parameters" do
+      c = Weird.new(value: 2)
+      expect(c.clamp(one, two)).to eq(c)
+      expect(c.clamp(two, two)).to eq(c)
+      expect(c.clamp(one, three)).to eq(c)
+      expect(c.clamp(two, three)).to eq(c)
+    end
+
+    specify "returns the min parameter if less than it" do
+      expect(Weird.new(value: 0).clamp(one, two)).to eq(one)
+    end
+
+    specify "returns the max parameter if greater than it" do
+      expect(Weird.new(value: 3).clamp(one, two)).to eq(two)
+    end
+
+    specify "works on the builtin orderables too" do
+      expect(5.clamp(1, 9)).to eq(5)
+      expect(0.clamp(1, 9)).to eq(1)
+      expect(2.5.clamp(1, 2)).to eq(2)
+      expect("m".clamp("a", "f")).to eq("f")
+    end
+  end
+end
