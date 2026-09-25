@@ -134,6 +134,29 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..start + 1],
                 });
             }
+            // A base prefix, either case (#72, ADR 0050): `0x` hexadecimal,
+            // `0b` binary, `0o` octal. The token keeps the spelling; the
+            // parser folds it. Ruby's `0d` is not taken, and its bare
+            // leading-zero octal refuses below.
+            '0' if source[start + 1..].starts_with(['x', 'X', 'b', 'B', 'o', 'O']) => {
+                chars.next(); // the `0`
+                chars.next(); // the base letter
+                let mut end = start + 2;
+                if chars.peek().is_some_and(|&(_, character)| {
+                    character.is_ascii_alphanumeric() || character == '_'
+                }) {
+                    end = scan_while(&mut chars, |character| {
+                        character.is_ascii_alphanumeric() || character == '_'
+                    });
+                }
+                let text = &source[start..end];
+                check_prefixed_literal(text);
+                tokens.push(Token {
+                    leading_space: false,
+                    kind: TokenKind::Integer,
+                    text,
+                });
+            }
             '0'..='9' => {
                 // Underscores group digits, Ruby's separators (#71) — legal
                 // only between digits, refused loose below.
@@ -157,6 +180,7 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 if text.contains("__") || text.ends_with('_') || text.contains("_.") {
                     panic!("an underscore in a number sits between digits — {text} has one loose");
                 }
+                check_leading_zero(text, kind);
                 tokens.push(Token {
                     leading_space: false,
                     kind,
@@ -485,6 +509,50 @@ fn skip_interpolation(chars: &mut std::iter::Peekable<std::str::CharIndices>, st
 }
 
 /// Consume characters while `keep` holds; return the byte offset just past the last one.
+/// A prefixed integer literal's digits must suit its base, sit at least one
+/// deep, and keep their underscores between digits (#72, ADR 0050).
+fn check_prefixed_literal(text: &str) {
+    let (base, base_name, allowed) = match &text[1..2] {
+        "x" | "X" => (16, "hexadecimal", "0-9 and a-f"),
+        "b" | "B" => (2, "binary", "0 and 1"),
+        _ => (8, "octal", "0-7"),
+    };
+    let digits = &text[2..];
+    if digits.is_empty() {
+        panic!("'{text}' has no digits after its prefix");
+    }
+    if digits.starts_with('_') || digits.contains("__") || digits.ends_with('_') {
+        panic!("an underscore in a number sits between digits — {text} has one loose");
+    }
+    if digits
+        .chars()
+        .any(|character| character != '_' && !character.is_digit(base))
+    {
+        panic!("'{text}' has a digit outside its base — {base_name} digits are {allowed}");
+    }
+}
+
+/// Ruby reads `017` as octal fifteen, a trap inherited from C (#72, ADR
+/// 0050). Portland refuses the leading zero and names both readings.
+fn check_leading_zero(text: &str, kind: TokenKind) {
+    if !text.starts_with('0')
+        || !text[1..].starts_with(|character: char| character.is_ascii_digit() || character == '_')
+    {
+        return;
+    }
+    let rest = text.trim_start_matches(['0', '_']);
+    if kind == TokenKind::Float {
+        let written = if rest.starts_with('.') {
+            format!("0{rest}")
+        } else {
+            rest.to_string()
+        };
+        panic!("'{text}' has a leading zero — write {written}");
+    }
+    let rest = if rest.is_empty() { "0" } else { rest };
+    panic!("'{text}' has a leading zero — write 0o{rest} for octal or {rest} for decimal");
+}
+
 fn scan_while(
     chars: &mut std::iter::Peekable<std::str::CharIndices>,
     keep: impl Fn(char) -> bool,
@@ -553,6 +621,55 @@ mod tests {
     #[should_panic(expected = "an underscore in a number sits between digits — 5_.5 has one loose")]
     fn an_underscore_against_the_dot_refuses() {
         lex("5_.5");
+    }
+
+    #[test]
+    fn a_base_prefix_lexes_as_one_integer() {
+        assert_eq!(kinds("0xff"), vec![TokenKind::Integer]);
+        assert_eq!(texts("0xff"), vec!["0xff"]);
+        assert_eq!(
+            texts("0XFF_FF 0b1010 0o17 0B1 0O7"),
+            vec!["0XFF_FF", "0b1010", "0o17", "0B1", "0O7"]
+        );
+        // `0.5` and `0` are not prefixed, and `0.upto` stays a call.
+        assert_eq!(kinds("0.5"), vec![TokenKind::Float]);
+        assert_eq!(texts("0"), vec!["0"]);
+        assert_eq!(
+            kinds("0.upto"),
+            vec![TokenKind::Integer, TokenKind::Dot, TokenKind::Identifier]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "'017' has a leading zero — write 0o17 for octal or 17 for decimal")]
+    fn a_leading_zero_refuses() {
+        lex("017");
+    }
+
+    #[test]
+    #[should_panic(expected = "'01.5' has a leading zero — write 1.5")]
+    fn a_leading_zero_on_a_float_refuses() {
+        lex("01.5");
+    }
+
+    #[test]
+    #[should_panic(expected = "'0x' has no digits after its prefix")]
+    fn a_bare_prefix_refuses() {
+        lex("0x + 1");
+    }
+
+    #[test]
+    #[should_panic(expected = "'0b102' has a digit outside its base — binary digits are 0 and 1")]
+    fn a_digit_outside_the_base_refuses() {
+        lex("0b102");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "an underscore in a number sits between digits — 0x_ff has one loose"
+    )]
+    fn an_underscore_against_the_prefix_refuses() {
+        lex("0x_ff");
     }
 
     #[test]

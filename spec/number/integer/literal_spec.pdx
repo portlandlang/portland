@@ -1,0 +1,47 @@
+# Integer literals: decimal, and the three base prefixes (ADR 0050).
+#
+# `0x` hexadecimal, `0b` binary, `0o` octal — either case of the letter, with
+# underscores between digits as in any number (#71). Ruby's bare leading-zero
+# octal and `0d` are not taken; the refusal is pinned by the seed's tests, since
+# a spec never refuses.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+require_relative "../../spec_helper"
+
+context "Integer" do
+  describe "literals" do
+    specify "read hexadecimal with 0x, either case" do
+      expect(0xff).to eq(255)
+      expect(0XFF).to eq(255)
+      expect(0xDeadBeef).to eq(3735928559)
+    end
+
+    specify "read binary with 0b" do
+      expect(0b1010).to eq(10)
+      expect(0B1).to eq(1)
+    end
+
+    specify "read octal with 0o" do
+      expect(0o17).to eq(15)
+      expect(0O644).to eq(420)
+    end
+
+    specify "group digits with underscores in any base" do
+      expect(0xff_ff).to eq(65535)
+      expect(0b1111_0000).to eq(240)
+      expect(8_675_309).to eq(8675309)
+    end
+
+    specify "take a unary minus" do
+      expect(-0x10).to eq(-16)
+      expect(-0b11 + 0xF).to eq(12)
+    end
+
+    specify "are integers like any other" do
+      expect(0x10.to_s).to eq("16")
+      expect(0b100.even?).to be_true
+      expect(0o17 == 15).to be_true
+    end
+  end
+end

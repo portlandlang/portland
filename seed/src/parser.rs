@@ -80,11 +80,19 @@ struct ItFrame {
 /// No interpolation, so the quoted form needs no escape handling beyond the
 /// surrounding quotes (ADR 0023 §2).
 /// A numeric literal's digits, underscores shed — the lexer has already
-/// refused any underscore not sitting between digits (#71).
+/// refused any underscore not sitting between digits (#71) — and a base
+/// prefix folded: `0x`, `0b`, `0o`, either case (#72, ADR 0050).
 fn integer_literal(text: &str) -> i64 {
-    text.replace('_', "")
-        .parse()
-        .expect("integer literal out of range")
+    let plain = text.replace('_', "");
+    let base = match plain.get(..2) {
+        Some("0x" | "0X") => 16,
+        Some("0b" | "0B") => 2,
+        Some("0o" | "0O") => 8,
+        _ => {
+            return plain.parse().expect("integer literal out of range");
+        }
+    };
+    i64::from_str_radix(&plain[2..], base).expect("integer literal out of range")
 }
 
 fn float_literal(text: &str) -> f64 {

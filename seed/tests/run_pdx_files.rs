@@ -1327,6 +1327,58 @@ fn portland_evaluator_matches_the_seed_on_fields_named_like_builtins() {
     );
 }
 
+/// Prefixed integer literals (#72, ADR 0050): `0x`, `0b`, `0o` in either
+/// case, underscores between digits, and a folded unary minus — one value
+/// on both oracles, and one S-expression, since the fold happens in each
+/// parser at its literal choke point.
+#[test]
+fn portland_evaluator_matches_the_seed_on_prefixed_integer_literals() {
+    assert_evaluator_matches_seed(
+        "evaluator_prefixed_literals.pdx",
+        "puts 0xff\nputs 0XFF_FF + 0b1010 + 0o17 + 0B1 + 0O7\nputs(-0x10)\nputs 0x7fff_ffff_ffff_ffff\nputs 0b1010.to_s\n",
+    );
+    let sample = std::env::temp_dir().join("parse_prefixed_literals.pdx");
+    std::fs::write(&sample, "puts(-0x10 + 0b11)\n").unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_parse())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert_eq!(
+        String::from_utf8(hosted.stdout).unwrap(),
+        "(call puts (+ -16 3))\n"
+    );
+}
+
+/// Ruby's bare leading-zero octal is refused, not read (#72, ADR 0050):
+/// `017` is fifteen in Ruby and a trap here, so both lexers name the two
+/// readings — one sentence, the seed marking it a parse refusal.
+#[test]
+fn a_leading_zero_refuses_on_both_oracles() {
+    let sample = std::env::temp_dir().join("leading_zero.pdx");
+    std::fs::write(&sample, "puts 017\n").unwrap();
+    let expected = "'017' has a leading zero — write 0o17 for octal or 17 for decimal";
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(!seed.status.success(), "the seed should refuse");
+    let stderr = String::from_utf8(seed.stderr).unwrap();
+    assert!(stderr.contains(expected), "the seed said: {stderr}");
+    assert!(
+        stderr.lines().any(|line| line == "refusal: parse"),
+        "the seed should mark a parse refusal, got: {stderr}"
+    );
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(!hosted.status.success(), "the hosted lexer should refuse");
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    assert!(stderr.contains(expected), "the hosted lexer said: {stderr}");
+}
+
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
 /// Every sentence shape the ADR pins, rendered from its tagged refusal, plus
 /// the rulings the renderer owns: the dump's type spelling, fact–dash–hint

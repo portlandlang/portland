@@ -54,7 +54,7 @@ Four rules do most of the work. They are not features; they are the reasons othe
 
 ## Values
 
-**Integers** are `i64`. **Floats** are IEEE doubles, printed Ruby's way, and mixed arithmetic promotes. A dot is only a float when a digit follows it, which is what keeps `1..5` a range.
+**Integers** are `i64`, written in decimal or with Ruby's `0x`, `0b`, `0o` prefixes, underscores between digits (`8_675_309`, `0xff_ff`). A bare leading zero refuses rather than meaning octal, and `0d` is gone ([ADR 0050](adr/0050-2026-09-24-integer-literals.md)). **Floats** are IEEE doubles, printed Ruby's way, and mixed arithmetic promotes. A dot is only a float when a digit follows it, which is what keeps `1..5` a range.
 
 Arithmetic is `+ - * / % **` with unary minus and parens. `+` concatenates strings and arrays; `*` repeats them. Integer division and modulo are **floored, exactly as in Ruby** (ADR 0018) — `-7 / 2` is `-4`, and `-7 % 2` is `1`. Exponent is `**` or its named twin `pow` ([ADR 0033](adr/0033-2026-08-11-exponent-is-starstar-and-pow.md)): right-associative, above `*`, floats through the host, and a minus before `**` applies last — `-2 ** 2` is `-4`, Ruby's answer and mathematics'. The one refusal is the chained negative literal (`-5.abs ** 2`), where Ruby's own rules contradict each other. A negative integer exponent and a past-i64 result refuse with their rewrites named, since Portland has neither rationals nor bignums.
 

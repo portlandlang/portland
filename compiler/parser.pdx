@@ -869,8 +869,35 @@ def float_node(value)
 end
 
 def integer_node(value)
-  IntegerNode.new(kind: "integer", value: value.split("_").join(""))
+  IntegerNode.new(kind: "integer", value: integer_digits(value))
 end
+
+# An integer literal's value in decimal digits: underscores shed, and a base
+# prefix — `0x`, `0b`, `0o`, either case — folded (#72, ADR 0050), so the
+# stored value and the S-expression dump hold what the seed holds. The lexer
+# has already refused a digit outside its base.
+def integer_digits(text)
+  plain = text.split("_").join("")
+  letters = plain.chars
+  # A folded unary minus arrives as part of the text (`-0x10`).
+  sign = letters.first == "-" ? "-" : ""
+  offset = sign.length
+  return plain unless letters.length > offset + 2 && letters[offset] == "0" && base_letter?(letters[offset + 1])
+  base = case letters[offset + 1].downcase
+         when "b" then 2
+         when "x" then 16
+         else 8
+         end
+  mutable total = 0
+  mutable index = offset + 2
+  while index < letters.length
+    total = total * base + digit_value(letters[index])
+    index += 1
+  end
+  sign + total.to_s
+end
+
+def digit_value(letter) = "0123456789abcdef".index(letter.downcase) or panic "'#{letter}' is not a digit"
 
 def range_node(start, finish, exclusive)
   RangeNode.new(kind: "range", start: start, finish: finish, exclusive: exclusive)
