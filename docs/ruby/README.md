@@ -28,6 +28,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Characters](characters.md) — A character is a grapheme cluster and string equality is canonical — `"🇺🇸".length` is 1 and composed `é` equals decomposed `é`, where Ruby counts scalars and compares bytes.
 - [`class`: four jobs, four homes](classes.md) — the keyword is gone — declined, not deferred — and its four jobs re-homed: data-with-behavior is a `struct`, shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects wait on the concurrency story.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
+- [Constants](constants.md) — `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Error handling: results, not raises](errors.md) — `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
@@ -44,6 +45,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 - [The `%` literal family](percent-literals.md) — `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
+- [Redefinition](redefinition.md) — A top-level name is defined once — a second `def`, `struct`, `enum`, `trait`, `alias`, or constant of the same name refuses, and a builtin's name is never taken.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 - [`String#count` and character sets](string-count.md) — `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.

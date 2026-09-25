@@ -63,6 +63,8 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0049](0049-2026-09-24-the-whole-program-door.md) — The whole-program door: a program is its require closure
 - [0050](0050-2026-09-24-integer-literals.md) — Integer literals: three prefixes, no leading-zero octal
 - [0051](0051-2026-09-24-the-percent-literal-family.md) — The `%` literal family: `%w` and `%i` with three delimiters, the rest declined
+- [0052](0052-2026-09-24-one-definition-per-name.md) — One definition per name: redefinition refuses, and the builtins are not for taking
+- [0053](0053-2026-09-24-constants.md) — Constants: a SCREAMING_CASE name at the top level is bound once, with a def's reach
 
 <!-- /generated -->
 

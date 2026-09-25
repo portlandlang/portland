@@ -357,6 +357,12 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, std::rc::Rc<Method>>,
     /// The namespace currently being defined or executed (ADR 0021).
     module_path: Vec<String>,
+    /// Top-level constants (ADR 0053): SCREAMING_CASE names bound once at
+    /// the top of a file, with a def's reach — read from inside every
+    /// frame, and from every file that requires this one.
+    constants: HashMap<String, Value>,
+    /// The REPL redefines on purpose; a program never does (ADR 0052).
+    redefinable: bool,
     output: W,
     pending: Option<Pending>,
     /// The receiver while a struct method runs: `(struct name, instance)`.
@@ -446,6 +452,8 @@ impl<W: std::io::Write> Interpreter<W> {
             expression_depth: 0,
             methods: HashMap::new(),
             module_path: Vec::new(),
+            constants: HashMap::new(),
+            redefinable: false,
             output,
             pending: None,
             self_receiver: None,
@@ -467,6 +475,47 @@ impl<W: std::io::Write> Interpreter<W> {
 
     pub fn set_arguments(&mut self, arguments: Vec<String>) {
         self.arguments = arguments;
+    }
+
+    /// The REPL's exemption from one-definition-per-name (ADR 0052):
+    /// redefining `greet` mid-session is the point of a session.
+    pub fn allow_redefinition(&mut self) {
+        self.redefinable = true;
+    }
+
+    /// A SCREAMING_CASE name (ADR 0053): two characters or more, starting
+    /// with a capital, all capitals, digits, and underscores.
+    fn constant_name(name: &str) -> bool {
+        name.len() >= 2
+            && name.starts_with(|character: char| character.is_ascii_uppercase())
+            && name.chars().all(|character| {
+                character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+            })
+    }
+
+    fn lone_capital(name: &str) -> bool {
+        name.len() == 1 && name.starts_with(|character: char| character.is_ascii_uppercase())
+    }
+
+    /// One definition per name (#70, ADR 0052): a builtin is never
+    /// redefined, and a def, struct, enum, trait, alias, or constant is
+    /// defined once — except in the REPL, where redefining is the point.
+    fn refuse_redefinition(&self, name: &str) {
+        if Self::builtin_name(name) {
+            panic!("'{name}' is a builtin — rename yours");
+        }
+        if self.redefinable {
+            return;
+        }
+        let qualified = self.qualified(name);
+        if self.methods.contains_key(&qualified)
+            || self.structs.contains_key(&qualified)
+            || self.enums.contains_key(&qualified)
+            || self.traits.contains_key(&qualified)
+            || (self.module_path.is_empty() && self.constants.contains_key(name))
+        {
+            panic!("'{name}' is already defined — rename one");
+        }
     }
 
     /// A bare name qualified by the namespace being defined (ADR 0021).
@@ -592,15 +641,38 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     panic!("assignment to {name} produced no value");
                 };
-                // A binding written directly in a module body is a constant
-                // of that namespace (ADR 0021): `Foo::LIMIT`. Inside a
-                // method the module path is the method's home, but locals
-                // there are ordinary — only top-of-body bindings qualify.
-                if self.module_path.is_empty() || self.call_depth > 0 {
+                let top_level = self.module_path.is_empty() && self.call_depth == 0;
+                // A SCREAMING_CASE name at the top level is a constant
+                // (ADR 0053): bound once, never mutable, a def's reach.
+                if top_level && Self::constant_name(name) {
+                    if *mutable {
+                        panic!("'{name}' is a constant — a constant cannot be mutable");
+                    }
+                    if self.constants.contains_key(name) && !self.redefinable {
+                        panic!("'{name}' is a constant — it is bound once");
+                    }
+                    if self.lookup_method(name).is_some() || Self::builtin_name(name) {
+                        panic!("'{name}' is already defined — rename one");
+                    }
+                    self.constants.insert(name.clone(), value.clone());
+                } else if top_level && Self::lone_capital(name) {
+                    panic!(
+                        "'{name}' is a single capital — spell a constant with two characters or more, a local in lowercase"
+                    );
+                } else if self.module_path.is_empty() || self.call_depth > 0 {
+                    // A binding written directly in a module body is a
+                    // constant of that namespace (ADR 0021): `Foo::LIMIT`.
+                    // Inside a method the module path is the method's home,
+                    // but locals there are ordinary — only top-of-body
+                    // bindings qualify.
                     self.assign(name, value.clone(), *mutable);
                 } else {
+                    let qualified = self.qualified(name);
+                    if self.variables.contains_key(&qualified) && !self.redefinable {
+                        panic!("'{name}' is a constant — it is bound once");
+                    }
                     self.variables.insert(
-                        self.qualified(name),
+                        qualified,
                         Binding {
                             mutable: *mutable,
                             value: value.clone(),
@@ -619,6 +691,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 if self.variables.contains_key(name) {
                     panic!("method {name} shadows local {name} — rename one");
                 }
+                self.refuse_redefinition(name);
                 let method = Method {
                     body: body.clone(),
                     home: self.module_path.clone(),
@@ -637,6 +710,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 if self.variables.contains_key(new_name) {
                     panic!("method {new_name} shadows local {new_name} — rename one");
                 }
+                self.refuse_redefinition(new_name);
                 let method = self.lookup_method(old_name).unwrap_or_else(|| {
                     panic!("alias points at nothing — no method {old_name} defined yet")
                 });
@@ -673,6 +747,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // structs and modules are (ADR 0021), so `Purchase::Status` and a
             // top-level `Ordering` need no separate lookup path.
             Statement::EnumDefinition { cases, name } => {
+                self.refuse_redefinition(name);
                 let qualified = self.qualified(name);
                 self.enums.insert(
                     qualified,
@@ -708,6 +783,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }),
                     );
                 }
+                self.refuse_redefinition(name);
                 self.traits.insert(
                     self.qualified(name),
                     TraitInfo {
@@ -798,6 +874,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         method_table.insert(method_name, method);
                     }
                 }
+                self.refuse_redefinition(name);
                 self.structs.insert(
                     self.qualified(name),
                     StructInfo {
@@ -1328,6 +1405,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 // zero-argument call — unambiguous because shadowing is an error.
                 if let Some(binding) = self.variables.get(name) {
                     Some(binding.value.clone())
+                } else if let Some(value) = self.constants.get(name) {
+                    // A top-level constant (ADR 0053), from any frame.
+                    Some(value.clone())
                 } else if let Some((_, binding)) =
                     Self::resolve(&self.module_path, name, &self.variables)
                 {
@@ -2711,6 +2791,10 @@ impl<W: std::io::Write> Interpreter<W> {
     /// rebindable name exactly once; a bare assignment creates an immutable
     /// binding or rebinds an existing mutable one.
     fn assign(&mut self, name: &str, value: Value, declare_mutable: bool) {
+        // A constant is bound once, from anywhere (ADR 0053).
+        if self.constants.contains_key(name) && !self.redefinable {
+            panic!("'{name}' is a constant — it is bound once");
+        }
         // The no-shadow rule: a name is a local or a method, never both.
         if self.lookup_method(name).is_some() || Self::builtin_name(name) {
             panic!("local {name} shadows method {name} — rename one");

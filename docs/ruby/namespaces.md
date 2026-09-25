@@ -77,7 +77,7 @@ end
 
 **Files and modules are unrelated**, as in Ruby: `require_relative` loads a file and implies no namespace. (Rails' path-to-constant convention comes from Zeitwerk, a library, not the language.)
 
-**Constants need no separate concept.** In Ruby they exist because variables are mutable by default; under [mutability](mutability.md) everything is already unrebindable, so `MAX = 5` was always constant — it only lacked a place to live.
+**Constants are a module's bindings** — `Config::LIMIT` is `LIMIT = 3` written in `module Config`'s body. A top-level `SCREAMING_CASE` binding is a constant too, with a def's reach ([constants.md](constants.md), [ADR 0053](../adr/0053-2026-09-24-constants.md)); the earlier line here, that constants needed no separate concept, held for the name's home and not for its reach.
 
 ## Migration
 

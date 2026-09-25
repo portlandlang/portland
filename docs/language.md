@@ -147,7 +147,7 @@ Bang *names* are legal ([ADR 0044](adr/0044-2026-08-19-propagation-is-the-toolki
 
 Parameters are binding sites too, so `def f(mutable position)` works. Blocks rebind outer mutables — the accumulator pattern — refuse outer immutables with the fix named, and their own fresh locals die at `end`. Loop iterations are fresh scopes for their own locals, which is the block rule applied to `while`.
 
-Constants needed no new concept: immutability already makes `MAX = 5` unrebindable. All that was missing was a place for the name to live, and that is what namespaces are for.
+**Constants** are `SCREAMING_CASE` bindings at the top level ([ADR 0053](adr/0053-2026-09-24-constants.md)): `LIMIT = 9` is computed once, read from inside every def and struct method and from every file that requires this one, and bound once — a second binding, or a `mutable` one, refuses. In a module body the same line is the module's constant, `Config::LIMIT`. A name is defined once, full stop ([ADR 0052](adr/0052-2026-09-24-one-definition-per-name.md)): a second `def`, `struct`, `enum`, or `trait` of a name refuses with `'apply' is already defined — rename one`, and a builtin's name is never taken.
 
 ## Absence
 

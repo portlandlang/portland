@@ -86,6 +86,7 @@ end
 # file's locals stay unknown to its requirer on purpose (#95).
 struct Declarations
   arities
+  constants
   contracts
   enums
   globals
@@ -137,7 +138,8 @@ def check_program_with(nodes, source, file, imports, sharpened)
   judging = nodes.none? { computed_require?(it) }
   scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, judging: judging, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
   found = check_annotations(nodes, source, scope, [])
-  in_source_order(check_body(nodes, scope, found))
+  walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
+  in_source_order(check_body(nodes, scope, walked.last))
 end
 
 # Refusals in the order the source has them: by line, with the walk's own
@@ -249,13 +251,13 @@ def computed_require?(node)
 end
 
 def declarations_of(nodes)
-  Declarations.new(arities: declared_arities(nodes), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
+  Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
 end
 
-def empty_declarations = Declarations.new(arities: [], contracts: [], enums: [], globals: [], shapes: [], traits: [])
+def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], shapes: [], traits: [])
 
 def merge_declarations(first, second)
-  Declarations.new(arities: first.arities + second.arities, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, shapes: first.shapes + second.shapes, traits: first.traits + second.traits)
+  Declarations.new(arities: first.arities + second.arities, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, shapes: first.shapes + second.shapes, traits: first.traits + second.traits)
 end
 
 # Where a refusal points (#89): the node's line and that line of the
@@ -272,7 +274,7 @@ end
 # 2026-09-24: the first token that begins the node); the rest do not yet.
 def line_of(node)
   case node
-  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode
+  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode | StructDefNode | EnumDefNode | TraitDefNode | AliasNode | AssignmentNode
     node.line
   else
     nil
@@ -417,6 +419,9 @@ def declared_globals(nodes)
   end
   nodes.each do |node|
     globals = [[node.name, synthesize_def_return(node, globals)]] + globals if node in DefNode
+    # A top-level SCREAMING_CASE binding is a constant (ADR 0053): a def's
+    # reach, so every def in the program reads it at its value's type.
+    globals = [[node.name, synthesize(node.value, globals)]] + globals if constant_declaration?(node)
     # A top-level `alias new old` (ADR 0039) is a second name for the def,
     # answering what the def answers — found by the corpus, where a tour
     # fixture's alias read as a name nothing defined (#98).
@@ -424,6 +429,93 @@ def declared_globals(nodes)
   end
   globals
 end
+
+def constant_declaration?(node)
+  return false unless node in AssignmentNode
+  return false if node.value.nil?
+  constant_name?(node.name)
+end
+
+# — one definition per name (#70, ADR 0052), and constants (#97, ADR 0053) —
+#
+# A top-level def, struct, enum, trait, alias, or constant is declared once
+# across the program, and a builtin's name is never taken. A module body is
+# walked with its names qualified, so `A::x` twice refuses and `module A`
+# reopened does not. Answers [seen, found]: the names declared so far, and
+# the refusals.
+def check_redefinitions(nodes, home, scope, mutable seen, mutable found)
+  nodes.each do |node|
+    if node in ModuleDefNode
+      walked = check_redefinitions(node.body, qualified_under(home, node.path.join("::")), scope, seen, found)
+      seen = walked.first
+      found = walked.last
+      next
+    end
+    if (node in AssignmentNode) && home.empty? && lone_capital?(node.name)
+      found = noted(found, ["lone_capital", node.name], locate(node, scope))
+      next
+    end
+    name = declared_name(node)
+    next if name.nil?
+    qualified = qualified_under(home, name)
+    # `seen` holds [name, kind] pairs, since a constant bound again says
+    # "bound once" and a constant named after a def says "already defined"
+    # — the seed's two sentences, in the seed's order.
+    if node in AssignmentNode
+      if node.rebindable
+        found = noted(found, ["constant_mutable", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified && it[1] == "constant" }
+        found = noted(found, ["constant_rebound", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified }
+        found = noted(found, ["redefined", name], locate(node, scope))
+      end
+      seen = seen + [[qualified, "constant"]]
+    else
+      # `fields` is the one builtin with a designed refusal of its own
+      # (ADR 0031), which the runtime keeps — the seed's list, not this
+      # file's, says which names are never taken.
+      if builtin_function?(name) && name != "fields"
+        found = noted(found, ["builtin", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified }
+        found = noted(found, ["redefined", name], locate(node, scope))
+      end
+      seen = seen + [[qualified, "declaration"]]
+    end
+  end
+  [seen, found]
+end
+
+# What a program's requires declare, as [name, kind] pairs for the walk
+# above: every global, with the constants among them marked.
+def imported_names(imports)
+  imports.globals.map { [it.first, imports.constants.include?(it.first) ? "constant" : "declaration"] }
+end
+
+# The names a file's top-level and module-body constants take, qualified.
+def declared_constants(nodes, home)
+  mutable names = []
+  nodes.each do |node|
+    names += declared_constants(node.body, qualified_under(home, node.path.join("::"))) if node in ModuleDefNode
+    names << qualified_under(home, node.name) if constant_declaration?(node)
+  end
+  names
+end
+
+# What a statement declares, or nil: a def, an alias's new name, a struct,
+# an enum, a trait, or a SCREAMING_CASE binding.
+def declared_name(node)
+  case node
+  in DefNode(name:) then name
+  in AliasNode(new_name:) then new_name
+  in StructDefNode(name:) then name
+  in EnumDefNode(name:) then name
+  in TraitDefNode(name:) then name
+  in AssignmentNode(name:) then constant_name?(name) ? name : nil
+  else nil
+  end
+end
+
+def qualified_under(home, name) = home.empty? ? name : "#{home}::#{name}"
 
 # A module's first path segment: `module A::B` is reached as `A`.
 def module_name(node)

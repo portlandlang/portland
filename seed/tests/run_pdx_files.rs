@@ -1114,11 +1114,13 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         ),
         // The seventh wording (#98) — a bare name nothing answers. Every kind
         // of name that is defined passes above it: a local, a def, a struct,
-        // an enum, a module, a builtin, a block's `it`, a pattern's capture.
+        // an enum, a module, a builtin, a block's `it`, a pattern's capture —
+        // and, since ADR 0053, a top-level constant read inside a def, which
+        // was this row's original refusal until constants got a def's reach.
         (
-            "SOME_SIGNIFICANT_NUMBER = 8_675_309\nstruct Token\n  kind\nend\nenum Status\n  :pending\nend\nmodule Stats\n  def mean = 1\nend\ndef twice(n) = n * 2\nputs twice(SOME_SIGNIFICANT_NUMBER)\nputs Token.new(kind: \"w\").kind\nputs Stats.mean\n[1].each { puts it }\ncase 5\nin found then puts found\nend\ndef foo(bar:)\n  if false\n    bar * SOME_SIGNIFICANT_NUMBER\n  end\nend\nputs \"reached the end\"\n",
+            "SOME_SIGNIFICANT_NUMBER = 8_675_309\nstruct Token\n  kind\nend\nenum Status\n  :pending\nend\nmodule Stats\n  def mean = 1\nend\ndef twice(n) = n * 2\nputs twice(SOME_SIGNIFICANT_NUMBER)\nputs Token.new(kind: \"w\").kind\nputs Stats.mean\n[1].each { puts it }\ncase 5\nin found then puts found\nend\ndef foo(bar:)\n  if false\n    bar * SOME_SIGNIFICANT_NUMBRE\n  end\n  bar * SOME_SIGNIFICANT_NUMBER\nend\nputs \"reached the end\"\n",
             "17350618\nw\n1\n1\n5\nreached the end\n",
-            "'SOME_SIGNIFICANT_NUMBER' is not defined\n  21 | bar * SOME_SIGNIFICANT_NUMBER",
+            "'SOME_SIGNIFICANT_NUMBRE' is not defined\n  21 | bar * SOME_SIGNIFICANT_NUMBRE",
         ),
         // The sixth wording — arity, the seed's own moved to build time with
         // its plural fixed. Keyword arguments stand outside the count.
@@ -1203,7 +1205,7 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             .expect("failed to run pdx");
         assert!(
             !hosted.status.success(),
-            "the checker should refuse this program"
+            "the checker should refuse {source:?}"
         );
         let stderr = String::from_utf8(hosted.stderr).unwrap();
         assert!(
@@ -1437,8 +1439,15 @@ fn the_declined_percent_members_refuse_on_both_oracles() {
             "'%i<' is not a Portland delimiter — write %i[], %i(), or %i{}",
         ),
     ];
+    assert_both_oracles_refuse("percent_declined.pdx", Some("refusal: parse"), &cases);
+}
+
+/// Both oracles refuse each program with the sentence, the seed marking a
+/// parse refusal or the hosted checker saying it at build — either way the
+/// same words.
+fn assert_both_oracles_refuse(name: &str, marker: Option<&str>, cases: &[(&str, &str)]) {
     for (source, expected) in cases {
-        let sample = std::env::temp_dir().join("percent_declined.pdx");
+        let sample = std::env::temp_dir().join(name);
         std::fs::write(&sample, source).unwrap();
         let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
             .arg(&sample)
@@ -1453,10 +1462,12 @@ fn the_declined_percent_members_refuse_on_both_oracles() {
             stderr.contains(expected),
             "the seed should say {expected:?}, got: {stderr}"
         );
-        assert!(
-            stderr.lines().any(|line| line == "refusal: parse"),
-            "{source:?} should mark a parse refusal, got: {stderr}"
-        );
+        if let Some(marker) = marker {
+            assert!(
+                stderr.lines().any(|line| line == marker),
+                "{source:?} should mark {marker:?} for the probe, got: {stderr}"
+            );
+        }
         let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
             .arg(portland_run())
             .arg(&sample)
@@ -1466,9 +1477,130 @@ fn the_declined_percent_members_refuse_on_both_oracles() {
         let stderr = String::from_utf8(hosted.stderr).unwrap();
         assert!(
             stderr.contains(expected),
-            "the hosted lexer should say {expected:?}, got: {stderr}"
+            "hosted should say {expected:?}, got: {stderr}"
         );
     }
+}
+
+/// One definition per name (#70, ADR 0052) and constants (#97, ADR 0053):
+/// every refusal, the same sentence on both oracles.
+#[test]
+fn one_definition_per_name_on_both_oracles() {
+    let cases = [
+        (
+            "def apply\n  1\nend\ndef apply\n  2\nend\nputs apply\n",
+            "'apply' is already defined — rename one",
+        ),
+        (
+            "struct Token\n  kind\nend\nstruct Token\n  kind\n  text\nend\n",
+            "'Token' is already defined — rename one",
+        ),
+        (
+            "enum Status\n  :paid\nend\nenum Status\n  :paid\nend\n",
+            "'Status' is already defined — rename one",
+        ),
+        (
+            "trait Greets\n  def hi = 1\nend\ntrait Greets\n  def hi = 2\nend\n",
+            "'Greets' is already defined — rename one",
+        ),
+        (
+            "def old = 1\ndef other = 2\nalias other old\n",
+            "'other' is already defined — rename one",
+        ),
+        (
+            "module A\n  def x = 1\nend\nmodule A\n  def x = 2\nend\n",
+            "'x' is already defined — rename one",
+        ),
+        (
+            "def panic(reason)\n  puts reason\nend\n",
+            "'panic' is a builtin — rename yours",
+        ),
+        (
+            "LIMIT = 1\nLIMIT = 2\n",
+            "'LIMIT' is a constant — it is bound once",
+        ),
+        (
+            "LIMIT = 1\ndef bump\n  LIMIT = 2\nend\nbump\n",
+            "'LIMIT' is a constant — it is bound once",
+        ),
+        (
+            "module A\n  LIMIT = 1\n  LIMIT = 2\nend\n",
+            "'LIMIT' is a constant — it is bound once",
+        ),
+        (
+            "mutable LIMIT = 1\n",
+            "'LIMIT' is a constant — a constant cannot be mutable",
+        ),
+        (
+            "X = 1\n",
+            "'X' is a single capital — spell a constant with two characters or more, a local in lowercase",
+        ),
+        (
+            "LIMIT = 1\ndef LIMIT = 2\n",
+            "'LIMIT' is already defined — rename one",
+        ),
+        (
+            "def LIMIT = 2\nLIMIT = 1\n",
+            "'LIMIT' is already defined — rename one",
+        ),
+    ];
+    assert_both_oracles_refuse("redefinition.pdx", None, &cases);
+
+    // The checker says it at build, with the second site's line beneath.
+    let sample = std::env::temp_dir().join("redefinition_located.pdx");
+    std::fs::write(&sample, "def apply\n  1\nend\ndef apply\n  2\nend\n").unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    assert!(
+        stderr.contains("'apply' is already defined — rename one\n  4 | def apply"),
+        "the checker should point at the second def, got: {stderr}"
+    );
+
+    // Across a require: a required file's declarations count, and its
+    // constant is a constant there too.
+    let directory = std::env::temp_dir().join("redefinition_across");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(directory.join("lib.pdx"), "LIMIT = 1\ndef helper = 2\n").unwrap();
+    let again = directory.join("again.pdx");
+    std::fs::write(&again, "require_relative \"lib\"\ndef helper = 4\n").unwrap();
+    let rebound = directory.join("rebound.pdx");
+    std::fs::write(&rebound, "require_relative \"lib\"\nLIMIT = 3\n").unwrap();
+    for (program, expected) in [
+        (&again, "'helper' is already defined — rename one"),
+        (&rebound, "'LIMIT' is a constant — it is bound once"),
+    ] {
+        for arguments in [vec![], vec![portland_run()]] {
+            let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+                .args(arguments)
+                .arg(program)
+                .output()
+                .expect("failed to run pdx");
+            assert!(
+                !output.status.success(),
+                "{} should refuse",
+                program.display()
+            );
+            let stderr = String::from_utf8(output.stderr).unwrap();
+            assert!(
+                stderr.contains(expected),
+                "expected {expected:?}, got: {stderr}"
+            );
+        }
+    }
+}
+
+/// Constants (ADR 0053): a def's reach — inside defs, struct methods, and
+/// blocks, beside a module's constant of the same name — on both oracles.
+#[test]
+fn portland_evaluator_matches_the_seed_on_constants() {
+    assert_evaluator_matches_seed(
+        "evaluator_constants.pdx",
+        "LIMIT = 9\nNAMES = %w[a b]\ndef over?(count) = count > LIMIT\nstruct Box\n  size\n  def full? = size >= LIMIT\nend\nmodule Config\n  LIMIT = 3\n  def scaled = LIMIT * 2\nend\nputs over?(10)\nputs Box.new(size: 9).full?\nputs NAMES.length\np([1].map { LIMIT + it })\nputs Config::LIMIT\nputs Config.scaled\nputs LIMIT\nx = 1\nputs x\n",
+    );
 }
 
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).

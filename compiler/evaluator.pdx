@@ -108,14 +108,14 @@ def evaluate_statement(node, bindings)
     bound = slot_value(step.value)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
   in DefNode(name:, parameters:, body:)
-    outcome([], [[name, "method", [parameters, body]]] + bindings)
+    outcome([], [[name, "method", [parameters, body]]] + declare(name, bindings))
   # A second name for an existing method (ADR 0039): the same slot value
   # bound twice, so the two names cannot drift. The target must already
   # exist — top to bottom, the seed's rule.
   in AliasNode(new_name:, old_name:)
     found = lookup(bindings, old_name)
     panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
-    outcome([], [[new_name, "method", found.first[2]]] + bindings)
+    outcome([], [[new_name, "method", found.first[2]]] + declare(new_name, bindings))
   in ReturnNode(value:)
     return return_outcome([], bindings, frame_of(bindings)) if value.nil?
     step = evaluate_expression(value, bindings)
@@ -125,7 +125,7 @@ def evaluate_statement(node, bindings)
   # Membership and exhaustiveness are static (#9) and a payload-free case is
   # just a symbol — but the declared labels register, because the one check
   # a runtime can make needs them (ADR 0022, #45).
-  in EnumDefNode then outcome([], register_enum(node, bindings))
+  in EnumDefNode then outcome([], register_enum(node, declare(qualify(home_of(bindings), node.name), bindings)))
   in ModuleDefNode then evaluate_module(node, bindings)
   else
     evaluate_expression(node, bindings)
@@ -294,6 +294,17 @@ def assigned(name, value, rebindable, bindings)
   else
     slot.first[1]
   end
+  # A SCREAMING_CASE name at the top level is a constant (ADR 0053): bound
+  # once, never mutable, with a def's reach — the "constant" tag survives a
+  # method scope and crosses a require.
+  if top_level?(bindings) && constant_name?(name)
+    panic("'#{name}' is a constant — a constant cannot be mutable") if rebindable
+    panic("'#{name}' is a constant — it is bound once") if kind == "constant"
+    panic("'#{name}' is already defined — rename one") if kind == "method" || builtin_method?(name)
+    return [[name, "constant", value]] + declare(name, bindings)
+  end
+  panic("'#{name}' is a single capital — spell a constant with two characters or more, a local in lowercase") if top_level?(bindings) && lone_capital?(name)
+  panic("'#{name}' is a constant — it is bound once") if kind == "constant"
   panic("local #{name} shadows method #{name} — rename one") if kind == "method" || builtin_method?(name)
   if rebindable
     panic("#{name} is already declared — mutable declares a new name once") if kind == "local" || kind == "mutable"
@@ -307,6 +318,26 @@ end
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
   %w[argv failure inspect p panic puts read_file require_relative some write_file].include?(name)
+end
+
+# The top of a file: no frame and no namespace around these bindings.
+def top_level?(bindings) = frame_of(bindings) == 0 && home_of(bindings).empty?
+
+# One definition per name (#70, ADR 0052): a builtin is never redefined,
+# and a def, struct, enum, trait, alias, or constant is declared once. The
+# names declared so far ride the bindings as `__declared__`, since an enum
+# binds no name of its own; the tag is not a local's, so the list survives
+# a method scope and crosses a require.
+def declared_names(bindings)
+  slot = lookup(bindings, "__declared__")
+  return [] if slot.empty?
+  value_at(slot.first, 2)
+end
+
+def declare(name, bindings)
+  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name)
+  panic("'#{name}' is already defined — rename one") if declared_names(bindings).include?(name)
+  [["__declared__", "declared", declared_names(bindings) + [name]]] + bindings
 end
 
 # Try a pattern against a value: an array of [name, value] captures on a
@@ -571,17 +602,17 @@ end
 def register_in_namespace(statement, home, mutable bindings)
   case statement
   in DefNode(name:, parameters:, body:)
-    [[qualify(home, name), "method", [parameters, body, home]]] + bindings
+    [[qualify(home, name), "method", [parameters, body, home]]] + declare(qualify(home, name), bindings)
   in AliasNode(new_name:, old_name:)
     found = lookup(bindings, qualify(home, old_name))
     panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
-    [[qualify(home, new_name), "method", found.first[2]]] + bindings
+    [[qualify(home, new_name), "method", found.first[2]]] + declare(qualify(home, new_name), bindings)
   in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
     merged = merged_methods(name, fields, includes, methods, home, bindings)
-    mutable result = [[inner_home, "struct", [fields, merged]]] + bindings
+    mutable result = [[inner_home, "struct", [fields, merged]]] + declare(inner_home, bindings)
     # Type functions (ADR 0031) register as ordinary methods under the
     # struct's namespace — `Token::of` — so the namespace rung dispatches
     # them with no new machinery. Their home is the struct itself: bare
@@ -595,7 +626,7 @@ def register_in_namespace(statement, home, mutable bindings)
     result
   # A trait waits under its qualified name to be included (ADR 0028).
   in TraitDefNode(name:, methods:)
-    [[qualify(home, name), "trait", methods]] + bindings
+    [[qualify(home, name), "trait", methods]] + declare(qualify(home, name), bindings)
   in ModuleDefNode(path:, body:)
     inner_home = qualify(home, path.join("::"))
     mutable result = bindings
@@ -604,13 +635,15 @@ def register_in_namespace(statement, home, mutable bindings)
     end
     result
   in AssignmentNode(name:, value:)
+    # A module's constant is bound once, like the top level's (ADR 0053).
+    panic("'#{name}' is a constant — it is bound once") unless lookup(bindings, qualify(home, name)).empty?
     step = evaluate_expression(value, bindings)
     # "constant" rather than "local" so it survives a fresh method scope.
-    [[qualify(home, name), "constant", slot_value(step.value)]] + step.bindings
+    [[qualify(home, name), "constant", slot_value(step.value)]] + declare(qualify(home, name), step.bindings)
   # Nested or module-housed enums register their cases unqualified — the
   # seed looks a case up across every declaration, since a bare `:paid`
   # says nothing about which vocabulary it came from.
-  in EnumDefNode then register_enum(statement, bindings)
+  in EnumDefNode then register_enum(statement, declare(qualify(home, statement.name), bindings))
   else
     bindings
   end

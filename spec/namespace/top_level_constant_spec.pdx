@@ -1,0 +1,49 @@
+# A SCREAMING_CASE name at the top level is a constant (ADR 0053): computed
+# once, bound once, and read from every def and struct method — a def's
+# reach, where a lowercase local's stops at the def's door.
+
+# Up one, because `require_relative` resolves against this file's own
+# directory (the seed's rule, matched by the compiler) — not against `spec/`.
+require_relative "../spec_helper"
+
+LIMIT = 9
+LABELS = %w[low high]
+
+def over?(count) = count > LIMIT
+
+struct Gauge
+  level
+
+  def high? = level > LIMIT
+end
+
+module Config
+  LIMIT = 3
+end
+
+context "Constant" do
+  describe "a top-level SCREAMING_CASE name" do
+    specify "is read inside a def" do
+      expect(over?(10)).to be_true
+      expect(over?(9)).to be_false
+    end
+
+    specify "is read inside a struct method" do
+      expect(Gauge.new(level: 10).high?).to be_true
+    end
+
+    specify "is read inside a block" do
+      expect([1, 2].map { it + LIMIT }).to eq([10, 11])
+    end
+
+    specify "holds any value" do
+      expect(LABELS.length).to eq(2)
+      expect(LABELS.first).to eq("low")
+    end
+
+    specify "sits beside a module's constant of the same name" do
+      expect(Config::LIMIT).to eq(3)
+      expect(LIMIT).to eq(9)
+    end
+  end
+end

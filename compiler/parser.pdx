@@ -101,6 +101,7 @@ struct AssignmentNode
   name
   value
   rebindable
+  line
 
   # A value-less node is a `mutable` parameter with no default; only the
   # mutable spelling can be value-less, so the plain arm never sees nil.
@@ -211,6 +212,7 @@ struct AliasNode
   kind
   new_name
   old_name
+  line
 
   def sexp
     "(alias " + new_name + " " + old_name + ")"
@@ -580,6 +582,7 @@ struct EnumDefNode
   cases
   kind
   name
+  line
 
   include Sexp
 
@@ -606,6 +609,7 @@ struct StructDefNode
   methods
   nested
   type_functions
+  line
 
   include Sexp
 
@@ -648,6 +652,7 @@ struct TraitDefNode
   kind
   name
   methods
+  line
 
   include Sexp
 
@@ -782,14 +787,26 @@ def array_pattern_node(elements, splat, rest_name)
   ArrayPatternNode.new(kind: "array_pattern", elements: elements, splat: splat, rest_name: rest_name)
 end
 
-def assignment_node(name, value)
-  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: false)
+def assignment_node(name, value, line: nil)
+  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: false, line: line)
 end
 
 # `mutable name = expr`, and a `mutable name` parameter (value nil there).
-def mutable_assignment_node(name, value)
-  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: true)
+def mutable_assignment_node(name, value, line: nil)
+  AssignmentNode.new(kind: "assignment", name: name, value: value, rebindable: true, line: line)
 end
+
+# A SCREAMING_CASE name — two characters or more, capitals, digits, and
+# underscores, starting with a capital — is a constant at the top level
+# (ADR 0053). One capital alone is neither shape, and refuses there.
+def constant_name?(name)
+  letters = name.chars
+  return false if letters.length < 2
+  return false unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(letters[0])
+  letters.all? { "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".include?(it) }
+end
+
+def lone_capital?(name) = name.length == 1 && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name)
 
 def binary_node(operator, left, right, line: nil)
   BinaryNode.new(kind: "binary", operator: operator, left: left, right: right, line: line)
@@ -977,8 +994,8 @@ def enum_case_node(name, payload, line: nil)
   EnumCaseNode.new(kind: "enum_case", name: name, payload: payload, line: line)
 end
 
-def enum_def_node(name, cases)
-  EnumDefNode.new(cases: cases, kind: "enum_def", name: name)
+def enum_def_node(name, cases, line: nil)
+  EnumDefNode.new(cases: cases, kind: "enum_def", name: name, line: line)
 end
 
 def enum_case_decl_node(name, labels)
@@ -997,12 +1014,12 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, includes, methods, nested, type_functions)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions)
+def struct_def_node(name, fields, includes, methods, nested, type_functions, line: nil)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions, line: line)
 end
 
-def trait_def_node(name, methods)
-  TraitDefNode.new(kind: "trait_def", name: name, methods: methods)
+def trait_def_node(name, methods, line: nil)
+  TraitDefNode.new(kind: "trait_def", name: name, methods: methods, line: line)
 end
 
 def together_node(lines)
@@ -1994,7 +2011,7 @@ def parse_statement(tokens, position)
   if token.identifier? && operator_at?(tokens, position + 1, %w[=])
     return Step.new(node: bang_binding_error(token.text), position: skip_line_at(tokens, position)) if bang_name?(token.text)
     value = parse_expression(tokens, position + 2)
-    return Step.new(node: assignment_node(token.text, value.node), position: value.position)
+    return Step.new(node: assignment_node(token.text, value.node, line: token.line), position: value.position)
   end
   if token.identifier? && operator_at?(tokens, position + 1, %w[<<])
     return Step.new(node: bang_binding_error(token.text), position: skip_line_at(tokens, position)) if bang_name?(token.text)
@@ -2067,7 +2084,7 @@ def parse_mutable(tokens, position)
     return Step.new(node: error_node("mutable is fused to the first assignment — write `mutable #{name} = ...`"), position: position + 1)
   end
   value = parse_expression(tokens, position + 2)
-  Step.new(node: mutable_assignment_node(name, value.node), position: value.position)
+  Step.new(node: mutable_assignment_node(name, value.node, line: tokens[position].line), position: value.position)
 end
 
 # Paren-less command calls, statement position only: `puts "hello"`.
@@ -2707,6 +2724,7 @@ def parse_enum(tokens, mutable position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected enum name after enum"), position: position)
   end
+  line = line_at(tokens, position)
   name = tokens[position].text
   unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
     return Step.new(node: error_node("enum names start with a capital letter, got #{name}"), position: position + 1)
@@ -2742,13 +2760,14 @@ def parse_enum(tokens, mutable position)
   end
   return Step.new(node: error_node("enum #{name} has no cases — a vocabulary needs words"), position: position + 1) if cases.empty?
 
-  Step.new(node: enum_def_node(name, cases), position: position + 1)
+  Step.new(node: enum_def_node(name, cases, line: line), position: position + 1)
 end
 
 def parse_struct(tokens, mutable position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected struct name after struct"), position: position)
   end
+  line = line_at(tokens, position)
   name = tokens[position].text
   unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
     return Step.new(node: error_node("struct names start with a capital letter, got #{name}"), position: position + 1)
@@ -2814,7 +2833,7 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
 end
@@ -2910,6 +2929,7 @@ def parse_trait(tokens, mutable position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("expected trait name after trait"), position: position)
   end
+  line = line_at(tokens, position)
   name = tokens[position].text
   unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
     return Step.new(node: error_node("trait names start with a capital letter, got #{name}"), position: position + 1)
@@ -2940,7 +2960,7 @@ def parse_trait(tokens, mutable position)
     return Step.new(node: error_node("expected end to close trait #{name}"), position: position)
   end
   return Step.new(node: error_node("trait #{name} has no methods — a bundle needs behavior"), position: position + 1) if methods.empty?
-  Step.new(node: trait_def_node(name, methods), position: position + 1)
+  Step.new(node: trait_def_node(name, methods, line: line), position: position + 1)
 end
 
 # `Foo::Bar` in expression position (ADR 0021). `::` names, `.` invokes —
@@ -3092,7 +3112,7 @@ def parse_alias(tokens, position)
   return first unless first.node in String
   second = parse_alias_name(tokens, first.position)
   return second unless second.node in String
-  Step.new(node: AliasNode.new(kind: "alias", new_name: first.node, old_name: second.node), position: second.position)
+  Step.new(node: AliasNode.new(kind: "alias", new_name: first.node, old_name: second.node, line: line_at(tokens, position)), position: second.position)
 end
 
 # One of alias's two names: Step.node is the name string, or an error node.

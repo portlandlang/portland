@@ -146,6 +146,8 @@ fn repl() {
     // rustyline draws its own prompt; only the piped path needs ours.
     let piped = matches!(source, Source::Piped(_));
     let mut interpreter = Interpreter::new();
+    // A session redefines on purpose (ADR 0052's one exemption).
+    interpreter.allow_redefinition();
     let mut buffer = String::new();
     prompt(piped && interactive, &buffer);
     loop {

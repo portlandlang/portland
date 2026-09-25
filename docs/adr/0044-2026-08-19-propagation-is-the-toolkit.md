@@ -1,6 +1,6 @@
 # 0044 — Propagation is the toolkit, and `!` goes back to being a name
 
-- **Status:** Accepted (built in both oracles, 2026-08-19) — supersedes ADR 0027's `!` clause; the failure *model* (typed results, absence with a reason, the unwrap toolkit) is untouched and remains 0027's
+- **Status:** Accepted (built in both oracles, 2026-08-19) — supersedes ADR 0027's `!` clause; the failure *model* (typed results, absence with a reason, the unwrap toolkit) is untouched and remains 0027's. The predicate's name was reconsidered under [#85](https://github.com/portlandlang/portland/issues/85) on 2026-09-24 and kept: `failure?` is a type-membership predicate like `nil?` and `some?` — "is this value a failure" — and the symmetric pair `failure(...)`/`failure?` is worth more than `failed?`'s verb reading, which would suggest an action rather than a value; `error?` collides with Ruby's `Error` family and with `error` as a common gem method name.
 - **Date:** 2026-08-19
 
 ## Context

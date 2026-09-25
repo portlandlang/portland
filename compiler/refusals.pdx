@@ -94,6 +94,13 @@ def render_refusal(refusal)
   # A sentence pinned by an earlier ADR (0034, 0035), carried whole.
   in ["sentence", words] then words
   in ["undefined", name] then "#{spelled(name)} is not defined"
+  # One definition per name (ADR 0052) and constants (ADR 0053): the seed's
+  # runtime sentences, said at build with the line beneath.
+  in ["redefined", name] then sentence("#{spelled(name)} is already defined", "rename one")
+  in ["builtin", name] then sentence("#{spelled(name)} is a builtin", "rename yours")
+  in ["constant_rebound", name] then sentence("#{spelled(name)} is a constant", "it is bound once")
+  in ["constant_mutable", name] then sentence("#{spelled(name)} is a constant", "a constant cannot be mutable")
+  in ["lone_capital", name] then sentence("#{spelled(name)} is a single capital", "spell a constant with two characters or more, a local in lowercase")
   else
     panic "refusals: no sentence for #{refusal.inspect}"
   end
