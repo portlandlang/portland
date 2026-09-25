@@ -754,6 +754,16 @@ struct WordArrayNode
   end
 end
 
+# `%i[...]` (ADR 0051): `%w[]`'s content rules, symbols out.
+struct SymbolArrayNode
+  kind
+  text
+
+  def sexp
+    text
+  end
+end
+
 # Node builders, alphabetical.
 
 def alternative_pattern_node(options)
@@ -1033,6 +1043,10 @@ end
 
 def word_array_node(text)
   WordArrayNode.new(kind: "word_array", text: text)
+end
+
+def symbol_array_node(text)
+  SymbolArrayNode.new(kind: "symbol_array", text: text)
 end
 
 # — parsing —
@@ -1781,6 +1795,7 @@ def parse_primary(tokens, position)
     parse_identifier_primary(tokens, position, token.text)
   when "string" then Step.new(node: string_expression(token.text, line: token.line), position: after)
   when "word_array" then Step.new(node: word_array_node(token.text), position: after)
+  when "symbol_array" then Step.new(node: symbol_array_node(token.text), position: after)
   when "keyword"
     case token.text
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
@@ -2064,7 +2079,7 @@ def command_start?(tokens, position)
   # "float" earned its place the hard way: its absence meant `p 2.5` never
   # became a command call at all, and the statement boundary reported the
   # leftover token instead (#46).
-  when "float", "integer", "string", "symbol", "word_array", "identifier" then true
+  when "float", "integer", "string", "symbol", "symbol_array", "word_array", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   when "operator" then token.text == "!"
   else

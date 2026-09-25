@@ -16,6 +16,7 @@
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never learned them and nothing has missed them.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was invented to replace (ADR 0017). `it` covers one parameter; names cover the rest. The polyfill autocorrects `_1 → it` for free.
 - **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase terminators** — squiggly `<<~SQL` is the only opener and terminators are SCREAMING_CAPS; see [heredocs](heredocs.md).
+- **`%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, `%x`** — the `%` family's synonyms and its shell spawn, each refusing with its rewrite; `%w[]` and `%i[]` stay, with three delimiters — see [the `%` literal family](percent-literals.md).
 - **Subjectless `case`** — declined for now, with [#84](https://github.com/portlandlang/portland/issues/84) as the standing reconsideration: without a subject, `when` flips from `===`-matching to truth-testing — one arm shape, two readings — and Ruby's own default linter (`Style/EmptyCaseCondition`) autocorrects the form away. The refusal names the rewrite: `case takes a subject — a subjectless case is an if/elsif chain here`. Reopens on corpus evidence, user demand, or Portland's own code wanting it.
 
 ## Kept, to be clear

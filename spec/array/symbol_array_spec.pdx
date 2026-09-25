@@ -1,0 +1,29 @@
+# `%i[]` — the symbol-array shorthand (ADR 0051): `%w[]`'s content rules
+# (ADR 0030), symbols out.
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "%i[]" do
+    specify "answers symbols" do
+      expect(%i[rose city]).to eq([:rose, :city])
+      expect(%i[]).to eq([])
+    end
+
+    specify "opens with (), {}, or [] alike" do
+      expect(%i(rose city)).to eq([:rose, :city])
+      expect(%i{rose city}).to eq([:rose, :city])
+    end
+
+    specify "takes the word-array content rules" do
+      expect(%i[a [b] c]).to eq([:a, :"[b]", :c])
+      expect(%i[rose\ city]).to eq([:"rose city"])
+      expect(%i[rose  city]).to eq([:rose, :city])
+    end
+
+    specify "answers symbols that are the ordinary kind" do
+      expect(%i[paid pending].include?(:paid)).to be_true
+      expect(%i[paid].first).to eq(:paid)
+    end
+  end
+end

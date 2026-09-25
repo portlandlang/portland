@@ -20,7 +20,7 @@ The bug is separable from #29's zoo ruling — which members survive, which deli
 
 The token carries the raw source; unescaping happens where the words are built (the seed's parser, the trio's evaluator), which is the same borrow-the-source discipline the heredoc pass established.
 
-`[` stays the only delimiter, and the rest of the family — `%i`, `%q`, `%r`, other delimiters — remains #29's corpus question. This ADR settles only what the existing member means.
+`[` stays the only delimiter, and the rest of the family — `%i`, `%q`, `%r`, other delimiters — remains #29's corpus question. This ADR settles only what the existing member means. (Superseded on the delimiter by [ADR 0051](0051-2026-09-24-the-percent-literal-family.md), which admits `()` and `{}` beside `[]` and keys these content rules to the pair in use; the rules themselves stand.)
 
 ## Consequences
 

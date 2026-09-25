@@ -1379,6 +1379,98 @@ fn a_leading_zero_refuses_on_both_oracles() {
     assert!(stderr.contains(expected), "the hosted lexer said: {stderr}");
 }
 
+/// The `%` literal family (ADR 0051): `%i[]` beside `%w[]`, each with
+/// `[]`, `()`, or `{}`, ADR 0030's content rules keyed to the pair in use
+/// — inside `%w{}` a `\]` keeps its backslash — and modulo untouched.
+#[test]
+fn portland_evaluator_matches_the_seed_on_the_percent_family() {
+    assert_evaluator_matches_seed(
+        "evaluator_percent_family.pdx",
+        "p %i[rose city]\np %i()\np %w(a (b) c \\) d)\np %w{a {b} c \\} d \\] e}\np %i[a [b] c]\np %w(a\\ b c)\np(%i[paid pending].include?(:paid))\nputs %w(x y).join(\"-\")\nputs 10 % (3)\nputs 10%(3)\np %i{odd\\ name x}\n",
+    );
+}
+
+/// Every declined member refuses by name on both oracles (ADR 0051), the
+/// sentence in ADR 0047's voice and the same to the byte; the seed marks
+/// each a parse refusal.
+#[test]
+fn the_declined_percent_members_refuse_on_both_oracles() {
+    let cases = [
+        (
+            "x = %q(hi)\n",
+            "'%q(' is not a Portland literal — write a quoted string or a heredoc",
+        ),
+        (
+            "x = %Q{hi}\n",
+            "'%Q{' is not a Portland literal — write a quoted string or a heredoc",
+        ),
+        (
+            "x = %(hi)\n",
+            "'%(' is not a Portland literal — write a quoted string or a heredoc",
+        ),
+        (
+            "x = %s(name)\n",
+            "'%s(' is not a Portland literal — write :name, or :\"odd name\" for a name with spaces",
+        ),
+        (
+            "x = %W[a b]\n",
+            "'%W[' is not a Portland literal — write %w[] when no word interpolates, or [\"#{a}\", \"b\"] when one does",
+        ),
+        (
+            "x = %I[a b]\n",
+            "'%I[' is not a Portland literal — write %i[]; a symbol does not interpolate",
+        ),
+        (
+            "x = %r{a/b}\n",
+            "'%r{' is not a Portland literal — there is no regex yet",
+        ),
+        (
+            "x = %x(ls)\n",
+            "'%x(' is not a Portland literal — there is no shell execution",
+        ),
+        (
+            "x = %w|a b|\n",
+            "'%w|' is not a Portland delimiter — write %w[], %w(), or %w{}",
+        ),
+        (
+            "x = %i<a>\n",
+            "'%i<' is not a Portland delimiter — write %i[], %i(), or %i{}",
+        ),
+    ];
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("percent_declined.pdx");
+        std::fs::write(&sample, source).unwrap();
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            !seed.status.success(),
+            "{source:?} should refuse on the seed"
+        );
+        let stderr = String::from_utf8(seed.stderr).unwrap();
+        assert!(
+            stderr.contains(expected),
+            "the seed should say {expected:?}, got: {stderr}"
+        );
+        assert!(
+            stderr.lines().any(|line| line == "refusal: parse"),
+            "{source:?} should mark a parse refusal, got: {stderr}"
+        );
+        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!hosted.status.success(), "{source:?} should refuse hosted");
+        let stderr = String::from_utf8(hosted.stderr).unwrap();
+        assert!(
+            stderr.contains(expected),
+            "the hosted lexer should say {expected:?}, got: {stderr}"
+        );
+    }
+}
+
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
 /// Every sentence shape the ADR pins, rendered from its tagged refusal, plus
 /// the rulings the renderer owns: the dump's type spelling, fact–dash–hint

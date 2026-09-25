@@ -27,5 +27,16 @@ context "Array" do
     specify "whitespace runs split once, never into empty words" do
       expect(%w[rose  city]).to eq(["rose", "city"])
     end
+
+    specify "opens with (), {}, or [] alike (ADR 0051)" do
+      expect(%w(rose city)).to eq(["rose", "city"])
+      expect(%w{rose city}).to eq(["rose", "city"])
+    end
+
+    specify "escapes and nests the pair it opened with, and only that pair" do
+      expect(%w(a \) b (c) d)).to eq(["a", ")", "b", "(c)", "d"])
+      expect(%w{a \] b}.last).to have_length(1)
+      expect(%w{a \] b}).to eq(["a", "\\]", "b"])
+    end
   end
 end

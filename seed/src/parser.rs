@@ -109,12 +109,15 @@ fn symbol_name(text: &str) -> String {
     }
 }
 
-/// The words of a `%w[...]` body — Ruby's rules (ADR 0030), run against
-/// Ruby 4.0.6 rather than remembered. A backslash before a bracket, a
-/// backslash, or whitespace drops away (escaped whitespace joins a word
-/// instead of splitting); before anything else it stays, `\n` meaning the
-/// two characters. Whitespace runs split once and never produce empties.
-fn word_array_words(content: &str) -> Vec<String> {
+/// The words of a `%w[...]` or `%i[...]` body — Ruby's rules (ADR 0030),
+/// run against Ruby 4.0.6 rather than remembered. A backslash before the
+/// literal's own delimiter, a backslash, or whitespace drops away (escaped
+/// whitespace joins a word instead of splitting); before anything else it
+/// stays, `\n` meaning the two characters. Whitespace runs split once and
+/// never produce empties. The delimiter pair is the one the literal opened
+/// with (ADR 0051): inside `%w(...)`, `\)` drops its backslash and `\]`
+/// keeps it.
+fn word_array_words(content: &str, opener: char, closer: char) -> Vec<String> {
     let mut words = Vec::new();
     let mut current = String::new();
     let mut started = false;
@@ -123,8 +126,8 @@ fn word_array_words(content: &str) -> Vec<String> {
         if character == '\\' {
             match chars.next() {
                 Some(escaped) => {
-                    if !(escaped == '['
-                        || escaped == ']'
+                    if !(escaped == opener
+                        || escaped == closer
                         || escaped == '\\'
                         || escaped.is_whitespace())
                     {
@@ -552,6 +555,7 @@ impl<'source> Parser<'source> {
             | TokenKind::Integer
             | TokenKind::String
             | TokenKind::Symbol
+            | TokenKind::SymbolArray
             | TokenKind::WordArray => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             TokenKind::Minus if next.leading_space => {
@@ -708,6 +712,7 @@ impl<'source> Parser<'source> {
             | TokenKind::Integer
             | TokenKind::String
             | TokenKind::Symbol
+            | TokenKind::SymbolArray
             | TokenKind::WordArray => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             TokenKind::Minus if next.leading_space => {
@@ -2722,12 +2727,18 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::Symbol => Expression::Symbol(symbol_name(token.text)),
-            TokenKind::WordArray => {
-                let words = &token.text[3..token.text.len() - 1];
+            TokenKind::WordArray | TokenKind::SymbolArray => {
+                let opener = token.text.as_bytes()[2] as char;
+                let closer = token.text.as_bytes()[token.text.len() - 1] as char;
+                let words = word_array_words(&token.text[3..token.text.len() - 1], opener, closer);
                 Expression::ArrayLiteral(
-                    word_array_words(words)
+                    words
                         .into_iter()
-                        .map(Expression::String)
+                        .map(if token.kind == TokenKind::WordArray {
+                            Expression::String
+                        } else {
+                            Expression::Symbol
+                        })
                         .collect(),
                 )
             }

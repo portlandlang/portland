@@ -58,6 +58,9 @@ pub enum TokenKind {
     String,
     /// `:name` — a symbol literal (ADR 0023). Its `text` includes the colon.
     Symbol,
+    /// `%i[...]` — a symbol array (ADR 0051), `%w[]`'s content rules with
+    /// symbols out. Its `text` is the raw source, delimiters included.
+    SymbolArray,
     /// `~` — a task line inside `together` (ADRs 0002, 0029), and nothing
     /// else anywhere: ADR 0003 cut the bitwise readings that would have
     /// contested it.
@@ -257,28 +260,39 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     text: &source[start..start + character.len_utf8()],
                 });
             }
-            '%' if source.as_bytes().get(start + 1) == Some(&b'w') => {
+            // The `%` literal family (ADR 0051): `%w` and `%i`, with `[]`,
+            // `()`, or `{}`. Every other member refuses by name below, and
+            // a bare `%(` after a space is the string form, refused too.
+            '%' if matches!(source.as_bytes().get(start + 1), Some(b'w' | b'i')) => {
                 chars.next(); // the `%`
-                chars.next(); // the `w`
-                match chars.next() {
-                    Some((_, '[')) => {}
-                    other => panic!("expected [ after %w, got {other:?}"),
-                }
+                let (_, letter) = chars.next().unwrap();
+                let opener = match chars.next() {
+                    Some((_, opener @ ('[' | '(' | '{'))) => opener,
+                    Some((_, other)) => panic!(
+                        "'%{letter}{other}' is not a Portland delimiter — write %{letter}[], %{letter}(), or %{letter}{{}}"
+                    ),
+                    None => panic!("unterminated %{letter} literal starting at byte {start}"),
+                };
+                let closer = closer_of(opener);
                 // ADR 0030: a backslash escapes the next character, and
-                // unescaped brackets balance, so only an unescaped `]` at
-                // depth zero closes. Escapes stay raw here — the token
+                // unescaped delimiters balance, so only an unescaped closer
+                // at depth zero closes. Escapes stay raw here — the token
                 // borrows the source, so unescaping is the parser's job.
                 let mut depth = 0usize;
                 let closing = loop {
                     match chars.next() {
-                        None => panic!("unterminated %w[] starting at byte {start}"),
+                        None => panic!(
+                            "unterminated %{letter}{opener}{closer} starting at byte {start}"
+                        ),
                         Some((_, '\\')) => {
                             if chars.next().is_none() {
-                                panic!("unterminated %w[] starting at byte {start}");
+                                panic!(
+                                    "unterminated %{letter}{opener}{closer} starting at byte {start}"
+                                );
                             }
                         }
-                        Some((_, '[')) => depth += 1,
-                        Some((position, ']')) => {
+                        Some((_, character)) if character == opener => depth += 1,
+                        Some((position, character)) if character == closer => {
                             if depth == 0 {
                                 break position;
                             }
@@ -289,9 +303,17 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 };
                 tokens.push(Token {
                     leading_space: false,
-                    kind: TokenKind::WordArray,
+                    kind: if letter == 'w' {
+                        TokenKind::WordArray
+                    } else {
+                        TokenKind::SymbolArray
+                    },
                     text: &source[start..=closing],
                 });
+            }
+            '%' if declined_percent_literal(source, start) => {
+                let spelling = &source[start..start + declined_percent_length(source, start)];
+                panic!("{}", declined_percent_sentence(spelling));
             }
             '=' | '<' | '>' | '!' | '&' | '|' | '+' | '-' | '*' | '/' | '%' | '^' | '~' | '?' => {
                 chars.next();
@@ -509,6 +531,55 @@ fn skip_interpolation(chars: &mut std::iter::Peekable<std::str::CharIndices>, st
 }
 
 /// Consume characters while `keep` holds; return the byte offset just past the last one.
+fn closer_of(opener: char) -> char {
+    match opener {
+        '[' => ']',
+        '(' => ')',
+        _ => '}',
+    }
+}
+
+/// Whether a `%` at `start` begins one of the family's declined members
+/// (ADR 0051): a letter in `qQsWIrx` followed by a delimiter character, or
+/// a bare `%` before `[`, `(`, or `{` where a space (or the line's start)
+/// precedes it — Ruby's own reading of `a %(b)` — so `a % (b)` and `a%(b)`
+/// stay modulo.
+fn declined_percent_literal(source: &str, start: usize) -> bool {
+    let bytes = source.as_bytes();
+    match bytes.get(start + 1) {
+        Some(b'q' | b'Q' | b's' | b'W' | b'I' | b'r' | b'x') => {
+            bytes.get(start + 2).is_some_and(|byte| {
+                !byte.is_ascii_alphanumeric() && !byte.is_ascii_whitespace() && *byte != b'_'
+            })
+        }
+        Some(b'[' | b'(' | b'{') => start == 0 || bytes[start - 1].is_ascii_whitespace(),
+        _ => false,
+    }
+}
+
+fn declined_percent_length(source: &str, start: usize) -> usize {
+    if source.as_bytes()[start + 1].is_ascii_alphabetic() {
+        3
+    } else {
+        2
+    }
+}
+
+/// One sentence per declined member, in ADR 0047's voice: the spelling as
+/// written, a dash, the Portland form.
+pub fn declined_percent_sentence(spelling: &str) -> String {
+    let next = match spelling.as_bytes()[1] {
+        b'q' | b'Q' => "write a quoted string or a heredoc",
+        b's' => "write :name, or :\"odd name\" for a name with spaces",
+        b'W' => "write %w[] when no word interpolates, or [\"#{a}\", \"b\"] when one does",
+        b'I' => "write %i[]; a symbol does not interpolate",
+        b'r' => "there is no regex yet",
+        b'x' => "there is no shell execution",
+        _ => "write a quoted string or a heredoc",
+    };
+    format!("'{spelling}' is not a Portland literal — {next}")
+}
+
 /// A prefixed integer literal's digits must suit its base, sit at least one
 /// deep, and keep their underscores between digits (#72, ADR 0050).
 fn check_prefixed_literal(text: &str) {
@@ -745,6 +816,88 @@ mod tests {
             kinds(r"%w[\]] * 2"),
             vec![TokenKind::WordArray, TokenKind::Star, TokenKind::Integer]
         );
+    }
+
+    #[test]
+    fn lexes_the_percent_family_with_three_delimiters() {
+        // ADR 0051: `%i` beside `%w`, each with `[]`, `()`, or `{}`, the
+        // pair in use being the one that balances.
+        assert_eq!(kinds("%i[rose city]"), vec![TokenKind::SymbolArray]);
+        assert_eq!(texts("%w(a (b) c)"), vec!["%w(a (b) c)"]);
+        assert_eq!(texts("%i{a {b} c}"), vec!["%i{a {b} c}"]);
+        assert_eq!(texts("%w(a ] b)"), vec!["%w(a ] b)"]);
+        // Modulo survives wherever a space or a name precedes the `%`
+        // without a literal opener glued on.
+        assert_eq!(
+            kinds("10 % (3)"),
+            vec![
+                TokenKind::Integer,
+                TokenKind::Percent,
+                TokenKind::LeftParen,
+                TokenKind::Integer,
+                TokenKind::RightParen
+            ]
+        );
+        assert_eq!(kinds("10%(3)").first(), Some(&TokenKind::Integer));
+        assert_eq!(kinds("10%(3)").get(1), Some(&TokenKind::Percent));
+    }
+
+    #[test]
+    #[should_panic(expected = "'%w|' is not a Portland delimiter — write %w[], %w(), or %w{}")]
+    fn another_delimiter_refuses() {
+        lex("%w|a b|");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'%q(' is not a Portland literal — write a quoted string or a heredoc"
+    )]
+    fn the_q_string_refuses() {
+        lex("x = %q(hi)");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'%(' is not a Portland literal — write a quoted string or a heredoc"
+    )]
+    fn the_bare_string_refuses() {
+        lex("x = %(hi)");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'%s(' is not a Portland literal — write :name, or :\"odd name\" for a name with spaces"
+    )]
+    fn the_symbol_form_refuses() {
+        lex("%s(name)");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'%W[' is not a Portland literal — write %w[] when no word interpolates, or [\"#{a}\", \"b\"] when one does"
+    )]
+    fn the_interpolating_word_array_refuses() {
+        lex("%W[a b]");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'%I[' is not a Portland literal — write %i[]; a symbol does not interpolate"
+    )]
+    fn the_interpolating_symbol_array_refuses() {
+        lex("%I[a b]");
+    }
+
+    #[test]
+    #[should_panic(expected = "'%r{' is not a Portland literal — there is no regex yet")]
+    fn the_regex_form_refuses() {
+        lex("%r{a/b}");
+    }
+
+    #[test]
+    #[should_panic(expected = "'%x(' is not a Portland literal — there is no shell execution")]
+    fn the_shell_form_refuses() {
+        lex("%x(ls)");
     }
 
     #[test]

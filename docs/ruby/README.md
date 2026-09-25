@@ -42,6 +42,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
+- [The `%` literal family](percent-literals.md) — `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.

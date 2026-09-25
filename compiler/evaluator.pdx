@@ -738,6 +738,7 @@ def evaluate_expression(node, bindings)
   in EnumCaseNode then evaluate_enum_case(node, bindings)
   in UnaryNode then evaluate_unary(node, bindings)
   in WordArrayNode(text:) then outcome([word_array_elements(text)], bindings)
+  in SymbolArrayNode(text:) then outcome([symbol_array_elements(text)], bindings)
   in IdentifierNode(name:)
     mutable slot = lookup(bindings, name)
     slot = resolve(bindings, name) if slot.empty?
@@ -1163,8 +1164,9 @@ def updated_array(current, index, value, name)
   rebuilt
 end
 
-# The words of a `%w[...]` body — Ruby's rules (ADR 0030), matching the
-# seed's `word_array_words`. A backslash before a bracket, a backslash, or
+# The words of a `%w[...]` or `%i[...]` body — Ruby's rules (ADR 0030),
+# matching the seed's `word_array_words`. A backslash before the literal's
+# own delimiter (ADR 0051: the pair it opened with), a backslash, or
 # whitespace drops away (escaped whitespace joins a word instead of
 # splitting); before anything else it stays. Whitespace runs split once and
 # never produce empties. The seed asks Unicode what whitespace is where this
@@ -1172,6 +1174,8 @@ end
 # has no escape here, on purpose — the recorded divergence class no
 # literally-written program has met.
 def word_array_elements(lexeme)
+  opener = lexeme.slice(2, 1)
+  closer = lexeme.slice(lexeme.length - 1, 1)
   content = lexeme.slice(3, lexeme.length - 4)
   characters = content.chars
   mutable words = []
@@ -1184,7 +1188,7 @@ def word_array_elements(lexeme)
     if character == "\\" && index < characters.length
       escaped = characters[index]
       index += 1
-      unless escaped == "[" || escaped == "]" || escaped == "\\" || word_separator?(escaped)
+      unless escaped == opener || escaped == closer || escaped == "\\" || word_separator?(escaped)
         current << "\\"
       end
       current << escaped
@@ -1207,6 +1211,9 @@ end
 def word_separator?(character)
   character == " " || character == "\t" || character == "\n"
 end
+
+# `%i[...]`: the same words, each a symbol (ADR 0051).
+def symbol_array_elements(lexeme) = word_array_elements(lexeme).map { ["__symbol__", it] }
 
 def evaluate_index(node, bindings)
   receiver_step = evaluate_expression(node.receiver, bindings)

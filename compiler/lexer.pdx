@@ -220,12 +220,20 @@ def read_double_quoted(characters, start)
   text
 end
 
-# ADR 0030: a backslash escapes the next character, and unescaped brackets
-# balance, so only an unescaped `]` at depth zero closes. Escapes stay raw
-# in the token text — unescaping is the evaluator's job, as it is the
-# seed's parser's.
+# The `%` literal family (ADR 0051): `%w` and `%i` with `[]`, `()`, or
+# `{}`. ADR 0030: a backslash escapes the next character, and unescaped
+# delimiters balance, so only an unescaped closer at depth zero closes.
+# Escapes stay raw in the token text — unescaping is the evaluator's job, as
+# it is the seed's parser's.
 def read_word_array(characters, start)
-  mutable text = "%w["
+  letter = characters[start + 1]
+  opener = start + 2 < characters.length ? characters[start + 2] : ""
+  panic "unterminated %#{letter} literal starting at byte #{start}" if opener.empty?
+  unless "[({".include?(opener)
+    panic "'%#{letter}#{opener}' is not a Portland delimiter — write %#{letter}[], %#{letter}(), or %#{letter}{}"
+  end
+  closer = closer_of(opener)
+  mutable text = "%#{letter}#{opener}"
   mutable index = start + 3
   mutable depth = 0
   while index < characters.length
@@ -237,14 +245,57 @@ def read_word_array(characters, start)
         text << characters[index]
         index += 1
       end
-    elsif character == "["
+    elsif character == opener
       depth += 1
-    elsif character == "]"
+    elsif character == closer
       return text if depth == 0
       depth -= 1
     end
   end
   text
+end
+
+def closer_of(opener)
+  case opener
+  when "[" then "]"
+  when "(" then ")"
+  else "}"
+  end
+end
+
+# Whether a `%` begins one of the family's declined members (ADR 0051): a
+# letter in `qQsWIrx` followed by a delimiter character, or a bare `%` before
+# `[`, `(`, or `{` where a space (or the line's start) precedes it — Ruby's
+# own reading of `a %(b)` — so `a % (b)` and `a%(b)` stay modulo.
+def declined_percent_literal?(characters, index)
+  return false unless index + 1 < characters.length
+  letter = characters[index + 1]
+  if "qQsWIrx".include?(letter)
+    return false unless index + 2 < characters.length
+    following = characters[index + 2]
+    return !(name_character?(following) || blank?(following))
+  end
+  return false unless "[({".include?(letter)
+  index == 0 || blank?(characters[index - 1])
+end
+
+def blank?(character)
+  character == " " || character == "\t" || character == "\n"
+end
+
+# One sentence per declined member, in ADR 0047's voice: the spelling as
+# written, a dash, the Portland form.
+def declined_percent_sentence(spelling)
+  letters = spelling.chars
+  next_step = case letters[1]
+              when "I" then "write %i[]; a symbol does not interpolate"
+              when "W" then "write %w[] when no word interpolates, or [\"\#{a}\", \"b\"] when one does"
+              when "r" then "there is no regex yet"
+              when "s" then "write :name, or :\"odd name\" for a name with spaces"
+              when "x" then "there is no shell execution"
+              else "write a quoted string or a heredoc"
+              end
+  "'#{spelling}' is not a Portland literal — #{next_step}"
 end
 
 # — heredocs (ADR 0020) —
@@ -487,12 +538,17 @@ def lex(raw_source, first_line: 1)
       index += text.length
       next
     end
-    if character == "%" && index + 2 < characters.length && characters[index + 1] == "w" && characters[index + 2] == "["
+    if character == "%" && index + 1 < characters.length && (characters[index + 1] == "w" || characters[index + 1] == "i")
       text = read_word_array(characters, index)
-      tokens << Token.new(kind: "word_array", text: text, leading_space: leading, line: line)
+      kind = characters[index + 1] == "w" ? "word_array" : "symbol_array"
+      tokens << Token.new(kind: kind, text: text, leading_space: leading, line: line)
       line += text.count("\n")
       index += text.length
       next
+    end
+    if character == "%" && declined_percent_literal?(characters, index)
+      length = name_start?(characters[index + 1]) ? 3 : 2
+      panic declined_percent_sentence(characters.slice(index, length).join(""))
     end
     # A base prefix, either case (#72, ADR 0050): `0x` hexadecimal, `0b`
     # binary, `0o` octal. The token keeps the spelling; the parser folds it.

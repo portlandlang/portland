@@ -100,6 +100,7 @@ def synthesize(node, types)
   in NilNode then ["nil"]
   in RangeNode then ["range"]
   in WordArrayNode then ["array", ["string"]]
+  in SymbolArrayNode then ["array", ["symbol"]]
   in ArrayNode then synthesize_array(node, types)
   in HashNode then synthesize_hash(node, types)
   in IdentifierNode then synthesize_identifier(node, types)
