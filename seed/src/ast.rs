@@ -98,6 +98,9 @@ pub enum BinaryOperator {
     /// `**` (ADR 0033): right-associative, binding above `*`; a negated
     /// base refuses rather than inheriting anyone's precedence guess.
     Power,
+    /// `<=>` (ADR 0054): -1, 0, or 1 — Ruby's shape, so a migrating
+    /// `def <=>(other)` means what it meant.
+    Spaceship,
     Subtract,
 }
 
@@ -117,6 +120,7 @@ impl BinaryOperator {
             BinaryOperator::Multiply => "*",
             BinaryOperator::NotEquals => "!=",
             BinaryOperator::Power => "**",
+            BinaryOperator::Spaceship => "<=>",
             BinaryOperator::Subtract => "-",
         }
     }

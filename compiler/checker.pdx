@@ -362,6 +362,12 @@ def shape_methods(declaration, traits)
   mutable methods = %w[failure? nil? some? to_s with] + declaration.fields
   methods += def_names(declaration.methods)
   declaration.includes.each do |trait_name|
+    # The builtin trait (ADR 0054) adds the two derived methods; the four
+    # orderings are operators, not names.
+    if trait_name == "Comparable"
+      methods += %w[between? clamp]
+      next
+    end
     matching = traits.select { it.name == trait_name }
     return nil unless matching.length == 1
     methods += def_names(matching.first.methods)
@@ -1288,7 +1294,13 @@ end
 def operator_takes?(operator, left, right)
   case operator
   when "==", "!=" then true
-  when "<", "<=", ">", ">=" then numeric?(left) && numeric?(right)
+  # Numbers and strings order (ADR 0054); a struct declines here, since its
+  # `<=>` is a call the shape table answers for.
+  when "<", "<=", ">", ">=", "<=>"
+    return true if numeric?(left) && numeric?(right)
+    return true if left == ["string"] && right == ["string"]
+    # Arrays order element by element, under `<=>` alone.
+    operator == "<=>" && (left in ["array", *]) && (right in ["array", *])
   when "+"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["string"]

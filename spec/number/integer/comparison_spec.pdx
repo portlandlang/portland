@@ -1,8 +1,8 @@
 # The four orderings, each a boolean — never a truthy something.
 #
-# Grown from ruby/spec core/integer/{lt,lteq,gt,gteq}_spec.rb (#23).
-# The spaceship stays behind: `<=>` is not an operator Portland has, and a
-# missing operator is missing syntax — `pending` cannot hold it.
+# Grown from ruby/spec core/integer/{lt,lteq,gt,gteq}_spec.rb (#23). The
+# spaceship stayed behind until ADR 0054 gave Portland `<=>`; its examples
+# live in spec/struct/comparable_spec.pdx beside the struct half.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the compiler) — not against `spec/`.

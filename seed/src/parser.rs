@@ -853,7 +853,9 @@ impl<'source> Parser<'source> {
             type_function = true;
         }
         let token = self.advance();
-        if token.kind != TokenKind::Identifier {
+        // `def <=>(other)` — the one operator a method may be named by
+        // (ADR 0054); every other method name is a word.
+        if token.kind != TokenKind::Identifier && token.kind != TokenKind::Spaceship {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
@@ -2362,6 +2364,7 @@ impl<'source> Parser<'source> {
             Some(TokenKind::Less) => Some(BinaryOperator::Less),
             Some(TokenKind::LessEqual) => Some(BinaryOperator::LessOrEqual),
             Some(TokenKind::NotEqual) => Some(BinaryOperator::NotEquals),
+            Some(TokenKind::Spaceship) => Some(BinaryOperator::Spaceship),
             _ => None,
         } {
             self.position += 1;

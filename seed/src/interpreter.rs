@@ -218,6 +218,35 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
 
 /// The application half of a binary operator — shared by Binary and
 /// SlotCompound so `h[k] += v` cannot drift from `h[k] + v`.
+/// Ruby's shape for `<=>` (ADR 0054): -1, 0, or 1.
+fn ordering_value(ordering: std::cmp::Ordering) -> i64 {
+    match ordering {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }
+}
+
+/// `<=>` and the four orderings — what a struct's own `<=>` answers for.
+fn ordering_operator(operator: BinaryOperator) -> bool {
+    matches!(
+        operator,
+        BinaryOperator::Spaceship
+            | BinaryOperator::Less
+            | BinaryOperator::LessOrEqual
+            | BinaryOperator::Greater
+            | BinaryOperator::GreaterOrEqual
+    )
+}
+
+/// What `<=>` orders: numbers, strings, and structs (by their own `<=>`).
+fn orderable(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Struct { .. }
+    )
+}
+
 fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
     match (left, operator, right) {
         (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
@@ -264,10 +293,30 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
                 BinaryOperator::LessOrEqual => Value::Boolean(left <= right),
                 BinaryOperator::Equals => Value::Boolean(left == right),
                 BinaryOperator::NotEquals => Value::Boolean(left != right),
+                BinaryOperator::Spaceship => Value::Integer(ordering_value(left.total_cmp(&right))),
             }
         }
         (Value::String(left), BinaryOperator::Add, Value::String(right)) => {
             Value::String(left + &right)
+        }
+        // Strings order by canonical text (ADR 0054), the four and `<=>`.
+        (Value::String(left), BinaryOperator::Spaceship, Value::String(right)) => Value::Integer(
+            ordering_value(crate::value::canonical_ordering(&left, &right)),
+        ),
+        (Value::String(left), BinaryOperator::Less, Value::String(right)) => {
+            Value::Boolean(crate::value::canonical_ordering(&left, &right).is_lt())
+        }
+        (Value::String(left), BinaryOperator::LessOrEqual, Value::String(right)) => {
+            Value::Boolean(crate::value::canonical_ordering(&left, &right).is_le())
+        }
+        (Value::String(left), BinaryOperator::Greater, Value::String(right)) => {
+            Value::Boolean(crate::value::canonical_ordering(&left, &right).is_gt())
+        }
+        (Value::String(left), BinaryOperator::GreaterOrEqual, Value::String(right)) => {
+            Value::Boolean(crate::value::canonical_ordering(&left, &right).is_ge())
+        }
+        (Value::Integer(left), BinaryOperator::Spaceship, Value::Integer(right)) => {
+            Value::Integer(ordering_value(left.cmp(&right)))
         }
         (Value::Array(left), BinaryOperator::Add, Value::Array(right)) => {
             let mut combined = left.as_ref().clone();
@@ -402,6 +451,9 @@ struct TraitInfo {
 
 #[derive(Clone)]
 struct StructInfo {
+    /// `include Comparable` (ADR 0054): the four orderings, `between?`,
+    /// and `clamp` derive from the struct's own `<=>`.
+    comparable: bool,
     fields: Vec<String>,
     methods: HashMap<String, std::rc::Rc<Method>>,
 }
@@ -477,6 +529,128 @@ impl<W: std::io::Write> Interpreter<W> {
         self.arguments = arguments;
     }
 
+    /// `<=>` and the four orderings on a struct (ADR 0054): `<=>` calls the
+    /// struct's own; the four need `include Comparable` and derive from it.
+    fn compare_struct(&mut self, left: Value, operator: BinaryOperator, right: Value) -> Value {
+        let Value::Struct {
+            name: struct_name, ..
+        } = &left
+        else {
+            unreachable!("only a struct reaches here")
+        };
+        let struct_name = struct_name.clone();
+        let found = Self::resolve(&self.module_path, &struct_name, &self.structs)
+            .map(|(_, info)| (info.comparable, info.methods.get("<=>").cloned()));
+        let Some((comparable, Some(spaceship))) = found else {
+            panic!(
+                "cannot apply '{}' to {} and {}",
+                operator.glyph(),
+                left.shown(),
+                right.shown()
+            );
+        };
+        if operator != BinaryOperator::Spaceship && !comparable {
+            panic!(
+                "cannot apply '{}' to {} and {} — include Comparable in {struct_name}",
+                operator.glyph(),
+                left.shown(),
+                right.shown()
+            );
+        }
+        let answer = self.call_struct_method(
+            struct_name,
+            left.clone(),
+            spaceship,
+            vec![right.clone()],
+            Vec::new(),
+        );
+        let Some(Value::Integer(ordering)) = answer else {
+            let got = answer.map_or("nothing".to_string(), |value| value.shown());
+            panic!("'<=>' answers -1, 0, or 1, got {got}");
+        };
+        match operator {
+            BinaryOperator::Spaceship => Value::Integer(ordering.signum()),
+            BinaryOperator::Less => Value::Boolean(ordering < 0),
+            BinaryOperator::LessOrEqual => Value::Boolean(ordering <= 0),
+            BinaryOperator::Greater => Value::Boolean(ordering > 0),
+            _ => Value::Boolean(ordering >= 0),
+        }
+    }
+
+    /// -1, 0, or 1 for any two values `<=>` orders: builtins by the value
+    /// table, structs by their own method, arrays element by element.
+    fn ordering_of(&mut self, left: &Value, right: &Value) -> i64 {
+        if let (Value::Array(left_elements), Value::Array(right_elements)) = (left, right) {
+            return self.compare_arrays(&left_elements[..], &right_elements[..]);
+        }
+        let answer = if matches!(left, Value::Struct { .. }) {
+            self.compare_struct(left.clone(), BinaryOperator::Spaceship, right.clone())
+        } else {
+            apply_binary(left.clone(), &BinaryOperator::Spaceship, right.clone())
+        };
+        match answer {
+            Value::Integer(ordering) => ordering,
+            _ => unreachable!("<=> answers an integer"),
+        }
+    }
+
+    /// Ruby's array ordering: the first differing pair decides, and a
+    /// shorter array sorts first when every pair agrees.
+    fn compare_arrays(&mut self, left: &[Value], right: &[Value]) -> i64 {
+        for (left_element, right_element) in left.iter().zip(right.iter()) {
+            let ordering = self.ordering_of(left_element, right_element);
+            if ordering != 0 {
+                return ordering;
+            }
+        }
+        ordering_value(left.len().cmp(&right.len()))
+    }
+
+    fn all_structs(elements: &[Value]) -> bool {
+        !elements.is_empty()
+            && elements
+                .iter()
+                .all(|element| matches!(element, Value::Struct { .. }))
+    }
+
+    /// `sort` over structs: by their `<=>`, stable, an insertion at a time.
+    fn sort_by_spaceship(&mut self, elements: &[Value]) -> Value {
+        let mut sorted: Vec<Value> = Vec::with_capacity(elements.len());
+        for element in elements.iter().cloned() {
+            let mut position = sorted.len();
+            while position > 0 && self.ordering_of(&sorted[position - 1], &element) > 0 {
+                position -= 1;
+            }
+            sorted.insert(position, element);
+        }
+        Value::array(sorted)
+    }
+
+    /// `min`/`max` over structs: by their `<=>`, the first of equals.
+    fn extreme_by_spaceship(&mut self, elements: &[Value], which: &str) -> Value {
+        let mut chosen: Option<Value> = None;
+        for element in elements {
+            let better = match &chosen {
+                None => true,
+                Some(best) => {
+                    let ordering = self.ordering_of(element, best);
+                    if which == "min" {
+                        ordering < 0
+                    } else {
+                        ordering > 0
+                    }
+                }
+            };
+            if better {
+                chosen = Some(element.clone());
+            }
+        }
+        match chosen {
+            Some(value) => Value::present(value),
+            None => Value::Nil,
+        }
+    }
+
     /// The REPL's exemption from one-definition-per-name (ADR 0052):
     /// redefining `greet` mid-session is the point of a session.
     pub fn allow_redefinition(&mut self) {
@@ -501,7 +675,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// redefined, and a def, struct, enum, trait, alias, or constant is
     /// defined once — except in the REPL, where redefining is the point.
     fn refuse_redefinition(&self, name: &str) {
-        if Self::builtin_name(name) {
+        if Self::builtin_name(name) || name == "Comparable" {
             panic!("'{name}' is a builtin — rename yours");
         }
         if self.redefinable {
@@ -826,7 +1000,19 @@ impl<W: std::io::Write> Interpreter<W> {
                 // every collision is a refusal naming both owners, never
                 // Ruby's silent last-include-wins.
                 let mut origin: HashMap<String, String> = HashMap::new();
+                let mut comparable = false;
                 for written in includes {
+                    // `Comparable` is the one builtin trait (ADR 0054). It
+                    // carries no methods of its own: the four orderings,
+                    // `between?`, and `clamp` derive from the struct's `<=>`,
+                    // which must therefore exist.
+                    if written == "Comparable" {
+                        if !method_table.contains_key("<=>") {
+                            panic!("{name} includes Comparable but defines no '<=>' — define it");
+                        }
+                        comparable = true;
+                        continue;
+                    }
                     let Some((_, info)) = Self::resolve(&self.module_path, written, &self.traits)
                     else {
                         if Self::resolve(&self.module_path, written, &self.structs).is_some() {
@@ -878,6 +1064,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.structs.insert(
                     self.qualified(name),
                     StructInfo {
+                        comparable,
                         fields: fields.clone(),
                         methods: method_table,
                     },
@@ -1294,6 +1481,23 @@ impl<W: std::io::Write> Interpreter<W> {
             } => {
                 let left = self.value_of(left);
                 let right = self.value_of(right);
+                // A struct orders by its own `<=>` (ADR 0054), which is a
+                // call, so it cannot ride the value-only table below.
+                if matches!(left, Value::Struct { .. }) && ordering_operator(*operator) {
+                    return Some(self.compare_struct(left, *operator, right));
+                }
+                // Arrays order element by element under `<=>` alone (ADR
+                // 0054) — the shape `[major, minor] <=> [o.major, o.minor]`
+                // — and an element may be a struct.
+                if let (
+                    Value::Array(left_elements),
+                    BinaryOperator::Spaceship,
+                    Value::Array(right_elements),
+                ) = (&left, operator, &right)
+                {
+                    let ordering = self.compare_arrays(&left_elements[..], &right_elements[..]);
+                    return Some(Value::Integer(ordering));
+                }
                 Some(apply_binary(left, operator, right))
             }
             Expression::MethodCall {
@@ -2052,6 +2256,12 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // The extremes are maybes (ADR 0010) and answer the element
             // itself, strings included.
+            (Value::Array(elements), "max", []) if Self::all_structs(elements) => {
+                self.extreme_by_spaceship(elements, "max")
+            }
+            (Value::Array(elements), "min", []) if Self::all_structs(elements) => {
+                self.extreme_by_spaceship(elements, "min")
+            }
             (Value::Array(elements), "max", []) => Self::extreme(elements, "max"),
             (Value::Array(elements), "min", []) => Self::extreme(elements, "min"),
             // An array already is one — the harmless end of Ruby's rule.
@@ -2133,6 +2343,9 @@ impl<W: std::io::Write> Interpreter<W> {
             // and answers the elements themselves, so `[1, 2.5]` keeps its
             // Integer where a float key would have rewritten it (Ruby's
             // shape). A mix of kinds refuses, naming what broke it.
+            (Value::Array(elements), "sort", []) if Self::all_structs(elements) => {
+                self.sort_by_spaceship(elements)
+            }
             (Value::Array(elements), "sort", []) => {
                 if Self::all_strings(elements) {
                     let mut sorted: Vec<String> = elements
@@ -2408,6 +2621,21 @@ impl<W: std::io::Write> Interpreter<W> {
                 )
             }
             (receiver, "to_s", []) => Value::String(receiver.to_string()),
+            // `between?` and `clamp` (ADR 0054): on anything `<=>` orders.
+            (receiver, "between?", [low, high]) if orderable(receiver) => {
+                let above_low = self.ordering_of(receiver, low) >= 0;
+                let below_high = self.ordering_of(receiver, high) <= 0;
+                Value::Boolean(above_low && below_high)
+            }
+            (receiver, "clamp", [low, high]) if orderable(receiver) => {
+                if self.ordering_of(receiver, low) < 0 {
+                    low.clone()
+                } else if self.ordering_of(receiver, high) > 0 {
+                    high.clone()
+                } else {
+                    receiver.clone()
+                }
+            }
             (receiver, name, arguments) => {
                 if let Some(survivor) = alias_survivor(name) {
                     refusal("alias");
@@ -4951,10 +5179,23 @@ end
         assert_eq!(evaluate(r#"1 != "1""#), Some(Value::Boolean(true)));
     }
 
+    /// Strings order by canonical text (ADR 0054); a string and a number
+    /// still do not.
     #[test]
-    #[should_panic(expected = "cannot apply '<' to \"a\" and \"b\"")]
-    fn panics_on_ordering_strings() {
-        evaluate(r#""a" < "b""#);
+    fn orders_strings_by_canonical_text() {
+        assert_eq!(evaluate(r#""a" < "b""#), Some(Value::Boolean(true)));
+        assert_eq!(evaluate(r#""b" <=> "a""#), Some(Value::Integer(1)));
+        // A decomposed é equals the composed one, so neither is first.
+        assert_eq!(
+            evaluate("\"e\u{301}\" <=> \"\u{e9}\""),
+            Some(Value::Integer(0))
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "cannot apply '<' to \"a\" and 1")]
+    fn panics_on_ordering_a_string_against_a_number() {
+        evaluate(r#""a" < 1"#);
     }
 
     #[test]

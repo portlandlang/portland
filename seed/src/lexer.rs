@@ -52,6 +52,8 @@ pub enum TokenKind {
     RightParen,
     Slash,
     SlashEqual,
+    /// `<=>` (ADR 0054), and the one operator a `def` may be named by.
+    Spaceship,
     Star,
     StarEqual,
     StarStar,
@@ -340,6 +342,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('=', _) => (TokenKind::Equal, 1),
                     ('>', Some('=')) => (TokenKind::GreaterEqual, 2),
                     ('>', _) => (TokenKind::Greater, 1),
+                    // `<=>` before `<=` (ADR 0054).
+                    ('<', Some('=')) if source[start..].starts_with("<=>") => {
+                        (TokenKind::Spaceship, 3)
+                    }
                     ('<', Some('=')) => (TokenKind::LessEqual, 2),
                     // `<<` exists only as the rebinding append (ADR 0015);
                     // bit-shift is out (ADR 0003), heredocs are future.

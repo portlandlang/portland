@@ -125,9 +125,10 @@ def two_character_operator?(pair)
   %w[== != <= >= && || += -= *= /= %= => &. << .. :: **].include?(pair)
 end
 
-# `...` and `<<~` — the only three-character operators (ADRs 0019, 0020).
+# `...`, `<<~`, `||=`, and `<=>` — the three-character operators (ADRs
+# 0019, 0020, 0043, 0054).
 def three_character_operator?(triple)
-  %w[... <<~ ||=].include?(triple)
+  %w[... <<~ ||= <=>].include?(triple)
 end
 
 # `?` joined for the ternary (#83): a `?` that is not a name's suffix

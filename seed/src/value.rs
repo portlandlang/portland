@@ -76,6 +76,20 @@ pub fn canonically_equal(left: &str, right: &str) -> bool {
     left.nfc().eq(right.nfc())
 }
 
+/// Strings order by their canonical text (ADR 0054, on ADR 0038's
+/// footing): NFC-normalized, code point by code point — the byte-equal
+/// and all-ASCII fast paths taken first, as for equality.
+pub fn canonical_ordering(left: &str, right: &str) -> std::cmp::Ordering {
+    if left == right {
+        return std::cmp::Ordering::Equal;
+    }
+    if left.is_ascii() && right.is_ascii() {
+        return left.cmp(right);
+    }
+    use unicode_normalization::UnicodeNormalization;
+    left.nfc().cmp(right.nfc())
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

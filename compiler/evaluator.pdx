@@ -335,7 +335,7 @@ def declared_names(bindings)
 end
 
 def declare(name, bindings)
-  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name)
+  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || name == "Comparable"
   panic("'#{name}' is already defined — rename one") if declared_names(bindings).include?(name)
   [["__declared__", "declared", declared_names(bindings) + [name]]] + bindings
 end
@@ -612,7 +612,8 @@ def register_in_namespace(statement, home, mutable bindings)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
     merged = merged_methods(name, fields, includes, methods, home, bindings)
-    mutable result = [[inner_home, "struct", [fields, merged]]] + declare(inner_home, bindings)
+    # The registration's third slot says whether the struct is Comparable.
+    mutable result = [[inner_home, "struct", [fields, value_at(merged, 0), value_at(merged, 1)]]] + declare(inner_home, bindings)
     # Type functions (ADR 0031) register as ordinary methods under the
     # struct's namespace — `Token::of` — so the namespace rung dispatches
     # them with no new machinery. Their home is the struct itself: bare
@@ -655,7 +656,15 @@ end
 def merged_methods(struct_name, fields, includes, methods, home, bindings)
   mutable merged = methods
   mutable origins = []
+  mutable comparable = false
   includes.each do |written|
+    # `Comparable` is the one builtin trait (ADR 0054): no methods of its
+    # own — the orderings derive from the struct's `<=>`, which must exist.
+    if written == "Comparable"
+      panic("#{struct_name} includes Comparable but defines no '<=>' — define it") unless methods.any? { it.name == "<=>" }
+      comparable = true
+      next
+    end
     slot = resolve_from(bindings, home, written)
     trait_methods = trait_methods_of(written, slot, bindings)
     trait_methods.each do |method|
@@ -670,7 +679,7 @@ def merged_methods(struct_name, fields, includes, methods, home, bindings)
       merged += [method]
     end
   end
-  merged
+  [merged, comparable]
 end
 
 # The trait's method list, or the seed's refusal for whatever `written`
@@ -807,7 +816,18 @@ def evaluate_binary(node, bindings)
   right_step = evaluate_expression(node.right, left_step.bindings)
   left = slot_value(left_step.value)
   right = slot_value(right_step.value)
+  # A struct orders by its own `<=>` (ADR 0054), which is a call, so it
+  # cannot ride the host's operators below.
+  if (left in ["__struct__", *]) && %w[<=> < <= > >=].include?(node.operator)
+    return compare_struct(node.operator, left, right, right_step.bindings)
+  end
+  # Arrays order element by element under `<=>` alone, and an element may
+  # be a struct, so the walk is the evaluator's rather than the host's.
+  if node.operator == "<=>" && guest_array?(left) && guest_array?(right)
+    return outcome([compare_guest_arrays(left, right, right_step.bindings)], right_step.bindings)
+  end
   result = case node.operator
+  when "<=>" then left <=> right
   when "+" then left + right
   when "-" then left - right
   when "*" then left * right
@@ -827,6 +847,111 @@ def evaluate_binary(node, bindings)
     0
   end
   outcome([result], right_step.bindings)
+end
+
+# `<=>` and the four orderings on a struct (ADR 0054): `<=>` calls the
+# struct's own; the four need `include Comparable` and derive from it. The
+# seed's sentences.
+def compare_struct(operator, left, right, bindings)
+  own = struct_method_for(left, "<=>", bindings)
+  panic("cannot apply '#{operator}' to #{shorten(render_inspect(left))} and #{shorten(render_inspect(right))}") if own.nil?
+  unless operator == "<=>" || struct_comparable?(left, bindings)
+    panic("cannot apply '#{operator}' to #{shorten(render_inspect(left))} and #{shorten(render_inspect(right))} — include Comparable in #{value_at(left, 1)}")
+  end
+  step = invoke_struct_method(left, own, [right], [], bindings)
+  ordering = slot_value(step.value)
+  panic("'<=>' answers -1, 0, or 1, got #{shorten(render_inspect(ordering))}") unless ordering in Integer
+  answer = case operator
+           when "<" then ordering < 0
+           when "<=" then ordering <= 0
+           when ">" then ordering > 0
+           when ">=" then ordering >= 0
+           else ordering_sign(ordering)
+           end
+  outcome([answer], bindings)
+end
+
+def ordering_sign(ordering)
+  return -1 if ordering < 0
+  return 1 if ordering > 0
+  0
+end
+
+# Whether the struct's declaration said `include Comparable`: the third
+# slot of its registration.
+def struct_comparable?(value, bindings)
+  slot = lookup(bindings, value_at(value, 1))
+  return false if slot.empty?
+  value_at(slot.first[2], 2) == true
+end
+
+# `sort`, `min`, and `max` over structs order by their `<=>` (ADR 0054);
+# host values ride the host's own ordering.
+def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
+
+def guest_ordering(left, right, bindings)
+  return slot_value(compare_struct("<=>", left, right, bindings).value) if left in ["__struct__", *]
+  return compare_guest_arrays(left, right, bindings) if guest_array?(left) && guest_array?(right)
+  left <=> right
+end
+
+# A guest array proper — not a symbol, enum case, or struct wearing the
+# host's array shape.
+def guest_array?(value) = (value in Array) && !(value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *])
+
+# Ruby's array ordering: the first differing pair decides, and a shorter
+# array sorts first when every pair agrees.
+def compare_guest_arrays(left, right, bindings)
+  mutable index = 0
+  while index < left.length && index < right.length
+    ordering = guest_ordering(left[index], right[index], bindings)
+    return ordering unless ordering == 0
+    index += 1
+  end
+  ordering_sign(left.length - right.length)
+end
+
+def sorted_values(values, bindings)
+  return values.sort unless guest_structs?(values)
+  mutable sorted = []
+  values.each do |element|
+    mutable position = sorted.length
+    while position > 0 && guest_ordering(sorted[position - 1], element, bindings) > 0
+      position -= 1
+    end
+    sorted = sorted.slice(0, position) + [element] + sorted.slice(position, sorted.length - position)
+  end
+  sorted
+end
+
+def extreme_value(values, which, bindings)
+  unless guest_structs?(values)
+    return values.min if which == "min"
+    return values.max
+  end
+  mutable chosen = nil
+  values.each do |element|
+    if chosen.nil?
+      chosen = element
+    elsif which == "min" && guest_ordering(element, chosen, bindings) < 0
+      chosen = element
+    elsif which == "max" && guest_ordering(element, chosen, bindings) > 0
+      chosen = element
+    end
+  end
+  chosen
+end
+
+# `between?` and `clamp` on a struct, by its `<=>` (ADR 0054).
+def ordered_answer(name, receiver, arguments, bindings)
+  low = value_at(arguments, 0)
+  high = value_at(arguments, 1)
+  above_low = guest_ordering(receiver, low, bindings) >= 0
+  below_high = guest_ordering(receiver, high, bindings) <= 0
+  return above_low && below_high if name == "between?"
+  return low unless above_low
+  return high unless below_high
+  receiver
 end
 
 # Typed or, mirrored from the seed (ADR 0007): nil unwraps-or-else and the
@@ -1499,6 +1624,11 @@ def evaluate_method_call(node, mutable bindings)
   if (receiver in ["__struct__", *]) && arguments.empty? && node.block.nil? && !%w[failure? nil? some? to_s].include?(node.name)
     return outcome([struct_field(receiver, node.name)], bindings)
   end
+  # `between?` and `clamp` on a struct order by its `<=>` (ADR 0054); host
+  # values reach the host's own arms below.
+  if (receiver in ["__struct__", *]) && %w[between? clamp].include?(node.name) && arguments.length == 2
+    return outcome([ordered_answer(node.name, receiver, arguments, bindings)], bindings)
+  end
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).
   check_builtin_count(receiver, node.name, arguments.length)
@@ -1570,9 +1700,11 @@ def evaluate_method_call(node, mutable bindings)
   when "count" then count_of(receiver, arguments)
   when "index" then receiver.index(arguments.first)
   when "sum" then receiver.sum
-  when "sort" then receiver.sort
-  when "min" then receiver.min
-  when "max" then receiver.max
+  when "sort" then sorted_values(receiver, bindings)
+  when "min" then extreme_value(receiver, "min", bindings)
+  when "max" then extreme_value(receiver, "max", bindings)
+  when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
+  when "clamp" then receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
   when "step" then receiver.step(arguments.first)
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.

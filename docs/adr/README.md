@@ -65,6 +65,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0051](0051-2026-09-24-the-percent-literal-family.md) — The `%` literal family: `%w` and `%i` with three delimiters, the rest declined
 - [0052](0052-2026-09-24-one-definition-per-name.md) — One definition per name: redefinition refuses, and the builtins are not for taking
 - [0053](0053-2026-09-24-constants.md) — Constants: a SCREAMING_CASE name at the top level is bound once, with a def's reach
+- [0054](0054-2026-09-25-ordering.md) — Ordering: `<=>` is Ruby's, `Comparable` is a builtin trait, and strings order
 
 <!-- /generated -->
 

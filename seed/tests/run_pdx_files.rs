@@ -1168,9 +1168,11 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "cannot apply '+' to String and Integer",
         ),
         (
-            "if false\n  ordered = \"a\" < \"b\"\nend\nputs \"reached the end\"\n",
+            // Strings order since ADR 0054; a string against a number
+            // still refuses.
+            "if false\n  ordered = \"a\" < 1\nend\nputs \"reached the end\"\n",
             "reached the end\n",
-            "cannot apply '<' to String and String",
+            "cannot apply '<' to String and Integer",
         ),
         (
             "name = \"pdx\"\nif false\n  negated = -name\nend\nputs \"reached the end\"\n",

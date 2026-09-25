@@ -1217,7 +1217,7 @@ end
 
 def parse_comparison(tokens, position)
   mutable step = parse_addition(tokens, position)
-  while operator_at?(tokens, step.position, %w[== != < <= > >=])
+  while operator_at?(tokens, step.position, %w[== != < <= > >= <=>])
     operator = tokens[step.position].text
     right = parse_addition(tokens, step.position + 1)
     step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
@@ -2396,7 +2396,9 @@ def parse_def(tokens, mutable position)
     type_function = true
     position += 2
   end
-  if position >= tokens.length || !tokens[position].identifier?
+  # `def <=>(other)` — the one operator a method may be named by (ADR
+  # 0054); every other method name is a word.
+  if position >= tokens.length || !(tokens[position].identifier? || operator_at?(tokens, position, %w[<=>]))
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text

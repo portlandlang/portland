@@ -322,6 +322,13 @@ def synthesize_binary(node, types)
   right = synthesize(node.right, types)
   case node.operator
   when "==", "!=", "<", "<=", ">", ">=" then ["boolean"]
+  # `<=>` (ADR 0054) answers -1, 0, or 1 on what it orders; a struct's own
+  # `<=>` is a call, and unknown here.
+  when "<=>"
+    return ["integer"] if numeric?(left) && numeric?(right)
+    return ["integer"] if left == ["string"] && right == ["string"]
+    return ["integer"] if (left in ["array", *]) && (right in ["array", *])
+    ["unknown"]
   when "+", "-", "*", "%"
     return ["integer"] if left == ["integer"] && right == ["integer"]
     return ["float"] if numeric?(left) && numeric?(right)
@@ -408,7 +415,7 @@ def call_answer(receiver, node, types)
   when "to_f" then ["float"]
   when "to_s", "upcase", "downcase", "capitalize", "swapcase", "reverse", "strip", "lstrip", "rstrip", "chomp", "join", "inspect"
     synthesize_text_answer(receiver, name)
-  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?"
+  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?"
     ["boolean"]
   when "chars", "split", "lines" then ["array", ["string"]]
   when "keys"
@@ -424,7 +431,7 @@ def call_answer(receiver, node, types)
     return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
     return ["maybe", ["integer"]] if receiver == ["range"]
     ["unknown"]
-  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries"
+  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries", "clamp"
     synthesize_shape_answer(receiver, name)
   else
     ["unknown"]
@@ -594,9 +601,9 @@ end
 # sentence handling it.
 def builtin_table(type)
   case type
-  in ["string"] then %w[capitalize/0 chars/0 chomp/0 count/1 downcase/0 empty?/0 end_with?/1 failure?/0 include?/1 index/1 length/0 lines/0 lstrip/0 nil?/0 reverse/0 rstrip/0 size/0 slice/2 some?/0 split/1 start_with?/1 strip/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0]
-  in ["integer"] then %w[abs/0 downto/1& even?/0 failure?/0 gcd/1 magnitude/0 negative?/0 next/0 nil?/0 odd?/0 positive?/0 pow/1 pred/0 some?/0 succ/0 times/0& to_f/0 to_s/0-1 upto/1& zero?/0]
-  in ["float"] then %w[abs/0 ceil/0 failure?/0 finite?/0 floor/0 infinite?/0 magnitude/0 nan?/0 nil?/0 pow/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
+  in ["string"] then %w[between?/2 capitalize/0 chars/0 chomp/0 clamp/2 count/1 downcase/0 empty?/0 end_with?/1 failure?/0 include?/1 index/1 length/0 lines/0 lstrip/0 nil?/0 reverse/0 rstrip/0 size/0 slice/2 some?/0 split/1 start_with?/1 strip/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0]
+  in ["integer"] then %w[abs/0 between?/2 clamp/2 downto/1& even?/0 failure?/0 gcd/1 magnitude/0 negative?/0 next/0 nil?/0 odd?/0 positive?/0 pow/1 pred/0 some?/0 succ/0 times/0& to_f/0 to_s/0-1 upto/1& zero?/0]
+  in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/2 failure?/0 finite?/0 floor/0 infinite?/0 magnitude/0 nan?/0 nil?/0 pow/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
   in ["array", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& compact/0 count/0-1 detect/0& each/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& flatten/0 include?/1 index/1 inject/1& join/1 last/0-1 length/0 map/0& max/0 member?/1 min/0 nil?/0 none?/0& reduce/1& reject/0& reverse/0 select/0& size/0 slice/2 some?/0 sort/0 sort_by/0& sum/0 tally/0 to_a/0 to_s/0 uniq/0 zip/1]

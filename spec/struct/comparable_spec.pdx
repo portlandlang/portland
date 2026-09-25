@@ -1,0 +1,90 @@
+# Ordering (ADR 0054): `<=>` answers -1, 0, or 1 on numbers, strings, and
+# arrays; a struct that defines `<=>` and includes `Comparable` gets the four
+# orderings, `between?`, and `clamp`, and sorts by it.
+
+require_relative "../spec_helper"
+
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+
+struct Size
+  amount
+
+  def <=>(other) = amount <=> other.amount
+end
+
+context "Ordering" do
+  describe "<=>" do
+    specify "answers -1, 0, or 1 on numbers" do
+      expect(1 <=> 2).to eq(-1)
+      expect(2 <=> 2).to eq(0)
+      expect(2.5 <=> 1).to eq(1)
+    end
+
+    specify "orders strings by their text" do
+      expect("apple" <=> "banana").to eq(-1)
+      expect("pear" <=> "pear").to eq(0)
+    end
+
+    specify "orders arrays element by element, shorter first on a tie" do
+      expect([1, 2] <=> [1, 10]).to eq(-1)
+      expect([1] <=> [1, 0]).to eq(-1)
+      expect([2] <=> [1, 9]).to eq(1)
+    end
+  end
+
+  describe "strings" do
+    specify "take the four orderings" do
+      expect("apple" < "banana").to be_true
+      expect("b" >= "a").to be_true
+    end
+
+    specify "sort, and answer min and max" do
+      expect(%w[pear apple fig].sort).to eq(["apple", "fig", "pear"])
+      expect(%w[pear apple].min).to eq("apple")
+    end
+  end
+
+  describe "between? and clamp" do
+    specify "work on numbers and strings" do
+      expect(5.between?(1, 9)).to be_true
+      expect(11.clamp(1, 9)).to eq(9)
+      expect("m".clamp("a", "f")).to eq("f")
+    end
+  end
+
+  describe "a Comparable struct" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+
+    specify "takes the four orderings from its <=>" do
+      expect(older < newer).to be_true
+      expect(newer >= older).to be_true
+      expect(older <=> newer).to eq(-1)
+    end
+
+    specify "takes between? and clamp" do
+      expect(older.between?(older, newer)).to be_true
+      expect(older.clamp(newer, newer)).to eq(newer)
+    end
+
+    specify "sorts, and answers min and max" do
+      expect([newer, older].sort).to eq([older, newer])
+      expect([newer, older].min).to eq(older)
+      expect([older, newer].max).to eq(newer)
+    end
+  end
+
+  describe "a struct with <=> alone" do
+    specify "answers <=> and sorts, without the four orderings" do
+      expect(Size.new(amount: 1) <=> Size.new(amount: 2)).to eq(-1)
+      expect([Size.new(amount: 2), Size.new(amount: 1)].sort.first.amount).to eq(1)
+    end
+  end
+end

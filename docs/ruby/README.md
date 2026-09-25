@@ -41,6 +41,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 - [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
+- [Ordering](ordering.md) — `<=>` and `include Comparable` migrate unchanged; strings order by canonical text, and `Comparable` is a builtin trait that needs your `<=>` to exist.
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 - [The `%` literal family](percent-literals.md) — `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.

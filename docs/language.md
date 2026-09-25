@@ -58,7 +58,7 @@ Four rules do most of the work. They are not features; they are the reasons othe
 
 Arithmetic is `+ - * / % **` with unary minus and parens. `+` concatenates strings and arrays; `*` repeats them. Integer division and modulo are **floored, exactly as in Ruby** (ADR 0018) — `-7 / 2` is `-4`, and `-7 % 2` is `1`. Exponent is `**` or its named twin `pow` ([ADR 0033](adr/0033-2026-08-11-exponent-is-starstar-and-pow.md)): right-associative, above `*`, floats through the host, and a minus before `**` applies last — `-2 ** 2` is `-4`, Ruby's answer and mathematics'. The one refusal is the chained negative literal (`-5.abs ** 2`), where Ruby's own rules contradict each other. A negative integer exponent and a past-i64 result refuse with their rewrites named, since Portland has neither rationals nor bignums.
 
-Comparison is `== != < <= > >=`. Equality works across all types, with mixed types simply unequal; ordering is integers-only for now.
+Comparison is `== != < <= > >=`, and `<=>` answers -1, 0, or 1 ([ADR 0054](adr/0054-2026-09-25-ordering.md)). Equality works across all types, with mixed types simply unequal. Numbers, strings (by canonical text), and arrays (element by element, under `<=>`) order; a struct orders by its own `def <=>(other)`, and `include Comparable` gives it the four operators, `between?`, and `clamp`.
 
 **Strings** are double-quoted, with `\n` `\r` `\t` `\"` `\\` `\#` escapes and `#{...}` interpolation that auto-`to_s`es and nests. A **character is a grapheme cluster** and equality is **canonical** ([ADR 0038](adr/0038-2026-08-19-what-a-character-is.md)): `"🇺🇸".length` is 1, composed and decomposed `é` are the same character and the same string, storage stays byte-faithful, and casing is full Unicode (`"ß".upcase` is `"SS"`).
 
