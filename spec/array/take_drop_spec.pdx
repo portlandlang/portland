@@ -1,0 +1,64 @@
+# The ends of an array by count or by a block (#104), from ruby/spec
+# core/array: take, drop, take_while, and drop_while. Staying upstream: a
+# negative count (Portland refuses where Ruby raises ArgumentError), the
+# to_int and TypeError rows (ADR 0036), subclasses, the shift corner
+# (values never mutate), and the rows where a block answers an element as
+# its truthiness — here the block answers true or false, as select's does.
+
+require_relative "../spec_helper"
+
+context "Array#take" do
+  specify "returns the first specified number of elements" do
+    expect([1, 2, 3].take(2)).to eq([1, 2])
+  end
+
+  specify "returns all elements when the argument is greater than the Array size" do
+    expect([1, 2].take(99)).to eq([1, 2])
+  end
+
+  specify "returns all elements when the argument is less than the Array size" do
+    expect([1, 2].take(4)).to eq([1, 2])
+  end
+
+  specify "returns an empty Array when passed zero" do
+    expect([1].take(0)).to eq([])
+  end
+
+  specify "returns an empty Array when called on an empty Array" do
+    expect([].take(3)).to eq([])
+  end
+end
+
+context "Array#drop" do
+  specify "removes the specified number of elements from the start of the array" do
+    expect([1, 2, 3, 4, 5].drop(2)).to eq([3, 4, 5])
+  end
+
+  specify "returns an empty Array if all elements are dropped" do
+    expect([1, 2].drop(2)).to eq([])
+  end
+
+  specify "returns an empty Array when called on an empty Array" do
+    expect([].drop(0)).to eq([])
+  end
+
+  specify "does not remove any elements when passed zero" do
+    expect([1, 2].drop(0)).to eq([1, 2])
+  end
+
+  specify "returns an empty Array if more elements than exist are dropped" do
+    expect([1, 2].drop(3)).to eq([])
+  end
+end
+
+context "Array#take_while" do
+  specify "returns all elements until the block returns false" do
+    expect([1, 2, 3].take_while { |element| element < 3 }).to eq([1, 2])
+  end
+end
+
+context "Array#drop_while" do
+  specify "removes elements from the start of the array while the block evaluates to true" do
+    expect([1, 2, 3, 4].drop_while { |number| number < 4 }).to eq([4])
+  end
+end

@@ -18,3 +18,17 @@ context "Array" do
     end
   end
 end
+
+# ruby/spec core/array/include_spec.rb, title for title (#104). The mocks
+# whose own == takes over, and the one counting == calls, stay upstream.
+
+context "Array#include?" do
+  specify "returns true if object is present, false otherwise" do
+    expect([1, 2, "a", "b"].include?("c")).to eq(false)
+    expect([1, 2, "a", "b"].include?("a")).to eq(true)
+  end
+
+  specify "determines presence by using element == obj" do
+    expect([1, 2.0, 3].include?(2)).to eq(true)
+  end
+end

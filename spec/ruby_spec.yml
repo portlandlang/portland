@@ -82,6 +82,48 @@ core/array/uniq_spec.rb:
   link: docs/ruby/mutability.md
 core/array/zip_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
+core/array/take_spec.rb:
+  pdx: [spec/array/take_drop_spec.pdx]
+  status: partial_intentional
+  reason: "A negative count refuses where Ruby raises ArgumentError; no subclasses."
+  link: docs/ruby/errors.md
+core/array/drop_spec.rb:
+  pdx: [spec/array/take_drop_spec.pdx]
+  status: partial_intentional
+  reason: "A negative count refuses where Ruby raises ArgumentError; no to_int conversion (ADR 0036); values never mutate, so there is no shift corner; no subclasses."
+  link: docs/ruby/errors.md
+core/array/take_while_spec.rb:
+  pdx: [spec/array/take_drop_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
+  link: docs/ruby/truthiness.md
+core/array/drop_while_spec.rb:
+  pdx: [spec/array/take_drop_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
+  link: docs/ruby/truthiness.md
+core/array/empty_spec.rb:
+  pdx: [spec/array/empty_spec.pdx]
+core/array/length_spec.rb:
+  pdx: [spec/array/length_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/array/size_spec.rb:
+  pdx: [spec/array/length_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so no array can hold itself and the recursive examples stay behind."
+  link: docs/ruby/mutability.md
+core/array/include_spec.rb:
+  pdx: [spec/array/include_spec.pdx]
+  status: partial_intentional
+  reason: "A mock's own == never takes over a builtin's answer here."
+  link: docs/ruby/metaprogramming.md
+core/array/to_a_spec.rb:
+  pdx: [spec/array/conversion_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so identity is not observable and no array can hold itself; no subclasses."
+  link: docs/ruby/mutability.md
 # The mutators: values never mutate, names do (ADR 0015). Each rewrite
 # rebinds a mutable name — `<<` and `[]=` survive as that sugar.
 core/array/append_spec.rb:

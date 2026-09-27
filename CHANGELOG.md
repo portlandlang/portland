@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Nine core/array files ported title for title** ([#104](https://github.com/portlandlang/portland/issues/104)) — `take`, `drop`, `take_while`, and `drop_while` port to `spec/array/take_drop_spec.pdx`. `empty?`, `length`, `size`, and `include?` join their house specs, and `to_a` opens `spec/array/conversion_spec.pdx`.
+
 - **`take`, `drop`, `take_while`, and `drop_while`** ([#104](https://github.com/portlandlang/portland/issues/104)) — the ends of an array by count or by a block, answering new arrays, on both implementations. A range answers the block twins as it answers `select`. A negative count refuses in Ruby's words (`attempt to take negative size`), and the block answers true or false, as `select`'s does.
 
 - **ruby/spec's `core/array/sort_spec.rb` ported title for title** ([#104](https://github.com/portlandlang/portland/issues/104)) — twelve upstream examples join `spec/array/sort_spec.pdx`, including the block-ordered ones that #99 made possible. The manifest entry had still said comparator blocks were unbuilt.

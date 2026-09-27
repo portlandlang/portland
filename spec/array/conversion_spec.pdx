@@ -1,0 +1,13 @@
+# What an array converts to (#104), from ruby/spec core/array: to_a. The
+# identity check (equal?) and the subclass and recursive-array examples
+# stay upstream: values never mutate, so identity is not observable and no
+# array can hold itself.
+
+require_relative "../spec_helper"
+
+context "Array#to_a" do
+  specify "returns self" do
+    numbers = [1, 2, 3]
+    expect(numbers.to_a).to eq([1, 2, 3])
+  end
+end

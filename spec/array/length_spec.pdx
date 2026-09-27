@@ -18,3 +18,21 @@ context "Array" do
     end
   end
 end
+
+# ruby/spec core/array/length_spec.rb and size_spec.rb, title for title
+# (#104). The alias check compares the two answers rather than method
+# objects; recursive arrays cannot exist, since values never mutate.
+
+context "Array#length" do
+  specify "is an alias of Array#size" do
+    expect([1, 2, 3].length).to eq([1, 2, 3].size)
+    expect([].length).to eq([].size)
+  end
+end
+
+context "Array#size" do
+  specify "returns the number of elements" do
+    expect([].size).to eq(0)
+    expect([1, 2, 3].size).to eq(3)
+  end
+end
