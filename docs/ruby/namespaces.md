@@ -53,7 +53,7 @@ Shapes::Circle.new(radius: 5)    # both, in order
 
 **Names are always fully qualified.** There is no import, no aliasing, and no way to inject names into scope. Lexical nesting is the only shortening — inside `module Statistics`, its own names are bare, exactly as in Ruby.
 
-**Both declaration forms exist and mean the same thing.** `module A::B` is identical to nested blocks, including lexical visibility of `A`'s names. Ruby's `Module.nesting` asymmetry is not reproduced.
+**Both declaration forms exist and mean the same thing.** `module A::B` is identical to nested blocks, including lexical visibility of `A`'s names. Ruby's `Module.nesting` asymmetry is not reproduced. The same holds for a type ([#146](https://github.com/portlandlang/portland/issues/146)): `class Deck::Card` (or `struct`) is `module Deck` holding `class Card`, and `include Formats::Loud` names a trait inside a namespace.
 
 **Types nest in types; modules do not nest in types.**
 

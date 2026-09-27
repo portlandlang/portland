@@ -1015,14 +1015,33 @@ impl<'source> Parser<'source> {
                 token.text
             );
         }
-        let name = token.text.to_string();
+        let mut name = token.text.to_string();
+        // `class Deck::Card` is `module Deck` holding `class Card` (#146),
+        // as `module A::B` is its nested blocks (ADR 0021).
+        let mut prefix: Vec<String> = Vec::new();
+        while self.peek_kind() == Some(TokenKind::ColonColon) {
+            self.position += 1; // the `::`
+            let segment = self.advance();
+            if segment.kind != TokenKind::Identifier
+                || !segment.text.chars().next().unwrap().is_ascii_uppercase()
+            {
+                panic!(
+                    "struct names start with a capital letter, got {}",
+                    segment.text
+                );
+            }
+            prefix.push(std::mem::replace(&mut name, segment.text.to_string()));
+        }
         // Hierarchies flatten into traits (ADR 0028), whichever keyword
         // declared the type.
         if self.peek_kind() == Some(TokenKind::Less) {
             self.position += 1; // the `<`
             let parent = self.advance().text;
+            let mut written = prefix.clone();
+            written.push(name.clone());
+            let written = written.join("::");
             panic!(
-                "'{keyword} {name} < {parent}' inherits, and Portland has no inheritance — move {parent}'s shared methods into a trait and 'include' it"
+                "'{keyword} {written} < {parent}' inherits, and Portland has no inheritance — move {parent}'s shared methods into a trait and 'include' it"
             );
         }
         self.expect_statement_boundary();
@@ -1057,7 +1076,15 @@ impl<'source> Parser<'source> {
                 {
                     panic!("expected a trait name after include, got {token:?}");
                 }
-                includes.push(token.text.to_string());
+                // A trait inside a namespace, `include Formats::Json` (#146).
+                let mut written = token.text.to_string();
+                while self.peek_kind() == Some(TokenKind::ColonColon)
+                    && self.peek_kind_at(1) == Some(TokenKind::Identifier)
+                {
+                    self.position += 1; // the `::`
+                    written = format!("{written}::{}", self.advance().text);
+                }
+                includes.push(written);
                 self.expect_statement_boundary();
                 self.skip_newlines();
                 continue;
@@ -1214,7 +1241,7 @@ impl<'source> Parser<'source> {
             panic!("struct {name} needs at least one field");
         }
         self.position += 1; // the `end`
-        Statement::StructDefinition {
+        let definition = Statement::StructDefinition {
             constants,
             fields,
             includes,
@@ -1222,6 +1249,13 @@ impl<'source> Parser<'source> {
             name,
             nested,
             type_functions,
+        };
+        if prefix.is_empty() {
+            return definition;
+        }
+        Statement::ModuleDefinition {
+            body: vec![definition],
+            path: prefix,
         }
     }
 

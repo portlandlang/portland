@@ -1683,6 +1683,21 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
     );
 }
 
+/// The compact nested form, `class Deck::Card` (#146), is `module Deck`
+/// holding `class Card`, as `module A::B` is its nested blocks (ADR 0021).
+#[test]
+fn compact_nested_types_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_compact_types.pdx",
+        "module Deck\nend\nclass Deck::Card\n  rank\n  def label = \"card #{rank}\"\nend\nstruct Game::Table::Seat\n  number\nend\np Deck::Card.new(rank: 7).label\np Game::Table::Seat.new(number: 2)\nmodule Formats\n  trait Loud\n    def shout = label.upcase\n  end\nend\nclass Sign\n  label\n  include Formats::Loud\nend\np Sign.new(label: \"open\").shout\n",
+    );
+    let cases = [(
+        "class Deck::Card < Base\n  rank\nend\n",
+        "'class Deck::Card < Base' inherits, and Portland has no inheritance — move Base's shared methods into a trait and 'include' it",
+    )];
+    assert_both_oracles_refuse("compact_type_refusal.pdx", None, &cases);
+}
+
 /// A type body holds constants (#145), ADR 0053's rules in a third home:
 /// `Token::KINDS` from outside, bare from the type's own methods and type
 /// functions, bound once.

@@ -2827,9 +2827,18 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("expected struct name after #{keyword}"), position: position)
   end
   line = line_at(tokens, position)
+  # `class Deck::Card` is `module Deck` holding `class Card` (#146), as
+  # `module A::B` is its nested blocks (ADR 0021) — the seed's reading.
+  mutable prefix = []
+  while operator_at?(tokens, position + 1, %w[::]) && position + 2 < tokens.length && tokens[position + 2].identifier?
+    prefix << tokens[position].text
+    position += 2
+  end
   name = tokens[position].text
-  unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
-    return Step.new(node: error_node("struct names start with a capital letter, got #{name}"), position: position + 1)
+  (prefix + [name]).each do |segment|
+    unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(segment.slice(0, 1))
+      return Step.new(node: error_node("struct names start with a capital letter, got #{segment}"), position: position + 1)
+    end
   end
   # Hierarchies flatten into traits (ADR 0028), whichever keyword declared
   # the type. The body still parses, so the refusal stands in for the whole
@@ -2837,7 +2846,8 @@ def parse_struct(tokens, mutable position)
   mutable refusal = nil
   if position + 2 < tokens.length && tokens[position + 1].operator? && tokens[position + 1].text == "<"
     parent = tokens[position + 2].text
-    refusal = "'#{keyword} #{name} < #{parent}' inherits, and Portland has no inheritance — move #{parent}'s shared methods into a trait and 'include' it"
+    written = (prefix + [name]).join("::")
+    refusal = "'#{keyword} #{written} < #{parent}' inherits, and Portland has no inheritance — move #{parent}'s shared methods into a trait and 'include' it"
     position += 2
   end
   position = skip_newlines_at(tokens, position + 1)
@@ -2889,8 +2899,15 @@ def parse_struct(tokens, mutable position)
       unless position + 1 < tokens.length && tokens[position + 1].identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(tokens[position + 1].text.slice(0, 1))
         return Step.new(node: error_node("expected a trait name after include"), position: position + 1)
       end
-      includes << tokens[position + 1].text
-      position = skip_newlines_at(tokens, position + 2)
+      # A trait inside a namespace, `include Formats::Json` (#146).
+      mutable written = tokens[position + 1].text
+      position += 2
+      while operator_at?(tokens, position, %w[::]) && position + 1 < tokens.length && tokens[position + 1].identifier?
+        written = "#{written}::#{tokens[position + 1].text}"
+        position += 2
+      end
+      includes << written
+      position = skip_newlines_at(tokens, position)
     elsif keyword_at?(tokens, position, %w[def])
       method = parse_def(tokens, position + 1)
       # One namespace serves instances and the type (ADR 0031): the same
@@ -2923,7 +2940,9 @@ def parse_struct(tokens, mutable position)
   end
   if keyword_at?(tokens, position, %w[end])
     return Step.new(node: error_node(refusal), position: position + 1) unless refusal.nil?
-    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, constants: constants, line: line), position: position + 1)
+    definition = struct_def_node(name, fields, includes, methods, nested, type_functions, constants: constants, line: line)
+    return Step.new(node: definition, position: position + 1) if prefix.empty?
+    return Step.new(node: module_def_node(prefix, [definition]), position: position + 1)
   end
   return Step.new(node: error_node(refusal), position: position) unless refusal.nil?
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
