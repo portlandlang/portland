@@ -412,6 +412,39 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// Euclid on magnitudes, taken unsigned so the smallest integer has one.
+fn magnitude_gcd(left: i64, right: i64) -> u64 {
+    let (mut left, mut right) = (left.unsigned_abs(), right.unsigned_abs());
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
+/// `gcd`: never a sign, and a zero yields the other side's magnitude (Ruby
+/// 4.0.6, probed). The smallest integer's magnitude is past the edge.
+fn integer_gcd(number: i64, other: i64) -> Value {
+    match i64::try_from(magnitude_gcd(number, other)) {
+        Ok(divisor) => Value::Integer(divisor),
+        Err(_) => panic!("{number}.gcd({other}) overflows the 64-bit integers"),
+    }
+}
+
+/// `lcm` (#107): a magnitude, zero beside a zero, refused past the edge.
+fn integer_lcm(number: i64, other: i64) -> Value {
+    if number == 0 || other == 0 {
+        return Value::Integer(0);
+    }
+    let divisor = magnitude_gcd(number, other) as u128;
+    let multiple = number.unsigned_abs() as u128 / divisor * other.unsigned_abs() as u128;
+    match i64::try_from(multiple) {
+        Ok(multiple) => Value::Integer(multiple),
+        Err(_) => panic!("{number}.lcm({other}) overflows the 64-bit integers"),
+    }
+}
+
 /// Where `upto` or `downto` stops (#107): an Integer endpoint is itself; a
 /// Float walks to its floor going up and its ceiling going down, as Ruby's
 /// does, and one with no integer — NaN, an infinity — refuses, since an
@@ -2954,15 +2987,17 @@ impl<W: std::io::Write> Interpreter<W> {
             // Euclid on magnitudes — the answer never carries a sign, and a
             // zero yields the other side's magnitude (Ruby 4.0.6, probed).
             (Value::Integer(number), "gcd", [Value::Integer(other)]) => {
-                let mut left = number.abs();
-                let mut right = other.abs();
-                while right != 0 {
-                    let remainder = left % right;
-                    left = right;
-                    right = remainder;
-                }
-                Value::Integer(left)
+                integer_gcd(*number, *other)
             }
+            // The least common multiple, a magnitude like `gcd`'s, and zero
+            // beside a zero (#107).
+            (Value::Integer(number), "lcm", [Value::Integer(other)]) => {
+                integer_lcm(*number, *other)
+            }
+            (Value::Integer(number), "gcdlcm", [Value::Integer(other)]) => Value::array(vec![
+                integer_gcd(*number, *other),
+                integer_lcm(*number, *other),
+            ]),
             // `to_s` with a base, 2 through 36, lowercase digits, the sign
             // out front — Ruby's shapes, including the refusal's bounds.
             (Value::Integer(number), "to_s", [Value::Integer(base)]) => {

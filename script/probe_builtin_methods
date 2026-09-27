@@ -39,7 +39,7 @@ receivers = {
 }
 
 candidates = %w[
-  abs magnitude downto even? gcd negative? next odd? positive? pow pred succ times to_f to_s upto zero?
+  abs magnitude downto even? gcd gcdlcm lcm negative? next odd? positive? pow pred succ times to_f to_s upto zero?
   all? any? compact count each each_slice each_with_index empty? find detect first flat_map collect_concat
   flatten include? member? index join last length size map collect max min none? reduce inject reject
   reverse select filter find_all slice sort sort_by sum tally uniq zip

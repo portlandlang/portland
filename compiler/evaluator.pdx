@@ -1765,6 +1765,8 @@ def evaluate_method_call(node, mutable bindings)
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
   when "gcd" then receiver.gcd(arguments.first)
+  when "lcm" then receiver.lcm(arguments.first)
+  when "gcdlcm" then receiver.gcdlcm(arguments.first)
   when "to_i" then receiver.to_i
   # Twins ride their survivor's builtin (ADR 0036); `member?` rides the
   # host twin because its survivor depends on the receiver's type.

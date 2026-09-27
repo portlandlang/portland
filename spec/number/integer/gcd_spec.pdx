@@ -25,3 +25,67 @@ context "Integer" do
     end
   end
 end
+
+# `lcm` and `gcdlcm` (#107), from ruby/spec core/integer/lcm_spec.rb and
+# gcdlcm_spec.rb. Upstream's is_a? type checks ask inspect's answer; the
+# bignum examples stay upstream, and so do the ArgumentError and TypeError
+# ones, where Portland refuses.
+
+context "Integer#lcm" do
+  specify "returns self if equal to the argument" do
+    expect(1.lcm(1)).to eq(1)
+    expect(398.lcm(398)).to eq(398)
+  end
+
+  specify "returns an Integer" do
+    expect(inspect(36.lcm(6))).to eq("36")
+    expect(inspect(4.lcm(20981))).to eq("83924")
+  end
+
+  specify "returns the least common multiple of self and argument" do
+    expect(200.lcm(2001)).to eq(400200)
+    expect(99.lcm(90)).to eq(990)
+  end
+
+  specify "returns a positive integer even if self is negative" do
+    expect(-12.lcm(6)).to eq(12)
+    expect(-100.lcm(100)).to eq(100)
+  end
+
+  specify "returns a positive integer even if the argument is negative" do
+    expect(12.lcm(-6)).to eq(12)
+    expect(100.lcm(-100)).to eq(100)
+  end
+
+  specify "returns a positive integer even if both self and argument are negative" do
+    expect(-12.lcm(-6)).to eq(12)
+    expect(-100.lcm(-100)).to eq(100)
+  end
+end
+
+context "Integer#gcdlcm" do
+  specify "returns [self, self] if self is equal to the argument" do
+    expect(1.gcdlcm(1)).to eq([1, 1])
+    expect(398.gcdlcm(398)).to eq([398, 398])
+  end
+
+  specify "returns an Array" do
+    expect(inspect(36.gcdlcm(6))).to eq("[6, 36]")
+    expect(inspect(4.gcdlcm(20981))).to eq("[1, 83924]")
+  end
+
+  specify "returns a two-element Array" do
+    expect(36.gcdlcm(876).size).to eq(2)
+    expect(29.gcdlcm(17).size).to eq(2)
+  end
+
+  specify "returns the greatest common divisor of self and argument as the first element" do
+    expect(10.gcdlcm(5)[0]).to eq(10.gcd(5))
+    expect(200.gcdlcm(20)[0]).to eq(200.gcd(20))
+  end
+
+  specify "returns the least common multiple of self and argument as the last element" do
+    expect(10.gcdlcm(5)[1]).to eq(10.lcm(5))
+    expect(200.gcdlcm(20)[1]).to eq(200.lcm(20))
+  end
+end

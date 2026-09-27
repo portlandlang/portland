@@ -388,6 +388,16 @@ core/integer/to_s_spec.rb:
   pdx: [spec/number/integer/conversion_spec.pdx]
 core/integer/uminus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
+core/integer/lcm_spec.rb:
+  pdx: [spec/number/integer/gcd_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums; a missing, extra, or non-Integer argument refuses where Ruby raises ArgumentError or TypeError."
+  link: docs/ruby/errors.md
+core/integer/gcdlcm_spec.rb:
+  pdx: [spec/number/integer/gcd_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums; a missing, extra, or non-Integer argument refuses where Ruby raises ArgumentError or TypeError."
+  link: docs/ruby/errors.md
 core/integer/divmod_spec.rb:
   pdx: [spec/number/integer/division_spec.pdx]
   status: partial_intentional

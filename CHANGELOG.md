@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`lcm` and `gcdlcm`** ([#107](https://github.com/portlandlang/portland/issues/107)) — beside `gcd`, on both implementations, magnitudes as Ruby's are: zero beside a zero, and an answer past the 64-bit integers refuses. `gcd` now works on unsigned magnitudes, so the smallest integer no longer trips the host's overflow. ruby/spec's `lcm` and `gcdlcm` files port into `spec/number/integer/gcd_spec.pdx`.
+
 - **An array's membership questions ask Ruby's `==`** — `include?`, `member?`, `index`, and `count` of a value compared by `eql?`, so `[1, 2].include?(1.0)` was false and `[1, 1.0, 2].count(1)` was 1, silently unlike Ruby. They now ask `==` of each element, as Ruby's do.
 
 - **ruby/spec's core/integer division and rounding files ported** ([#107](https://github.com/portlandlang/portland/issues/107)) — `divmod`, `div`, `remainder`, `ceildiv`, and `fdiv` extend `spec/number/integer/division_spec.pdx`, and `floor`, `ceil`, `round`, and `truncate` port to `spec/number/integer/rounding_spec.pdx`: forty examples, passing on both implementations.

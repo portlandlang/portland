@@ -1770,6 +1770,29 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `gcd`, `lcm`, and `gcdlcm` (#107): magnitudes, never a sign, a zero
+/// giving the other side's magnitude to `gcd` and zero to `lcm` (Ruby
+/// 4.0.6, the expected lines). An answer past the 64-bit integers refuses.
+#[test]
+fn integer_divisors_match_ruby() {
+    assert_both_print(
+        "evaluator_integer_divisors.pdx",
+        "p(1.lcm(1))\np(398.lcm(398))\np(200.lcm(2001))\np(99.lcm(90))\np(-12.lcm(6))\np(12.lcm(-6))\np(-100.lcm(-100))\np(0.lcm(5))\np(1.gcdlcm(1))\np(-12.gcdlcm(6))\np(0.gcdlcm(0))\np(10.gcdlcm(5))\np(-12.gcd(18))\np((-9223372036854775807 - 1).gcd(2))\n",
+        "1\n398\n400200\n990\n12\n12\n100\n0\n[1, 1]\n[6, 12]\n[0, 0]\n[5, 10]\n6\n2\n",
+    );
+    let cases = [
+        (
+            "p(3037000500.lcm(3037000501))\n",
+            "3037000500.lcm(3037000501) overflows the 64-bit integers",
+        ),
+        (
+            "p((-9223372036854775807 - 1).gcd(0))\n",
+            "-9223372036854775808.gcd(0) overflows the 64-bit integers",
+        ),
+    ];
+    assert_both_oracles_refuse("integer_divisors_refusal.pdx", None, &cases);
+}
+
 /// An array's membership questions ask Ruby's `==` of each element, as
 /// Ruby's do — `include?`, `member?`, `index`, and `count` of a value — so
 /// `[1, 2].include?(1.0)` is true (Ruby 4.0.6, the expected lines).
