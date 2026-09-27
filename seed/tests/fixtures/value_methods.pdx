@@ -149,6 +149,8 @@ p(counting.take(2))
 p(counting.drop(2))
 p(counting.take_while { it < 3 })
 p(counting.drop_while { it < 3 })
+p(counting.find_index { it > 2 })
+p(counting.rindex(2))
 
 # `pow` is `**`'s named twin (ADR 0033).
 puts 2.pow(8).to_s

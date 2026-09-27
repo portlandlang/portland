@@ -1844,7 +1844,8 @@ def evaluate_method_call(node, mutable bindings)
   when "flatten" then receiver.flatten
   when "compact" then receiver.compact
   when "count" then count_of(receiver, arguments)
-  when "index" then receiver.index(arguments.first)
+  when "index", "find_index" then receiver.index(arguments.first)
+  when "rindex" then receiver.rindex(arguments.first)
   when "sum" then receiver.sum
   when "sort" then sorted_values(receiver, bindings)
   when "min" then extreme_value(receiver, "min", bindings)
@@ -2219,6 +2220,32 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     outcome([result], scope)
   when "none?"
     result = receiver.none? do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  # Where a true-or-false block first says true (#104), riding the host's
+  # by name so a refusal quotes the method written.
+  when "index", "find_index"
+    result = receiver.find_index do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "rindex"
+    result = receiver.rindex do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"

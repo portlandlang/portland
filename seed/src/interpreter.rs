@@ -2326,7 +2326,9 @@ impl<W: std::io::Write> Interpreter<W> {
             if name == "to_a" && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
             }
-            if block.is_some()
+            // A range walks as its array — except `index` and `rindex`,
+            // which Ruby's Range lacks (its Enumerable has `find_index`).
+            if (block.is_some() && !matches!(name, "index" | "rindex"))
                 || matches!(name, "length" | "size" | "count" | "sum" | "first" | "last")
             {
                 let elements = range_elements(&receiver);
@@ -2513,6 +2515,31 @@ impl<W: std::io::Write> Interpreter<W> {
                             Some(Value::Boolean(false)) => {}
                             other => {
                                 panic!("find block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Nil)
+                }
+                // Where a true-or-false block first says true — from the
+                // front, or with `rindex` from the far end — a maybe (#104).
+                (Value::Array(elements), "index" | "find_index" | "rindex", []) => {
+                    let positions: Vec<usize> = if name == "rindex" {
+                        (0..elements.len()).rev().collect()
+                    } else {
+                        (0..elements.len()).collect()
+                    };
+                    for position in positions {
+                        let verdict = self.run_block(block, vec![elements[position].clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => {
+                                return Some(Value::Integer(position as i64));
+                            }
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("{name} block must produce true or false, got {other:?}")
                             }
                         }
                     }
@@ -2945,9 +2972,15 @@ impl<W: std::io::Write> Interpreter<W> {
                     .count() as i64,
             ),
             // First position of a value — a maybe, like every partial lookup.
-            (Value::Array(elements), "index", [needle]) => elements
+            // `find_index` is its twin (#104).
+            (Value::Array(elements), "index" | "find_index", [needle]) => elements
                 .iter()
                 .position(|element| element.ruby_equals(needle))
+                .map_or(Value::Nil, |position| Value::Integer(position as i64)),
+            // The last position of a value, from the far end (#104).
+            (Value::Array(elements), "rindex", [needle]) => elements
+                .iter()
+                .rposition(|element| element.ruby_equals(needle))
                 .map_or(Value::Nil, |position| Value::Integer(position as i64)),
             // The counted ends answer arrays, clamped at the edges — asking
             // for more than there is answers what there is (Ruby's rule).

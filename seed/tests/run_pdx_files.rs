@@ -1770,6 +1770,24 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// The index family (#104): `index` and its twin `find_index` by value or
+/// by a true-or-false block, and `rindex` from the far end, each a maybe
+/// (ADR 0010) that asks Ruby's `==` of a value (Ruby 4.0.6, the expected
+/// lines).
+#[test]
+fn array_index_family_matches_ruby() {
+    assert_both_print(
+        "evaluator_array_index_family.pdx",
+        "p([3, 1, 2].find_index(1))\np([3, 1, 2].find_index { it < 3 })\np([3, 1, 2].index { it > 5 })\np([1, 2, 1].rindex(1))\np([1, 2, 1].rindex { it == 2 })\np([1, 2, 1].rindex(9))\np([1, 2, 3].rindex { it > 1 })\np([].rindex(1))\np([1, 2.0].rindex(2))\n",
+        "1\n1\nnil\n2\n1\nnil\n2\nnil\n1\n",
+    );
+    let cases = [(
+        "p([1, 2].rindex { 1 })\n",
+        "rindex block must produce true or false",
+    )];
+    assert_both_oracles_refuse("array_index_family_refusal.pdx", None, &cases);
+}
+
 /// `take`, `drop`, `take_while`, and `drop_while` (#104): the ends of an
 /// array by count or by a true-or-false block, answering new arrays (Ruby
 /// 4.0.6, the expected lines). A negative count refuses in Ruby's words,
