@@ -1817,7 +1817,7 @@ fn symbol_text_queries_on_both_oracles() {
 fn case_equality_on_both_oracles() {
     assert_evaluator_matches_seed(
         "evaluator_case_equality.pdx",
-        "x = 5\ncase x\nwhen 1..9 then p \"range\"\nelse p \"no\"\nend\ncase x\nwhen Integer then p \"type\"\nelse p \"no\"\nend\ncase 2.5\nwhen 1..3 then p \"float in range\"\nend\ncase \"a\"\nwhen Integer then p \"int\"\nwhen String then p \"string\"\nend\nstruct Even\n  unused\n  def ===(other) = other % 2 == 0\nend\ncase 4\nwhen Even.new(unused: 0) then p \"even\"\nelse p \"odd\"\nend\nstruct Point\n  x\nend\ncase Point.new(x: 1)\nwhen Point then p \"point\"\nend\np(true === true)\np(Integer === 5)\np((1..3) === 2)\np(String === 5)\n",
+        "x = 5\ncase x\nwhen 1..9 then p \"range\"\nelse p \"no\"\nend\ncase x\nwhen Integer then p \"type\"\nelse p \"no\"\nend\ncase 2.5\nwhen 1..3 then p \"float in range\"\nend\ncase \"a\"\nwhen Integer then p \"int\"\nwhen String then p \"string\"\nend\nstruct Even\n  unused\n  def ===(other) = other % 2 == 0\nend\ncase 4\nwhen Even.new(unused: 0) then p \"even\"\nelse p \"odd\"\nend\nstruct Point\n  x\nend\ncase Point.new(x: 1)\nwhen Point then p \"point\"\nend\np(true === true)\np(Integer === 5)\np((1..3) === 2)\np(String === 5)\ncase 1.0\nwhen 1 then p \"one\"\nend\np(1.0 === 1)\n",
     );
     let cases = [(
         "struct Odd\n  unused\n  def ===(other) = 1\nend\np(Odd.new(unused: 0) === 3)\n",

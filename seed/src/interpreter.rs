@@ -2697,6 +2697,10 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Integer(number), "odd?", []) => Value::Boolean(number % 2 != 0),
             (Value::Integer(number), "positive?", []) => Value::Boolean(*number > 0),
             (Value::Integer(number), "zero?", []) => Value::Boolean(*number == 0),
+            // Ruby's rule (#108): neither zero is either sign, and NaN is
+            // neither.
+            (Value::Float(number), "negative?", []) => Value::Boolean(*number < 0.0),
+            (Value::Float(number), "positive?", []) => Value::Boolean(*number > 0.0),
             // A character is a grapheme cluster (ADR 0038): `chars`,
             // `length`, `reverse`, `slice`, and `index` all count what a
             // human sees — one flag, one é, however encoded.
@@ -3562,7 +3566,11 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
             }
-            _ => pattern == *subject,
+            // Portland's own `==`, so `1 === 1.0` as `1 == 1.0` does.
+            _ => {
+                apply_binary(pattern.clone(), &BinaryOperator::Equals, subject.clone())
+                    == Value::Boolean(true)
+            }
         }
     }
 

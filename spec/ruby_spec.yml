@@ -161,6 +161,59 @@ core/false/to_s_spec.rb:
 
 # — core/float —
 
+core/float/abs_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "infinite? answers true or false here, so upstream's 1 is asked as a sign."
+  link: docs/ruby/truthiness.md
+core/float/case_compare_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/float/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/float/equal_value_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums (integers are i64), and a mock's own == never takes over a builtin's answer here."
+  link: docs/ruby/metaprogramming.md
+core/float/float_spec.rb:
+  status: skipped
+  reason: "There is no Float class object to allocate from or ask about its ancestors; a float is a value."
+  link: docs/ruby/metaprogramming.md
+core/float/inspect_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(4.5), not a method (ADR 0026), so the example compares its answer rather than method objects."
+  link: docs/ruby/inspect.md
+core/float/magnitude_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/float/negative_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+core/float/positive_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+core/float/to_f_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+core/float/to_i_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums (integers are i64), and NaN's to_i refuses where Ruby raised FloatDomainError; failures are values, not exceptions."
+  link: docs/ruby/errors.md
+core/float/to_int_spec.rb:
+  status: skipped
+  reason: "to_int is Ruby's implicit-conversion protocol, a false alias that refuses naming to_i (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/float/uminus_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_planned
+  reason: "The boundary example waits on Float::MAX and Float::MIN; the rest ports, -x spelled as the operator rather than send(:-@)."
+  link: https://github.com/portlandlang/portland/issues/152
 core/float/ceil_spec.rb:
   pdx: [spec/number/float/rounding_spec.pdx]
 core/float/comparison_spec.rb:
