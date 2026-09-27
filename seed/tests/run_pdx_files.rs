@@ -1782,10 +1782,18 @@ fn integer_overflow_refuses_rather_than_wrapping() {
     assert_evaluator_matches_seed(
         "evaluator_integer_edges.pdx",
         &format!(
-            "p({biggest})\np({smallest})\np({biggest} - 1 + 1)\np(-{biggest})\nzero = 0.0\np(-zero)\n"
+            "p({biggest})\np({smallest})\np({biggest} - 1 + 1)\np(-{biggest})\nzero = 0.0\np(-zero)\np({smallest} % -1)\np({smallest}.remainder(-1))\np({smallest}.divmod(1))\n"
         ),
     );
     let cases = [
+        (
+            format!("p({smallest} / -1)\n"),
+            "-9223372036854775808 / -1 overflows the 64-bit integers",
+        ),
+        (
+            format!("p({smallest}.divmod(-1))\n"),
+            "-9223372036854775808 / -1 overflows the 64-bit integers",
+        ),
         (
             format!("p({biggest} + 1)\n"),
             "9223372036854775807 + 1 overflows the 64-bit integers",

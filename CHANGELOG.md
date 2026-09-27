@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The smallest integer over -1** — `/` and `divmod` refuse with `-9223372036854775808 / -1 overflows the 64-bit integers`, where Ruby's answer is a bignum, and `%` and `remainder` answer 0 as Ruby's do. Both had tripped the host's own overflow panic.
+
 - **`div`, `remainder`, and `ceildiv`** ([#107](https://github.com/portlandlang/portland/issues/107)) — ADR 0018's on-demand division names, on both implementations:
   - `div` is floored division between integers and Ruby's `(x / y).floor` once a float is involved. That isn't always `divmod`'s quotient: `1.div(0.2)` is 5.
   - `remainder` keeps the dividend's sign, as Ruby's `num_remainder` does.

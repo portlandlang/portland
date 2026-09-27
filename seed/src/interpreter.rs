@@ -403,7 +403,11 @@ fn refuse_zero_divisor(right: i64) {
 
 fn floored_divide(left: i64, right: i64) -> i64 {
     refuse_zero_divisor(right);
-    let quotient = left / right;
+    // The one quotient past the edge: the smallest integer over -1, a
+    // bignum in Ruby.
+    let Some(quotient) = left.checked_div(right) else {
+        panic!("{left} / {right} overflows the 64-bit integers");
+    };
     if left % right != 0 && (left < 0) != (right < 0) {
         quotient - 1
     } else {
@@ -415,7 +419,9 @@ fn floored_divide(left: i64, right: i64) -> i64 {
 /// (ADR 0018): `-7 % 2` is `1`, and `7 % -2` is `-1`.
 fn floored_modulo(left: i64, right: i64) -> i64 {
     refuse_zero_divisor(right);
-    let remainder = left % right;
+    // The smallest integer over -1 divides evenly, though its quotient
+    // is past the edge.
+    let remainder = left.checked_rem(right).unwrap_or(0);
     if remainder != 0 && (remainder < 0) != (right < 0) {
         remainder + right
     } else {
