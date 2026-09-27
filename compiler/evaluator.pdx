@@ -65,7 +65,10 @@ def slot_value(values)
 end
 
 # Raw positional read for the same reason — used where a triple or pair
-# may hold nil in a value position.
+# may hold nil in a value position, and for every argument a builtin is
+# handed: `first` on a list holding nil answers the present nil ADR 0005
+# keeps apart from absence, so the builtin would see some(nil) where the
+# program wrote nil.
 def value_at(list, target_index)
   mutable result = nil
   list.each_with_index do |element, index|
@@ -980,8 +983,8 @@ def symbol_text_answer(text, name, arguments)
   when "name", "id2name" then text
   when "length", "size" then text.length
   when "empty?" then text.empty?
-  when "start_with?" then text.start_with?(arguments.first)
-  else text.end_with?(arguments.first)
+  when "start_with?" then text.start_with?(value_at(arguments, 0))
+  else text.end_with?(value_at(arguments, 0))
   end
 end
 
@@ -1371,7 +1374,7 @@ end
 # bounds refusal included.
 def to_s_of(receiver, arguments)
   return rendered_to_s(receiver) if arguments.empty?
-  receiver.to_s(arguments.first)
+  receiver.to_s(value_at(arguments, 0))
 end
 
 # `dig`, one step at a time — each step is the host's own single-key dig, so
@@ -1392,12 +1395,12 @@ end
 # counted rides the array-answering one, both the host's.
 def first_of(receiver, arguments)
   return receiver.first if arguments.empty?
-  receiver.first(arguments.first)
+  receiver.first(value_at(arguments, 0))
 end
 
 def last_of(receiver, arguments)
   return receiver.last if arguments.empty?
-  receiver.last(arguments.first)
+  receiver.last(value_at(arguments, 0))
 end
 
 # `values_at` takes any number of positions (#104); each rides the host's
@@ -1409,7 +1412,7 @@ end
 
 def count_of(receiver, arguments)
   return receiver.count if arguments.empty?
-  receiver.count(arguments.first)
+  receiver.count(value_at(arguments, 0))
 end
 
 # One hash pair, written the way it would be typed (ADR 0023 §1).
@@ -1774,11 +1777,11 @@ def evaluate_method_call(node, mutable bindings)
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
-  when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(arguments.first)
+  when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(value_at(arguments, 0))
   when "values_at" then values_at_of(receiver, arguments)
-  when "at" then receiver.at(arguments.first)
-  when "assoc" then receiver.assoc(arguments.first)
-  when "rassoc" then receiver.rassoc(arguments.first)
+  when "at" then receiver.at(value_at(arguments, 0))
+  when "assoc" then receiver.assoc(value_at(arguments, 0))
+  when "rassoc" then receiver.rassoc(value_at(arguments, 0))
   when "transpose" then receiver.transpose
   when "to_h" then receiver.to_h
   # Set arithmetic by eql? (#104), any number of arrays folded one at a
@@ -1786,13 +1789,13 @@ def evaluate_method_call(node, mutable bindings)
   when "difference" then arguments.reduce(receiver) { |kept, other| kept.difference(other) }
   when "union" then arguments.reduce(receiver.union) { |joined, other| joined.union(other) }
   when "intersection" then arguments.reduce(receiver.intersection) { |kept, other| kept.intersection(other) }
-  when "intersect?" then receiver.intersect?(arguments.first)
-  when "take" then receiver.take(arguments.first)
-  when "drop" then receiver.drop(arguments.first)
-  when "gcd" then receiver.gcd(arguments.first)
-  when "lcm" then receiver.lcm(arguments.first)
-  when "digits" then arguments.empty? ? receiver.digits : receiver.digits(arguments.first)
-  when "gcdlcm" then receiver.gcdlcm(arguments.first)
+  when "intersect?" then receiver.intersect?(value_at(arguments, 0))
+  when "take" then receiver.take(value_at(arguments, 0))
+  when "drop" then receiver.drop(value_at(arguments, 0))
+  when "gcd" then receiver.gcd(value_at(arguments, 0))
+  when "lcm" then receiver.lcm(value_at(arguments, 0))
+  when "digits" then arguments.empty? ? receiver.digits : receiver.digits(value_at(arguments, 0))
+  when "gcdlcm" then receiver.gcdlcm(value_at(arguments, 0))
   when "to_i" then receiver.to_i
   # Twins ride their survivor's builtin (ADR 0036); `member?` rides the
   # host twin because its survivor depends on the receiver's type.
@@ -1822,15 +1825,15 @@ def evaluate_method_call(node, mutable bindings)
   when "next" then receiver.succ
   when "pred" then receiver.pred
   # `pow` is `**`'s named twin (ADR 0033), one arity, the host's edges.
-  when "pow" then receiver ** arguments.first
+  when "pow" then receiver ** value_at(arguments, 0)
   # Ruby's named division (ADR 0018, #108) rides the host's.
-  when "fdiv" then receiver.fdiv(arguments.first)
-  when "quo" then receiver.quo(arguments.first)
-  when "modulo" then receiver % arguments.first
-  when "divmod" then receiver.divmod(arguments.first)
-  when "div" then receiver.div(arguments.first)
-  when "remainder" then receiver.remainder(arguments.first)
-  when "ceildiv" then receiver.ceildiv(arguments.first)
+  when "fdiv" then receiver.fdiv(value_at(arguments, 0))
+  when "quo" then receiver.quo(value_at(arguments, 0))
+  when "modulo" then receiver % value_at(arguments, 0)
+  when "divmod" then receiver.divmod(value_at(arguments, 0))
+  when "div" then receiver.div(value_at(arguments, 0))
+  when "remainder" then receiver.remainder(value_at(arguments, 0))
+  when "ceildiv" then receiver.ceildiv(value_at(arguments, 0))
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?
@@ -1840,35 +1843,35 @@ def evaluate_method_call(node, mutable bindings)
   when "infinite?" then receiver.infinite?
   # Without a block, the finished walk (ADR 0055, #107).
   when "times" then receiver.times
-  when "upto" then receiver.upto(arguments.first)
-  when "downto" then receiver.downto(arguments.first)
+  when "upto" then receiver.upto(value_at(arguments, 0))
+  when "downto" then receiver.downto(value_at(arguments, 0))
   when "next_float" then receiver.next_float
   when "prev_float" then receiver.prev_float
   # An Integer takes a precision too (#107).
-  when "floor" then arguments.empty? ? receiver.floor : receiver.floor(arguments.first)
-  when "ceil" then arguments.empty? ? receiver.ceil : receiver.ceil(arguments.first)
-  when "round" then arguments.empty? ? receiver.round : receiver.round(arguments.first)
-  when "truncate" then arguments.empty? ? receiver.truncate : receiver.truncate(arguments.first)
+  when "floor" then arguments.empty? ? receiver.floor : receiver.floor(value_at(arguments, 0))
+  when "ceil" then arguments.empty? ? receiver.ceil : receiver.ceil(value_at(arguments, 0))
+  when "round" then arguments.empty? ? receiver.round : receiver.round(value_at(arguments, 0))
+  when "truncate" then arguments.empty? ? receiver.truncate : receiver.truncate(value_at(arguments, 0))
   when "positive?" then receiver.positive?
   when "negative?" then receiver.negative?
   when "keys" then receiver.keys
-  when "merge" then receiver.merge(arguments.first)
+  when "merge" then receiver.merge(value_at(arguments, 0))
   when "dig" then dig_into(receiver, arguments)
   when "to_a", "entries" then receiver.to_a
   when "values" then receiver.values
-  when "key?", "has_key?" then receiver.key?(arguments.first)
-  when "member?" then receiver.member?(arguments.first)
+  when "key?", "has_key?" then receiver.key?(value_at(arguments, 0))
+  when "member?" then receiver.member?(value_at(arguments, 0))
   when "first" then first_of(receiver, arguments)
   when "last" then last_of(receiver, arguments)
   when "uniq" then receiver.uniq
   when "tally" then receiver.tally
-  when "zip" then receiver.zip(arguments.first)
-  when "each_slice" then receiver.each_slice(arguments.first)
+  when "zip" then receiver.zip(value_at(arguments, 0))
+  when "each_slice" then receiver.each_slice(value_at(arguments, 0))
   when "flatten" then receiver.flatten
   when "compact" then receiver.compact
   when "count" then count_of(receiver, arguments)
-  when "index", "find_index" then receiver.index(arguments.first)
-  when "rindex" then receiver.rindex(arguments.first)
+  when "index", "find_index" then receiver.index(value_at(arguments, 0))
+  when "rindex" then receiver.rindex(value_at(arguments, 0))
   when "sum" then receiver.sum
   when "sort" then sorted_values(receiver, bindings)
   when "min" then extreme_value(receiver, "min", bindings)
@@ -1876,25 +1879,25 @@ def evaluate_method_call(node, mutable bindings)
   when "max" then extreme_value(receiver, "max", bindings)
   when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
   # One range for both bounds (#101), or the two bounds.
-  when "clamp" then arguments.length == 1 ? receiver.clamp(arguments.first) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
-  when "step" then receiver.step(arguments.first)
+  when "clamp" then arguments.length == 1 ? receiver.clamp(value_at(arguments, 0)) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
+  when "step" then receiver.step(value_at(arguments, 0))
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   when "join"
     rendered = receiver.map { render(it) }
     # No separator joins with nothing between (#142).
-    arguments.empty? ? rendered.join("") : rendered.join(arguments.first)
-  when "include?" then receiver.include?(arguments.first)
+    arguments.empty? ? rendered.join("") : rendered.join(value_at(arguments, 0))
+  when "include?" then receiver.include?(value_at(arguments, 0))
   # Ruby's rules, the seed's `ruby_split` (#142): the host answers, so the
   # arguments pass through as written.
   when "split"
     case arguments.length
     when 0 then receiver.split
-    when 1 then receiver.split(arguments.first)
+    when 1 then receiver.split(value_at(arguments, 0))
     else receiver.split(arguments[0], arguments[1])
     end
-  when "start_with?" then receiver.start_with?(arguments.first)
-  when "end_with?" then receiver.end_with?(arguments.first)
+  when "start_with?" then receiver.start_with?(value_at(arguments, 0))
+  when "end_with?" then receiver.end_with?(value_at(arguments, 0))
   when "slice" then receiver.slice(arguments[0], arguments[1])
   # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
   # revised): the refusal names the real conversion, the host's words.
@@ -2230,7 +2233,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "reduce", "inject"
-    results = receiver.reduce(arguments.first) do |running, element|
+    results = receiver.reduce(value_at(arguments, 0)) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
@@ -2243,7 +2246,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   when "upto"
-    receiver.upto(arguments.first) do |number|
+    receiver.upto(value_at(arguments, 0)) do |number|
       step = run_guest_block(block, [number], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
@@ -2254,7 +2257,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "downto"
-    receiver.downto(arguments.first) do |number|
+    receiver.downto(value_at(arguments, 0)) do |number|
       step = run_guest_block(block, [number], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"

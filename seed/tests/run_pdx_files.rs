@@ -1770,6 +1770,19 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A builtin handed `nil` sees `nil`, on both implementations: the hosted
+/// evaluator had passed its arguments through `first`, whose answer for a
+/// nil argument is the present nil ADR 0005 keeps apart from absence — so
+/// `[1, nil].include?(nil)` was false hosted, true on the seed and in Ruby.
+#[test]
+fn a_builtin_handed_nil_sees_nil() {
+    assert_both_print(
+        "evaluator_nil_argument.pdx",
+        "p([1, nil].include?(nil))\np([1, nil].index(nil))\np([1, nil].count(nil))\np({nil => 1}.key?(nil))\np([[\"a\", 1], [nil, nil]].assoc(nil))\n",
+        "true\n1\n1\ntrue\n[nil, nil]\n",
+    );
+}
+
 /// `at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and
 /// `reverse_each` (#104), Ruby's answers (4.0.6, the expected lines).
 /// `at` and `dig` answer maybes as `[]` does; `dig` walks arrays and

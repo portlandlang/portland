@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A builtin handed `nil` sees `nil` on the hosted evaluator** — it passed arguments through `first`, whose answer for a nil argument is the present nil ADR 0005 keeps apart from absence. So `[1, nil].include?(nil)` was false hosted and true on the seed and in Ruby, and `index`, `count`, `key?`, and `assoc` of nil diverged the same way. Every builtin argument now goes through the raw positional read.
+
 - **`at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and `reverse_each` on arrays** ([#104](https://github.com/portlandlang/portland/issues/104)) — on both implementations, answering as Ruby 4.0.6's do:
   - `at` and `dig` answer maybes, as `[]` does. `dig` now walks arrays and hashes alike, and a value that cannot be dug into mid-chain refuses with Ruby's `Integer does not have #dig method`.
   - A ragged `transpose` and a `to_h` element that is not a pair refuse in Ruby's words.
