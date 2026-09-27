@@ -49,7 +49,7 @@ candidates = %w[
   id2name name
   nil? some? failure? to_s
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
-  take drop push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
+  take drop take_while drop_while push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
   fetch values_at transform_values invert
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv
   inspect class hash is_a? respond_to? send tap then itself instance_of?

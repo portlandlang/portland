@@ -2412,6 +2412,30 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(kept))
                 }
+                // The leading run a true-or-false block keeps, or the rest
+                // once it first says false (#104).
+                (Value::Array(elements), "take_while" | "drop_while", []) => {
+                    let mut split = elements.len();
+                    for (position, element) in elements.iter().enumerate() {
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => {}
+                            Some(Value::Boolean(false)) => {
+                                split = position;
+                                break;
+                            }
+                            other => {
+                                panic!("{name} block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    let (taken, dropped) = elements.split_at(split);
+                    let kept = if name == "take_while" { taken } else { dropped };
+                    Some(Value::array(kept.to_vec()))
+                }
                 (Value::Array(elements), "select" | "filter" | "find_all", []) => {
                     let mut kept = Vec::new();
                     for element in elements.iter().cloned() {
@@ -2902,6 +2926,17 @@ impl<W: std::io::Write> Interpreter<W> {
                     .cloned()
                     .collect(),
             ),
+            // The first `count` elements, or all but them, as new arrays —
+            // a count past the end answers what there is (#104).
+            (Value::Array(elements), "take" | "drop", [Value::Integer(count)]) => {
+                if *count < 0 {
+                    panic!("attempt to {name} negative size");
+                }
+                let split = (*count as usize).min(elements.len());
+                let (taken, dropped) = elements.split_at(split);
+                let kept = if name == "take" { taken } else { dropped };
+                Value::array(kept.to_vec())
+            }
             (Value::Array(elements), "count", []) => Value::Integer(elements.len() as i64),
             (Value::Array(elements), "count", [needle]) => Value::Integer(
                 elements

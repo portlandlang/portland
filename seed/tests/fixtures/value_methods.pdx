@@ -145,6 +145,10 @@ puts %w[a b a].tally.length.to_s
 puts counting.zip([9, 8, 7, 6]).flatten.join(",")
 puts counting.each_slice(3).length.to_s
 puts counting.flat_map { [it, it] }.join(",")
+p(counting.take(2))
+p(counting.drop(2))
+p(counting.take_while { it < 3 })
+p(counting.drop_while { it < 3 })
 
 # `pow` is `**`'s named twin (ADR 0033).
 puts 2.pow(8).to_s

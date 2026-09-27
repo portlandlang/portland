@@ -431,7 +431,7 @@ def call_answer(receiver, node, types)
     return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
     return ["maybe", ["integer"]] if receiver == ["range"]
     ["unknown"]
-  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries", "clamp"
+  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries", "clamp", "take", "drop", "take_while", "drop_while"
     synthesize_shape_answer(receiver, name)
   else
     ["unknown"]
@@ -475,7 +475,7 @@ end
 
 def synthesize_shape_answer(receiver, name)
   case name
-  when "sort", "uniq", "compact", "flatten", "slice"
+  when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while"
     return receiver if receiver in ["array", *]
     return ["string"] if receiver == ["string"] && name == "slice"
     ["unknown"]
@@ -606,9 +606,9 @@ def builtin_table(type)
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 div/1 divmod/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[empty?/0 end_with?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 some?/0 start_with?/1 to_s/0]
-  in ["array", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& compact/0 count/0-1 detect/0& each/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& flatten/0 include?/1 index/1 inject/1& join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& nil?/0 none?/0& reduce/1& reject/0& reverse/0 select/0& size/0 slice/2 some?/0 sort/0& sort_by/0& sum/0 tally/0 to_a/0 to_s/0 uniq/0 zip/1]
+  in ["array", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& compact/0 count/0-1 detect/0& drop/1 drop_while/0& each/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& flatten/0 include?/1 index/1 inject/1& join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& nil?/0 none?/0& reduce/1& reject/0& reverse/0 select/0& size/0 slice/2 some?/0 sort/0& sort_by/0& sum/0 take/1 take_while/0& tally/0 to_a/0 to_s/0 uniq/0 zip/1]
   in ["hash", *] then %w[dig/1-2 each/0& each_pair/0& empty?/0 entries/0 failure?/0 has_key?/1 include?/1 key?/1 keys/0 length/0 member?/1 merge/1 nil?/0 size/0 some?/0 to_a/0 to_s/0 values/0]
-  in ["range"] then %w[all?/0& any?/0& collect/0& collect_concat/0& count/0-1 detect/0& each/0& each_with_index/0& failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& min/0& min_by/0& nil?/0 none?/0& reduce/1& reject/0& select/0& size/0 some?/0 sort/0& sort_by/0& step/1 sum/0 to_a/0& to_s/0]
+  in ["range"] then %w[all?/0& any?/0& collect/0& collect_concat/0& count/0-1 detect/0& drop_while/0& each/0& each_with_index/0& failure?/0 filter/0& find/0& find_all/0& first/0-1 flat_map/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& min/0& min_by/0& nil?/0 none?/0& reduce/1& reject/0& select/0& size/0 some?/0 sort/0& sort_by/0& step/1 sum/0 take_while/0& to_a/0& to_s/0]
   else
     nil
   end

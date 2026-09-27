@@ -1764,6 +1764,8 @@ def evaluate_method_call(node, mutable bindings)
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
+  when "take" then receiver.take(arguments.first)
+  when "drop" then receiver.drop(arguments.first)
   when "gcd" then receiver.gcd(arguments.first)
   when "lcm" then receiver.lcm(arguments.first)
   when "digits" then arguments.empty? ? receiver.digits : receiver.digits(arguments.first)
@@ -2081,6 +2083,31 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       # A valueless pass — a bare `next`, a trailing `puts` — has nothing to
       # collect, and the seed refuses rather than inventing a nil.
       panic("map block produced no value") if step.value.empty?
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  # The leading run, or the rest after it (#104), riding the host's.
+  when "take_while"
+    results = receiver.take_while do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  when "drop_while"
+    results = receiver.drop_while do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?

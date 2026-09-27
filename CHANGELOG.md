@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`take`, `drop`, `take_while`, and `drop_while`** ([#104](https://github.com/portlandlang/portland/issues/104)) — the ends of an array by count or by a block, answering new arrays, on both implementations. A range answers the block twins as it answers `select`. A negative count refuses in Ruby's words (`attempt to take negative size`), and the block answers true or false, as `select`'s does.
+
 - **ruby/spec's `core/array/sort_spec.rb` ported title for title** ([#104](https://github.com/portlandlang/portland/issues/104)) — twelve upstream examples join `spec/array/sort_spec.pdx`, including the block-ordered ones that #99 made possible. The manifest entry had still said comparator blocks were unbuilt.
 
 - **A struct may have no fields** — Ruby's empty Struct, and the everyday class that is only methods (`class Greeter` with a `def hello`, since `class` spells `struct`, #127). The seed had refused one with `struct Empty needs at least one field` while the compiler already built it, so the two implementations disagreed; both now agree with Ruby.

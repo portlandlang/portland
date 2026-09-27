@@ -1770,6 +1770,33 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `take`, `drop`, `take_while`, and `drop_while` (#104): the ends of an
+/// array by count or by a true-or-false block, answering new arrays (Ruby
+/// 4.0.6, the expected lines). A negative count refuses in Ruby's words,
+/// and a block answering anything but true or false refuses as `select`'s
+/// does.
+#[test]
+fn array_take_and_drop_match_ruby() {
+    assert_both_print(
+        "evaluator_array_take_drop.pdx",
+        "p([1, 2, 3].take(2))\np([1, 2].take(99))\np([1].take(0))\np([].take(3))\np([1, 2, 3, 4, 5].drop(2))\np([1, 2].drop(2))\np([].drop(0))\np([1, 2].drop(0))\np([1, 2].drop(3))\np([1, 2, 3].take_while { it < 3 })\np([1, 2, 3, 4].drop_while { it < 4 })\np([5, 1].take_while { it > 9 })\np([1, 2].drop_while { true })\n",
+        "[1, 2]\n[1, 2]\n[]\n[]\n[3, 4, 5]\n[]\n[]\n[1, 2]\n[]\n[1, 2]\n[4]\n[]\n[]\n",
+    );
+    let cases = [
+        ("p([1].take(-3))\n", "attempt to take negative size"),
+        ("p([1, 2].drop(-3))\n", "attempt to drop negative size"),
+        (
+            "p([1, 2].take_while { 1 })\n",
+            "take_while block must produce true or false",
+        ),
+        (
+            "p([1, 2].drop_while { nil })\n",
+            "drop_while block must produce true or false",
+        ),
+    ];
+    assert_both_oracles_refuse("array_take_drop_refusal.pdx", None, &cases);
+}
+
 /// A struct may have no fields — Ruby's empty Struct, and a class that is
 /// only methods — on both implementations; the seed had refused one the
 /// compiler already built.
