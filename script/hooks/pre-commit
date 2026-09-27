@@ -1,19 +1,15 @@
 #!/bin/sh
-# The fast gate — everything except the one slow test, ~4s warm.
+# The fast gate — everything except the whole suites, about twenty seconds.
 #
-# `parses_the_whole_compiler_including_itself` takes ~31s of the suite's
-# ~33s (it parses 1961 lines of Portland with the Portland parser, and
-# `<<` copies the array each time — see #12). It guards the self-hosting
-# property, which pre-push is the right place for. Everything else runs
-# here, at the moment you make the mistake.
+# The whole suites (seed/tests/whole_suites.rs: the language spec on both
+# implementations and the checker over the compiler's own source) take most
+# of a full run. They guard the self-hosting property, which pre-push is the
+# right place for. Everything else runs here, at the moment you make the
+# mistake. `script/test --fast` owns what "everything else" is, so this hook
+# cannot drift from it.
 #
 # Escape hatch: `git commit --no-verify`.
 set -e
 cd "$(dirname "$0")/../.."
 
-. script/lib/rust.sh
-
-cargo fmt --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --quiet -- --skip parses_the_whole_compiler
-script/docs/check
+script/test --fast
