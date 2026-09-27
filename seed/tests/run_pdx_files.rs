@@ -1637,6 +1637,21 @@ fn semicolons_separate_statements_on_both_oracles() {
     );
 }
 
+/// A backslash before a newline joins the two lines (#137), as in Ruby;
+/// anywhere else outside a string it still refuses, naming where it may go.
+#[test]
+fn backslash_continues_a_line_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_continuation.pdx",
+        "total = 1 + \\\n  2\np total\nputs \\\n  \"hi\"\nputs \"a \\\\ b\"\n",
+    );
+    let cases = [(
+        "x = 1 \\ 2\n",
+        "a backslash outside a string continues a line, so a newline must follow it",
+    )];
+    assert_both_oracles_refuse("continuation_refusal.pdx", None, &cases);
+}
+
 /// Ruby's visibility words in a type body refuse until #133 decides them,
 /// rather than reading as fields named `private` (#132) — before the
 /// methods, after them, and on a `def`'s own line.

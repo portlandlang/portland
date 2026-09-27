@@ -525,6 +525,14 @@ def lex(raw_source, first_line: 1)
       index += 1
       next
     end
+    # A backslash before a newline joins the two lines (#137); the line
+    # count still moves.
+    if character == "\\"
+      panic "a backslash outside a string continues a line, so a newline must follow it" unless index + 1 < characters.length && characters[index + 1] == "\n"
+      line += 1
+      index += 2
+      next
+    end
     # `;` ends a statement exactly where a newline would (#136), on the
     # same line.
     if character == ";"

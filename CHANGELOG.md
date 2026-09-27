@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A backslash at the end of a line continues it** ([#137](https://github.com/portlandlang/portland/issues/137)) — `total = first + \` then `second` on the next line refused with `unexpected character '\'`; the level-0 census found that in 30,058 gems, the only refusal for 1,982. Tie goes to Ruby: both lexers skip a backslash and the newline right after it, the line count still moving. A backslash anywhere else outside a string refuses: `a backslash outside a string continues a line, so a newline must follow it`.
+
 - **`;` separates statements** ([#136](https://github.com/portlandlang/portland/issues/136)) — neither lexer knew it, so `def five; 5; end`, `a = 1; b = 2`, and `class Error < StandardError; end`'s shape all refused at the `;`. ruby_research's level-0 census found that in 38,455 gems, the only refusal for 4,379. No ADR removes it, so tie goes to Ruby: both lexers read `;` as the newline token, on the same line for line numbers, and a `;` inside a string is untouched.
 
 - **`pdx --parse` over many files names each refusal on its file's line** — `pdx --parse: lib/token.rb does not parse: 'class Token < Node' inherits, …`, one line per failing file, with the panic hook's three-line report no longer printed beside it. The corpus readiness census (ruby_research#9) ranks refusals across every gem's files from these lines.

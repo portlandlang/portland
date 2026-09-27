@@ -132,6 +132,16 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 // Comment runs to end of line; the newline itself still lexes.
                 scan_while(&mut chars, |character| character != '\n');
             }
+            // A backslash before a newline joins the two lines (#137).
+            '\\' => {
+                if !source[start + 1..].starts_with('\n') {
+                    panic!(
+                        "a backslash outside a string continues a line, so a newline must follow it"
+                    );
+                }
+                chars.next(); // the backslash
+                chars.next(); // the newline, which ends no statement here
+            }
             // `;` ends a statement exactly where a newline would (#136).
             '\n' | ';' => {
                 chars.next();
