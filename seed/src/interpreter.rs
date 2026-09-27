@@ -1685,10 +1685,14 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // `yield` — run the block this method was handed, in the scope,
             // frame, and block context that block was written in.
-            Expression::Yield(_) => {
+            Expression::Yield(values) => {
                 let Some(handed) = self.current_block.clone() else {
                     panic!("yield without a block — this method was called without one");
                 };
+                // The values are the yielding method's, evaluated in its
+                // scope before the block's scope takes over (#144).
+                let arguments: Vec<Value> =
+                    values.iter().map(|value| self.value_of(value)).collect();
                 let (block, written_in, home, written_under) = {
                     let handed = handed.borrow();
                     (
@@ -1705,7 +1709,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // instead of re-entering itself (#49).
                 let yielding_home = std::mem::replace(&mut self.home_depth, home);
                 let yielding_block = std::mem::replace(&mut self.current_block, written_under);
-                let result = self.run_block(&block, Vec::new());
+                let result = self.run_block(&block, arguments);
                 self.current_block = yielding_block;
                 self.home_depth = yielding_home;
                 // Whatever the block rebound stays rebound: blocks rebind

@@ -256,7 +256,7 @@ squares = numbers.map { it * it }
 
 `it` is an ordinary binding under no-shadow, not a soft keyword. Every collision is a shadow and every shadow is an error: declared parameters, a nested `it`, or a local of that name. `_1`–`_9` do not exist; `it` and named parameters cover the space.
 
-A user-defined method takes a block too, reached with `yield`, and a paren-less call may be handed one:
+A user-defined method takes a block too, reached with `yield`, which hands it values as Ruby's does — `yield word, index` or `yield(word, index)`, taken by the block's parameters or by `it` ([#144](https://github.com/portlandlang/portland/issues/144)) — and a paren-less call may be handed one:
 
 ```ruby
 describe "Array#first" do

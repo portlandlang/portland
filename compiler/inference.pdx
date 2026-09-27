@@ -749,6 +749,7 @@ def children_of(node)
   in MatchAssertNode(subject:) then [subject]
   in MatchTestNode(subject: test_subject) then [test_subject]
   in KeywordArgumentNode(value:) then [value]
+  in YieldNode(values:) then values
   in EnumCaseNode(payload:) then payload.map { it.value }
   else
     []

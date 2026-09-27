@@ -2890,7 +2890,7 @@ impl<'source> Parser<'source> {
                 "nil" => Expression::Nil,
                 "self" => Expression::SelfValue,
                 // `yield` runs the block the enclosing method was handed.
-                "yield" => Expression::Yield(Vec::new()),
+                "yield" => Expression::Yield(self.yield_values()),
                 "if" => self.if_expression(),
                 "true" => Expression::Boolean(true),
                 "unless" => self.unless_expression(),
@@ -2898,6 +2898,46 @@ impl<'source> Parser<'source> {
             },
             _ => panic!("unexpected token {token:?}"),
         }
+    }
+
+    /// The values a `yield` hands its block (#144): `yield(a, b)` with the
+    /// paren attached, or `yield a, b` paren-less when a value starts on the
+    /// same line. A bare `yield` hands none, and a `yield if ...` modifier
+    /// is still bare.
+    fn yield_values(&mut self) -> Vec<Expression> {
+        let Some(next) = self.tokens.get(self.position).copied() else {
+            return Vec::new();
+        };
+        if next.kind == TokenKind::LeftParen && !next.leading_space {
+            self.position += 1; // the `(`
+            let (positional, keyword) = self.call_arguments();
+            if !keyword.is_empty() {
+                panic!("'yield' hands its block positional values — write yield(value)");
+            }
+            return positional;
+        }
+        let starts_a_value = next.leading_space
+            && (matches!(
+                next.kind,
+                TokenKind::Float
+                    | TokenKind::Identifier
+                    | TokenKind::Integer
+                    | TokenKind::String
+                    | TokenKind::Symbol
+                    | TokenKind::SymbolArray
+                    | TokenKind::WordArray
+            ) || (next.kind == TokenKind::Keyword
+                && matches!(next.text, "false" | "nil" | "self" | "true")));
+        if !starts_a_value {
+            return Vec::new();
+        }
+        let mut values = vec![self.expression()];
+        while self.peek_kind() == Some(TokenKind::Comma) {
+            self.position += 1;
+            self.skip_newlines();
+            values.push(self.expression());
+        }
+        values
     }
 
     /// Parse a comma-separated argument list, consuming the closing paren.

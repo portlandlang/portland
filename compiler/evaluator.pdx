@@ -754,7 +754,7 @@ def evaluate_expression(node, bindings)
   in BinaryNode then evaluate_binary(node, bindings)
   in BooleanNode(value:) then outcome([value == "true"], bindings)
   in CallNode then evaluate_call(node, bindings)
-  in YieldNode then evaluate_yield(bindings)
+  in YieldNode then evaluate_yield(node, bindings)
   in CaseInNode then evaluate_case_in(node, bindings)
   in CaseNode then evaluate_case(node, bindings)
   in HashNode then evaluate_hash(node, bindings)
@@ -2197,15 +2197,22 @@ def invoke_with_block(payload, arguments, keyword_values, block, fields_target, 
   outcome(result.value, settled)
 end
 
-# `yield` — run the block the enclosing method was handed.
-def evaluate_yield(bindings)
+# `yield` — run the block the enclosing method was handed, with the values
+# the yield hands it (#144), evaluated in the method's own scope first.
+def evaluate_yield(node, mutable bindings)
   slot = lookup(bindings, "__block__")
   panic("yield without a block — this method was called without one") if slot.empty?
 
+  mutable values = []
+  node.values.each do |value|
+    step = evaluate_expression(value, bindings)
+    bindings = step.bindings
+    values += step.value
+  end
   handed = slot.first[2]
   block = value_at(handed, 0)
   written_in = value_at(handed, 1)
-  result = run_guest_block(block, [], written_in)
+  result = run_guest_block(block, values, written_in)
   # What the block rebound belongs to the caller, and a method body has no
   # channel to its caller — so the updated caller scope rides home inside
   # `__block__`, which `invoke_with_block` unpacks on the way out. Rebinding

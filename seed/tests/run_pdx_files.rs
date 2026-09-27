@@ -1683,6 +1683,16 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
     );
 }
 
+/// `yield` hands values to the block (#144), paren-less or in parens, as
+/// Ruby does: named parameters take them, and `it` takes a lone one.
+#[test]
+fn yield_passes_values_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_yield_values.pdx",
+        "def each_pair\n  yield 1, 2\n  yield(3, 4)\nend\neach_pair { |left, right| p left + right }\ndef configure\n  yield \"config\"\nend\nconfigure { p it }\ndef doubled\n  value = yield(21)\n  value * 2\nend\np(doubled { |number| number })\ndef guarded\n  yield if true\nend\nguarded { p \"bare\" }\n",
+    );
+}
+
 /// A character outside ASCII, outside a string or comment, refuses with one
 /// sentence on both oracles (#139) — the seed had panicked slicing inside it,
 /// and the compiler had read `café` as `caf`.

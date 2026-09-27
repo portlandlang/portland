@@ -161,12 +161,16 @@ struct CallNode
   end
 end
 
-# `yield` — run the block the enclosing method was handed.
+# `yield` — run the block the enclosing method was handed, with the values
+# it hands the block (#144).
 struct YieldNode
   kind
+  values
+
+  include Sexp
 
   def sexp
-    "(yield)"
+    headed_sexp("yield", values)
   end
 end
 
@@ -840,8 +844,8 @@ def line_at(tokens, position)
   tokens[position].line
 end
 
-def yield_node
-  YieldNode.new(kind: "yield")
+def yield_node(values)
+  YieldNode.new(kind: "yield", values: values)
 end
 
 def case_in_node(subject, branches, else_body, line: nil)
@@ -1615,6 +1619,33 @@ def parse_index(tokens, receiver, position)
   Step.new(node: error_node("expected closing bracket"), position: inner.position)
 end
 
+# The values a `yield` hands its block (#144): `yield(a, b)` with the paren
+# attached, or `yield a, b` paren-less when a value starts on the same line.
+# A bare `yield` hands none, and `yield if ...` is still bare. The seed's
+# yield_values.
+def parse_yield(tokens, position)
+  return Step.new(node: yield_node([]), position: position) if position >= tokens.length
+
+  token = tokens[position]
+  if operator_at?(tokens, position, %w[(]) && !token.leading_space
+    arguments = parse_arguments(tokens, position + 1)
+    if arguments.node.any? { it in KeywordArgumentNode }
+      return Step.new(node: error_node("'yield' hands its block positional values — write yield(value)"), position: arguments.position)
+    end
+    return Step.new(node: yield_node(arguments.node), position: arguments.position)
+  end
+  starts_a_value = token.leading_space && (%w[float identifier integer string symbol symbol_array word_array].include?(token.kind) || (token.keyword? && %w[false nil self true].include?(token.text)))
+  return Step.new(node: yield_node([]), position: position) unless starts_a_value
+
+  mutable step = parse_expression(tokens, position)
+  mutable values = [step.node]
+  while operator_at?(tokens, step.position, %w[,])
+    step = parse_expression(tokens, skip_newlines_at(tokens, step.position + 1))
+    values << step.node
+  end
+  Step.new(node: yield_node(values), position: step.position)
+end
+
 # Parse a comma-separated argument list, consuming the closing paren.
 # The Step's node is the array of argument nodes.
 def parse_arguments(tokens, mutable position)
@@ -1834,7 +1865,7 @@ def parse_primary(tokens, position)
     when "true", "false" then Step.new(node: boolean_node(token.text), position: after)
     when "nil" then Step.new(node: nil_node, position: after)
     when "self" then Step.new(node: self_node, position: after)
-    when "yield" then Step.new(node: yield_node, position: after)
+    when "yield" then parse_yield(tokens, after)
     when "if" then parse_if(tokens, after)
     when "unless" then parse_unless(tokens, after)
     when "case" then parse_case(tokens, after)
