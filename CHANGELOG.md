@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **`rotate`, `values_at`, and `each_index`, and a notation for any number of arguments** ([#104](https://github.com/portlandlang/portland/issues/104)) — on both implementations:
+  - `rotate` turns an array either way.
+  - `values_at` picks by position or range, padding past the end with nil as Ruby's `rb_range_component_beg_len` does. A range starting before the array refuses with Ruby's `-5..1 out of range`.
+  - `each_index` walks the positions.
+  - The builtin table writes an arity with a trailing `+` for any number from there, and the probe now tries three arguments to find one. That turned up Hash's `dig` as `1+` rather than the `1-2` the table had capped it at.
+  - Ranges don't answer `index`, `rindex`, or `each_index`, which Ruby's Range lacks.
+
 - **ruby/spec's core/array `find_index` and `rindex` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — eight examples in `spec/array/find_index_spec.pdx`.
 
 - **Array's index family** ([#104](https://github.com/portlandlang/portland/issues/104)) — `index` takes a true-or-false block as well as a value, and `find_index` is its twin. `rindex` searches from the far end. Each answers a maybe and asks Ruby's `==` of a value. A range answers `find_index` with a block, as Ruby's Enumerable does, but not `index` or `rindex`, which Ruby's Range lacks.

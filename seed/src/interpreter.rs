@@ -412,6 +412,62 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `rotate` (#104): the array turned `count` places, wrapping either way.
+fn rotated(elements: &[Value], count: i64) -> Value {
+    if elements.is_empty() {
+        return Value::array(Vec::new());
+    }
+    let turn = count.rem_euclid(elements.len() as i64) as usize;
+    let mut turned = elements[turn..].to_vec();
+    turned.extend_from_slice(&elements[..turn]);
+    Value::array(turned)
+}
+
+/// One `values_at` argument (#104), Ruby's `rb_range_component_beg_len`
+/// with its end unclamped: an integer picks one element, nil past either
+/// end; a range picks its run, padding with nil past the end. A range
+/// starting before the array refuses in Ruby's words.
+fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Value>) {
+    let length = elements.len() as i64;
+    let element_at = |index: i64| {
+        if (0..length).contains(&index) {
+            elements[index as usize].clone()
+        } else {
+            Value::Nil
+        }
+    };
+    match position {
+        Value::Integer(index) => {
+            let index = if *index < 0 { index + length } else { *index };
+            picked.push(element_at(index));
+        }
+        Value::Range {
+            end,
+            exclusive,
+            start,
+        } => {
+            let mut from = start.unwrap_or(0);
+            if from < 0 {
+                from += length;
+                if from < 0 {
+                    panic!("{} out of range", position.shown());
+                }
+            }
+            let mut to = end.unwrap_or(length);
+            if to < 0 {
+                to += length;
+            }
+            if !exclusive && end.is_some() {
+                to += 1;
+            }
+            for index in from..to.max(from) {
+                picked.push(element_at(index));
+            }
+        }
+        other => panic!("values_at takes positions or ranges, got {}", other.shown()),
+    }
+}
+
 /// `digits` (#107): place values, least significant first, in any radix
 /// from 2 up, refusing in Ruby's words where it raises — a radix below 2,
 /// and a negative self, which has no digits in Ruby's sense.
@@ -2326,9 +2382,10 @@ impl<W: std::io::Write> Interpreter<W> {
             if name == "to_a" && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
             }
-            // A range walks as its array — except `index` and `rindex`,
-            // which Ruby's Range lacks (its Enumerable has `find_index`).
-            if (block.is_some() && !matches!(name, "index" | "rindex"))
+            // A range walks as its array — except `index`, `rindex`, and
+            // `each_index`, which Ruby's Range lacks (its Enumerable has
+            // `find_index`).
+            if (block.is_some() && !matches!(name, "index" | "rindex" | "each_index"))
                 || matches!(name, "length" | "size" | "count" | "sum" | "first" | "last")
             {
                 let elements = range_elements(&receiver);
@@ -2379,6 +2436,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 (Value::Array(elements), "each_with_index", []) => {
                     for (index, element) in elements.iter().cloned().enumerate() {
                         self.run_block(block, vec![element, Value::Integer(index as i64)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                // Each position, answering the array (#104).
+                (Value::Array(elements), "each_index", []) => {
+                    for index in 0..elements.len() {
+                        self.run_block(block, vec![Value::Integer(index as i64)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
@@ -2977,6 +3044,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 .iter()
                 .position(|element| element.ruby_equals(needle))
                 .map_or(Value::Nil, |position| Value::Integer(position as i64)),
+            // The array turned by a count, the front's elements going to
+            // the back — backward for a negative count (#104).
+            (Value::Array(elements), "rotate", []) => rotated(elements, 1),
+            (Value::Array(elements), "rotate", [Value::Integer(count)]) => {
+                rotated(elements, *count)
+            }
+            // The elements at each position, nil past the end (#104).
+            (Value::Array(elements), "values_at", positions) => {
+                let mut picked = Vec::new();
+                for position in positions {
+                    values_at_position(elements, position, &mut picked);
+                }
+                Value::array(picked)
+            }
             // The last position of a value, from the far end (#104).
             (Value::Array(elements), "rindex", [needle]) => elements
                 .iter()

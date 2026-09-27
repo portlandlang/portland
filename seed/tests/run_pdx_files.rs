@@ -1770,6 +1770,21 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `rotate`, `values_at`, and `each_index` (#104), Ruby's answers (4.0.6,
+/// the expected lines): `values_at` pads what lies past the end with nil,
+/// a range's too, and a range starting before the array refuses in Ruby's
+/// words.
+#[test]
+fn array_rotate_values_at_each_index_match_ruby() {
+    assert_both_print(
+        "evaluator_array_rotate_values_at.pdx",
+        "p([1, 2, 3].rotate)\np([1, 2, 3].rotate(2))\np([1, 2, 3].rotate(-1))\np([1, 2, 3].rotate(7))\np([].rotate(3))\np([1, 2, 3, 4, 5].values_at)\np([1, 2, 3, 4, 5].values_at(1, 0, 5, -1, -8, 10))\np([1, 2, 3, 4, 5].values_at(0..2, 1...3, 2..-2))\np([1, 2, 3, 4, 5].values_at(6..4))\np([0, 1].values_at(0..3))\np([0, 1].values_at(2..4))\np([].values_at(1..3))\np([1, 2, 3, 4].values_at(1..))\np([1, 2, 3, 4].values_at(..2))\np([1, 2, 3, 4].values_at(...2))\nmutable seen = []\nanswer = [5, 6].each_index { |index| seen = seen + [index] }\np(seen)\np(answer)\n",
+        "[2, 3, 1]\n[3, 1, 2]\n[3, 1, 2]\n[2, 3, 1]\n[]\n[]\n[2, 1, nil, 5, nil, nil]\n[1, 2, 3, 2, 3, 3, 4]\n[]\n[0, 1, nil, nil]\n[nil, nil, nil]\n[nil, nil, nil]\n[2, 3, 4]\n[1, 2, 3]\n[1, 2]\n[0, 1]\n[5, 6]\n",
+    );
+    let cases = [("p([1, 2, 3].values_at(-5..1))\n", "-5..1 out of range")];
+    assert_both_oracles_refuse("array_values_at_refusal.pdx", None, &cases);
+}
+
 /// The index family (#104): `index` and its twin `find_index` by value or
 /// by a true-or-false block, and `rindex` from the far end, each a maybe
 /// (ADR 0010) that asks Ruby's `==` of a value (Ruby 4.0.6, the expected

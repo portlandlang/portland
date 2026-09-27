@@ -8,7 +8,8 @@
 //! honest against the arms.
 //!
 //! An entry reads `name/arity` with an optional trailing `&` for a
-//! block-taking method: `include?/1`, `first/0-1`, `each/0&`.
+//! block-taking method: `include?/1`, `first/0-1`, `each/0&`. A trailing
+//! `+` on the arity takes any number from there: `values_at/0+`.
 
 use std::sync::OnceLock;
 
@@ -45,11 +46,15 @@ fn table() -> &'static Vec<Signature> {
                     continue;
                 };
                 let arity = arity.trim_end_matches('&');
-                let (low, high) = match arity.split_once('-') {
-                    Some((low, high)) => (low.parse().unwrap_or(0), high.parse().unwrap_or(0)),
-                    None => {
-                        let count = arity.parse().unwrap_or(0);
-                        (count, count)
+                let (low, high) = if let Some(low) = arity.strip_suffix('+') {
+                    (low.parse().unwrap_or(0), usize::MAX)
+                } else {
+                    match arity.split_once('-') {
+                        Some((low, high)) => (low.parse().unwrap_or(0), high.parse().unwrap_or(0)),
+                        None => {
+                            let count = arity.parse().unwrap_or(0);
+                            (count, count)
+                        }
                     }
                 };
                 signatures.push(Signature {
@@ -84,5 +89,10 @@ mod tests {
         assert_eq!(signature("array", "each"), Some((0, 0)));
         assert_eq!(signature("string", "knd"), None);
         assert_eq!(signature("nil", "to_s"), None);
+    }
+
+    #[test]
+    fn reads_a_trailing_plus_as_any_number_from_there() {
+        assert_eq!(signature("array", "values_at"), Some((0, usize::MAX)));
     }
 }

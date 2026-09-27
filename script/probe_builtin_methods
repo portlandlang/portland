@@ -16,7 +16,8 @@
 # Usage: script/probe_builtin_methods            (needs target/debug/pdx)
 #
 # Each line is `type: name/arity name/arity …`, sorted: `include?/1`,
-# `slice/1-2`, `each/0&` (block-taking), `first/0-1`. Candidates are the
+# `slice/1-2`, `each/0&` (block-taking), `first/0-1`, `values_at/0+` (any
+# number from the least). Candidates are the
 # names the seed's dispatch arms mention plus the Ruby names a migrating
 # reader might reach for; add to the list to widen the probe.
 
@@ -49,7 +50,7 @@ candidates = %w[
   id2name name
   nil? some? failure? to_s
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
-  take drop take_while drop_while push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
+  take drop take_while drop_while rotate values_at each_index push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
   fetch values_at transform_values invert
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv
   inspect class hash is_a? respond_to? send tap then itself instance_of?
@@ -67,6 +68,9 @@ shapes = lambda do |receiver, name|
     # A range, `clamp(1..3)` (#101).
     ["#{receiver}.#{name}(1..2)", 1, false],
     ["#{receiver}.#{name}(1, 2)", 2, false],
+    # No fixed-arity builtin takes three, so one that does takes any
+    # number from its least: `values_at/0+`.
+    ["#{receiver}.#{name}(1, 2, 3)", 3, false],
     # A separator and a limit, `split(",", -1)` (#142).
     ["#{receiver}.#{name}(\"a\", 1)", 2, false],
     ["#{receiver}.#{name} { it }", 0, true],
@@ -121,6 +125,8 @@ Dir.mktmpdir do |directory|
       counts = reaching.map { |_kind, count, _block| count }.uniq.sort
       arity = if counts.empty?
         "0"
+      elsif counts.max == 3
+        "#{counts.min}+"
       elsif counts.length == 1
         counts.first.to_s
       else

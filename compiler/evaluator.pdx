@@ -1397,6 +1397,13 @@ def last_of(receiver, arguments)
   receiver.last(arguments.first)
 end
 
+# `values_at` takes any number of positions (#104); each rides the host's
+# alone, and flat_map joins their answers — one level, so an element that
+# is itself an array stays whole.
+def values_at_of(receiver, arguments)
+  arguments.flat_map { |position| receiver.values_at(position) }
+end
+
 def count_of(receiver, arguments)
   return receiver.count if arguments.empty?
   receiver.count(arguments.first)
@@ -1764,6 +1771,8 @@ def evaluate_method_call(node, mutable bindings)
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
+  when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(arguments.first)
+  when "values_at" then values_at_of(receiver, arguments)
   when "take" then receiver.take(arguments.first)
   when "drop" then receiver.drop(arguments.first)
   when "gcd" then receiver.gcd(arguments.first)
@@ -2151,6 +2160,17 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "each_with_index"
     receiver.each_with_index do |element, index|
       step = run_guest_block(block, [element, index], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "each_index"
+    receiver.each_index do |index|
+      step = run_guest_block(block, [index], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step
