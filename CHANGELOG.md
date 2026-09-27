@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **core/array's mutators recorded as decided out** ([#104](https://github.com/portlandlang/portland/issues/104)) — eighteen files skipped under ADR 0015, each reason naming the rebinding that replaces it: `push`, `append`, `pop`, `shift`, `unshift`, `prepend`, `clear`, `concat`, `delete`, `delete_at`, `delete_if`, `keep_if`, `fill`, `insert`, `replace`, `dup`, `clone`, and `frozen?`.
+
 - **An Integer's `digits`, `ord`, and `size`** ([#107](https://github.com/portlandlang/portland/issues/107)) — `digits` answers place values least significant first, in any radix from 2 up. A bad radix or a negative self refuses in Ruby's words (`invalid radix 1`, `negative radix`, `out of domain`). An Integer's `ord` is itself, and its `size` is the 8 bytes Ruby reports for a machine integer. The hosted evaluator asks `size` by its own name rather than through `length`. ruby/spec's three files port to `spec/number/integer/digits_spec.pdx`.
 
 - **Five core/integer files recorded as decided out** ([#107](https://github.com/portlandlang/portland/issues/107)) — `constants`, `dup`, `integer`, `to_int`, and `try_convert` are skipped for the reasons their core/float twins are: reflection, values that never mutate, and the implicit-conversion protocol.

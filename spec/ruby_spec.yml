@@ -82,6 +82,80 @@ core/array/uniq_spec.rb:
   link: docs/ruby/mutability.md
 core/array/zip_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
+# The mutators: values never mutate, names do (ADR 0015). Each rewrite
+# rebinds a mutable name — `<<` and `[]=` survive as that sugar.
+core/array/append_spec.rb:
+  status: skipped
+  reason: "append mutates its receiver, and values never mutate (ADR 0015); list << item rebinds a mutable name instead."
+  link: docs/ruby/mutability.md
+core/array/push_spec.rb:
+  status: skipped
+  reason: "push mutates its receiver, and values never mutate (ADR 0015); list << item rebinds a mutable name instead."
+  link: docs/ruby/mutability.md
+core/array/pop_spec.rb:
+  status: skipped
+  reason: "pop mutates its receiver, and values never mutate (ADR 0015); read list.last, then rebind the rest."
+  link: docs/ruby/mutability.md
+core/array/shift_spec.rb:
+  status: skipped
+  reason: "shift mutates its receiver, and values never mutate (ADR 0015); read list.first, then rebind the rest."
+  link: docs/ruby/mutability.md
+core/array/unshift_spec.rb:
+  status: skipped
+  reason: "unshift mutates its receiver, and values never mutate (ADR 0015); list = [item] + list rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/prepend_spec.rb:
+  status: skipped
+  reason: "prepend mutates its receiver, and values never mutate (ADR 0015); list = [item] + list rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/clear_spec.rb:
+  status: skipped
+  reason: "clear mutates its receiver, and values never mutate (ADR 0015); list = [] rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/concat_spec.rb:
+  status: skipped
+  reason: "concat mutates its receiver, and values never mutate (ADR 0015); list += other rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/delete_spec.rb:
+  status: skipped
+  reason: "delete mutates its receiver, and values never mutate (ADR 0015); list = list.reject { it == item } rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/delete_at_spec.rb:
+  status: skipped
+  reason: "delete_at mutates its receiver, and values never mutate (ADR 0015); rebinding the slices either side is the rewrite."
+  link: docs/ruby/mutability.md
+core/array/delete_if_spec.rb:
+  status: skipped
+  reason: "delete_if mutates its receiver, and values never mutate (ADR 0015); list = list.reject { ... } rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/keep_if_spec.rb:
+  status: skipped
+  reason: "keep_if mutates its receiver, and values never mutate (ADR 0015); list = list.select { ... } rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/fill_spec.rb:
+  status: skipped
+  reason: "fill mutates its receiver, and values never mutate (ADR 0015); list = list.map { value } rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/insert_spec.rb:
+  status: skipped
+  reason: "insert mutates its receiver, and values never mutate (ADR 0015); rebinding the slices either side with the item between is the rewrite."
+  link: docs/ruby/mutability.md
+core/array/replace_spec.rb:
+  status: skipped
+  reason: "replace mutates its receiver in place, and values never mutate (ADR 0015); list = other rebinds instead."
+  link: docs/ruby/mutability.md
+core/array/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/array/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/array/frozen_spec.rb:
+  status: skipped
+  reason: "Every value is frozen, so frozen? asks nothing and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 
 # — core/comparable —
 
