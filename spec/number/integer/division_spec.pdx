@@ -33,3 +33,122 @@ context "Integer" do
     end
   end
 end
+
+# The named division family (#107), from ruby/spec core/integer: divmod,
+# div, remainder, ceildiv, and fdiv, fixnum halves. Upstream's be_close is
+# close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
+# infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
+# (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
+# ends a run, so those examples stay upstream with the bignum, Rational,
+# and coercion ones.
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Integer#divmod" do
+  specify "returns an Array containing quotient and modulus obtained from dividing self by the given argument" do
+    expect(13.divmod(4)).to eq([3, 1])
+    expect(4.divmod(13)).to eq([0, 4])
+    expect(13.divmod(4.0)).to eq([3, 1])
+    expect(4.divmod(13.0)).to eq([0, 4])
+    expect(1.divmod(2.0)).to eq([0, 1.0])
+  end
+end
+
+context "Integer#div" do
+  specify "returns self divided by the given argument as an Integer" do
+    expect(2.div(2)).to eq(1)
+    expect(1.div(2)).to eq(0)
+    expect(5.div(2)).to eq(2)
+  end
+
+  specify "rounds towards -inf" do
+    expect(8192.div(10)).to eq(819)
+    expect(8192.div(-10)).to eq(-820)
+    expect((-8192).div(10)).to eq(-820)
+    expect((-8192).div(-10)).to eq(819)
+  end
+
+  specify "means (x / y).floor" do
+    expect(5.div(2)).to eq((5 / 2).floor)
+    expect(5.div(2.0)).to eq((5 / 2.0).floor)
+    expect(5.div(-2)).to eq((5 / -2).floor)
+    expect(5.div(100)).to eq((5 / 100).floor)
+    expect(5.div(100.0)).to eq((5 / 100.0).floor)
+    expect(5.div(-100)).to eq((5 / -100).floor)
+  end
+
+  specify "coerces self and the given argument to Floats and returns self divided by other as Integer" do
+    expect(1.div(0.2)).to eq(5)
+    expect(1.div(0.16)).to eq(6)
+    expect(1.div(0.169)).to eq(5)
+    expect(-1.div(50.4)).to eq(-1)
+  end
+end
+
+context "Integer#remainder" do
+  specify "returns the remainder of dividing self by other" do
+    expect(5.remainder(3)).to eq(2)
+    expect(5.remainder(3.0)).to eq(2.0)
+  end
+
+  specify "means x-y*(x/y).truncate" do
+    expect(5.remainder(3)).to eq(2)
+    expect(close_to?(5.remainder(3.3), 1.7)).to eq(true)
+    expect(close_to?(5.remainder(3.7), 1.3)).to eq(true)
+  end
+
+  specify "keeps sign of self" do
+    expect(5.remainder(3)).to eq(2)
+    expect(5.remainder(-3)).to eq(2)
+    expect(-5.remainder(3)).to eq(-2)
+    expect(-5.remainder(-3)).to eq(-2)
+  end
+end
+
+context "Integer#ceildiv" do
+  specify "returns a quotient of division which is rounded up to the nearest integer" do
+    expect(inspect(0.ceildiv(3))).to eq("0")
+    expect(inspect(1.ceildiv(3))).to eq("1")
+    expect(inspect(3.ceildiv(3))).to eq("1")
+    expect(inspect(4.ceildiv(3))).to eq("2")
+    expect(inspect(4.ceildiv(-3))).to eq("-1")
+    expect(inspect(-4.ceildiv(3))).to eq("-1")
+    expect(inspect(-4.ceildiv(-3))).to eq("2")
+    expect(inspect(3.ceildiv(1.2))).to eq("3")
+  end
+end
+
+context "Integer#fdiv" do
+  specify "performs floating-point division between self and a fixnum" do
+    expect(close_to?(8.fdiv(7), 1.14285714285714)).to eq(true)
+  end
+
+  specify "performs floating-point division between self and a Float" do
+    expect(close_to?(8.fdiv(9.0), 0.888888888888889)).to eq(true)
+  end
+
+  specify "returns NaN when the argument is NaN" do
+    expect(-1.fdiv(Float::NAN).nan?).to eq(true)
+    expect(1.fdiv(Float::NAN).nan?).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0" do
+    expect(1.fdiv(0).infinite?).to eq(true)
+    expect(1.fdiv(0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0 and self is negative" do
+    expect(-1.fdiv(0).infinite?).to eq(true)
+    expect(-1.fdiv(0) < 0.0).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0.0" do
+    expect(1.fdiv(0.0).infinite?).to eq(true)
+    expect(1.fdiv(0.0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0.0 and self is negative" do
+    expect(-1.fdiv(0.0).infinite?).to eq(true)
+    expect(-1.fdiv(0.0) < 0.0).to eq(true)
+  end
+end

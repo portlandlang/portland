@@ -1,0 +1,159 @@
+# An integer's rounding family (#107), from ruby/spec core/integer: floor,
+# ceil, round, and truncate, through upstream's shared to_i,
+# rounding-precision, and floor/ceil-precision groups. Upstream's eql?
+# type checks ask inspect's answer. The bignum rows (10**70 and kin, and
+# the Bug #20654 precisions past 64 bits) stay upstream, as do round's
+# half: option, which waits for builtins to take keyword arguments, and its
+# RangeError, TypeError, and to_int examples, where Portland refuses.
+
+require_relative "../../spec_helper"
+
+def same_integer?(actual, expected) = inspect(actual) == inspect(expected)
+
+context "Integer#floor" do
+  specify "returns self" do
+    expect(same_integer?(10.floor, 10)).to eq(true)
+    expect(same_integer?((-15).floor, -15)).to eq(true)
+  end
+
+  specify "returns self if not passed a precision, or passed zero or a positive one" do
+    [2, -4].each do |number|
+      expect(same_integer?(number.floor, number)).to eq(true)
+      expect(same_integer?(number.floor(0), number)).to eq(true)
+      expect(same_integer?(number.floor(42), number)).to eq(true)
+    end
+  end
+
+  describe "with precision" do
+    specify "returns integer self when precision is zero" do
+      expect(same_integer?(0.floor(0), 0)).to eq(true)
+      expect(same_integer?(123.floor(0), 123)).to eq(true)
+      expect(same_integer?(-123.floor(0), -123)).to eq(true)
+    end
+
+    specify "returns self when precision is positive" do
+      expect(same_integer?(0.floor(1), 0)).to eq(true)
+      expect(same_integer?(0.floor(10), 0)).to eq(true)
+      expect(same_integer?(123.floor(10), 123)).to eq(true)
+      expect(same_integer?(-123.floor(10), -123)).to eq(true)
+    end
+
+    specify "always returns 0 when self is 0 and precision is negative" do
+      expect(same_integer?(0.floor(-1), 0)).to eq(true)
+      expect(same_integer?(0.floor(-10), 0)).to eq(true)
+    end
+
+    specify "returns largest integer less than self with at least precision.abs trailing zeros" do
+      expect(same_integer?(123.floor(-1), 120)).to eq(true)
+      expect(same_integer?(123.floor(-2), 100)).to eq(true)
+      expect(same_integer?(123.floor(-3), 0)).to eq(true)
+      expect(same_integer?(-123.floor(-1), -130)).to eq(true)
+      expect(same_integer?(-123.floor(-2), -200)).to eq(true)
+      expect(same_integer?(-123.floor(-3), -1000)).to eq(true)
+    end
+  end
+end
+
+context "Integer#ceil" do
+  specify "returns self" do
+    expect(same_integer?(10.ceil, 10)).to eq(true)
+    expect(same_integer?((-15).ceil, -15)).to eq(true)
+  end
+
+  specify "returns self if not passed a precision, or passed zero or a positive one" do
+    [2, -4].each do |number|
+      expect(same_integer?(number.ceil, number)).to eq(true)
+      expect(same_integer?(number.ceil(0), number)).to eq(true)
+      expect(same_integer?(number.ceil(42), number)).to eq(true)
+    end
+  end
+
+  describe "with precision" do
+    specify "returns Integer equal to self when precision is zero" do
+      expect(same_integer?(0.ceil(0), 0)).to eq(true)
+      expect(same_integer?(123.ceil(0), 123)).to eq(true)
+      expect(same_integer?(-123.ceil(0), -123)).to eq(true)
+    end
+
+    specify "returns self when precision is positive" do
+      expect(same_integer?(0.ceil(1), 0)).to eq(true)
+      expect(same_integer?(0.ceil(10), 0)).to eq(true)
+      expect(same_integer?(123.ceil(10), 123)).to eq(true)
+      expect(same_integer?(-123.ceil(10), -123)).to eq(true)
+    end
+
+    specify "always returns 0 when self is 0 and precision is negative" do
+      expect(same_integer?(0.ceil(-1), 0)).to eq(true)
+      expect(same_integer?(0.ceil(-10), 0)).to eq(true)
+    end
+
+    specify "returns Integer equal to self if there are already at least precision.abs trailing zeros" do
+      expect(same_integer?(10.ceil(-1), 10)).to eq(true)
+      expect(same_integer?(100.ceil(-1), 100)).to eq(true)
+      expect(same_integer?(100.ceil(-2), 100)).to eq(true)
+      expect(same_integer?(-10.ceil(-1), -10)).to eq(true)
+      expect(same_integer?(-100.ceil(-1), -100)).to eq(true)
+      expect(same_integer?(-100.ceil(-2), -100)).to eq(true)
+    end
+
+    specify "returns smallest Integer greater than self with at least precision.abs trailing zeros" do
+      expect(same_integer?(123.ceil(-1), 130)).to eq(true)
+      expect(same_integer?(123.ceil(-2), 200)).to eq(true)
+      expect(same_integer?(123.ceil(-3), 1000)).to eq(true)
+      expect(same_integer?(-123.ceil(-1), -120)).to eq(true)
+      expect(same_integer?(-123.ceil(-2), -100)).to eq(true)
+      expect(same_integer?(-123.ceil(-3), 0)).to eq(true)
+      expect(same_integer?(100.ceil(-3), 1000)).to eq(true)
+      expect(same_integer?(-100.ceil(-3), 0)).to eq(true)
+    end
+  end
+end
+
+context "Integer#round" do
+  specify "returns self" do
+    expect(same_integer?(10.round, 10)).to eq(true)
+    expect(same_integer?((-15).round, -15)).to eq(true)
+  end
+
+  specify "returns self if not passed a precision, or passed zero or a positive one" do
+    [2, -4].each do |number|
+      expect(same_integer?(number.round, number)).to eq(true)
+      expect(same_integer?(number.round(0), number)).to eq(true)
+      expect(same_integer?(number.round(42), number)).to eq(true)
+    end
+  end
+
+  specify "returns itself rounded if passed a negative value" do
+    expect(same_integer?(+249.round(-2), +200)).to eq(true)
+    expect(same_integer?(-249.round(-2), -200)).to eq(true)
+  end
+
+  specify "returns itself rounded to nearest if passed a negative value" do
+    expect(same_integer?(+250.round(-2), +300)).to eq(true)
+    expect(same_integer?(-250.round(-2), -300)).to eq(true)
+  end
+end
+
+context "Integer#truncate" do
+  specify "returns self" do
+    expect(same_integer?(10.truncate, 10)).to eq(true)
+    expect(same_integer?((-15).truncate, -15)).to eq(true)
+  end
+
+  specify "returns self if not passed a precision, or passed zero or a positive one" do
+    [2, -4].each do |number|
+      expect(same_integer?(number.truncate, number)).to eq(true)
+      expect(same_integer?(number.truncate(0), number)).to eq(true)
+      expect(same_integer?(number.truncate(42), number)).to eq(true)
+    end
+  end
+
+  specify "returns an integer with at least precision.abs trailing zeros" do
+    expect(same_integer?(1832.truncate(-1), 1830)).to eq(true)
+    expect(same_integer?(1832.truncate(-2), 1800)).to eq(true)
+    expect(same_integer?(1832.truncate(-3), 1000)).to eq(true)
+    expect(same_integer?(-1832.truncate(-1), -1830)).to eq(true)
+    expect(same_integer?(-1832.truncate(-2), -1800)).to eq(true)
+    expect(same_integer?(-1832.truncate(-3), -1000)).to eq(true)
+  end
+end
