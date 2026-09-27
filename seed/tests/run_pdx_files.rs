@@ -2689,6 +2689,20 @@ fn parse_only(source: &str, name: &str) -> std::process::Output {
         .expect("failed to run pdx")
 }
 
+/// One file fails the way many do: its line, with the refusal. A lone file
+/// had printed only the panic's report, which a tool reading the lines took
+/// for a pass.
+#[test]
+fn parse_only_names_a_lone_failing_file() {
+    let output = parse_only("x = )\n", "parse_only_lone_failure.pdx");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("parse_only_lone_failure.pdx does not parse: unexpected token"),
+        "got: {stderr}"
+    );
+}
+
 #[test]
 fn parse_only_accepts_valid_portland() {
     let output = parse_only("x = 1 + 2\nputs x\n", "parse_only_valid.pdx");

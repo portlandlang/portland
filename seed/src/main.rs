@@ -32,7 +32,6 @@ fn run() {
                     eprintln!("pdx --parse: needs a file to parse");
                     process::exit(64);
                 }
-                [path] => parse_file(path),
                 _ => parse_files(&paths),
             }
         }
@@ -41,7 +40,7 @@ fn run() {
     }
 }
 
-/// Parse and stop, without evaluating (#35).
+/// Parse and stop, without evaluating (#35), one file or many.
 ///
 /// The doc checks use this to prove every code sample in the documentation is
 /// real Portland. Parsing is the right depth: it catches syntax that does not
@@ -50,15 +49,12 @@ fn run() {
 /// sample references `lookup(id)` or `article` and never defines them, which
 /// running it would.
 ///
-/// A parse error panics, and `main`'s thread join turns that into exit 1, so
-/// the caller only has to look at the status.
-fn parse_file(path: &str) {
-    parser::parse(&read_source(path));
-}
-
-/// Parse many files in one process, naming each that fails, and exit 1 if
-/// any did. The ruby/spec stubs are thousands of files; one process per file
-/// would spend its time starting up rather than parsing.
+/// Many files parse in one process, each that fails named on its own line,
+/// and the run exits 1 if any did. The ruby/spec stubs are thousands of
+/// files; one process per file would spend its time starting up rather than
+/// parsing. One file takes the same path, so its failure reads the same —
+/// a lone file had printed only the panic, which the corpus census read as
+/// a pass.
 fn parse_files(paths: &[String]) {
     // Each failure is reported once, on its file's line, with the refusal's
     // first line — one line per file, so a tool can rank refusals across a

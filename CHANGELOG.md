@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`pdx --parse` on one file reports the way it does on many** — a lone file took its own path, which printed only the panic's report, so a tool reading the `does not parse:` lines saw none and counted a pass. ruby_research's level-0 census did exactly that for every one-file gem, inflating its "parses" count (fizzbuzzard, reopening `Fixnum`, was listed as a first-gem candidate). Every `--parse` now runs through the many-files path: one line per failing file with its refusal, exit 1.
+
 - **A leading `::` names the top level** ([#147](https://github.com/portlandlang/portland/issues/147)) — Ruby's `::Rails` steps around a same-named constant in the current namespace; Portland misread `p ::X` as `p::X` and refused, `only namespaces have :: names`, in 5,397 gems of the level-0 census. No-shadow already makes the top-level reading the only one, so both parsers read a spaced `::Name` as a second spelling of `Name` (principle 3), take it as a paren-less argument, and refuse a `::` before anything but a capitalized name. An attached `::` still reaches inside a namespace.
 
 - **The compact nested form, `class Deck::Card`, and `include` of a namespaced trait** ([#146](https://github.com/portlandlang/portland/issues/146)) — `module A::B` already read as its nested blocks (ADR 0021), but a type's compact form, and `include Formats::Loud` in a type body, refused at the `::`; with the second, that shape stops 10,319 gems in the level-0 census. Both parsers read `class A::B ... end` (or `struct`) as `module A` holding the type, the same no-existence-required reading `module A::B` has, and take a `::`-path after `include`. An inheriting compact class refuses with its whole written name.
