@@ -156,6 +156,10 @@ puts 7.modulo(3).to_s
 p(-7.divmod(2))
 p(3.14.divmod(2))
 
+# One IEEE step either way (#108).
+p(1.0.next_float)
+p(1.0.prev_float)
+
 # The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose (#79).
 # `next` is `succ`'s third spelling: a keyword everywhere else, a method
 # name after a dot, where loop control can never stand.

@@ -239,6 +239,10 @@ core/float/fdiv_spec.rb:
   status: partial_intentional
   reason: "No bignums, Rational, or Complex; a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
   link: docs/ruby/errors.md
+core/float/next_float_spec.rb:
+  pdx: [spec/number/float/steps_spec.pdx]
+core/float/prev_float_spec.rb:
+  pdx: [spec/number/float/steps_spec.pdx]
 core/float/quo_spec.rb:
   pdx: [spec/number/float/division_spec.pdx]
   status: partial_intentional

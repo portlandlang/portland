@@ -2929,6 +2929,10 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Float(number), "zero?", []) => Value::Boolean(*number == 0.0),
             (Value::Float(number), "nan?", []) => Value::Boolean(number.is_nan()),
             (Value::Float(number), "finite?", []) => Value::Boolean(number.is_finite()),
+            // One IEEE step toward either infinity — Ruby's `nextafter`,
+            // which the host's `next_up` and `next_down` are (#108).
+            (Value::Float(number), "next_float", []) => Value::Float(number.next_up()),
+            (Value::Float(number), "prev_float", []) => Value::Float(number.next_down()),
             // A predicate proper, answering true/false — not Ruby's nil/1/-1,
             // which reads as a predicate and answers a direction (recorded in
             // the ledger; nil is not falsy here, so Ruby's shape is unusable).

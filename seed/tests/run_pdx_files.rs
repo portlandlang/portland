@@ -1659,6 +1659,16 @@ fn unary_plus_answers_the_number_itself() {
     assert_both_oracles_refuse("unary_plus_refusal.pdx", None, &cases);
 }
 
+/// `next_float` and `prev_float` (#108): Ruby's `nextafter` toward the
+/// infinities, one IEEE step, a zero's sign included (Ruby 4.0.6).
+#[test]
+fn float_steps_match_ruby() {
+    assert_evaluator_matches_seed(
+        "evaluator_float_steps.pdx",
+        "p(0.0.next_float)\np(-0.0.next_float)\np(1.0.next_float)\np(-1.0.next_float)\np(1.0.prev_float)\np(0.0.prev_float)\np(Float::MAX.next_float)\np(-Float::INFINITY.next_float)\np(Float::INFINITY.prev_float)\np(Float::INFINITY.next_float)\np(-0.0.prev_float.next_float)\np(0.0.next_float.prev_float)\np(Float::NAN.next_float.nan?)\np(0.37.prev_float.next_float)\n",
+    );
+}
+
 /// A float `%` is Ruby's `flomod`: a zero keeps its sign, an infinite
 /// modulus answers the dividend or its own infinity, and NaN spreads
 /// (Ruby 4.0.6).

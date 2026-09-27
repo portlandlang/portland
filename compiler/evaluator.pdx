@@ -1803,6 +1803,8 @@ def evaluate_method_call(node, mutable bindings)
   when "nan?" then receiver.nan?
   when "finite?" then receiver.finite?
   when "infinite?" then receiver.infinite?
+  when "next_float" then receiver.next_float
+  when "prev_float" then receiver.prev_float
   when "floor" then receiver.floor
   when "ceil" then receiver.ceil
   when "round" then receiver.round
