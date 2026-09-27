@@ -51,7 +51,7 @@ candidates = %w[
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
   take drop push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
   fetch values_at transform_values invert
-  step clamp digits between? divmod modulo remainder fdiv quo
+  step clamp digits between? divmod modulo remainder fdiv quo div ceildiv
   inspect class hash is_a? respond_to? send tap then itself instance_of?
   append prepend concat replace to_ary to_int to_str to_sym
 ].uniq.sort

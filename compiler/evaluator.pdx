@@ -1796,6 +1796,9 @@ def evaluate_method_call(node, mutable bindings)
   when "quo" then receiver.quo(arguments.first)
   when "modulo" then receiver % arguments.first
   when "divmod" then receiver.divmod(arguments.first)
+  when "div" then receiver.div(arguments.first)
+  when "remainder" then receiver.remainder(arguments.first)
+  when "ceildiv" then receiver.ceildiv(arguments.first)
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?

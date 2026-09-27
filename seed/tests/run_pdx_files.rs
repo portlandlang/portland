@@ -1702,6 +1702,30 @@ fn float_steps_match_ruby() {
     );
 }
 
+/// `div`, `remainder`, and `ceildiv` (ADR 0018, #107): `div` is Ruby's
+/// `(x / y).floor`, `remainder` keeps the dividend's sign, and `ceildiv`
+/// rounds the quotient up; any zero divisor refuses, a float one too
+/// (Ruby 4.0.6).
+#[test]
+fn integer_quotients_match_ruby() {
+    assert_evaluator_matches_seed(
+        "evaluator_integer_quotients.pdx",
+        "p(2.div(2))\np(8192.div(-10))\np(-8192.div(10))\np(-8192.div(-10))\np(5.div(2.0))\np(1.div(0.2))\np(1.div(0.16))\np(1.div(0.169))\np(-1.div(50.4))\np(5.5.div(2))\np(-5.5.div(2))\np(7.remainder(3))\np(-7.remainder(3))\np(7.remainder(-3))\np(5.remainder(3.0))\np(5.remainder(3.3))\np(7.5.remainder(2))\np(-7.remainder(2.5))\np(13.remainder(4.0))\np(5.remainder(-(1.0 / 0.0)))\np(-5.0.remainder(1.0 / 0.0))\np(0.ceildiv(3))\np(1.ceildiv(3))\np(4.ceildiv(3))\np(4.ceildiv(-3))\np(-4.ceildiv(3))\np(-4.ceildiv(-3))\np(3.ceildiv(1.2))\n",
+    );
+    let cases = [
+        ("p(13.div(0))\n", "divided by 0"),
+        ("p(0.div(0.0))\n", "divided by 0"),
+        ("p(5.remainder(0))\n", "divided by 0"),
+        ("p(5.remainder(0.0))\n", "divided by 0"),
+        ("p(5.ceildiv(0))\n", "divided by 0"),
+        (
+            "p((0.0 / 0.0).div(1))\n",
+            "NaN.div(1) has no integer quotient",
+        ),
+    ];
+    assert_both_oracles_refuse("integer_quotient_refusal.pdx", None, &cases);
+}
+
 /// A float `%` is Ruby's `flomod`: a zero keeps its sign, an infinite
 /// modulus answers the dividend or its own infinity, and NaN spreads
 /// (Ruby 4.0.6).

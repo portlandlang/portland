@@ -155,6 +155,9 @@ puts 2.5.quo(2).to_s
 puts 7.modulo(3).to_s
 p(-7.divmod(2))
 p(3.14.divmod(2))
+p(1.div(0.2))
+p(-7.remainder(3))
+p(4.ceildiv(3))
 
 # One IEEE step either way (#108).
 p(1.0.next_float)

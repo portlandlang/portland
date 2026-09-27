@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`div`, `remainder`, and `ceildiv`** ([#107](https://github.com/portlandlang/portland/issues/107)) — ADR 0018's on-demand division names, on both implementations:
+  - `div` is floored division between integers and Ruby's `(x / y).floor` once a float is involved. That isn't always `divmod`'s quotient: `1.div(0.2)` is 5.
+  - `remainder` keeps the dividend's sign, as Ruby's `num_remainder` does.
+  - Integer's `ceildiv` rounds the quotient up.
+  - Any zero divisor refuses with `divided by 0`, a float one too, as in Ruby.
+
 - **`times`, `upto`, and `downto` without a block, and to a Float** ([#107](https://github.com/portlandlang/portland/issues/107)) — blockless, each answers the finished walk (`3.times` is `[0, 1, 2]`), ADR 0055's rule for whatever Ruby answers with an Enumerator. They had refused. A Float endpoint walks to its floor going up and its ceiling going down, as Ruby's does (`9.upto(13.3)` stops at 13), and a NaN or infinite endpoint refuses rather than walking forever. ruby/spec's `times`, `upto`, and `downto` files port to `spec/number/integer/walks_spec.pdx`.
 
 - **Integer#to_i, and seven core/integer files ported** ([#107](https://github.com/portlandlang/portland/issues/107)) — an Integer's `to_i` is itself, as in Ruby, on both implementations. ruby/spec's `to_i`, `zero?`, `==`, `next`, `magnitude`, `inspect`, and `===` files port to `spec/number/integer/identity_spec.pdx`, alias checks comparing answers rather than method objects.

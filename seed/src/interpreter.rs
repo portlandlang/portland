@@ -295,11 +295,6 @@ fn float_modulo(left: f64, right: f64) -> f64 {
 /// The quotient is an Integer; where there is none — NaN or an infinity —
 /// it refuses where Ruby raises FloatDomainError (#108).
 fn float_divmod(receiver: &Value, argument: &Value) -> Value {
-    let as_float = |value: &Value| match value {
-        Value::Float(number) => *number,
-        Value::Integer(number) => *number as f64,
-        other => panic!("divmod needs a number, got {}", other.shown()),
-    };
     let (left, right) = (as_float(receiver), as_float(argument));
     let written = || format!("{}.divmod({})", receiver.shown(), argument.shown());
     if right == 0.0 {
@@ -319,6 +314,16 @@ fn float_divmod(receiver: &Value, argument: &Value) -> Value {
         remainder += right;
         quotient -= 1.0;
     }
+    Value::array(vec![
+        Value::Integer(integer_quotient(quotient, written)),
+        Value::Float(remainder),
+    ])
+}
+
+/// A float quotient as the Integer Ruby answers, or its refusal: NaN or an
+/// infinity has none (Ruby's FloatDomainError), and past the 64-bit
+/// integers Portland has no bignum to reach for. `written` quotes the call.
+fn integer_quotient(quotient: f64, written: impl Fn() -> String) -> i64 {
     if !quotient.is_finite() {
         panic!("{} has no integer quotient", written());
     }
@@ -326,10 +331,39 @@ fn float_divmod(receiver: &Value, argument: &Value) -> Value {
     if quotient >= limit || quotient < -limit {
         panic!("{} overflows the 64-bit integers", written());
     }
-    Value::array(vec![
-        Value::Integer(quotient as i64),
-        Value::Float(remainder),
-    ])
+    quotient as i64
+}
+
+/// `div` (ADR 0018, #107): floored division between integers, and Ruby's
+/// `(x / y).floor` once a float is involved — which is not always
+/// `divmod`'s quotient (`1.div(0.2)` is 5, `1.0.divmod(0.2)` starts 4).
+/// Any zero divisor refuses, a float one too, as Ruby's does.
+fn integer_divide(receiver: &Value, argument: &Value) -> Value {
+    if let (Value::Integer(left), Value::Integer(right)) = (receiver, argument) {
+        return Value::Integer(floored_divide(*left, *right));
+    }
+    let (left, right) = (as_float(receiver), as_float(argument));
+    if right == 0.0 {
+        panic!("divided by 0");
+    }
+    let written = || format!("{}.div({})", receiver.shown(), argument.shown());
+    Value::Integer(integer_quotient((left / right).floor(), written))
+}
+
+/// `remainder` (#107): Ruby's `num_remainder`, the dividend's sign kept —
+/// `%`, then, where the two signs differ, the divisor taken back off (an
+/// infinite divisor leaves the dividend whole).
+fn remainder(receiver: &Value, argument: &Value) -> Value {
+    let modulo = apply_binary(receiver.clone(), &BinaryOperator::Modulo, argument.clone());
+    let (left, right) = (as_float(receiver), as_float(argument));
+    let signs_differ = (left < 0.0 && right > 0.0) || (left > 0.0 && right < 0.0);
+    if as_float(&modulo) == 0.0 || !signs_differ {
+        return modulo;
+    }
+    if right.is_infinite() {
+        return receiver.clone();
+    }
+    apply_binary(modulo, &BinaryOperator::Subtract, argument.clone())
 }
 
 /// Where `upto` or `downto` stops (#107): an Integer endpoint is itself; a
@@ -2817,11 +2851,6 @@ impl<W: std::io::Write> Interpreter<W> {
                 [Value::Integer(_) | Value::Float(_)],
             )
             | (Value::Float(_), "quo", [Value::Integer(_) | Value::Float(_)]) => {
-                let as_float = |value: &Value| match value {
-                    Value::Float(number) => *number,
-                    Value::Integer(number) => *number as f64,
-                    _ => unreachable!(),
-                };
                 Value::Float(as_float(&receiver) / as_float(&arguments[0]))
             }
             (
@@ -2829,6 +2858,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 "modulo",
                 [argument @ (Value::Integer(_) | Value::Float(_))],
             ) => apply_binary(receiver.clone(), &BinaryOperator::Modulo, argument.clone()),
+            (
+                Value::Integer(_) | Value::Float(_),
+                "div",
+                [argument @ (Value::Integer(_) | Value::Float(_))],
+            ) => integer_divide(&receiver, argument),
+            (
+                Value::Integer(_) | Value::Float(_),
+                "remainder",
+                [argument @ (Value::Integer(_) | Value::Float(_))],
+            ) => remainder(&receiver, argument),
+            // Ruby's `-div(-other)`: the quotient rounded up (#107).
+            (Value::Integer(_), "ceildiv", [argument @ (Value::Integer(_) | Value::Float(_))]) => {
+                let negated = match argument {
+                    Value::Integer(number) => {
+                        checked_integer(number.checked_neg(), || format!("-({number})"))
+                    }
+                    Value::Float(number) => Value::Float(-number),
+                    _ => unreachable!(),
+                };
+                let Value::Integer(floored) = integer_divide(&receiver, &negated) else {
+                    unreachable!()
+                };
+                checked_integer(floored.checked_neg(), || format!("-({floored})"))
+            }
             // Whole numbers divide as whole numbers; a float anywhere takes
             // Ruby's float path.
             (Value::Integer(left), "divmod", [Value::Integer(right)]) => Value::array(vec![
