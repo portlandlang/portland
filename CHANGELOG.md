@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The hosted language spec's tripwire is 130 seconds** — the ports under #104, #107, and #108 grew the batch to a steady 115–125 s against a 120 s ceiling.
+
 - **`join` flattens nested arrays and refuses a nil** ([#104](https://github.com/portlandlang/portland/issues/104)) — a nested array joins into the same string with the same separator, as Ruby's does: `[1, [2, [3, 4], 5], 6].join(":")` is `"1:2:3:4:5:6"`. It had been spliced in as its inspect form, a silent divergence. A nil element had joined as the word `"nil"`, which is neither Ruby's `""` nor Portland's own rule. It now refuses as interpolating a nil does, since nil has no `to_s` (ADR 0005). `join(nil)` is plain `join`, Ruby's reading of a nil separator.
 
 - **ruby/spec's core/array `max` and `min` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — twenty examples join `spec/array/extremes_spec.pdx`, the Enumerable ones upstream copies in included.
