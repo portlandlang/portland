@@ -412,6 +412,29 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `digits` (#107): place values, least significant first, in any radix
+/// from 2 up, refusing in Ruby's words where it raises — a radix below 2,
+/// and a negative self, which has no digits in Ruby's sense.
+fn integer_digits(number: i64, radix: i64) -> Value {
+    if radix < 0 {
+        panic!("negative radix");
+    }
+    if radix < 2 {
+        panic!("invalid radix {radix}");
+    }
+    if number < 0 {
+        panic!("out of domain");
+    }
+    let mut remaining = number;
+    let mut places = vec![Value::Integer(remaining % radix)];
+    remaining /= radix;
+    while remaining > 0 {
+        places.push(Value::Integer(remaining % radix));
+        remaining /= radix;
+    }
+    Value::array(places)
+}
+
 /// Euclid on magnitudes, taken unsigned so the smallest integer has one.
 fn magnitude_gcd(left: i64, right: i64) -> u64 {
     let (mut left, mut right) = (left.unsigned_abs(), right.unsigned_abs());
@@ -3088,6 +3111,14 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
             (Value::Integer(number), "to_i", []) => Value::Integer(*number),
+            // An Integer's `ord` is itself, and its `size` the bytes of a
+            // 64-bit machine integer, what Ruby reports (#107).
+            (Value::Integer(number), "ord", []) => Value::Integer(*number),
+            (Value::Integer(_), "size", []) => Value::Integer(8),
+            (Value::Integer(number), "digits", []) => integer_digits(*number, 10),
+            (Value::Integer(number), "digits", [Value::Integer(radix)]) => {
+                integer_digits(*number, *radix)
+            }
             (Value::Integer(number), "floor" | "ceil" | "round" | "truncate", []) => {
                 Value::Integer(*number)
             }

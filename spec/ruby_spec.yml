@@ -408,6 +408,20 @@ core/integer/try_convert_spec.rb:
   status: skipped
   reason: "Integer.try_convert is the implicit-conversion protocol's entry point, and to_int is a false alias that refuses naming to_i (ADR 0036)."
   link: docs/ruby/aliases.md
+core/integer/digits_spec.rb:
+  pdx: [spec/number/integer/digits_spec.pdx]
+  status: partial_intentional
+  reason: "A bad radix or a negative self refuses in Ruby's words where Ruby raises ArgumentError or Math::DomainError; no to_int conversion of the radix (ADR 0036)."
+  link: docs/ruby/errors.md
+core/integer/ord_spec.rb:
+  pdx: [spec/number/integer/digits_spec.pdx]
+  status: partial_planned
+  reason: "The ?a rows are String#ord, owed to core/string (#106); the bignum rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/106
+core/integer/size_spec.rb:
+  pdx: [spec/number/integer/digits_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums, so the byte counts past 64 bits stay upstream."
 core/integer/lcm_spec.rb:
   pdx: [spec/number/integer/gcd_spec.pdx]
   status: partial_intentional

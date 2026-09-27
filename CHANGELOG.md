@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **An Integer's `digits`, `ord`, and `size`** ([#107](https://github.com/portlandlang/portland/issues/107)) — `digits` answers place values least significant first, in any radix from 2 up. A bad radix or a negative self refuses in Ruby's words (`invalid radix 1`, `negative radix`, `out of domain`). An Integer's `ord` is itself, and its `size` is the 8 bytes Ruby reports for a machine integer. The hosted evaluator asks `size` by its own name rather than through `length`. ruby/spec's three files port to `spec/number/integer/digits_spec.pdx`.
+
 - **Five core/integer files recorded as decided out** ([#107](https://github.com/portlandlang/portland/issues/107)) — `constants`, `dup`, `integer`, `to_int`, and `try_convert` are skipped for the reasons their core/float twins are: reflection, values that never mutate, and the implicit-conversion protocol.
 
 - **`lcm` and `gcdlcm`** ([#107](https://github.com/portlandlang/portland/issues/107)) — beside `gcd`, on both implementations, magnitudes as Ruby's are: zero beside a zero, and an answer past the 64-bit integers refuses. `gcd` now works on unsigned magnitudes, so the smallest integer no longer trips the host's overflow. ruby/spec's `lcm` and `gcdlcm` files port into `spec/number/integer/gcd_spec.pdx`.

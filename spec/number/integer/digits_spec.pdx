@@ -1,0 +1,51 @@
+# An integer's places and what it is as a character code and in memory
+# (#107), from ruby/spec core/integer: digits, ord, and size. Upstream's
+# eql? type checks ask inspect's answer. Its `?a.ord` rows are String#ord,
+# which waits on core/string (#106): Ruby's answers the first codepoint,
+# and a Portland character is a grapheme cluster (ADR 0038).
+# Where Ruby raises (ArgumentError, Math::DomainError) Portland refuses in
+# the same words, which ends a run, so those examples stay upstream with
+# the bignum and to_int ones.
+
+require_relative "../../spec_helper"
+
+context "Integer#digits" do
+  specify "returns an array of place values in base-10 by default" do
+    expect(12345.digits).to eq([5, 4, 3, 2, 1])
+  end
+
+  specify "returns digits by place value of a given radix" do
+    expect(12345.digits(7)).to eq([4, 6, 6, 0, 5])
+  end
+
+  specify "returns [0] when called on 0, regardless of base" do
+    expect(0.digits).to eq([0])
+    expect(0.digits(7)).to eq([0])
+  end
+
+  specify "returns integer values > 9 when base is above 10" do
+    expect(1234.digits(16)).to eq([2, 13, 4])
+  end
+
+  specify "can be used with base > 37" do
+    expect(1234.digits(100)).to eq([34, 12])
+    expect(980099.digits(100)).to eq([99, 0, 98])
+  end
+end
+
+context "Integer#ord" do
+  specify "returns self" do
+    expect(inspect(20.ord)).to eq("20")
+    expect(inspect(40.ord)).to eq("40")
+    expect(inspect(0.ord)).to eq("0")
+    expect(inspect((-10).ord)).to eq("-10")
+  end
+end
+
+context "Integer#size" do
+  specify "returns the number of bytes in the machine representation of self" do
+    expect(-1.size).to eq(8)
+    expect(0.size).to eq(8)
+    expect(4091.size).to eq(8)
+  end
+end

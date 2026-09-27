@@ -1770,6 +1770,28 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `digits`, `ord`, and `size` (#107): place values least significant
+/// first in any radix from 2 up, an Integer's `ord` is itself, and its
+/// `size` is the 8 bytes Ruby reports for a 64-bit machine integer (Ruby
+/// 4.0.6, the expected lines). A bad radix or a negative self refuses in
+/// Ruby's words.
+#[test]
+fn integer_digits_ord_size_match_ruby() {
+    assert_both_print(
+        "evaluator_integer_digits.pdx",
+        "p(12345.digits)\np(12345.digits(7))\np(0.digits)\np(0.digits(7))\np(1234.digits(16))\np(1234.digits(100))\np(980099.digits(100))\np(20.ord)\np(-10.ord)\np(-1.size)\np(4091.size)\np(9223372036854775807.digits.size)\n",
+        "[5, 4, 3, 2, 1]\n[4, 6, 6, 0, 5]\n[0]\n[0]\n[2, 13, 4]\n[34, 12]\n[99, 0, 98]\n20\n-10\n8\n8\n19\n",
+    );
+    let cases = [
+        ("p(12345.digits(1))\n", "invalid radix 1"),
+        ("p(12345.digits(0))\n", "invalid radix 0"),
+        ("p(12345.digits(-2))\n", "negative radix"),
+        ("p(-12345.digits(7))\n", "out of domain"),
+        ("p(-12345.digits)\n", "out of domain"),
+    ];
+    assert_both_oracles_refuse("integer_digits_refusal.pdx", None, &cases);
+}
+
 /// `gcd`, `lcm`, and `gcdlcm` (#107): magnitudes, never a sign, a zero
 /// giving the other side's magnitude to `gcd` and zero to `lcm` (Ruby
 /// 4.0.6, the expected lines). An answer past the 64-bit integers refuses.
