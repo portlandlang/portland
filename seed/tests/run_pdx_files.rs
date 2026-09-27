@@ -1770,6 +1770,18 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// An array's membership questions ask Ruby's `==` of each element, as
+/// Ruby's do — `include?`, `member?`, `index`, and `count` of a value — so
+/// `[1, 2].include?(1.0)` is true (Ruby 4.0.6, the expected lines).
+#[test]
+fn array_membership_asks_rubys_equality() {
+    assert_both_print(
+        "evaluator_array_membership.pdx",
+        "p([1, 2].include?(1.0))\np([1, 2].index(2.0))\np([1, 1.0, 2].count(1))\np([[1]].include?([1.0]))\np([1, 2].member?(2.0))\np([1, 2].include?(3))\np([\"a\"].index(\"b\"))\n",
+        "true\n1\n2\ntrue\ntrue\nfalse\nnil\n",
+    );
+}
+
 /// `div`, `remainder`, and `ceildiv` (ADR 0018, #107): `div` is Ruby's
 /// `(x / y).floor`, `remainder` keeps the dividend's sign, and `ceildiv`
 /// rounds the quotient up; any zero divisor refuses, a float one too

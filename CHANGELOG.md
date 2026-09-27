@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **An array's membership questions ask Ruby's `==`** — `include?`, `member?`, `index`, and `count` of a value compared by `eql?`, so `[1, 2].include?(1.0)` was false and `[1, 1.0, 2].count(1)` was 1, silently unlike Ruby. They now ask `==` of each element, as Ruby's do.
+
 - **ruby/spec's core/integer division and rounding files ported** ([#107](https://github.com/portlandlang/portland/issues/107)) — `divmod`, `div`, `remainder`, `ceildiv`, and `fdiv` extend `spec/number/integer/division_spec.pdx`, and `floor`, `ceil`, `round`, and `truncate` port to `spec/number/integer/rounding_spec.pdx`: forty examples, passing on both implementations.
 
 - **An Integer's `floor`, `ceil`, `round`, and `truncate`** ([#107](https://github.com/portlandlang/portland/issues/107)) — with no precision, or one at or above zero, the integer itself. Below zero, the integer goes to that many trailing zeros, as Ruby's does: `123.floor(-1)` is 120, `-123.ceil(-1)` is -120, and `250.round(-2)` is 300, a half going away from zero. An answer past the 64-bit integers refuses. Integers had answered none of the four. `round`'s `half:` option waits for builtins to take keyword arguments.

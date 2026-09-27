@@ -2704,8 +2704,9 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Hash(pairs), "values", []) => {
                 Value::array(pairs.iter().map(|(_, value)| value.clone()).collect())
             }
+            // Membership asks Ruby's `==`, so `[1].include?(1.0)` holds.
             (Value::Array(elements), "include?" | "member?", [needle]) => {
-                Value::Boolean(elements.contains(needle))
+                Value::Boolean(elements.iter().any(|element| element.ruby_equals(needle)))
             }
             // The extremes are maybes (ADR 0010) and answer the element
             // itself, strings included.
@@ -2846,13 +2847,16 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect(),
             ),
             (Value::Array(elements), "count", []) => Value::Integer(elements.len() as i64),
-            (Value::Array(elements), "count", [needle]) => {
-                Value::Integer(elements.iter().filter(|element| *element == needle).count() as i64)
-            }
+            (Value::Array(elements), "count", [needle]) => Value::Integer(
+                elements
+                    .iter()
+                    .filter(|element| element.ruby_equals(needle))
+                    .count() as i64,
+            ),
             // First position of a value — a maybe, like every partial lookup.
             (Value::Array(elements), "index", [needle]) => elements
                 .iter()
-                .position(|element| element == needle)
+                .position(|element| element.ruby_equals(needle))
                 .map_or(Value::Nil, |position| Value::Integer(position as i64)),
             // The counted ends answer arrays, clamped at the edges — asking
             // for more than there is answers what there is (Ruby's rule).
