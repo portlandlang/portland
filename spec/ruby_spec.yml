@@ -72,9 +72,9 @@ core/array/sort_by_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
 core/array/sort_spec.rb:
   pdx: [spec/array/sort_spec.pdx]
-  status: partial_planned
-  reason: "sort with a comparator block is not built."
-  link: https://github.com/portlandlang/portland/issues/99
+  status: partial_intentional
+  reason: "Values never mutate, so recursive arrays, identity and frozen? checks, and sort! stay behind; a block's nil or String answer and an uncomparable pair refuse where Ruby raises; break with a value waits on ADR 0012; no bignums or subclasses."
+  link: docs/ruby/mutability.md
 core/array/uniq_spec.rb:
   pdx: [spec/array/transforms_spec.pdx]
   status: partial_intentional

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's `core/array/sort_spec.rb` ported title for title** ([#104](https://github.com/portlandlang/portland/issues/104)) — twelve upstream examples join `spec/array/sort_spec.pdx`, including the block-ordered ones that #99 made possible. The manifest entry had still said comparator blocks were unbuilt.
+
 - **A struct may have no fields** — Ruby's empty Struct, and the everyday class that is only methods (`class Greeter` with a `def hello`, since `class` spells `struct`, #127). The seed had refused one with `struct Empty needs at least one field` while the compiler already built it, so the two implementations disagreed; both now agree with Ruby.
 
 - **core/array's mutators recorded as decided out** ([#104](https://github.com/portlandlang/portland/issues/104)) — eighteen files skipped under ADR 0015, each reason naming the rebinding that replaces it: `push`, `append`, `pop`, `shift`, `unshift`, `prepend`, `clear`, `concat`, `delete`, `delete_at`, `delete_if`, `keep_if`, `fill`, `insert`, `replace`, `dup`, `clone`, and `frozen?`.

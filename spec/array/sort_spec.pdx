@@ -39,3 +39,93 @@ context "Array" do
     end
   end
 end
+
+# ruby/spec core/array/sort_spec.rb, title for title (#104). Upstream's
+# fixtures are structs here: SortSame orders every pair equal, and a
+# Sceptic has no <=> at all, so sorting it by a block proves the block is
+# all that is asked; instance_of?(Array) is asked of the length. Staying
+# upstream: recursive arrays (values never mutate, so none can exist),
+# identity and frozen? checks, mocks counting their <=> calls, a block's
+# nil or String answer and an uncomparable pair (refusals where Ruby
+# raises), break with a value (ADR 0012), 2 ** 200 (no bignums), the
+# shift-and-set corners of one Rubinius bug, subclasses, and sort!.
+
+struct SortSame
+  include Comparable
+
+  def <=>(other) = 0
+end
+
+struct Sceptic
+end
+
+context "Array#sort" do
+  specify "returns a new array sorted based on comparing elements with <=>" do
+    unsorted = [1, -2, 3, 9, 1, 5, -5, 1000, -5, 2, -10, 14, 6, 23, 0]
+    expect(unsorted.sort).to eq([-10, -5, -5, -2, 0, 1, 1, 2, 3, 5, 6, 9, 14, 23, 1000])
+  end
+
+  specify "does not affect the original Array" do
+    short = [3, 1, 2]
+    expect(short.sort).to eq([1, 2, 3])
+    expect(short).to eq([3, 1, 2])
+
+    long = [0, 15, 2, 3, 4, 6, 14, 5, 7, 12, 8, 9, 1, 10, 11, 13]
+    sorted = long.sort
+    expect(long).to eq([0, 15, 2, 3, 4, 6, 14, 5, 7, 12, 8, 9, 1, 10, 11, 13])
+    expect(sorted).to eq((0..15).to_a)
+  end
+
+  specify "sorts already-sorted Arrays" do
+    expect((0..15).to_a.sort).to eq((0..15).to_a)
+  end
+
+  specify "sorts reverse-sorted Arrays" do
+    expect((0..15).to_a.reverse.sort).to eq((0..15).to_a)
+  end
+
+  specify "sorts Arrays that consist entirely of equal elements" do
+    ones = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    expect(ones.sort).to eq(ones)
+    same = (0...15).map { SortSame.new }
+    expect(same.sort).to eq(same)
+  end
+
+  specify "sorts Arrays that consist mostly of equal elements" do
+    mostly = [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    expect(mostly.sort).to eq([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+  end
+
+  specify "does not return self even if the array would be already sorted" do
+    already = [1, 2, 3]
+    expect(already.sort).to eq(already)
+  end
+
+  specify "may take a block which is used to determine the order of objects a and b described as -1, 0 or +1" do
+    shuffled = [5, 1, 4, 3, 2]
+    expect(shuffled.sort).to eq([1, 2, 3, 4, 5])
+    expect(shuffled.sort { |left, right| right <=> left }).to eq([5, 4, 3, 2, 1])
+  end
+
+  specify "does not call #<=> on contained objects when invoked with a block" do
+    sceptics = (0...25).map { Sceptic.new }
+    expect(sceptics.sort { -1 }.length).to eq(25)
+  end
+
+  specify "does not call #<=> on elements when invoked with a block even if Array is large (Rubinius #412)" do
+    sceptics = (0...1500).map { Sceptic.new }
+    expect(sceptics.sort { -1 }.length).to eq(1500)
+  end
+
+  specify "completes when supplied a block that always returns the same result" do
+    numbers = [2, 3, 5, 1, 4]
+    expect(numbers.sort { 1 }.length).to eq(5)
+    expect(numbers.sort { 0 }.length).to eq(5)
+    expect(numbers.sort { -1 }.length).to eq(5)
+  end
+
+  specify "compares values returned by block with 0" do
+    numbers = [1, 2, 5, 10, 7, -4, 12]
+    expect(numbers.sort { |left, right| left - right }).to eq([-4, 1, 2, 5, 7, 10, 12])
+  end
+end
