@@ -1,0 +1,47 @@
+# Ordering by a block (#99): `sort`, `min`, and `max` take a comparator
+# block answering an integer that orders two elements, and `min_by` and
+# `max_by` take a key under `<=>` (ADR 0054). Every expected value is Ruby
+# 4.0.7's answer for the same call.
+
+require_relative "../spec_helper"
+
+context "Array" do
+  describe "#sort with a block" do
+    specify "orders by the block's answer, keeping equals in order" do
+      words = %w[pear fig apple kiwi]
+      expect(words.sort { |a, b| a.length <=> b.length }).to eq(["fig", "pear", "kiwi", "apple"])
+      expect(words.sort { |a, b| b <=> a }).to eq(["pear", "kiwi", "fig", "apple"])
+    end
+
+    specify "reads any integer by its sign" do
+      numbers = [3, 1, 2]
+      expect(numbers.sort { |a, b| (a - b) * 10 }).to eq([1, 2, 3])
+    end
+  end
+
+  describe "#min and #max with a block" do
+    specify "pick by the block's answer" do
+      words = %w[pear fig apple kiwi]
+      expect(words.max { |a, b| a.length <=> b.length }).to eq("apple")
+      expect(words.min { |a, b| a.length <=> b.length }).to eq("fig")
+    end
+  end
+
+  describe "#min_by and #max_by" do
+    specify "pick the element whose key is least or greatest" do
+      words = %w[pear fig apple kiwi]
+      expect(words.max_by { it.length }).to eq("apple")
+      expect(words.min_by { it.length }).to eq("fig")
+    end
+
+    specify "take the first of equals" do
+      pairs = [[1, "b"], [1, "a"]]
+      expect(pairs.min_by { it[0] }).to eq([1, "b"])
+    end
+
+    specify "come back absent for an empty array" do
+      empty = []
+      expect(empty.min_by { it }).to be_nil
+    end
+  end
+end

@@ -1799,6 +1799,23 @@ fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
     assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
+/// A comparator block answering anything but an integer refuses (#99), in
+/// ADR 0054's words for `<=>`, on both oracles.
+#[test]
+fn comparator_block_refusals_on_both_oracles() {
+    let cases = [
+        (
+            "list = [1, 2]\np list.sort { |a, b| \"x\" }\n",
+            "'sort' block answers -1, 0, or 1, got \"x\"",
+        ),
+        (
+            "list = [1, 2]\np list.max { |a, b| true }\n",
+            "'max' block answers -1, 0, or 1, got true",
+        ),
+    ];
+    assert_both_oracles_refuse("comparator_refusal.pdx", None, &cases);
+}
+
 /// Three corrections to ADR 0054's build, each caught by an upstream
 /// ruby/spec example: NaN does not order, backwards clamp bounds refuse
 /// (on a Comparable struct too), and the two zeros are equal under `<=>`.

@@ -39,4 +39,4 @@ The differences, each small:
 
 - A `def <=>` and `include Comparable` port verbatim, as do callers reading the answer as an integer.
 - A `<=>` that returns `nil` for "not comparable" refuses at that call; the rewrite is to not ask.
-- `sort { |a, b| ... }` with a comparator block, `min_by`, and `max_by` are not built yet; `sort_by` covers most of them.
+- `sort { |a, b| ... }`, `min { |a, b| ... }`, and `max { |a, b| ... }` port verbatim: the block answers an integer read by its sign, as Ruby reads it, and anything else refuses (`'sort' block answers -1, 0, or 1, got "x"`) where Ruby raised `comparison of String with 0 failed` ([#99](https://github.com/portlandlang/portland/issues/99)). The sort is stable. `min_by` and `max_by` port verbatim too, taking the first of equals.

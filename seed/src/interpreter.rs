@@ -2154,6 +2154,85 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::Nil)
                 }
+                // A comparator block (#99): `|a, b|` answers an integer that
+                // orders them, as `<=>` would. Stable — equal elements keep
+                // their order — an insertion at a time.
+                (Value::Array(elements), "sort", []) => {
+                    let mut sorted: Vec<Value> = Vec::with_capacity(elements.len());
+                    for element in elements.iter().cloned() {
+                        let mut position = sorted.len();
+                        while position > 0 {
+                            let ordering = match self.block_ordering(
+                                block,
+                                &sorted[position - 1],
+                                &element,
+                                "sort",
+                            ) {
+                                Ok(ordering) => ordering,
+                                Err(interrupted) => return interrupted,
+                            };
+                            if ordering <= 0 {
+                                break;
+                            }
+                            position -= 1;
+                        }
+                        sorted.insert(position, element);
+                    }
+                    Some(Value::array(sorted))
+                }
+                // `min`/`max` by a comparator block (#99): the first of
+                // equals, and absent for an empty array, as without one.
+                (Value::Array(elements), "min" | "max", []) => {
+                    let mut best: Option<Value> = None;
+                    for element in elements.iter().cloned() {
+                        let replaces = match &best {
+                            None => true,
+                            Some(current) => {
+                                let ordering =
+                                    match self.block_ordering(block, &element, current, name) {
+                                        Ok(ordering) => ordering,
+                                        Err(interrupted) => return interrupted,
+                                    };
+                                if name == "max" {
+                                    ordering > 0
+                                } else {
+                                    ordering < 0
+                                }
+                            }
+                        };
+                        if replaces {
+                            best = Some(element);
+                        }
+                    }
+                    Some(best.map_or(Value::Nil, Value::present))
+                }
+                // `min_by`/`max_by` (#99): the element whose block answer
+                // is least or greatest under `<=>`, the first of equals.
+                (Value::Array(elements), "min_by" | "max_by", []) => {
+                    let mut best: Option<(Value, Value)> = None;
+                    for element in elements.iter().cloned() {
+                        let key = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let key = key.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        let replaces = match &best {
+                            None => true,
+                            Some((best_key, _)) => {
+                                let ordering = self.ordering_of(&key, best_key);
+                                if name == "max_by" {
+                                    ordering > 0
+                                } else {
+                                    ordering < 0
+                                }
+                            }
+                        };
+                        if replaces {
+                            best = Some((key, element));
+                        }
+                    }
+                    Some(best.map_or(Value::Nil, |(_, element)| Value::present(element)))
+                }
                 // Sorts by the block's answers, which take `sort`'s rule:
                 // uniform, all integers or all strings.
                 (Value::Array(elements), "sort_by", []) => {
@@ -2941,6 +3020,30 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// After a block ran: `Some(outcome)` when the iteration must stop now.
+    /// A comparator block's answer for `left` against `right` (#99): an
+    /// integer compared with 0, as Ruby reads one, refused otherwise in ADR
+    /// 0054's words for `<=>`. `Err` carries a `break` or `return` out, as
+    /// `block_interrupt` hands it.
+    fn block_ordering(
+        &mut self,
+        block: &Block,
+        left: &Value,
+        right: &Value,
+        name: &str,
+    ) -> Result<i64, Option<Value>> {
+        let answer = self.run_block(block, vec![left.clone(), right.clone()]);
+        if let Some(interrupted) = self.block_interrupt() {
+            return Err(interrupted);
+        }
+        match answer {
+            Some(Value::Integer(ordering)) => Ok(ordering.signum()),
+            other => {
+                let got = other.map_or("nothing".to_string(), |value| value.shown());
+                panic!("'{name}' block answers -1, 0, or 1, got {got}")
+            }
+        }
+    }
+
     /// A `break` is consumed here and the call produces nil (ADR 0012);
     /// a `return` stays pending and unwinds to the enclosing method.
     fn block_interrupt(&mut self) -> Option<Option<Value>> {

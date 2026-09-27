@@ -907,6 +907,15 @@ end
 # host values ride the host's own ordering.
 def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
 
+# One comparator-block answer (#99), for the host's sort, min, and max to
+# read — the host refuses a non-integer in the seed's words. A recorded gap
+# (principle 4): what the block rebinds, and a `break` or `return` inside
+# it, stay inside the comparison here, where the seed carries them out.
+def guest_comparison(block, left, right, entry, scope)
+  step = run_guest_block(block, [left, right], scope)
+  slot_value(step.value)
+end
+
 def guest_ordering(left, right, bindings)
   return slot_value(compare_struct("<=>", left, right, bindings).value) if left in ["__struct__", *]
   return compare_guest_arrays(left, right, bindings) if guest_array?(left) && guest_array?(right)
@@ -2104,6 +2113,33 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
+  # A comparator block (#99): the host sorts, and picks `min`/`max`, by the
+  # guest block's answers, refusing a non-integer in its own words.
+  when "sort", "min", "max"
+    result = case node.name
+    when "sort" then receiver.sort { |left, right| guest_comparison(block, left, right, entry, scope) }
+    when "min" then receiver.min { |left, right| guest_comparison(block, left, right, entry, scope) }
+    else receiver.max { |left, right| guest_comparison(block, left, right, entry, scope) }
+    end
+    outcome([result], scope)
+  # `min_by`/`max_by` (#99): the host compares the block's keys.
+  when "min_by", "max_by"
+    result = if node.name == "min_by"
+      receiver.min_by do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        panic("min_by block produced no value") if step.value.empty?
+        slot_value(step.value)
+      end
+    else
+      receiver.max_by do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        panic("max_by block produced no value") if step.value.empty?
+        slot_value(step.value)
+      end
+    end
+    outcome([result], scope)
   when "flat_map", "collect_concat"
     results = receiver.flat_map do |element|
       step = run_guest_block(block, [element], scope)
