@@ -2757,6 +2757,7 @@ impl<W: std::io::Write> Interpreter<W> {
         self.loaded.insert(resolved.clone());
         let source = std::fs::read_to_string(&resolved)
             .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
+        let source = crate::lexer::normalize_line_endings(source);
         let program = parser::parse(&source);
         let previous_file = self.current_file.replace(resolved);
         // A required file gets the scope a method call gets (#95): namespace

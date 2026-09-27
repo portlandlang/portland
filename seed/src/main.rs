@@ -5,7 +5,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process;
 
 use portland_seed::interpreter::Interpreter;
-use portland_seed::parser;
+use portland_seed::{lexer, parser};
 
 fn main() {
     // Parser and interpreter both recurse on the stack, and the 8 MB main
@@ -88,10 +88,11 @@ fn parse_files(paths: &[String]) {
 }
 
 fn read_source(path: &str) -> String {
-    std::fs::read_to_string(path).unwrap_or_else(|error| {
+    let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
         eprintln!("pdx: cannot read {path}: {error}");
         process::exit(66);
-    })
+    });
+    lexer::normalize_line_endings(source)
 }
 
 fn run_file(path: &str) {

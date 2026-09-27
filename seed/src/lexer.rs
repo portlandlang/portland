@@ -119,6 +119,17 @@ pub struct Token<'source> {
     pub text: &'source str,
 }
 
+/// Source as Ruby reads it (#138): every `\r\n` is a newline, inside
+/// strings and heredocs too. Applied where a program's text is read — never
+/// to a data file a program reads.
+pub fn normalize_line_endings(source: String) -> String {
+    if source.contains("\r\n") {
+        source.replace("\r\n", "\n")
+    } else {
+        source
+    }
+}
+
 pub fn lex(source: &str) -> Vec<Token<'_>> {
     let mut tokens = Vec::new();
     let mut chars = source.char_indices().peekable();

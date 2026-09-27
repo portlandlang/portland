@@ -1652,6 +1652,26 @@ fn backslash_continues_a_line_on_both_oracles() {
     assert_both_oracles_refuse("continuation_refusal.pdx", None, &cases);
 }
 
+/// A file saved with Windows line endings reads as Ruby reads it (#138):
+/// every `\r\n` is a newline, inside strings and heredocs too.
+#[test]
+fn crlf_line_endings_read_as_newlines_on_both_oracles() {
+    let source = "x = \"a\r\nb\"\r\np x\r\ny = <<~EOS\r\n  hi\r\nEOS\r\np y\r\ntotal = 1 + \\\r\n  2\r\np total\r\n";
+    assert_evaluator_matches_seed("evaluator_crlf.pdx", source);
+    // Both agreeing is not enough — both keeping the `\r` would agree too.
+    // Ruby 4.0.7 prints this for the same bytes.
+    let sample = std::env::temp_dir().join("crlf_against_ruby.pdx");
+    std::fs::write(&sample, source).unwrap();
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert_eq!(
+        String::from_utf8(seed.stdout).unwrap(),
+        "\"a\\nb\"\n\"hi\\n\"\n3\n"
+    );
+}
+
 /// Ruby's visibility words in a type body refuse until #133 decides them,
 /// rather than reading as fields named `private` (#132) — before the
 /// methods, after them, and on a `def`'s own line.

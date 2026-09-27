@@ -498,8 +498,18 @@ end
 # `first_line` is where the count starts: 1 for a file, and a string's own
 # line for the source inside its interpolation, which is lexed on its own
 # (#98 — an identifier inside `"#{greeting}"` points at the right line).
+# Source as Ruby reads it (#138): every `\r\n` is a newline, inside strings
+# and heredocs too — the seed's `normalize_line_endings`. A `\r\n` is one
+# character here (ADR 0038: CR LF is a single grapheme cluster), so the swap
+# is one map.
+def normalize_line_endings(source)
+  return source unless source.include?("\r\n")
+
+  source.chars.map { it == "\r\n" ? "\n" : it }.join("")
+end
+
 def lex(raw_source, first_line: 1)
-  source = expand_heredocs(raw_source)
+  source = expand_heredocs(normalize_line_endings(raw_source))
   characters = source.chars
   mutable tokens = []
   mutable index = 0
