@@ -92,9 +92,7 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
 
 /// The constants every program starts with (#152): `Float`'s, Ruby's values
 /// for an IEEE 754 double, under their qualified names, so `Float::MAX` reads
-/// like `Config::LIMIT`. They sit with the top-level constants rather than
-/// in `variables`, which every block call copies the names of — twelve more
-/// there doubled the time to parse the compiler.
+/// like `Config::LIMIT`, and sit with every other constant.
 fn builtin_constants() -> HashMap<String, Value> {
     let float_constants = [
         ("DIG", Value::Integer(15)),
@@ -520,9 +518,12 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     methods: HashMap<String, std::rc::Rc<Method>>,
     /// The namespace currently being defined or executed (ADR 0021).
     module_path: Vec<String>,
-    /// Top-level constants (ADR 0053): SCREAMING_CASE names bound once at
-    /// the top of a file, with a def's reach — read from inside every
-    /// frame, and from every file that requires this one.
+    /// Constants (ADR 0053): SCREAMING_CASE names bound once at the top of
+    /// a file, with a def's reach — read from inside every frame, and from
+    /// every file that requires this one. A namespace's and a type's
+    /// constants live here too under their qualified names (ADR 0021,
+    /// #145), as do `Float`'s (#152), so no call copies them into its
+    /// scope (#153).
     constants: HashMap<String, Value>,
     /// The REPL redefines on purpose; a program never does (ADR 0052).
     redefinable: bool,
@@ -844,7 +845,7 @@ impl<W: std::io::Write> Interpreter<W> {
         let prefix = format!("{path}::");
         self.methods.keys().any(|name| name.starts_with(&prefix))
             || self.structs.keys().any(|name| name.starts_with(&prefix))
-            || self.variables.keys().any(|name| name.starts_with(&prefix))
+            || self.constants.keys().any(|name| name.starts_with(&prefix))
     }
 
     /// The namespace a receiver expression names, if it names one. A local
@@ -952,16 +953,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.assign(name, value.clone(), *mutable);
                 } else {
                     let qualified = self.qualified(name);
-                    if self.variables.contains_key(&qualified) && !self.redefinable {
+                    if self.constants.contains_key(&qualified) && !self.redefinable {
                         panic!("'{name}' is a constant — it is bound once");
                     }
-                    self.variables.insert(
-                        qualified,
-                        Binding {
-                            mutable: *mutable,
-                            value: value.clone(),
-                        },
-                    );
+                    self.constants.insert(qualified, value.clone());
                 }
                 Some(value)
             }
@@ -1215,16 +1210,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 for (constant, value) in constants {
                     let value = self.value_of(value);
                     let qualified = self.qualified(constant);
-                    if self.variables.contains_key(&qualified) && !self.redefinable {
+                    if self.constants.contains_key(&qualified) && !self.redefinable {
                         panic!("'{constant}' is a constant — it is bound once");
                     }
-                    self.variables.insert(
-                        qualified,
-                        Binding {
-                            mutable: false,
-                            value,
-                        },
-                    );
+                    self.constants.insert(qualified, value);
                 }
                 // A type nested in a type lives under it: `Outer::Inner`.
                 self.run_body(nested);
@@ -1345,9 +1334,6 @@ impl<W: std::io::Write> Interpreter<W> {
             // here (ADR 0021).
             Expression::Path(path) => {
                 let joined = path.join("::");
-                if let Some(binding) = self.variables.get(&joined) {
-                    return Some(binding.value.clone());
-                }
                 if let Some(value) = self.constants.get(&joined) {
                     return Some(value.clone());
                 }
@@ -1746,11 +1732,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 } else if let Some(value) = self.constants.get(name) {
                     // A top-level constant (ADR 0053), from any frame.
                     Some(value.clone())
-                } else if let Some((_, binding)) =
-                    Self::resolve(&self.module_path, name, &self.variables)
+                } else if let Some((_, value)) =
+                    Self::resolve(&self.module_path, name, &self.constants)
                 {
                     // A constant of an enclosing namespace (ADR 0021).
-                    Some(binding.value.clone())
+                    Some(value.clone())
                 } else if let Some(value) = self.own_type_constant(name) {
                     // A constant of the receiver's own type (#145), read
                     // bare from its instance methods.
@@ -3038,24 +3024,14 @@ impl<W: std::io::Write> Interpreter<W> {
         let source = crate::lexer::normalize_line_endings(source);
         let program = parser::parse(&source);
         let previous_file = self.current_file.replace(resolved);
-        // A required file gets the scope a method call gets (#95): namespace
-        // constants cross, bare locals do not — in either direction. Its
-        // defs, structs, enums, and traits live in their own tables and
-        // cross on their own; what it binds under a namespace is copied back.
-        let mut scope: HashMap<String, Binding> = self
-            .variables
-            .iter()
-            .filter(|(name, _)| name.contains("::"))
-            .map(|(name, binding)| (name.clone(), binding.clone()))
-            .collect();
+        // A required file gets the scope a method call gets (#95): bare
+        // locals do not cross, in either direction. Its defs, structs,
+        // enums, traits, and constants live in their own tables and cross
+        // on their own.
+        let mut scope = HashMap::new();
         std::mem::swap(&mut self.variables, &mut scope);
         self.run_body(&program.statements);
         std::mem::swap(&mut self.variables, &mut scope);
-        for (name, binding) in scope {
-            if name.contains("::") {
-                self.variables.insert(name, binding);
-            }
-        }
         self.current_file = previous_file;
         true
     }
@@ -3651,9 +3627,9 @@ impl<W: std::io::Write> Interpreter<W> {
     /// exist — `Token::KINDS` read as `KINDS` from a `Token` method.
     fn own_type_constant(&self, name: &str) -> Option<Value> {
         let (struct_name, _) = self.self_receiver.as_ref()?;
-        self.variables
+        self.constants
             .get(&format!("{struct_name}::{name}"))
-            .map(|binding| binding.value.clone())
+            .cloned()
     }
 
     /// Run one struct method: a fresh scope of the receiver's fields (bare,
@@ -3688,14 +3664,9 @@ impl<W: std::io::Write> Interpreter<W> {
         if self.call_depth > MAXIMUM_CALL_DEPTH {
             panic!("call stack deeper than {MAXIMUM_CALL_DEPTH} frames (infinite recursion?)");
         }
-        // Namespace constants (qualified names) survive into a fresh
-        // scope; bare locals do not (ADR 0021).
-        let mut scope: HashMap<String, Binding> = self
-            .variables
-            .iter()
-            .filter(|(name, _)| name.contains("::"))
-            .map(|(name, binding)| (name.clone(), binding.clone()))
-            .collect();
+        // A fresh scope: bare locals do not cross; namespace constants are
+        // in `constants`, which every frame reads (ADR 0021).
+        let mut scope = HashMap::new();
         std::mem::swap(&mut self.variables, &mut scope);
         let field_names: Vec<String> = if let Value::Struct { fields, .. } = &receiver {
             for (field, value) in fields {
@@ -3976,14 +3947,9 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // Methods get a fresh scope: parameters only, no outer locals.
         // Bind left to right so a default can reference earlier parameters.
-        // Namespace constants (qualified names) survive into a fresh
-        // scope; bare locals do not (ADR 0021).
-        let mut scope: HashMap<String, Binding> = self
-            .variables
-            .iter()
-            .filter(|(name, _)| name.contains("::"))
-            .map(|(name, binding)| (name.clone(), binding.clone()))
-            .collect();
+        // Bare locals do not cross; namespace constants are in
+        // `constants`, which every frame reads (ADR 0021).
+        let mut scope = HashMap::new();
         std::mem::swap(&mut self.variables, &mut scope);
         let mut supplied = arguments.into_iter();
         for parameter in &method.parameters {
