@@ -102,6 +102,46 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/at_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No to_int conversion (ADR 0036), so a Float or mock index refuses; a bad index or a second argument refuses where Ruby raises."
+  link: docs/ruby/aliases.md
+core/array/dig_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "A non-numeric index, a non-diggable step, or no arguments refuses where Ruby raises; a mock's own dig never takes over."
+  link: docs/ruby/errors.md
+core/array/assoc_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Identity checks compare by value, since values never mutate; a mock's own == never takes over; no to_ary conversion (ADR 0036)."
+  link: docs/ruby/mutability.md
+core/array/rassoc_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so no array can hold itself; a mock's own == never takes over; no to_ary conversion (ADR 0036)."
+  link: docs/ruby/mutability.md
+core/array/transpose_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No to_ary conversion (ADR 0036); values never mutate, so no array can hold itself; a ragged or non-array row refuses where Ruby raises; no subclasses."
+  link: docs/ruby/aliases.md
+core/array/to_h_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No to_ary conversion (ADR 0036); a non-pair element refuses in Ruby's words where Ruby raises; the splat-parameter block row waits on splats (ADR 0014)."
+  link: docs/ruby/aliases.md
+core/array/rfind_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_planned
+  reason: "The ifnone proc waits on #77 (can a block be held in a value); blockless Enumerators and mid-walk mutation stay behind."
+  link: https://github.com/portlandlang/portland/issues/77
+core/array/reverse_each_spec.rb:
+  pdx: [spec/array/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so recursive arrays and mid-walk growth stay behind; a blockless walk answers no Enumerator (ADR 0055)."
+  link: docs/ruby/mutability.md
 core/array/map_spec.rb:
   pdx: [spec/array/iteration_spec.pdx]
   status: partial_intentional

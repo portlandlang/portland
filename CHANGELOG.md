@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array lookup and reshape files ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and `reverse_each` in `spec/array/lookups_spec.pdx`, twenty-five examples.
+
 - **A builtin handed `nil` sees `nil` on the hosted evaluator** — it passed arguments through `first`, whose answer for a nil argument is the present nil ADR 0005 keeps apart from absence. So `[1, nil].include?(nil)` was false hosted and true on the seed and in Ruby, and `index`, `count`, `key?`, and `assoc` of nil diverged the same way. Every builtin argument now goes through the raw positional read.
 
 - **`at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and `reverse_each` on arrays** ([#104](https://github.com/portlandlang/portland/issues/104)) — on both implementations, answering as Ruby 4.0.6's do:

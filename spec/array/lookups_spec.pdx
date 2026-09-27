@@ -1,0 +1,190 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../spec_helper"
+
+context "Array#at" do
+  numbers = [1, 2, 3, 4, 5, 6]
+
+  specify "returns the (n+1)'th element for the passed index n" do
+    expect(numbers.at(0)).to eq(1)
+    expect(numbers.at(1)).to eq(2)
+    expect(numbers.at(5)).to eq(6)
+  end
+
+  specify "returns nil if the given index is greater than or equal to the array's length" do
+    expect(numbers.at(6)).to eq(nil)
+    expect(numbers.at(7)).to eq(nil)
+  end
+
+  specify "returns the (-n)'th element from the last, for the given negative index n" do
+    expect(numbers.at(-1)).to eq(6)
+    expect(numbers.at(-2)).to eq(5)
+    expect(numbers.at(-6)).to eq(1)
+  end
+
+  specify "returns nil if the given index is less than -len, where len is length of the array" do
+    expect(numbers.at(-7)).to eq(nil)
+    expect(numbers.at(-8)).to eq(nil)
+  end
+
+  specify "does not extend the array unless the given index is out of range" do
+    expect(numbers.length).to eq(6)
+    numbers.at(100)
+    expect(numbers.length).to eq(6)
+    numbers.at(-100)
+    expect(numbers.length).to eq(6)
+  end
+end
+
+context "Array#dig" do
+  specify "returns #at with one arg" do
+    expect(["a"].dig(0)).to eq("a")
+    expect(["a"].dig(1)).to eq(nil)
+  end
+
+  specify "recurses array elements" do
+    nested = [[1, [2, "3"]]]
+    expect(nested.dig(0, 0)).to eq(1)
+    expect(nested.dig(0, 1, 1)).to eq("3")
+    expect(nested.dig(0, -1, 0)).to eq(2)
+  end
+
+  specify "returns the nested value specified if the sequence includes a key" do
+    mixed = [42, {foo: :bar}]
+    expect(mixed.dig(1, :foo)).to eq(:bar)
+  end
+
+  specify "returns nil if any intermediate step is nil" do
+    nested = [[1, [2, 3]]]
+    expect(nested.dig(1, 2, 3)).to eq(nil)
+  end
+end
+
+context "Array#assoc" do
+  specify "returns the first array whose 1st item is == obj or nil" do
+    colors = ["colors", "red", "blue", "green"]
+    letters = [:letters, "a", "b", "c"]
+    four = [4]
+    more_colors = ["colors", "cyan", "yellow", "magenta"]
+    more_letters = [:letters, "a", "i", "u"]
+    nils = [nil, nil]
+    table = [colors, letters, four, more_colors, more_letters, nils]
+    expect(table.assoc(colors.first)).to eq(colors)
+    expect(table.assoc(letters.first)).to eq(letters)
+    expect(table.assoc(four.first)).to eq(four)
+    expect(table.assoc(more_colors.first)).to eq(colors)
+    expect(table.assoc(more_letters.first)).to eq(letters)
+    expect(table.assoc(nil)).to eq(nils)
+    expect(table.assoc(4)).to eq(four)
+    expect(table.assoc("key not in array")).to eq(nil)
+  end
+
+  specify "ignores any non-Array elements" do
+    expect([1, 2, 3].assoc(2)).to eq(nil)
+    four = [4]
+    five = [5, 4, 3]
+    mixed = ["foo", [], four, five, nil, []]
+    expect(mixed.assoc(four.first)).to eq(four)
+    expect(mixed.assoc(five.first)).to eq(five)
+  end
+end
+
+context "Array#rassoc" do
+  specify "returns the first contained array whose second element is == object" do
+    table = [[1, "a", 0.5], [2, "b"], [3, "b"], [4, "c"], [], [5], [6, "d"]]
+    expect(table.rassoc("a")).to eq([1, "a", 0.5])
+    expect(table.rassoc("b")).to eq([2, "b"])
+    expect(table.rassoc("d")).to eq([6, "d"])
+    expect(table.rassoc("z")).to eq(nil)
+  end
+end
+
+context "Array#transpose" do
+  specify "assumes an array of arrays and returns the result of transposing rows and columns" do
+    expect([[1, "a"], [2, "b"], [3, "c"]].transpose).to eq([[1, 2, 3], ["a", "b", "c"]])
+    expect([[1, 2, 3], ["a", "b", "c"]].transpose).to eq([[1, "a"], [2, "b"], [3, "c"]])
+    expect([].transpose).to eq([])
+    expect([[]].transpose).to eq([])
+    expect([[], []].transpose).to eq([])
+    expect([[0]].transpose).to eq([[0]])
+    expect([[0], [1]].transpose).to eq([[0, 1]])
+  end
+end
+
+context "Array#to_h" do
+  specify "converts empty array to empty hash" do
+    expect([].to_h).to eq({})
+  end
+
+  specify "converts [key, value] pairs to a hash" do
+    expect([[:a, 1], [:b, 2]].to_h).to eq({a: 1, b: 2})
+  end
+
+  specify "uses the last value of a duplicated key" do
+    expect([[:a, 1], [:b, 2], [:a, 3]].to_h).to eq({a: 3, b: 2})
+  end
+
+  specify "produces a hash that returns nil for a missing element" do
+    expect([[:a, 1], [:b, 2]].to_h[:c]).to eq(nil)
+  end
+
+  describe "with block" do
+    specify "converts [key, value] pairs returned by the block to a Hash" do
+      expect([:a, :b].to_h { |key| [key, key.to_s] }).to eq({a: "a", b: "b"})
+    end
+  end
+end
+
+context "Array#rfind" do
+  specify "returns the last element for which the block is not false" do
+    expect([1, 2, 3, 4, 5].rfind { |number| number % 2 == 0 }).to eq(4)
+  end
+
+  specify "returns nil when the block is false and there is no ifnone proc given" do
+    expect([1, 2, 3].rfind { |number| false }).to eq(nil)
+  end
+
+  specify "iterates elements in reverse order" do
+    mutable visited = []
+    [1, 2, 3].rfind { |number|
+      visited = visited + [number]
+      false
+    }
+    expect(visited).to eq([3, 2, 1])
+  end
+
+  specify "stops iterating as soon as a matching element is found from the end" do
+    mutable visited = []
+    [1, 2, 3, 4, 5].rfind { |number|
+      visited = visited + [number]
+      number == 3
+    }
+    expect(visited).to eq([5, 4, 3])
+  end
+
+  specify "does not destructure elements" do
+    pairs = [[1, 2], [3, 4, 5], [6, 7, 8, 9]]
+    expect(pairs.rfind { |element| element == [1, 2] }).to eq([1, 2])
+  end
+end
+
+context "Array#reverse_each" do
+  specify "traverses array in reverse order and pass each element to block" do
+    mutable seen = []
+    [1, 3, 4, 6].reverse_each { |number| seen = seen + [number] }
+    expect(seen).to eq([6, 4, 3, 1])
+  end
+
+  specify "returns self" do
+    symbols = [:a, :b, :c]
+    expect(symbols.reverse_each { |symbol| symbol }).to eq(symbols)
+  end
+end
