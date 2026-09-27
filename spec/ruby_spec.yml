@@ -388,6 +388,26 @@ core/integer/to_s_spec.rb:
   pdx: [spec/number/integer/conversion_spec.pdx]
 core/integer/uminus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
+core/integer/constants_spec.rb:
+  status: skipped
+  reason: "Asks Object.const_defined? — reflection a closed runtime has none of; Portland never had Fixnum or Bignum to retire."
+  link: docs/ruby/metaprogramming.md
+core/integer/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/integer/integer_spec.rb:
+  status: skipped
+  reason: "There is no Integer class object to ask about its ancestors or its instances; an integer is a value."
+  link: docs/ruby/metaprogramming.md
+core/integer/to_int_spec.rb:
+  status: skipped
+  reason: "to_int is Ruby's implicit-conversion protocol, a false alias that refuses naming to_i (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/integer/try_convert_spec.rb:
+  status: skipped
+  reason: "Integer.try_convert is the implicit-conversion protocol's entry point, and to_int is a false alias that refuses naming to_i (ADR 0036)."
+  link: docs/ruby/aliases.md
 core/integer/lcm_spec.rb:
   pdx: [spec/number/integer/gcd_spec.pdx]
   status: partial_intentional

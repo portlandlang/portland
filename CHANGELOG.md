@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Five core/integer files recorded as decided out** ([#107](https://github.com/portlandlang/portland/issues/107)) — `constants`, `dup`, `integer`, `to_int`, and `try_convert` are skipped for the reasons their core/float twins are: reflection, values that never mutate, and the implicit-conversion protocol.
+
 - **`lcm` and `gcdlcm`** ([#107](https://github.com/portlandlang/portland/issues/107)) — beside `gcd`, on both implementations, magnitudes as Ruby's are: zero beside a zero, and an answer past the 64-bit integers refuses. `gcd` now works on unsigned magnitudes, so the smallest integer no longer trips the host's overflow. ruby/spec's `lcm` and `gcdlcm` files port into `spec/number/integer/gcd_spec.pdx`.
 
 - **An array's membership questions ask Ruby's `==`** — `include?`, `member?`, `index`, and `count` of a value compared by `eql?`, so `[1, 2].include?(1.0)` was false and `[1, 1.0, 2].count(1)` was 1, silently unlike Ruby. They now ask `==` of each element, as Ruby's do.
