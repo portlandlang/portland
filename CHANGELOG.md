@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`times`, `upto`, and `downto` without a block, and to a Float** ([#107](https://github.com/portlandlang/portland/issues/107)) — blockless, each answers the finished walk (`3.times` is `[0, 1, 2]`), ADR 0055's rule for whatever Ruby answers with an Enumerator. They had refused. A Float endpoint walks to its floor going up and its ceiling going down, as Ruby's does (`9.upto(13.3)` stops at 13), and a NaN or infinite endpoint refuses rather than walking forever. ruby/spec's `times`, `upto`, and `downto` files port to `spec/number/integer/walks_spec.pdx`.
+
 - **Integer#to_i, and seven core/integer files ported** ([#107](https://github.com/portlandlang/portland/issues/107)) — an Integer's `to_i` is itself, as in Ruby, on both implementations. ruby/spec's `to_i`, `zero?`, `==`, `next`, `magnitude`, `inspect`, and `===` files port to `spec/number/integer/identity_spec.pdx`, alias checks comparing answers rather than method objects.
 
 - **ruby/spec's `core/float/exponent_spec.rb` ported in part** ([#108](https://github.com/portlandlang/portland/issues/108)) — Float `**` answers as Ruby's does, `9.5 ** 0xffffffff` overflowing to Infinity included. The Complex example waits on #124.

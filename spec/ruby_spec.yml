@@ -388,6 +388,21 @@ core/integer/to_s_spec.rb:
   pdx: [spec/number/integer/conversion_spec.pdx]
 core/integer/uminus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
+core/integer/times_spec.rb:
+  pdx: [spec/number/integer/walks_spec.pdx]
+  status: partial_planned
+  reason: "break with a value waits on real demand (ADR 0012); the rest is ported, a blockless walk answering an array (ADR 0055)."
+  link: docs/adr/0012-2026-07-22-branchless-if-is-nil.md
+core/integer/upto_spec.rb:
+  pdx: [spec/number/integer/walks_spec.pdx]
+  status: partial_intentional
+  reason: "A non-number endpoint refuses where Ruby raises ArgumentError; a blockless walk answers an array, not an Enumerator (ADR 0055)."
+  link: docs/ruby/errors.md
+core/integer/downto_spec.rb:
+  pdx: [spec/number/integer/walks_spec.pdx]
+  status: partial_intentional
+  reason: "A non-number endpoint refuses where Ruby raises ArgumentError; a blockless walk answers an array, not an Enumerator (ADR 0055)."
+  link: docs/ruby/errors.md
 core/integer/to_i_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
   status: partial_intentional

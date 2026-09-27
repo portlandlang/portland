@@ -332,6 +332,33 @@ fn float_divmod(receiver: &Value, argument: &Value) -> Value {
     ])
 }
 
+/// Where `upto` or `downto` stops (#107): an Integer endpoint is itself; a
+/// Float walks to its floor going up and its ceiling going down, as Ruby's
+/// does, and one with no integer — NaN, an infinity — refuses, since an
+/// infinite walk waits on a real pull (ADR 0055).
+fn walk_endpoint(endpoint: &Value, name: &str) -> i64 {
+    let rounded = match (endpoint, name) {
+        (Value::Integer(number), _) => return *number,
+        (Value::Float(number), "upto") => float_to_integer(*number, number.floor(), name),
+        (Value::Float(number), _) => float_to_integer(*number, number.ceil(), name),
+        (other, _) => panic!("{name} needs a number to walk to, got {}", other.shown()),
+    };
+    let Value::Integer(number) = rounded else {
+        unreachable!()
+    };
+    number
+}
+
+/// The integers `upto` or `downto` walks, in order (#107).
+fn walk(from: i64, endpoint: &Value, name: &str) -> Vec<i64> {
+    let to = walk_endpoint(endpoint, name);
+    if name == "upto" {
+        (from..=to).collect()
+    } else {
+        (to..=from).rev().collect()
+    }
+}
+
 /// Refuses a zero divisor in Ruby's words, ZeroDivisionError's message,
 /// before the host's own panic can speak.
 fn refuse_zero_divisor(right: i64) {
@@ -2467,19 +2494,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
-                (Value::Integer(from), "downto", [Value::Integer(to)]) => {
-                    let mut current = *from;
-                    while current >= *to {
-                        self.run_block(block, vec![Value::Integer(current)]);
-                        if let Some(interrupted) = self.block_interrupt() {
-                            return interrupted;
-                        }
-                        current -= 1;
-                    }
-                    Some(receiver)
-                }
-                (Value::Integer(from), "upto", [Value::Integer(to)]) => {
-                    for current in *from..=*to {
+                (
+                    Value::Integer(from),
+                    "downto" | "upto",
+                    [endpoint @ (Value::Integer(_) | Value::Float(_))],
+                ) => {
+                    for current in walk(*from, endpoint, name) {
                         self.run_block(block, vec![Value::Integer(current)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
@@ -2922,6 +2942,21 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
             (Value::Integer(number), "to_i", []) => Value::Integer(*number),
+            // Without a block, the finished walk — ADR 0055's rule for
+            // whatever Ruby answers with an enumerator (#107).
+            (Value::Integer(count), "times", []) => {
+                Value::array((0..*count).map(Value::Integer).collect())
+            }
+            (
+                Value::Integer(from),
+                "downto" | "upto",
+                [endpoint @ (Value::Integer(_) | Value::Float(_))],
+            ) => Value::array(
+                walk(*from, endpoint, name)
+                    .into_iter()
+                    .map(Value::Integer)
+                    .collect(),
+            ),
             (Value::Float(number), "to_f", []) => Value::Float(*number),
             // Ruby's Float#to_i truncates toward zero — it is not the
             // floored division of ADR 0018.

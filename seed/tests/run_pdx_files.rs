@@ -1659,6 +1659,30 @@ fn unary_plus_answers_the_number_itself() {
     assert_both_oracles_refuse("unary_plus_refusal.pdx", None, &cases);
 }
 
+/// `times`, `upto`, and `downto` without a block answer the finished
+/// walk, ADR 0055's rule for whatever Ruby answers with an enumerator; a
+/// Float endpoint walks to its floor going up and its ceiling going down,
+/// as Ruby's does (4.0.6), and an endpoint with no integer — NaN, an
+/// infinity — refuses, since an infinite walk waits on a real pull (#107).
+#[test]
+fn integer_walks_match_ruby() {
+    assert_evaluator_matches_seed(
+        "evaluator_integer_walks.pdx",
+        "p(3.times.to_a)\np(0.times.to_a)\np(-2.times.to_a)\np(2.upto(5).to_a)\np(5.upto(4).to_a)\np(5.downto(2).to_a)\np(9.upto(13.3).to_a)\np(-5.upto(-1.3).to_a)\np(5.downto(2.5).to_a)\np(-1.downto(-3.7).to_a)\np(5.times.size)\np(5.upto(10).size)\nmutable seen = []\n9.upto(13.3) { seen = seen + [it] }\n-5.upto(-1.3) { seen = seen + [it] }\n5.downto(2.5) { seen = seen + [it] }\np seen\n",
+    );
+    let cases = [
+        (
+            "p(1.upto(1.0 / 0.0))\n",
+            "Infinity.upto has no integer answer",
+        ),
+        (
+            "p(1.downto(0.0 / 0.0))\n",
+            "NaN.downto has no integer answer",
+        ),
+    ];
+    assert_both_oracles_refuse("integer_walk_refusal.pdx", None, &cases);
+}
+
 /// An Integer's `to_i` is itself, as in Ruby (#107).
 #[test]
 fn integer_to_i_is_itself() {

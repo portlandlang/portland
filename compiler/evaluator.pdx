@@ -1803,6 +1803,10 @@ def evaluate_method_call(node, mutable bindings)
   when "nan?" then receiver.nan?
   when "finite?" then receiver.finite?
   when "infinite?" then receiver.infinite?
+  # Without a block, the finished walk (ADR 0055, #107).
+  when "times" then receiver.times
+  when "upto" then receiver.upto(arguments.first)
+  when "downto" then receiver.downto(arguments.first)
   when "next_float" then receiver.next_float
   when "prev_float" then receiver.prev_float
   when "floor" then receiver.floor
