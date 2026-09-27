@@ -37,7 +37,7 @@ harness_program = parse_program(lex(harness_source))
 # The checker's memo of files already checked rides across the specs, so
 # the helper every spec requires is checked once here, not a hundred times.
 mutable checked = check_closure(harness_path, [])
-harness = run_body(harness_program, [["__file__", "file", harness_path]])
+harness = run_body(harness_program, [["__file__", "file", harness_path]] + builtin_constants)
 already_loaded = [["__loaded__", "loaded", [canonical_path(harness_path)]]]
 
 argv.slice(1, argv.length - 1).each do |path|

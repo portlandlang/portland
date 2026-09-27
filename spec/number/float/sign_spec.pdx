@@ -91,6 +91,11 @@ context "Float#-@" do
     expect(-negative).to eq(5.5)
   end
 
+  specify "negates self at Float boundaries" do
+    expect(-Float::MAX).to eq(0.0 - Float::MAX)
+    expect(-Float::MIN).to eq(0.0 - Float::MIN)
+  end
+
   specify "returns negative infinity for positive infinity" do
     infinity = 1.0 / 0.0
     expect((-infinity).infinite?).to eq(true)

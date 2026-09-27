@@ -80,7 +80,26 @@ def evaluate_program(nodes)
   # `require_relative` resolves against the file doing the requiring, so that
   # path has to be in scope from the first statement. `argv.first` is it: the
   # compiler was handed the guest program's path, and run.pdx read the same value.
-  run_body(nodes, [["__file__", "file", argv.first or "."]])
+  run_body(nodes, [["__file__", "file", argv.first or "."]] + builtin_constants)
+end
+
+# The constants every program starts with (#152): `Float`'s, the seed's
+# `builtin_constants`, bound under qualified names as a module's are.
+def builtin_constants
+  [
+    ["Float::DIG", "constant", 15],
+    ["Float::EPSILON", "constant", 2.220446049250313e-16],
+    ["Float::INFINITY", "constant", 1.0 / 0.0],
+    ["Float::MANT_DIG", "constant", 53],
+    ["Float::MAX", "constant", 1.7976931348623157e308],
+    ["Float::MAX_10_EXP", "constant", 308],
+    ["Float::MAX_EXP", "constant", 1024],
+    ["Float::MIN", "constant", 2.2250738585072014e-308],
+    ["Float::MIN_10_EXP", "constant", -307],
+    ["Float::MIN_EXP", "constant", -1021],
+    ["Float::NAN", "constant", 0.0 / 0.0],
+    ["Float::RADIX", "constant", 2]
+  ]
 end
 
 # Run statements until done or a signal starts unwinding.

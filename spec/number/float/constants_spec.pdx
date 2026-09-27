@@ -1,0 +1,60 @@
+# Float's constants (#152), from ruby/spec core/float/constants_spec.rb —
+# Ruby's values for an IEEE 754 double, bound as `Float::NAME` the way a
+# module's constants are. `infinite?` answers true or false here, so
+# upstream's 1 is asked as a sign.
+
+require_relative "../../spec_helper"
+
+context "Float constant" do
+  specify "DIG is 15" do
+    expect(Float::DIG).to eq(15)
+  end
+
+  specify "EPSILON is 2.220446049250313e-16" do
+    expect(Float::EPSILON).to eq(2.0 ** -52)
+    expect(Float::EPSILON).to eq(2.220446049250313e-16)
+  end
+
+  specify "MANT_DIG is 53" do
+    expect(Float::MANT_DIG).to eq(53)
+  end
+
+  specify "MAX_10_EXP is 308" do
+    expect(Float::MAX_10_EXP).to eq(308)
+  end
+
+  specify "MIN_10_EXP is -308" do
+    expect(Float::MIN_10_EXP).to eq(-307)
+  end
+
+  specify "MAX_EXP is 1024" do
+    expect(Float::MAX_EXP).to eq(1024)
+  end
+
+  specify "MIN_EXP is -1021" do
+    expect(Float::MIN_EXP).to eq(-1021)
+  end
+
+  specify "MAX is 1.7976931348623157e+308" do
+    expect(Float::MAX).to eq((1 + (1 - (2.0 ** -52))) * (2.0 ** 1023))
+    expect(Float::MAX).to eq(1.7976931348623157e+308)
+  end
+
+  specify "MIN is 2.2250738585072014e-308" do
+    expect(Float::MIN).to eq(2.0 ** -1022)
+    expect(Float::MIN).to eq(2.2250738585072014e-308)
+  end
+
+  specify "RADIX is 2" do
+    expect(Float::RADIX).to eq(2)
+  end
+
+  specify "INFINITY is the positive infinity" do
+    expect(Float::INFINITY.infinite?).to eq(true)
+    expect(Float::INFINITY > 0.0).to eq(true)
+  end
+
+  specify "NAN is 'not a number'" do
+    expect(Float::NAN.nan?).to eq(true)
+  end
+end

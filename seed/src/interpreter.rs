@@ -90,6 +90,32 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
     }
 }
 
+/// The constants every program starts with (#152): `Float`'s, Ruby's values
+/// for an IEEE 754 double, under their qualified names, so `Float::MAX` reads
+/// like `Config::LIMIT`. They sit with the top-level constants rather than
+/// in `variables`, which every block call copies the names of — twelve more
+/// there doubled the time to parse the compiler.
+fn builtin_constants() -> HashMap<String, Value> {
+    let float_constants = [
+        ("DIG", Value::Integer(15)),
+        ("EPSILON", Value::Float(f64::EPSILON)),
+        ("INFINITY", Value::Float(f64::INFINITY)),
+        ("MANT_DIG", Value::Integer(53)),
+        ("MAX", Value::Float(f64::MAX)),
+        ("MAX_10_EXP", Value::Integer(308)),
+        ("MAX_EXP", Value::Integer(1024)),
+        ("MIN", Value::Float(f64::MIN_POSITIVE)),
+        ("MIN_10_EXP", Value::Integer(-307)),
+        ("MIN_EXP", Value::Integer(-1021)),
+        ("NAN", Value::Float(f64::NAN)),
+        ("RADIX", Value::Integer(2)),
+    ];
+    float_constants
+        .into_iter()
+        .map(|(name, value)| (format!("Float::{name}"), value))
+        .collect()
+}
+
 /// Whether a number sits inside an integer range, either end open (ADR
 /// 0019): Ruby's `cover?`, which is what `===` asks of a range.
 fn range_covers(start: Option<i64>, end: Option<i64>, exclusive: bool, probe: f64) -> bool {
@@ -592,7 +618,7 @@ impl<W: std::io::Write> Interpreter<W> {
             expression_depth: 0,
             methods: HashMap::new(),
             module_path: Vec::new(),
-            constants: HashMap::new(),
+            constants: builtin_constants(),
             redefinable: false,
             output,
             pending: None,
@@ -1321,6 +1347,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 let joined = path.join("::");
                 if let Some(binding) = self.variables.get(&joined) {
                     return Some(binding.value.clone());
+                }
+                if let Some(value) = self.constants.get(&joined) {
+                    return Some(value.clone());
                 }
                 if self.structs.contains_key(&joined) {
                     panic!("{joined} is a type, not a value");
