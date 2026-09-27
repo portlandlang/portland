@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A float with no integer refuses instead of answering a wrong one** ([#108](https://github.com/portlandlang/portland/issues/108)) — `to_i`, `floor`, `ceil`, `round`, and `truncate` on NaN answered 0, and on an infinity or anything past the 64-bit integers answered i64::MAX, a silent divergence the manifest already claimed was a refusal. NaN and the infinities now refuse where Ruby raises FloatDomainError (`NaN.to_i has no integer answer`), and a float past the 64-bit integers refuses where Ruby reaches for a bignum.
+
 - **A method call no longer copies every namespaced constant** ([#153](https://github.com/portlandlang/portland/issues/153)) — the seed kept `Config::LIMIT` and kin among the locals, so each call and each `require` cloned them into its fresh scope: with forty constants in reach, 200,000 calls ran 5.5 times slower. Namespace and type constants now sit in the one constants table every frame reads, and a call's scope starts empty.
 
 - **Float's constants** ([#152](https://github.com/portlandlang/portland/issues/152)) — `Float::MAX`, `MIN`, `EPSILON`, `INFINITY`, `NAN`, `DIG`, `MANT_DIG`, `RADIX`, and the exponent bounds, with Ruby's values for an IEEE 754 double, bound under qualified names the way a module's constants are, so they read anywhere, required files and the hosted spec runner included. ruby/spec's `core/float/constants_spec.rb` ports whole to `spec/number/float/constants_spec.pdx` (INFINITY's 1 asked as a sign), and uminus's boundary example comes in with them. language.md's library table gains Float's new predicates and constants, and a Symbol row it had never had.

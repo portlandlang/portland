@@ -1591,6 +1591,34 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A float with no integer to give refuses where Ruby raises
+/// FloatDomainError, and one past the 64-bit integers refuses where Ruby
+/// would reach for a bignum — never a silent 0 or i64::MAX (#108).
+#[test]
+fn float_to_integer_refuses_what_has_no_integer() {
+    assert_evaluator_matches_seed(
+        "evaluator_float_to_integer.pdx",
+        "p(2.5.to_i)\np(-2.5.to_i)\np(2.5.floor)\np(-2.5.ceil)\np(2.5.round)\np(-2.5.truncate)\np(9.2e18.to_i)\n",
+    );
+    let cases = [
+        ("p((0.0 / 0.0).to_i)\n", "NaN.to_i has no integer answer"),
+        (
+            "p((1.0 / 0.0).floor)\n",
+            "Infinity.floor has no integer answer",
+        ),
+        (
+            "p((-1.0 / 0.0).ceil)\n",
+            "-Infinity.ceil has no integer answer",
+        ),
+        ("p((0.0 / 0.0).round)\n", "NaN.round has no integer answer"),
+        (
+            "p(1.0e30.truncate)\n",
+            "1.0e+30.truncate overflows the 64-bit integers",
+        ),
+    ];
+    assert_both_oracles_refuse("float_to_integer_refusal.pdx", None, &cases);
+}
+
 /// `class` is a spelling of `struct` (ADR 0056, #127): the same values on
 /// both oracles, and the three Ruby shapes it has no Portland meaning for —
 /// inheritance, `class << self`, and instance variables — refuse with the

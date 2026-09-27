@@ -250,6 +250,24 @@ fn integer_power(left: i64, right: i64) -> Value {
     }
 }
 
+/// A float's integer, already rounded by `method`'s rule. NaN and the
+/// infinities have none (Ruby's FloatDomainError), and past the 64-bit
+/// integers Ruby would reach for a bignum, which Portland has not — both
+/// refuse rather than answer `as i64`'s silent 0 or i64::MAX (#108).
+fn float_to_integer(original: f64, rounded: f64, method: &str) -> Value {
+    let shown = Value::Float(original).shown();
+    if !rounded.is_finite() {
+        panic!("{shown}.{method} has no integer answer");
+    }
+    // 2^63 is exactly representable; every float below it and at or above
+    // -2^63 converts without saturating.
+    let limit = -(i64::MIN as f64);
+    if rounded >= limit || rounded < -limit {
+        panic!("{shown}.{method} overflows the 64-bit integers");
+    }
+    Value::Integer(rounded as i64)
+}
+
 fn floored_divide(left: i64, right: i64) -> i64 {
     let quotient = left / right;
     if left % right != 0 && (left < 0) != (right < 0) {
@@ -2771,7 +2789,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Float(number), "to_f", []) => Value::Float(*number),
             // Ruby's Float#to_i truncates toward zero — it is not the
             // floored division of ADR 0018.
-            (Value::Float(number), "to_i", []) => Value::Integer(*number as i64),
+            (Value::Float(number), "to_i", []) => float_to_integer(*number, number.trunc(), "to_i"),
             (Value::Float(number), "abs" | "magnitude", []) => Value::Float(number.abs()),
             (Value::Float(number), "zero?", []) => Value::Boolean(*number == 0.0),
             (Value::Float(number), "nan?", []) => Value::Boolean(number.is_nan()),
@@ -2783,10 +2801,16 @@ impl<W: std::io::Write> Interpreter<W> {
             // The rounding family answers Integers, Ruby's shapes verified on
             // 4.0.6: `round` goes half away from zero (Rust's f64::round
             // agrees), `truncate` toward it, `floor`/`ceil` by their names.
-            (Value::Float(number), "floor", []) => Value::Integer(number.floor() as i64),
-            (Value::Float(number), "ceil", []) => Value::Integer(number.ceil() as i64),
-            (Value::Float(number), "round", []) => Value::Integer(number.round() as i64),
-            (Value::Float(number), "truncate", []) => Value::Integer(number.trunc() as i64),
+            (Value::Float(number), "floor", []) => {
+                float_to_integer(*number, number.floor(), "floor")
+            }
+            (Value::Float(number), "ceil", []) => float_to_integer(*number, number.ceil(), "ceil"),
+            (Value::Float(number), "round", []) => {
+                float_to_integer(*number, number.round(), "round")
+            }
+            (Value::Float(number), "truncate", []) => {
+                float_to_integer(*number, number.trunc(), "truncate")
+            }
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
             (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
             (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),
