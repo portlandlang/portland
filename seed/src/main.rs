@@ -60,11 +60,21 @@ fn parse_file(path: &str) {
 /// any did. The ruby/spec stubs are thousands of files; one process per file
 /// would spend its time starting up rather than parsing.
 fn parse_files(paths: &[String]) {
+    // Each failure is reported once, on its file's line, with the refusal's
+    // first line — one line per file, so a tool can rank refusals across a
+    // corpus — rather than the panic hook's three lines beside it.
+    std::panic::set_hook(Box::new(|_| {}));
     let mut failed = 0;
     for path in paths {
         let source = read_source(path);
-        if catch_unwind(|| parser::parse(&source)).is_err() {
-            eprintln!("pdx --parse: {path} does not parse");
+        if let Err(payload) = catch_unwind(|| parser::parse(&source)) {
+            let message = payload
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| payload.downcast_ref::<&str>().copied())
+                .unwrap_or("a refusal with no message");
+            let first_line = message.lines().next().unwrap_or_default();
+            eprintln!("pdx --parse: {path} does not parse: {first_line}");
             failed += 1;
         }
     }

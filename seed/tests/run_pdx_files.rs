@@ -2640,6 +2640,22 @@ fn parse_only_takes_many_files_and_names_the_failures() {
         stderr.contains("1 of 3 files do not parse"),
         "got: {stderr}"
     );
+    // One line per failing file, carrying its refusal, so a tool reading a
+    // corpus's worth of these can rank refusals (ruby_research#9); the
+    // panic's own report is not printed beside it.
+    let failures: Vec<&str> = stderr
+        .lines()
+        .filter(|line| line.contains("does not parse"))
+        .collect();
+    assert_eq!(failures.len(), 1, "got: {stderr}");
+    assert!(
+        failures[0].starts_with(&format!(
+            "pdx --parse: {} does not parse: unexpected token",
+            bad.display()
+        )),
+        "got: {stderr}"
+    );
+    assert!(!stderr.contains("panicked"), "got: {stderr}");
 }
 
 /// The ruby/spec stubs (spec/ruby/, written by script/ruby_spec_stubs) are
