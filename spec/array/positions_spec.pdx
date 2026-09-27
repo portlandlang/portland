@@ -1,0 +1,86 @@
+# An array by its positions (#104), from ruby/spec core/array: rotate,
+# values_at, and each_index. Values never mutate, so the frozen, identity,
+# recursive-array, and mid-walk-shift examples stay upstream, with rotate!
+# and the subclass ones; so do the to_int rows (ADR 0036), where a Float
+# or a mock would stand in for an integer, and the blockless Enumerator.
+
+require_relative "../spec_helper"
+
+context "Array#rotate" do
+  describe "when passed no argument" do
+    specify "returns a copy of the array with the first element moved at the end" do
+      expect([1, 2, 3, 4, 5].rotate).to eq([2, 3, 4, 5, 1])
+    end
+  end
+
+  describe "with an argument n" do
+    specify "returns a copy of the array with the first (n % size) elements moved at the end" do
+      numbers = [1, 2, 3, 4, 5]
+      expect(numbers.rotate(2)).to eq([3, 4, 5, 1, 2])
+      expect(numbers.rotate(-1)).to eq([5, 1, 2, 3, 4])
+      expect(numbers.rotate(-21)).to eq([5, 1, 2, 3, 4])
+      expect(numbers.rotate(13)).to eq([4, 5, 1, 2, 3])
+      expect(numbers.rotate(0)).to eq(numbers)
+    end
+  end
+
+  specify "returns a copy of the array when its length is one or zero" do
+    expect([1].rotate).to eq([1])
+    expect([1].rotate(2)).to eq([1])
+    expect([1].rotate(-42)).to eq([1])
+    expect([].rotate).to eq([])
+    expect([].rotate(2)).to eq([])
+    expect([].rotate(-42)).to eq([])
+  end
+end
+
+context "Array#values_at" do
+  specify "returns an array of elements at the indexes when passed indexes" do
+    expect([1, 2, 3, 4, 5].values_at).to eq([])
+    expect([1, 2, 3, 4, 5].values_at(1, 0, 5, -1, -8, 10)).to eq([2, 1, nil, 5, nil, nil])
+  end
+
+  describe "when passed ranges" do
+    specify "returns an array of elements in the ranges" do
+      expect([1, 2, 3, 4, 5].values_at(0..2, 1...3, 2..-2)).to eq([1, 2, 3, 2, 3, 3, 4])
+      expect([1, 2, 3, 4, 5].values_at(6..4)).to eq([])
+    end
+  end
+
+  describe "when passed a range" do
+    specify "fills with nil if the index is out of the range" do
+      expect([0, 1].values_at(0..3)).to eq([0, 1, nil, nil])
+      expect([0, 1].values_at(2..4)).to eq([nil, nil, nil])
+    end
+
+    describe "on an empty array" do
+      specify "fills with nils if the index is out of the range" do
+        expect([].values_at(0..2)).to eq([nil, nil, nil])
+        expect([].values_at(1..3)).to eq([nil, nil, nil])
+      end
+    end
+  end
+
+  specify "works when given endless ranges" do
+    expect([1, 2, 3, 4].values_at(1..)).to eq([2, 3, 4])
+    expect([1, 2, 3, 4].values_at(3...)).to eq([4])
+  end
+
+  specify "works when given beginless ranges" do
+    expect([1, 2, 3, 4].values_at(..2)).to eq([1, 2, 3])
+    expect([1, 2, 3, 4].values_at(...2)).to eq([1, 2])
+  end
+end
+
+context "Array#each_index" do
+  specify "passes the index of each element to the block" do
+    mutable seen = []
+    ["a", "b", "c", "d"].each_index { |index| seen = seen + [index] }
+    expect(seen).to eq([0, 1, 2, 3])
+  end
+
+  specify "returns self" do
+    symbols = [:a, :b, :c]
+    expect(symbols.each_index { |index| index }).to eq(symbols)
+  end
+end

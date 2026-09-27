@@ -102,6 +102,21 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/rotate_spec.rb:
+  pdx: [spec/array/positions_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so rotate! and the frozen and identity checks stay behind; no to_int conversion (ADR 0036); no subclasses."
+  link: docs/ruby/mutability.md
+core/array/values_at_spec.rb:
+  pdx: [spec/array/positions_spec.pdx]
+  status: partial_intentional
+  reason: "No to_int conversion (ADR 0036); values never mutate, so no array can hold itself; no subclasses."
+  link: docs/ruby/aliases.md
+core/array/each_index_spec.rb:
+  pdx: [spec/array/positions_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so the shift and mid-walk-growth examples stay behind; a blockless walk answers no Enumerator (ADR 0055)."
+  link: docs/ruby/mutability.md
 core/array/find_index_spec.rb:
   pdx: [spec/array/find_index_spec.pdx]
   status: partial_intentional

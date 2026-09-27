@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array `rotate`, `values_at`, and `each_index` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — eleven examples in `spec/array/positions_spec.pdx`, endless and beginless ranges included.
+
 - **`rotate`, `values_at`, and `each_index`, and a notation for any number of arguments** ([#104](https://github.com/portlandlang/portland/issues/104)) — on both implementations:
   - `rotate` turns an array either way.
   - `values_at` picks by position or range, padding past the end with nil as Ruby's `rb_range_component_beg_len` does. A range starting before the array refuses with Ruby's `-5..1 out of range`.
