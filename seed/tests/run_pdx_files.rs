@@ -494,6 +494,24 @@ fn assert_evaluator_matches_seed(name: &str, source: &str) {
     );
 }
 
+/// The differential harness, with the answer pinned too: both
+/// implementations print `expected`, which is Ruby's own output where the
+/// test says so — agreement alone would let both drift together.
+fn assert_both_print(name: &str, source: &str, expected: &str) {
+    assert_evaluator_matches_seed(name, source);
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert_eq!(
+        String::from_utf8(direct.stdout).unwrap(),
+        expected,
+        "{name}"
+    );
+}
+
 #[test]
 fn portland_evaluator_matches_the_seed_on_optionals() {
     assert_evaluator_matches_seed(
@@ -1699,6 +1717,19 @@ fn float_steps_match_ruby() {
     assert_evaluator_matches_seed(
         "evaluator_float_steps.pdx",
         "p(0.0.next_float)\np(-0.0.next_float)\np(1.0.next_float)\np(-1.0.next_float)\np(1.0.prev_float)\np(0.0.prev_float)\np(Float::MAX.next_float)\np(-Float::INFINITY.next_float)\np(Float::INFINITY.prev_float)\np(Float::INFINITY.next_float)\np(-0.0.prev_float.next_float)\np(0.0.next_float.prev_float)\np(Float::NAN.next_float.nan?)\np(0.37.prev_float.next_float)\n",
+    );
+}
+
+/// `==` between collections asks `==` of what they hold, as Ruby's does:
+/// numbers cross (`[1] == [1.0]`), a hash's order is not its identity, and
+/// its keys still match by `eql?`, so `{1 => :x}` is not `{1.0 => :x}`
+/// (Ruby 4.0.6, the expected lines).
+#[test]
+fn collection_equality_asks_rubys_equality_of_members() {
+    assert_both_print(
+        "evaluator_collection_equality.pdx",
+        "struct Point\n  x\n  y\nend\np([1] == [1.0])\np({a: 1} == {a: 1.0})\np([[1]] == [[1.0]])\np([1] != [1.0])\np({a: 1, b: 2} == {b: 2, a: 1})\np({a: 1, b: 2} != {b: 2, a: 1})\np({1 => :x} == {1.0 => :x})\np([1, 2] == [1.0, 2.5])\np([1] == [1, 1])\np(Point.new(x: 1, y: 2) == Point.new(x: 1.0, y: 2))\n",
+        "true\ntrue\ntrue\nfalse\ntrue\nfalse\nfalse\nfalse\nfalse\ntrue\n",
     );
 }
 

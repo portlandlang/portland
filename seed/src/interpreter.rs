@@ -631,9 +631,11 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
         (Value::Integer(left), BinaryOperator::LessOrEqual, Value::Integer(right)) => {
             Value::Boolean(left <= right)
         }
-        // Equality is defined for every value pair; mixed types are just unequal.
-        (left, BinaryOperator::Equals, right) => Value::Boolean(left == right),
-        (left, BinaryOperator::NotEquals, right) => Value::Boolean(left != right),
+        // Equality is defined for every value pair; mixed types are just
+        // unequal. It is Ruby's `==`, which asks `==` of what a collection
+        // holds — not the `eql?` a hash key matches by.
+        (left, BinaryOperator::Equals, right) => Value::Boolean(left.ruby_equals(&right)),
+        (left, BinaryOperator::NotEquals, right) => Value::Boolean(!left.ruby_equals(&right)),
         (left, operator, right) => {
             panic!(
                 "cannot apply '{}' to {} and {}",

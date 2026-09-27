@@ -90,6 +90,18 @@ pub fn canonical_ordering(left: &str, right: &str) -> std::cmp::Ordering {
     left.nfc().cmp(right.nfc())
 }
 
+/// Labelled members in order — a struct's fields, an enum case's payload —
+/// compared by label and by Ruby's `==` (`Value::ruby_equals`).
+fn pairs_equal(left: &[(String, Value)], right: &[(String, Value)]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right.iter())
+            .all(|((left_label, left), (right_label, right))| {
+                left_label == right_label && left.ruby_equals(right)
+            })
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -145,6 +157,57 @@ impl PartialEq for Value {
 }
 
 impl Value {
+    /// Ruby's `==`, where `PartialEq` above is its `eql?` — the equality a
+    /// hash key matches by. The two part at numbers: `1 == 1.0`, and a
+    /// collection asks `==` of what it holds, so `[1] == [1.0]` too. A
+    /// hash's order is not its identity, and its keys still match by
+    /// `eql?`, so `{1 => :x}` is not `{1.0 => :x}`.
+    pub fn ruby_equals(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Integer(left), Value::Float(right))
+            | (Value::Float(right), Value::Integer(left)) => *left as f64 == *right,
+            (Value::Array(left), Value::Array(right)) => {
+                left.len() == right.len()
+                    && left
+                        .iter()
+                        .zip(right.iter())
+                        .all(|(left, right)| left.ruby_equals(right))
+            }
+            (Value::Hash(left), Value::Hash(right)) => {
+                left.len() == right.len()
+                    && left.iter().all(|(key, value)| {
+                        right
+                            .iter()
+                            .find(|(other_key, _)| other_key == key)
+                            .is_some_and(|(_, other_value)| value.ruby_equals(other_value))
+                    })
+            }
+            (
+                Value::Struct {
+                    fields: left_fields,
+                    name: left_name,
+                },
+                Value::Struct {
+                    fields: right_fields,
+                    name: right_name,
+                },
+            ) => left_name == right_name && pairs_equal(left_fields, right_fields),
+            (
+                Value::EnumCase {
+                    name: left_name,
+                    payload: left_payload,
+                },
+                Value::EnumCase {
+                    name: right_name,
+                    payload: right_payload,
+                },
+            ) => left_name == right_name && pairs_equal(left_payload, right_payload),
+            (Value::Some(left), Value::Some(right))
+            | (Value::Failure(left), Value::Failure(right)) => left.ruby_equals(right),
+            _ => self == other,
+        }
+    }
+
     pub fn array(elements: Vec<Value>) -> Value {
         Value::Array(std::rc::Rc::new(elements))
     }

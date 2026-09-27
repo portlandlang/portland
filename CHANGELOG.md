@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`==` between collections is Ruby's** — arrays, hashes, structs, and enum payloads compared their members by `eql?`, so `[1] == [1.0]` was false and `{a: 1, b: 2} == {b: 2, a: 1}` was false, both silently unlike Ruby. `==` and `!=` now ask `==` of each member, as Ruby's do: numbers cross, and a hash's order is not its identity. Hash keys still match by `eql?`, so `{1 => :x} == {1.0 => :x}` stays false, as in Ruby. Tests can now pin Ruby's printed answer as well as the two implementations' agreement.
+
 - **The smallest integer over -1** — `/` and `divmod` refuse with `-9223372036854775808 / -1 overflows the 64-bit integers`, where Ruby's answer is a bignum, and `%` and `remainder` answer 0 as Ruby's do. Both had tripped the host's own overflow panic.
 
 - **`div`, `remainder`, and `ceildiv`** ([#107](https://github.com/portlandlang/portland/issues/107)) — ADR 0018's on-demand division names, on both implementations:
