@@ -20,6 +20,13 @@ For anything an end user types, matching Ruby is the preferred answer unless it 
 
 Every divergence must name the principle that justified it. "It seemed cleaner" is not one.
 
+**The promise to Rubyists: it feels like home, and porting is mechanical.** Not "your Ruby runs unchanged" — that promise would cost the reasons Portland exists — but a language that reads like Ruby and a migration where each change is one the ledger names and a linter could make. Two kinds of difference sit under that promise, and they are argued differently:
+
+- **Thesis differences** are why Portland exists: values never mutate, absence is explicit rather than ambient nil, failures are values rather than exceptions, and the runtime is closed to metaprogramming. Their friction is the price of the language. The answer to it is sugar that keeps Ruby's spelling over Portland's semantics — `+=`, `<<`, and a bang method as rebinding — and a migration linter, not retreat.
+- **Taste differences** are spellings and keywords removed because they seemed redundant or unclean. These default to Ruby. `class`, `%i[]`, `<=>`, and constants each came back once someone asked what the removal bought; a taste difference that remains has to name what it buys.
+
+Ruled by the deciding user on 2026-09-27, after a run of taste removals had made the migration list feel longer than the thesis ever required.
+
 ### 3. Never guess
 
 Where one spelling has two genuine readings, Portland refuses and names both readings with their rewrites. It does not pick.
