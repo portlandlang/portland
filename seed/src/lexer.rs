@@ -132,7 +132,8 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 // Comment runs to end of line; the newline itself still lexes.
                 scan_while(&mut chars, |character| character != '\n');
             }
-            '\n' => {
+            // `;` ends a statement exactly where a newline would (#136).
+            '\n' | ';' => {
                 chars.next();
                 tokens.push(Token {
                     leading_space: false,

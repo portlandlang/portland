@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`;` separates statements** ([#136](https://github.com/portlandlang/portland/issues/136)) — neither lexer knew it, so `def five; 5; end`, `a = 1; b = 2`, and `class Error < StandardError; end`'s shape all refused at the `;`. ruby_research's level-0 census found that in 38,455 gems, the only refusal for 4,379. No ADR removes it, so tie goes to Ruby: both lexers read `;` as the newline token, on the same line for line numbers, and a `;` inside a string is untouched.
+
 - **`pdx --parse` over many files names each refusal on its file's line** — `pdx --parse: lib/token.rb does not parse: 'class Token < Node' inherits, …`, one line per failing file, with the panic hook's three-line report no longer printed beside it. The corpus readiness census (ruby_research#9) ranks refusals across every gem's files from these lines.
 
 - **`private` in a type body refuses instead of becoming a field** ([#132](https://github.com/portlandlang/portland/issues/132)) — a struct or class body read `private` on its own line as a field named `private`, so every Ruby class saying it quietly meant something else, which principle 5 forbids. `private`, `protected`, `public`, `module_function`, and `private_constant` now refuse on both implementations, before the methods, after them, or on a `def`'s own line — `'private' has no Portland meaning yet — visibility is undecided (#133); remove it to run` — until [#133](https://github.com/portlandlang/portland/issues/133) decides what visibility is.

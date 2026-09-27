@@ -525,6 +525,13 @@ def lex(raw_source, first_line: 1)
       index += 1
       next
     end
+    # `;` ends a statement exactly where a newline would (#136), on the
+    # same line.
+    if character == ";"
+      tokens << Token.new(kind: "newline", text: "", leading_space: leading, line: line)
+      index += 1
+      next
+    end
     if character == "\""
       text = read_double_quoted(characters, index)
       tokens << Token.new(kind: "string", text: text, leading_space: leading, line: line)

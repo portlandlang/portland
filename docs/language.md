@@ -371,7 +371,7 @@ Read-only, and small on purpose.
 
 The twins ride along ([ADR 0036](adr/0036-2026-08-18-the-famous-twins-ship.md)): every pure Ruby synonym whose survivor exists here — `size` for `length`, `collect` for `map`, `inject` for `reduce`, `detect` for `find`, `filter`/`find_all` for `select`, `collect_concat` for `flat_map`, `entries` for `to_a`, `each_pair` for Hash's `each`, `magnitude` for `abs`, `member?` for membership, and Hash's `has_key?`/`include?`/`member?` all asking `key?`'s question. Each shares its survivor's implementation — one behavior, many spellings, drift impossible. The false aliases (`to_ary`, `to_int`, `to_str` — Ruby's implicit-conversion protocol, not spellings) refuse naming the real conversion.
 
-Method chains continue across newlines with a leading dot.
+Method chains continue across newlines with a leading dot. A `;` ends a statement exactly where a newline would ([#136](https://github.com/portlandlang/portland/issues/136)), so `def five; 5; end` and `a = 1; b = 2` read as in Ruby.
 
 **IO** is `puts` (one line per argument, produces no value), `p` (prints `inspect` renderings and returns its argument, like Ruby), and crude file access: `argv()`, `read_file(path)`, `write_file(path, content)`. Those three are placeholder names until the real object model exists.
 

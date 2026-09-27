@@ -1626,6 +1626,17 @@ fn class_is_a_spelling_of_struct_on_both_oracles() {
     assert_both_oracles_refuse("class_refusal.pdx", None, &cases);
 }
 
+/// `;` ends a statement where a newline would (#136) — Ruby's separator,
+/// which no ADR removes — at the top level, in a def, a type body, and a
+/// block; inside a string it is just a character.
+#[test]
+fn semicolons_separate_statements_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_semicolons.pdx",
+        "a = 1; b = 2; p a + b\ndef five; 5; end\np five\nclass Pair; left; right; end\np Pair.new(left: 1, right: 2)\n[1, 2].each { |number| doubled = number * 2; p doubled }\nputs \"a; b\"\n",
+    );
+}
+
 /// Ruby's visibility words in a type body refuse until #133 decides them,
 /// rather than reading as fields named `private` (#132) — before the
 /// methods, after them, and on a `def`'s own line.
