@@ -15,3 +15,33 @@ context "Array" do
     end
   end
 end
+
+# ruby/spec core/array/plus_spec.rb and multiply_spec.rb, title for title
+# (#104). Staying upstream: to_ary and to_int conversion (ADR 0036), the
+# refusals where Ruby raises, recursive arrays and identity (values never
+# mutate), subclasses, and `*` with a string — Ruby's join by another
+# name, which would give one spelling two behaviors (principle 3); `join`
+# is the spelling.
+
+context "Array#+" do
+  specify "concatenates two arrays" do
+    expect([1, 2, 3] + [3, 4, 5]).to eq([1, 2, 3, 3, 4, 5])
+    expect([1, 2, 3] + []).to eq([1, 2, 3])
+    expect([] + [1, 2, 3]).to eq([1, 2, 3])
+    expect([] + []).to eq([])
+  end
+
+  specify "can concatenate an array with itself" do
+    numbers = [1, 2, 3]
+    expect(numbers + numbers).to eq([1, 2, 3, 1, 2, 3])
+  end
+end
+
+context "Array#* with an integer" do
+  specify "concatenates n copies of the array when passed an integer" do
+    expect([1, 2, 3] * 0).to eq([])
+    expect([1, 2, 3] * 1).to eq([1, 2, 3])
+    expect([1, 2, 3] * 3).to eq([1, 2, 3, 1, 2, 3, 1, 2, 3])
+    expect([] * 10).to eq([])
+  end
+end

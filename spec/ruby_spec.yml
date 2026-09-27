@@ -102,6 +102,16 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/plus_spec.rb:
+  pdx: [spec/array/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No to_ary conversion (ADR 0036), so a non-array refuses where Ruby raises TypeError; values never mutate, so no array can hold itself; no subclasses."
+  link: docs/ruby/aliases.md
+core/array/multiply_spec.rb:
+  pdx: [spec/array/operators_spec.pdx]
+  status: partial_intentional
+  reason: "* with a string is Ruby's join by another name, one spelling with two behaviors (principle 3), so join is its spelling; no to_str or to_int conversion; a negative count refuses where Ruby raises; no subclasses."
+  link: docs/principles.md
 core/array/minus_spec.rb:
   pdx: [spec/array/set_arithmetic_spec.pdx]
   status: partial_intentional
