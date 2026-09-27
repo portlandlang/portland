@@ -1,0 +1,44 @@
+# Where a value or a block's true first falls (#104), from ruby/spec
+# core/array: find_index and rindex. Each answers a maybe (ADR 0010).
+# Staying upstream: mocks whose own == takes over, recursive arrays and
+# mid-walk mutation (values never mutate), a block beside an argument (the
+# block-not-used warning), and the blockless Enumerator (ADR 0055 has none
+# to answer for a search).
+
+require_relative "../spec_helper"
+
+context "Array#find_index" do
+  specify "returns 0 if first element == to object" do
+    expect([2, 1, 3, 2, 5].find_index(2)).to eq(0)
+  end
+
+  specify "returns size-1 if only last element == to object" do
+    expect([2, 1, 3, 1, 5].find_index(5)).to eq(4)
+  end
+
+  specify "returns nil if no element == to object" do
+    expect([2, 1, 1, 1, 1].find_index(3)).to eq(nil)
+  end
+
+  specify "accepts a block instead of an argument" do
+    expect([4, 2, 1, 5, 1, 3].find_index { |number| number < 2 }).to eq(2)
+  end
+end
+
+context "Array#rindex" do
+  specify "returns size-1 if last element == to object" do
+    expect([2, 1, 3, 2, 5].rindex(5)).to eq(4)
+  end
+
+  specify "returns 0 if only first element == to object" do
+    expect([2, 1, 3, 1, 5].rindex(2)).to eq(0)
+  end
+
+  specify "returns nil if no element == to object" do
+    expect([1, 1, 3, 2, 1, 3].rindex(4)).to eq(nil)
+  end
+
+  specify "accepts a block instead of an argument" do
+    expect([4, 2, 1, 5, 1, 3].rindex { |number| number < 2 }).to eq(4)
+  end
+end

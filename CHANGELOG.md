@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array `find_index` and `rindex` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — eight examples in `spec/array/find_index_spec.pdx`.
+
 - **Array's index family** ([#104](https://github.com/portlandlang/portland/issues/104)) — `index` takes a true-or-false block as well as a value, and `find_index` is its twin. `rindex` searches from the far end. Each answers a maybe and asks Ruby's `==` of a value. A range answers `find_index` with a block, as Ruby's Enumerable does, but not `index` or `rindex`, which Ruby's Range lacks.
 
 - **Nine core/array files ported title for title** ([#104](https://github.com/portlandlang/portland/issues/104)) — `take`, `drop`, `take_while`, and `drop_while` port to `spec/array/take_drop_spec.pdx`. `empty?`, `length`, `size`, and `include?` join their house specs, and `to_a` opens `spec/array/conversion_spec.pdx`.
