@@ -1243,9 +1243,6 @@ impl<'source> Parser<'source> {
             self.expect_statement_boundary();
             self.skip_newlines();
         }
-        if fields.is_empty() {
-            panic!("struct {name} needs at least one field");
-        }
         self.position += 1; // the `end`
         let definition = Statement::StructDefinition {
             constants,

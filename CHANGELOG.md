@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A struct may have no fields** — Ruby's empty Struct, and the everyday class that is only methods (`class Greeter` with a `def hello`, since `class` spells `struct`, #127). The seed had refused one with `struct Empty needs at least one field` while the compiler already built it, so the two implementations disagreed; both now agree with Ruby.
+
 - **core/array's mutators recorded as decided out** ([#104](https://github.com/portlandlang/portland/issues/104)) — eighteen files skipped under ADR 0015, each reason naming the rebinding that replaces it: `push`, `append`, `pop`, `shift`, `unshift`, `prepend`, `clear`, `concat`, `delete`, `delete_at`, `delete_if`, `keep_if`, `fill`, `insert`, `replace`, `dup`, `clone`, and `frozen?`.
 
 - **An Integer's `digits`, `ord`, and `size`** ([#107](https://github.com/portlandlang/portland/issues/107)) — `digits` answers place values least significant first, in any radix from 2 up. A bad radix or a negative self refuses in Ruby's words (`invalid radix 1`, `negative radix`, `out of domain`). An Integer's `ord` is itself, and its `size` is the 8 bytes Ruby reports for a machine integer. The hosted evaluator asks `size` by its own name rather than through `length`. ruby/spec's three files port to `spec/number/integer/digits_spec.pdx`.

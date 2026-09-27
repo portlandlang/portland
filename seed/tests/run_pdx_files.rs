@@ -1770,6 +1770,18 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A struct may have no fields — Ruby's empty Struct, and a class that is
+/// only methods — on both implementations; the seed had refused one the
+/// compiler already built.
+#[test]
+fn a_struct_may_have_no_fields() {
+    assert_both_print(
+        "evaluator_fieldless_struct.pdx",
+        "struct Empty\nend\nclass Greeter\n  def hello = \"hi\"\nend\np(Empty.new)\np(Empty.new == Empty.new)\np(Greeter.new.hello)\nputs(Empty.new.to_s)\n",
+        "Empty()\ntrue\n\"hi\"\nEmpty()\n",
+    );
+}
+
 /// `digits`, `ord`, and `size` (#107): place values least significant
 /// first in any radix from 2 up, an Integer's `ord` is itself, and its
 /// `size` is the 8 bytes Ruby reports for a 64-bit machine integer (Ruby
