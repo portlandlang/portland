@@ -25,13 +25,17 @@ fn run() {
     let mut arguments = std::env::args().skip(1);
     let first = arguments.next();
     match first.as_deref() {
-        Some("--parse") => match arguments.next() {
-            Some(path) => parse_file(&path),
-            None => {
-                eprintln!("pdx --parse: needs a file to parse");
-                process::exit(64);
+        Some("--parse") => {
+            let paths: Vec<String> = arguments.collect();
+            match paths.as_slice() {
+                [] => {
+                    eprintln!("pdx --parse: needs a file to parse");
+                    process::exit(64);
+                }
+                [path] => parse_file(path),
+                _ => parse_files(&paths),
             }
-        },
+        }
         Some(path) => run_file(path),
         None => repl(),
     }
@@ -50,6 +54,27 @@ fn run() {
 /// the caller only has to look at the status.
 fn parse_file(path: &str) {
     parser::parse(&read_source(path));
+}
+
+/// Parse many files in one process, naming each that fails, and exit 1 if
+/// any did. The ruby/spec stubs are thousands of files; one process per file
+/// would spend its time starting up rather than parsing.
+fn parse_files(paths: &[String]) {
+    let mut failed = 0;
+    for path in paths {
+        let source = read_source(path);
+        if catch_unwind(|| parser::parse(&source)).is_err() {
+            eprintln!("pdx --parse: {path} does not parse");
+            failed += 1;
+        }
+    }
+    if failed > 0 {
+        eprintln!(
+            "pdx --parse: {failed} of {} files do not parse",
+            paths.len()
+        );
+        process::exit(1);
+    }
 }
 
 fn read_source(path: &str) -> String {

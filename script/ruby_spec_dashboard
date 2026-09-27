@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S rv run ruby
 # The data behind portlandlang.com's spec dashboard: every spec file in a
 # ruby/spec checkout, each with one status, as JSON on stdout.
 #

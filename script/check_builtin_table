@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S rv run ruby
 # The builtin method table in compiler/inference.pdx must match what the
 # seed actually answers (#88). This runs script/probe_builtin_methods and
 # diffs its eight lines against the table, type by type and entry by entry

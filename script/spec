@@ -18,7 +18,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+. script/lib/rust.sh
 cargo build --quiet --package portland-seed --bin pdx
 
 transcript=$(mktemp)
@@ -67,8 +67,26 @@ total_pendings=0
 # would not be if a spec path ever contained a space. Kept in the parent shell
 # rather than piped into `while read`, because a pipeline gets a subshell and
 # `failed` would be set in it and lost.
-specs=$(find spec -name "*_spec.pdx" | sort)
+#
+# spec/ruby/ is left out: those are the ruby/spec stubs, every example a
+# pending, which cannot fail — running them would prove only that they parse,
+# at many minutes a run. They are parsed below instead, in under a second.
+specs=$(find spec -name "*_spec.pdx" -not -path "spec/ruby/*" | sort)
 [ -n "$specs" ] || { echo "no *_spec.pdx files under spec/"; exit 1; }
+
+# The stubs parse, all in one process; the counts are the generator's own,
+# from spec/ruby/pendings.yml.
+stubs=$(find spec/ruby -name "*_spec.pdx" 2>/dev/null | sort)
+if [ -n "$stubs" ]; then
+  if ./target/debug/pdx --parse $stubs; then
+    stub_count=$(sed -n 's/^stubs: //p' spec/ruby/pendings.yml)
+    stub_pendings=$(sed -n 's/^pendings: //p' spec/ruby/pendings.yml)
+    echo "ruby/spec stubs: $stub_count files parse, holding $stub_pendings pendings (not run)"
+  else
+    echo "ruby/spec stubs: some do not parse — regenerate with script/ruby_spec_stubs"
+    failed=1
+  fi
+fi
 
 # The hosted half runs once for the whole suite, not once per spec. What a
 # hosted spec costs is not the compiler — loading that is 0.02s — but

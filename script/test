@@ -1,11 +1,56 @@
 #!/bin/sh
-# Run the full test suite and linters.
+# Run the test suite and linters.
+#
+#   script/test          everything — the same as --all
+#   script/test --all    everything
+#   script/test --fast   everything but seed/tests/whole_suites.rs: the
+#                        language spec on both implementations and the
+#                        checker over the compiler's own source, each over a
+#                        minute. About twenty seconds of tests instead of two
+#                        minutes.
+#
+# Each group is its own labeled step, so the output says what ran: cargo's
+# `--quiet` hides the file each group comes from, and without it cargo names
+# every one of hundreds of tests. The test targets are named one by one — the
+# seed's library, then each file in seed/tests/ — and the rest are left out
+# because none holds any tests: the `pdx` binary, doc tests, and `crate/`,
+# which exists only to hold the `portland` name on crates.io. A new test file
+# in seed/tests/ needs a step here, or it does not run.
 set -e
 cd "$(dirname "$0")/.."
 
-export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+case "${1:---all}" in
+  --all) scope=all ;;
+  --fast) scope=fast ;;
+  *)
+    echo "usage: script/test [--all | --fast]" >&2
+    exit 64
+    ;;
+esac
 
+. script/lib/rust.sh
+
+step() {
+  echo ""
+  echo "== $1"
+}
+
+step "format — cargo fmt --check"
 cargo fmt --check
+
+step "lint — clippy, warnings as errors"
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --quiet
+
+step "unit tests — seed/src"
+cargo test --package portland-seed --quiet --lib
+
+step "integration tests — seed/tests/run_pdx_files.rs"
+cargo test --package portland-seed --quiet --test run_pdx_files
+
+if [ "$scope" = all ]; then
+  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (about two minutes)"
+  cargo test --package portland-seed --quiet --test whole_suites
+fi
+
+step "docs checks — script/docs/check"
 script/docs/check

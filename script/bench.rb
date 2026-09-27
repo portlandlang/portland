@@ -25,8 +25,10 @@ def repo_root = File.expand_path("..", __dir__)
 
 def build_seed
   Dir.chdir(repo_root) do
-    system({ "PATH" => "/opt/homebrew/opt/rustup/bin:#{ENV.fetch("PATH")}" },
-           "cargo", "build", "--quiet", "--package", "portland-seed", "--bin", "pdx",
+    # rustup found the way every script finds it — see script/lib/rust.sh.
+    system('sh',
+           '-c',
+           '. script/lib/rust.sh && cargo build --quiet --package portland-seed --bin pdx',
            exception: true)
   end
 end

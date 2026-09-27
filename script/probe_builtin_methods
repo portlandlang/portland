@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S rv run ruby
 # Derive the builtin method table from the seed's behavior (#88): for each
 # builtin receiver, which names answer, with how many positional arguments,
 # and whether with a block. The seed marks every refusal it makes with a

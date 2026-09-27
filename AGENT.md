@@ -37,7 +37,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 |                        |                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------- |
-| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks |
+| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks; `--fast` skips the two whole-suite tests (about 20s instead of 2 minutes) |
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
@@ -45,7 +45,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/ruby_spec_dashboard PATH` | the spec dashboard's JSON, from a ruby/spec checkout and `spec/ruby_spec.yml` |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
-**Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`.
+**Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`. Every file not yet taken in has a generated stub under `spec/ruby/` (`script/ruby_spec_stubs ~/Developer/ruby/spec`): its upstream titles as pendings, parsed by the gate but never run. Importing a file means deleting its stub and regenerating.
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.
 

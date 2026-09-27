@@ -1279,46 +1279,6 @@ fn portland_types_dumps_method_returns() {
     );
 }
 
-/// The checker's own source passes its own checks — every compiler file,
-/// through `check.pdx`. The inference-backed refusals (ADR 0047) fire on
-/// types read off real code, and this ~6,000-line corpus is the standing
-/// proof that they refuse nothing that runs: a false positive here is a
-/// checker bug by doctrine (ADR 0040), and the first one was caught by
-/// exactly this run — `mutable result = nil` rebound inside an `each`.
-#[test]
-fn the_checker_passes_the_compilers_own_source() {
-    let compiler = format!("{}/../compiler", env!("CARGO_MANIFEST_DIR"));
-    // The fixtures ride along: every one is a program the seed runs, and a
-    // `reduce(0) { |count, line| … }` among them was the first false
-    // positive this run did not cover.
-    let fixtures = format!("{}/tests/fixtures", env!("CARGO_MANIFEST_DIR"));
-    let mut files: Vec<_> = [&compiler, &fixtures]
-        .iter()
-        .flat_map(|directory| std::fs::read_dir(directory).unwrap())
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
-        .collect();
-    files.sort();
-    assert!(
-        files.len() > 5,
-        "the compiler directory should hold the trio"
-    );
-    // One process for the whole corpus: `check.pdx` follows each file's
-    // requires (#94) and shares its memo across the files it is handed, so
-    // the compiler is checked once rather than once per file that requires
-    // it.
-    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
-        .arg(format!("{compiler}/check.pdx"))
-        .args(&files)
-        .output()
-        .expect("failed to run pdx");
-    assert!(
-        checked.status.success(),
-        "the compiler and fixtures should pass the checker, got: {}",
-        String::from_utf8_lossy(&checked.stderr)
-    );
-}
-
 /// A struct's field named like a builtin is the field, not the builtin (#96):
 /// hosted, a guest struct is a tagged host array, and `size` on one once
 /// answered its three elements. The seed's order — methods, fields, then
@@ -2589,6 +2549,89 @@ fn parse_only_needs_a_file() {
     );
 }
 
+/// Parse-only takes many files in one process, naming each that fails and
+/// exiting 1 if any did — what lets the gate parse thousands of ruby/spec
+/// stubs in under a second.
+#[test]
+fn parse_only_takes_many_files_and_names_the_failures() {
+    let directory = std::env::temp_dir().join("parse_only_many");
+    std::fs::create_dir_all(&directory).unwrap();
+    let good = directory.join("good.pdx");
+    let bad = directory.join("bad.pdx");
+    std::fs::write(&good, "x = 1\n").unwrap();
+    std::fs::write(&bad, "x = (\n").unwrap();
+
+    let clean = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--parse")
+        .args([&good, &good])
+        .output()
+        .expect("failed to run pdx");
+    assert!(clean.status.success(), "two good files should parse");
+
+    let mixed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--parse")
+        .args([&good, &bad, &good])
+        .output()
+        .expect("failed to run pdx");
+    assert!(!mixed.status.success(), "a bad file should fail the run");
+    let stderr = String::from_utf8(mixed.stderr).unwrap();
+    assert!(
+        stderr.contains(&format!("{} does not parse", bad.display())),
+        "the failure should be named, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("1 of 3 files do not parse"),
+        "got: {stderr}"
+    );
+}
+
+/// The ruby/spec stubs (spec/ruby/, written by script/ruby_spec_stubs) are
+/// parsed, never run: every example in them is a pending, which cannot fail,
+/// so running them would prove only that they parse. They all parse, in one
+/// process, and there are as many as the generator's index says.
+#[test]
+fn the_ruby_spec_stubs_parse() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../spec/ruby");
+    let mut stubs = Vec::new();
+    ruby_spec_stubs(&root, &mut stubs);
+    stubs.sort();
+    assert!(!stubs.is_empty(), "no stubs under spec/ruby/");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--parse")
+        .args(&stubs)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        output.status.success(),
+        "stubs that do not parse — regenerate with script/ruby_spec_stubs:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let index = std::fs::read_to_string(root.join("pendings.yml")).expect("spec/ruby/pendings.yml");
+    let recorded = index
+        .lines()
+        .find_map(|line| line.strip_prefix("stubs: "))
+        .and_then(|count| count.parse::<usize>().ok())
+        .expect("pendings.yml records a stub count");
+    assert_eq!(
+        recorded,
+        stubs.len(),
+        "pendings.yml is stale — regenerate with script/ruby_spec_stubs"
+    );
+}
+
+fn ruby_spec_stubs(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+    for entry in std::fs::read_dir(directory).expect("failed to read spec/ruby") {
+        let path = entry.expect("failed to read a spec/ruby entry").path();
+        if path.is_dir() {
+            ruby_spec_stubs(&path, found);
+        } else if path.to_string_lossy().ends_with("_spec.pdx") {
+            found.push(path);
+        }
+    }
+}
+
 /// The seed and the compiler must implement the same builtin methods, and every
 /// one of them must appear in a hosted fixture.
 ///
@@ -2674,135 +2717,4 @@ fn every_builtin_appears_in_a_hosted_fixture() {
          Add them to a fixture — green is not covered.",
         untested.join(", ")
     );
-}
-
-/// Portland's language spec runs, on both oracles (`spec/`).
-///
-/// The differential harness proves the seed and the compiler agree with each
-/// other. It cannot prove either agrees with what was *decided* — a shared
-/// misreading of an ADR passes it. So the spec runs twice.
-///
-/// A failing example is a `  FAIL ` line, not a panic, and this test has to
-/// look for it: the spec file reports every failure and keeps going, because a
-/// Portland method cannot hold a tally, so counting lives in `script/spec`
-/// instead. A zero exit status alone would therefore pass a spec that failed
-/// every example — the same shape of hole as "green is not covered."
-/// Every `*_spec.pdx` under a directory, recursively.
-///
-/// Recursive because specs nest: `spec/numbers/integers_spec.pdx` groups by
-/// subject, and a spec that silently never runs is the worst way to be green.
-/// Named rather than extension-matched so `spec_helper.pdx` is left alone —
-/// running a library as a spec reports zero examples and passes, which is noise
-/// dressed as coverage.
-fn spec_files(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
-    for entry in std::fs::read_dir(directory).expect("failed to read a spec directory") {
-        let path = entry.expect("failed to read a spec directory entry").path();
-        if path.is_dir() {
-            spec_files(&path, found);
-        } else if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.ends_with("_spec.pdx"))
-        {
-            found.push(path);
-        }
-    }
-}
-
-#[test]
-fn the_language_spec_passes_on_both_oracles() {
-    let mut specs = Vec::new();
-    spec_files(
-        std::path::Path::new(&format!("{}/../spec", env!("CARGO_MANIFEST_DIR"))),
-        &mut specs,
-    );
-    // Directory order is not stable across filesystems, and a failure message
-    // naming a different file each run is a worse failure message.
-    specs.sort();
-    assert!(!specs.is_empty(), "no *_spec.pdx files found under spec/");
-
-    // The hosted half runs once for the whole suite. What a hosted spec costs
-    // is not the compiler — loading that is 0.02s — but `spec_helper.pdx`,
-    // re-parsed into every spec's fresh scope at 0.40s a time; run_specs.pdx
-    // parses the harness once and shares it (#69). The ceiling covers the
-    // whole batch rather than one file, so it is scaled to match.
-    let batch = within_seconds(120, "language spec, hosted", || {
-        Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(format!(
-                "{}/../spec/run_specs.pdx",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .arg(format!(
-                "{}/../spec/spec_helper.pdx",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .args(&specs)
-            .output()
-            .expect("failed to run pdx")
-    });
-    assert!(
-        batch.status.success(),
-        "the hosted run failed:\n{}{}",
-        String::from_utf8_lossy(&batch.stdout),
-        String::from_utf8_lossy(&batch.stderr)
-    );
-
-    // Split the batch back into one transcript per spec, on the `=== ` marker
-    // the driver prints before each file.
-    let batch_stdout = String::from_utf8(batch.stdout).unwrap();
-    let mut hosted: Vec<String> = Vec::new();
-    for line in batch_stdout.lines() {
-        match line.strip_prefix("=== ") {
-            Some(_) => hosted.push(String::new()),
-            None => {
-                let current = hosted
-                    .last_mut()
-                    .expect("the hosted run printed output before naming a spec");
-                current.push_str(line);
-                current.push('\n');
-            }
-        }
-    }
-    assert_eq!(
-        hosted.len(),
-        specs.len(),
-        "the hosted run covered {} specs, not {}",
-        hosted.len(),
-        specs.len()
-    );
-
-    for (spec, hosted) in specs.iter().zip(hosted) {
-        let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(spec)
-            .output()
-            .expect("failed to run pdx");
-        assert!(
-            direct.status.success(),
-            "{} failed direct:\n{}{}",
-            spec.display(),
-            String::from_utf8_lossy(&direct.stdout),
-            String::from_utf8_lossy(&direct.stderr)
-        );
-        let direct = String::from_utf8(direct.stdout).unwrap();
-
-        for (label, transcript) in [("direct", &direct), ("hosted", &hosted)] {
-            let failures: Vec<&str> = transcript
-                .lines()
-                .filter(|line| line.starts_with("  FAIL "))
-                .collect();
-            assert!(
-                failures.is_empty(),
-                "{} reported failing examples {label}:\n{}",
-                spec.display(),
-                failures.join("\n")
-            );
-        }
-        // Same spec, same oracles, same answers.
-        assert_eq!(
-            direct,
-            hosted,
-            "{} diverged between the seed and the compiler",
-            spec.display()
-        );
-    }
 }

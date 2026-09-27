@@ -77,8 +77,7 @@ def pdx_binary
   binary = "#{REPO}/target/debug/pdx"
   return binary if File.executable?(binary)
 
-  ENV["PATH"] = "/opt/homebrew/opt/rustup/bin:#{ENV.fetch("PATH", "")}"
-  Dir.chdir(REPO) { system("cargo", "build", "--quiet", "--bin", "pdx") }
+  Dir.chdir(REPO) { system("sh", "-c", ". script/lib/rust.sh && cargo build --quiet --bin pdx") }
   abort "cannot find or build target/debug/pdx — run script/test once" unless File.executable?(binary)
 
   binary

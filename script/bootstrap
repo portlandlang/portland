@@ -10,13 +10,21 @@ fi
 
 brew bundle check > /dev/null 2>&1 || brew bundle
 
-export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
-rustup default stable > /dev/null
+. script/lib/rust.sh
+# The Rust rust-toolchain.toml pins, with its components; with no name given,
+# rustup installs the toolchain that file selects.
+rustup toolchain install
 rustc --version
 cargo --version
 
-# Ruby gems for the doc tooling (mdl). The interpreter itself comes from
-# chruby per .ruby-version — see script/docs/lib/ruby.sh.
+# The Ruby .ruby-version pins, installed by rv if it is not already (rv says
+# so and succeeds when it is), then selected the way every script selects it —
+# see script/docs/lib/ruby.sh — so the gems below land under that Ruby.
+rv ruby install
+. script/docs/lib/ruby.sh
+ruby --version
+
+# Ruby gems for the doc tooling (mdl).
 bundle install --quiet
 echo "gems: $(bundle exec mdl --version 2> /dev/null || echo 'mdl missing')"
 

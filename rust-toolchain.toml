@@ -1,0 +1,7 @@
+# The Rust this repo builds with, the way .ruby-version pins its Ruby: rustup
+# reads this whenever cargo or rustc runs here and installs it if missing, so
+# a laptop, CI, and a fresh clone all build with the same compiler and lints.
+# Moving to a newer Rust is a deliberate one-line change to `channel`.
+[toolchain]
+channel = "1.98.1"
+components = ["clippy", "rustfmt"]
