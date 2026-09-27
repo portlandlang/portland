@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The whole suites overlap the rest again** — split into their own labeled step, they ran after everything else, and CI's run grew from 2:51 to 4:21: the quick integration tests (30s) and the whole suites (166s on the runner) no longer shared the machine. `script/test` builds the seed's test binaries once, starts the whole suites in the background, runs the other steps in front of them, and prints the suites' output under their own label at the end, with their exit status. A failing step in front stops the suites behind it; a first draft's cleanup turned a clean run into exit 1 under `set -e`, caught by a probe of all three pass/fail cases before it landed. Locally the full run is 1:47, below the 1:57 before the split.
+
 - **`script/test` labels what it runs** — each group is its own step under a `==` heading: format, lint, unit tests (`seed/src`), integration tests (`seed/tests/run_pdx_files.rs`), whole suites (`seed/tests/whole_suites.rs`, skipped by `--fast`), and the doc checks. cargo's `--quiet` had hidden which file each "running N tests" block came from. The two empty blocks are gone: tests run for the seed's package only, since `crate/` (the crates.io name holder), the `pdx` binary, and doc tests hold none — so a new file in `seed/tests/` needs a step of its own, as the script says.
 
 - **`script/test --fast`** — everything but `seed/tests/whole_suites.rs`: format, clippy, the unit tests, the quick integration tests, and the doc checks, in about 20 seconds rather than two minutes, so nobody has to remember a cargo invocation. `--all` is the default and runs what `script/test` always has; anything else prints the usage and exits 64.

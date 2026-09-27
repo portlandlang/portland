@@ -9,7 +9,8 @@
 #                        minute. About twenty seconds of tests instead of two
 #                        minutes.
 #
-# Each group is its own labeled step, so the output says what ran: cargo's
+# Each group is its own labeled step, so the output says what ran — the whole
+# suites run in the background alongside the rest and print last. cargo's
 # `--quiet` hides the file each group comes from, and without it cargo names
 # every one of hundreds of tests. The test targets are named one by one — the
 # seed's library, then each file in seed/tests/ — and the rest are left out
@@ -41,16 +42,40 @@ cargo fmt --check
 step "lint — clippy, warnings as errors"
 cargo clippy --workspace --all-targets -- -D warnings
 
+# Built once up front, so the steps below only run tests: two cargo builds at
+# once would wait on each other's lock.
+step "build — the seed's test binaries"
+cargo test --package portland-seed --quiet --lib --tests --no-run
+
+# The whole suites take most of the run, so they start now, in the
+# background, while everything else runs in front of them. Their output is
+# held in a file and printed under their own label at the end. Run one after
+# the other instead, CI's two cores sat a minute longer — the steps overlap,
+# the labels still say which is which.
+if [ "$scope" = all ]; then
+  whole_suites_output=$(mktemp)
+  cargo test --package portland-seed --quiet --test whole_suites > "$whole_suites_output" 2>&1 &
+  whole_suites_pid=$!
+  # A step in front failing ends the script; the suites behind it stop too,
+  # rather than running on unwatched.
+  # `|| true` because the suites have usually finished by then, and under
+  # `set -e` a kill that finds nothing would become the script's exit status.
+  trap 'kill "$whole_suites_pid" 2> /dev/null || true; rm -f "$whole_suites_output"' EXIT
+fi
+
 step "unit tests — seed/src"
 cargo test --package portland-seed --quiet --lib
 
 step "integration tests — seed/tests/run_pdx_files.rs"
 cargo test --package portland-seed --quiet --test run_pdx_files
 
-if [ "$scope" = all ]; then
-  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (about two minutes)"
-  cargo test --package portland-seed --quiet --test whole_suites
-fi
-
 step "docs checks — script/docs/check"
 script/docs/check
+
+if [ "$scope" = all ]; then
+  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (about two minutes, started with the unit tests)"
+  whole_suites_status=0
+  wait "$whole_suites_pid" || whole_suites_status=$?
+  cat "$whole_suites_output"
+  exit "$whole_suites_status"
+fi
