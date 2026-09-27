@@ -129,6 +129,31 @@ core/enumerable/flat_map_spec.rb:
 core/enumerable/tally_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
 
+# — core/false —
+
+core/false/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/false/falseclass_spec.rb:
+  status: skipped
+  reason: "false is a value, not an instance of a class object to allocate from, and failures are values rather than raised exceptions."
+  link: docs/ruby/nil-and-optionals.md
+core/false/inspect_spec.rb:
+  pdx: [spec/boolean/to_s_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(false), not a method (ADR 0026), so the example compares its answer rather than method objects."
+  link: docs/ruby/inspect.md
+core/false/singleton_method_spec.rb:
+  status: skipped
+  reason: "Singleton methods are runtime metaprogramming, which Portland closes."
+  link: docs/ruby/metaprogramming.md
+core/false/to_s_spec.rb:
+  pdx: [spec/boolean/to_s_spec.pdx]
+  status: partial_intentional
+  reason: "Whether the string is frozen or the same object each time can't be observed where values never mutate."
+  link: docs/ruby/mutability.md
+
 # — core/float —
 
 core/float/ceil_spec.rb:
@@ -267,6 +292,78 @@ core/integer/to_s_spec.rb:
 core/integer/uminus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
 
+# — core/nil —
+# nil has no methods beyond nil? and some? (ADR 0005), so its conversions
+# and operators stay behind by design, one entry each.
+
+core/nil/and_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/nil/inspect_spec.rb:
+  pdx: [spec/optionals/nil_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(nil), not a method (ADR 0026)."
+  link: docs/ruby/inspect.md
+core/nil/match_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/nil_spec.rb:
+  pdx: [spec/optionals/nil_spec.pdx]
+core/nil/nilclass_spec.rb:
+  status: skipped
+  reason: "nil is a value, not an instance of a class object to allocate from, and failures are values rather than raised exceptions."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/or_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/rationalize_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/singleton_method_spec.rb:
+  status: skipped
+  reason: "Singleton methods are runtime metaprogramming, which Portland closes."
+  link: docs/ruby/metaprogramming.md
+core/nil/to_a_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_c_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_f_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_h_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_i_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_r_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/to_s_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+core/nil/xor_spec.rb:
+  status: skipped
+  reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
+  link: docs/ruby/nil-and-optionals.md
+
 # — core/range —
 
 core/range/max_spec.rb:
@@ -311,6 +408,31 @@ core/string/strip_spec.rb:
 
 core/symbol/to_s_spec.rb:
   pdx: [spec/symbol/text_boundary_spec.pdx]
+
+# — core/true —
+
+core/true/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/true/inspect_spec.rb:
+  pdx: [spec/boolean/to_s_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(true), not a method (ADR 0026), so the example compares its answer rather than method objects."
+  link: docs/ruby/inspect.md
+core/true/singleton_method_spec.rb:
+  status: skipped
+  reason: "Singleton methods are runtime metaprogramming, which Portland closes."
+  link: docs/ruby/metaprogramming.md
+core/true/to_s_spec.rb:
+  pdx: [spec/boolean/to_s_spec.pdx]
+  status: partial_intentional
+  reason: "Whether the string is frozen or the same object each time can't be observed where values never mutate."
+  link: docs/ruby/mutability.md
+core/true/trueclass_spec.rb:
+  status: skipped
+  reason: "true is a value, not an instance of a class object to allocate from, and failures are values rather than raised exceptions."
+  link: docs/ruby/nil-and-optionals.md
 
 # — skipped by doctrine, whole directories —
 

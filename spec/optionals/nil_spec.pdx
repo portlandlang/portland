@@ -1,0 +1,19 @@
+# `nil` itself (#113), from ruby/spec core/nil/nil_spec.rb and
+# core/nil/inspect_spec.rb. Absence is explicit here (ADR 0005): `nil` is a
+# keyword literal whose one dispatch is `nil?`/`some?`, so the rest of
+# upstream's core/nil — to_s, to_a, to_i, and the other conversions, `&`,
+# `|`, `^` — stays behind by design; `inspect` is a function (ADR 0026).
+
+require_relative "../spec_helper"
+
+context "NilClass#nil?" do
+  specify "returns true" do
+    expect(nil.nil?).to eq(true)
+  end
+end
+
+context "NilClass#inspect" do
+  specify "returns the string 'nil'" do
+    expect(inspect(nil)).to eq("nil")
+  end
+end

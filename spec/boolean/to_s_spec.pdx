@@ -1,0 +1,32 @@
+# `true` and `false` as text (#113), from ruby/spec core/true/to_s_spec.rb,
+# core/false/to_s_spec.rb, and their inspect_spec.rb. Upstream's other
+# to_s examples check the string is frozen and the same object each time,
+# which a language where values never mutate can't observe; its inspect
+# examples compare method objects, and `inspect` is a function here
+# (ADR 0026), so they ask the same question of `inspect(true)`.
+
+require_relative "../spec_helper"
+
+context "TrueClass#to_s" do
+  specify "returns the string 'true'" do
+    expect(true.to_s).to eq("true")
+  end
+end
+
+context "FalseClass#to_s" do
+  specify "returns the string 'false'" do
+    expect(false.to_s).to eq("false")
+  end
+end
+
+context "TrueClass#inspect" do
+  specify "is an alias of TrueClass#to_s" do
+    expect(inspect(true)).to eq(true.to_s)
+  end
+end
+
+context "FalseClass#inspect" do
+  specify "is an alias of FalseClass#to_s" do
+    expect(inspect(false)).to eq(false.to_s)
+  end
+end
