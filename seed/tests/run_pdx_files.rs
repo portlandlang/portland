@@ -1770,6 +1770,30 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `partition`, `one?`, and `minmax` (#104), Ruby's answers (4.0.6, the
+/// expected lines): `minmax` is `min` and `max` together — maybes, a
+/// comparator block included — and the other two take a true-or-false
+/// block, as `select` does.
+#[test]
+fn array_partition_one_minmax_match_ruby() {
+    assert_both_print(
+        "evaluator_array_partition_minmax.pdx",
+        "p([1, 2, 3, 4].partition { it.even? })\np([].partition { true })\np([1, 2, 3].one? { it > 2 })\np([1, 2, 3].one? { it > 1 })\np([].one? { true })\np([3, 1, 2].minmax)\np([].minmax)\np([\"b\", \"a\"].minmax)\np([3, 1, 2].minmax { |left, right| right <=> left })\np([1, 2.5].minmax)\np((1..4).minmax)\n",
+        "[[2, 4], [1, 3]]\n[[], []]\ntrue\nfalse\nfalse\n[1, 3]\n[nil, nil]\n[\"a\", \"b\"]\n[3, 1]\n[1, 2.5]\n[1, 4]\n",
+    );
+    let cases = [
+        (
+            "p([1, 2].partition { 1 })\n",
+            "partition block must produce true or false",
+        ),
+        (
+            "p([1, 2].one? { nil })\n",
+            "one? block must produce true or false",
+        ),
+    ];
+    assert_both_oracles_refuse("array_partition_refusal.pdx", None, &cases);
+}
+
 /// `rotate`, `values_at`, and `each_index` (#104), Ruby's answers (4.0.6,
 /// the expected lines): `values_at` pads what lies past the end with nil,
 /// a range's too, and a range starting before the array refuses in Ruby's

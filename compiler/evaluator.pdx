@@ -1858,6 +1858,7 @@ def evaluate_method_call(node, mutable bindings)
   when "sum" then receiver.sum
   when "sort" then sorted_values(receiver, bindings)
   when "min" then extreme_value(receiver, "min", bindings)
+  when "minmax" then [extreme_value(receiver, "min", bindings), extreme_value(receiver, "max", bindings)]
   when "max" then extreme_value(receiver, "max", bindings)
   when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
   # One range for both bounds (#101), or the two bounds.
@@ -2303,12 +2304,39 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     outcome([results], scope)
   # A comparator block (#99): the host sorts, and picks `min`/`max`, by the
   # guest block's answers, refusing a non-integer in its own words.
-  when "sort", "min", "max"
+  when "sort", "min", "max", "minmax"
     result = case node.name
     when "sort" then receiver.sort { |left, right| guest_comparison(block, left, right, entry, scope) }
     when "min" then receiver.min { |left, right| guest_comparison(block, left, right, entry, scope) }
+    when "minmax" then receiver.minmax { |left, right| guest_comparison(block, left, right, entry, scope) }
     else receiver.max { |left, right| guest_comparison(block, left, right, entry, scope) }
     end
+    outcome([result], scope)
+  # The kept and the rest (#104), and exactly one true (#104), riding the
+  # host's by name so a refusal quotes the method written.
+  when "partition"
+    results = receiver.partition do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  when "one?"
+    result = receiver.one? do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
   # `min_by`/`max_by` (#99): the host compares the block's keys.
   when "min_by", "max_by"

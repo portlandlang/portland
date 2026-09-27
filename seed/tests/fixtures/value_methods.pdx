@@ -152,6 +152,9 @@ p(counting.drop_while { it < 3 })
 p(counting.find_index { it > 2 })
 p(counting.rindex(2))
 p(counting.rotate(2))
+p(counting.partition { it > 2 })
+p(counting.one? { it > 5 })
+p(counting.minmax)
 p(counting.values_at(0, 2..3, 9))
 counting.each_index { |position| puts position }
 

@@ -2261,6 +2261,25 @@ impl<W: std::io::Write> Interpreter<W> {
         keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
     ) -> Option<Value> {
+        // `minmax` is `min` and `max` together (#104), each a maybe, and a
+        // comparator block goes to both.
+        if name == "minmax"
+            && arguments.is_empty()
+            && matches!(receiver, Value::Array(_) | Value::Range { .. })
+        {
+            let low = self.method_call(receiver.clone(), "min", Vec::new(), Vec::new(), block);
+            if self.pending.is_some() {
+                return None;
+            }
+            let high = self.method_call(receiver, "max", Vec::new(), Vec::new(), block);
+            if self.pending.is_some() {
+                return None;
+            }
+            return Some(Value::array(vec![
+                low.unwrap_or(Value::Nil),
+                high.unwrap_or(Value::Nil),
+            ]));
+        }
         // A symbol answers Ruby's text queries about its name (#112) — none
         // of them builds a symbol, which ADR 0023 keeps literal.
         if let Value::Symbol(text) = &receiver
@@ -2504,6 +2523,43 @@ impl<W: std::io::Write> Interpreter<W> {
                     let (taken, dropped) = elements.split_at(split);
                     let kept = if name == "take_while" { taken } else { dropped };
                     Some(Value::array(kept.to_vec()))
+                }
+                // The kept and the rest, as two arrays (#104).
+                (Value::Array(elements), "partition", []) => {
+                    let (mut kept, mut rest) = (Vec::new(), Vec::new());
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => kept.push(element),
+                            Some(Value::Boolean(false)) => rest.push(element),
+                            other => {
+                                panic!("partition block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::array(vec![Value::array(kept), Value::array(rest)]))
+                }
+                // Exactly one element the block says true of (#104).
+                (Value::Array(elements), "one?", []) => {
+                    let mut found = 0;
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => found += 1,
+                            Some(Value::Boolean(false)) => {}
+                            other => panic!("one? block must produce true or false, got {other:?}"),
+                        }
+                        if found > 1 {
+                            return Some(Value::Boolean(false));
+                        }
+                    }
+                    Some(Value::Boolean(found == 1))
                 }
                 (Value::Array(elements), "select" | "filter" | "find_all", []) => {
                     let mut kept = Vec::new();
