@@ -237,6 +237,38 @@ core/array/to_a_spec.rb:
   status: partial_intentional
   reason: "Values never mutate, so identity is not observable and no array can hold itself; no subclasses."
   link: docs/ruby/mutability.md
+core/array/allocate_spec.rb:
+  status: skipped
+  reason: "There is no Array class object to allocate from; an array is a value."
+  link: docs/ruby/metaprogramming.md
+core/array/array_spec.rb:
+  status: skipped
+  reason: "Asks the Array class for its ancestors — reflection a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/array/initialize_spec.rb:
+  status: skipped
+  reason: "initialize's privacy and its calls on subclasses are the class object's; an array is a value with no subclasses."
+  link: docs/ruby/metaprogramming.md
+core/array/try_convert_spec.rb:
+  status: skipped
+  reason: "Array.try_convert is the implicit-conversion protocol's entry point, and to_ary is a false alias that refuses naming to_a (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/array/to_ary_spec.rb:
+  status: skipped
+  reason: "to_ary is Ruby's implicit-conversion protocol, a false alias that refuses naming to_a (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/array/fetch_spec.rb:
+  status: skipped
+  reason: "fetch is retired: a lookup miss answers a maybe, and the default is the or-guard."
+  link: docs/ruby/lookups.md
+core/array/fetch_values_spec.rb:
+  status: skipped
+  reason: "fetch is retired, fetch_values with it: a lookup miss answers a maybe, and the default is the or-guard."
+  link: docs/ruby/lookups.md
+core/array/deconstruct_spec.rb:
+  status: skipped
+  reason: "deconstruct is the pattern-matching protocol's hook for user types; array patterns match arrays directly, with no hook to call."
+  link: docs/ruby/pattern-matching.md
 # The mutators: values never mutate, names do (ADR 0015). Each rewrite
 # rebinds a mutable name — `<<` and `[]=` survive as that sugar.
 core/array/append_spec.rb:

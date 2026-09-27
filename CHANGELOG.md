@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Eight more core/array files recorded as decided out** ([#104](https://github.com/portlandlang/portland/issues/104)) — `allocate`, `array`, `initialize`, `try_convert`, `to_ary`, `fetch`, `fetch_values`, and `deconstruct`, each linking the ledger page that decides it. `new` and `constructor` wait on #159: builtin type functions like `Array.new`.
+
 - **ruby/spec's core/array iteration files ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `map`, `collect`, `select`, `filter`, `reject`, `each`, and `detect` port to `spec/array/iteration_spec.pdx`, and `none_spec` is recorded as skipped. `each`'s multi-parameter row waits on #158, filed today: whether `|a, b|` destructures a yielded array, which Portland refuses and Ruby does.
 
 - **ruby/spec's core/array `+` and `*` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — into `spec/array/operators_spec.pdx`. `*` with a string stays behind: it is Ruby's `join` under another name, one spelling with two behaviors (principle 3).
