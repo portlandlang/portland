@@ -1,6 +1,6 @@
 # 0028 — The object model: structs stay the only type; traits carry shared behavior
 
-- **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. Built in the seed and the trio, differentially pinned, 2026-07-27.)
+- **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. Built in the seed and the trio, differentially pinned, 2026-07-27.) Superseded on the `class` keyword alone by [ADR 0056](0056-2026-09-27-class-is-a-spelling-of-struct.md): `class` is a spelling of `struct`; the object model stands.
 - **Date:** 2026-07-27
 
 ## Context, shared by both drafts

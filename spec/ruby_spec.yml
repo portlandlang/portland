@@ -316,8 +316,8 @@ core/symbol/to_s_spec.rb:
 
 core/class/:
   status: skipped
-  reason: "The class keyword is gone; its four jobs have other homes."
-  link: docs/ruby/classes.md
+  reason: "These specs test Class as a runtime object — Class.new, allocate, superclass, subclasses, inherited — which is runtime metaprogramming. The class keyword itself is a spelling of struct (ADR 0056)."
+  link: docs/ruby/metaprogramming.md
 core/conditionvariable/:
   status: skipped
   reason: "No Thread and its primitives: concurrency is together and meanwhile."

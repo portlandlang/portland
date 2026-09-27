@@ -67,6 +67,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0053](0053-2026-09-24-constants.md) — Constants: a SCREAMING_CASE name at the top level is bound once, with a def's reach
 - [0054](0054-2026-09-25-ordering.md) — Ordering: `<=>` is Ruby's, `Comparable` is a builtin trait, and strings order
 - [0055](0055-2026-09-25-no-lazy-tier-yet.md) — No lazy tier: eager answers stay, external iteration is declined, and the rest waits on its real pull
+- [0056](0056-2026-09-27-class-is-a-spelling-of-struct.md) — `class` is a spelling of `struct`
 
 <!-- /generated -->
 
