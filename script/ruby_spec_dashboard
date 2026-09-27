@@ -161,8 +161,14 @@ class Dashboard
   end
 
   def area_for(area, rows)
-    directories = rows.group_by { it[:directory] }.map do |directory, directory_rows|
-      { name: directory, totals: totals(directory_rows), files: directory_rows.map { it.except(:area, :directory) } }
+    # By directory name, so `core/enumerator` comes before
+    # `core/enumerator/lazy` rather than wherever its first file sorted.
+    grouped = rows.group_by { it[:directory] }.sort_by { |directory, _| directory }
+    directories = grouped.map do |directory, directory_rows|
+      # By name, not path: `each` before `each_line`, which the `_spec.rb`
+      # suffix would otherwise reverse.
+      files = directory_rows.sort_by { it[:name] }.map { it.except(:area, :directory) }
+      { name: directory, totals: totals(directory_rows), files: files }
     end
     { name: area, totals: totals(rows), directories: directories }
   end
