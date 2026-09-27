@@ -865,9 +865,13 @@ impl<'source> Parser<'source> {
             type_function = true;
         }
         let token = self.advance();
-        // `def <=>(other)` — the one operator a method may be named by
-        // (ADR 0054); every other method name is a word.
-        if token.kind != TokenKind::Identifier && token.kind != TokenKind::Spaceship {
+        // `def <=>(other)` (ADR 0054) and `def ===(other)` (#150) — the
+        // operators a method may be named by; every other method name is a
+        // word.
+        if !matches!(
+            token.kind,
+            TokenKind::Identifier | TokenKind::Spaceship | TokenKind::CaseEqual
+        ) {
             panic!("expected method name after def, got {token:?}");
         }
         let name = token.text.to_string();
@@ -2446,6 +2450,16 @@ impl<'source> Parser<'source> {
 
     fn comparison(&mut self) -> Expression {
         let mut left = self.addition();
+        // `===` (#150) sits with the comparisons, as in Ruby.
+        while self.peek_kind() == Some(TokenKind::CaseEqual) {
+            self.position += 1;
+            self.skip_newlines();
+            let subject = self.addition();
+            left = Expression::CaseEqual {
+                pattern: Box::new(left),
+                subject: Box::new(subject),
+            };
+        }
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::EqualEqual) => Some(BinaryOperator::Equals),
             Some(TokenKind::Greater) => Some(BinaryOperator::Greater),

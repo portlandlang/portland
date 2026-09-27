@@ -26,7 +26,7 @@ end
 What changes from Ruby:
 
 - **Exhaustiveness is compile-checked** for `case/in`: cover the subject or write `else`. A maybe missing `in nil` refuses to build. (`when` requires `else` instead when coverage can't be proven.)
-- **`===` is a statically resolved method** — `when Integer` / `when 1..9` / user-defined `===` all work; runtime redefinition is gone with the rest of the runtime magic.
+- **`===` is a statically resolved method** — `when Integer` / `when 1..9` / user-defined `===` all work; runtime redefinition is gone with the rest of the runtime magic. Built on both implementations 2026-09-27 ([#150](https://github.com/portlandlang/portland/issues/150), [#151](https://github.com/portlandlang/portland/issues/151)): until then `when` had compared by equality alone, so `when 1..9` silently missed. The `===` operator itself reads the same way, `Integer === 5`, and a `def ===` answering anything but true or false refuses.
 - **Captures are Ruby's**, fenced by no-shadow (collision = error), exhaustiveness (catch-alls make later arms unreachable = error), and an unused-capture lint. The silent-capture typo class dies.
 - **Struct patterns are keyword-only** and ceremony-free — no `deconstruct_keys`; fields are the pattern surface.
 - **In:** pin `^`, guards, alternatives `|`, one-line `=>` and `in`. **Out for now:** the find pattern (`in [*, x, *]`), until demanded. **Out:** positional struct patterns.

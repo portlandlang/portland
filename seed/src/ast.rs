@@ -255,6 +255,13 @@ pub enum Expression {
         operator: BinaryOperator,
         right: Box<Expression>,
     },
+    /// `pattern === subject` (#150): Ruby's case equality, the test
+    /// `case/when` runs — kept as its own node because the pattern may be
+    /// a type name, which is not a value to evaluate.
+    CaseEqual {
+        pattern: Box<Expression>,
+        subject: Box<Expression>,
+    },
     Boolean(bool),
     Case {
         branches: Vec<CaseBranch>,

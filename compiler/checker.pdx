@@ -658,6 +658,11 @@ def check_node(node, scope, mutable found)
     found = check_node(left, scope, found)
     found = check_node(right, scope, found)
     check_operator(node, scope, found)
+  # `pattern === subject` (#150): a builtin type's name as the pattern is a
+  # type, not a name to find defined.
+  in CaseEqualNode(pattern:, subject:)
+    found = check_node(pattern, scope, found) unless builtin_type_name?(pattern)
+    check_node(subject, scope, found)
   in LogicalNode(left:, right:)
     found = check_node(left, scope, found)
     # The right side runs only where the left decided it: under the left's
@@ -719,11 +724,17 @@ end
 def check_case(node, scope, mutable found)
   found = check_node(node.subject, scope, found)
   node.branches.each do |branch|
-    found = check_body(branch.values, scope, found)
+    found = check_body(branch.values.reject { builtin_type_name?(it) }, scope, found)
     found = check_body(branch.body, scope, found)
   end
   found = check_body(node.else_body, scope, found) unless node.else_body.nil?
   found
+end
+
+# A builtin type's name, as a `when` value or a `===` pattern tests for it
+# (#151): a type, not a value, so not a name to find defined.
+def builtin_type_name?(node)
+  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Range String Symbol].include?(node.name)
 end
 
 def check_case_in(node, scope, mutable found)

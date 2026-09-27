@@ -131,6 +131,11 @@ core/enumerable/tally_spec.rb:
 
 # — core/false —
 
+core/false/case_compare_spec.rb:
+  pdx: [spec/boolean/case_compare_spec.pdx]
+  status: partial_intentional
+  reason: "There is no Object class object for false to be compared with; every other row ports."
+  link: docs/ruby/metaprogramming.md
 core/false/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
@@ -300,6 +305,11 @@ core/nil/and_spec.rb:
   status: skipped
   reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
   link: docs/ruby/nil-and-optionals.md
+core/nil/case_compare_spec.rb:
+  pdx: [spec/boolean/case_compare_spec.pdx]
+  status: partial_intentional
+  reason: "There is no Object class object for nil to be compared with; every other row ports."
+  link: docs/ruby/metaprogramming.md
 core/nil/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
@@ -411,6 +421,11 @@ core/symbol/to_s_spec.rb:
 
 # — core/true —
 
+core/true/case_compare_spec.rb:
+  pdx: [spec/boolean/case_compare_spec.pdx]
+  status: partial_intentional
+  reason: "There is no Object class object for true to be compared with; every other row ports."
+  link: docs/ruby/metaprogramming.md
 core/true/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."

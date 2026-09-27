@@ -161,6 +161,20 @@ struct CallNode
   end
 end
 
+# `pattern === subject` (#150): Ruby's case equality, the test `case/when`
+# runs.
+struct CaseEqualNode
+  kind
+  pattern
+  subject
+
+  include Sexp
+
+  def sexp
+    headed_sexp("===", [pattern, subject])
+  end
+end
+
 # `yield` — run the block the enclosing method was handed, with the values
 # it hands the block (#144).
 struct YieldNode
@@ -1226,6 +1240,12 @@ end
 
 def parse_comparison(tokens, position)
   mutable step = parse_addition(tokens, position)
+  # `===` (#150) sits with the comparisons, as in Ruby — its own node, since
+  # the pattern may be a type name rather than a value.
+  while operator_at?(tokens, step.position, %w[===])
+    subject = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
+    step = Step.new(node: CaseEqualNode.new(kind: "case_equal", pattern: step.node, subject: subject.node), position: subject.position)
+  end
   while operator_at?(tokens, step.position, %w[== != < <= > >= <=>])
     operator = tokens[step.position].text
     right = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
@@ -2458,9 +2478,9 @@ def parse_def(tokens, mutable position)
     type_function = true
     position += 2
   end
-  # `def <=>(other)` — the one operator a method may be named by (ADR
-  # 0054); every other method name is a word.
-  if position >= tokens.length || !(tokens[position].identifier? || operator_at?(tokens, position, %w[<=>]))
+  # `def <=>(other)` (ADR 0054) and `def ===(other)` (#150) — the operators
+  # a method may be named by; every other method name is a word.
+  if position >= tokens.length || !(tokens[position].identifier? || operator_at?(tokens, position, %w[<=> ===]))
     return Step.new(node: error_node("expected method name after def"), position: position)
   end
   name = tokens[position].text

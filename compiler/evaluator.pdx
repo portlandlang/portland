@@ -215,15 +215,59 @@ def evaluate_case(node, mutable bindings)
     branch = node.branches[branch_index]
     mutable value_index = 0
     while value_index < branch.values.length
-      candidate = evaluate_expression(branch.values[value_index], bindings)
-      bindings = candidate.bindings
-      return run_body(branch.body, bindings) if candidate.value.first == subject.value.first
+      # Case equality, the seed's `case_matches` (#151).
+      matched = guest_case_matches(branch.values[value_index], slot_value(subject.value), bindings)
+      bindings = matched.bindings
+      return run_body(branch.body, bindings) if matched.value.first
       value_index += 1
     end
     branch_index += 1
   end
   return outcome([], bindings) if node.else_body.nil?
   run_body(node.else_body, bindings)
+end
+
+# Ruby's case equality (#150, #151), the seed's `case_matches`: a type name
+# matches a value of that type, a struct defining `===` answers for itself,
+# and the rest — a range covering a number, equality — is the host's own
+# `===`. An outcome whose value is the verdict.
+def guest_case_matches(pattern_node, subject, bindings)
+  if pattern_node in IdentifierNode
+    typed = guest_type_matches(pattern_node.name, subject, bindings)
+    return outcome([typed], bindings) unless typed.nil?
+  end
+  step = evaluate_expression(pattern_node, bindings)
+  pattern = slot_value(step.value)
+  if pattern in ["__struct__", *]
+    method = struct_method_for(pattern, "===", step.bindings)
+    unless method.nil?
+      result = invoke_struct_method(pattern, method, [subject], [], step.bindings)
+      answer = slot_value(result.value)
+      panic("'===' answers true or false, got #{shorten(render_inspect(answer))}") unless answer == true || answer == false
+      return outcome([answer], result.bindings)
+    end
+  end
+  outcome([pattern === subject], step.bindings)
+end
+
+# Whether `subject` is of the type `name` names, or nil when `name` names no
+# type — a builtin's, the host answering, or a struct's. Guest symbols and
+# arrays wear the host's array shape, so those two are told apart here.
+def guest_type_matches(name, subject, bindings)
+  case name
+  when "Array" then return guest_array?(subject)
+  when "Symbol" then return subject in ["__symbol__", *]
+  when "Boolean" then return Boolean === subject
+  when "Float" then return Float === subject
+  when "Hash" then return Hash === subject
+  when "Integer" then return Integer === subject
+  when "Range" then return Range === subject
+  when "String" then return String === subject
+  end
+  slot = resolve(bindings, name)
+  return nil if slot.empty? || slot.first[1] != "struct"
+
+  (subject in ["__struct__", *]) && value_at(subject, 1) == slot.first[0]
 end
 
 def evaluate_case_in(node, mutable bindings)
@@ -774,6 +818,10 @@ def evaluate_expression(node, bindings)
   in YieldNode then evaluate_yield(node, bindings)
   in CaseInNode then evaluate_case_in(node, bindings)
   in CaseNode then evaluate_case(node, bindings)
+  # `pattern === subject` (#150).
+  in CaseEqualNode
+    subject_step = evaluate_expression(node.subject, bindings)
+    guest_case_matches(node.pattern, slot_value(subject_step.value), subject_step.bindings)
   in HashNode then evaluate_hash(node, bindings)
   in IfNode then evaluate_if(node, bindings)
   in IndexNode then evaluate_index(node, bindings)

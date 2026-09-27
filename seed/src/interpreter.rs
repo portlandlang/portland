@@ -90,6 +90,20 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
     }
 }
 
+/// Whether a number sits inside an integer range, either end open (ADR
+/// 0019): Ruby's `cover?`, which is what `===` asks of a range.
+fn range_covers(start: Option<i64>, end: Option<i64>, exclusive: bool, probe: f64) -> bool {
+    let above = start.is_none_or(|start| probe >= start as f64);
+    let below = end.is_none_or(|end| {
+        if exclusive {
+            probe < end as f64
+        } else {
+            probe <= end as f64
+        }
+    });
+    above && below
+}
+
 fn split_value(text: &str, separator: Option<&str>, limit: i64) -> Value {
     Value::array(
         ruby_split(text, separator, limit)
@@ -1489,6 +1503,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 self.run_body(else_body)
             }
+            // `pattern === subject` (#150): the test `case/when` runs.
+            Expression::CaseEqual { pattern, subject } => {
+                let subject = self.value_of(subject);
+                Some(Value::Boolean(self.case_matches(pattern, &subject)))
+            }
             Expression::Case {
                 branches,
                 else_body,
@@ -1497,7 +1516,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 let subject = self.value_of(subject);
                 for branch in branches {
                     for value in &branch.values {
-                        if self.value_of(value) == subject {
+                        if self.case_matches(value, &subject) {
                             return self.run_body(&branch.body);
                         }
                     }
@@ -3477,6 +3496,69 @@ impl<W: std::io::Write> Interpreter<W> {
                 Some(captures)
             }
         }
+    }
+
+    /// Ruby's case equality, as `case/when` reads it (#151,
+    /// docs/ruby/pattern-matching.md): a type name matches a value of that
+    /// type, a range the numbers it covers, a struct defining `===` answers
+    /// for itself, and anything else matches by equality.
+    fn case_matches(&mut self, pattern: &Expression, subject: &Value) -> bool {
+        if let Expression::Variable(name) = pattern
+            && let Some(matched) = self.type_matches(name, subject)
+        {
+            return matched;
+        }
+        let pattern = self.value_of(pattern);
+        match (&pattern, subject) {
+            (
+                Value::Range {
+                    end,
+                    exclusive,
+                    start,
+                },
+                Value::Integer(_) | Value::Float(_),
+            ) => range_covers(*start, *end, *exclusive, as_float(subject)),
+            (Value::Struct { name, .. }, _) if self.struct_defines(name, "===") => {
+                let method = Self::resolve(&self.module_path, name, &self.structs)
+                    .and_then(|(_, info)| info.methods.get("===").cloned())
+                    .expect("the struct defines ===");
+                let answer = self.call_struct_method(
+                    name.clone(),
+                    pattern.clone(),
+                    method,
+                    vec![subject.clone()],
+                    Vec::new(),
+                );
+                match answer {
+                    Some(Value::Boolean(matched)) => matched,
+                    other => {
+                        let got = other.map_or("nothing".to_string(), |value| value.shown());
+                        panic!("'===' answers true or false, got {got}")
+                    }
+                }
+            }
+            _ => pattern == *subject,
+        }
+    }
+
+    /// Whether `subject` is of the type `name` names, when `name` names a
+    /// type: a builtin's, or a struct's. `None` when it names neither.
+    fn type_matches(&self, name: &str, subject: &Value) -> Option<bool> {
+        if matches!(
+            name,
+            "Array" | "Boolean" | "Float" | "Hash" | "Integer" | "Range" | "String" | "Symbol"
+        ) {
+            return Some(subject.type_name() == name);
+        }
+        let (qualified, _) = Self::resolve(&self.module_path, name, &self.structs)?;
+        Some(
+            matches!(subject, Value::Struct { name: struct_name, .. } if *struct_name == qualified),
+        )
+    }
+
+    fn struct_defines(&self, name: &str, method: &str) -> bool {
+        Self::resolve(&self.module_path, name, &self.structs)
+            .is_some_and(|(_, info)| info.methods.contains_key(method))
     }
 
     /// Evaluate an expression that must produce a value.

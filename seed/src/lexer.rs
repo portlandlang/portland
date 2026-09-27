@@ -9,6 +9,8 @@ pub enum TokenKind {
     AmpersandDot,
     Bang,
     Caret,
+    /// `===` — case equality (#150), and a name a `def` may take.
+    CaseEqual,
     Colon,
     /// `::` — reaches a name inside a namespace (ADR 0021).
     ColonColon,
@@ -391,6 +393,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         }
                     }
                     ('|', _) => (TokenKind::Pipe, 1),
+                    // `===` before `==` (#150): case equality.
+                    ('=', Some('=')) if source[start..].starts_with("===") => {
+                        (TokenKind::CaseEqual, 3)
+                    }
                     ('=', Some('=')) => (TokenKind::EqualEqual, 2),
                     ('=', Some('>')) => (TokenKind::FatArrow, 2),
                     ('=', _) => (TokenKind::Equal, 1),

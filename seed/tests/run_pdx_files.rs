@@ -1799,6 +1799,23 @@ fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
     assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
+/// Case equality (#150, #151): `case/when` and the `===` operator match a
+/// type name by type, a range by the numbers it covers, a struct by its own
+/// `def ===`, and anything else by equality — where `when` had compared by
+/// equality alone, so `when 1..9` silently missed.
+#[test]
+fn case_equality_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_case_equality.pdx",
+        "x = 5\ncase x\nwhen 1..9 then p \"range\"\nelse p \"no\"\nend\ncase x\nwhen Integer then p \"type\"\nelse p \"no\"\nend\ncase 2.5\nwhen 1..3 then p \"float in range\"\nend\ncase \"a\"\nwhen Integer then p \"int\"\nwhen String then p \"string\"\nend\nstruct Even\n  unused\n  def ===(other) = other % 2 == 0\nend\ncase 4\nwhen Even.new(unused: 0) then p \"even\"\nelse p \"odd\"\nend\nstruct Point\n  x\nend\ncase Point.new(x: 1)\nwhen Point then p \"point\"\nend\np(true === true)\np(Integer === 5)\np((1..3) === 2)\np(String === 5)\n",
+    );
+    let cases = [(
+        "struct Odd\n  unused\n  def ===(other) = 1\nend\np(Odd.new(unused: 0) === 3)\n",
+        "'===' answers true or false, got 1",
+    )];
+    assert_both_oracles_refuse("case_equality_refusal.pdx", None, &cases);
+}
+
 /// `clamp` by a range (#101): an exclusive range with an end has no top to
 /// clamp to, and a range given backwards refuses as two bounds do.
 #[test]
