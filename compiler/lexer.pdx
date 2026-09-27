@@ -484,7 +484,10 @@ def skip_literal(characters, start)
 end
 
 def expand_heredocs(source)
-  lines = source.split("\n")
+  # Every line, trailing blanks included, so the rejoined source keeps its
+  # length and every token its line (Ruby's split drops trailing empties
+  # unless the limit is negative, #142).
+  lines = source.split("\n", -1)
   mutable output = []
   mutable index = 0
   while index < lines.length

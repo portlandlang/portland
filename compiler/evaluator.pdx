@@ -1732,9 +1732,17 @@ def evaluate_method_call(node, mutable bindings)
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   when "join"
     rendered = receiver.map { render(it) }
-    rendered.join(arguments.first)
+    # No separator joins with nothing between (#142).
+    arguments.empty? ? rendered.join("") : rendered.join(arguments.first)
   when "include?" then receiver.include?(arguments.first)
-  when "split" then receiver.split(arguments.first)
+  # Ruby's rules, the seed's `ruby_split` (#142): the host answers, so the
+  # arguments pass through as written.
+  when "split"
+    case arguments.length
+    when 0 then receiver.split
+    when 1 then receiver.split(arguments.first)
+    else receiver.split(arguments[0], arguments[1])
+    end
   when "start_with?" then receiver.start_with?(arguments.first)
   when "end_with?" then receiver.end_with?(arguments.first)
   when "slice" then receiver.slice(arguments[0], arguments[1])

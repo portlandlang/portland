@@ -1,15 +1,51 @@
-# `split` cuts on a separator.
+# `String#split` with Ruby's rules (#142): trailing empty fields drop unless
+# the limit is negative, a positive limit caps the pieces, `" "` or no
+# separator splits on runs of whitespace, and `""` splits into characters.
+# Every expected value is Ruby 4.0.7's answer for the same call.
 
 require_relative "../spec_helper"
 
 context "String" do
   describe "#split" do
-    specify "cuts on the separator" do
-      expect("a,b,c".split(",")).to eq(["a", "b", "c"])
+    specify "drops trailing empty fields and keeps the ones between" do
+      expect("a,b,,c,,".split(",")).to eq(["a", "b", "", "c"])
+      expect("a\nb\n\n".split("\n")).to eq(["a", "b"])
+      expect(",a".split(",")).to eq(["", "a"])
     end
 
-    specify "answers the whole string when the separator is absent" do
-      expect("abc".split(",")).to eq(["abc"])
+    specify "keeps trailing empty fields under a negative limit" do
+      expect("a,b,,c,,".split(",", -1)).to eq(["a", "b", "", "c", "", ""])
+      expect("a\nb\n\n".split("\n", -1)).to eq(["a", "b", "", ""])
+    end
+
+    specify "caps the pieces under a positive limit, the last holding the rest" do
+      expect("a,b,c".split(",", 2)).to eq(["a", "b,c"])
+      expect("a,b,c".split(",", 1)).to eq(["a,b,c"])
+      expect("a,b".split(",", 0)).to eq(["a", "b"])
+    end
+
+    specify "splits on runs of whitespace with no separator or a single space" do
+      expect("a b  c ".split).to eq(["a", "b", "c"])
+      expect("  a b  c ".split(" ")).to eq(["a", "b", "c"])
+    end
+
+    specify "splits into characters on an empty separator" do
+      expect("abc".split("")).to eq(["a", "b", "c"])
+    end
+
+    specify "answers no fields for an empty string, and the whole for no match" do
+      expect("".split(",")).to eq([])
+      expect("x".split(",")).to eq(["x"])
+      expect("a::b".split("::")).to eq(["a", "b"])
+    end
+  end
+end
+
+context "Array" do
+  describe "#join" do
+    specify "joins with nothing between when given no separator" do
+      expect(["a", "b"].join).to eq("ab")
+      expect([1, 2].join).to eq("12")
     end
   end
 end

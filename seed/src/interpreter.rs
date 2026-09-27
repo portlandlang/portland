@@ -90,6 +90,66 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
     }
 }
 
+fn split_value(text: &str, separator: Option<&str>, limit: i64) -> Value {
+    Value::array(
+        ruby_split(text, separator, limit)
+            .into_iter()
+            .map(Value::String)
+            .collect(),
+    )
+}
+
+/// `String#split` by Ruby's rules (#142), each checked against Ruby 4.0.7:
+/// no separator or a single space splits on runs of whitespace, leading
+/// whitespace ignored; an empty separator splits into characters; a
+/// positive limit caps the pieces, the last holding the rest; and trailing
+/// empty fields drop unless a limit is given — a negative one keeps them.
+/// An empty string has no fields at all.
+fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let cap = usize::try_from(limit).ok().filter(|cap| *cap > 0);
+    let full = |pieces: &Vec<String>| cap.is_some_and(|cap| pieces.len() + 1 == cap);
+    let mut pieces: Vec<String> = Vec::new();
+    match separator {
+        None | Some(" ") => {
+            let mut rest = text.trim_start();
+            while !rest.is_empty() {
+                if full(&pieces) {
+                    pieces.push(rest.to_string());
+                    break;
+                }
+                let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+                pieces.push(rest[..end].to_string());
+                rest = rest[end..].trim_start();
+            }
+        }
+        Some("") => {
+            let characters: Vec<&str> = text.graphemes(true).collect();
+            for (index, character) in characters.iter().enumerate() {
+                if full(&pieces) {
+                    pieces.push(characters[index..].concat());
+                    break;
+                }
+                pieces.push((*character).to_string());
+            }
+        }
+        Some(separator) => {
+            pieces = match cap {
+                Some(cap) => text.splitn(cap, separator).map(str::to_string).collect(),
+                None => text.split(separator).map(str::to_string).collect(),
+            };
+        }
+    }
+    if limit == 0 {
+        while pieces.last().is_some_and(String::is_empty) {
+            pieces.pop();
+        }
+    }
+    pieces
+}
+
 /// `flatten`'s walk: arrays open, everything else lands (Ruby's one-call,
 /// all-depths rule).
 fn flatten_into(elements: &[Value], flat: &mut Vec<Value>) {
@@ -2212,6 +2272,13 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "first", []) => {
                 elements.first().cloned().map_or(Value::Nil, Value::present)
             }
+            // No separator joins with nothing between, as Ruby's does (#142).
+            (Value::Array(elements), "join", []) => Value::String(
+                elements
+                    .iter()
+                    .map(|element| element.to_string())
+                    .collect::<String>(),
+            ),
             (Value::Array(elements), "join", [Value::String(separator)]) => Value::String(
                 elements
                     .iter()
@@ -2536,11 +2603,14 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
                 Value::String(text.graphemes(true).skip(start).take(length).collect())
             }
-            (Value::String(text), "split", [Value::String(separator)]) => Value::array(
-                text.split(separator.as_str())
-                    .map(|piece| Value::String(piece.to_string()))
-                    .collect(),
-            ),
+            // Ruby's rules, all of them (#142): see `ruby_split`.
+            (Value::String(text), "split", []) => split_value(text, None, 0),
+            (Value::String(text), "split", [Value::String(separator)]) => {
+                split_value(text, Some(separator), 0)
+            }
+            (Value::String(text), "split", [Value::String(separator), Value::Integer(limit)]) => {
+                split_value(text, Some(separator), *limit)
+            }
             (Value::String(text), "start_with?", [Value::String(prefix)]) => {
                 Value::Boolean(text.starts_with(prefix))
             }
