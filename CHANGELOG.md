@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`join` flattens nested arrays and refuses a nil** ([#104](https://github.com/portlandlang/portland/issues/104)) — a nested array joins into the same string with the same separator, as Ruby's does: `[1, [2, [3, 4], 5], 6].join(":")` is `"1:2:3:4:5:6"`. It had been spliced in as its inspect form, a silent divergence. A nil element had joined as the word `"nil"`, which is neither Ruby's `""` nor Portland's own rule. It now refuses as interpolating a nil does, since nil has no `to_s` (ADR 0005). `join(nil)` is plain `join`, Ruby's reading of a nil separator.
+
 - **ruby/spec's core/array `max` and `min` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — twenty examples join `spec/array/extremes_spec.pdx`, the Enumerable ones upstream copies in included.
 
 - **A comparator block's rebindings carry through, and arrays of arrays have extremes** ([#104](https://github.com/portlandlang/portland/issues/104)) — the hosted evaluator had kept whatever a `sort`, `min`, `max`, or `minmax` block rebound inside that one comparison. So `counter += 1` in a comparator never counted past one there, while the seed carried it and Ruby does too. Both now thread it through, in Ruby's call order. `min` and `max` of an array of arrays order element by element under `<=>` (ADR 0054), where they had refused.

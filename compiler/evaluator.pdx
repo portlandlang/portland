@@ -1306,6 +1306,17 @@ end
 # The seed's Display: what `puts`, `to_s`, `join`, and interpolation show.
 # Symbols shed the colon; structs, enum cases, maybes, and failures keep
 # their inspect form, which is the seed's rule too.
+# `join`, the seed's `joined` (#104): a nested guest array joins into the
+# same string with the same separator, and a nil element refuses as
+# interpolating one does.
+def joined_guest(values, separator)
+  rendered = values.map do |value|
+    panic("nil has no method 'to_s' — handle the nil case first") if value.nil?
+    plain_array?(value) ? joined_guest(value, separator) : render(value)
+  end
+  rendered.join(separator)
+end
+
 def render(value)
   return "nil" if value.nil?
   return render_inspect(value) if value.failure?
@@ -1875,10 +1886,10 @@ def evaluate_method_call(node, mutable bindings)
   when "step" then receiver.step(value_at(arguments, 0))
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
+  # No separator, or a nil one, joins with nothing between (#142, #104).
   when "join"
-    rendered = receiver.map { render(it) }
-    # No separator joins with nothing between (#142).
-    arguments.empty? ? rendered.join("") : rendered.join(value_at(arguments, 0))
+    separator = value_at(arguments, 0)
+    joined_guest(receiver, separator.nil? ? "" : separator)
   when "include?" then receiver.include?(value_at(arguments, 0))
   # Ruby's rules, the seed's `ruby_split` (#142): the host answers, so the
   # arguments pass through as written.

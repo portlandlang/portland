@@ -412,6 +412,22 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `join` (#104): each element as `to_s` renders it, a nested array joined
+/// into the same string with the same separator, as Ruby's is. A nil
+/// element refuses as interpolating one does, since nil has no `to_s`
+/// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
+fn joined(elements: &[Value], separator: &str) -> String {
+    elements
+        .iter()
+        .map(|element| match element {
+            Value::Array(inner) => joined(inner, separator),
+            Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
+            other => other.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
 /// while they last; from the first float — or a float init — the rest go
 /// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
@@ -3066,20 +3082,14 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "first", []) => {
                 elements.first().cloned().map_or(Value::Nil, Value::present)
             }
-            // No separator joins with nothing between, as Ruby's does (#142).
-            (Value::Array(elements), "join", []) => Value::String(
-                elements
-                    .iter()
-                    .map(|element| element.to_string())
-                    .collect::<String>(),
-            ),
-            (Value::Array(elements), "join", [Value::String(separator)]) => Value::String(
-                elements
-                    .iter()
-                    .map(|element| element.to_string())
-                    .collect::<Vec<_>>()
-                    .join(separator),
-            ),
+            // No separator joins with nothing between, as Ruby's does (#142),
+            // and a nil one is none (#104).
+            (Value::Array(elements), "join", [] | [Value::Nil]) => {
+                Value::String(joined(elements, ""))
+            }
+            (Value::Array(elements), "join", [Value::String(separator)]) => {
+                Value::String(joined(elements, separator))
+            }
             (Value::Array(elements), "last", []) => {
                 elements.last().cloned().map_or(Value::Nil, Value::present)
             }

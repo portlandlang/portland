@@ -1770,6 +1770,25 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `join` (#104): a nested array joins into the same string with the same
+/// separator, as Ruby's does — it had been spliced in as its inspect form —
+/// and a nil element refuses as interpolating one does, since nil has no
+/// `to_s` (ADR 0005), where it had joined as the word "nil". `join(nil)`
+/// is `join`, Ruby's reading of a nil separator.
+#[test]
+fn join_flattens_nested_arrays_and_refuses_nil() {
+    assert_both_print(
+        "evaluator_join.pdx",
+        "p([1, [2, [3, 4], 5], 6].join(\":\"))\np([1, 2, 3].join(nil))\np([].join)\np([[\"a\", [\"b\"]], \"c\"].join)\np([1, :a, 2.5].join(\"-\"))\n",
+        "\"1:2:3:4:5:6\"\n\"123\"\n\"\"\n\"abc\"\n\"1-a-2.5\"\n",
+    );
+    let cases = [(
+        "p([1, nil].join(\"-\"))\n",
+        "nil has no method 'to_s' — handle the nil case first",
+    )];
+    assert_both_oracles_refuse("join_nil_refusal.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
