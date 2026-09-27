@@ -2313,6 +2313,7 @@ impl<'source> Parser<'source> {
         // semantics — Ruby's looser-than-assignment `or` is the cut perlism.
         while self.peek_kind() == Some(TokenKind::PipePipe) || self.peek_is_keyword("or") {
             self.position += 1;
+            self.skip_newlines();
             let right = match self.guard_right() {
                 Some(right) => right,
                 None => self.logical_and(),
@@ -2371,6 +2372,7 @@ impl<'source> Parser<'source> {
         while self.peek_kind() == Some(TokenKind::AmpersandAmpersand) || self.peek_is_keyword("and")
         {
             self.position += 1;
+            self.skip_newlines();
             let right = self.comparison();
             left = Expression::Logical {
                 left: Box::new(left),
@@ -2394,6 +2396,7 @@ impl<'source> Parser<'source> {
             _ => None,
         } {
             self.position += 1;
+            self.skip_newlines();
             let right = self.addition();
             left = Expression::Binary {
                 left: Box::new(left),
@@ -2412,6 +2415,7 @@ impl<'source> Parser<'source> {
             _ => None,
         } {
             self.position += 1;
+            self.skip_newlines();
             let right = self.multiplication();
             left = Expression::Binary {
                 left: Box::new(left),
@@ -2431,6 +2435,8 @@ impl<'source> Parser<'source> {
             _ => None,
         } {
             self.position += 1;
+            // An operator ending a line continues the expression (#143).
+            self.skip_newlines();
             let right = self.unary();
             left = Expression::Binary {
                 left: Box::new(left),
@@ -2450,6 +2456,7 @@ impl<'source> Parser<'source> {
         let left = self.postfix();
         if self.peek_kind() == Some(TokenKind::StarStar) {
             self.position += 1;
+            self.skip_newlines();
             let right = self.unary();
             return Expression::Binary {
                 left: Box::new(left),
@@ -2773,6 +2780,8 @@ impl<'source> Parser<'source> {
             }
             TokenKind::LeftBrace => {
                 let mut pairs = Vec::new();
+                // Newlines inside a literal's brackets end nothing (#143).
+                self.skip_newlines();
                 if self.peek_kind() != Some(TokenKind::RightBrace) {
                     loop {
                         // `{name: "pdx"}` — shorthand for a symbol key, and
@@ -2814,10 +2823,16 @@ impl<'source> Parser<'source> {
                         };
                         let value = self.expression();
                         pairs.push((key, value));
+                        self.skip_newlines();
                         if self.peek_kind() != Some(TokenKind::Comma) {
                             break;
                         }
                         self.position += 1; // the `,`
+                        self.skip_newlines();
+                        // A trailing comma before the closer, as Ruby allows.
+                        if self.peek_kind() == Some(TokenKind::RightBrace) {
+                            break;
+                        }
                     }
                 }
                 if self.peek_kind() != Some(TokenKind::RightBrace) {
@@ -2831,11 +2846,20 @@ impl<'source> Parser<'source> {
             }
             TokenKind::LeftBracket => {
                 let mut elements = Vec::new();
+                // Newlines inside a literal's brackets end nothing (#143).
+                self.skip_newlines();
                 if self.peek_kind() != Some(TokenKind::RightBracket) {
                     elements.push(self.expression());
+                    self.skip_newlines();
                     while self.peek_kind() == Some(TokenKind::Comma) {
                         self.position += 1;
+                        self.skip_newlines();
+                        // A trailing comma before the closer, as Ruby allows.
+                        if self.peek_kind() == Some(TokenKind::RightBracket) {
+                            break;
+                        }
                         elements.push(self.expression());
+                        self.skip_newlines();
                     }
                 }
                 if self.peek_kind() != Some(TokenKind::RightBracket) {
@@ -2848,7 +2872,9 @@ impl<'source> Parser<'source> {
                 Expression::ArrayLiteral(elements)
             }
             TokenKind::LeftParen => {
+                self.skip_newlines();
                 let inner = self.expression();
+                self.skip_newlines();
                 if self.peek_kind() != Some(TokenKind::RightParen) {
                     panic!(
                         "expected closing paren, got {:?}",
@@ -2882,6 +2908,8 @@ impl<'source> Parser<'source> {
         let enclosing_command = std::mem::replace(&mut self.command_arguments, false);
         let mut positional = Vec::new();
         let mut keyword: Vec<(String, Expression)> = Vec::new();
+        // Newlines inside the parens end nothing (#143).
+        self.skip_newlines();
         if self.peek_kind() != Some(TokenKind::RightParen) {
             loop {
                 if self.peek_kind() == Some(TokenKind::Identifier)
@@ -2899,10 +2927,16 @@ impl<'source> Parser<'source> {
                     }
                     positional.push(self.expression());
                 }
+                self.skip_newlines();
                 if self.peek_kind() != Some(TokenKind::Comma) {
                     break;
                 }
                 self.position += 1; // the `,`
+                self.skip_newlines();
+                // A trailing comma before the closer, as Ruby allows.
+                if self.peek_kind() == Some(TokenKind::RightParen) {
+                    break;
+                }
             }
         }
         if self.peek_kind() != Some(TokenKind::RightParen) {

@@ -1672,6 +1672,17 @@ fn crlf_line_endings_read_as_newlines_on_both_oracles() {
     );
 }
 
+/// Newlines inside brackets, and after an operator that ends a line, don't
+/// end the statement (#143) — Ruby's rule. Trailing commas close as Ruby
+/// allows them.
+#[test]
+fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_multiline.pdx",
+        "numbers = [\n  1,\n  2,\n]\np numbers\nsettings = {\n  color: \"red\",\n  \"size\" => 3,\n}\np settings\ndef add(left, right) = left + right\np add(\n  1,\n  2,\n)\ntotal = 1 +\n  2 *\n  3\np total\nready = true &&\n  false ||\n  true\np ready\nsame = 1 ==\n  1\np same\ngrouped = (\n  4 - 1\n)\np grouped\n",
+    );
+}
+
 /// A character outside ASCII, outside a string or comment, refuses with one
 /// sentence on both oracles (#139) — the seed had panicked slicing inside it,
 /// and the compiler had read `café` as `caf`.
@@ -2674,7 +2685,7 @@ fn parse_only_takes_many_files_and_names_the_failures() {
     let good = directory.join("good.pdx");
     let bad = directory.join("bad.pdx");
     std::fs::write(&good, "x = 1\n").unwrap();
-    std::fs::write(&bad, "x = (\n").unwrap();
+    std::fs::write(&bad, "x = )\n").unwrap();
 
     let clean = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .arg("--parse")

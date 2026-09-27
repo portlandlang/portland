@@ -1172,7 +1172,8 @@ end
 def parse_logical_or(tokens, position)
   mutable step = parse_logical_and(tokens, position)
   while operator_at?(tokens, step.position, %w[||]) || keyword_at?(tokens, step.position, %w[or])
-    right = parse_or_right(tokens, step.position + 1)
+    # An operator ending a line continues the expression (#143).
+    right = parse_or_right(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: logical_node("||", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1209,7 +1210,7 @@ end
 def parse_logical_and(tokens, position)
   mutable step = parse_comparison(tokens, position)
   while operator_at?(tokens, step.position, %w[&&]) || keyword_at?(tokens, step.position, %w[and])
-    right = parse_comparison(tokens, step.position + 1)
+    right = parse_comparison(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: logical_node("&&", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1219,7 +1220,7 @@ def parse_comparison(tokens, position)
   mutable step = parse_addition(tokens, position)
   while operator_at?(tokens, step.position, %w[== != < <= > >= <=>])
     operator = tokens[step.position].text
-    right = parse_addition(tokens, step.position + 1)
+    right = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1229,7 +1230,7 @@ def parse_addition(tokens, position)
   mutable step = parse_multiplication(tokens, position)
   while operator_at?(tokens, step.position, %w[+ -])
     operator = tokens[step.position].text
-    right = parse_multiplication(tokens, step.position + 1)
+    right = parse_multiplication(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1239,7 +1240,7 @@ def parse_multiplication(tokens, position)
   mutable step = parse_unary(tokens, position)
   while operator_at?(tokens, step.position, %w[* / %])
     operator = tokens[step.position].text
-    right = parse_unary(tokens, step.position + 1)
+    right = parse_unary(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: binary_node(operator, step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1253,7 +1254,7 @@ end
 def parse_exponent_operand(tokens, position)
   step = parse_postfix(tokens, position)
   if operator_at?(tokens, step.position, %w[**])
-    right = parse_unary(tokens, step.position + 1)
+    right = parse_unary(tokens, skip_newlines_at(tokens, step.position + 1))
     return Step.new(node: binary_node("**", step.node, right.node, line: line_at(tokens, position)), position: right.position)
   end
   step
@@ -1618,16 +1619,21 @@ end
 # The Step's node is the array of argument nodes.
 def parse_arguments(tokens, mutable position)
   mutable arguments = []
+  # Newlines inside the parens end nothing, and a trailing comma closes as
+  # Ruby allows (#143) — the seed's call_arguments.
+  position = skip_newlines_at(tokens, position)
   if operator_at?(tokens, position, %w[)])
     return Step.new(node: arguments, position: position + 1)
   end
   mutable step = parse_argument(tokens, position)
   arguments << step.node
-  position = step.position
+  position = skip_newlines_at(tokens, step.position)
   while operator_at?(tokens, position, %w[,])
-    step = parse_argument(tokens, position + 1)
+    position = skip_newlines_at(tokens, position + 1)
+    break if operator_at?(tokens, position, %w[)])
+    step = parse_argument(tokens, position)
     arguments << step.node
-    position = step.position
+    position = skip_newlines_at(tokens, step.position)
   end
   if operator_at?(tokens, position, %w[)])
     return Step.new(node: arguments, position: position + 1)
@@ -1638,16 +1644,21 @@ end
 # `[a, b, c]` — position already past the opening bracket.
 def parse_array(tokens, mutable position)
   mutable elements = []
+  # Newlines inside the brackets end nothing, and a trailing comma closes
+  # as Ruby allows (#143).
+  position = skip_newlines_at(tokens, position)
   if operator_at?(tokens, position, ["]"])
     return Step.new(node: array_node(elements), position: position + 1)
   end
   mutable step = parse_expression(tokens, position)
   elements << step.node
-  position = step.position
+  position = skip_newlines_at(tokens, step.position)
   while operator_at?(tokens, position, %w[,])
-    step = parse_expression(tokens, position + 1)
+    position = skip_newlines_at(tokens, position + 1)
+    break if operator_at?(tokens, position, ["]"])
+    step = parse_expression(tokens, position)
     elements << step.node
-    position = step.position
+    position = skip_newlines_at(tokens, step.position)
   end
   if operator_at?(tokens, position, ["]"])
     return Step.new(node: array_node(elements), position: position + 1)
@@ -1681,6 +1692,9 @@ end
 
 def parse_hash(tokens, mutable position)
   mutable pairs = []
+  # Newlines inside the braces end nothing, and a trailing comma closes as
+  # Ruby allows (#143).
+  position = skip_newlines_at(tokens, position)
   if operator_at?(tokens, position, ["}"])
     return Step.new(node: hash_node(pairs), position: position + 1)
   end
@@ -1690,9 +1704,10 @@ def parse_hash(tokens, mutable position)
     if tokens[position].identifier? && operator_at?(tokens, position + 1, %w[:])
       shorthand = parse_expression(tokens, position + 2)
       pairs << pair_node(symbol_node(tokens[position].text), shorthand.node)
-      position = shorthand.position
+      position = skip_newlines_at(tokens, shorthand.position)
       if operator_at?(tokens, position, %w[,])
-        position += 1
+        position = skip_newlines_at(tokens, position + 1)
+        return Step.new(node: hash_node(pairs), position: position + 1) if operator_at?(tokens, position, ["}"])
         next
       end
       if operator_at?(tokens, position, ["}"])
@@ -1706,9 +1721,10 @@ def parse_hash(tokens, mutable position)
     end
     value = parse_expression(tokens, key.position + 1)
     pairs << pair_node(key.node, value.node)
-    position = value.position
+    position = skip_newlines_at(tokens, value.position)
     if operator_at?(tokens, position, %w[,])
-      position += 1
+      position = skip_newlines_at(tokens, position + 1)
+      return Step.new(node: hash_node(pairs), position: position + 1) if operator_at?(tokens, position, ["}"])
       next
     end
     if operator_at?(tokens, position, ["}"])
@@ -1827,9 +1843,10 @@ def parse_primary(tokens, position)
     end
   when "operator"
     if token.text == "("
-      inner = parse_expression(tokens, after)
-      if operator_at?(tokens, inner.position, %w[)])
-        Step.new(node: inner.node, position: inner.position + 1)
+      inner = parse_expression(tokens, skip_newlines_at(tokens, after))
+      closer = skip_newlines_at(tokens, inner.position)
+      if operator_at?(tokens, closer, %w[)])
+        Step.new(node: inner.node, position: closer + 1)
       else
         Step.new(node: error_node("expected closing paren"), position: inner.position)
       end
