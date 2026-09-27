@@ -955,6 +955,17 @@ end
 # host values ride the host's own ordering.
 def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
 
+# What a symbol's name answers for one of its text queries (#112).
+def symbol_text_answer(text, name, arguments)
+  case name
+  when "name", "id2name" then text
+  when "length", "size" then text.length
+  when "empty?" then text.empty?
+  when "start_with?" then text.start_with?(arguments.first)
+  else text.end_with?(arguments.first)
+  end
+end
+
 # One comparator-block answer (#99), for the host's sort, min, and max to
 # read — the host refuses a non-integer in the seed's words. A recorded gap
 # (principle 4): what the block rebinds, and a `break` or `return` inside
@@ -1456,6 +1467,9 @@ def evaluate_index(node, bindings)
   receiver_step = evaluate_expression(node.receiver, bindings)
   index_step = evaluate_expression(node.index, receiver_step.bindings)
   receiver = slot_value(receiver_step.value)
+  # A symbol indexes its name, answering text (#112), the seed's arm.
+  return outcome([value_at(receiver, 1)[slot_value(index_step.value)]], index_step.bindings) if receiver in ["__symbol__", *]
+
   outcome([receiver[slot_value(index_step.value)]], index_step.bindings)
 end
 
@@ -1707,6 +1721,12 @@ def evaluate_method_call(node, mutable bindings)
   # values reach the host's own arms below.
   if (receiver in ["__struct__", *]) && %w[between? clamp].include?(node.name) && arguments.length == 2
     return outcome([ordered_answer(node.name, receiver, arguments, bindings)], bindings)
+  end
+  # A symbol answers Ruby's text queries about its name (#112), the seed's
+  # arm: a guest symbol is a tagged host array, so its name answers instead.
+  if (receiver in ["__symbol__", *]) && %w[empty? end_with? id2name length name size start_with?].include?(node.name)
+    check_builtin_count(receiver, node.name, arguments.length)
+    return outcome([symbol_text_answer(value_at(receiver, 1), node.name, arguments)], bindings)
   end
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).

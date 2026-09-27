@@ -278,7 +278,12 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
             {
                 chars.next(); // the colon
                 let length = 1 + symbol_length(&source[start + 1..]);
-                for _ in 1..length {
+                // By position, not count: the length is in bytes, and a
+                // quoted symbol may hold multi-byte characters (#112).
+                while chars
+                    .peek()
+                    .is_some_and(|&(index, _)| index < start + length)
+                {
                     chars.next();
                 }
                 tokens.push(Token {
@@ -1071,6 +1076,17 @@ mod tests {
         assert_eq!(
             kinds("kind: 1"),
             vec![TokenKind::Identifier, TokenKind::Colon, TokenKind::Integer]
+        );
+    }
+
+    /// A quoted symbol holding multi-byte characters ends where it ends
+    /// (#112): the scan had advanced a byte count's worth of characters and
+    /// swallowed what followed.
+    #[test]
+    fn lexes_a_quoted_symbol_with_multi_byte_characters() {
+        assert_eq!(
+            kinds(":\"céréale\".size"),
+            vec![TokenKind::Symbol, TokenKind::Dot, TokenKind::Identifier]
         );
     }
 

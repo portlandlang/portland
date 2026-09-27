@@ -46,6 +46,7 @@ candidates = %w[
   dig each_pair key? has_key? keys merge to_a entries values
   ceil finite? floor infinite? nan? round to_i truncate
   capitalize chars chomp downcase end_with? lines lstrip rstrip split start_with? strip swapcase upcase
+  id2name name
   nil? some? failure? to_s
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
   take drop push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object

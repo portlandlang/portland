@@ -286,6 +286,10 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
             .iter()
             .find(|(existing, _)| existing == key)
             .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
+        // A symbol indexes its name, answering text (#112).
+        (Value::Symbol(text), Value::Integer(_) | Value::Range { .. }) => {
+            index_read(&Value::String(text.clone()), index)
+        }
         _ => panic!("cannot index {receiver:?} with {index:?}"),
     }
 }
@@ -1905,6 +1909,27 @@ impl<W: std::io::Write> Interpreter<W> {
         keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
     ) -> Option<Value> {
+        // A symbol answers Ruby's text queries about its name (#112) — none
+        // of them builds a symbol, which ADR 0023 keeps literal.
+        if let Value::Symbol(text) = &receiver
+            && block.is_none()
+        {
+            if matches!(name, "name" | "id2name") && arguments.is_empty() {
+                return Some(Value::String(text.clone()));
+            }
+            if matches!(
+                name,
+                "empty?" | "end_with?" | "length" | "size" | "start_with?"
+            ) {
+                return self.method_call(
+                    Value::String(text.clone()),
+                    name,
+                    arguments,
+                    keyword_arguments,
+                    None,
+                );
+            }
+        }
         // `with` builds an updated copy of an immutable struct.
         if name == "with" {
             let Value::Struct { fields, name } = receiver else {

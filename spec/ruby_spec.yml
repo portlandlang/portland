@@ -415,9 +415,113 @@ core/string/strip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 
 # — core/symbol —
+# A symbol answers questions about its name, and never builds a new symbol
+# from text (ADR 0023): the case changers and succ stay behind, and symbols
+# are not ordered.
 
+core/symbol/all_symbols_spec.rb:
+  status: skipped
+  reason: "The symbol table is runtime reflection; every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/capitalize_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/case_compare_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/symbol/casecmp_spec.rb:
+  status: skipped
+  reason: "Symbols are not ordered (ADR 0023), and casecmp? asks through casecmp's ordering."
+  link: docs/ruby/symbols.md
+core/symbol/comparison_spec.rb:
+  status: skipped
+  reason: "Symbols are not ordered (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/downcase_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/symbol/empty_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+core/symbol/end_with_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_planned
+  reason: "end_with? takes one argument here; the several-argument and to_str forms come with the string port, and regexps wait on #74."
+  link: https://github.com/portlandlang/portland/issues/106
+core/symbol/id2name_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/symbol/intern_spec.rb:
+  status: skipped
+  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/length_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "Byte-escaped names (a NUL, raw UTF-8 bytes) don't lex: a double-quoted string takes only its six escapes."
+  link: docs/ruby/string-escapes.md
+core/symbol/name_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "A bare non-ASCII symbol like :ルビー doesn't lex (names are ASCII outside a string), and a string's frozenness or identity can't be observed where values never mutate."
+  link: docs/ruby/mutability.md
+core/symbol/next_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/size_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/symbol/start_with_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_planned
+  reason: "start_with? takes one argument here; the several-argument and to_str forms come with the string port, and regexps wait on #74."
+  link: https://github.com/portlandlang/portland/issues/106
+core/symbol/succ_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/swapcase_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/symbol_spec.rb:
+  status: skipped
+  reason: "Symbols are not ordered, so not Comparable (ADR 0023), and there is no Symbol class object to allocate from."
+  link: docs/ruby/symbols.md
+core/symbol/to_proc_spec.rb:
+  status: skipped
+  reason: "Symbol-to-proc is gone with method references; a block says it, { it.name } (ADR 0023, ADR 0017)."
+  link: docs/ruby/symbols.md
 core/symbol/to_s_spec.rb:
-  pdx: [spec/symbol/text_boundary_spec.pdx]
+  pdx: [spec/symbol/text_boundary_spec.pdx, spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "Operator and @-symbols (:[], :@ruby) don't exist (ADR 0023); the encoding and frozen-string examples stay behind."
+  link: docs/ruby/symbols.md
+core/symbol/to_sym_spec.rb:
+  status: skipped
+  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/upcase_spec.rb:
+  status: skipped
+  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/symbol/equal_value_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "@-symbols don't exist, and :ruby == \"ruby\" is a compile error rather than false (ADR 0023)."
+  link: docs/ruby/symbols.md
 
 # — core/true —
 

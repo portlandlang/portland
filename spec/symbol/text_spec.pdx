@@ -1,0 +1,102 @@
+# A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
+# start_with?, end_with?, name, id2name, to_s, ==, and ===. A symbol answers
+# questions about its name here, as in Ruby, and never builds a new symbol
+# from text (ADR 0023) — so upcase and its kin stay behind. Upstream's
+# alias checks compare method objects, which a closed runtime has none of;
+# they ask the same question of the two answers instead.
+
+require_relative "../spec_helper"
+
+context "Symbol#length" do
+  specify "returns 0 for empty name" do
+    expect(:"".length).to eq(0)
+  end
+
+  specify "returns 3 for name formed by 3 ASCII characters" do
+    expect(:one.length).to eq(3)
+  end
+
+  specify "returns 4 for name formed by 4 ASCII characters" do
+    expect(:four.length).to eq(4)
+  end
+end
+
+context "Symbol#size" do
+  specify "is an alias of Symbol#length" do
+    expect(:four.size).to eq(:four.length)
+  end
+end
+
+context "Symbol#empty?" do
+  specify "returns true if self is empty" do
+    expect(:"".empty?).to eq(true)
+  end
+
+  specify "returns false if self is non-empty" do
+    expect(:"a".empty?).to eq(false)
+  end
+end
+
+context "Symbol#start_with?" do
+  specify "returns true only if beginning match" do
+    expect(:hello.start_with?("h")).to eq(true)
+    expect(:hello.start_with?("hel")).to eq(true)
+    expect(:hello.start_with?("el")).to eq(false)
+  end
+
+  specify "returns true if the search string is empty" do
+    expect(:hello.start_with?("")).to eq(true)
+    expect(:"".start_with?("")).to eq(true)
+  end
+
+  specify "works for multibyte strings" do
+    expect(:"céréale".start_with?("cér")).to eq(true)
+  end
+end
+
+context "Symbol#end_with?" do
+  specify "returns true only if ends match" do
+    expect(:hello.end_with?("o")).to eq(true)
+    expect(:hello.end_with?("llo")).to eq(true)
+    expect(:hello.end_with?("ll")).to eq(false)
+  end
+
+  specify "returns true if the search string is empty" do
+    expect(:hello.end_with?("")).to eq(true)
+    expect(:"".end_with?("")).to eq(true)
+  end
+end
+
+context "Symbol#name" do
+  specify "returns string" do
+    expect(:ruby.name).to eq("ruby")
+  end
+end
+
+context "Symbol#id2name" do
+  specify "is an alias of Symbol#to_s" do
+    expect(:ruby.id2name).to eq(:ruby.to_s)
+  end
+end
+
+context "Symbol#to_s" do
+  specify "returns the string corresponding to self" do
+    expect(:rubinius.to_s).to eq("rubinius")
+    expect(:squash.to_s).to eq("squash")
+  end
+end
+
+context "Symbol#==" do
+  specify "only returns true when the other is exactly the same symbol" do
+    expect(:ruby == :ruby).to eq(true)
+    expect(:ruby == :"ruby").to eq(true)
+    expect(:foo == :bar).to eq(false)
+  end
+end
+
+context "Symbol#===" do
+  specify "is an alias of Symbol#==" do
+    expect(:ruby === :ruby).to eq(:ruby == :ruby)
+    expect(:foo === :bar).to eq(:foo == :bar)
+  end
+end

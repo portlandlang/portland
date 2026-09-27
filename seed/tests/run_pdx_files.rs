@@ -1799,6 +1799,16 @@ fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
     assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
+/// A symbol answers Ruby's text queries about its name (#112), as Ruby 4.0.7
+/// answers them, and indexes its name as text.
+#[test]
+fn symbol_text_queries_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_symbol_text.pdx",
+        "p :abc.length\np :abc.size\np :\"\".empty?\np :abc.start_with?(\"a\")\np :abc.end_with?(\"bc\")\np :abc.name\np :abc.id2name\np :abc[1]\np :abc[0..1]\np :abc[9]\np :\"céréale\".length\n",
+    );
+}
+
 /// Case equality (#150, #151): `case/when` and the `===` operator match a
 /// type name by type, a range by the numbers it covers, a struct by its own
 /// `def ===`, and anything else by equality — where `when` had compared by
