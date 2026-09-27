@@ -1,0 +1,63 @@
+# `class` is a spelling of `struct` (ADR 0056): the same type under either
+# keyword — fields, methods, type functions, traits, and nesting all read the
+# same, and the values they build are the values `struct` builds.
+
+require_relative "../spec_helper"
+
+trait Sized
+  def big? = size > 10
+end
+
+class Parcel
+  size
+  label
+
+  include Sized
+
+  def self.small(label) = Parcel.new(size: 1, label: label)
+
+  def describe = "#{label} (#{size})"
+
+  class Stamp
+    cents
+  end
+end
+
+struct Crate
+  size
+  label
+end
+
+context "class" do
+  describe "as a spelling of struct" do
+    specify "declares fields and builds values with them" do
+      parcel = Parcel.new(size: 3, label: "books")
+      expect(parcel.size).to eq(3)
+      expect(parcel.label).to eq("books")
+    end
+
+    specify "holds methods and type functions" do
+      expect(Parcel.new(size: 3, label: "books").describe).to eq("books (3)")
+      expect(Parcel.small("card").size).to eq(1)
+    end
+
+    specify "includes a trait" do
+      expect(Parcel.new(size: 12, label: "desk").big?).to eq(true)
+    end
+
+    specify "compares by value and updates with with" do
+      parcel = Parcel.new(size: 3, label: "books")
+      expect(parcel == Parcel.new(size: 3, label: "books")).to eq(true)
+      expect(parcel.with(size: 4).size).to eq(4)
+    end
+
+    specify "nests, named with ::" do
+      expect(Parcel::Stamp.new(cents: 68).cents).to eq(68)
+    end
+
+    specify "inspects the way a struct does" do
+      expect(inspect(Parcel.new(size: 3, label: "books"))).to eq("Parcel(size: 3, label: \"books\")")
+      expect(inspect(Crate.new(size: 3, label: "books"))).to eq("Crate(size: 3, label: \"books\")")
+    end
+  end
+end

@@ -310,7 +310,8 @@ impl<'source> Parser<'source> {
         if self.peek_is_keyword("module") {
             return self.module_definition();
         }
-        if self.peek_is_keyword("struct") {
+        // `class` is a spelling of `struct` (ADR 0056): one construct.
+        if self.peek_is_keyword("struct") || self.peek_is_keyword("class") {
             return self.struct_definition();
         }
         if self.peek_is_keyword("trait") {
@@ -989,10 +990,15 @@ impl<'source> Parser<'source> {
     }
 
     fn struct_definition(&mut self) -> Statement {
-        self.position += 1; // the `struct`
+        let keyword = self.advance().text; // `struct`, or `class` (ADR 0056)
+        if self.peek_kind() == Some(TokenKind::LessLess) {
+            panic!(
+                "'{keyword} << self' has no Portland meaning — write each method as 'def self.name' in the type's body"
+            );
+        }
         let token = self.advance();
         if token.kind != TokenKind::Identifier {
-            panic!("expected struct name after struct, got {token:?}");
+            panic!("expected struct name after {keyword}, got {token:?}");
         }
         if !token.text.chars().next().unwrap().is_ascii_uppercase() {
             panic!(
@@ -1001,6 +1007,15 @@ impl<'source> Parser<'source> {
             );
         }
         let name = token.text.to_string();
+        // Hierarchies flatten into traits (ADR 0028), whichever keyword
+        // declared the type.
+        if self.peek_kind() == Some(TokenKind::Less) {
+            self.position += 1; // the `<`
+            let parent = self.advance().text;
+            panic!(
+                "'{keyword} {name} < {parent}' inherits, and Portland has no inheritance — move {parent}'s shared methods into a trait and 'include' it"
+            );
+        }
         self.expect_statement_boundary();
         self.skip_newlines();
         let mut fields: Vec<String> = Vec::new();
@@ -1032,7 +1047,7 @@ impl<'source> Parser<'source> {
                     "modules don't nest inside structs — a module groups things, a struct is a thing"
                 );
             }
-            if self.peek_is_keyword("struct") {
+            if self.peek_is_keyword("struct") || self.peek_is_keyword("class") {
                 nested.push(self.struct_definition());
                 self.skip_newlines();
                 continue;

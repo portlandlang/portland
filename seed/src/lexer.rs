@@ -72,11 +72,12 @@ pub enum TokenKind {
 
 /// The Stage 0 keyword set — grows as the subset does.
 #[rustfmt::skip]
-const KEYWORDS: [&str; 34] = [
+const KEYWORDS: [&str; 35] = [
     "alias",
     "and",
     "break",
     "case",
+    "class",
     "def",
     "do",
     "else",
@@ -486,6 +487,31 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     kind,
                     text,
                 });
+            }
+            // Ruby's instance and class variables have no Portland meaning
+            // (ADR 0056; instance state is #103's question), so the lexer
+            // names what was written and where the value lives instead.
+            '@' => {
+                let class_variable = source[start + 1..].starts_with('@');
+                let name_start = if class_variable { start + 2 } else { start + 1 };
+                let name_length = source[name_start..]
+                    .find(|character: char| {
+                        !(character.is_ascii_alphanumeric() || character == '_')
+                    })
+                    .unwrap_or(source.len() - name_start);
+                if name_length == 0 {
+                    panic!("unexpected character {character:?} at byte {start}");
+                }
+                let spelling = &source[start..name_start + name_length];
+                if class_variable {
+                    panic!(
+                        "'{spelling}' is a class variable, which Portland does not have — a value lives in a local, a field, or a constant"
+                    );
+                }
+                let name = &source[name_start..name_start + name_length];
+                panic!(
+                    "'{spelling}' is an instance variable, which Portland does not have — a field is read by its bare name, '{name}'"
+                );
             }
             _ => panic!("unexpected character {character:?} at byte {start}"),
         }

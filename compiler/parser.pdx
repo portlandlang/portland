@@ -1979,7 +1979,8 @@ def parse_statement(tokens, position)
     when "alias" then return parse_alias(tokens, position + 1)
     when "def" then return parse_def(tokens, position + 1)
     when "mutable" then return parse_mutable(tokens, position + 1)
-    when "struct" then return parse_struct(tokens, position + 1)
+    # `class` is a spelling of `struct` (ADR 0056): one construct.
+    when "struct", "class" then return parse_struct(tokens, position + 1)
     when "together" then return parse_together(tokens, position + 1)
     when "meanwhile" then return Step.new(node: error_node("a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"), position: skip_line_at(tokens, position))
     when "trait" then return parse_trait(tokens, position + 1)
@@ -2766,13 +2767,26 @@ def parse_enum(tokens, mutable position)
 end
 
 def parse_struct(tokens, mutable position)
+  keyword = tokens[position - 1].text # `struct`, or `class` (ADR 0056)
+  if position < tokens.length && tokens[position].operator? && tokens[position].text == "<<"
+    return Step.new(node: error_node("'#{keyword} << self' has no Portland meaning — write each method as 'def self.name' in the type's body"), position: skip_line_at(tokens, position))
+  end
   if position >= tokens.length || !tokens[position].identifier?
-    return Step.new(node: error_node("expected struct name after struct"), position: position)
+    return Step.new(node: error_node("expected struct name after #{keyword}"), position: position)
   end
   line = line_at(tokens, position)
   name = tokens[position].text
   unless "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.slice(0, 1))
     return Step.new(node: error_node("struct names start with a capital letter, got #{name}"), position: position + 1)
+  end
+  # Hierarchies flatten into traits (ADR 0028), whichever keyword declared
+  # the type. The body still parses, so the refusal stands in for the whole
+  # declaration rather than leaving its fields loose at the top level.
+  mutable inherits = nil
+  if position + 2 < tokens.length && tokens[position + 1].operator? && tokens[position + 1].text == "<"
+    parent = tokens[position + 2].text
+    inherits = "'#{keyword} #{name} < #{parent}' inherits, and Portland has no inheritance — move #{parent}'s shared methods into a trait and 'include' it"
+    position += 2
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable fields = []
@@ -2789,7 +2803,7 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[alias def enum include struct])
+  while keyword_at?(tokens, position, %w[alias class def enum include struct])
     if keyword_at?(tokens, position, %w[alias])
       # `alias footprint area` (ADR 0039) — desugared right here: the body
       # is self-contained, so the alias clones the def it points at, and
@@ -2835,6 +2849,7 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
   end
   if keyword_at?(tokens, position, %w[end])
+    return Step.new(node: error_node(inherits), position: position + 1) unless inherits.nil?
     return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)

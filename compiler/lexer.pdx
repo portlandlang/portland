@@ -118,7 +118,7 @@ def check_leading_zero(text, kind)
 end
 
 def keyword?(word)
-  %w[alias and break case def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
+  %w[alias and break case class def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
 end
 
 def two_character_operator?(pair)
@@ -680,6 +680,23 @@ def lex(raw_source, first_line: 1)
       tokens << Token.new(kind: "operator", text: character, leading_space: leading, line: line)
       index += 1
       next
+    end
+    # Ruby's instance and class variables have no Portland meaning (ADR
+    # 0056; instance state is #103's question), so the lexer names what was
+    # written and where the value lives instead — the seed's sentences.
+    if character == "@"
+      class_variable = index + 1 < characters.length && characters[index + 1] == "@"
+      name_begin = class_variable ? index + 2 : index + 1
+      mutable name_end = name_begin
+      while name_end < characters.length && name_character?(characters[name_end])
+        name_end += 1
+      end
+      if name_end > name_begin
+        spelling = characters.slice(index, name_end - index).join("")
+        panic "'#{spelling}' is a class variable, which Portland does not have — a value lives in a local, a field, or a constant" if class_variable
+        name = characters.slice(name_begin, name_end - name_begin).join("")
+        panic "'#{spelling}' is an instance variable, which Portland does not have — a field is read by its bare name, '#{name}'"
+      end
     end
     tokens << Token.new(kind: "error", text: character, leading_space: leading, line: line)
     index += 1

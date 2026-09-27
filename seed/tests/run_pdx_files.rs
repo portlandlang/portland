@@ -1591,6 +1591,41 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// `class` is a spelling of `struct` (ADR 0056, #127): the same values on
+/// both oracles, and the three Ruby shapes it has no Portland meaning for —
+/// inheritance, `class << self`, and instance variables — refuse with the
+/// rewrite named, the same sentence on both.
+#[test]
+fn class_is_a_spelling_of_struct_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_class.pdx",
+        "class Point\n  x\n  y\n  def sum = x + y\n  class Label\n    text\n  end\nend\np Point.new(x: 1, y: 2)\nputs Point.new(x: 1, y: 2).sum\np Point::Label.new(text: \"origin\")\n",
+    );
+    let cases = [
+        (
+            "class Token < Node\n  text\nend\n",
+            "'class Token < Node' inherits, and Portland has no inheritance — move Node's shared methods into a trait and 'include' it",
+        ),
+        (
+            "struct Token < Node\n  text\nend\n",
+            "'struct Token < Node' inherits, and Portland has no inheritance — move Node's shared methods into a trait and 'include' it",
+        ),
+        (
+            "class << self\n  def build = 1\nend\n",
+            "'class << self' has no Portland meaning — write each method as 'def self.name' in the type's body",
+        ),
+        (
+            "class Counter\n  count\n  def bump = @count + 1\nend\n",
+            "'@count' is an instance variable, which Portland does not have — a field is read by its bare name, 'count'",
+        ),
+        (
+            "@@total = 0\n",
+            "'@@total' is a class variable, which Portland does not have — a value lives in a local, a field, or a constant",
+        ),
+    ];
+    assert_both_oracles_refuse("class_refusal.pdx", None, &cases);
+}
+
 /// Three corrections to ADR 0054's build, each caught by an upstream
 /// ruby/spec example: NaN does not order, backwards clamp bounds refuse
 /// (on a Comparable struct too), and the two zeros are equal under `<=>`.

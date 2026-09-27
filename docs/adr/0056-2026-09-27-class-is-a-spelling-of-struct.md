@@ -1,6 +1,6 @@
 # 0056 — `class` is a spelling of `struct`
 
-- **Status:** Accepted (ruled by the deciding user 2026-09-27; not yet built) — supersedes [ADR 0028](0028-2026-07-27-object-model-structs-and-traits.md) on the keyword only
+- **Status:** Accepted (ruled by the deciding user 2026-09-27; built in the seed and the trio, differentially pinned, 2026-09-27, [#127](https://github.com/portlandlang/portland/issues/127)) — supersedes [ADR 0028](0028-2026-07-27-object-model-structs-and-traits.md) on the keyword only
 - **Date:** 2026-09-27
 - **Issue:** [#61](https://github.com/portlandlang/portland/issues/61), with job 4 split out as [#103](https://github.com/portlandlang/portland/issues/103)
 
@@ -22,5 +22,9 @@ The object model itself holds up. What removed the word was a sentence, not an a
 - Value-shaped Ruby classes — data plus methods, built once and not mutated — keep their `class` line when migrated; the migration linter (#36) no longer rewrites the keyword.
 - The two walls between most real Ruby classes and Portland are now named and tracked in one place each: inheritance (declined, trait rewrite) and mutable instance state (#103, open).
 - A per-gem readiness assessment can count `class` as runs-as-is for value-shaped classes and route the rest to exactly those two reasons.
-- Not built yet: both lexers treat `class` as a keyword, both parsers desugar it, the refusals get wordings, and a spec pins `class` and `struct` answering the same values.
+- Built (#127): both lexers treat `class` as a keyword and both parsers read it into the struct node; `spec/struct/class_spec.pdx` pins `class` and `struct` answering the same values. The refusals' wordings, settled at build, pinned on both implementations:
+  - `'class Token < Node' inherits, and Portland has no inheritance — move Node's shared methods into a trait and 'include' it` (spelled with `struct` when `struct` declared it);
+  - `'class << self' has no Portland meaning — write each method as 'def self.name' in the type's body`;
+  - `'@count' is an instance variable, which Portland does not have — a field is read by its bare name, 'count'`;
+  - `'@@total' is a class variable, which Portland does not have — a value lives in a local, a field, or a constant`.
 - Ledger: [classes.md](../ruby/classes.md) says the keyword is a spelling of `struct` and points job 4 at #103.

@@ -2,7 +2,7 @@
 
 **Summary:** `class` is a spelling of `struct`, and its four jobs have homes: data-with-behavior is a `struct` (either word), shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects are an open question.
 
-**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md), [ADR 0031](../adr/0031-2026-07-31-smart-constructors-definable-new.md), and [ADR 0056](../adr/0056-2026-09-27-class-is-a-spelling-of-struct.md), which brought the keyword back on 2026-09-27 — not yet built); jobs 1–3 built on both implementations, differentially pinned; job 4 open ([#103](https://github.com/portlandlang/portland/issues/103)). The ledger of the four jobs is [#61](https://github.com/portlandlang/portland/issues/61).
+**Status:** decided ([ADR 0028](../adr/0028-2026-07-27-object-model-structs-and-traits.md), [ADR 0031](../adr/0031-2026-07-31-smart-constructors-definable-new.md), and [ADR 0056](../adr/0056-2026-09-27-class-is-a-spelling-of-struct.md), which brought the keyword back on 2026-09-27 — built the same day); jobs 1–3 built on both implementations, differentially pinned; job 4 open ([#103](https://github.com/portlandlang/portland/issues/103)). The ledger of the four jobs is [#61](https://github.com/portlandlang/portland/issues/61).
 
 ## Ruby
 
@@ -55,11 +55,11 @@ end
 1. **Construction logic** — `def self.name` declares a type function; `new` is one of the definable names and replaces the raw constructor everywhere, any signature, value-or-`failure` (ADRs 0027, 0031). Inside it — and only there — `fields(...)` is the raw kwargs-in-fields-out layer, so a validating struct cannot be constructed around: the raw constructor has no spelling outside the body.
 1. **Stateful objects** — the parser-with-a-position, the connection, the cache — have no home yet. Values thread through returns today (the compiler's own Outcome pattern). This was parked until `together` had semantics; it has them now (ADR 0029), and the question is open as [#103](https://github.com/portlandlang/portland/issues/103).
 
-`class` itself is a second spelling of `struct` ([ADR 0056](../adr/0056-2026-09-27-class-is-a-spelling-of-struct.md)): `class Token` and `struct Token` declare the same type. Inheritance, `class Token < Node`, refuses with the trait rewrite named, and an instance variable refuses until #103 decides what instance state is.
+`class` itself is a second spelling of `struct` ([ADR 0056](../adr/0056-2026-09-27-class-is-a-spelling-of-struct.md)): `class Token` and `struct Token` declare the same type. Inheritance, `class Token < Node`, refuses with the trait rewrite named; `class << self` refuses naming `def self.`; and an instance variable, `@text`, refuses naming the bare field until #103 decides what instance state is.
 
 ## Migration
 
-- `class Token` holding data keeps its `class` line (ADR 0056, once built); the field list becomes explicit.
+- `class Token` holding data keeps its `class` line (ADR 0056); the field list becomes explicit, and each `@text` read becomes a bare `text`.
 - `initialize` becomes `def self.new`: its body moves whole, the `@field = value` tail becomes one `fields(field: value)` call, and `raise` becomes a returned `failure` the caller handles with the toolkit. Call sites do not change: `Token.new(...)`, positional arguments included, is a deliberate non-difference.
 - A `def self.new ... super` override needs one edit — `super` to `fields(...)` — and `super` anywhere refuses with the rewrite named (there is no hierarchy to climb).
 - `def self.of`-style constructors move unchanged, in structs and in modules both — a module-body `def self.` is accepted as a plain `def`.
