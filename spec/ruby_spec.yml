@@ -102,6 +102,45 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/map_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so map!, identity, and mid-walk growth stay behind; break with a value waits on ADR 0012; no blockless Enumerator (ADR 0055); no subclasses."
+  link: docs/ruby/mutability.md
+core/array/collect_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects; collect! stays behind with map!, since values never mutate."
+  link: docs/ruby/metaprogramming.md
+core/array/select_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so select!, recursive arrays, and mid-walk growth stay behind; no blockless Enumerator (ADR 0055); no subclasses."
+  link: docs/ruby/mutability.md
+core/array/filter_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects; filter! stays behind with select!, since values never mutate."
+  link: docs/ruby/metaprogramming.md
+core/array/reject_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the nil and 5 rows stay behind; values never mutate, so reject!, identity, and recursive arrays stay behind too; no subclasses."
+  link: docs/ruby/truthiness.md
+core/array/each_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_planned
+  reason: "The multi-parameter row waits on #158 (does |a, b| destructure a yielded array); the mid-walk mutation rows stay behind, since values never mutate."
+  link: https://github.com/portlandlang/portland/issues/158
+core/array/detect_spec.rb:
+  pdx: [spec/array/iteration_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/array/none_spec.rb:
+  status: skipped
+  reason: "Its examples grow the array mid-walk and pass a pattern beside a block; values never mutate, and none? takes a true-or-false block."
+  link: docs/ruby/mutability.md
 core/array/plus_spec.rb:
   pdx: [spec/array/operators_spec.pdx]
   status: partial_intentional

@@ -1,0 +1,67 @@
+# Walking an array with a block (#104), from ruby/spec core/array: map and
+# collect, select and filter, reject, each, and detect. Alias checks
+# compare the two answers rather than method objects. Blocks answer true
+# or false where they choose, so reject's rows where nil or 5 stands for a
+# truth stay upstream; so do identity checks, recursive arrays, and
+# mid-walk mutation (values never mutate), the bang forms, subclasses,
+# break with a value (ADR 0012), blockless Enumerators, and each's
+# multi-parameter row, which waits on #158.
+
+require_relative "../spec_helper"
+
+context "Array#map" do
+  specify "returns a copy of array with each element replaced by the value returned by block" do
+    letters = ["a", "b", "c", "d"]
+    expect(letters.map { |letter| letter + "!" }).to eq(["a!", "b!", "c!", "d!"])
+  end
+
+  specify "does not change self" do
+    letters = ["a", "b", "c", "d"]
+    letters.map { |letter| letter + "!" }
+    expect(letters).to eq(["a", "b", "c", "d"])
+  end
+end
+
+context "Array#collect" do
+  specify "is an alias of Array#map" do
+    expect([1, 2, 3].collect { it * 2 }).to eq([1, 2, 3].map { it * 2 })
+  end
+end
+
+context "Array#select" do
+  specify "returns a new array of elements for which block is true" do
+    expect([1, 3, 4, 5, 6, 9].select { |number| number % ((number + 1) / 2) == 0 }).to eq([1, 4, 6])
+  end
+end
+
+context "Array#filter" do
+  specify "is an alias of Array#select" do
+    expect([1, 2, 3, 4].filter { it.even? }).to eq([1, 2, 3, 4].select { it.even? })
+  end
+end
+
+context "Array#reject" do
+  specify "returns a new array without elements for which block is true" do
+    numbers = [1, 2, 3, 4, 5]
+    expect(numbers.reject { true }).to eq([])
+    expect(numbers.reject { false }).to eq(numbers)
+    expect(numbers.reject { |number| number < 3 }).to eq([3, 4, 5])
+    expect(numbers.reject { |number| number % 2 == 0 }).to eq([1, 3, 5])
+  end
+end
+
+context "Array#each" do
+  specify "yields each element to the block" do
+    mutable seen = []
+    numbers = [1, 2, 3]
+    expect(numbers.each { |item| seen = seen + [item] }).to eq(numbers)
+    expect(seen).to eq([1, 2, 3])
+  end
+end
+
+context "Array#detect" do
+  specify "is an alias of Array#find" do
+    expect([1, 2, 3].detect { it > 1 }).to eq([1, 2, 3].find { it > 1 })
+    expect([1, 2, 3].detect { it > 5 }).to eq([1, 2, 3].find { it > 5 })
+  end
+end

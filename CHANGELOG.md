@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array iteration files ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `map`, `collect`, `select`, `filter`, `reject`, `each`, and `detect` port to `spec/array/iteration_spec.pdx`, and `none_spec` is recorded as skipped. `each`'s multi-parameter row waits on #158, filed today: whether `|a, b|` destructures a yielded array, which Portland refuses and Ruby does.
+
 - **ruby/spec's core/array `+` and `*` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — into `spec/array/operators_spec.pdx`. `*` with a string stays behind: it is Ruby's `join` under another name, one spelling with two behaviors (principle 3).
 
 - **ruby/spec's core/array set arithmetic ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `-`, `difference`, `union`, `intersection`, and `intersect?` in `spec/array/set_arithmetic_spec.pdx`, twenty-three examples. The `|` and `&` groups stay behind with ADR 0003.
