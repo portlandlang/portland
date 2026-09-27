@@ -1773,6 +1773,12 @@ def evaluate_method_call(node, mutable bindings)
   when "to_s" then to_s_of(receiver, arguments)
   when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(arguments.first)
   when "values_at" then values_at_of(receiver, arguments)
+  # Set arithmetic by eql? (#104), any number of arrays folded one at a
+  # time: each step is the host's, and the fold keeps its order.
+  when "difference" then arguments.reduce(receiver) { |kept, other| kept.difference(other) }
+  when "union" then arguments.reduce(receiver.union) { |joined, other| joined.union(other) }
+  when "intersection" then arguments.reduce(receiver.intersection) { |kept, other| kept.intersection(other) }
+  when "intersect?" then receiver.intersect?(arguments.first)
   when "take" then receiver.take(arguments.first)
   when "drop" then receiver.drop(arguments.first)
   when "gcd" then receiver.gcd(arguments.first)

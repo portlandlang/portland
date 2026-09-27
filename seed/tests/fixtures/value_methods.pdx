@@ -155,6 +155,11 @@ p(counting.rotate(2))
 p(counting.partition { it > 2 })
 p(counting.one? { it > 5 })
 p(counting.minmax)
+p(counting - [2])
+p(counting.difference([1], [3]))
+p(counting.union([9]))
+p(counting.intersection([2, 3, 8]))
+p(counting.intersect?([8]))
 p(counting.values_at(0, 2..3, 9))
 counting.each_index { |position| puts position }
 

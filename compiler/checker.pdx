@@ -1322,7 +1322,11 @@ def operator_takes?(operator, left, right)
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["integer"]
     (left in ["array", *]) && right == ["integer"]
-  when "-", "/", "%", "**" then numeric?(left) && numeric?(right)
+  # An array less another is the elements the other lacks (#104).
+  when "-"
+    return true if numeric?(left) && numeric?(right)
+    (left in ["array", *]) && (right in ["array", *])
+  when "/", "%", "**" then numeric?(left) && numeric?(right)
   else
     # An operator this table does not know is not one it may refuse.
     true

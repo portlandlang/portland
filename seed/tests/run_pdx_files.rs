@@ -1770,6 +1770,20 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// Array's set arithmetic (#104): `-` and its named twin `difference`,
+/// `union`, `intersection`, and `intersect?`, matching elements by `eql?`
+/// as Ruby's do — so `[1, 1.0] - [1]` keeps the float (Ruby 4.0.6, the
+/// expected lines). `|` and `&` stay out of the grammar (ADR 0003); the
+/// named methods are the spelling.
+#[test]
+fn array_set_arithmetic_matches_ruby() {
+    assert_both_print(
+        "evaluator_array_set_arithmetic.pdx",
+        "p([1, 2, 2, 3] - [2])\np([1, 1.0] - [1])\np([1, 2, 3].difference([2], [3]))\np([1, 2, 3].difference)\np([1, 2].union([2, 3], [3, 4]))\np([1, 1].union)\np([1, 2, 2, 3].intersection([2, 3, 4], [3, 2]))\np([1, 1.0].intersection([1.0]))\np([1, 2].intersect?([2, 3]))\np([1, 2].intersect?([3]))\np([].union([]))\nmutable left = [1, 2, 3]\nleft -= [2]\np(left)\n",
+        "[1, 3]\n[1.0]\n[1]\n[1, 2, 3]\n[1, 2, 3, 4]\n[1]\n[2, 3]\n[1.0]\ntrue\nfalse\n[]\n[1, 3]\n",
+    );
+}
+
 /// `partition`, `one?`, and `minmax` (#104), Ruby's answers (4.0.6, the
 /// expected lines): `minmax` is `min` and `max` together — maybes, a
 /// comparator block included — and the other two take a true-or-false

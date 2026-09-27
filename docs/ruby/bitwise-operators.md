@@ -23,4 +23,5 @@ What the freed characters buy: `~` marks `together` tasks, `|` stays purely bloc
 
 - Application-shaped Ruby almost never contains bit math; most codebases migrate with zero contact.
 - Where it exists, `x & y` → `x.bit_and(y)` is a mechanical linter autocorrect. Loud errors otherwise, never silent reinterpretation.
+- Array's set operators go the same way, to names Ruby already has: `a | b` is `a.union(b)` and `a & b` is `a.intersection(b)`. `a - b` is not bitwise and stays, as does its twin `a.difference(b)`.
 - `array << item` awaits the mutable-values decision — not ruled out, not promised.

@@ -412,6 +412,17 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// The arrays a set method was handed, refusing anything else (#104).
+fn arrays_of<'a>(values: &'a [Value], name: &str) -> Vec<&'a std::rc::Rc<Vec<Value>>> {
+    values
+        .iter()
+        .map(|value| match value {
+            Value::Array(elements) => elements,
+            other => panic!("{name} takes arrays, got {}", other.shown()),
+        })
+        .collect()
+}
+
 /// `rotate` (#104): the array turned `count` places, wrapping either way.
 fn rotated(elements: &[Value], count: i64) -> Value {
     if elements.is_empty() {
@@ -763,6 +774,14 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
             combined.extend(right.iter().cloned());
             Value::array(combined)
         }
+        // Every element the right side lacks, matched by `eql?` as Ruby's
+        // are (#104).
+        (Value::Array(left), BinaryOperator::Subtract, Value::Array(right)) => Value::array(
+            left.iter()
+                .filter(|element| !right.contains(element))
+                .cloned()
+                .collect(),
+        ),
         (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
             let count = usize::try_from(count)
                 .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
@@ -3100,6 +3119,47 @@ impl<W: std::io::Write> Interpreter<W> {
                 .iter()
                 .position(|element| element.ruby_equals(needle))
                 .map_or(Value::Nil, |position| Value::Integer(position as i64)),
+            // Set arithmetic by `eql?`, Ruby's (#104): `difference` is `-`
+            // across any number of arrays, `union` joins them keeping the
+            // first of each, `intersection` keeps what every one holds.
+            // `|` and `&` stay out of the grammar (ADR 0003).
+            (Value::Array(elements), "difference", others) => {
+                let others = arrays_of(others, name);
+                Value::array(
+                    elements
+                        .iter()
+                        .filter(|element| !others.iter().any(|other| other.contains(element)))
+                        .cloned()
+                        .collect(),
+                )
+            }
+            (Value::Array(elements), "union", others) => {
+                let mut joined: Vec<Value> = Vec::new();
+                for element in elements.iter().chain(
+                    arrays_of(others, name)
+                        .iter()
+                        .flat_map(|other| other.iter()),
+                ) {
+                    if !joined.contains(element) {
+                        joined.push(element.clone());
+                    }
+                }
+                Value::array(joined)
+            }
+            (Value::Array(elements), "intersection", others) => {
+                let others = arrays_of(others, name);
+                let mut kept: Vec<Value> = Vec::new();
+                for element in elements.iter() {
+                    if others.iter().all(|other| other.contains(element)) && !kept.contains(element)
+                    {
+                        kept.push(element.clone());
+                    }
+                }
+                Value::array(kept)
+            }
+            (Value::Array(elements), "intersect?", [Value::Array(other)]) => {
+                Value::Boolean(elements.iter().any(|element| other.contains(element)))
+            }
             // The array turned by a count, the front's elements going to
             // the back — backward for a negative count (#104).
             (Value::Array(elements), "rotate", []) => rotated(elements, 1),
