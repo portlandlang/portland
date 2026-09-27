@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A comparator block's rebindings carry through, and arrays of arrays have extremes** ([#104](https://github.com/portlandlang/portland/issues/104)) — the hosted evaluator had kept whatever a `sort`, `min`, `max`, or `minmax` block rebound inside that one comparison. So `counter += 1` in a comparator never counted past one there, while the seed carried it and Ruby does too. Both now thread it through, in Ruby's call order. `min` and `max` of an array of arrays order element by element under `<=>` (ADR 0054), where they had refused.
+
 - **ruby/spec's `core/array/sum_spec.rb` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — ten examples join `spec/array/sum_spec.pdx`, Kahan's compensated summation and the NaN and infinity table included.
 
 - **`sum` is Ruby's, compensated floats and all** ([#104](https://github.com/portlandlang/portland/issues/104)) — `[0.1, 0.2, 0.3].sum` answered the running total's `0.6000000000000001`, a silent divergence from Ruby's `0.6`. `sum` now follows Ruby's `rb_ary_sum` step for step, read from Ruby 4.0.6's `array.c`: integers exactly, Kahan–Babuska compensated summation from the first float, and `+` for anything else. It takes an init (`sum(10)`, `sum("")`, `sum([])`) and a block, on both implementations. Inference no longer calls a summed block, or a sum with an init, an Integer.

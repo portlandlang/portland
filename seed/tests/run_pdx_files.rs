@@ -1770,6 +1770,19 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A comparator block's rebindings carry from one comparison to the next
+/// on both implementations, in Ruby's call order — the hosted evaluator
+/// had kept each inside its comparison — and `min`/`max` order arrays of
+/// arrays element by element (#104; Ruby 4.0.6, the expected lines).
+#[test]
+fn comparators_carry_their_rebindings_and_arrays_order() {
+    assert_both_print(
+        "evaluator_stateful_comparator.pdx",
+        "mutable counter = -2\np([11, 12, 22, 33].min { |left, right| counter += 1 })\np(counter)\nmutable calls = 0\nsorted = [3, 1, 2].sort { |left, right|\n  calls += 1\n  left <=> right\n}\np(sorted)\np(calls > 0)\np([[1, 2], [3, 4, 5], [6, 7, 8, 9]].max)\np([[1, 2], [3, 4, 5], [6, 7, 8, 9]].min)\np([[2], [1, 9]].minmax)\n",
+        "12\n1\n[1, 2, 3]\ntrue\n[6, 7, 8, 9]\n[1, 2]\n[[1, 9], [2]]\n",
+    );
+}
+
 /// `sum` is Ruby's `rb_ary_sum` (#104): integers exactly, then from the
 /// first float Kahan–Babuska compensated summation, so `[0.1, 0.2,
 /// 0.3].sum` is 0.6 — the naive running total's 0.6000000000000001 was a

@@ -988,14 +988,6 @@ def symbol_text_answer(text, name, arguments)
   end
 end
 
-# One comparator-block answer (#99), for the host's sort, min, and max to
-# read — the host refuses a non-integer in the seed's words. A recorded gap
-# (principle 4): what the block rebinds, and a `break` or `return` inside
-# it, stay inside the comparison here, where the seed carries them out.
-def guest_comparison(block, left, right, entry, scope)
-  step = run_guest_block(block, [left, right], scope)
-  slot_value(step.value)
-end
 
 def guest_ordering(left, right, bindings)
   return slot_value(compare_struct("<=>", left, right, bindings).value) if left in ["__struct__", *]
@@ -2371,13 +2363,37 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   # A comparator block (#99): the host sorts, and picks `min`/`max`, by the
-  # guest block's answers, refusing a non-integer in its own words.
-  when "sort", "min", "max", "minmax"
-    result = case node.name
-    when "sort" then receiver.sort { |left, right| guest_comparison(block, left, right, entry, scope) }
-    when "min" then receiver.min { |left, right| guest_comparison(block, left, right, entry, scope) }
-    when "minmax" then receiver.minmax { |left, right| guest_comparison(block, left, right, entry, scope) }
-    else receiver.max { |left, right| guest_comparison(block, left, right, entry, scope) }
+  # guest block's answers, refusing a non-integer in its own words. What
+  # the block rebinds carries from one comparison to the next, in the
+  # order the host asks them (#104). A recorded gap (principle 4): a
+  # `break` or `return` inside it stays inside the comparison here, where
+  # the seed carries it out.
+  when "sort"
+    result = receiver.sort do |left, right|
+      step = run_guest_block(block, [left, right], scope)
+      scope = compacted_since(entry, step.bindings)
+      slot_value(step.value)
+    end
+    outcome([result], scope)
+  when "min"
+    result = receiver.min do |left, right|
+      step = run_guest_block(block, [left, right], scope)
+      scope = compacted_since(entry, step.bindings)
+      slot_value(step.value)
+    end
+    outcome([result], scope)
+  when "max"
+    result = receiver.max do |left, right|
+      step = run_guest_block(block, [left, right], scope)
+      scope = compacted_since(entry, step.bindings)
+      slot_value(step.value)
+    end
+    outcome([result], scope)
+  when "minmax"
+    result = receiver.minmax do |left, right|
+      step = run_guest_block(block, [left, right], scope)
+      scope = compacted_since(entry, step.bindings)
+      slot_value(step.value)
     end
     outcome([result], scope)
   # The kept and the rest (#104), and exactly one true (#104), riding the

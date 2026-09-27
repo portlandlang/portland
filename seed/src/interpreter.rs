@@ -1199,6 +1199,13 @@ impl<W: std::io::Write> Interpreter<W> {
         ordering_value(left.len().cmp(&right.len()))
     }
 
+    fn all_arrays(elements: &[Value]) -> bool {
+        !elements.is_empty()
+            && elements
+                .iter()
+                .all(|element| matches!(element, Value::Array(_)))
+    }
+
     fn all_structs(elements: &[Value]) -> bool {
         !elements.is_empty()
             && elements
@@ -3174,11 +3181,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Boolean(elements.iter().any(|element| element.ruby_equals(needle)))
             }
             // The extremes are maybes (ADR 0010) and answer the element
-            // itself, strings included.
-            (Value::Array(elements), "max", []) if Self::all_structs(elements) => {
+            // itself, strings included. Structs and arrays order by `<=>`
+            // (ADR 0054), an array element by element (#104).
+            (Value::Array(elements), "max", [])
+                if Self::all_structs(elements) || Self::all_arrays(elements) =>
+            {
                 self.extreme_by_spaceship(elements, "max")
             }
-            (Value::Array(elements), "min", []) if Self::all_structs(elements) => {
+            (Value::Array(elements), "min", [])
+                if Self::all_structs(elements) || Self::all_arrays(elements) =>
+            {
                 self.extreme_by_spaceship(elements, "min")
             }
             (Value::Array(elements), "max", []) => Self::extreme(elements, "max"),
