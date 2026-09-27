@@ -1,0 +1,12 @@
+# htmldog 1.0.0 as published to rubygems.org — lib/htmldog.rb byte for byte
+# (SHA-1 b7736d5e75470578b5aa7605ad54e8b9e3dede95) — loaded unmodified, and
+# asked what Ruby is asked in the test beside this file.
+require_relative "lib/htmldog.rb"
+
+p Htmldog::VERSION
+p Htmldog::HTML_TAGS.length
+p Htmldog::HTML_TAGS.first(3)
+p Htmldog::HEADINGS
+p Htmldog::HEADINGS_URL
+p Htmldog::CSS_PROPERTIES.include?("z-index")
+p Htmldog::CSS_PROPERTIES.length

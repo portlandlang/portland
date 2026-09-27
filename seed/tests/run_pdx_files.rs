@@ -1683,6 +1683,31 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
     );
 }
 
+/// The first published gem to load unmodified: htmldog 1.0.0's
+/// `lib/htmldog.rb`, byte for byte as rubygems.org serves it, on both
+/// implementations, answering what Ruby 4.0.7 answers for the same driver
+/// (found by ruby_research's first-gem-candidates report). A differential
+/// check alone would pass if both agreed on something Ruby doesn't say.
+#[test]
+fn htmldog_loads_unmodified_on_both_oracles() {
+    let ruby_says = "\"1.0.0\"\n78\n[\"a\", \"abbr\", \"acronym\"]\n[\"h1\", \"h2\", \"h3\", \"h4\", \"h5\", \"h6\"]\n\"h1h2h3h4h5h6\"\ntrue\n71\n";
+    let driver = format!(
+        "{}/tests/fixtures/gems/htmldog-1.0.0/load.pdx",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .output()
+        .expect("failed to run pdx");
+    assert_eq!(String::from_utf8(seed.stdout).unwrap(), ruby_says);
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&driver)
+        .output()
+        .expect("failed to run pdx");
+    assert_eq!(String::from_utf8(hosted.stdout).unwrap(), ruby_says);
+}
+
 /// A leading `::` names the top-level constant or type (#147), a second
 /// spelling of the bare name since no-shadow allows no other reading; an
 /// attached `::` still reaches inside a namespace.
