@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **`at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and `reverse_each` on arrays** ([#104](https://github.com/portlandlang/portland/issues/104)) — on both implementations, answering as Ruby 4.0.6's do:
+  - `at` and `dig` answer maybes, as `[]` does. `dig` now walks arrays and hashes alike, and a value that cannot be dug into mid-chain refuses with Ruby's `Integer does not have #dig method`.
+  - A ragged `transpose` and a `to_h` element that is not a pair refuse in Ruby's words.
+  - Ranges answer `reverse_each` and `to_h` as Ruby's Enumerable does, but not `rfind`, which is Array's alone.
+
 - **Eight more core/array files recorded as decided out** ([#104](https://github.com/portlandlang/portland/issues/104)) — `allocate`, `array`, `initialize`, `try_convert`, `to_ary`, `fetch`, `fetch_values`, and `deconstruct`, each linking the ledger page that decides it. `new` and `constructor` wait on #159: builtin type functions like `Array.new`.
 
 - **ruby/spec's core/array iteration files ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `map`, `collect`, `select`, `filter`, `reject`, `each`, and `detect` port to `spec/array/iteration_spec.pdx`, and `none_spec` is recorded as skipped. `each`'s multi-parameter row waits on #158, filed today: whether `|a, b|` destructures a yielded array, which Portland refuses and Ruby does.

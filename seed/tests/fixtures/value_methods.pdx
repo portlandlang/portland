@@ -160,6 +160,15 @@ p(counting.difference([1], [3]))
 p(counting.union([9]))
 p(counting.intersection([2, 3, 8]))
 p(counting.intersect?([8]))
+p(counting.at(1))
+p([counting].dig(0, 1))
+p([[1, :one]].assoc(1))
+p([[1, :one]].rassoc(:one))
+p([[1, 2], [3, 4]].transpose)
+p([[1, :one]].to_h)
+p(counting.to_h { [it, it * 2] })
+p(counting.rfind { it < 3 })
+counting.reverse_each { |number| puts number }
 p(counting.values_at(0, 2..3, 9))
 counting.each_index { |position| puts position }
 

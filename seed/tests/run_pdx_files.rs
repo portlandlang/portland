@@ -1770,6 +1770,39 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and
+/// `reverse_each` (#104), Ruby's answers (4.0.6, the expected lines).
+/// `at` and `dig` answer maybes as `[]` does; `dig` walks arrays and
+/// hashes alike; a ragged `transpose` and a `to_h` element that is not a
+/// pair refuse in Ruby's words.
+#[test]
+fn array_lookups_and_reshapes_match_ruby() {
+    assert_both_print(
+        "evaluator_array_lookups_reshapes.pdx",
+        "p([1, 2, 3].at(0))\np([1, 2, 3].at(-1))\np([1, 2, 3].at(5))\np([[1, [2, 3]]].dig(0, 1, 0))\np([[1, 2]].dig(0, 5))\np([1, {a: [7]}].dig(1, :a, 0))\np([[1, :one], [2, :two]].assoc(2))\np([[1, :one], [2, :two]].assoc(3))\np([[1, :one], [2, :two]].rassoc(:one))\np([[1, :one], [2, :two]].rassoc(:three))\np([[1, 2], [3, 4], [5, 6]].transpose)\np([].transpose)\np([[1, :a], [2, :b]].to_h)\np([1, 2].to_h { |number| [number, number * 10] })\np([1, 2, 3].rfind { |number| number < 3 })\np([1, 2, 3].rfind { |number| number > 5 })\nmutable seen = []\nanswer = [1, 2, 3].reverse_each { |number| seen = seen + [number] }\np(seen)\np(answer)\n",
+        "1\n3\nnil\n2\nnil\n7\n[2, :two]\nnil\n[1, :one]\nnil\n[[1, 3, 5], [2, 4, 6]]\n[]\n{1 => :a, 2 => :b}\n{1 => 10, 2 => 20}\n2\nnil\n[3, 2, 1]\n[1, 2, 3]\n",
+    );
+    let cases = [
+        (
+            "p([[1, 2], [3]].transpose)\n",
+            "element size differs (1 should be 2)",
+        ),
+        (
+            "p([1].to_h)\n",
+            "wrong element type Integer at 0 (expected array)",
+        ),
+        (
+            "p([[1]].to_h)\n",
+            "wrong array length at 0 (expected 2, was 1)",
+        ),
+        (
+            "p([[1, 2]].dig(0, 0, 1))\n",
+            "Integer does not have #dig method",
+        ),
+    ];
+    assert_both_oracles_refuse("array_lookups_reshapes_refusal.pdx", None, &cases);
+}
+
 /// Array's set arithmetic (#104): `-` and its named twin `difference`,
 /// `union`, `intersection`, and `intersect?`, matching elements by `eql?`
 /// as Ruby's do — so `[1, 1.0] - [1]` keeps the float (Ruby 4.0.6, the

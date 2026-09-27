@@ -1378,7 +1378,10 @@ end
 # a miss answers nil, a found nil short-circuits, and a non-hash mid-chain
 # refuses with the host's wording.
 def dig_into(receiver, keys)
-  value = receiver.dig(keys.first)
+  # Each step rides the host's own two-step dig from a one-element array,
+  # so a value that cannot be dug into mid-chain refuses in the host's
+  # words (`Integer does not have #dig method`), not as a missing method.
+  value = [receiver].dig(0, keys.first)
   rest = keys.slice(1, keys.length - 1)
   return value if rest.empty?
   return nil if value.nil?
@@ -1773,6 +1776,11 @@ def evaluate_method_call(node, mutable bindings)
   when "to_s" then to_s_of(receiver, arguments)
   when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(arguments.first)
   when "values_at" then values_at_of(receiver, arguments)
+  when "at" then receiver.at(arguments.first)
+  when "assoc" then receiver.assoc(arguments.first)
+  when "rassoc" then receiver.rassoc(arguments.first)
+  when "transpose" then receiver.transpose
+  when "to_h" then receiver.to_h
   # Set arithmetic by eql? (#104), any number of arrays folded one at a
   # time: each step is the host's, and the fold keeps its order.
   when "difference" then arguments.reduce(receiver) { |kept, other| kept.difference(other) }
@@ -2175,6 +2183,41 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
+  when "reverse_each"
+    receiver.reverse_each do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "rfind"
+    result = receiver.rfind do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
+  when "to_h"
+    result = receiver.to_h do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
   when "each_index"
     receiver.each_index do |index|
       step = run_guest_block(block, [index], scope)

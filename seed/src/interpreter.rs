@@ -412,6 +412,46 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// One step of `dig` (#104): `[]` on an array by position or a hash by
+/// key, a maybe either way; anything else refuses in Ruby's words.
+fn dig_step(container: &Value, key: &Value) -> Value {
+    match container {
+        Value::Array(_) if matches!(key, Value::Integer(_)) => index_read(container, key),
+        Value::Hash(pairs) => pairs
+            .iter()
+            .find(|(existing, _)| existing == key)
+            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
+        Value::Some(inner) => dig_step(inner, key),
+        other => panic!("{} does not have #dig method", other.type_name()),
+    }
+}
+
+/// An array's pairs as a hash, as `to_h` builds one (#104): each element
+/// a two-element array, a later key replacing an earlier one's value.
+fn array_pairs_to_hash(pairs: impl Iterator<Item = Value>) -> Value {
+    let mut hash: Vec<(Value, Value)> = Vec::new();
+    for (position, pair) in pairs.enumerate() {
+        let Value::Array(pair) = pair else {
+            panic!(
+                "wrong element type {} at {position} (expected array)",
+                pair.type_name()
+            );
+        };
+        if pair.len() != 2 {
+            panic!(
+                "wrong array length at {position} (expected 2, was {})",
+                pair.len()
+            );
+        }
+        let (key, value) = (pair[0].clone(), pair[1].clone());
+        match hash.iter_mut().find(|(existing, _)| *existing == key) {
+            Some(entry) => entry.1 = value,
+            None => hash.push((key, value)),
+        }
+    }
+    Value::hash(hash)
+}
+
 /// The arrays a set method was handed, refusing anything else (#104).
 fn arrays_of<'a>(values: &'a [Value], name: &str) -> Vec<&'a std::rc::Rc<Vec<Value>>> {
     values
@@ -2420,10 +2460,10 @@ impl<W: std::io::Write> Interpreter<W> {
             if name == "to_a" && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
             }
-            // A range walks as its array — except `index`, `rindex`, and
-            // `each_index`, which Ruby's Range lacks (its Enumerable has
-            // `find_index`).
-            if (block.is_some() && !matches!(name, "index" | "rindex" | "each_index"))
+            // A range walks as its array — except `index`, `rindex`,
+            // `each_index`, and `rfind`, which Ruby's Range lacks (its
+            // Enumerable has `find_index` and `find`).
+            if (block.is_some() && !matches!(name, "index" | "rindex" | "each_index" | "rfind"))
                 || matches!(name, "length" | "size" | "count" | "sum" | "first" | "last")
             {
                 let elements = range_elements(&receiver);
@@ -2479,6 +2519,45 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                     }
                     Some(receiver)
+                }
+                // Each element from the far end, answering the array (#104).
+                (Value::Array(elements), "reverse_each", []) => {
+                    for element in elements.iter().rev().cloned() {
+                        self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                // `find` from the far end, a maybe (Ruby 4.0, #104).
+                (Value::Array(elements), "rfind", []) => {
+                    for element in elements.iter().rev().cloned() {
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => return Some(Value::present(element)),
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("rfind block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Nil)
+                }
+                // Each element's pair, as the block answers it (#104).
+                (Value::Array(elements), "to_h", []) => {
+                    let mut pairs = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let pair = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        pairs.push(pair.unwrap_or_else(|| panic!("to_h block produced no value")));
+                    }
+                    Some(array_pairs_to_hash(pairs.into_iter()))
                 }
                 // Each position, answering the array (#104).
                 (Value::Array(elements), "each_index", []) => {
@@ -2923,26 +3002,60 @@ impl<W: std::io::Write> Interpreter<W> {
             // A maybe at every step, each step exactly `[]`: a miss answers
             // nil, a found nil short-circuits the rest, and a found
             // non-hash mid-chain refuses the way any dig on it would.
-            (Value::Hash(pairs), "dig", [first, rest @ ..]) => {
-                let mut current = pairs
-                    .iter()
-                    .find(|(existing, _)| existing == first)
-                    .map_or(Value::Nil, |(_, value)| Value::present(value.clone()));
-                for (position, key) in rest.iter().enumerate() {
-                    current = match current {
-                        Value::Nil => Value::Nil,
-                        Value::Hash(inner) => inner
-                            .iter()
-                            .find(|(existing, _)| existing == key)
-                            .map_or(Value::Nil, |(_, value)| Value::present(value.clone())),
-                        other => panic!(
-                            "undefined method dig for {other:?} with {:?}",
-                            &rest[position..=position]
-                        ),
-                    };
+            // Arrays and hashes alike (#104), each step exactly `[]`.
+            (Value::Hash(_) | Value::Array(_), "dig", [first, rest @ ..]) => {
+                let mut current = dig_step(&receiver, first);
+                for key in rest {
+                    if matches!(current, Value::Nil) {
+                        break;
+                    }
+                    current = dig_step(&current, key);
                 }
                 current
             }
+            // One element by position, a maybe as `[]` is (#104).
+            (Value::Array(_), "at", [index @ Value::Integer(_)]) => index_read(&receiver, index),
+            // The first pair whose first element is the key — or with
+            // `rassoc`, whose second is — `==` asked, a maybe (#104).
+            (Value::Array(elements), "assoc" | "rassoc", [key]) => {
+                let side = if name == "assoc" { 0 } else { 1 };
+                elements
+                    .iter()
+                    .find(|element| match element {
+                        Value::Array(pair) => {
+                            pair.get(side).is_some_and(|value| value.ruby_equals(key))
+                        }
+                        _ => false,
+                    })
+                    .map_or(Value::Nil, |pair| Value::present(pair.clone()))
+            }
+            // Rows become columns; every row the same length (#104).
+            (Value::Array(rows), "transpose", []) => {
+                let rows: Vec<&std::rc::Rc<Vec<Value>>> = rows
+                    .iter()
+                    .map(|row| match row {
+                        Value::Array(row) => row,
+                        other => {
+                            panic!("transpose takes an array of arrays, got {}", other.shown())
+                        }
+                    })
+                    .collect();
+                let width = rows.first().map_or(0, |row| row.len());
+                for row in &rows {
+                    if row.len() != width {
+                        panic!("element size differs ({} should be {width})", row.len());
+                    }
+                }
+                Value::array(
+                    (0..width)
+                        .map(|column| {
+                            Value::array(rows.iter().map(|row| row[column].clone()).collect())
+                        })
+                        .collect(),
+                )
+            }
+            // An array of pairs as a hash, a later key winning (#104).
+            (Value::Array(elements), "to_h", []) => array_pairs_to_hash(elements.iter().cloned()),
             (Value::Hash(pairs), "to_a" | "entries", []) => Value::array(
                 pairs
                     .iter()
