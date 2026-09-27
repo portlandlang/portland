@@ -1,0 +1,385 @@
+# Which ruby/spec files Portland's spec suite has taken in, and how far.
+#
+# The dashboard at portlandlang.com reads this through
+# script/ruby_spec_dashboard, which walks a ruby/spec checkout and gives every
+# upstream spec file one status:
+#
+#   passing              imported; every mapped pdx spec passes on both oracles
+#   failing              imported; a mapped pdx spec fails on either oracle
+#   partial_planned      imported in part; the rest is owed (reason, and an
+#                        issue or ADR where one exists)
+#   partial_intentional  imported in part; the rest stays behind by design
+#                        (reason, and the ledger page that says why)
+#   skipped              not imported, by design (reason, ledger page)
+#   missing              not mentioned here — the to-do list
+#
+# Failing is never written here: the generator runs the specs and decides.
+# Missing is never written here either: it is every file this does not name.
+#
+# Keys are paths inside the ruby/spec checkout. A key ending in `/` covers a
+# whole directory and every spec file under it (skips by doctrine only). A
+# file-level key wins over the directory it sits in. Where one upstream file
+# is spread over several pdx specs, or several upstream files share one, each
+# upstream file is its own entry.
+#
+# `link` is a path in this repo (docs/ruby/..., docs/adr/...) or an issue
+# URL. An intentional partial or a skip without one is a ledger gap: the
+# reason is real and the ledger page has not been written yet.
+
+# — core/array —
+
+core/array/all_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+core/array/any_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+core/array/comparison_spec.rb:
+  pdx: [spec/array/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "An element's nil or non-integer <=> answer refuses rather than propagating; recursive arrays cannot exist, since values never mutate; there is no to_ary conversion."
+  link: docs/ruby/ordering.md
+core/array/compact_spec.rb:
+  pdx: [spec/array/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "compact! stays behind: values never mutate."
+  link: docs/ruby/mutability.md
+core/array/count_spec.rb:
+  pdx: [spec/array/queries_spec.pdx]
+core/array/find_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+core/array/first_spec.rb:
+  pdx: [spec/array/queries_spec.pdx, spec/array/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Bare first answers a maybe: a partial operation never hands back a silent nil."
+  link: docs/ruby/lookups.md
+core/array/flatten_spec.rb:
+  pdx: [spec/array/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "flatten! stays behind: values never mutate."
+  link: docs/ruby/mutability.md
+core/array/index_spec.rb:
+  pdx: [spec/array/queries_spec.pdx]
+core/array/last_spec.rb:
+  pdx: [spec/array/queries_spec.pdx, spec/array/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Bare last answers a maybe: a partial operation never hands back a silent nil."
+  link: docs/ruby/lookups.md
+core/array/reverse_spec.rb:
+  pdx: [spec/array/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "reverse! stays behind: values never mutate."
+  link: docs/ruby/mutability.md
+core/array/sort_by_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+core/array/sort_spec.rb:
+  pdx: [spec/array/sort_spec.pdx]
+  status: partial_planned
+  reason: "sort with a comparator block is not built."
+  link: https://github.com/portlandlang/portland/issues/99
+core/array/uniq_spec.rb:
+  pdx: [spec/array/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "uniq! stays behind: values never mutate."
+  link: docs/ruby/mutability.md
+core/array/zip_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+
+# — core/comparable —
+
+core/comparable/between_spec.rb:
+  pdx: [spec/comparable/between_spec.pdx]
+core/comparable/clamp_spec.rb:
+  pdx: [spec/comparable/clamp_spec.pdx]
+  status: partial_planned
+  reason: "The range-argument forms, clamp(1..3) with endless and beginless ranges, are not built; nil bounds and backwards bounds refuse by design."
+  link: https://github.com/portlandlang/portland/issues/101
+core/comparable/equal_value_spec.rb:
+  status: skipped
+  reason: "Comparable does not derive ==: struct equality is already field by field, and a second definition of equal would disagree with it."
+  link: docs/ruby/ordering.md
+core/comparable/gt_spec.rb:
+  pdx: [spec/comparable/operators_spec.pdx]
+  status: partial_intentional
+  reason: "A <=> answering a float or nil refuses: <=> answers -1, 0, or 1."
+  link: docs/ruby/ordering.md
+core/comparable/gte_spec.rb:
+  pdx: [spec/comparable/operators_spec.pdx]
+  status: partial_intentional
+  reason: "A <=> answering a float or nil refuses: <=> answers -1, 0, or 1."
+  link: docs/ruby/ordering.md
+core/comparable/lt_spec.rb:
+  pdx: [spec/comparable/operators_spec.pdx]
+  status: partial_intentional
+  reason: "A <=> answering a float or nil refuses: <=> answers -1, 0, or 1; mixed kinds refuse in Portland's own words."
+  link: docs/ruby/ordering.md
+core/comparable/lte_spec.rb:
+  pdx: [spec/comparable/operators_spec.pdx]
+  status: partial_intentional
+  reason: "A <=> answering a float or nil refuses: <=> answers -1, 0, or 1."
+  link: docs/ruby/ordering.md
+
+# — core/enumerable —
+
+core/enumerable/each_slice_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+  status: partial_intentional
+  reason: "each_slice answers the slices as an array; there is no enumerator to answer without a block."
+  link: docs/ruby/enumerators.md
+core/enumerable/flat_map_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+core/enumerable/tally_spec.rb:
+  pdx: [spec/block/queries_spec.pdx]
+
+# — core/float —
+
+core/float/ceil_spec.rb:
+  pdx: [spec/number/float/rounding_spec.pdx]
+core/float/comparison_spec.rb:
+  pdx: [spec/number/float/spaceship_spec.pdx]
+  status: partial_intentional
+  reason: "NaN and non-number arguments refuse where Ruby answers nil; no coercion protocol; no bignums."
+  link: docs/ruby/ordering.md
+core/float/divide_spec.rb:
+  pdx: [spec/number/float/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol and no Rational."
+core/float/finite_spec.rb:
+  pdx: [spec/number/float/predicates_spec.pdx]
+core/float/floor_spec.rb:
+  pdx: [spec/number/float/rounding_spec.pdx]
+core/float/gt_spec.rb:
+  pdx: [spec/number/float/comparison_spec.pdx]
+core/float/gte_spec.rb:
+  pdx: [spec/number/float/comparison_spec.pdx]
+core/float/infinite_spec.rb:
+  pdx: [spec/number/float/predicates_spec.pdx, spec/number/float/operators_spec.pdx]
+  status: partial_intentional
+  reason: "infinite? answers true or false, not Ruby's nil, 1, or -1, since nil is not falsy here."
+  link: docs/ruby/truthiness.md
+core/float/lt_spec.rb:
+  pdx: [spec/number/float/comparison_spec.pdx]
+core/float/lte_spec.rb:
+  pdx: [spec/number/float/comparison_spec.pdx]
+core/float/minus_spec.rb:
+  pdx: [spec/number/float/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol and no Rational."
+core/float/multiply_spec.rb:
+  pdx: [spec/number/float/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol and no Rational."
+core/float/nan_spec.rb:
+  pdx: [spec/number/float/predicates_spec.pdx]
+core/float/plus_spec.rb:
+  pdx: [spec/number/float/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol and no Rational."
+core/float/round_spec.rb:
+  pdx: [spec/number/float/rounding_spec.pdx]
+core/float/to_s_spec.rb:
+  pdx: [spec/number/float/to_s_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding block: Portland has one encoding."
+  link: docs/ruby/characters.md
+core/float/truncate_spec.rb:
+  pdx: [spec/number/float/rounding_spec.pdx]
+core/float/zero_spec.rb:
+  pdx: [spec/number/float/predicates_spec.pdx]
+
+# — core/hash —
+
+core/hash/dig_spec.rb:
+  pdx: [spec/hash/queries_spec.pdx]
+core/hash/fetch_spec.rb:
+  status: skipped
+  reason: "fetch is retired: a lookup miss answers a maybe, and the default is the or-guard."
+  link: docs/ruby/lookups.md
+core/hash/merge_spec.rb:
+  pdx: [spec/hash/merge_spec.pdx]
+  status: partial_intentional
+  reason: "merge! stays behind: values never mutate."
+  link: docs/ruby/mutability.md
+core/hash/to_a_spec.rb:
+  pdx: [spec/hash/queries_spec.pdx]
+
+# — core/integer —
+
+core/integer/abs_spec.rb:
+  pdx: [spec/number/integer/abs_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums (integers are i64), and unary plus does not parse."
+core/integer/comparison_spec.rb:
+  pdx: [spec/number/integer/spaceship_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums and no coercion protocol; a non-number argument refuses where Ruby answers nil."
+  link: docs/ruby/ordering.md
+core/integer/divide_spec.rb:
+  pdx: [spec/number/integer/division_spec.pdx]
+  status: partial_planned
+  reason: "The divide-by-zero half: the refusal is a panic, and a panic ends the spec file."
+core/integer/even_spec.rb:
+  pdx: [spec/number/integer/parity_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums: integers are i64."
+core/integer/exponent_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol: a wrong operand type refuses rather than negotiating."
+core/integer/gcd_spec.rb:
+  pdx: [spec/number/integer/gcd_spec.pdx]
+core/integer/gt_spec.rb:
+  pdx: [spec/number/integer/comparison_spec.pdx]
+core/integer/gte_spec.rb:
+  pdx: [spec/number/integer/comparison_spec.pdx]
+core/integer/lt_spec.rb:
+  pdx: [spec/number/integer/comparison_spec.pdx]
+core/integer/lte_spec.rb:
+  pdx: [spec/number/integer/comparison_spec.pdx]
+core/integer/minus_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol: a wrong operand type refuses rather than negotiating."
+core/integer/modulo_spec.rb:
+  pdx: [spec/number/integer/modulo_spec.pdx]
+core/integer/multiply_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol: a wrong operand type refuses rather than negotiating."
+core/integer/odd_spec.rb:
+  pdx: [spec/number/integer/parity_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums: integers are i64."
+core/integer/plus_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol: a wrong operand type refuses rather than negotiating."
+core/integer/pow_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "No coercion protocol and no Rational."
+core/integer/pred_spec.rb:
+  pdx: [spec/number/integer/succession_spec.pdx]
+core/integer/succ_spec.rb:
+  pdx: [spec/number/integer/succession_spec.pdx]
+core/integer/to_f_spec.rb:
+  pdx: [spec/number/integer/conversion_spec.pdx]
+core/integer/to_s_spec.rb:
+  pdx: [spec/number/integer/conversion_spec.pdx]
+core/integer/uminus_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+
+# — core/range —
+
+core/range/max_spec.rb:
+  pdx: [spec/range/stepping_spec.pdx]
+core/range/min_spec.rb:
+  pdx: [spec/range/stepping_spec.pdx]
+core/range/step_spec.rb:
+  pdx: [spec/range/stepping_spec.pdx]
+  status: partial_intentional
+  reason: "step answers an array outright; there is no enumerator to hand back."
+  link: docs/ruby/enumerators.md
+
+# — core/string —
+
+core/string/chomp_spec.rb:
+  pdx: [spec/string/trim_spec.pdx]
+core/string/comparison_spec.rb:
+  pdx: [spec/string/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "No subclasses, one encoding, and no to_str conversion; the chr table needs Array.new with a block."
+  link: docs/ruby/characters.md
+core/string/count_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_intentional
+  reason: "count takes a single character; Ruby's character-set count refuses rather than meaning something else."
+  link: docs/ruby/string-count.md
+core/string/index_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_planned
+  reason: "The regex arguments wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
+core/string/lines_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+core/string/lstrip_spec.rb:
+  pdx: [spec/string/trim_spec.pdx]
+core/string/rstrip_spec.rb:
+  pdx: [spec/string/trim_spec.pdx]
+core/string/strip_spec.rb:
+  pdx: [spec/string/trim_spec.pdx]
+
+# — core/symbol —
+
+core/symbol/to_s_spec.rb:
+  pdx: [spec/symbol/text_boundary_spec.pdx]
+
+# — skipped by doctrine, whole directories —
+
+core/class/:
+  status: skipped
+  reason: "The class keyword is gone; its four jobs have other homes."
+  link: docs/ruby/classes.md
+core/conditionvariable/:
+  status: skipped
+  reason: "No Thread and its primitives: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/enumerator/:
+  status: skipped
+  reason: "There are no enumerators; methods that would answer one answer the finished collection."
+  link: docs/ruby/enumerators.md
+core/fiber/:
+  status: skipped
+  reason: "No Fiber: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/mutex/:
+  status: skipped
+  reason: "No Thread and its primitives: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/queue/:
+  status: skipped
+  reason: "No Thread and its primitives: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/sizedqueue/:
+  status: skipped
+  reason: "No Thread and its primitives: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/thread/:
+  status: skipped
+  reason: "No Thread: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+core/threadgroup/:
+  status: skipped
+  reason: "No Thread and its primitives: concurrency is together and meanwhile."
+  link: docs/ruby/concurrency.md
+
+# — language —
+
+language/array_spec.rb:
+  pdx: [spec/array/word_array_spec.pdx]
+  status: partial_planned
+  reason: "The splat operator is deferred (ADR 0014); %W is declined (ADR 0051)."
+  link: docs/adr/0014-2026-07-22-keyword-arguments.md
+language/BEGIN_spec.rb:
+  status: skipped
+  reason: "BEGIN and END blocks are removed syntax."
+  link: docs/ruby/removed-syntax.md
+language/END_spec.rb:
+  status: skipped
+  reason: "BEGIN and END blocks are removed syntax."
+  link: docs/ruby/removed-syntax.md
+language/for_spec.rb:
+  status: skipped
+  reason: "for is removed syntax: each is the loop."
+  link: docs/ruby/removed-syntax.md
+language/numbered_parameters_spec.rb:
+  status: skipped
+  reason: "Numbered block parameters are removed; it is the single-parameter spelling."
+  link: docs/ruby/removed-syntax.md
+language/numbers_spec.rb:
+  pdx: [spec/number/literal_spec.pdx]
+  status: partial_intentional
+  reason: "A bare leading-zero octal refuses; no Rational or Complex suffixes."
+  link: docs/ruby/integer-literals.md
+language/rescue_spec.rb:
+  status: skipped
+  reason: "begin/rescue/raise do not exist: a fallible operation returns its failure."
+  link: docs/ruby/errors.md

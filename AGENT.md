@@ -42,7 +42,10 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
 | `script/spec`          | the language spec in `spec/`, on both oracles — seed and compiler                   |
+| `script/ruby_spec_dashboard PATH` | the spec dashboard's JSON, from a ruby/spec checkout and `spec/ruby_spec.yml` |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
+
+**Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`.
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.
 

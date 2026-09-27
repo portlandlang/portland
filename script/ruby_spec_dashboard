@@ -1,0 +1,195 @@
+#!/usr/bin/env ruby
+# The data behind portlandlang.com's spec dashboard: every spec file in a
+# ruby/spec checkout, each with one status, as JSON on stdout.
+#
+#   script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json
+#
+# spec/ruby_spec.yml says what has been taken in and how far (see its header
+# for the six statuses). Two of them this computes rather than reads:
+# `missing` is every upstream file the manifest does not name, and `failing`
+# is an imported file whose pdx specs do not pass on both oracles — so every
+# mapped pdx spec is run here, on the seed and hosted, before anything is
+# written. Upstream examples are counted with Prism, never a pattern.
+#
+# Resolution, per upstream file: a skip wins; then a failing run; then the
+# manifest's partial status; then passing. A file-level key wins over the
+# directory key it sits under.
+
+require "json"
+require "open3"
+require "prism"
+require "time"
+require "yaml"
+
+REPO = File.expand_path("..", __dir__)
+AREAS = %w[core language library command_line optional security].freeze
+PORTLAND_BLOB = "https://github.com/portlandlang/portland/blob/main"
+RUBY_SPEC_BLOB = "https://github.com/ruby/spec/blob"
+
+# One upstream spec file: where it lives and how many examples it holds.
+class UpstreamFile
+  attr_reader :path
+
+  def initialize(checkout:, path:)
+    @checkout = checkout
+    @path = path
+  end
+
+  def area = path.split("/").first
+
+  # `core/array/sort_spec.rb` sits in `core/array`; `language/if_spec.rb`
+  # sits in `language` itself, which is its own directory.
+  def directory = File.dirname(path)
+
+  def name = File.basename(path, "_spec.rb")
+
+  # Every `it "…" do` call, found in the syntax tree.
+  def examples
+    tree = Prism.parse_file(File.join(@checkout, path)).value
+    count_examples(tree)
+  end
+
+  private
+
+  def count_examples(node)
+    own = node.is_a?(Prism::CallNode) && node.name == :it && node.receiver.nil? && node.block ? 1 : 0
+    own + node.compact_child_nodes.sum { count_examples(it) }
+  end
+end
+
+# spec/ruby_spec.yml, answering for any upstream path.
+class Manifest
+  def initialize(path:)
+    @entries = YAML.safe_load_file(path)
+  end
+
+  # The file's own entry, or the deepest directory entry above it.
+  def entry_for(path)
+    return @entries[path] if @entries.key?(path)
+
+    directories = @entries.keys.select { it.end_with?("/") && path.start_with?(it) }
+    deepest = directories.max_by(&:length)
+    deepest && @entries[deepest]
+  end
+
+  def pdx_files = @entries.values.flat_map { Array(it&.fetch("pdx", nil)) }.uniq.sort
+
+  def keys = @entries.keys
+end
+
+# Runs each pdx spec on the seed and hosted, and remembers which pass. A spec
+# passes when both runs exit cleanly, print at least one example, and print
+# no failure.
+class SpecRun
+  def initialize(files:, binary:)
+    @results = files.to_h { [it, passes?(it, binary:)] }
+  end
+
+  def passing?(file) = @results.fetch(file)
+
+  private
+
+  def passes?(file, binary:)
+    seed = Open3.capture2e(binary, file, chdir: REPO)
+    hosted = Open3.capture2e(binary, "spec/run_specs.pdx", "spec/spec_helper.pdx", file, chdir: REPO)
+    [seed, hosted].all? { |output, status| status.success? && output.include?("\n- ") && !output.include?("  FAIL ") }
+  end
+end
+
+# The whole dashboard: statuses resolved, grouped by area and directory.
+class Dashboard
+  def initialize(checkout:, manifest:, run:)
+    @checkout = checkout
+    @manifest = manifest
+    @run = run
+  end
+
+  def to_h
+    files = upstream_files
+    rows = files.map { row_for(it) }
+    {
+      generated_at: Time.now.utc.iso8601,
+      portland_commit: git(REPO, "rev-parse", "--short", "HEAD"),
+      ruby_spec_commit: git(@checkout, "rev-parse", "--short", "HEAD"),
+      ruby_spec_date: git(@checkout, "log", "-1", "--format=%cs"),
+      totals: totals(rows),
+      areas: rows.group_by { it[:area] }.map { |area, area_rows| area_for(area, area_rows) }
+    }
+  end
+
+  private
+
+  def upstream_files
+    AREAS.flat_map do |area|
+      Dir.chdir(@checkout) { Dir.glob("#{area}/**/*_spec.rb") }
+         .reject { it.include?("/shared/") || it.include?("/fixtures/") }
+         .sort
+         .map { UpstreamFile.new(checkout: @checkout, path: it) }
+    end
+  end
+
+  def row_for(file)
+    entry = @manifest.entry_for(file.path)
+    pdx = Array(entry&.fetch("pdx", nil))
+    {
+      area: file.area,
+      directory: file.directory,
+      name: file.name,
+      path: file.path,
+      url: "#{RUBY_SPEC_BLOB}/#{ruby_spec_commit}/#{file.path}",
+      examples: file.examples,
+      status: status_for(entry, pdx),
+      reason: entry&.fetch("reason", nil),
+      link: link_for(entry&.fetch("link", nil)),
+      pdx: pdx.map { { path: it, url: "#{PORTLAND_BLOB}/#{it}" } }
+    }.compact
+  end
+
+  def status_for(entry, pdx)
+    return "missing" if entry.nil?
+    return "skipped" if entry["status"] == "skipped"
+    return "failing" unless pdx.all? { @run.passing?(it) }
+
+    entry["status"] || "passing"
+  end
+
+  def link_for(link)
+    return nil if link.nil?
+    return { label: link.delete_prefix("https://github.com/portlandlang/portland/"), url: link } if link.start_with?("https://")
+
+    { label: File.basename(link, ".md"), url: "#{PORTLAND_BLOB}/#{link}" }
+  end
+
+  def area_for(area, rows)
+    directories = rows.group_by { it[:directory] }.map do |directory, directory_rows|
+      { name: directory, totals: totals(directory_rows), files: directory_rows.map { it.except(:area, :directory) } }
+    end
+    { name: area, totals: totals(rows), directories: directories }
+  end
+
+  def totals(rows)
+    counts = rows.map { it[:status] }.tally
+    %w[passing partial_intentional partial_planned failing missing skipped].to_h { [it, counts.fetch(it, 0)] }
+      .merge("files" => rows.size)
+  end
+
+  def ruby_spec_commit = @ruby_spec_commit ||= git(@checkout, "rev-parse", "HEAD")
+
+  def git(directory, *arguments)
+    output, status = Open3.capture2("git", "-C", directory, *arguments)
+    abort "git #{arguments.join(' ')} failed in #{directory}" unless status.success?
+    output.strip
+  end
+end
+
+checkout = ARGV.first or abort "usage: script/ruby_spec_dashboard PATH_TO_RUBY_SPEC_CHECKOUT"
+checkout = File.expand_path(checkout)
+abort "#{checkout} is not a ruby/spec checkout — no core/ directory" unless Dir.exist?(File.join(checkout, "core"))
+
+manifest = Manifest.new(path: File.join(REPO, "spec/ruby_spec.yml"))
+unknown = manifest.keys.reject { File.exist?(File.join(checkout, it)) }
+abort "spec/ruby_spec.yml names paths this checkout does not have:\n  #{unknown.join("\n  ")}" if unknown.any?
+
+system("cargo", "build", "--quiet", "--manifest-path", File.join(REPO, "seed/Cargo.toml"), exception: true)
+run = SpecRun.new(files: manifest.pdx_files, binary: File.join(REPO, "target/debug/pdx"))
+puts JSON.pretty_generate(Dashboard.new(checkout:, manifest:, run:).to_h)
