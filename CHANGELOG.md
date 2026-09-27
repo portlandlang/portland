@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array set arithmetic ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `-`, `difference`, `union`, `intersection`, and `intersect?` in `spec/array/set_arithmetic_spec.pdx`, twenty-three examples. The `|` and `&` groups stay behind with ADR 0003.
+
 - **Array's set arithmetic** ([#104](https://github.com/portlandlang/portland/issues/104)) — `-` and its named twin `difference`, plus `union`, `intersection`, and `intersect?`, on both implementations. Elements match by `eql?` as Ruby's do, so `[1, 1.0] - [1]` keeps the float. `-=` rebinds. `|` and `&` stay out of the grammar (ADR 0003), so the bitwise ledger now names `union` and `intersection` as their spelling.
 
 - **ruby/spec's core/array `partition` and `minmax` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `spec/array/partition_minmax_spec.pdx`, minmax through upstream's shared enumerable examples. `one_spec` is recorded as skipped: its examples grow the array mid-walk.

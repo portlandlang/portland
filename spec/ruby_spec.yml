@@ -102,6 +102,31 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/minus_spec.rb:
+  pdx: [spec/array/set_arithmetic_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks stubbing hash and eql? stay behind; no to_ary conversion (ADR 0036); values never mutate, so no array can hold itself; no subclasses."
+  link: docs/ruby/metaprogramming.md
+core/array/difference_spec.rb:
+  pdx: [spec/array/set_arithmetic_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks stubbing hash and eql? stay behind; no to_ary conversion (ADR 0036); values never mutate, so identity and recursive arrays are unobservable; no subclasses."
+  link: docs/ruby/metaprogramming.md
+core/array/union_spec.rb:
+  pdx: [spec/array/set_arithmetic_spec.pdx]
+  status: partial_intentional
+  reason: "The Array#| group stays behind: | is out of the grammar and union is its spelling (ADR 0003); mocks, to_ary, recursive arrays, and subclasses stay behind too."
+  link: docs/ruby/bitwise-operators.md
+core/array/intersection_spec.rb:
+  pdx: [spec/array/set_arithmetic_spec.pdx]
+  status: partial_intentional
+  reason: "The Array#& group stays behind: & is out of the grammar and intersection is its spelling (ADR 0003); mocks, to_ary, recursive arrays, and subclasses stay behind too."
+  link: docs/ruby/bitwise-operators.md
+core/array/intersect_spec.rb:
+  pdx: [spec/array/set_arithmetic_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks stubbing hash and eql? stay behind; no to_ary conversion (ADR 0036); no subclasses."
+  link: docs/ruby/metaprogramming.md
 core/array/partition_spec.rb:
   pdx: [spec/array/partition_minmax_spec.pdx]
   status: partial_intentional

@@ -1,0 +1,144 @@
+# Array's set arithmetic (#104), from ruby/spec core/array: - and
+# difference (through upstream's shared array_binary_difference), union
+# (array_binary_union), intersection (array_intersection), and intersect?.
+# Elements match by eql?, as Ruby's do. Staying upstream: the Array#| and
+# Array#& groups (ADR 0003 keeps both operators out of the grammar; union
+# and intersection are their spelling), mocks stubbing hash and eql?,
+# to_ary conversion (ADR 0036), recursive arrays and identity checks
+# (values never mutate), and subclasses. Upstream's uniq! check asks
+# whether uniq changes the answer.
+
+require_relative "../spec_helper"
+
+context "Array#-" do
+  specify "creates an array minus any items from other array" do
+    expect([] - [1, 2, 4]).to eq([])
+    expect([1, 2, 4] - []).to eq([1, 2, 4])
+    expect([1, 2, 3, 4, 5] - [1, 2, 4]).to eq([3, 5])
+  end
+
+  specify "removes multiple items on the lhs equal to one on the rhs" do
+    expect([1, 1, 2, 2, 3, 3, 4, 5] - [1, 2, 4]).to eq([3, 3, 5])
+  end
+
+  specify "is not destructive" do
+    numbers = [1, 2, 3]
+    numbers - [1]
+    expect(numbers).to eq([1, 2, 3])
+  end
+end
+
+context "Array#difference" do
+  specify "creates an array minus any items from other array" do
+    expect([].difference([1, 2, 4])).to eq([])
+    expect([1, 2, 4].difference([])).to eq([1, 2, 4])
+    expect([1, 2, 3, 4, 5].difference([1, 2, 4])).to eq([3, 5])
+  end
+
+  specify "removes multiple items on the lhs equal to one on the rhs" do
+    expect([1, 1, 2, 2, 3, 3, 4, 5].difference([1, 2, 4])).to eq([3, 3, 5])
+  end
+
+  specify "is not destructive" do
+    numbers = [1, 2, 3]
+    numbers.difference([1])
+    expect(numbers).to eq([1, 2, 3])
+  end
+
+  specify "returns a copy when called without any parameter" do
+    numbers = [1, 2, 3, 2]
+    expect(numbers.difference).to eq(numbers)
+  end
+
+  specify "accepts multiple arguments" do
+    numbers = [1, 2, 3, 1]
+    expect(numbers.difference([], [0, 1], [3, 4], [3])).to eq([2])
+  end
+end
+
+context "Array#union" do
+  specify "returns an array of elements that appear in either array (union)" do
+    expect([].union([])).to eq([])
+    expect([1, 2].union([])).to eq([1, 2])
+    expect([].union([1, 2])).to eq([1, 2])
+    expect([1, 2, 3, 4].union([3, 4, 5])).to eq([1, 2, 3, 4, 5])
+  end
+
+  specify "creates an array with no duplicates" do
+    expect([1, 2, 3, 1, 4, 5].union([1, 3, 4, 5, 3, 6])).to eq([1, 2, 3, 4, 5, 6])
+  end
+
+  specify "creates an array with elements in order they are first encountered" do
+    expect([1, 2, 3, 1].union([1, 3, 4, 5])).to eq([1, 2, 3, 4, 5])
+  end
+
+  specify "acts as if using an intermediate hash to collect values" do
+    expect([5.0, 4.0].union([5, 4])).to eq([5.0, 4.0, 5, 4])
+    expect(["x"].union(["x"])).to eq(["x"])
+  end
+
+  specify "returns unique elements when given no argument" do
+    expect([1, 2, 3, 2].union).to eq([1, 2, 3])
+  end
+
+  specify "accepts multiple arguments" do
+    numbers = [1, 2, 3]
+    expect(numbers.union(numbers, numbers, numbers, numbers, [3, 4], numbers)).to eq([1, 2, 3, 4])
+  end
+end
+
+context "Array#intersection" do
+  specify "creates an array with elements common to both arrays (intersection)" do
+    expect([].intersection([])).to eq([])
+    expect([1, 2].intersection([])).to eq([])
+    expect([].intersection([1, 2])).to eq([])
+    expect([1, 3, 5].intersection([1, 2, 3])).to eq([1, 3])
+  end
+
+  specify "creates an array with no duplicates" do
+    common = [1, 1, 3, 5].intersection([1, 2, 3])
+    expect(common.uniq).to eq(common)
+  end
+
+  specify "creates an array with elements in order they are first encountered" do
+    expect([1, 2, 3, 2, 5, 6, 7, 8].intersection([5, 2, 3, 4])).to eq([2, 3, 5])
+    expect([5, 2, 3, 4].intersection([1, 2, 3, 2, 5, 6, 7, 8])).to eq([5, 2, 3])
+  end
+
+  specify "does not modify the original Array" do
+    numbers = [1, 1, 3, 5]
+    expect(numbers.intersection([1, 2, 3])).to eq([1, 3])
+    expect(numbers).to eq([1, 1, 3, 5])
+  end
+
+  specify "determines equivalence between elements in the sense of eql?" do
+    expect([5.0, 4.0].intersection([5, 4])).to eq([])
+    expect(["x"].intersection(["x"])).to eq(["x"])
+  end
+
+  specify "accepts multiple arguments" do
+    expect([1, 2, 3, 4].intersection([1, 2, 3], [2, 3, 4])).to eq([2, 3])
+  end
+
+  specify "preserves elements order from original array" do
+    expect([1, 2, 3, 4].intersection([3, 2, 1])).to eq([1, 2, 3])
+  end
+end
+
+context "Array#intersect?" do
+  describe "when at least one element in two Arrays is the same" do
+    specify "returns true" do
+      expect([1, 2].intersect?([2, 3, 4])).to eq(true)
+      expect([2, 3, 4].intersect?([1, 2])).to eq(true)
+    end
+  end
+
+  describe "when there are no elements in common between two Arrays" do
+    specify "returns false" do
+      expect([0, 1, 2].intersect?([3, 4])).to eq(false)
+      expect([3, 4].intersect?([0, 1, 2])).to eq(false)
+      expect([3, 4].intersect?([])).to eq(false)
+      expect([].intersect?([0, 1, 2])).to eq(false)
+    end
+  end
+end
