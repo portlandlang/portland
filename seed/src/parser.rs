@@ -1165,6 +1165,17 @@ impl<'source> Parser<'source> {
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
             }
+            // Ruby's visibility words would otherwise read as fields named
+            // `private` — a spelling quietly meaning something else (#132).
+            if matches!(
+                token.text,
+                "module_function" | "private" | "private_constant" | "protected" | "public"
+            ) {
+                panic!(
+                    "'{}' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
+                    token.text
+                );
+            }
             if !methods.is_empty() || !type_functions.is_empty() {
                 panic!("fields come before methods in struct {name}");
             }

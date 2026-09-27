@@ -2782,16 +2782,22 @@ def parse_struct(tokens, mutable position)
   # Hierarchies flatten into traits (ADR 0028), whichever keyword declared
   # the type. The body still parses, so the refusal stands in for the whole
   # declaration rather than leaving its fields loose at the top level.
-  mutable inherits = nil
+  mutable refusal = nil
   if position + 2 < tokens.length && tokens[position + 1].operator? && tokens[position + 1].text == "<"
     parent = tokens[position + 2].text
-    inherits = "'#{keyword} #{name} < #{parent}' inherits, and Portland has no inheritance — move #{parent}'s shared methods into a trait and 'include' it"
+    refusal = "'#{keyword} #{name} < #{parent}' inherits, and Portland has no inheritance — move #{parent}'s shared methods into a trait and 'include' it"
     position += 2
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable fields = []
   while position < tokens.length && tokens[position].identifier?
-    fields << tokens[position].text
+    # Ruby's visibility words would otherwise read as fields named
+    # `private` — a spelling quietly meaning something else (#132).
+    if visibility_word?(tokens[position].text)
+      refusal = visibility_refusal(tokens[position].text) if refusal.nil?
+    else
+      fields << tokens[position].text
+    end
     position = skip_newlines_at(tokens, position + 1)
   end
   # Methods after the fields (#27), includes (ADR 0028), and nested types —
@@ -2803,8 +2809,11 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[alias class def enum include struct])
-    if keyword_at?(tokens, position, %w[alias])
+  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
+    if tokens[position].identifier?
+      refusal = visibility_refusal(tokens[position].text) if refusal.nil?
+      position = skip_newlines_at(tokens, position + 1)
+    elsif keyword_at?(tokens, position, %w[alias])
       # `alias footprint area` (ADR 0039) — desugared right here: the body
       # is self-contained, so the alias clones the def it points at, and
       # every def-collision rule fires on the new name too.
@@ -2849,11 +2858,16 @@ def parse_struct(tokens, mutable position)
     return Step.new(node: error_node("modules don't nest inside structs — a module groups things, a struct is a thing"), position: position + 1)
   end
   if keyword_at?(tokens, position, %w[end])
-    return Step.new(node: error_node(inherits), position: position + 1) unless inherits.nil?
+    return Step.new(node: error_node(refusal), position: position + 1) unless refusal.nil?
     return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, line: line), position: position + 1)
   end
+  return Step.new(node: error_node(refusal), position: position) unless refusal.nil?
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
 end
+
+def visibility_word?(word) = %w[module_function private private_constant protected public].include?(word)
+
+def visibility_refusal(word) = "'#{word}' has no Portland meaning yet — visibility is undecided (#133); remove it to run"
 
 # One trait-body alias: same desugar, the trait's own wordings.
 def parse_trait_alias(tokens, position, trait_name, methods)

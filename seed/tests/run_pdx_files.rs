@@ -1626,6 +1626,28 @@ fn class_is_a_spelling_of_struct_on_both_oracles() {
     assert_both_oracles_refuse("class_refusal.pdx", None, &cases);
 }
 
+/// Ruby's visibility words in a type body refuse until #133 decides them,
+/// rather than reading as fields named `private` (#132) — before the
+/// methods, after them, and on a `def`'s own line.
+#[test]
+fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
+    let cases = [
+        (
+            "class Box\n  size\n  private\n  def secret = 1\nend\n",
+            "'private' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
+        ),
+        (
+            "struct Box\n  size\n  def open = 1\n  protected\n  def secret = 1\nend\n",
+            "'protected' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
+        ),
+        (
+            "class Box\n  size\n  def open = 1\n  private def secret = 1\nend\n",
+            "'private' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
+        ),
+    ];
+    assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
+}
+
 /// Three corrections to ADR 0054's build, each caught by an upstream
 /// ruby/spec example: NaN does not order, backwards clamp bounds refuse
 /// (on a Comparable struct too), and the two zeros are equal under `<=>`.
