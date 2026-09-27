@@ -113,11 +113,26 @@ class Dashboard
       ruby_spec_commit: git(@checkout, "rev-parse", "--short", "HEAD"),
       ruby_spec_date: git(@checkout, "log", "-1", "--format=%cs"),
       totals: totals(rows),
+      progress: progress(rows),
       areas: rows.group_by { it[:area] }.map { |area, area_rows| area_for(area, area_rows) }
     }
   end
 
   private
+
+  # The thermometer's numbers (#130), by upstream example rather than file,
+  # since a file can hold 2 examples or 200. A skipped file is decided out,
+  # so it is not in the denominator. A partial file's examples can't be told
+  # apart one by one here, so it counts as its own segment beside the files
+  # that pass whole — never folded into them.
+  def progress(rows)
+    portable = rows.reject { it[:status] == "skipped" }
+    {
+      examples_portable: portable.sum { it[:examples] },
+      examples_passing: portable.select { it[:status] == "passing" }.sum { it[:examples] },
+      examples_partial: portable.select { it[:status].start_with?("partial") }.sum { it[:examples] }
+    }
+  end
 
   def upstream_files
     AREAS.flat_map do |area|
