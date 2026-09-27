@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Integer division by zero refuses in Ruby's words** — `1 / 0`, `7 % 0`, and `total /= 0` said the host's "attempt to divide by zero"; they now say ZeroDivisionError's `divided by 0`. A float divisor still answers IEEE's infinity or NaN, as Ruby's does.
+
 - **A float with no integer refuses instead of answering a wrong one** ([#108](https://github.com/portlandlang/portland/issues/108)) — `to_i`, `floor`, `ceil`, `round`, and `truncate` on NaN answered 0, and on an infinity or anything past the 64-bit integers answered i64::MAX, a silent divergence the manifest already claimed was a refusal. NaN and the infinities now refuse where Ruby raises FloatDomainError (`NaN.to_i has no integer answer`), and a float past the 64-bit integers refuses where Ruby reaches for a bignum.
 
 - **A method call no longer copies every namespaced constant** ([#153](https://github.com/portlandlang/portland/issues/153)) — the seed kept `Config::LIMIT` and kin among the locals, so each call and each `require` cloned them into its fresh scope: with forty constants in reach, 200,000 calls ran 5.5 times slower. Namespace and type constants now sit in the one constants table every frame reads, and a call's scope starts empty.

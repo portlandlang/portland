@@ -1619,6 +1619,23 @@ fn float_to_integer_refuses_what_has_no_integer() {
     assert_both_oracles_refuse("float_to_integer_refusal.pdx", None, &cases);
 }
 
+/// Integer division by zero refuses in Ruby's words, ZeroDivisionError's
+/// message, not the host's panic text; a float divisor answers IEEE's
+/// infinity or NaN, as Ruby's does.
+#[test]
+fn integer_division_by_zero_refuses_in_rubys_words() {
+    assert_evaluator_matches_seed(
+        "evaluator_float_division_by_zero.pdx",
+        "p(1 / 0.0)\np(-1.0 / 0)\np(1.0 % 0.0)\n",
+    );
+    let cases = [
+        ("p(1 / 0)\n", "divided by 0"),
+        ("p(7 % 0)\n", "divided by 0"),
+        ("mutable total = 4\ntotal /= 0\n", "divided by 0"),
+    ];
+    assert_both_oracles_refuse("integer_division_by_zero.pdx", None, &cases);
+}
+
 /// `class` is a spelling of `struct` (ADR 0056, #127): the same values on
 /// both oracles, and the three Ruby shapes it has no Portland meaning for —
 /// inheritance, `class << self`, and instance variables — refuse with the

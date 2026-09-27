@@ -268,7 +268,16 @@ fn float_to_integer(original: f64, rounded: f64, method: &str) -> Value {
     Value::Integer(rounded as i64)
 }
 
+/// Refuses a zero divisor in Ruby's words, ZeroDivisionError's message,
+/// before the host's own panic can speak.
+fn refuse_zero_divisor(right: i64) {
+    if right == 0 {
+        panic!("divided by 0");
+    }
+}
+
 fn floored_divide(left: i64, right: i64) -> i64 {
+    refuse_zero_divisor(right);
     let quotient = left / right;
     if left % right != 0 && (left < 0) != (right < 0) {
         quotient - 1
@@ -280,6 +289,7 @@ fn floored_divide(left: i64, right: i64) -> i64 {
 /// Modulo whose result takes the sign of the divisor — Ruby's rule
 /// (ADR 0018): `-7 % 2` is `1`, and `7 % -2` is `-1`.
 fn floored_modulo(left: i64, right: i64) -> i64 {
+    refuse_zero_divisor(right);
     let remainder = left % right;
     if remainder != 0 && (remainder < 0) != (right < 0) {
         remainder + right
@@ -5960,7 +5970,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "divide by zero")]
+    #[should_panic(expected = "divided by 0")]
     fn panics_on_dividing_by_zero() {
         evaluate("1 / 0");
     }
