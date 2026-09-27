@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array `partition` and `minmax` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `spec/array/partition_minmax_spec.pdx`, minmax through upstream's shared enumerable examples. `one_spec` is recorded as skipped: its examples grow the array mid-walk.
+
 - **`partition`, `one?`, and `minmax`** ([#104](https://github.com/portlandlang/portland/issues/104)) — on arrays and ranges, on both implementations. `partition` answers the kept and the rest as two arrays, and `one?` asks for exactly one true; both take a true-or-false block, as `select` does. `minmax` is `min` and `max` together, each a maybe, so `[].minmax` is `[nil, nil]` as in Ruby, and a comparator block goes to both.
 
 - **ruby/spec's core/array `rotate`, `values_at`, and `each_index` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — eleven examples in `spec/array/positions_spec.pdx`, endless and beginless ranges included.

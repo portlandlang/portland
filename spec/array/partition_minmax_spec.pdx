@@ -1,0 +1,42 @@
+# An array split by a block, and its two extremes at once (#104), from
+# ruby/spec core/array: partition, and minmax through upstream's shared
+# enumerable_minmax. partition's block answers true or false, as select's
+# does, so the rows where 5 or nil stands for a truth stay upstream, as do
+# recursive arrays (values never mutate) and subclasses; so do minmax's
+# incomparable and incompatible rows, where Portland refuses and Ruby
+# raises.
+
+require_relative "../spec_helper"
+
+context "Array#partition" do
+  specify "returns two arrays" do
+    expect([].partition { true }).to eq([[], []])
+  end
+
+  specify "returns in the left array values for which the block evaluates to true" do
+    numbers = [0, 1, 2, 3, 4, 5]
+    expect(numbers.partition { |number| true }).to eq([numbers, []])
+    expect(numbers.partition { |number| false }).to eq([[], numbers])
+    expect(numbers.partition { |number| number % 2 == 0 }).to eq([[0, 2, 4], [1, 3, 5]])
+    expect(numbers.partition { |number| number / 3 == 0 }).to eq([[0, 1, 2], [3, 4, 5]])
+  end
+end
+
+context "Array#minmax" do
+  numbers = [6, 4, 5, 10, 8]
+  strings = ["333", "2", "60", "55555", "1010", "111"]
+
+  specify "min should return the minimum element" do
+    expect(numbers.minmax).to eq([4, 10])
+    expect(strings.minmax).to eq(["1010", "60"])
+  end
+
+  specify "returns the minimum when using a block rule" do
+    expect(numbers.minmax { |left, right| right <=> left }).to eq([10, 4])
+    expect(strings.minmax { |left, right| left.length <=> right.length }).to eq(["2", "55555"])
+  end
+
+  specify "returns [nil, nil] for an empty Enumerable" do
+    expect([].minmax).to eq([nil, nil])
+  end
+end
