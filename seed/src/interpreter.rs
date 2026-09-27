@@ -412,6 +412,95 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
+/// while they last; from the first float — or a float init — the rest go
+/// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
+/// 0.6 as Ruby's is, not the running total's 0.6000000000000001; and
+/// anything else, or an init that is not a number, adds through `+`.
+fn ruby_sum(addends: &[Value], initial: Value) -> Value {
+    if addends.is_empty() {
+        return initial;
+    }
+    let float_initial = match initial {
+        Value::Float(number) => Some(number),
+        _ => None,
+    };
+    let mut exact = match (&initial, float_initial) {
+        (_, Some(_)) => 0,
+        (Value::Integer(number), None) => *number,
+        _ => return added_through_plus(initial, addends),
+    };
+    let mut position = 0;
+    while let Some(Value::Integer(addend)) = addends.get(position) {
+        exact = match exact.checked_add(*addend) {
+            Some(total) => total,
+            None => panic!("{exact} + {addend} overflows the 64-bit integers"),
+        };
+        position += 1;
+    }
+    if position == addends.len() {
+        return match float_initial {
+            Some(number) => Value::Float(number + exact as f64),
+            None => Value::Integer(exact),
+        };
+    }
+    let starts_float = float_initial.is_some() || matches!(addends[position], Value::Float(_));
+    if !starts_float {
+        return added_through_plus(Value::Integer(exact), &addends[position..]);
+    }
+    let (mut total, mut compensation) = (exact as f64, 0.0);
+    if let Some(number) = float_initial {
+        kahan_step(&mut total, &mut compensation, number);
+    }
+    for (offset, addend) in addends[position..].iter().enumerate() {
+        let number = match addend {
+            Value::Float(number) => *number,
+            Value::Integer(number) => *number as f64,
+            // Ruby drops the compensation here, taking what it has so far.
+            _ => return added_through_plus(Value::Float(total), &addends[position + offset..]),
+        };
+        kahan_step(&mut total, &mut compensation, number);
+    }
+    Value::Float(total + compensation)
+}
+
+/// One addend of Kahan–Babuska summation, NaN and the infinities as Ruby's
+/// `rb_ary_sum` takes them.
+fn kahan_step(total: &mut f64, compensation: &mut f64, addend: f64) {
+    if total.is_nan() {
+        return;
+    }
+    if addend.is_nan() {
+        *total = addend;
+        return;
+    }
+    if addend.is_infinite() {
+        *total = if total.is_infinite() && addend.is_sign_negative() != total.is_sign_negative() {
+            f64::NAN
+        } else {
+            addend
+        };
+        return;
+    }
+    if total.is_infinite() {
+        return;
+    }
+    let next = *total + addend;
+    if total.abs() >= addend.abs() {
+        *compensation += (*total - next) + addend;
+    } else {
+        *compensation += (addend - next) + *total;
+    }
+    *total = next;
+}
+
+/// `sum`'s last resort, Ruby's too: each addend through `+`.
+fn added_through_plus(initial: Value, addends: &[Value]) -> Value {
+    addends.iter().fold(initial, |total, addend| {
+        apply_binary(total, &BinaryOperator::Add, addend.clone())
+    })
+}
+
 /// One step of `dig` (#104): `[]` on an array by position or a hash by
 /// key, a maybe either way; anything else refuses in Ruby's words.
 fn dig_step(container: &Value, key: &Value) -> Value {
@@ -2547,6 +2636,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::Nil)
                 }
+                // The block's answers summed as `sum` sums (#104).
+                (Value::Array(elements), "sum", [] | [_]) => {
+                    let mut addends = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let addend = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        addends
+                            .push(addend.unwrap_or_else(|| panic!("sum block produced no value")));
+                    }
+                    let initial = arguments.first().cloned().unwrap_or(Value::Integer(0));
+                    Some(ruby_sum(&addends, initial))
+                }
                 // Each element's pair, as the block answers it (#104).
                 (Value::Array(elements), "to_h", []) => {
                     let mut pairs = Vec::new();
@@ -3305,23 +3408,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 let skipped = elements.len().saturating_sub(wanted);
                 Value::array(elements.iter().skip(skipped).cloned().collect())
             }
-            // Whole numbers stay whole; one float anywhere makes the total a
-            // float, the way `1 + 2.5` does (ADR 0018).
-            (Value::Array(elements), "sum", []) => {
-                if elements
-                    .iter()
-                    .all(|element| matches!(element, Value::Integer(_)))
-                {
-                    Self::integers_of(elements, "sum").into_iter().fold(
-                        Value::Integer(0),
-                        |total, element| {
-                            apply_binary(total, &BinaryOperator::Add, Value::Integer(element))
-                        },
-                    )
-                } else {
-                    Value::Float(Self::numbers_of(elements, "sum").into_iter().sum())
-                }
-            }
+            // Ruby's `rb_ary_sum` (#104): see `ruby_sum`.
+            (Value::Array(elements), "sum", []) => ruby_sum(elements, Value::Integer(0)),
+            (Value::Array(elements), "sum", [initial]) => ruby_sum(elements, initial.clone()),
             (Value::Integer(number), "abs" | "magnitude", []) => {
                 checked_integer(number.checked_abs(), || format!("{number}.{name}"))
             }
@@ -3796,16 +3885,6 @@ impl<W: std::io::Write> Interpreter<W> {
         std::mem::swap(&mut self.variables, &mut scope);
         self.current_file = previous_file;
         true
-    }
-
-    fn integers_of(elements: &[Value], method: &str) -> Vec<i64> {
-        elements
-            .iter()
-            .map(|element| match element {
-                Value::Integer(value) => *value,
-                other => panic!("{method} needs an array of integers, found {other:?}"),
-            })
-            .collect()
     }
 
     /// Every element as an f64, for comparing and totalling across the

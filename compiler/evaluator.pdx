@@ -1872,7 +1872,7 @@ def evaluate_method_call(node, mutable bindings)
   when "count" then count_of(receiver, arguments)
   when "index", "find_index" then receiver.index(value_at(arguments, 0))
   when "rindex" then receiver.rindex(value_at(arguments, 0))
-  when "sum" then receiver.sum
+  when "sum" then arguments.empty? ? receiver.sum : receiver.sum(value_at(arguments, 0))
   when "sort" then sorted_values(receiver, bindings)
   when "min" then extreme_value(receiver, "min", bindings)
   when "minmax" then [extreme_value(receiver, "min", bindings), extreme_value(receiver, "max", bindings)]
@@ -2186,6 +2186,22 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
+  # The block's answers, summed as `sum` sums (#104): the host collects
+  # them through `map`, then sums with the init, if any.
+  when "sum"
+    addends = receiver.map do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("sum block produced no value") if step.value.empty?
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    result = arguments.empty? ? addends.sum : addends.sum(value_at(arguments, 0))
+    outcome([result], scope)
   when "reverse_each"
     receiver.reverse_each do |element|
       step = run_guest_block(block, [element], scope)

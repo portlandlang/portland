@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`sum` is Ruby's, compensated floats and all** ([#104](https://github.com/portlandlang/portland/issues/104)) — `[0.1, 0.2, 0.3].sum` answered the running total's `0.6000000000000001`, a silent divergence from Ruby's `0.6`. `sum` now follows Ruby's `rb_ary_sum` step for step, read from Ruby 4.0.6's `array.c`: integers exactly, Kahan–Babuska compensated summation from the first float, and `+` for anything else. It takes an init (`sum(10)`, `sum("")`, `sum([])`) and a block, on both implementations. Inference no longer calls a summed block, or a sum with an init, an Integer.
+
 - **ruby/spec's core/array lookup and reshape files ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — `at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and `reverse_each` in `spec/array/lookups_spec.pdx`, twenty-five examples.
 
 - **A builtin handed `nil` sees `nil` on the hosted evaluator** — it passed arguments through `first`, whose answer for a nil argument is the present nil ADR 0005 keeps apart from absence. So `[1, nil].include?(nil)` was false hosted and true on the seed and in Ruby, and `index`, `count`, `key?`, and `assoc` of nil diverged the same way. Every builtin argument now goes through the raw positional read.

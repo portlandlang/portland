@@ -1770,6 +1770,20 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `sum` is Ruby's `rb_ary_sum` (#104): integers exactly, then from the
+/// first float Kahan–Babuska compensated summation, so `[0.1, 0.2,
+/// 0.3].sum` is 0.6 — the naive running total's 0.6000000000000001 was a
+/// silent divergence — and anything else through `+`, with an init and a
+/// block as Ruby's take them (Ruby 4.0.6, the expected lines).
+#[test]
+fn array_sum_matches_ruby() {
+    assert_both_print(
+        "evaluator_array_sum.pdx",
+        "p([1, 2, 3].sum)\np([1, 2, 3].sum { |number| number * 10 })\np([1, 2, 3].sum(1) { |number| number * 10 })\np([2.7800000000000002, 5.0, 2.5, 4.44, 3.89, 3.89, 4.44, 7.78, 5.0, 2.7800000000000002, 5.0, 2.5].sum)\np([0.1, 0.2, 0.3].sum)\np([1, 0.1, 0.2].sum)\np([0.1, 0.2, 0.3].sum(1))\np([1, 2].sum(0.5))\np([1.0, 1.0 / 0.0].sum)\np([1.0 / 0.0, -1.0 / 0.0].sum.nan?)\np([].sum(-1))\np([].sum)\np([1, 2, 3].sum(10))\np([\"a\", \"b\", \"c\"].sum(\"\"))\np([[1], [2]].sum([]))\np([0.1, 0.2, 0.3].sum { |number| number * 2 })\nhalves = [1, 2].sum { it * 0.5 }\np(halves.nan?)\nshifted = [1].sum(0.5)\np(shifted.nan?)\n",
+        "6\n60\n61\n50.0\n0.6\n1.3\n1.6\n3.5\nInfinity\ntrue\n-1\n0\n16\n\"abc\"\n[1, 2]\n1.2\nfalse\nfalse\n",
+    );
+}
+
 /// A builtin handed `nil` sees `nil`, on both implementations: the hosted
 /// evaluator had passed its arguments through `first`, whose answer for a
 /// nil argument is the present nil ADR 0005 keeps apart from absence — so
