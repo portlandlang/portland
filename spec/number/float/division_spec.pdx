@@ -1,0 +1,123 @@
+# A float's named division (#108), from ruby/spec core/float: divmod, % and
+# modulo, fdiv, and quo. Upstream's be_close is close_to? here, at mspec's
+# own TOLERANCE. Where Ruby raises — ZeroDivisionError, FloatDomainError,
+# TypeError — Portland refuses, and a refusal ends a run rather than
+# answering an example, so those examples stay upstream; so do the ones
+# that need a bignum, a Rational, a Complex, or a coercing mock. `infinite?`
+# answers true or false here, so upstream's 1 and -1 are asked as a sign.
+# Alias checks compare the two answers rather than method objects.
+
+require_relative "../../spec_helper"
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Float#divmod" do
+  specify "returns an [quotient, modulus] from dividing self by other" do
+    by_integer = 3.14.divmod(2)
+    expect(inspect(by_integer[0])).to eq("1")
+    expect(close_to?(by_integer[1], 1.14)).to eq(true)
+    by_float = 2.8284.divmod(3.1415)
+    expect(inspect(by_float[0])).to eq("0")
+    expect(close_to?(by_float[1], 2.8284)).to eq(true)
+    negative = -1.0.divmod(1)
+    expect(inspect(negative[0])).to eq("-1")
+    expect(negative[1]).to eq(0.0)
+  end
+
+  specify "returns the correct [quotient, modulus] even for large quotient" do
+    expect(inspect(0.59.divmod(7.761021455128987e-11).first)).to eq("7602092113")
+  end
+end
+
+context "Float#%" do
+  specify "returns self modulo other" do
+    expect(close_to?(6543.21 % 137, 104.21)).to eq(true)
+    expect(close_to?(6543.21 % 137.24, 92.9299999999996)).to eq(true)
+    expect(-1.0 % 1).to eq(0)
+  end
+
+  specify "returns self when modulus is +Infinity" do
+    expect(4.2 % Float::INFINITY).to eq(4.2)
+  end
+
+  specify "returns -Infinity when modulus is -Infinity" do
+    expect(4.2 % -Float::INFINITY).to eq(-Float::INFINITY)
+  end
+
+  specify "returns NaN when called on NaN or Infinities" do
+    expect((Float::NAN % 42).nan?).to eq(true)
+    expect((Float::INFINITY % 42).nan?).to eq(true)
+    expect((-Float::INFINITY % 42).nan?).to eq(true)
+  end
+
+  specify "returns NaN when modulus is NaN" do
+    expect((4.2 % Float::NAN).nan?).to eq(true)
+  end
+
+  specify "returns -0.0 when called on -0.0 with a non zero modulus" do
+    remainder = -0.0 % 42
+    expect(remainder).to eq(0)
+    expect(1 / remainder < 0).to eq(true)
+
+    infinite_remainder = -0.0 % Float::INFINITY
+    expect(infinite_remainder).to eq(0)
+    expect(1 / infinite_remainder < 0).to eq(true)
+  end
+end
+
+context "Float#modulo" do
+  specify "is an alias of Float#%" do
+    expect(6543.21.modulo(137.24)).to eq(6543.21 % 137.24)
+    expect(-0.0.modulo(42)).to eq(-0.0 % 42)
+  end
+end
+
+context "Float#fdiv" do
+  specify "performs floating-point division between self and an Integer" do
+    expect(8.9.fdiv(7)).to eq(1.2714285714285716)
+  end
+
+  specify "performs floating-point division between self and a Float" do
+    expect(2827.22.fdiv(872.111111)).to eq(3.2418116961704433)
+  end
+
+  specify "returns NaN when the argument is NaN" do
+    expect(-1819.999999.fdiv(Float::NAN).nan?).to eq(true)
+    expect(11109.1981271.fdiv(Float::NAN).nan?).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0.0" do
+    expect(2827.22.fdiv(0.0).infinite?).to eq(true)
+    expect(2827.22.fdiv(0.0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0.0 and self is negative" do
+    expect(-48229.282.fdiv(0.0).infinite?).to eq(true)
+    expect(-48229.282.fdiv(0.0) < 0.0).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0" do
+    expect(2827.22.fdiv(0).infinite?).to eq(true)
+    expect(2827.22.fdiv(0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0 and self is negative" do
+    expect(-48229.282.fdiv(0).infinite?).to eq(true)
+    expect(-48229.282.fdiv(0) < 0.0).to eq(true)
+  end
+
+  specify "returns 0.0 when the argument is Infinity" do
+    expect(47292.2821.fdiv(Float::INFINITY)).to eq(0.0)
+  end
+
+  specify "returns -0.0 when the argument is -Infinity" do
+    expect(1.9999918.fdiv(-Float::INFINITY)).to eq(-0.0)
+  end
+end
+
+context "Float#quo" do
+  specify "is an alias of Float#fdiv" do
+    expect(8.9.quo(7)).to eq(8.9.fdiv(7))
+    expect(2827.22.quo(0.0)).to eq(2827.22.fdiv(0.0))
+  end
+end

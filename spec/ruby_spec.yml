@@ -219,6 +219,26 @@ core/float/constants_spec.rb:
   status: partial_intentional
   reason: "infinite? answers true or false here, so INFINITY's 1 is asked as a sign."
   link: docs/ruby/truthiness.md
+core/float/divmod_spec.rb:
+  pdx: [spec/number/float/division_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums (integers are i64), and a zero divisor or a NaN or infinite quotient refuses where Ruby raises ZeroDivisionError or FloatDomainError; failures are values, not exceptions."
+  link: docs/ruby/errors.md
+core/float/modulo_spec.rb:
+  pdx: [spec/number/float/division_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums and no coercion protocol, and a zero modulus refuses where Ruby raises ZeroDivisionError; modulo's alias check compares answers rather than method objects."
+  link: docs/ruby/errors.md
+core/float/fdiv_spec.rb:
+  pdx: [spec/number/float/division_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums, Rational, or Complex; a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
+  link: docs/ruby/errors.md
+core/float/quo_spec.rb:
+  pdx: [spec/number/float/division_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
 core/float/ceil_spec.rb:
   pdx: [spec/number/float/rounding_spec.pdx]
 core/float/comparison_spec.rb:
