@@ -1789,6 +1789,11 @@ def evaluate_method_call(node, mutable bindings)
   when "pred" then receiver.pred
   # `pow` is `**`'s named twin (ADR 0033), one arity, the host's edges.
   when "pow" then receiver ** arguments.first
+  # Ruby's named division (ADR 0018, #108) rides the host's.
+  when "fdiv" then receiver.fdiv(arguments.first)
+  when "quo" then receiver.quo(arguments.first)
+  when "modulo" then receiver % arguments.first
+  when "divmod" then receiver.divmod(arguments.first)
   when "even?" then receiver.even?
   when "odd?" then receiver.odd?
   when "zero?" then receiver.zero?

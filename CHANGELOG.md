@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Ruby's named division: `fdiv`, `quo`, `modulo`, `divmod`** ([#108](https://github.com/portlandlang/portland/issues/108)) — as ADR 0018 promised, Ruby-named and built on demand. `fdiv` divides as floats on Integer and Float, and `quo` is Float's twin of it (Ruby's Integer#quo answers a Rational, which Portland has not, so Integer does not answer it). `modulo` is `%` by another name, and `divmod` answers the floored quotient and the remainder together. Once a float is involved, `divmod` follows Ruby's `flodivmod` step for step, so `-1.0.divmod(1)` is `[-1, -0.0]` and `-1.0.divmod(Float::INFINITY)` is `[-1, Infinity]`. A zero divisor refuses with `divided by 0`, and a NaN or infinite quotient refuses where Ruby raises FloatDomainError.
+
 - **Integer overflow refuses instead of wrapping** — past the 64-bit integers, where Ruby reaches for a bignum, `+`, `-`, `*`, unary minus, `abs`, `succ`, `next`, `pred`, `sum`, and the compound assignments now refuse (`9223372036854775807 + 1 overflows the 64-bit integers`). A release build of the seed had wrapped silently to the other end of the range. The hosted evaluator negates with the host's own `-` rather than `0 - operand`, which had turned `-x` of a float zero into `0.0` where Ruby answers `-0.0`.
 
 - **Integer division by zero refuses in Ruby's words** — `1 / 0`, `7 % 0`, and `total /= 0` said the host's "attempt to divide by zero"; they now say ZeroDivisionError's `divided by 0`. A float divisor still answers IEEE's infinity or NaN, as Ruby's does.

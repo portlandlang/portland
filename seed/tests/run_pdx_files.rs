@@ -1636,6 +1636,41 @@ fn integer_division_by_zero_refuses_in_rubys_words() {
     assert_both_oracles_refuse("integer_division_by_zero.pdx", None, &cases);
 }
 
+/// Ruby's named division (ADR 0018, #108): `fdiv` and Float's `quo` divide
+/// as floats, `modulo` is `%`, and `divmod` answers the floored quotient and
+/// the remainder together — Ruby's `flodivmod` once a float is involved, so
+/// a zero's sign and an infinite divisor answer as Ruby's do (4.0.6).
+#[test]
+fn named_division_matches_ruby() {
+    assert_evaluator_matches_seed(
+        "evaluator_named_division.pdx",
+        "p(1.0.fdiv(2))\np(7.fdiv(2))\np(1.fdiv(0))\np(-1.fdiv(0.0))\np(0.fdiv(0).nan?)\np(2.5.quo(2))\np(7.modulo(3))\np(-7.modulo(3))\np(3.14.modulo(2))\np(-2.5.modulo(1))\np(7.divmod(2))\np(-7.divmod(2))\np(7.divmod(-2))\np(3.14.divmod(2))\np(-1.0.divmod(1))\np(0.59.divmod(7.761021455128987e-11).first)\np(1.0.divmod(1.0 / 0.0))\np(-1.0.divmod(1.0 / 0.0))\np(7.divmod(2.5))\np(-0.0.divmod(1))\n",
+    );
+    let cases = [
+        (
+            "p((0.0 / 0.0).divmod(1))\n",
+            "NaN.divmod(1) has no integer quotient",
+        ),
+        (
+            "p(1.0.divmod(0.0 / 0.0))\n",
+            "1.0.divmod(NaN) has no integer quotient",
+        ),
+        (
+            "p((1.0 / 0.0).divmod(1))\n",
+            "Infinity.divmod(1) has no integer quotient",
+        ),
+        ("p(1.divmod(0))\n", "divided by 0"),
+        ("p(1.0.divmod(0))\n", "divided by 0"),
+        ("p(1.divmod(0.0))\n", "divided by 0"),
+        ("p(7.modulo(0))\n", "divided by 0"),
+        (
+            "p(1e30.divmod(1))\n",
+            "1.0e+30.divmod(1) overflows the 64-bit integers",
+        ),
+    ];
+    assert_both_oracles_refuse("named_division_refusal.pdx", None, &cases);
+}
+
 /// Past the 64-bit integers Ruby reaches for a bignum; Portland has none,
 /// so every integer operation refuses there rather than wrapping — a
 /// release build's silent `i64::MAX + 1 == i64::MIN` is the divergence.

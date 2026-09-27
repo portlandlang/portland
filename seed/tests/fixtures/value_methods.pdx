@@ -149,6 +149,13 @@ puts counting.flat_map { [it, it] }.join(",")
 # `pow` is `**`'s named twin (ADR 0033).
 puts 2.pow(8).to_s
 
+# Ruby's named division (ADR 0018, #108).
+puts 7.fdiv(2).to_s
+puts 2.5.quo(2).to_s
+puts 7.modulo(3).to_s
+p(-7.divmod(2))
+p(3.14.divmod(2))
+
 # The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose (#79).
 # `next` is `succ`'s third spelling: a keyword everywhere else, a method
 # name after a dot, where loop control can never stand.

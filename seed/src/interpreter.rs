@@ -268,6 +268,48 @@ fn float_to_integer(original: f64, rounded: f64, method: &str) -> Value {
     Value::Integer(rounded as i64)
 }
 
+/// `divmod` once a float is involved: Ruby's `flodivmod`, step for step,
+/// so a zero keeps its sign and an infinite divisor answers as Ruby's does.
+/// The quotient is an Integer; where there is none — NaN or an infinity —
+/// it refuses where Ruby raises FloatDomainError (#108).
+fn float_divmod(receiver: &Value, argument: &Value) -> Value {
+    let as_float = |value: &Value| match value {
+        Value::Float(number) => *number,
+        Value::Integer(number) => *number as f64,
+        other => panic!("divmod needs a number, got {}", other.shown()),
+    };
+    let (left, right) = (as_float(receiver), as_float(argument));
+    let written = || format!("{}.divmod({})", receiver.shown(), argument.shown());
+    if right == 0.0 {
+        panic!("divided by 0");
+    }
+    let mut remainder = if left == 0.0 || (right.is_infinite() && !left.is_infinite()) {
+        left
+    } else {
+        left % right
+    };
+    let mut quotient = if left.is_infinite() && !right.is_infinite() {
+        left
+    } else {
+        ((left - remainder) / right).round()
+    };
+    if right * remainder < 0.0 {
+        remainder += right;
+        quotient -= 1.0;
+    }
+    if !quotient.is_finite() {
+        panic!("{} has no integer quotient", written());
+    }
+    let limit = -(i64::MIN as f64);
+    if quotient >= limit || quotient < -limit {
+        panic!("{} overflows the 64-bit integers", written());
+    }
+    Value::array(vec![
+        Value::Integer(quotient as i64),
+        Value::Float(remainder),
+    ])
+}
+
 /// Refuses a zero divisor in Ruby's words, ZeroDivisionError's message,
 /// before the host's own panic can speak.
 fn refuse_zero_divisor(right: i64) {
@@ -2720,6 +2762,39 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Integer(number), "pred", []) => {
                 checked_integer(number.checked_sub(1), || format!("{number}.pred"))
             }
+            // Ruby's named division (ADR 0018, #108). `fdiv` divides as
+            // floats whatever the operands; `quo` is its Float-only twin,
+            // since Ruby's Integer#quo answers a Rational, which Portland has
+            // not. `modulo` is `%` by another name.
+            (
+                Value::Integer(_) | Value::Float(_),
+                "fdiv",
+                [Value::Integer(_) | Value::Float(_)],
+            )
+            | (Value::Float(_), "quo", [Value::Integer(_) | Value::Float(_)]) => {
+                let as_float = |value: &Value| match value {
+                    Value::Float(number) => *number,
+                    Value::Integer(number) => *number as f64,
+                    _ => unreachable!(),
+                };
+                Value::Float(as_float(&receiver) / as_float(&arguments[0]))
+            }
+            (
+                Value::Integer(_) | Value::Float(_),
+                "modulo",
+                [argument @ (Value::Integer(_) | Value::Float(_))],
+            ) => apply_binary(receiver.clone(), &BinaryOperator::Modulo, argument.clone()),
+            // Whole numbers divide as whole numbers; a float anywhere takes
+            // Ruby's float path.
+            (Value::Integer(left), "divmod", [Value::Integer(right)]) => Value::array(vec![
+                Value::Integer(floored_divide(*left, *right)),
+                Value::Integer(floored_modulo(*left, *right)),
+            ]),
+            (
+                Value::Integer(_) | Value::Float(_),
+                "divmod",
+                [argument @ (Value::Integer(_) | Value::Float(_))],
+            ) => float_divmod(&receiver, argument),
             // Euclid on magnitudes — the answer never carries a sign, and a
             // zero yields the other side's magnitude (Ruby 4.0.6, probed).
             (Value::Integer(number), "gcd", [Value::Integer(other)]) => {
