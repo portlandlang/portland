@@ -102,6 +102,16 @@ core/array/drop_while_spec.rb:
   status: partial_intentional
   reason: "The block answers true or false, so the rows where an element's own truthiness stops the walk stay behind; values never mutate, so the array cannot grow mid-walk; no subclasses."
   link: docs/ruby/truthiness.md
+core/array/max_spec.rb:
+  pdx: [spec/array/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "The method-owner check is reflection; a comparator takes two parameters, so the one-parameter block stays behind; the nil-holding row orders through truthiness; incomparable elements refuse where Ruby raises."
+  link: docs/ruby/truthiness.md
+core/array/min_spec.rb:
+  pdx: [spec/array/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "The method-owner check is reflection; a comparator takes two parameters, so the one-parameter block stays behind; the nil-holding row orders through truthiness; incomparable elements refuse where Ruby raises."
+  link: docs/ruby/truthiness.md
 core/array/sum_spec.rb:
   pdx: [spec/array/sum_spec.pdx]
   status: partial_intentional

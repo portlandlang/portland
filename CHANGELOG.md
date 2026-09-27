@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's core/array `max` and `min` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — twenty examples join `spec/array/extremes_spec.pdx`, the Enumerable ones upstream copies in included.
+
 - **A comparator block's rebindings carry through, and arrays of arrays have extremes** ([#104](https://github.com/portlandlang/portland/issues/104)) — the hosted evaluator had kept whatever a `sort`, `min`, `max`, or `minmax` block rebound inside that one comparison. So `counter += 1` in a comparator never counted past one there, while the seed carried it and Ruby does too. Both now thread it through, in Ruby's call order. `min` and `max` of an array of arrays order element by element under `<=>` (ADR 0054), where they had refused.
 
 - **ruby/spec's `core/array/sum_spec.rb` ported** ([#104](https://github.com/portlandlang/portland/issues/104)) — ten examples join `spec/array/sum_spec.pdx`, Kahan's compensated summation and the NaN and infinity table included.
