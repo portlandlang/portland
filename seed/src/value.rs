@@ -323,8 +323,30 @@ fn format_float(value: f64) -> String {
             "Infinity".to_string()
         };
     }
-    // Rust's Debug for f64 already keeps the point on whole numbers.
-    format!("{value:?}")
+    // Ruby's `Float#to_s` (#102): the shortest digits that round-trip, in
+    // fixed notation while the decimal point sits at most 15 places to
+    // their right or less than 4 to their left, scientific past that.
+    // Rust's `{:e}` gives those same shortest digits and the exponent.
+    let scientific = format!("{value:e}");
+    let (mantissa, exponent) = scientific
+        .split_once('e')
+        .expect("`{:e}` always writes an exponent");
+    let exponent: i32 = exponent.parse().expect("the exponent is an integer");
+    // Where the point falls, counted from the first digit: 1e14 has it
+    // 15 places along, 0.0001 has it 3 places before.
+    let point = exponent + 1;
+    if value == 0.0 || (-4 < point && point <= 15) {
+        // Rust's Debug is fixed across this whole range, and keeps the
+        // point on whole numbers.
+        return format!("{value:?}");
+    }
+    let mantissa = if mantissa.contains('.') {
+        mantissa.to_string()
+    } else {
+        format!("{mantissa}.0")
+    };
+    let sign = if exponent < 0 { '-' } else { '+' };
+    format!("{mantissa}e{sign}{:02}", exponent.abs())
 }
 
 impl fmt::Display for Value {
@@ -375,6 +397,42 @@ impl fmt::Display for Value {
             // `puts :paid` shows the name; `p :paid` shows the literal.
             Value::Symbol(name) => write!(formatter, "{name}"),
             Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_float;
+
+    /// #102: Ruby's `Float#to_s`, each expectation taken from Ruby 4.0.7's
+    /// own output. Fixed notation while the decimal point sits within 15
+    /// places left of it or 4 right; scientific past that, with a fractional
+    /// digit always, a signed exponent, and at least two exponent digits.
+    #[test]
+    fn floats_print_the_way_ruby_prints_them() {
+        let cases = [
+            (1e20, "1.0e+20"),
+            (1e16, "1.0e+16"),
+            (1e15, "1.0e+15"),
+            (1e14, "100000000000000.0"),
+            (123456789012345.0, "123456789012345.0"),
+            (1234567890123456.0, "1.234567890123456e+15"),
+            (0.0001, "0.0001"),
+            (0.00012, "0.00012"),
+            (0.00001, "1.0e-05"),
+            (1.5e-7, "1.5e-07"),
+            (-2.5e30, "-2.5e+30"),
+            (1.0e100, "1.0e+100"),
+            (5e-324, "5.0e-324"),
+            (1.7976931348623157e308, "1.7976931348623157e+308"),
+            (0.1, "0.1"),
+            (100.0, "100.0"),
+            (0.0, "0.0"),
+            (-0.0, "-0.0"),
+        ];
+        for (value, expected) in cases {
+            assert_eq!(format_float(value), expected, "{value:?}");
         }
     }
 }

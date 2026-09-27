@@ -1595,6 +1595,17 @@ fn one_definition_per_name_on_both_oracles() {
     }
 }
 
+/// Floats print Ruby's way at the scientific edges too (#102), through
+/// every path that renders one: `p`, `puts`, `to_s`, interpolation, and an
+/// array's inspect.
+#[test]
+fn portland_evaluator_matches_the_seed_on_float_printing() {
+    assert_evaluator_matches_seed(
+        "evaluator_float_printing.pdx",
+        "p(1e20)\nputs 1e15\nputs 0.00001.to_s\nputs \"at #{1.5e-7}\"\np([1e16, 0.0001, 1e14])\np(-2.5e30)\nputs(10.0 ** 20)\n",
+    );
+}
+
 /// Exponent literals (#100): Ruby's rule on both oracles — `e` or `E`, an
 /// optional sign, digits, a float with or without a dot — and one sentence
 /// per refusal.
