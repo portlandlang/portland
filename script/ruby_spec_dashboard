@@ -164,13 +164,27 @@ class Dashboard
     # By directory name, so `core/enumerator` comes before
     # `core/enumerator/lazy` rather than wherever its first file sorted.
     grouped = rows.group_by { it[:directory] }.sort_by { |directory, _| directory }
+    directory_anchors = grouped.map { |directory, _| anchor_for(directory) }
     directories = grouped.map do |directory, directory_rows|
       # By name, not path: `each` before `each_line`, which the `_spec.rb`
       # suffix would otherwise reverse.
-      files = directory_rows.sort_by { it[:name] }.map { it.except(:area, :directory) }
-      { name: directory, totals: totals(directory_rows), files: files }
+      files = directory_rows.sort_by { it[:name] }.map do |row|
+        row.except(:area, :directory).merge(anchor: file_anchor(directory, row[:name], directory_anchors))
+      end
+      { name: directory, anchor: anchor_for(directory), totals: totals(directory_rows), files: files }
     end
-    { name: area, totals: totals(rows), directories: directories }
+    { name: area, anchor: area, totals: totals(rows), directories: directories }
+  end
+
+  # A link target for each level: `core`, `core-array`, `core-array-each_index`.
+  def anchor_for(path) = path.tr("/", "-")
+
+  # A file named like a sibling directory — `core/string/unpack_spec.rb`
+  # beside `core/string/unpack/` — would share its anchor; the directory
+  # keeps the plain one and the file takes its upstream `_spec` suffix.
+  def file_anchor(directory, name, directory_anchors)
+    plain = "#{anchor_for(directory)}-#{name}"
+    directory_anchors.include?(plain) ? "#{plain}_spec" : plain
   end
 
   def totals(rows)
