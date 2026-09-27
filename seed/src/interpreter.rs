@@ -366,6 +366,52 @@ fn remainder(receiver: &Value, argument: &Value) -> Value {
     apply_binary(modulo, &BinaryOperator::Subtract, argument.clone())
 }
 
+/// An Integer's `floor`, `ceil`, `round`, or `truncate` to `digits` (#107):
+/// at or above zero the integer itself; below zero, to a multiple of
+/// ten to the `-digits` — `round` taking a half away from zero, Ruby's
+/// default. Worked in 128 bits, where every i64 and its neighbouring
+/// multiples fit; an answer past the 64-bit integers refuses.
+fn round_integer(number: i64, digits: i64, method: &str) -> Value {
+    if digits >= 0 {
+        return Value::Integer(number);
+    }
+    let written = || format!("{number}.{method}({digits})");
+    // Ten to the 39th already passes i128; far past that every answer is
+    // zero, or past the edge.
+    let power = 10_i128.checked_pow(u32::try_from(-digits).unwrap_or(u32::MAX).min(39));
+    let value = number as i128;
+    let answer = match power {
+        None => match method {
+            "floor" if value < 0 => panic!("{} overflows the 64-bit integers", written()),
+            "ceil" if value > 0 => panic!("{} overflows the 64-bit integers", written()),
+            _ => 0,
+        },
+        Some(power) => {
+            let floored = value - value.rem_euclid(power);
+            match method {
+                "floor" => floored,
+                "ceil" if floored == value => value,
+                "ceil" => floored + power,
+                "truncate" => value - value % power,
+                _ => {
+                    let magnitude = value.abs();
+                    let below = magnitude - magnitude % power;
+                    let rounded = if (magnitude - below) * 2 >= power {
+                        below + power
+                    } else {
+                        below
+                    };
+                    rounded * value.signum()
+                }
+            }
+        }
+    };
+    match i64::try_from(answer) {
+        Ok(answer) => Value::Integer(answer),
+        Err(_) => panic!("{} overflows the 64-bit integers", written()),
+    }
+}
+
 /// Where `upto` or `downto` stops (#107): an Integer endpoint is itself; a
 /// Float walks to its floor going up and its ceiling going down, as Ruby's
 /// does, and one with no integer — NaN, an infinity — refuses, since an
@@ -3003,6 +3049,14 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
             (Value::Integer(number), "to_i", []) => Value::Integer(*number),
+            (Value::Integer(number), "floor" | "ceil" | "round" | "truncate", []) => {
+                Value::Integer(*number)
+            }
+            (
+                Value::Integer(number),
+                "floor" | "ceil" | "round" | "truncate",
+                [Value::Integer(digits)],
+            ) => round_integer(*number, *digits, name),
             // Without a block, the finished walk — ADR 0055's rule for
             // whatever Ruby answers with an enumerator (#107).
             (Value::Integer(count), "times", []) => {

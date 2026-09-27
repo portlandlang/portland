@@ -1812,10 +1812,11 @@ def evaluate_method_call(node, mutable bindings)
   when "downto" then receiver.downto(arguments.first)
   when "next_float" then receiver.next_float
   when "prev_float" then receiver.prev_float
-  when "floor" then receiver.floor
-  when "ceil" then receiver.ceil
-  when "round" then receiver.round
-  when "truncate" then receiver.truncate
+  # An Integer takes a precision too (#107).
+  when "floor" then arguments.empty? ? receiver.floor : receiver.floor(arguments.first)
+  when "ceil" then arguments.empty? ? receiver.ceil : receiver.ceil(arguments.first)
+  when "round" then arguments.empty? ? receiver.round : receiver.round(arguments.first)
+  when "truncate" then arguments.empty? ? receiver.truncate : receiver.truncate(arguments.first)
   when "positive?" then receiver.positive?
   when "negative?" then receiver.negative?
   when "keys" then receiver.keys

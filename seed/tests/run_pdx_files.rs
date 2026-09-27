@@ -1733,6 +1733,43 @@ fn collection_equality_asks_rubys_equality_of_members() {
     );
 }
 
+/// An Integer's rounding family (#107): with no precision, or one at or
+/// above zero, the integer itself; below zero, to that many trailing
+/// zeros — `floor` down, `ceil` up, `truncate` toward zero, `round` to the
+/// nearest with a half going away from zero (Ruby 4.0.6, the expected
+/// lines). An answer past the 64-bit integers refuses.
+#[test]
+fn integer_rounding_matches_ruby() {
+    assert_both_print(
+        "evaluator_integer_rounding.pdx",
+        "p(2.floor)\np(-4.ceil)\np(7.round)\np(-9.truncate)\np(123.floor(0))\np(123.floor(10))\np(0.floor(-1))\np(123.floor(-1))\np(123.floor(-2))\np(123.floor(-3))\np(-123.floor(-1))\np(-123.floor(-2))\np(-123.floor(-3))\np(123.ceil(-1))\np(123.ceil(-3))\np(-123.ceil(-1))\np(-123.ceil(-3))\np(120.ceil(-1))\np(249.round(-2))\np(-249.round(-2))\np(250.round(-2))\np(-250.round(-2))\np(25.round(-1))\np(-25.round(-1))\np(123.truncate(-1))\np(-123.truncate(-1))\np(-123.truncate(-5))\np(123.round(-20))\np(-123.floor(-18))\np(123.ceil(-18))\np(9223372036854775807.floor(-1))\n",
+        "2\n-4\n7\n-9\n123\n123\n0\n120\n100\n0\n-130\n-200\n-1000\n130\n1000\n-120\n0\n120\n200\n-200\n300\n-300\n30\n-30\n120\n-120\n0\n0\n-1000000000000000000\n1000000000000000000\n9223372036854775800\n",
+    );
+    let cases = [
+        (
+            "p(9223372036854775807.round(-1))\n",
+            "9223372036854775807.round(-1) overflows the 64-bit integers",
+        ),
+        (
+            "p(9223372036854775807.ceil(-1))\n",
+            "9223372036854775807.ceil(-1) overflows the 64-bit integers",
+        ),
+        (
+            "p((-9223372036854775807 - 1).floor(-1))\n",
+            "-9223372036854775808.floor(-1) overflows the 64-bit integers",
+        ),
+        (
+            "p(123.ceil(-19))\n",
+            "123.ceil(-19) overflows the 64-bit integers",
+        ),
+        (
+            "p(-123.floor(-19))\n",
+            "-123.floor(-19) overflows the 64-bit integers",
+        ),
+    ];
+    assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
+}
+
 /// `div`, `remainder`, and `ceildiv` (ADR 0018, #107): `div` is Ruby's
 /// `(x / y).floor`, `remainder` keeps the dividend's sign, and `ceildiv`
 /// rounds the quotient up; any zero divisor refuses, a float one too
