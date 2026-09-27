@@ -1619,21 +1619,36 @@ fn float_to_integer_refuses_what_has_no_integer() {
     assert_both_oracles_refuse("float_to_integer_refusal.pdx", None, &cases);
 }
 
-/// Integer division by zero refuses in Ruby's words, ZeroDivisionError's
-/// message, not the host's panic text; a float divisor answers IEEE's
-/// infinity or NaN, as Ruby's does.
+/// Division by zero refuses in Ruby's words, ZeroDivisionError's message,
+/// not the host's panic text — for `/` between integers and for `%`
+/// always. A float `/` answers IEEE's infinity, as Ruby's does.
 #[test]
 fn integer_division_by_zero_refuses_in_rubys_words() {
     assert_evaluator_matches_seed(
         "evaluator_float_division_by_zero.pdx",
-        "p(1 / 0.0)\np(-1.0 / 0)\np(1.0 % 0.0)\n",
+        "p(1 / 0.0)\np(-1.0 / 0)\n",
     );
     let cases = [
         ("p(1 / 0)\n", "divided by 0"),
         ("p(7 % 0)\n", "divided by 0"),
         ("mutable total = 4\ntotal /= 0\n", "divided by 0"),
+        ("p(1.0 % 0.0)\n", "divided by 0"),
+        ("p(1.0 % 0)\n", "divided by 0"),
+        ("p(1 % 0.0)\n", "divided by 0"),
+        ("p(1.0.modulo(0.0))\n", "divided by 0"),
     ];
     assert_both_oracles_refuse("integer_division_by_zero.pdx", None, &cases);
+}
+
+/// A float `%` is Ruby's `flomod`: a zero keeps its sign, an infinite
+/// modulus answers the dividend or its own infinity, and NaN spreads
+/// (Ruby 4.0.6).
+#[test]
+fn float_modulo_matches_ruby() {
+    assert_evaluator_matches_seed(
+        "evaluator_float_modulo.pdx",
+        "p(-0.0 % 42)\np(4.2 % -(1.0 / 0.0))\np(4.2 % (1.0 / 0.0))\np((0.0 / 0.0) % 42)\np((1.0 / 0.0) % 42)\np(4.2 % (0.0 / 0.0))\np(-0.0 % (1.0 / 0.0))\np(6543.21 % 137.24)\np(-7.5 % 2)\np(7.5 % -2)\np(-1.0 % 1)\n",
+    );
 }
 
 /// Ruby's named division (ADR 0018, #108): `fdiv` and Float's `quo` divide

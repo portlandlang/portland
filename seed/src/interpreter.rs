@@ -268,6 +268,28 @@ fn float_to_integer(original: f64, rounded: f64, method: &str) -> Value {
     Value::Integer(rounded as i64)
 }
 
+/// `%` once a float is involved: Ruby's `flomod`, step for step. The host's
+/// remainder is C's `fmod`, taking the divisor's sign after; a zero keeps
+/// its sign, an infinite modulus answers the dividend, and a zero modulus
+/// refuses as Ruby's does, even between floats.
+fn float_modulo(left: f64, right: f64) -> f64 {
+    if right.is_nan() {
+        return right;
+    }
+    if right == 0.0 {
+        panic!("divided by 0");
+    }
+    let mut remainder = if left == 0.0 || (right.is_infinite() && !left.is_infinite()) {
+        left
+    } else {
+        left % right
+    };
+    if right * remainder < 0.0 {
+        remainder += right;
+    }
+    remainder
+}
+
 /// `divmod` once a float is involved: Ruby's `flodivmod`, step for step,
 /// so a zero keeps its sign and an infinite divisor answers as Ruby's does.
 /// The quotient is an Integer; where there is none — NaN or an infinity —
@@ -466,7 +488,7 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
             match operator {
                 BinaryOperator::Add => Value::Float(left + right),
                 BinaryOperator::Divide => Value::Float(left / right),
-                BinaryOperator::Modulo => Value::Float(left - right * (left / right).floor()),
+                BinaryOperator::Modulo => Value::Float(float_modulo(left, right)),
                 BinaryOperator::Multiply => Value::Float(left * right),
                 BinaryOperator::Power => Value::Float(left.powf(right)),
                 BinaryOperator::Subtract => Value::Float(left - right),

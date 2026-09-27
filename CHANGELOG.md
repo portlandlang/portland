@@ -2,11 +2,13 @@
 
 ## Unreleased
 
+- **A float `%` is Ruby's** ([#108](https://github.com/portlandlang/portland/issues/108)) — `a - b * (a / b).floor` gave the wrong last digits (`6543.21 % 137.24`), lost a zero's sign (`-0.0 % 42`), and answered NaN for an infinite modulus. Now it follows Ruby's `flomod`: `4.2 % Float::INFINITY` is `4.2`, `4.2 % -Float::INFINITY` is `-Infinity`, and a zero modulus refuses with `divided by 0` even between floats, where it had answered NaN.
+
 - **Ruby's named division: `fdiv`, `quo`, `modulo`, `divmod`** ([#108](https://github.com/portlandlang/portland/issues/108)) — as ADR 0018 promised, Ruby-named and built on demand. `fdiv` divides as floats on Integer and Float, and `quo` is Float's twin of it (Ruby's Integer#quo answers a Rational, which Portland has not, so Integer does not answer it). `modulo` is `%` by another name, and `divmod` answers the floored quotient and the remainder together. Once a float is involved, `divmod` follows Ruby's `flodivmod` step for step, so `-1.0.divmod(1)` is `[-1, -0.0]` and `-1.0.divmod(Float::INFINITY)` is `[-1, Infinity]`. A zero divisor refuses with `divided by 0`, and a NaN or infinite quotient refuses where Ruby raises FloatDomainError.
 
 - **Integer overflow refuses instead of wrapping** — past the 64-bit integers, where Ruby reaches for a bignum, `+`, `-`, `*`, unary minus, `abs`, `succ`, `next`, `pred`, `sum`, and the compound assignments now refuse (`9223372036854775807 + 1 overflows the 64-bit integers`). A release build of the seed had wrapped silently to the other end of the range. The hosted evaluator negates with the host's own `-` rather than `0 - operand`, which had turned `-x` of a float zero into `0.0` where Ruby answers `-0.0`.
 
-- **Integer division by zero refuses in Ruby's words** — `1 / 0`, `7 % 0`, and `total /= 0` said the host's "attempt to divide by zero"; they now say ZeroDivisionError's `divided by 0`. A float divisor still answers IEEE's infinity or NaN, as Ruby's does.
+- **Integer division by zero refuses in Ruby's words** — `1 / 0`, `7 % 0`, and `total /= 0` said the host's "attempt to divide by zero"; they now say ZeroDivisionError's `divided by 0`. A float `/` still answers IEEE's infinity, as Ruby's does.
 
 - **A float with no integer refuses instead of answering a wrong one** ([#108](https://github.com/portlandlang/portland/issues/108)) — `to_i`, `floor`, `ceil`, `round`, and `truncate` on NaN answered 0, and on an infinity or anything past the 64-bit integers answered i64::MAX, a silent divergence the manifest already claimed was a refusal. NaN and the infinities now refuse where Ruby raises FloatDomainError (`NaN.to_i has no integer answer`), and a float past the 64-bit integers refuses where Ruby reaches for a bignum.
 
