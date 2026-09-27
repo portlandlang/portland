@@ -60,8 +60,11 @@ fn expand_line(lines: &[&str], index: usize) -> (String, usize) {
             position += opener_length;
             continue;
         }
-        result.push(character as char);
-        position += 1;
+        // Whole characters, not bytes: a multi-byte one passes through
+        // intact and the next slice starts on a boundary (#139).
+        let whole = line[position..].chars().next().unwrap();
+        result.push(whole);
+        position += whole.len_utf8();
     }
     (result, consumed)
 }
@@ -224,6 +227,17 @@ mod tests {
     #[test]
     fn ignores_a_heredoc_looking_thing_in_a_comment() {
         assert_eq!(expand("# see <<~FAKE\n"), "# see <<~FAKE\n");
+    }
+
+    /// The walk steps by character, not byte: a multi-byte character
+    /// outside a string passes through whole (#139), where it had been
+    /// split into bytes and the next slice landed inside it.
+    #[test]
+    fn passes_a_multi_byte_character_outside_a_string_through_whole() {
+        assert_eq!(
+            expand("x = /[ぁ-ゟ]/ <<~A\n  é\nA\n"),
+            "x = /[ぁ-ゟ]/ \"é\\n\"\n"
+        );
     }
 
     #[test]

@@ -57,6 +57,11 @@ def name_character?(character)
   name_start?(character) || digit?(character)
 end
 
+# Printable ASCII, plus the whitespace a line can hold.
+def ascii?(character)
+  " !\"\#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\t\n".include?(character)
+end
+
 def base_letter?(character)
   "xXbBoO".include?(character)
 end
@@ -723,6 +728,8 @@ def lex(raw_source, first_line: 1)
         panic "'#{spelling}' is an instance variable, which Portland does not have — a field is read by its bare name, '#{name}'"
       end
     end
+    # The seed's sentence for a character outside ASCII (#139).
+    panic "'#{character}' is outside a string or comment, where Portland reads only ASCII" unless ascii?(character)
     tokens << Token.new(kind: "error", text: character, leading_space: leading, line: line)
     index += 1
   end

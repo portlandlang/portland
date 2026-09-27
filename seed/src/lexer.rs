@@ -535,6 +535,9 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     "'{spelling}' is an instance variable, which Portland does not have — a field is read by its bare name, '{name}'"
                 );
             }
+            character if !character.is_ascii() => panic!(
+                "'{character}' is outside a string or comment, where Portland reads only ASCII"
+            ),
             _ => panic!("unexpected character {character:?} at byte {start}"),
         }
     }

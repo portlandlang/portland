@@ -1672,6 +1672,18 @@ fn crlf_line_endings_read_as_newlines_on_both_oracles() {
     );
 }
 
+/// A character outside ASCII, outside a string or comment, refuses with one
+/// sentence on both oracles (#139) — the seed had panicked slicing inside it,
+/// and the compiler had read `café` as `caf`.
+#[test]
+fn non_ascii_outside_a_string_refuses_on_both_oracles() {
+    let cases = [(
+        "café = 1\n",
+        "'é' is outside a string or comment, where Portland reads only ASCII",
+    )];
+    assert_both_oracles_refuse("non_ascii_refusal.pdx", None, &cases);
+}
+
 /// Ruby's visibility words in a type body refuse until #133 decides them,
 /// rather than reading as fields named `private` (#132) — before the
 /// methods, after them, and on a `def`'s own line.
