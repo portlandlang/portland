@@ -18,7 +18,7 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           bundler-cache: true
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -26,4 +26,16 @@ jobs:
             target
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
+      # The toolchains bootstrap would otherwise download on every run: the
+      # Rust rust-toolchain.toml pins, through rustup, and the Ruby
+      # .ruby-version pins, through rv. Each key is its pin file, so bumping
+      # a version is what refreshes its cache.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.rustup
+          key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.local/share/rv/rubies
+          key: rv-rubies-${{ runner.os }}-${{ hashFiles('.ruby-version') }}
       - run: script/cibuild
