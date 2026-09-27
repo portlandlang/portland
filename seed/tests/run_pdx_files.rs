@@ -1659,6 +1659,15 @@ fn unary_plus_answers_the_number_itself() {
     assert_both_oracles_refuse("unary_plus_refusal.pdx", None, &cases);
 }
 
+/// An Integer's `to_i` is itself, as in Ruby (#107).
+#[test]
+fn integer_to_i_is_itself() {
+    assert_evaluator_matches_seed(
+        "evaluator_integer_to_i.pdx",
+        "p(10.to_i)\np(-15.to_i)\np(9223372036854775807.to_i)\n",
+    );
+}
+
 /// `next_float` and `prev_float` (#108): Ruby's `nextafter` toward the
 /// infinities, one IEEE step, a zero's sign included (Ruby 4.0.6).
 #[test]

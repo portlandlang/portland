@@ -602,7 +602,7 @@ end
 def builtin_table(type)
   case type
   in ["string"] then %w[between?/2 capitalize/0 chars/0 chomp/0 clamp/2 count/1 downcase/0 empty?/0 end_with?/1 failure?/0 include?/1 index/1 length/0 lines/0 lstrip/0 nil?/0 reverse/0 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1 strip/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0]
-  in ["integer"] then %w[abs/0 between?/2 clamp/1-2 divmod/1 downto/1& even?/0 failure?/0 fdiv/1 gcd/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 odd?/0 positive?/0 pow/1 pred/0 some?/0 succ/0 times/0& to_f/0 to_s/0-1 upto/1& zero?/0]
+  in ["integer"] then %w[abs/0 between?/2 clamp/1-2 divmod/1 downto/1& even?/0 failure?/0 fdiv/1 gcd/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 odd?/0 positive?/0 pow/1 pred/0 some?/0 succ/0 times/0& to_f/0 to_i/0 to_s/0-1 upto/1& zero?/0]
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 divmod/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[empty?/0 end_with?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 some?/0 start_with?/1 to_s/0]

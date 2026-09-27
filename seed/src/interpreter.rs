@@ -2921,6 +2921,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Float(text.trim().parse().unwrap_or(0.0))
             }
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
+            (Value::Integer(number), "to_i", []) => Value::Integer(*number),
             (Value::Float(number), "to_f", []) => Value::Float(*number),
             // Ruby's Float#to_i truncates toward zero — it is not the
             // floored division of ADR 0018.

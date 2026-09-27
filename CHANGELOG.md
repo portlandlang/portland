@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Integer#to_i, and seven core/integer files ported** ([#107](https://github.com/portlandlang/portland/issues/107)) — an Integer's `to_i` is itself, as in Ruby, on both implementations. ruby/spec's `to_i`, `zero?`, `==`, `next`, `magnitude`, `inspect`, and `===` files port to `spec/number/integer/identity_spec.pdx`, alias checks comparing answers rather than method objects.
+
 - **ruby/spec's `core/float/exponent_spec.rb` ported in part** ([#108](https://github.com/portlandlang/portland/issues/108)) — Float `**` answers as Ruby's does, `9.5 ** 0xffffffff` overflowing to Infinity included. The Complex example waits on #124.
 
 - **`next_float` and `prev_float`** ([#108](https://github.com/portlandlang/portland/issues/108)) — one IEEE step toward either infinity, Ruby's `nextafter`, a zero's sign included, on both implementations. ruby/spec's `core/float/next_float_spec.rb` and `prev_float_spec.rb` port whole to `spec/number/float/steps_spec.pdx`, their `rand` a fixed 0.37 so every run answers alike.

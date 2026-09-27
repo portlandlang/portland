@@ -1,0 +1,64 @@
+# What an integer is to itself (#107), from ruby/spec core/integer: to_i,
+# zero?, ==, and the aliases next, magnitude, inspect, and ===. Alias
+# checks compare the two answers rather than method objects, which a closed
+# runtime has none of; upstream's type check through eql? is asked of
+# inspect's answer. The bignum rows, the mocks whose own == takes over, and
+# zero?'s method-owner check stay upstream.
+
+require_relative "../../spec_helper"
+
+context "Integer#to_i" do
+  specify "returns self" do
+    expect(inspect(10.to_i)).to eq("10")
+    expect(inspect((-15).to_i)).to eq("-15")
+  end
+end
+
+context "Integer#zero?" do
+  specify "returns true if self is 0" do
+    expect(0.zero?).to eq(true)
+    expect(1.zero?).to eq(false)
+    expect(-1.zero?).to eq(false)
+  end
+end
+
+context "Integer#==" do
+  specify "returns true if self has the same value as other" do
+    expect(1 == 1).to eq(true)
+    expect(9 == 5).to eq(false)
+    expect(9 == 9.0).to eq(true)
+    expect(9 == 9.01).to eq(false)
+  end
+
+  specify "calls 'other == self' if the given argument is not an Integer" do
+    expect(1 == "*").to eq(false)
+  end
+end
+
+context "Integer#next" do
+  specify "is an alias of Integer#succ" do
+    expect(41.next).to eq(41.succ)
+    expect(-1.next).to eq(-1.succ)
+  end
+end
+
+context "Integer#magnitude" do
+  specify "is an alias of Integer#abs" do
+    expect(-7.magnitude).to eq(-7.abs)
+    expect(7.magnitude).to eq(7.abs)
+  end
+end
+
+context "Integer#inspect" do
+  specify "is an alias of Integer#to_s" do
+    expect(inspect(-42)).to eq(-42.to_s)
+  end
+end
+
+context "Integer#===" do
+  specify "is an alias of Integer#==" do
+    expect(1 === 1).to eq(1 == 1)
+    expect(9 === 9.0).to eq(9 == 9.0)
+    expect(9 === 5).to eq(9 == 5)
+  end
+end

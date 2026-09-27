@@ -388,6 +388,40 @@ core/integer/to_s_spec.rb:
   pdx: [spec/number/integer/conversion_spec.pdx]
 core/integer/uminus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
+core/integer/to_i_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums (integers are i64)."
+core/integer/zero_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "Asking a method object for its owner is reflection a closed runtime does not have."
+  link: docs/ruby/metaprogramming.md
+core/integer/equal_value_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums, and a mock's own == never takes over a builtin's answer here."
+  link: docs/ruby/metaprogramming.md
+core/integer/next_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/integer/magnitude_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/integer/inspect_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(-42), not a method (ADR 0026), so the example compares its answer rather than method objects."
+  link: docs/ruby/inspect.md
+core/integer/case_compare_spec.rb:
+  pdx: [spec/number/integer/identity_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
 
 # — core/nil —
 # nil has no methods beyond nil? and some? (ADR 0005), so its conversions
