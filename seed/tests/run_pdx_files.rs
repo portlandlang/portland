@@ -1636,6 +1636,60 @@ fn integer_division_by_zero_refuses_in_rubys_words() {
     assert_both_oracles_refuse("integer_division_by_zero.pdx", None, &cases);
 }
 
+/// Past the 64-bit integers Ruby reaches for a bignum; Portland has none,
+/// so every integer operation refuses there rather than wrapping — a
+/// release build's silent `i64::MAX + 1 == i64::MIN` is the divergence.
+#[test]
+fn integer_overflow_refuses_rather_than_wrapping() {
+    let biggest = "9223372036854775807";
+    let smallest = "(-9223372036854775807 - 1)";
+    assert_evaluator_matches_seed(
+        "evaluator_integer_edges.pdx",
+        &format!(
+            "p({biggest})\np({smallest})\np({biggest} - 1 + 1)\np(-{biggest})\nzero = 0.0\np(-zero)\n"
+        ),
+    );
+    let cases = [
+        (
+            format!("p({biggest} + 1)\n"),
+            "9223372036854775807 + 1 overflows the 64-bit integers",
+        ),
+        (
+            format!("p({smallest} - 1)\n"),
+            "-9223372036854775808 - 1 overflows the 64-bit integers",
+        ),
+        (
+            "p(4611686018427387904 * 2)\n".to_string(),
+            "4611686018427387904 * 2 overflows the 64-bit integers",
+        ),
+        (
+            format!("x = {smallest}\np(-x)\n"),
+            "-(-9223372036854775808) overflows the 64-bit integers",
+        ),
+        (
+            format!("p({smallest}.abs)\n"),
+            "-9223372036854775808.abs overflows the 64-bit integers",
+        ),
+        (
+            format!("p({biggest}.succ)\n"),
+            "9223372036854775807.succ overflows the 64-bit integers",
+        ),
+        (
+            format!("p([{biggest}, 1].sum)\n"),
+            "9223372036854775807 + 1 overflows the 64-bit integers",
+        ),
+        (
+            format!("mutable total = {biggest}\ntotal += 1\n"),
+            "9223372036854775807 + 1 overflows the 64-bit integers",
+        ),
+    ];
+    let cases: Vec<(&str, &str)> = cases
+        .iter()
+        .map(|(source, expected)| (source.as_str(), *expected))
+        .collect();
+    assert_both_oracles_refuse("integer_overflow.pdx", None, &cases);
+}
+
 /// `class` is a spelling of `struct` (ADR 0056, #127): the same values on
 /// both oracles, and the three Ruby shapes it has no Portland meaning for —
 /// inheritance, `class << self`, and instance variables — refuse with the

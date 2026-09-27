@@ -1107,7 +1107,9 @@ def evaluate_unary(node, bindings)
   result = if node.operator == "!"
     !operand
   else
-    0 - operand
+    # The host's own negation, not `0 - operand`: that loses a float
+    # zero's sign and words an overflow as a subtraction.
+    -operand
   end
   outcome([result], step.bindings)
 end

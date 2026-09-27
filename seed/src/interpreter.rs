@@ -377,10 +377,21 @@ fn orderable(value: &Value) -> bool {
     )
 }
 
+/// An integer operation's answer, or its refusal past the 64-bit integers,
+/// where Ruby reaches for a bignum and Portland has none — never the host's
+/// wrap, which a release build does silently. `written` names the operation
+/// the way the refusal quotes it.
+fn checked_integer(answer: Option<i64>, written: impl FnOnce() -> String) -> Value {
+    match answer {
+        Some(answer) => Value::Integer(answer),
+        None => panic!("{} overflows the 64-bit integers", written()),
+    }
+}
+
 fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
     match (left, operator, right) {
         (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
-            Value::Integer(left + right)
+            checked_integer(left.checked_add(right), || format!("{left} + {right}"))
         }
         (Value::Integer(left), BinaryOperator::Divide, Value::Integer(right)) => {
             Value::Integer(floored_divide(left, right))
@@ -389,13 +400,13 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
             Value::Integer(floored_modulo(left, right))
         }
         (Value::Integer(left), BinaryOperator::Multiply, Value::Integer(right)) => {
-            Value::Integer(left * right)
+            checked_integer(left.checked_mul(right), || format!("{left} * {right}"))
         }
         (Value::Integer(left), BinaryOperator::Power, Value::Integer(right)) => {
             integer_power(left, right)
         }
         (Value::Integer(left), BinaryOperator::Subtract, Value::Integer(right)) => {
-            Value::Integer(left - right)
+            checked_integer(left.checked_sub(right), || format!("{left} - {right}"))
         }
         // Mixed arithmetic promotes to float, Ruby's rule
         // (ADR 0018). `/` is real division once a float is
@@ -1744,7 +1755,11 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::Unary { operand, operator } => {
                 let operand = self.value_of(operand);
                 match (operator, operand) {
-                    (UnaryOperator::Negate, Value::Integer(value)) => Some(Value::Integer(-value)),
+                    (UnaryOperator::Negate, Value::Integer(value)) => {
+                        Some(checked_integer(value.checked_neg(), || {
+                            format!("-({value})")
+                        }))
+                    }
                     (UnaryOperator::Negate, Value::Float(value)) => Some(Value::Float(-value)),
                     (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
                     (operator, operand) => {
@@ -2684,17 +2699,27 @@ impl<W: std::io::Write> Interpreter<W> {
                     .iter()
                     .all(|element| matches!(element, Value::Integer(_)))
                 {
-                    Value::Integer(Self::integers_of(elements, "sum").into_iter().sum())
+                    Self::integers_of(elements, "sum").into_iter().fold(
+                        Value::Integer(0),
+                        |total, element| {
+                            apply_binary(total, &BinaryOperator::Add, Value::Integer(element))
+                        },
+                    )
                 } else {
                     Value::Float(Self::numbers_of(elements, "sum").into_iter().sum())
                 }
             }
-            (Value::Integer(number), "abs" | "magnitude", []) => Value::Integer(number.abs()),
+            (Value::Integer(number), "abs" | "magnitude", []) => {
+                checked_integer(number.checked_abs(), || format!("{number}.{name}"))
+            }
             // The neighbors — synonyms for `+ 1` and `- 1`, kept on purpose
             // (principle 3: one behavior may have many spellings; #79).
-            (Value::Integer(number), "succ", []) => Value::Integer(number + 1),
-            (Value::Integer(number), "next", []) => Value::Integer(number + 1),
-            (Value::Integer(number), "pred", []) => Value::Integer(number - 1),
+            (Value::Integer(number), "succ" | "next", []) => {
+                checked_integer(number.checked_add(1), || format!("{number}.{name}"))
+            }
+            (Value::Integer(number), "pred", []) => {
+                checked_integer(number.checked_sub(1), || format!("{number}.pred"))
+            }
             // Euclid on magnitudes — the answer never carries a sign, and a
             // zero yields the other side's magnitude (Ruby 4.0.6, probed).
             (Value::Integer(number), "gcd", [Value::Integer(other)]) => {
