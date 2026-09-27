@@ -1799,6 +1799,23 @@ fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
     assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
+/// `clamp` by a range (#101): an exclusive range with an end has no top to
+/// clamp to, and a range given backwards refuses as two bounds do.
+#[test]
+fn clamp_range_refusals_on_both_oracles() {
+    let cases = [
+        (
+            "p 5.clamp(1...3)\n",
+            "'clamp' cannot take an exclusive range — write 'low..high'",
+        ),
+        (
+            "p 5.clamp(3..1)\n",
+            "'clamp' takes the low bound first, got 3 then 1",
+        ),
+    ];
+    assert_both_oracles_refuse("clamp_range_refusal.pdx", None, &cases);
+}
+
 /// A comparator block answering anything but an integer refuses (#99), in
 /// ADR 0054's words for `<=>`, on both oracles.
 #[test]

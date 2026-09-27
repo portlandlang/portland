@@ -63,6 +63,8 @@ shapes = lambda do |receiver, name|
     ["#{receiver}.#{name}(\"a\")", 1, false],
     ["#{receiver}.#{name}([1])", 1, false],
     ["#{receiver}.#{name}({\"a\" => 1})", 1, false],
+    # A range, `clamp(1..3)` (#101).
+    ["#{receiver}.#{name}(1..2)", 1, false],
     ["#{receiver}.#{name}(1, 2)", 2, false],
     # A separator and a limit, `split(",", -1)` (#142).
     ["#{receiver}.#{name}(\"a\", 1)", 2, false],

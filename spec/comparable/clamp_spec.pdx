@@ -47,4 +47,25 @@ context "Comparable" do
       expect("m".clamp("a", "f")).to eq("f")
     end
   end
+
+  # One range for both bounds (#101). Ranges hold integers (ADR 0019), so
+  # upstream's struct ranges wait; a number clamps by an integer range, as
+  # Ruby 4.0.7 answers.
+  describe "#clamp with a range" do
+    specify "clamps a number between the range's ends" do
+      expect(5.clamp(1..3)).to eq(3)
+      expect(0.clamp(1..3)).to eq(1)
+      expect(2.clamp(1..3)).to eq(2)
+      expect(2.5.clamp(1..3)).to eq(2.5)
+      expect(7.5.clamp(1..3)).to eq(3)
+    end
+
+    specify "clamps one side only for an endless or beginless range" do
+      expect(5.clamp(1..)).to eq(5)
+      expect(0.clamp(1..)).to eq(1)
+      expect(5.clamp(..3)).to eq(3)
+      expect(0.clamp(..3)).to eq(0)
+      expect(5.clamp(1...)).to eq(5)
+    end
+  end
 end

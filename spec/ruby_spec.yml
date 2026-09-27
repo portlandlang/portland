@@ -90,8 +90,8 @@ core/comparable/between_spec.rb:
 core/comparable/clamp_spec.rb:
   pdx: [spec/comparable/clamp_spec.pdx]
   status: partial_planned
-  reason: "The range-argument forms, clamp(1..3) with endless and beginless ranges, are not built; nil bounds and backwards bounds refuse by design."
-  link: https://github.com/portlandlang/portland/issues/101
+  reason: "A number clamps by an integer range, endless and beginless included (#101); upstream's range examples clamp structs by a range of structs, which waits on ranges over any orderable (ADR 0019 holds integers). Nil bounds and backwards bounds refuse by design."
+  link: https://github.com/portlandlang/portland/issues/149
 core/comparable/equal_value_spec.rb:
   status: skipped
   reason: "Comparable does not derive ==: struct equality is already field by field, and a second definition of equal would disagree with it."

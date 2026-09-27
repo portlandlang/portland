@@ -2806,6 +2806,38 @@ impl<W: std::io::Write> Interpreter<W> {
                 let below_high = self.ordering_of(receiver, high) <= 0;
                 Value::Boolean(above_low && below_high)
             }
+            // One range for both bounds (#101), endless and beginless too.
+            // Ranges hold integers (ADR 0019), so a number clamps by one;
+            // an exclusive range with an end has no top to clamp to.
+            (
+                receiver,
+                "clamp",
+                [
+                    Value::Range {
+                        end,
+                        exclusive,
+                        start,
+                    },
+                ],
+            ) if matches!(receiver, Value::Integer(_) | Value::Float(_)) => {
+                if *exclusive && end.is_some() {
+                    panic!("'clamp' cannot take an exclusive range — write 'low..high'");
+                }
+                if let (Some(low), Some(high)) = (start, end)
+                    && low > high
+                {
+                    panic!("'clamp' takes the low bound first, got {low} then {high}");
+                }
+                match (start, end) {
+                    (Some(low), _) if self.ordering_of(receiver, &Value::Integer(*low)) < 0 => {
+                        Value::Integer(*low)
+                    }
+                    (_, Some(high)) if self.ordering_of(receiver, &Value::Integer(*high)) > 0 => {
+                        Value::Integer(*high)
+                    }
+                    _ => receiver.clone(),
+                }
+            }
             (receiver, "clamp", [low, high]) if orderable(receiver) => {
                 // Bounds given backwards refuse, as Ruby raises for them,
                 // rather than answering whichever bound was checked first.

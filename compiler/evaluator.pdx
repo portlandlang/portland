@@ -1735,7 +1735,8 @@ def evaluate_method_call(node, mutable bindings)
   when "min" then extreme_value(receiver, "min", bindings)
   when "max" then extreme_value(receiver, "max", bindings)
   when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
-  when "clamp" then receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
+  # One range for both bounds (#101), or the two bounds.
+  when "clamp" then arguments.length == 1 ? receiver.clamp(arguments.first) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
   when "step" then receiver.step(arguments.first)
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
