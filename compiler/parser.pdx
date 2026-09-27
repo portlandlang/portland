@@ -1323,11 +1323,12 @@ def parse_unary(tokens, position)
     return Step.new(node: chained_negative_error, position: chained.position + 1) if operator_at?(tokens, chained.position, %w[**])
     return chained
   end
-  if operator_at?(tokens, position, %w[! -])
+  if operator_at?(tokens, position, %w[! - +])
     operator = tokens[position].text
     # A minus on anything else applies last too: `-x ** 2` is `-(x ** 2)`,
     # exactly Ruby's answer — the recursion reaches the exponent level for
-    # plain operands and keeps stacked signs legal.
+    # plain operands and keeps stacked signs legal. Unary plus (#108) is a
+    # number's identity, so it takes the same path with no answer changed.
     operand = parse_unary(tokens, position + 1)
     return Step.new(node: unary_node(operator, operand.node, line: line_at(tokens, position)), position: operand.position)
   end

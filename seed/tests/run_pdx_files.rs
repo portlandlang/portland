@@ -1180,6 +1180,11 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "cannot apply '-' to String",
         ),
         (
+            "name = \"pdx\"\nif false\n  kept = +name\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "cannot apply '+' to String",
+        ),
+        (
             // `"ab" * 2` and `[1] * 2` are legal; a mutable widened by a
             // branch is unknown and declines. Only the last line refuses.
             "mutable count = 1\nif true\n  count = \"one\"\nend\ndoubled = \"ab\" * 2\nrepeated = [1] * 2\nwidened = count == 1\nif false\n  bad = 1 - \"one\"\nend\nputs \"reached the end\"\n",
@@ -1638,6 +1643,20 @@ fn integer_division_by_zero_refuses_in_rubys_words() {
         ("p(1.0.modulo(0.0))\n", "divided by 0"),
     ];
     assert_both_oracles_refuse("integer_division_by_zero.pdx", None, &cases);
+}
+
+/// Unary plus (#108): a number's `+@` is itself, as in Ruby, a literal or
+/// any operand; anything else refuses in unary minus's words. A string's
+/// `+@` exists in Ruby to unfreeze, and values never mutate (ADR 0015).
+#[test]
+fn unary_plus_answers_the_number_itself() {
+    assert_evaluator_matches_seed(
+        "evaluator_unary_plus.pdx",
+        "p(+34.56)\np(+-34.56)\np(-+34.56)\np(+0.0)\np(+-0.0)\nnumber = 5\np(+number)\np(+2 ** 2)\np(+number.abs)\np(3 + +2)\n",
+    );
+    // The seed names the value at run, the checker the type at build.
+    let cases = [("p(+\"pdx\")\n", "cannot apply '+' to ")];
+    assert_both_oracles_refuse("unary_plus_refusal.pdx", None, &cases);
 }
 
 /// A float `%` is Ruby's `flomod`: a zero keeps its sign, an infinite

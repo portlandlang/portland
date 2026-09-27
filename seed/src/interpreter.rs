@@ -1826,6 +1826,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     (UnaryOperator::Negate, Value::Float(value)) => Some(Value::Float(-value)),
                     (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
+                    (UnaryOperator::Plus, number @ (Value::Integer(_) | Value::Float(_))) => {
+                        Some(number)
+                    }
                     (operator, operand) => {
                         panic!("cannot apply '{}' to {}", operator.glyph(), operand.shown())
                     }

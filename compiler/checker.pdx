@@ -1329,13 +1329,13 @@ def operator_takes?(operator, left, right)
   end
 end
 
-# `!` takes a boolean and `-` a number; the seed refuses the rest.
+# `!` takes a boolean, and `-` and `+` a number; the seed refuses the rest.
 def check_unary(node, scope, found)
   operand = synthesize(node.operand, known_types(scope))
   return found unless plain_value?(operand)
   return found if node.operator == "!" && operand == ["boolean"]
-  return found if node.operator == "-" && numeric?(operand)
-  return found unless node.operator == "!" || node.operator == "-"
+  return found if (node.operator == "-" || node.operator == "+") && numeric?(operand)
+  return found unless node.operator == "!" || node.operator == "-" || node.operator == "+"
   noted(found, ["unary", node.operator, operand], locate(node, scope))
 end
 

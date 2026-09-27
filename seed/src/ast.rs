@@ -139,6 +139,7 @@ pub enum LogicalOperator {
 pub enum UnaryOperator {
     Negate,
     Not,
+    Plus,
 }
 
 impl UnaryOperator {
@@ -147,6 +148,7 @@ impl UnaryOperator {
         match self {
             UnaryOperator::Negate => "-",
             UnaryOperator::Not => "!",
+            UnaryOperator::Plus => "+",
         }
     }
 }

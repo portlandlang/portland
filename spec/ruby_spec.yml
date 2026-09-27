@@ -214,6 +214,11 @@ core/float/uminus_spec.rb:
   status: partial_intentional
   reason: "-x is spelled as the operator rather than send(:-@), and infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
   link: docs/ruby/metaprogramming.md
+core/float/uplus_spec.rb:
+  pdx: [spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "+x is spelled as the operator rather than send(:+@), and -0.0's sign is asked of 1.0 divided by it."
+  link: docs/ruby/metaprogramming.md
 core/float/constants_spec.rb:
   pdx: [spec/number/float/constants_spec.pdx]
   status: partial_intentional
@@ -314,7 +319,7 @@ core/hash/to_a_spec.rb:
 core/integer/abs_spec.rb:
   pdx: [spec/number/integer/abs_spec.pdx]
   status: partial_intentional
-  reason: "No bignums (integers are i64), and unary plus does not parse."
+  reason: "No bignums (integers are i64)."
 core/integer/comparison_spec.rb:
   pdx: [spec/number/integer/spaceship_spec.pdx]
   status: partial_intentional

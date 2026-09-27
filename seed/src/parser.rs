@@ -2614,6 +2614,15 @@ impl<'source> Parser<'source> {
                 operator: UnaryOperator::Negate,
             };
         }
+        // Unary plus (#108): a number's `+@` is itself, so where it binds
+        // against `**` changes no answer — it takes minus's path.
+        if self.peek_kind() == Some(TokenKind::Plus) {
+            self.position += 1;
+            return Expression::Unary {
+                operand: Box::new(self.unary()),
+                operator: UnaryOperator::Plus,
+            };
+        }
         self.exponent_operand()
     }
 

@@ -1,6 +1,6 @@
 # A float's sign and its conversions (#108), from ruby/spec core/float:
 # abs and magnitude (through upstream's shared float_abs), positive?,
-# negative?, unary minus, to_f, to_i (through float_to_i), inspect, ==, and
+# negative?, unary minus and plus, to_f, to_i (through float_to_i), inspect, ==, and
 # ===. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0; a positive zero is one that
 # 1.0 divides into positive infinity. `infinite?` answers true or false
 # here, so upstream's 1 and -1 are asked as a sign. Alias checks compare the
@@ -111,6 +111,14 @@ context "Float#-@" do
   specify "returns NaN for NaN" do
     nan = 0.0 / 0.0
     expect((-nan).nan?).to eq(true)
+  end
+end
+
+context "Float#+@" do
+  specify "returns the same value with same sign (twos complement)" do
+    expect(+34.56).to eq(34.56)
+    expect(+-34.56).to eq(-34.56)
+    expect(positive_zero?(+0.0)).to eq(true)
   end
 end
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Unary plus** ([#108](https://github.com/portlandlang/portland/issues/108)) — `+x` is a number's identity, as in Ruby: `+34.56`, `+-34.56`, `3 + +2`, and `+0.0` keeping its sign. On anything else it refuses in unary minus's words (`cannot apply '+' to String`), since a string's `+@` exists in Ruby to unfreeze and values never mutate (ADR 0015). ruby/spec's `core/float/uplus_spec.rb` ports into `sign_spec.pdx`, and `core/integer/abs_spec.rb` takes in its `+2` rows.
+
 - **ruby/spec's core/float divmod, modulo, fdiv, and quo ported** ([#108](https://github.com/portlandlang/portland/issues/108)) — nineteen examples in `spec/number/float/division_spec.pdx`, passing on both implementations. The examples that need a raise, a bignum, a Rational, a Complex, or a coercing mock stay upstream, each file `partial_intentional` with its reason.
 
 - **A float `%` is Ruby's** ([#108](https://github.com/portlandlang/portland/issues/108)) — `a - b * (a / b).floor` gave the wrong last digits (`6543.21 % 137.24`), lost a zero's sign (`-0.0 % 42`), and answered NaN for an infinite modulus. Now it follows Ruby's `flomod`: `4.2 % Float::INFINITY` is `4.2`, `4.2 % -Float::INFINITY` is `-Infinity`, and a zero modulus refuses with `divided by 0` even between floats, where it had answered NaN.

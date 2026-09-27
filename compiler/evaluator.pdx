@@ -1106,6 +1106,8 @@ def evaluate_unary(node, bindings)
   operand = slot_value(step.value)
   result = if node.operator == "!"
     !operand
+  elsif node.operator == "+"
+    +operand
   else
     # The host's own negation, not `0 - operand`: that loses a float
     # zero's sign and words an overflow as a subtraction.
