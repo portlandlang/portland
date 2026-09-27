@@ -1812,7 +1812,8 @@ end
 # a `::` path, a paren call, a block-handed call, or a bare name.
 def parse_identifier_primary(tokens, position, name)
   after = position + 1
-  if operator_at?(tokens, after, ["::"])
+  # The `::` is attached; a spaced one starts a `::Name` of its own (#147).
+  if operator_at?(tokens, after, ["::"]) && !tokens[after].leading_space
     parse_path(tokens, name, after)
   elsif operator_at?(tokens, after, %w[(])
     arguments = parse_arguments(tokens, after + 1)
@@ -1889,6 +1890,13 @@ def parse_primary(tokens, position)
       parse_array(tokens, after)
     elsif token.text == "{"
       parse_hash(tokens, after)
+    # `::Rails` — the top-level name (#147); no-shadow already makes it the
+    # only reading of `Rails`, so it is a second spelling. The seed's words.
+    elsif token.text == "::"
+      unless after < tokens.length && tokens[after].identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(tokens[after].text.slice(0, 1))
+        return Step.new(node: error_node("a leading '::' names a top-level constant or type — write '::Name'"), position: after)
+      end
+      parse_primary(tokens, after)
     else
       Step.new(node: error_node("unexpected #{token.kind} #{token.text}"), position: after)
     end
@@ -2151,7 +2159,8 @@ def command_start?(tokens, position)
   # leftover token instead (#46).
   when "float", "integer", "string", "symbol", "symbol_array", "word_array", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
-  when "operator" then token.text == "!"
+  # `p ::Config` — a spaced `::` starts a top-level name (#147).
+  when "operator" then token.text == "!" || (token.text == "::" && token.leading_space)
   else
     false
   end

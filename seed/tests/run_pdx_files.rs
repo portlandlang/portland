@@ -1683,6 +1683,22 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
     );
 }
 
+/// A leading `::` names the top-level constant or type (#147), a second
+/// spelling of the bare name since no-shadow allows no other reading; an
+/// attached `::` still reaches inside a namespace.
+#[test]
+fn leading_colons_name_the_top_level_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_leading_colons.pdx",
+        "TOP = 1\np ::TOP\nmodule Config\n  LIMIT = 4\n  def self.twice = LIMIT * 2\nend\nx = ::Config::LIMIT\np x\np(::TOP + 1)\np ::Config.twice\n",
+    );
+    let cases = [(
+        "p ::nope\n",
+        "a leading '::' names a top-level constant or type — write '::Name'",
+    )];
+    assert_both_oracles_refuse("leading_colons_refusal.pdx", None, &cases);
+}
+
 /// The compact nested form, `class Deck::Card` (#146), is `module Deck`
 /// holding `class Card`, as `module A::B` is its nested blocks (ADR 0021).
 #[test]

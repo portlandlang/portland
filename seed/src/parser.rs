@@ -568,6 +568,8 @@ impl<'source> Parser<'source> {
             | TokenKind::SymbolArray
             | TokenKind::WordArray => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
+            // `p ::Config` — a spaced `::` starts a top-level name (#147).
+            TokenKind::ColonColon => next.leading_space,
             TokenKind::Minus if next.leading_space => {
                 // `foo - 1` is subtraction; `foo -1` would be a guess.
                 let after = self.tokens.get(self.position + 2)?;
@@ -2711,8 +2713,26 @@ impl<'source> Parser<'source> {
                 let value = float_literal(token.text);
                 Expression::Float(value)
             }
-            // `Foo::Bar` — naming a name inside a namespace (ADR 0021).
-            TokenKind::Identifier if self.peek_kind() == Some(TokenKind::ColonColon) => {
+            // `::Rails` — the top-level name (#147). No-shadow already makes
+            // it the only reading of `Rails`, so it is a second spelling.
+            TokenKind::ColonColon => {
+                let next = self.tokens.get(self.position).copied();
+                if !next.is_some_and(|name| {
+                    name.kind == TokenKind::Identifier
+                        && name
+                            .text
+                            .starts_with(|character: char| character.is_ascii_uppercase())
+                }) {
+                    panic!("a leading '::' names a top-level constant or type — write '::Name'");
+                }
+                self.primary()
+            }
+            // `Foo::Bar` — naming a name inside a namespace (ADR 0021). The
+            // `::` is attached; a spaced one starts a `::Name` of its own.
+            TokenKind::Identifier
+                if self.peek_kind() == Some(TokenKind::ColonColon)
+                    && !self.tokens[self.position].leading_space =>
+            {
                 if !token.text.chars().next().unwrap().is_ascii_uppercase() {
                     panic!("only namespaces have `::` names, got {}", token.text);
                 }
