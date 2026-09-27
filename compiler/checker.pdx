@@ -502,6 +502,8 @@ def declared_constants(nodes, home)
   mutable names = []
   nodes.each do |node|
     names += declared_constants(node.body, qualified_under(home, node.path.join("::"))) if node in ModuleDefNode
+    # A type's constants (#145), and its nested types', live under it.
+    names += declared_constants(node.constants + node.nested, qualified_under(home, node.name)) if node in StructDefNode
     names << qualified_under(home, node.name) if constant_declaration?(node)
   end
   names

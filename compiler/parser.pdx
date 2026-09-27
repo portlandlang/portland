@@ -613,12 +613,16 @@ struct StructDefNode
   methods
   nested
   type_functions
+  # `NAME = value` lines in the body (#145): the type's constants, each an
+  # AssignmentNode, in the order written.
+  constants
   line
 
   include Sexp
 
   def sexp
     mutable result = "(struct #{name} #{fields.join(" ")}"
+    result << " #{sexp_list(constants)}" unless constants.empty?
     result << " (include #{includes.join(" ")})" unless includes.empty?
     result << " #{sexp_list(methods)}" unless methods.empty?
     result << " #{sexp_list(type_functions)}" unless type_functions.empty?
@@ -1018,8 +1022,8 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, includes, methods, nested, type_functions, line: nil)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions, line: line)
+def struct_def_node(name, fields, includes, methods, nested, type_functions, constants: [], line: nil)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions, constants: constants, line: line)
 end
 
 def trait_def_node(name, methods, line: nil)
@@ -2838,7 +2842,15 @@ def parse_struct(tokens, mutable position)
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable fields = []
+  mutable constants = []
   while position < tokens.length && tokens[position].identifier?
+    # `KINDS = value` — the type's constant (#145), anywhere in the body.
+    if type_constant_at?(tokens, position)
+      constant = parse_type_constant(tokens, position)
+      constants << constant.node
+      position = skip_newlines_at(tokens, constant.position)
+      next
+    end
     # Ruby's visibility words would otherwise read as fields named
     # `private` — a spelling quietly meaning something else (#132).
     if visibility_word?(tokens[position].text)
@@ -2857,8 +2869,12 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
-    if tokens[position].identifier?
+  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || type_constant_at?(tokens, position) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
+    if type_constant_at?(tokens, position)
+      constant = parse_type_constant(tokens, position)
+      constants << constant.node
+      position = skip_newlines_at(tokens, constant.position)
+    elsif tokens[position].identifier?
       refusal = visibility_refusal(tokens[position].text) if refusal.nil?
       position = skip_newlines_at(tokens, position + 1)
     elsif keyword_at?(tokens, position, %w[alias])
@@ -2907,10 +2923,21 @@ def parse_struct(tokens, mutable position)
   end
   if keyword_at?(tokens, position, %w[end])
     return Step.new(node: error_node(refusal), position: position + 1) unless refusal.nil?
-    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, line: line), position: position + 1)
+    return Step.new(node: struct_def_node(name, fields, includes, methods, nested, type_functions, constants: constants, line: line), position: position + 1)
   end
   return Step.new(node: error_node(refusal), position: position) unless refusal.nil?
   Step.new(node: error_node("expected end to close struct #{name}"), position: position)
+end
+
+def type_constant_at?(tokens, position)
+  position < tokens.length && tokens[position].identifier? && constant_name?(tokens[position].text) && operator_at?(tokens, position + 1, %w[=])
+end
+
+# `NAME = value` in a type body (#145), as an ordinary assignment node the
+# evaluator registers under the type, the way a module's is.
+def parse_type_constant(tokens, position)
+  value = parse_expression(tokens, position + 2)
+  Step.new(node: assignment_node(tokens[position].text, value.node, line: line_at(tokens, position)), position: value.position)
 end
 
 def visibility_word?(word) = %w[module_function private private_constant protected public].include?(word)

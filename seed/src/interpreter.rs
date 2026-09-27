@@ -670,11 +670,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// A SCREAMING_CASE name (ADR 0053): two characters or more, starting
     /// with a capital, all capitals, digits, and underscores.
     fn constant_name(name: &str) -> bool {
-        name.len() >= 2
-            && name.starts_with(|character: char| character.is_ascii_uppercase())
-            && name.chars().all(|character| {
-                character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
-            })
+        parser::constant_name(name)
     }
 
     fn lone_capital(name: &str) -> bool {
@@ -977,6 +973,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 None
             }
             Statement::StructDefinition {
+                constants,
                 fields,
                 includes,
                 methods,
@@ -1107,12 +1104,27 @@ impl<W: std::io::Write> Interpreter<W> {
                         }),
                     );
                 }
-                // A type nested in a type lives under it: `Outer::Inner`.
-                if !nested.is_empty() {
-                    self.module_path.push(name.clone());
-                    self.run_body(nested);
-                    self.module_path.pop();
+                // The type's constants (#145) live under it, `Token::KINDS`,
+                // bound once like a module's (ADR 0021, ADR 0053), each
+                // computed with the ones before it in reach.
+                self.module_path.push(name.clone());
+                for (constant, value) in constants {
+                    let value = self.value_of(value);
+                    let qualified = self.qualified(constant);
+                    if self.variables.contains_key(&qualified) && !self.redefinable {
+                        panic!("'{constant}' is a constant — it is bound once");
+                    }
+                    self.variables.insert(
+                        qualified,
+                        Binding {
+                            mutable: false,
+                            value,
+                        },
+                    );
                 }
+                // A type nested in a type lives under it: `Outer::Inner`.
+                self.run_body(nested);
+                self.module_path.pop();
                 None
             }
             // `together do ... end` (ADR 0029): serial today, and the oracle
@@ -1627,6 +1639,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 {
                     // A constant of an enclosing namespace (ADR 0021).
                     Some(binding.value.clone())
+                } else if let Some(value) = self.own_type_constant(name) {
+                    // A constant of the receiver's own type (#145), read
+                    // bare from its instance methods.
+                    Some(value)
                 } else if let Some(method) = self.own_struct_method(name) {
                     // Bare own-method calls inside a struct method (#27).
                     let (struct_name, receiver) = self.self_receiver.clone().unwrap();
@@ -3280,6 +3296,15 @@ impl<W: std::io::Write> Interpreter<W> {
             .get(struct_name)
             .and_then(|info| info.methods.get(name))
             .cloned()
+    }
+
+    /// The constant `name` of the current receiver's type (#145), if both
+    /// exist — `Token::KINDS` read as `KINDS` from a `Token` method.
+    fn own_type_constant(&self, name: &str) -> Option<Value> {
+        let (struct_name, _) = self.self_receiver.as_ref()?;
+        self.variables
+            .get(&format!("{struct_name}::{name}"))
+            .map(|binding| binding.value.clone())
     }
 
     /// Run one struct method: a fresh scope of the receiver's fields (bare,

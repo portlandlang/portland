@@ -50,6 +50,9 @@ pub enum Statement {
         name: String,
     },
     StructDefinition {
+        /// `NAME = value` lines in the body (#145): the type's constants,
+        /// `Token::KINDS`, in the order written.
+        constants: Vec<(String, Expression)>,
         fields: Vec<String>,
         /// Traits this struct includes (ADR 0028): their methods join the
         /// struct's own at registration, collisions refused by name.

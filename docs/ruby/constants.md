@@ -2,7 +2,7 @@
 
 **Summary:** `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
 
-**Status:** decided ([ADR 0053](../adr/0053-2026-09-24-constants.md), 2026-09-24), built in both oracles the same day; module constants were already [ADR 0021](../adr/0021-2026-07-24-namespaces-and-modules.md)'s.
+**Status:** decided ([ADR 0053](../adr/0053-2026-09-24-constants.md), 2026-09-24), built in both oracles the same day; module constants were already [ADR 0021](../adr/0021-2026-07-24-namespaces-and-modules.md)'s; a type body's constants follow the same rules ([#145](https://github.com/portlandlang/portland/issues/145), 2026-09-27).
 
 ## Ruby
 
@@ -25,6 +25,13 @@ end
 
 module Config
   LIMIT = 3                                        # Config::LIMIT, as before
+  DOUBLE = LIMIT * 2                               # the ones before it in reach
+end
+
+class Token
+  KINDS = %i[word space]                           # Token::KINDS
+  text
+  def known? = KINDS.include?(:word)               # bare from its own methods
 end
 ```
 

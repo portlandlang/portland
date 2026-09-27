@@ -79,6 +79,15 @@ struct ItFrame {
 /// The name inside a symbol token: `:paid` → `paid`, `:"odd key"` → `odd key`.
 /// No interpolation, so the quoted form needs no escape handling beyond the
 /// surrounding quotes (ADR 0023 §2).
+/// A constant's spelling (ADR 0053): SCREAMING_CASE, two characters or more.
+pub fn constant_name(name: &str) -> bool {
+    name.len() >= 2
+        && name.starts_with(|character: char| character.is_ascii_uppercase())
+        && name.chars().all(|character| {
+            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+        })
+}
+
 /// A numeric literal's digits, underscores shed — the lexer has already
 /// refused any underscore not sitting between digits (#71) — and a base
 /// prefix folded: `0x`, `0b`, `0o`, either case (#72, ADR 0050).
@@ -1019,11 +1028,26 @@ impl<'source> Parser<'source> {
         self.expect_statement_boundary();
         self.skip_newlines();
         let mut fields: Vec<String> = Vec::new();
+        let mut constants: Vec<(String, Expression)> = Vec::new();
         let mut includes: Vec<String> = Vec::new();
         let mut methods: Vec<Statement> = Vec::new();
         let mut nested: Vec<Statement> = Vec::new();
         let mut type_functions: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
+            // `KINDS = value` — the type's constant (#145), anywhere in the
+            // body, as a module's is (ADR 0021, ADR 0053).
+            if let Some(token) = self.tokens.get(self.position)
+                && token.kind == TokenKind::Identifier
+                && constant_name(token.text)
+                && self.peek_kind_at(1) == Some(TokenKind::Equal)
+            {
+                let constant = token.text.to_string();
+                self.position += 2; // the name and the `=`
+                constants.push((constant, self.expression()));
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                continue;
+            }
             // `include TraitName` — a declaration, not a call (ADR 0028).
             if self.peek_is_keyword("include") {
                 self.position += 1; // the `include`
@@ -1191,6 +1215,7 @@ impl<'source> Parser<'source> {
         }
         self.position += 1; // the `end`
         Statement::StructDefinition {
+            constants,
             fields,
             includes,
             methods,

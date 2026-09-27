@@ -532,6 +532,16 @@ end
 # as the seed does; `__home__` carries the namespace a method was written
 # in so its bare names resolve outward.
 
+# A constant of the current receiver's type (#145), read bare from its
+# instance methods — `Token::KINDS` as `KINDS` — or no slot.
+def own_type_constant(bindings, name)
+  self_slot = lookup(bindings, "__self__")
+  return [] if self_slot.empty?
+
+  receiver = value_at(self_slot.first, 2)
+  lookup(bindings, "#{value_at(receiver, 1)}::#{name}")
+end
+
 def home_of(bindings)
   slot = lookup(bindings, "__home__")
   return "" if slot.empty?
@@ -607,7 +617,7 @@ def register_in_namespace(statement, home, mutable bindings)
     found = lookup(bindings, qualify(home, old_name))
     panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
     [[qualify(home, new_name), "method", found.first[2]]] + declare(qualify(home, new_name), bindings)
-  in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:)
+  in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:, constants:)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
@@ -620,6 +630,11 @@ def register_in_namespace(statement, home, mutable bindings)
     # names inside resolve outward from it, sibling type functions included.
     type_functions.each do |function|
       result = [["#{inner_home}::#{function.name}", "method", [function.parameters, function.body, inner_home]]] + result
+    end
+    # The type's constants (#145) register under it as a module's do,
+    # `Token::KINDS`, each computed with the ones before it in reach.
+    constants.each do |constant|
+      result = register_in_namespace(constant, inner_home, result)
     end
     nested.each do |inner|
       result = register_in_namespace(inner, inner_home, result)
@@ -638,9 +653,11 @@ def register_in_namespace(statement, home, mutable bindings)
   in AssignmentNode(name:, value:)
     # A module's constant is bound once, like the top level's (ADR 0053).
     panic("'#{name}' is a constant — it is bound once") unless lookup(bindings, qualify(home, name)).empty?
-    step = evaluate_expression(value, bindings)
+    # Its value is computed from inside the namespace, so the constants
+    # written before it resolve bare — `DOUBLE = LIMIT * 2`, as the seed.
+    step = evaluate_expression(value, [["__home__", "home", home]] + bindings)
     # "constant" rather than "local" so it survives a fresh method scope.
-    [[qualify(home, name), "constant", slot_value(step.value)]] + declare(qualify(home, name), step.bindings)
+    [[qualify(home, name), "constant", slot_value(step.value)]] + declare(qualify(home, name), bindings)
   # Nested or module-housed enums register their cases unqualified — the
   # seed looks a case up across every declaration, since a bare `:paid`
   # says nothing about which vocabulary it came from.
@@ -784,6 +801,7 @@ def evaluate_expression(node, bindings)
   in IdentifierNode(name:)
     mutable slot = lookup(bindings, name)
     slot = resolve(bindings, name) if slot.empty?
+    slot = own_type_constant(bindings, name) if slot.empty?
     if slot.empty? || slot.first[1] == "method"
       evaluate_call(call_node(name, []), bindings)
     else

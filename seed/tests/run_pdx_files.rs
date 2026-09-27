@@ -1683,6 +1683,22 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
     );
 }
 
+/// A type body holds constants (#145), ADR 0053's rules in a third home:
+/// `Token::KINDS` from outside, bare from the type's own methods and type
+/// functions, bound once.
+#[test]
+fn constants_in_a_type_body_on_both_oracles() {
+    assert_evaluator_matches_seed(
+        "evaluator_type_constants.pdx",
+        "class Token\n  KINDS = %i[word space]\n  LIMIT = 3\n  ALL = KINDS.length + LIMIT\n  text\n  def known? = KINDS.length == 2\n  def self.limit = LIMIT\nend\np Token::KINDS\np Token::ALL\np Token.new(text: \"a\").known?\np Token.limit\nmodule Shop\n  struct Price\n    CURRENCY = \"USD\"\n    cents\n    def label = \"#{cents} #{CURRENCY}\"\n  end\nend\np Shop::Price::CURRENCY\np Shop::Price.new(cents: 5).label\n",
+    );
+    let cases = [(
+        "class Token\n  LIMIT = 3\n  LIMIT = 4\n  text\nend\n",
+        "'LIMIT' is a constant — it is bound once",
+    )];
+    assert_both_oracles_refuse("type_constant_refusal.pdx", None, &cases);
+}
+
 /// `yield` hands values to the block (#144), paren-less or in parens, as
 /// Ruby does: named parameters take them, and `it` takes a lone one.
 #[test]
