@@ -1,5 +1,5 @@
-# A float's named division (#108), from ruby/spec core/float: divmod, % and
-# modulo, fdiv, and quo. Upstream's be_close is close_to? here, at mspec's
+# A float's named division and its power (#108), from ruby/spec core/float:
+# divmod, % and modulo, fdiv, quo, and **. Upstream's be_close is close_to? here, at mspec's
 # own TOLERANCE. Where Ruby raises — ZeroDivisionError, FloatDomainError,
 # TypeError — Portland refuses, and a refusal ends a run rather than
 # answering an example, so those examples stay upstream; so do the ones
@@ -112,6 +112,15 @@ context "Float#fdiv" do
 
   specify "returns -0.0 when the argument is -Infinity" do
     expect(1.9999918.fdiv(-Float::INFINITY)).to eq(-0.0)
+  end
+end
+
+context "Float#**" do
+  specify "returns self raise to the other power" do
+    expect(close_to?(2.3 ** 3, 12.167)).to eq(true)
+    expect(close_to?(5.2 ** -1, 0.192307692307692)).to eq(true)
+    expect(close_to?(9.5 ** 0.5, 3.08220700148449)).to eq(true)
+    expect((9.5 ** 0xffffffff).to_s).to eq("Infinity")
   end
 end
 

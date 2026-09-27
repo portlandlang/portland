@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's `core/float/exponent_spec.rb` ported in part** ([#108](https://github.com/portlandlang/portland/issues/108)) — Float `**` answers as Ruby's does, `9.5 ** 0xffffffff` overflowing to Infinity included. The Complex example waits on #124.
+
 - **`next_float` and `prev_float`** ([#108](https://github.com/portlandlang/portland/issues/108)) — one IEEE step toward either infinity, Ruby's `nextafter`, a zero's sign included, on both implementations. ruby/spec's `core/float/next_float_spec.rb` and `prev_float_spec.rb` port whole to `spec/number/float/steps_spec.pdx`, their `rand` a fixed 0.37 so every run answers alike.
 
 - **Unary plus** ([#108](https://github.com/portlandlang/portland/issues/108)) — `+x` is a number's identity, as in Ruby: `+34.56`, `+-34.56`, `3 + +2`, and `+0.0` keeping its sign. On anything else it refuses in unary minus's words (`cannot apply '+' to String`), since a string's `+@` exists in Ruby to unfreeze and values never mutate (ADR 0015). ruby/spec's `core/float/uplus_spec.rb` ports into `sign_spec.pdx`, and `core/integer/abs_spec.rb` takes in its `+2` rows.
