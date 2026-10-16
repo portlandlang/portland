@@ -1,0 +1,40 @@
+# `Range.new` (#111, ADR 0058): the literal's two spellings as a function,
+# from ruby/spec core/range/new_spec.rb. A range holds integers or an open
+# end here, so the String rows wait on ranges over other orderables (#149);
+# the third argument is a Boolean, so the rows handing it a 1 or a symbol
+# refuse; the to_str and mock rows stay upstream.
+
+require_relative "../spec_helper"
+
+context "Range.new" do
+  specify "constructs a range using the given start and end" do
+    range = Range.new(1, 3)
+    expect(range).to eq(1..3)
+    expect(range.first).to eq(1)
+    expect(range.last).to eq(3)
+  end
+
+  specify "includes the end object when the third parameter is omitted or false" do
+    expect(Range.new(1, 3).to_a).to eq([1, 2, 3])
+    expect(Range.new(1, 3, false).to_a).to eq([1, 2, 3])
+    expect(Range.new(1, 3, true).to_a).to eq([1, 2])
+  end
+
+  describe "beginless/endless range" do
+    specify "allows beginless left boundary" do
+      range = Range.new(nil, 1)
+      expect(range.begin).to be_nil
+    end
+
+    specify "distinguishes ranges with included and excluded right boundary" do
+      range_exclude = Range.new(nil, 1, true)
+      range_include = Range.new(nil, 1, false)
+      expect(range_exclude).not_to eq(range_include)
+    end
+
+    specify "allows endless right boundary" do
+      range = Range.new(1, nil)
+      expect(range.end).to be_nil
+    end
+  end
+end

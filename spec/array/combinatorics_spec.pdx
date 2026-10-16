@@ -1,0 +1,175 @@
+# Ruby's combinatorics and cycle (#104), from ruby/spec
+# core/array/{combination,repeated_combination,permutation,repeated_permutation,product,cycle}_spec.rb.
+# Without a block each answers its arrangements as an array — there are no
+# enumerators (ADR 0055), so the enumerator-size rows stay upstream — and
+# with one hands them over in turn and answers the array; `cycle` takes a
+# count, since a cycle with no count never ends, so the unbounded rows stay
+# upstream with the StopIteration, to_int, and to_ary rows and the
+# mid-walk mutation rows (values never mutate).
+
+require_relative "../spec_helper"
+
+context "Array#combination" do
+  specify "returns self when a block is given" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.combination(2) { }).to eq(numbers)
+  end
+
+  specify "yields nothing for out of bounds length and return self" do
+    expect([1, 2, 3, 4].combination(5)).to eq([])
+    expect([1, 2, 3, 4].combination(-1)).to eq([])
+  end
+
+  specify "yields the expected combinations" do
+    expect([1, 2, 3, 4].combination(3).sort).to eq([[1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]])
+  end
+
+  specify "yields a copy of self if the argument is the size of the receiver" do
+    expect([1, 2, 3, 4].combination(4)).to eq([[1, 2, 3, 4]])
+  end
+
+  specify "yields [] when length is 0" do
+    expect([1, 2, 3, 4].combination(0)).to eq([[]])
+    expect([].combination(0)).to eq([[]])
+  end
+
+  specify "yields a partition consisting of only singletons" do
+    expect([1, 2, 3, 4].combination(1).sort).to eq([[1], [2], [3], [4]])
+  end
+end
+
+context "Array#repeated_combination" do
+  specify "returns self when a block is given" do
+    numbers = [10, 11, 12]
+    expect(numbers.repeated_combination(2) { }).to eq(numbers)
+  end
+
+  specify "yields nothing for negative length and return self" do
+    numbers = [10, 11, 12]
+    expect(numbers.repeated_combination(-1) { }).to eq(numbers)
+    expect(numbers.repeated_combination(-1)).to eq([])
+  end
+
+  specify "yields the expected repeated_combinations" do
+    expect([10, 11, 12].repeated_combination(2).sort).to eq([[10, 10], [10, 11], [10, 12], [11, 11], [11, 12], [12, 12]])
+    expect([10, 11, 12].repeated_combination(3).sort).to eq([[10, 10, 10], [10, 10, 11], [10, 10, 12], [10, 11, 11], [10, 11, 12], [10, 12, 12], [11, 11, 11], [11, 11, 12], [11, 12, 12], [12, 12, 12]])
+  end
+
+  specify "yields [] when length is 0" do
+    expect([10, 11, 12].repeated_combination(0)).to eq([[]])
+    expect([].repeated_combination(0)).to eq([[]])
+  end
+
+  specify "yields nothing when the array is empty and num is non zero" do
+    expect([].repeated_combination(5)).to eq([])
+  end
+
+  specify "yields a partition consisting of only singletons" do
+    expect([10, 11, 12].repeated_combination(1).sort).to eq([[10], [11], [12]])
+  end
+end
+
+context "Array#permutation" do
+  specify "yields all permutations to the block then returns self when called with block but no arguments" do
+    mutable yielded = []
+    answer = [1, 2, 3].permutation { |arrangement| yielded << arrangement }
+    expect(answer).to eq([1, 2, 3])
+    expect(yielded.sort).to eq([[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]])
+  end
+
+  specify "yields all permutations of given length to the block then returns self when called with block and argument" do
+    mutable yielded = []
+    answer = [1, 2, 3].permutation(2) { |arrangement| yielded << arrangement }
+    expect(answer).to eq([1, 2, 3])
+    expect(yielded.sort).to eq([[1, 2], [1, 3], [2, 1], [2, 3], [3, 1], [3, 2]])
+  end
+
+  specify "returns the empty permutation ([[]]) when the given length is 0" do
+    expect([1, 2, 3].permutation(0)).to eq([[]])
+  end
+
+  specify "returns the empty permutation([]) when called on an empty Array" do
+    expect([].permutation).to eq([[]])
+  end
+
+  specify "returns no permutations when the given length has no permutations" do
+    expect([1, 2, 3].permutation(9).length).to eq(0)
+  end
+
+  specify "handles duplicate elements correctly" do
+    expect([1, 2, 3, 1].permutation(2).sort).to eq([[1, 1], [1, 1], [1, 2], [1, 2], [1, 3], [1, 3], [2, 1], [2, 1], [2, 3], [3, 1], [3, 1], [3, 2]])
+  end
+end
+
+context "Array#repeated_permutation" do
+  specify "yields all repeated_permutations to the block then returns self when called with block but no arguments" do
+    mutable yielded = []
+    answer = [10, 11, 12].repeated_permutation(2) { |arrangement| yielded << arrangement }
+    expect(answer).to eq([10, 11, 12])
+    expect(yielded.sort).to eq([[10, 10], [10, 11], [10, 12], [11, 10], [11, 11], [11, 12], [12, 10], [12, 11], [12, 12]])
+  end
+
+  specify "yields the empty repeated_permutation ([[]]) when the given length is 0" do
+    expect([10, 11, 12].repeated_permutation(0)).to eq([[]])
+    expect([].repeated_permutation(0)).to eq([[]])
+  end
+
+  specify "does not yield when called on an empty Array with a nonzero argument" do
+    expect([].repeated_permutation(10)).to eq([])
+  end
+
+  specify "allows permutations larger than the number of elements" do
+    expect([1, 2].repeated_permutation(3).sort).to eq([[1, 1, 1], [1, 1, 2], [1, 2, 1], [1, 2, 2], [2, 1, 1], [2, 1, 2], [2, 2, 1], [2, 2, 2]])
+  end
+end
+
+context "Array#product" do
+  specify "returns the expected result" do
+    expect([1, 2].product([3, 4, 5], [6, 8])).to eq([[1, 3, 6], [1, 3, 8], [1, 4, 6], [1, 4, 8], [1, 5, 6], [1, 5, 8], [2, 3, 6], [2, 3, 8], [2, 4, 6], [2, 4, 8], [2, 5, 6], [2, 5, 8]])
+  end
+
+  specify "has no required argument" do
+    expect([1, 2].product).to eq([[1], [2]])
+  end
+
+  specify "returns an empty array when the argument is an empty array" do
+    expect([1, 2].product([])).to eq([])
+  end
+
+  describe "when given a block" do
+    specify "yields all combinations in turn" do
+      mutable seen = []
+      [1, 2].product([3, 4, 5], [6, 8]) { |arrangement| seen << arrangement }
+      expect(seen).to eq([[1, 3, 6], [1, 3, 8], [1, 4, 6], [1, 4, 8], [1, 5, 6], [1, 5, 8], [2, 3, 6], [2, 3, 8], [2, 4, 6], [2, 4, 8], [2, 5, 6], [2, 5, 8]])
+
+      mutable none = []
+      [1, 2].product([3, 4, 5], [], [6, 8]) { |arrangement| none << arrangement }
+      expect(none).to be_empty
+    end
+
+    specify "returns self" do
+      numbers = [1, 2, 3]
+      expect(numbers.product([1, 2]) { |pair| pair.first }).to eq(numbers)
+    end
+  end
+end
+
+context "Array#cycle" do
+  specify "does not yield and returns nil when the array is empty and passed value is an integer" do
+    mutable seen = []
+    expect([].cycle(6) { |element| seen << element }).to be_nil
+    expect(seen).to eq([])
+  end
+
+  specify "does not yield and returns nil when passed 0" do
+    mutable seen = []
+    expect([1, 2, 3].cycle(0) { |element| seen << element }).to be_nil
+    expect(seen).to eq([])
+  end
+
+  specify "iterates the array 'count' times yielding each item to the block" do
+    mutable seen = []
+    [1, 2, 3].cycle(2) { |element| seen << element }
+    expect(seen).to eq([1, 2, 3, 1, 2, 3])
+  end
+end

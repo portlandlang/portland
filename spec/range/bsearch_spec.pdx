@@ -1,0 +1,77 @@
+# Binary search over a range's integers (#111), from ruby/spec
+# core/range/bsearch_spec.rb, its Integer rows: Ruby's two modes by what
+# the block answers. A range holds integers here, so the Float and endless
+# rows wait on ranges over other orderables (#149); without a block there
+# are no enumerators (ADR 0055); the String-range and Object rows refuse
+# at the literal.
+
+require_relative "../spec_helper"
+
+context "Range#bsearch" do
+  describe "with Integer values" do
+    describe "with a block returning true or false" do
+      specify "returns nil if the block returns false for every element" do
+        expect((0...3).bsearch { |x| x > 3 }).to be_nil
+      end
+
+      specify "returns nil if the block returns nil for every element" do
+        expect((0..3).bsearch { |x| nil }).to be_nil
+      end
+
+      specify "returns minimum element if the block returns true for every element" do
+        expect((-2..4).bsearch { |x| x < 4 }).to eq(-2)
+      end
+
+      specify "returns the smallest element for which block returns true" do
+        expect((0..4).bsearch { |x| x >= 2 }).to eq(2)
+        expect((-1..4).bsearch { |x| x >= 1 }).to eq(1)
+      end
+
+      specify "returns the last element if the block returns true for the last element" do
+        expect((0..4).bsearch { |x| x >= 4 }).to eq(4)
+        expect((0...4).bsearch { |x| x >= 3 }).to eq(3)
+      end
+    end
+
+    describe "with a block returning negative, zero, positive numbers" do
+      specify "returns nil if the block returns less than zero for every element" do
+        expect((0..3).bsearch { |x| x <=> 5 }).to be_nil
+      end
+
+      specify "returns nil if the block returns greater than zero for every element" do
+        expect((0..3).bsearch { |x| x <=> -1 }).to be_nil
+      end
+
+      specify "returns nil if the block never returns zero" do
+        expect((0..3).bsearch { |x| x < 2 ? 1 : -1 }).to be_nil
+      end
+
+      specify "accepts (+/-)Float::INFINITY from the block" do
+        expect((0..4).bsearch { |x| Float::INFINITY }).to be_nil
+        expect((0..4).bsearch { |x| -Float::INFINITY }).to be_nil
+      end
+
+      specify "returns an element at an index for which block returns 0.0" do
+        result = (0..4).bsearch { |x| x < 2 ? 1.0 : (x > 2 ? -1.0 : 0.0) }
+        expect(result).to eq(2)
+      end
+
+      specify "returns an element at an index for which block returns 0" do
+        result = (0..4).bsearch { |x| x < 1 ? 1 : (x > 3 ? -1 : 0) }
+        expect([1, 2].include?(result)).to be_true
+      end
+    end
+
+    specify "returns nil for empty ranges" do
+      expect((0...0).bsearch { true }).to be_nil
+      expect((0...0).bsearch { false }).to be_nil
+      expect((0...0).bsearch { 1 }).to be_nil
+      expect((0...0).bsearch { 0 }).to be_nil
+      expect((0...0).bsearch { -1 }).to be_nil
+      expect((4..2).bsearch { true }).to be_nil
+      expect((4..2).bsearch { 1 }).to be_nil
+      expect((4..2).bsearch { 0 }).to be_nil
+      expect((4..2).bsearch { -1 }).to be_nil
+    end
+  end
+end

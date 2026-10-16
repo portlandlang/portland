@@ -197,6 +197,26 @@ core/array/detect_spec.rb:
   status: partial_intentional
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
+core/array/bsearch_spec.rb:
+  pdx: [spec/array/bsearch_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block there are no enumerators; break carries no value (ADR 0012); the bignum rows wait on #156."
+  link: docs/ruby/enumerators.md
+core/array/bsearch_index_spec.rb:
+  pdx: [spec/array/bsearch_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block there are no enumerators; the bignum and coerce rows wait on #156 and #155."
+  link: docs/ruby/enumerators.md
+core/array/combination_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block the arrangements come back as an array, not an enumerator with a size; values never mutate, so the mid-walk mutation row stays upstream."
+  link: docs/ruby/enumerators.md
+core/array/cycle_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "cycle takes a count — a cycle with no count never ends, so the unbounded rows refuse on arity; the StopIteration, to_int, and type-check rows stay upstream."
+  link: docs/ruby/enumerators.md
 core/array/none_spec.rb:
   status: skipped
   reason: "Its examples grow the array mid-walk and pass a pattern beside a block; values never mutate, and none? takes a true-or-false block."
@@ -246,6 +266,26 @@ core/array/minmax_spec.rb:
   status: partial_intentional
   reason: "An incomparable or incompatible pair refuses where Ruby raises NoMethodError or ArgumentError."
   link: docs/ruby/errors.md
+core/array/permutation_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block the arrangements come back as an array, not an enumerator with a size; the Float-argument, nested-array, and mid-walk mutation rows stay upstream."
+  link: docs/ruby/enumerators.md
+core/array/product_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "The to_ary and method_missing conversions (ADR 0036) and the unreasonable-size RangeError rows stay upstream."
+  link: docs/ruby/aliases.md
+core/array/repeated_combination_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block the arrangements come back as an array, not an enumerator with a size; the Float-argument and mid-walk mutation rows stay upstream."
+  link: docs/ruby/enumerators.md
+core/array/repeated_permutation_spec.rb:
+  pdx: [spec/array/combinatorics_spec.pdx]
+  status: partial_intentional
+  reason: "Without a block the arrangements come back as an array, not an enumerator with a size; the Float-argument and mid-walk mutation rows stay upstream."
+  link: docs/ruby/enumerators.md
 core/array/one_spec.rb:
   status: skipped
   reason: "Its examples grow the array mid-walk and pass a pattern beside a block; values never mutate, and one? takes a true-or-false block."
@@ -452,6 +492,10 @@ core/enumerable/tally_spec.rb:
 
 # — core/false —
 
+core/false/and_spec.rb:
+  status: skipped
+  reason: "The & operator is out of the grammar (ADR 0003), on booleans as on integers; && and `and` are the boolean spellings, and conditions take booleans only."
+  link: docs/ruby/bitwise-operators.md
 core/false/case_compare_spec.rb:
   pdx: [spec/boolean/case_compare_spec.pdx]
   status: partial_intentional
@@ -470,6 +514,14 @@ core/false/inspect_spec.rb:
   status: partial_intentional
   reason: "inspect is a function, inspect(false), not a method (ADR 0026), so the example compares its answer rather than method objects."
   link: docs/ruby/inspect.md
+core/false/or_spec.rb:
+  status: skipped
+  reason: "The | operator is out of the grammar (ADR 0003), on booleans as on integers; || and `or` are the boolean spellings, and conditions take booleans only."
+  link: docs/ruby/bitwise-operators.md
+core/false/xor_spec.rb:
+  status: skipped
+  reason: "The ^ operator is out of the grammar (ADR 0003), on booleans as on integers; != is the boolean exclusive-or."
+  link: docs/ruby/bitwise-operators.md
 core/false/singleton_method_spec.rb:
   status: skipped
   reason: "Singleton methods are runtime metaprogramming, which Portland closes."
@@ -1280,6 +1332,16 @@ core/range/minmax_spec.rb:
   status: partial_intentional
   reason: "Ranges hold integers here; the mock, infinite, open-range, and comparator rows stay upstream."
   link: docs/ruby/ranges.md
+core/range/bsearch_spec.rb:
+  pdx: [spec/range/bsearch_spec.pdx]
+  status: partial_planned
+  reason: "A range holds integers, so the Float and endless rows wait on ranges over other orderables; without a block there are no enumerators, and the String-range and Object rows refuse at the literal."
+  link: https://github.com/portlandlang/portland/issues/149
+core/range/new_spec.rb:
+  pdx: [spec/range/construction_spec.pdx]
+  status: partial_planned
+  reason: "The ends are integers or nil until ranges over other orderables are decided; the third argument is a Boolean, so the 1 and symbol rows refuse; the to_str, mock, frozen, and subclass rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/149
 core/range/overlap_spec.rb:
   pdx: [spec/range/overlap_spec.pdx]
   status: partial_intentional
@@ -1820,6 +1882,13 @@ core/symbol/to_s_spec.rb:
   status: partial_intentional
   reason: "Operator and @-symbols (:[], :@ruby) don't exist (ADR 0023); the encoding and frozen-string examples stay behind."
   link: docs/ruby/symbols.md
+core/symbol/element_reference_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "An index with a length is spelled slice(start, length), as a string's is, and a slice past the end answers the empty string, never nil (ADR 0019); the to_int, Float, and nil rows stay upstream."
+  link: docs/ruby/ranges.md
+core/symbol/slice_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
 core/symbol/to_sym_spec.rb:
   status: skipped
   reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
@@ -1836,6 +1905,10 @@ core/symbol/equal_value_spec.rb:
 
 # — core/true —
 
+core/true/and_spec.rb:
+  status: skipped
+  reason: "The & operator is out of the grammar (ADR 0003), on booleans as on integers; && and `and` are the boolean spellings, and conditions take booleans only."
+  link: docs/ruby/bitwise-operators.md
 core/true/case_compare_spec.rb:
   pdx: [spec/boolean/case_compare_spec.pdx]
   status: partial_intentional
@@ -1850,6 +1923,14 @@ core/true/inspect_spec.rb:
   status: partial_intentional
   reason: "inspect is a function, inspect(true), not a method (ADR 0026), so the example compares its answer rather than method objects."
   link: docs/ruby/inspect.md
+core/true/or_spec.rb:
+  status: skipped
+  reason: "The | operator is out of the grammar (ADR 0003), on booleans as on integers; || and `or` are the boolean spellings, and conditions take booleans only."
+  link: docs/ruby/bitwise-operators.md
+core/true/xor_spec.rb:
+  status: skipped
+  reason: "The ^ operator is out of the grammar (ADR 0003), on booleans as on integers; != is the boolean exclusive-or."
+  link: docs/ruby/bitwise-operators.md
 core/true/singleton_method_spec.rb:
   status: skipped
   reason: "Singleton methods are runtime metaprogramming, which Portland closes."

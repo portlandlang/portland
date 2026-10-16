@@ -100,3 +100,62 @@ context "Symbol#===" do
     expect(:foo === :bar).to eq(:foo == :bar)
   end
 end
+
+# From core/symbol/{element_reference,slice}_spec.rb: a symbol indexes its
+# name as a string does. An index with a length is spelled `slice(start,
+# length)` here, as a string's is, and a slice past the end answers the
+# empty string, never nil (ADR 0019); the to_int, Float, and nil rows stay
+# upstream.
+context "Symbol#[]" do
+  describe "with an Integer index" do
+    specify "returns the character code of the element at the index" do
+      expect(:symbol[1]).to eq("y")
+    end
+
+    specify "returns nil if the index starts from the end and is greater than the length" do
+      expect(:symbol[-10]).to be_nil
+    end
+
+    specify "returns nil if the index is greater than the length" do
+      expect(:symbol[42]).to be_nil
+    end
+  end
+
+  describe "with an Integer index and length" do
+    describe "and a positive index and length" do
+      specify "returns a slice" do
+        expect(:symbol.slice(1, 3)).to eq("ymb")
+      end
+
+      specify "returns a blank slice if the length is 0" do
+        expect(:symbol.slice(0, 0)).to eq("")
+        expect(:symbol.slice(1, 0)).to eq("")
+      end
+
+      specify "returns a slice of all remaining characters if the given length is greater than the actual length" do
+        expect(:symbol.slice(1, 100)).to eq("ymbol")
+      end
+    end
+
+    describe "and a negative index and positive length" do
+      specify "returns a slice starting from the end upto the length" do
+        expect(:symbol.slice(-3, 2)).to eq("bo")
+      end
+
+      specify "returns a blank slice if the length is 0" do
+        expect(:symbol.slice(-1, 0)).to eq("")
+      end
+
+      specify "returns a slice of all remaining characters if the given length is larger than the actual length" do
+        expect(:symbol.slice(-4, 100)).to eq("mbol")
+      end
+    end
+  end
+end
+
+context "Symbol#slice" do
+  specify "is an alias of Symbol#[]" do
+    expect(:symbol.slice(1, 3)).to eq("ymb")
+    expect(:symbol.slice(1, 1)).to eq(:symbol[1])
+  end
+end
