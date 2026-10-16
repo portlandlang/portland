@@ -1413,15 +1413,6 @@ def values_at_of(receiver, arguments)
   arguments.flat_map { |position| receiver.values_at(position) }
 end
 
-# One step of a one-value walk the host drives — `each_key`, `each_value`,
-# `transform_keys`, `transform_values` (#105): the guest block's answer,
-# its rebindings left where the walk's caller compacts them. A recorded
-# gap (principle 4): a `break` or `return` inside stays inside the step.
-def guest_walk_step(block, handed, entry, scope)
-  step = run_guest_block(block, [handed], scope)
-  slot_value(step.value)
-end
-
 def count_of(receiver, arguments)
   return receiver.count if arguments.empty?
   receiver.count(value_at(arguments, 0))
@@ -1973,6 +1964,8 @@ def evaluate_method_call(node, mutable bindings)
     end
   when "except" then arguments.reduce(receiver) { |kept, key| kept.except(key) }
   when "invert" then receiver.invert
+  # Bare `any?` on a hash asks whether it holds a pair (#105).
+  when "any?" then receiver.any?
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))
   when "key" then receiver.key(value_at(arguments, 0))
   # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
@@ -2260,13 +2253,53 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
-  when "each_key", "each_value", "transform_keys", "transform_values"
-    results = case node.name
-    when "each_key" then receiver.each_key { |key| guest_walk_step(block, key, entry, scope) }
-    when "each_value" then receiver.each_value { |value| guest_walk_step(block, value, entry, scope) }
-    when "transform_keys" then receiver.transform_keys { |key| guest_walk_step(block, key, entry, scope) }
-    else receiver.transform_values { |value| guest_walk_step(block, value, entry, scope) }
+  # A hash's one-value walks (#105): each rides the host's by name, its
+  # rebindings threaded through like every other walk's.
+  when "each_key"
+    receiver.each_key do |key|
+      step = run_guest_block(block, [key], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
     end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "each_value"
+    receiver.each_value do |value|
+      step = run_guest_block(block, [value], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "transform_keys"
+    results = receiver.transform_keys do |key|
+      step = run_guest_block(block, [key], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  when "transform_values"
+    results = receiver.transform_values do |value|
+      step = run_guest_block(block, [value], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   # By its own name, since a hash's `find_all` answers its pairs as an
   # array where its `select` answers a hash (#105).

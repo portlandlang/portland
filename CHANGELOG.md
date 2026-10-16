@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The hosted language spec's tripwire is 150 seconds** — the #105 ports took the batch to 133 s against 130. Timed file by file, the hosted cost is about 0.15 s an example with no outlier, so the ceiling now says roughly a thousand examples.
+
+- **Twenty-five core/hash files ported, eighteen recorded as decided out** ([#105](https://github.com/portlandlang/portland/issues/105)) — `spec/hash/lookups_spec.pdx` (keys, values, key, value?, invert, compact, slice, each and kin, sort, size, empty?, to_a) and `spec/hash/selection_spec.pdx` (include? and its twins, any?, select, reject, except, values_at). Bare `any?` on a hash asks whether it holds a pair. The mutators and the class-object files are skipped with their rewrites.
+
 - **A hash's own methods** ([#105](https://github.com/portlandlang/portland/issues/105)) — on both implementations, answering as Ruby's do: `select`, `filter`, and `reject` answer a hash and hand a one-parameter block the key; `transform_keys` and `transform_values` rewrite one side, a later key winning a collision; `to_h` bare and with a block; `invert`, `compact`, `slice` and `except` of any number of keys, `has_value?`/`value?`, `key` (a maybe), `values_at`, `each_key`, and `each_value`. Keys match by `eql?` as a lookup's do, values by Ruby's `==`.
 
 - **A hash walks as its pairs** ([#105](https://github.com/portlandlang/portland/issues/105)) — Ruby's Enumerable over a hash, on both implementations: `map`, `flat_map`, `any?`/`all?`/`none?`/`one?`, `find`, `find_all`, `count`, `sum`, `min_by`/`max_by`, `sort_by`, `partition`, `first`, `sort`, `min`/`max`/`minmax`, `take`/`drop`, `take_while`, `zip`, `reduce`, `uniq`, and `tally` yield or answer `[key, value]` pairs, which a two-parameter block spreads (ADR 0057). `each_with_index` and `reverse_each` answer the hash itself, as Ruby's do. The names a hash answers for itself — `each`, `select`, `reject`, and kin — are unchanged. On the way: arrays take `count` with a block, and `sort` orders an array of arrays element by element.

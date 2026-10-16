@@ -642,7 +642,191 @@ core/hash/merge_spec.rb:
   reason: "merge! stays behind: values never mutate."
   link: docs/ruby/mutability.md
 core/hash/to_a_spec.rb:
-  pdx: [spec/hash/queries_spec.pdx]
+  pdx: [spec/hash/queries_spec.pdx, spec/hash/lookups_spec.pdx]
+core/hash/keys_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults; the is_a? checks are reflection; a nil key stays behind."
+  link: docs/ruby/metaprogramming.md
+core/hash/values_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "The is_a? check is reflection a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/key_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "The key? alias check compares method objects, which a closed runtime has none of; no Hash.new defaults; a mock's own == never takes over."
+  link: docs/ruby/metaprogramming.md
+core/hash/value_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults, so the default-value rows stay behind."
+  link: docs/ruby/lookups.md
+core/hash/has_value_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/invert_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults, default_proc, compare_by_identity, or subclasses."
+  link: docs/ruby/metaprogramming.md
+core/hash/compact_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "compact! stays behind, since values never mutate; no defaults, default_proc, compare_by_identity, or frozen hashes; identity is unobservable; a nil key stays behind."
+  link: docs/ruby/mutability.md
+core/hash/slice_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults, default_proc, subclasses, or identity."
+  link: docs/ruby/metaprogramming.md
+core/hash/each_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/each_pair_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "|*args| and |k,| do not parse (no splats, ADR 0014; no trailing comma); callables of a given arity and subclasses are method objects; blockless Enumerators stay behind (ADR 0055)."
+  link: docs/ruby/removed-syntax.md
+core/hash/each_key_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Blockless Enumerators stay behind (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/hash/each_value_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Blockless Enumerators stay behind (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/hash/sort_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+core/hash/size_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults; the in-place write is the rebinding sugar here, so the size question it asks stays behind."
+  link: docs/ruby/lookups.md
+core/hash/length_spec.rb:
+  pdx: [spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/empty_spec.rb:
+  pdx: [spec/hash/empty_spec.pdx, spec/hash/lookups_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults, so the default-value rows stay behind."
+  link: docs/ruby/lookups.md
+core/hash/include_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks stubbing hash and eql? stay behind; a nil key stays behind."
+  link: docs/ruby/metaprogramming.md
+core/hash/member_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/has_key_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/hash/any_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+core/hash/select_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "|*args| does not parse (no splats, ADR 0014); select! stays behind, since values never mutate; no defaults, default_proc, compare_by_identity, frozen hashes, or blockless Enumerators."
+  link: docs/ruby/removed-syntax.md
+core/hash/reject_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "|*args| does not parse (no splats, ADR 0014); reject! and delete_if stay behind, since values never mutate; no defaults, default_proc, compare_by_identity, subclasses, or blockless Enumerators."
+  link: docs/ruby/removed-syntax.md
+core/hash/except_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults, default_proc, or compare_by_identity; identity is unobservable."
+  link: docs/ruby/metaprogramming.md
+core/hash/values_at_spec.rb:
+  pdx: [spec/hash/selection_spec.pdx]
+  status: partial_intentional
+  reason: "The is_a? checks are reflection a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+# The mutators: values never mutate, names do (ADR 0015). Each rewrite
+# rebinds a mutable name — `table[key] = value` survives as that sugar.
+core/hash/store_spec.rb:
+  status: skipped
+  reason: "store mutates its receiver, and values never mutate (ADR 0015); table[key] = value rebinds a mutable name instead."
+  link: docs/ruby/mutability.md
+core/hash/delete_spec.rb:
+  status: skipped
+  reason: "delete mutates its receiver, and values never mutate (ADR 0015); table = table.except(key) rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/delete_if_spec.rb:
+  status: skipped
+  reason: "delete_if mutates its receiver, and values never mutate (ADR 0015); table = table.reject { ... } rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/keep_if_spec.rb:
+  status: skipped
+  reason: "keep_if mutates its receiver, and values never mutate (ADR 0015); table = table.select { ... } rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/clear_spec.rb:
+  status: skipped
+  reason: "clear mutates its receiver, and values never mutate (ADR 0015); table = {} rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/shift_spec.rb:
+  status: skipped
+  reason: "shift mutates its receiver, and values never mutate (ADR 0015); read table.first, then rebind table.except(key)."
+  link: docs/ruby/mutability.md
+core/hash/update_spec.rb:
+  status: skipped
+  reason: "update is merge! — it mutates its receiver, and values never mutate (ADR 0015); table = table.merge(other) rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/replace_spec.rb:
+  status: skipped
+  reason: "replace mutates its receiver in place, and values never mutate (ADR 0015); table = other rebinds instead."
+  link: docs/ruby/mutability.md
+core/hash/rehash_spec.rb:
+  status: skipped
+  reason: "rehash repairs a hash whose keys mutated after insertion; keys never mutate here (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/hash/compare_by_identity_spec.rb:
+  status: skipped
+  reason: "Identity is unobservable where values never mutate (ADR 0015): two equal keys are the same key."
+  link: docs/ruby/mutability.md
+core/hash/allocate_spec.rb:
+  status: skipped
+  reason: "There is no Hash class object to allocate from; a hash is a value."
+  link: docs/ruby/metaprogramming.md
+core/hash/initialize_spec.rb:
+  status: skipped
+  reason: "initialize's privacy and its calls on subclasses are the class object's; a hash is a value with no subclasses."
+  link: docs/ruby/metaprogramming.md
+core/hash/try_convert_spec.rb:
+  status: skipped
+  reason: "Hash.try_convert is the implicit-conversion protocol's entry point, and to_hash is a false alias that refuses naming to_h (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/hash/to_hash_spec.rb:
+  status: skipped
+  reason: "to_hash is Ruby's implicit-conversion protocol, a false alias that refuses naming to_h (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/hash/ruby2_keywords_hash_spec.rb:
+  status: skipped
+  reason: "ruby2_keywords_hash is a flag on the interpreter's keyword-splat plumbing; keyword arguments are Ruby 3's here with no splats (ADR 0014)."
+  link: docs/ruby/removed-syntax.md
+core/hash/to_proc_spec.rb:
+  status: skipped
+  reason: "to_proc answers a Proc, and whether a block can be held in a value is #77; a hash is not a callable."
+  link: docs/ruby/metaprogramming.md
+core/hash/deconstruct_keys_spec.rb:
+  status: skipped
+  reason: "deconstruct_keys is the pattern-matching protocol's hook for user types; struct patterns are keyword-only with no hook to call."
+  link: docs/ruby/pattern-matching.md
 
 # — core/integer —
 

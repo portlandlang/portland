@@ -1,0 +1,232 @@
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../spec_helper"
+
+context "Hash#keys" do
+  specify "returns an array with the keys in the order they were inserted" do
+    expect({}.keys).to eq([])
+    expect({1 => 2, 4 => 8, 2 => 4}.keys).to eq([1, 4, 2])
+  end
+
+  specify "uses the same order as #values" do
+    table = {1 => "1", 2 => "2", 3 => "3", 4 => "4"}
+    table.size.times do |index|
+      expect(table[table.keys[index]]).to eq(table.values[index])
+    end
+  end
+end
+
+context "Hash#values" do
+  specify "returns an array of values" do
+    table = {1 => :a, "a" => :a, "the" => "lang"}
+    expect(table.values.sort { |left, right| left.to_s <=> right.to_s }).to eq([:a, :a, "lang"])
+  end
+end
+
+context "Hash#key" do
+  specify "returns the corresponding key for value" do
+    expect({2 => "a", 1 => "b"}.key("b")).to eq(1)
+  end
+
+  specify "returns nil if the value is not found" do
+    expect({a: -1, b: 3.14, c: 2.718}.key(1)).to eq(nil)
+  end
+
+  specify "compares values using ==" do
+    expect({1 => 0}.key(0.0)).to eq(1)
+    expect({1 => 0.0}.key(0)).to eq(1)
+  end
+end
+
+context "Hash#value?" do
+  specify "returns true if the value exists in the hash" do
+    expect({a: :b}.value?(:a)).to eq(false)
+    expect({1 => 2}.value?(2)).to eq(true)
+  end
+
+  specify "uses == semantics for comparing values" do
+    expect({5 => 2.0}.value?(2)).to eq(true)
+  end
+end
+
+context "Hash#has_value?" do
+  specify "is an alias of Hash#value?" do
+    expect({1 => 2}.has_value?(2)).to eq({1 => 2}.value?(2))
+    expect({1 => 2}.has_value?(9)).to eq({1 => 2}.value?(9))
+  end
+end
+
+context "Hash#invert" do
+  specify "returns a new hash where keys are values and vice versa" do
+    expect({1 => "a", 2 => "b", 3 => "c"}.invert).to eq({"a" => 1, "b" => 2, "c" => 3})
+  end
+
+  specify "handles collisions by overriding with the key coming later in keys()" do
+    table = {a: 1, b: 1}
+    override_key = table.keys.last
+    expect(table.invert[1]).to eq(override_key)
+  end
+
+  specify "compares new keys with eql? semantics" do
+    inverted = {a: 1.0, b: 1}.invert
+    expect(inverted[1.0]).to eq(:a)
+    expect(inverted[1]).to eq(:b)
+  end
+end
+
+context "Hash#compact" do
+  table = {"truthy" => true, "false" => false, "nil" => nil}
+  compacted = {"truthy" => true, "false" => false}
+
+  specify "returns new object that rejects pair has nil value" do
+    expect(table.compact).to eq(compacted)
+  end
+
+  specify "keeps own pairs" do
+    table.compact
+    expect(table).to eq({"truthy" => true, "false" => false, "nil" => nil})
+  end
+end
+
+context "Hash#slice" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "returns a new empty hash without arguments" do
+    expect(table.slice).to eq({})
+  end
+
+  specify "returns the requested subset" do
+    expect(table.slice(:c, :a)).to eq({c: 3, a: 1})
+  end
+
+  specify "returns a hash ordered in the order of the requested keys" do
+    expect(table.slice(:c, :a).keys).to eq([:c, :a])
+  end
+
+  specify "returns only the keys of the original hash" do
+    expect(table.slice(:a, :chunky_bacon)).to eq({a: 1})
+  end
+end
+
+context "Hash#each" do
+  specify "is an alias of Hash#each_pair" do
+    mutable seen = []
+    mutable seen_pairwise = []
+    {a: 1, b: 2}.each { |key, value| seen = seen + [key, value] }
+    {a: 1, b: 2}.each_pair { |key, value| seen_pairwise = seen_pairwise + [key, value] }
+    expect(seen).to eq(seen_pairwise)
+  end
+end
+
+context "Hash#each_pair" do
+  specify "yields the key and value of each pair to a block expecting |key, value|" do
+    mutable rendered = {}
+    table = {a: 1, b: 2, c: 3, d: 5}
+    expect(table.each_pair { |key, value| rendered[key.to_s] = value.to_s }).to eq(table)
+    expect(rendered).to eq({"a" => "1", "b" => "2", "c" => "3", "d" => "5"})
+  end
+
+  specify "uses the same order as keys() and values()" do
+    table = {a: 1, b: 2, c: 3, d: 5}
+    mutable keys = []
+    mutable values = []
+    table.each_pair do |key, value|
+      keys = keys + [key]
+      values = values + [value]
+    end
+    expect(keys).to eq(table.keys)
+    expect(values).to eq(table.values)
+  end
+end
+
+context "Hash#each_key" do
+  specify "calls block once for each key, passing key" do
+    mutable seen = {}
+    table = {1 => -1, 2 => -2, 3 => -3, 4 => -4}
+    expect(table.each_key { |key| seen[key] = key }).to eq(table)
+    expect(seen).to eq({1 => 1, 2 => 2, 3 => 3, 4 => 4})
+  end
+
+  specify "processes keys in the same order as keys()" do
+    mutable keys = []
+    table = {1 => -1, 2 => -2, 3 => -3, 4 => -4}
+    table.each_key { |key| keys = keys + [key] }
+    expect(keys).to eq(table.keys)
+  end
+end
+
+context "Hash#each_value" do
+  specify "calls block once for each key, passing value" do
+    mutable seen = []
+    table = {a: -5, b: -3, c: -2, d: -1, e: -1}
+    expect(table.each_value { |value| seen = seen + [value] }).to eq(table)
+    expect(seen.sort).to eq([-5, -3, -2, -1, -1])
+  end
+
+  specify "processes values in the same order as values()" do
+    mutable values = []
+    table = {a: -5, b: -3, c: -2, d: -1, e: -1}
+    table.each_value { |value| values = values + [value] }
+    expect(values).to eq(table.values)
+  end
+end
+
+context "Hash#sort" do
+  specify "converts self to a nested array of [key, value] arrays and sort with Array#sort" do
+    expect({"a" => "b", "1" => "2", "b" => "a"}.sort).to eq([["1", "2"], ["a", "b"], ["b", "a"]])
+  end
+
+  specify "works when some of the keys are themselves arrays" do
+    expect({[1, 2] => 5, [1, 1] => 5}.sort).to eq([[[1, 1], 5], [[1, 2], 5]])
+  end
+
+  specify "uses block to sort array if passed a block" do
+    expect({1 => 2, 2 => 9, 3 => 4}.sort { |left, right| right <=> left }).to eq([[3, 4], [2, 9], [1, 2]])
+  end
+end
+
+context "Hash#size" do
+  specify "returns the number of entries" do
+    expect({a: 1, b: "c"}.size).to eq(2)
+    expect({a: 1, b: 1, c: 1}.size).to eq(3)
+    expect({}.size).to eq(0)
+  end
+end
+
+context "Hash#length" do
+  specify "is an alias of Hash#size" do
+    expect({a: 1, b: 2}.length).to eq({a: 1, b: 2}.size)
+    expect({}.length).to eq({}.size)
+  end
+end
+
+context "Hash#empty?" do
+  specify "returns true if the hash has no entries" do
+    expect({}.empty?).to eq(true)
+    expect({1 => 1}.empty?).to eq(false)
+  end
+end
+
+context "Hash#to_a" do
+  specify "returns a list of [key, value] pairs with same order as each()" do
+    table = {a: 1, 1 => :a, 3 => :b, b: 5}
+    mutable pairs = []
+    table.each_pair { |key, value| pairs = pairs + [[key, value]] }
+    expect(table.to_a).to eq(pairs)
+  end
+
+  specify "is called for Enumerable#entries" do
+    table = {a: 1, 1 => :a, 3 => :b, b: 5}
+    mutable pairs = []
+    table.each_pair { |key, value| pairs = pairs + [[key, value]] }
+    expect(table.entries).to eq(pairs)
+  end
+end

@@ -428,7 +428,7 @@ def call_answer(receiver, node, types)
   when "to_f", "fdiv", "quo", "next_float", "prev_float" then ["float"]
   when "to_s", "upcase", "downcase", "capitalize", "swapcase", "reverse", "strip", "lstrip", "rstrip", "chomp", "join", "inspect"
     synthesize_text_answer(receiver, name)
-  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "intersect?"
+  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "intersect?", "any?"
     ["boolean"]
   when "chars", "split", "lines" then ["array", ["string"]]
   when "keys"

@@ -1,0 +1,121 @@
+# Asking a hash which pairs it holds (#105), from ruby/spec core/hash:
+# include? and its twins member? and has_key?, any?, select, reject,
+# except, and values_at. Alias checks compare the two answers rather than
+# method objects. Staying upstream: `|*args|` and `|*pair|` (no splats, ADR
+# 0014), the bang mutators and delete_if (values never mutate), defaults,
+# default_proc, compare_by_identity, subclasses, identity, mocks stubbing
+# hash and eql?, is_a? checks, and blockless Enumerators (ADR 0055).
+
+require_relative "../spec_helper"
+
+context "Hash#include?" do
+  specify "returns true if argument is a key" do
+    table = {a: 1, b: 2, c: 3, 4 => 0}
+    expect(table.include?(:a)).to eq(true)
+    expect(table.include?(:b)).to eq(true)
+    expect(table.include?(2)).to eq(false)
+    expect(table.include?(4)).to eq(true)
+    expect(table.include?("b")).to eq(false)
+    expect(table.include?(4.0)).to eq(false)
+  end
+
+  specify "returns true if the key's matching value was nil" do
+    expect({xyz: nil}.include?(:xyz)).to eq(true)
+  end
+
+  specify "returns true if the key's matching value was false" do
+    expect({xyz: false}.include?(:xyz)).to eq(true)
+  end
+end
+
+context "Hash#member?" do
+  specify "is an alias of Hash#include?" do
+    expect({a: 1}.member?(:a)).to eq({a: 1}.include?(:a))
+    expect({a: 1}.member?(:b)).to eq({a: 1}.include?(:b))
+  end
+end
+
+context "Hash#has_key?" do
+  specify "is an alias of Hash#include?" do
+    expect({a: 1}.has_key?(:a)).to eq({a: 1}.include?(:a))
+    expect({a: 1}.has_key?(:b)).to eq({a: 1}.include?(:b))
+  end
+end
+
+context "Hash#any?" do
+  describe "with no block given" do
+    specify "checks if there are any members of a Hash" do
+      expect({}.any?).to eq(false)
+      expect({"key" => "value"}.any?).to eq(true)
+    end
+  end
+
+  describe "with a block given" do
+    specify "is false if the hash is empty" do
+      expect({}.any? { |key, value| 1 == 1 }).to eq(false)
+    end
+
+    specify "is true if the block returns true for any member of the hash" do
+      table = {"a" => false, "b" => false, "c" => true, "d" => false}
+      expect(table.any? { |key, value| value == true }).to eq(true)
+    end
+
+    specify "is false if the block returns false for all members of the hash" do
+      table = {"a" => false, "b" => false, "c" => true, "d" => false}
+      expect(table.any? { |key, value| value == 42 }).to eq(false)
+    end
+  end
+end
+
+context "Hash#select" do
+  specify "returns a Hash of entries for which block is true" do
+    even_pairs = {"a" => 9, "c" => 4, "b" => 5, "d" => 2}.select { |key, value| value % 2 == 0 }
+    expect(even_pairs.sort).to eq([["c", 4], ["d", 2]])
+  end
+
+  specify "processes entries with the same order as reject" do
+    table = {a: 9, c: 4, b: 5, d: 2}
+    mutable select_pairs = []
+    mutable reject_pairs = []
+    table.select do |key, value|
+      select_pairs = select_pairs + [[key, value]]
+      true
+    end
+    table.reject do |key, value|
+      reject_pairs = reject_pairs + [[key, value]]
+      true
+    end
+    expect(select_pairs).to eq(reject_pairs)
+  end
+end
+
+context "Hash#reject" do
+  specify "returns a new hash removing keys for which the block yields true" do
+    table = {1 => false, 2 => true, 3 => false, 4 => true}
+    expect(table.reject { |key, value| value }.keys.sort).to eq([1, 3])
+  end
+end
+
+context "Hash#except" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "returns a new duplicate hash without arguments" do
+    expect(table.except).to eq(table)
+  end
+
+  specify "returns a hash without the requested subset" do
+    expect(table.except(:c, :a)).to eq({b: 2})
+  end
+
+  specify "ignores keys not present in the original hash" do
+    expect(table.except(:a, :chunky_bacon)).to eq({b: 2, c: 3})
+  end
+end
+
+context "Hash#values_at" do
+  specify "returns an array of values for the given keys" do
+    table = {a: 9, b: "a", c: -10, d: nil}
+    expect(table.values_at).to eq([])
+    expect(table.values_at(:a, :d, :b)).to eq([9, nil, "a"])
+  end
+end

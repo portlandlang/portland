@@ -3399,6 +3399,9 @@ impl<W: std::io::Write> Interpreter<W> {
             // A hash's own answers (#105): keys match by `eql?` as a lookup's
             // do, values by Ruby's `==`.
             (hash @ Value::Hash(_), "to_h", []) => hash.clone(),
+            // Bare `any?` asks whether the hash holds a pair, as Ruby's
+            // does — every pair counts, so no truthiness is asked of one.
+            (Value::Hash(pairs), "any?", []) => Value::Boolean(!pairs.is_empty()),
             (Value::Hash(pairs), "invert", []) => array_pairs_to_hash(
                 pairs
                     .iter()
