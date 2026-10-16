@@ -117,6 +117,11 @@ core/array/sum_spec.rb:
   status: partial_intentional
   reason: "An addend + cannot take refuses where Ruby raises TypeError; a mock's own + never takes over a builtin's; values never mutate, so the array cannot grow mid-walk."
   link: docs/ruby/errors.md
+core/array/new_spec.rb:
+  pdx: [spec/array/construction_spec.pdx]
+  status: partial_intentional
+  reason: "No instance_of?, identity, or subclasses; no to_int or to_ary conversion (ADR 0036); a negative or too-large size refuses where Ruby raises; a fill beside a block refuses rather than the block winning; break with a value waits on ADR 0012."
+  link: docs/ruby/metaprogramming.md
 core/array/at_spec.rb:
   pdx: [spec/array/lookups_spec.pdx]
   status: partial_intentional
@@ -184,9 +189,9 @@ core/array/reject_spec.rb:
   link: docs/ruby/truthiness.md
 core/array/each_spec.rb:
   pdx: [spec/array/iteration_spec.pdx]
-  status: partial_planned
-  reason: "The multi-parameter row waits on #158 (does |a, b| destructure a yielded array); the mid-walk mutation rows stay behind, since values never mutate."
-  link: https://github.com/portlandlang/portland/issues/158
+  status: partial_intentional
+  reason: "The multi-parameter row leans on nil-filling a parameter from :a, which ADR 0057 refuses; the mid-walk mutation rows stay behind, since values never mutate."
+  link: docs/ruby/pattern-matching.md
 core/array/detect_spec.rb:
   pdx: [spec/array/iteration_spec.pdx]
   status: partial_intentional
@@ -723,6 +728,11 @@ core/integer/to_int_spec.rb:
 core/integer/try_convert_spec.rb:
   status: skipped
   reason: "Integer.try_convert is the implicit-conversion protocol's entry point, and to_int is a false alias that refuses naming to_i (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/integer/sqrt_spec.rb:
+  pdx: [spec/number/integer/sqrt_spec.pdx]
+  status: partial_intentional
+  reason: "No bignums, so the 10**400 row stays upstream; a Float, mock, or String argument refuses where Ruby converts or raises (ADR 0036)."
   link: docs/ruby/aliases.md
 core/integer/digits_spec.rb:
   pdx: [spec/number/integer/digits_spec.pdx]

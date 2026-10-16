@@ -1,0 +1,19 @@
+# The integer square root (ADR 0058, #107), from ruby/spec
+# core/integer/sqrt_spec.rb. Upstream's is_a? asks inspect's answer. The
+# 10**400 row needs a bignum, and a Float, a mock, or a String argument
+# refuses where Ruby converts or raises (ADR 0036); those stay upstream.
+
+require_relative "../../spec_helper"
+
+context "Integer.sqrt" do
+  specify "returns an integer" do
+    expect(inspect(Integer.sqrt(10))).to eq("3")
+  end
+
+  specify "returns the integer square root of the argument" do
+    expect(Integer.sqrt(0)).to eq(0)
+    expect(Integer.sqrt(1)).to eq(1)
+    expect(Integer.sqrt(24)).to eq(4)
+    expect(Integer.sqrt(25)).to eq(5)
+  end
+end

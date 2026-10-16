@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **ruby/spec's `Array.new` and `Integer.sqrt` files ported** ([#104](https://github.com/portlandlang/portland/issues/104), [#107](https://github.com/portlandlang/portland/issues/107)) — `spec/array/construction_spec.pdx` and `spec/number/integer/sqrt_spec.pdx`. `core/array/each_spec.rb`'s multi-parameter row is recorded against ADR 0057: it nil-fills from a symbol.
+
 - **`Array.new` and `Integer.sqrt`** ([ADR 0058](docs/adr/0058-2026-10-16-builtin-types-carry-type-functions.md), [#159](https://github.com/portlandlang/portland/issues/159)) — the builtin types carry Ruby's type functions, on both implementations. `Array.new` bare, by count (nil-filled), by count and fill, by count and a block handed each index, or copied from an array; `Integer.sqrt` exact to the 64-bit edge. Refusals are Ruby's words where Ruby has them (`negative array size`) and name the argument otherwise. A fill beside a block refuses rather than one silently winning. The checker types both answers.
 
 - **Block parameters spread a yielded array** ([ADR 0057](docs/adr/0057-2026-10-16-block-parameters-spread-a-yielded-array.md), [#158](https://github.com/portlandlang/portland/issues/158)) — `pairs.each { |key, value| }`, `list.zip(other).map { |left, right| }`, and every other two-or-more-parameter block handed one array bind from its elements, as Ruby's do, on both implementations. Where Ruby would nil-fill a parameter — an array too short, or no array at all — Portland refuses: `block expects 2 arguments — [1] has 1 element to spread`. The checker types a spreading block's parameters from the element's own element type.
