@@ -1993,6 +1993,11 @@ def evaluate_method_call(node, mutable bindings)
     end
   when "except" then arguments.reduce(receiver) { |kept, key| kept.except(key) }
   when "invert" then receiver.invert
+  # A range's own answers (#111), the seed's.
+  when "exclude_end?" then receiver.exclude_end?
+  when "begin" then receiver.begin
+  when "end" then receiver.end
+  when "cover?" then receiver.cover?(value_at(arguments, 0))
   # Bare `any?` on a hash asks whether it holds a pair (#105).
   when "any?" then receiver.any?
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))

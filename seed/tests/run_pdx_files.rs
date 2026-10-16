@@ -1770,6 +1770,33 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A range's own answers (#111), Ruby's (4.0.6, the expected lines):
+/// `begin` and `end` — `end` legal after a dot, as `next` is — a maybe
+/// where the range is open; `exclude_end?`; `cover?` and `member?` as
+/// `include?`; `entries` as `to_a`; bare `first` and `last` the ends
+/// themselves, so `(0...0).first` is 0; and `each`, `each_with_index`, and
+/// `reverse_each` answering the range. A bare `first` of a beginless range
+/// refuses in Ruby's words.
+#[test]
+fn a_ranges_own_answers_match_ruby() {
+    assert_both_print(
+        "evaluator_range_own.pdx",
+        "p((1..5).exclude_end?)\np((1...5).exclude_end?)\np((1..5).begin)\np((1..5).end)\np((1...5).end)\np((1..).end)\np((..5).begin)\np((1..5).cover?(3))\np((1..5).cover?(6))\np((1..5).member?(5))\np((1..5).entries)\np((1..3).reverse_each { |number| number })\np((1..3).each_with_index { |number, index| number })\np((1..3).each { |number| number })\np((0...0).first)\np((5..1).last)\np((1..5).first)\np((1..5).last)\n",
+        "false\ntrue\n1\n5\n5\nnil\nnil\ntrue\nfalse\ntrue\n[1, 2, 3, 4, 5]\n1..3\n1..3\n1..3\n0\n1\n1\n5\n",
+    );
+    let cases = [
+        (
+            "p((..1).first)\n",
+            "cannot get the first element of beginless range",
+        ),
+        (
+            "p((1..).last)\n",
+            "cannot get the last element of endless range",
+        ),
+    ];
+    assert_both_oracles_refuse("range_ends_refusal.pdx", None, &cases);
+}
+
 /// A hash's pairs by lookup and as a list, and the subset comparisons
 /// (#105): `assoc` and `rassoc` ask Ruby's `==` and answer a maybe pair,
 /// `flatten` lays the pairs out to a depth, and `<=`, `<`, `>=`, `>` ask

@@ -1195,6 +1195,91 @@ core/nil/xor_spec.rb:
 
 # — core/range —
 
+core/range/begin_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/end_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/first_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here; no to_int, Float, nil, or String count (ADR 0036); a negative count or a beginless range refuses where Ruby raises."
+  link: docs/ruby/ranges.md
+core/range/last_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here; no to_int, Float, nil, or String count (ADR 0036); a negative count or an endless range refuses where Ruby raises."
+  link: docs/ruby/ranges.md
+core/range/exclude_end_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, and Range.new waits on builtin type functions beyond ADR 0058's two."
+  link: docs/ruby/ranges.md
+core/range/to_s_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/inspect_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(range), not a method (ADR 0026); ranges hold integers here, and a nil..nil range has no spelling."
+  link: docs/ruby/inspect.md
+core/range/equal_value_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, float, struct-endpoint, Range.new, subclass, and mock rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/to_a_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, symbol, and non-ASCII rows stay upstream; a float, endless, or beginless range refuses where Ruby raises."
+  link: docs/ruby/ranges.md
+core/range/entries_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/range/member_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/range/include_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, float, endless-float, nil, and mock rows stay upstream; a missing or extra argument refuses where Ruby raises."
+  link: docs/ruby/ranges.md
+core/range/cover_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, float, subrange, and mock rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/size_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here: no Float::INFINITY, float, string, or symbol ends, and no beginless or endless size."
+  link: docs/ruby/ranges.md
+core/range/each_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, and an endless range refuses to be walked (ADR 0055); mocks, Time, and blockless Enumerators stay upstream."
+  link: docs/ruby/enumerators.md
+core/range/reverse_each_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, and an open range refuses to be walked (ADR 0055); mocks and blockless Enumerators stay upstream."
+  link: docs/ruby/enumerators.md
+core/range/minmax_spec.rb:
+  pdx: [spec/range/ends_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here; the mock, infinite, open-range, and comparator rows stay upstream."
+  link: docs/ruby/ranges.md
 core/range/max_spec.rb:
   pdx: [spec/range/stepping_spec.pdx]
 core/range/min_spec.rb:

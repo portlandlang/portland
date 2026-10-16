@@ -2789,7 +2789,31 @@ impl<W: std::io::Write> Interpreter<W> {
             start,
         } = &receiver
         {
-            if name == "include?"
+            // A range's own answers (#111): its ends, each a maybe where
+            // the range is open; whether the end is excluded; and bare
+            // `first`/`last`, which are its ends, so `(0...0).first` is 0
+            // as in Ruby, an open end refusing in Ruby's words.
+            if arguments.is_empty() && block.is_none() {
+                match name {
+                    "exclude_end?" => return Some(Value::Boolean(*exclusive)),
+                    "begin" => return Some(start.map_or(Value::Nil, Value::Integer)),
+                    "end" => return Some(end.map_or(Value::Nil, Value::Integer)),
+                    "first" => {
+                        return Some(Value::Integer(start.unwrap_or_else(|| {
+                            panic!("cannot get the first element of beginless range")
+                        })));
+                    }
+                    "last" => {
+                        return Some(Value::Integer(end.unwrap_or_else(|| {
+                            panic!("cannot get the last element of endless range")
+                        })));
+                    }
+                    _ => {}
+                }
+            }
+            // `cover?` and `member?` ask what `include?` asks: a range of
+            // integers has no gap between the two.
+            if matches!(name, "include?" | "cover?" | "member?")
                 && let [Value::Integer(probe)] = arguments.as_slice()
             {
                 let above = start.is_none_or(|start| *probe >= start);
@@ -2802,8 +2826,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 });
                 return Some(Value::Boolean(above && below));
             }
-            if name == "to_a" && arguments.is_empty() {
+            if matches!(name, "to_a" | "entries") && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
+            }
+            // The walks that answer the range itself, as Ruby's do.
+            if let Some(block) = block
+                && matches!(name, "each" | "each_with_index" | "reverse_each")
+                && arguments.is_empty()
+            {
+                let mut elements = range_elements(&receiver);
+                if name == "reverse_each" {
+                    elements.reverse();
+                }
+                for (index, element) in elements.into_iter().enumerate() {
+                    let handed = if name == "each_with_index" {
+                        vec![element, Value::Integer(index as i64)]
+                    } else {
+                        vec![element]
+                    };
+                    self.run_block(block, handed);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
             }
             // A range walks as its array — except `index`, `rindex`,
             // `each_index`, and `rfind`, which Ruby's Range lacks (its

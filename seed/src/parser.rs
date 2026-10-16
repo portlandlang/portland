@@ -2650,8 +2650,10 @@ impl<'source> Parser<'source> {
                     // `next` is loop control as a statement but never a
                     // receiver's message, so after a dot it can only be a
                     // method name — admitted narrowly (#79), not keywords
-                    // wholesale.
-                    let keyword_method = token.kind == TokenKind::Keyword && token.text == "next";
+                    // wholesale. `end` closes a body as a statement and is
+                    // a range's far end after a dot (#111), the same way.
+                    let keyword_method =
+                        token.kind == TokenKind::Keyword && matches!(token.text, "next" | "end");
                     if token.kind != TokenKind::Identifier && !keyword_method {
                         panic!("expected method name after dot, got {token:?}");
                     }

@@ -1,0 +1,300 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax. Ranges hold integers here (the seed's recorded
+# crudeness), so the string, float, symbol, non-ASCII, Time, and mock rows
+# stay upstream, with to_int and Float counts (ADR 0036), the refusals
+# where Ruby raises, Range.new, subclasses, identity checks, and blockless
+# Enumerators (ADR 0055). `inspect` is a function here (ADR 0026), and
+# alias checks compare the two answers. Upstream's `a << i` is the
+# accumulator pattern on a mutable.
+
+require_relative "../spec_helper"
+
+context "Range#begin" do
+  specify "returns the first element of self" do
+    expect((-1..1).begin).to eq(-1)
+    expect((0..1).begin).to eq(0)
+    expect((0xffff...0xfffff).begin).to eq(65535)
+  end
+end
+
+context "Range#end" do
+  specify "end returns the last element of self" do
+    expect((-1..1).end).to eq(1)
+    expect((0..1).end).to eq(1)
+    expect((0xffff...0xfffff).end).to eq(1048575)
+  end
+end
+
+context "Range#first" do
+  specify "returns the first element of self" do
+    expect((-1..1).first).to eq(-1)
+    expect((0..1).first).to eq(0)
+    expect((0xffff...0xfffff).first).to eq(65535)
+  end
+
+  specify "returns the specified number of elements from the beginning" do
+    expect((0..2).first(2)).to eq([0, 1])
+  end
+
+  specify "returns an empty array for an empty Range" do
+    expect((0...0).first(2)).to eq([])
+  end
+
+  specify "returns an empty array when passed zero" do
+    expect((0..2).first(0)).to eq([])
+  end
+
+  specify "returns all elements in the range when count exceeds the number of elements" do
+    expect((0..2).first(4)).to eq([0, 1, 2])
+  end
+end
+
+context "Range#last" do
+  specify "end returns the last element of self" do
+    expect((-1..1).last).to eq(1)
+    expect((0..1).last).to eq(1)
+    expect((0xffff...0xfffff).last).to eq(1048575)
+  end
+
+  specify "returns the specified number of elements from the end" do
+    expect((1..5).last(3)).to eq([3, 4, 5])
+  end
+
+  specify "returns the specified number if elements for single element inclusive range" do
+    expect((1..1).last(1)).to eq([1])
+  end
+
+  specify "returns an empty array for an empty Range" do
+    expect((0...0).last(2)).to eq([])
+  end
+
+  specify "returns an empty array when passed zero" do
+    expect((0..2).last(0)).to eq([])
+  end
+
+  specify "returns all elements in the range when count exceeds the number of elements" do
+    expect((2..4).last(5)).to eq([2, 3, 4])
+  end
+end
+
+context "Range#exclude_end?" do
+  specify "returns false if the range does not exclude the end value" do
+    expect((-2..2).exclude_end?).to eq(false)
+    expect((0xfffd..0xffff).exclude_end?).to eq(false)
+  end
+
+  specify "returns true if the range excludes the end value" do
+    expect((0...5).exclude_end?).to eq(true)
+    expect((0xfffd...0xffff).exclude_end?).to eq(true)
+  end
+end
+
+context "Range#to_s" do
+  specify "provides a printable form of self" do
+    expect((0..21).to_s).to eq("0..21")
+    expect((-8..0).to_s).to eq("-8..0")
+    expect((-411..959).to_s).to eq("-411..959")
+    expect((0xfff..0xfffff).to_s).to eq("4095..1048575")
+  end
+
+  specify "can show endless ranges" do
+    expect((1..).to_s).to eq("1..")
+  end
+
+  specify "can show beginless ranges" do
+    expect((..1).to_s).to eq("..1")
+  end
+end
+
+context "Range#inspect" do
+  specify "provides a printable form, using #inspect to convert the start and end objects" do
+    expect(inspect(0..21)).to eq("0..21")
+    expect(inspect(-8..0)).to eq("-8..0")
+    expect(inspect(-411..959)).to eq("-411..959")
+    expect(inspect(0xfff..0xfffff)).to eq("4095..1048575")
+  end
+
+  specify "works for endless ranges" do
+    expect(inspect(1..)).to eq("1..")
+  end
+
+  specify "works for beginless ranges" do
+    expect(inspect(..1)).to eq("..1")
+  end
+end
+
+context "Range#==" do
+  specify "returns true if other has same begin, end, and exclude_end? values" do
+    expect((0..2) == (0..2)).to eq(true)
+    expect((0xffff..0xfffff) == (0xffff..0xfffff)).to eq(true)
+  end
+
+  specify "returns false if one of the attributes differs" do
+    expect((1482..1911) == (1482...1911)).to eq(false)
+    expect((0xffff..0xfffff) == (0xffff...0xfffff)).to eq(false)
+  end
+
+  specify "returns false if other is not a Range" do
+    expect((1..10) == 1).to eq(false)
+    expect((1..10) == "a").to eq(false)
+  end
+
+  specify "works for endless Ranges" do
+    expect((1..) == (1..)).to eq(true)
+    expect((1..) == (1...)).to eq(false)
+  end
+
+  specify "returns true if the endpoints are == for beginless ranges" do
+    expect((...10) == (...10)).to eq(true)
+  end
+end
+
+context "Range#to_a" do
+  specify "converts self to an array" do
+    expect((-5..5).to_a).to eq([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
+    expect((0xfffd...0xffff).to_a).to eq([0xfffd, 0xfffe])
+  end
+
+  specify "returns empty array for descending-ordered" do
+    expect((5..-5).to_a).to eq([])
+    expect((0xffff...0xfffd).to_a).to eq([])
+  end
+
+  specify "works with Ranges of 64-bit integers" do
+    large = 1099511627776
+    expect((large..large + 1).to_a).to eq([1099511627776, 1099511627777])
+  end
+end
+
+context "Range#entries" do
+  specify "is an alias of Range#to_a" do
+    expect((1..4).entries).to eq((1..4).to_a)
+    expect((4..1).entries).to eq((4..1).to_a)
+  end
+end
+
+context "Range#member?" do
+  specify "is an alias of Range#include?" do
+    expect((1..4).member?(3)).to eq((1..4).include?(3))
+    expect((1..4).member?(9)).to eq((1..4).include?(9))
+  end
+end
+
+context "Range#include?" do
+  specify "returns true if other is an element of self" do
+    expect((0..5).include?(2)).to eq(true)
+    expect((-5..5).include?(0)).to eq(true)
+    expect((0xffff..0xfffff).include?(0xffffd)).to eq(true)
+    expect((0xffff..0xfffff).include?(0xfffd)).to eq(false)
+  end
+
+  specify "returns true if argument is equal to the first value of the range" do
+    expect((0..5).include?(0)).to eq(true)
+  end
+
+  specify "returns true if argument is equal to the last value of the range" do
+    expect((0..5).include?(5)).to eq(true)
+    expect((0...5).include?(4)).to eq(true)
+  end
+
+  specify "returns true if argument is less than the last value of the range and greater than the first value" do
+    expect((20..30).include?(28)).to eq(true)
+  end
+
+  specify "returns true if argument is sole element in the range" do
+    expect((30..30).include?(30)).to eq(true)
+  end
+
+  specify "returns false if range is empty" do
+    expect((30...30).include?(30)).to eq(false)
+  end
+end
+
+context "Range#cover?" do
+  specify "returns true if other is an element of self" do
+    expect((0..5).cover?(2)).to eq(true)
+    expect((-5..5).cover?(0)).to eq(true)
+    expect((0xffff..0xfffff).cover?(0xffffd)).to eq(true)
+    expect((0xffff..0xfffff).cover?(0xfffd)).to eq(false)
+  end
+
+  specify "returns true if argument is equal to the first value of the range" do
+    expect((0..5).cover?(0)).to eq(true)
+  end
+
+  specify "returns true if argument is equal to the last value of the range" do
+    expect((0..5).cover?(5)).to eq(true)
+    expect((0...5).cover?(4)).to eq(true)
+  end
+
+  specify "returns true if argument is less than the last value of the range and greater than the first value" do
+    expect((20..30).cover?(28)).to eq(true)
+  end
+
+  specify "returns true if argument is sole element in the range" do
+    expect((30..30).cover?(30)).to eq(true)
+  end
+
+  specify "returns false if range is empty" do
+    expect((30...30).cover?(30)).to eq(false)
+  end
+end
+
+context "Range#size" do
+  specify "returns the number of elements in the range" do
+    expect((1..16).size).to eq(16)
+    expect((1...16).size).to eq(15)
+  end
+
+  specify "returns 0 if last is less than first" do
+    expect((16..0).size).to eq(0)
+  end
+end
+
+context "Range#each" do
+  specify "passes each element to the given block by using #succ" do
+    mutable seen = []
+    (-5..5).each { |number| seen = seen + [number] }
+    expect(seen).to eq([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
+    mutable hex_seen = []
+    (0xfffd...0xffff).each { |number| hex_seen = hex_seen + [number] }
+    expect(hex_seen).to eq([0xfffd, 0xfffe])
+  end
+
+  specify "returns self" do
+    range = 1..10
+    expect(range.each { |number| number }).to eq(range)
+  end
+end
+
+context "Range#reverse_each" do
+  specify "traverses the Range in reverse order and passes each element to block" do
+    mutable seen = []
+    (1..3).reverse_each { |number| seen = seen + [number] }
+    expect(seen).to eq([3, 2, 1])
+    mutable exclusive_seen = []
+    (1...3).reverse_each { |number| exclusive_seen = exclusive_seen + [number] }
+    expect(exclusive_seen).to eq([2, 1])
+  end
+
+  specify "returns self" do
+    range = (1..3)
+    expect(range.reverse_each { |number| number }).to eq(range)
+  end
+end
+
+context "Range#minmax" do
+  describe "on an inclusive range" do
+    specify "should return the minimum and maximum values for a numeric range" do
+      expect((1..3).minmax).to eq([1, 3])
+    end
+  end
+
+  describe "on an exclusive range" do
+    specify "should return the minimum and maximum values for a numeric range" do
+      expect((1...3).minmax).to eq([1, 2])
+    end
+  end
+end
