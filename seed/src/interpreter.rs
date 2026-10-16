@@ -37,6 +37,8 @@ fn enumerable_name(name: &str) -> bool {
         name,
         "all?"
             | "any?"
+            | "chunk"
+            | "chunk_while"
             | "collect"
             | "collect_concat"
             | "compact"
@@ -45,15 +47,18 @@ fn enumerable_name(name: &str) -> bool {
             | "detect"
             | "drop"
             | "drop_while"
+            | "each_cons"
             | "each_slice"
             | "each_with_index"
             | "entries"
             | "filter"
+            | "filter_map"
             | "find"
             | "find_all"
             | "find_index"
             | "first"
             | "flat_map"
+            | "group_by"
             | "include?"
             | "inject"
             | "map"
@@ -63,6 +68,7 @@ fn enumerable_name(name: &str) -> bool {
             | "min"
             | "min_by"
             | "minmax"
+            | "minmax_by"
             | "none?"
             | "one?"
             | "partition"
@@ -70,6 +76,9 @@ fn enumerable_name(name: &str) -> bool {
             | "reject"
             | "reverse_each"
             | "select"
+            | "slice_after"
+            | "slice_before"
+            | "slice_when"
             | "sort"
             | "sort_by"
             | "sum"
@@ -1065,7 +1074,6 @@ fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
                 | "select"
                 | "filter"
                 | "reject"
-                | "filter_map"
                 | "to_h"
                 | "transform_keys"
                 | "transform_values"
@@ -4560,6 +4568,193 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(results))
                 }
+                // Ruby's filter_map (#110): the block's answers, less nil
+                // and false — Ruby's cut, a nil meaning "skip this one".
+                (Value::Array(elements), "filter_map", []) => {
+                    let mut results = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let result = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match result {
+                            Some(Value::Nil) | Some(Value::Boolean(false)) => {}
+                            Some(value) => results.push(value),
+                            None => panic!("filter_map block produced no value"),
+                        }
+                    }
+                    Some(Value::array(results))
+                }
+                // Ruby's group_by (#110): a hash from each block answer to
+                // the elements that answered it, keys in first-seen order.
+                (Value::Array(elements), "group_by", []) => {
+                    let mut groups: Vec<(Value, Vec<Value>)> = Vec::new();
+                    for element in elements.iter().cloned() {
+                        let key = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let key = key.unwrap_or_else(|| panic!("group_by block produced no value"));
+                        match groups.iter_mut().find(|(existing, _)| *existing == key) {
+                            Some((_, members)) => members.push(element),
+                            None => groups.push((key, vec![element])),
+                        }
+                    }
+                    Some(Value::hash(
+                        groups
+                            .into_iter()
+                            .map(|(key, members)| (key, Value::array(members)))
+                            .collect(),
+                    ))
+                }
+                // Ruby's chunk_while and slice_when (#110): runs of adjacent
+                // elements, the block asked of each neighbouring pair —
+                // true keeps them together under chunk_while, apart under
+                // slice_when. A single element is one run, unasked.
+                (Value::Array(elements), "chunk_while" | "slice_when", []) => {
+                    let mut runs: Vec<Vec<Value>> = Vec::new();
+                    for (position, element) in elements.iter().cloned().enumerate() {
+                        if position == 0 {
+                            runs.push(vec![element]);
+                            continue;
+                        }
+                        let previous = elements[position - 1].clone();
+                        let verdict = self.run_block(block, vec![previous, element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let together = match verdict {
+                            Some(Value::Boolean(answer)) => {
+                                if name == "chunk_while" {
+                                    answer
+                                } else {
+                                    !answer
+                                }
+                            }
+                            other => {
+                                panic!("{name} block must produce true or false, got {other:?}")
+                            }
+                        };
+                        if together {
+                            runs.last_mut().expect("a run exists").push(element);
+                        } else {
+                            runs.push(vec![element]);
+                        }
+                    }
+                    Some(Value::array(runs.into_iter().map(Value::array).collect()))
+                }
+                // Ruby's slice_before and slice_after (#110): runs cut
+                // before, or after, each element the block says true of.
+                (Value::Array(elements), "slice_before" | "slice_after", []) => {
+                    let mut runs: Vec<Vec<Value>> = Vec::new();
+                    let mut open = false;
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let matched = match verdict {
+                            Some(Value::Boolean(answer)) => answer,
+                            other => {
+                                panic!("{name} block must produce true or false, got {other:?}")
+                            }
+                        };
+                        if name == "slice_before" {
+                            if matched || runs.is_empty() {
+                                runs.push(vec![element]);
+                            } else {
+                                runs.last_mut().expect("a run exists").push(element);
+                            }
+                        } else {
+                            if open {
+                                runs.last_mut().expect("a run exists").push(element);
+                            } else {
+                                runs.push(vec![element]);
+                            }
+                            open = !matched;
+                        }
+                    }
+                    Some(Value::array(runs.into_iter().map(Value::array).collect()))
+                }
+                // Ruby's chunk (#110): adjacent elements with equal block
+                // answers, as `[answer, run]` pairs. A nil or :_separator
+                // answer drops the element, :_alone keeps it in a run of
+                // its own, and any other underscore symbol is reserved.
+                (Value::Array(elements), "chunk", []) => {
+                    let mut runs: Vec<(Value, Vec<Value>)> = Vec::new();
+                    let mut open = false;
+                    for element in elements.iter().cloned() {
+                        let key = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let key = key.unwrap_or_else(|| panic!("chunk block produced no value"));
+                        match &key {
+                            Value::Nil => {
+                                open = false;
+                                continue;
+                            }
+                            Value::Symbol(name) if name == "_separator" => {
+                                open = false;
+                                continue;
+                            }
+                            Value::Symbol(name) if name == "_alone" => {
+                                runs.push((key.clone(), vec![element]));
+                                open = false;
+                                continue;
+                            }
+                            Value::Symbol(name) if name.starts_with('_') => {
+                                panic!("symbols beginning with an underscore are reserved")
+                            }
+                            _ => {}
+                        }
+                        match runs.last_mut() {
+                            Some((existing, run)) if open && *existing == key => run.push(element),
+                            _ => {
+                                runs.push((key, vec![element]));
+                                open = true;
+                            }
+                        }
+                    }
+                    Some(Value::array(
+                        runs.into_iter()
+                            .map(|(key, run)| Value::array(vec![key, Value::array(run)]))
+                            .collect(),
+                    ))
+                }
+                // Ruby's minmax_by (#110): the elements whose block answers
+                // order least and greatest, the first of a tie; nils when
+                // there are none.
+                (Value::Array(elements), "minmax_by", []) => {
+                    let mut least: Option<(Value, Value)> = None;
+                    let mut most: Option<(Value, Value)> = None;
+                    for element in elements.iter().cloned() {
+                        let key = self.run_block(block, vec![element.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let key =
+                            key.unwrap_or_else(|| panic!("minmax_by block produced no value"));
+                        let replaces_least = match &least {
+                            None => true,
+                            Some((best_key, _)) => self.ordering_of(&key, best_key) < 0,
+                        };
+                        if replaces_least {
+                            least = Some((key.clone(), element.clone()));
+                        }
+                        let replaces_most = match &most {
+                            None => true,
+                            Some((best_key, _)) => self.ordering_of(&key, best_key) > 0,
+                        };
+                        if replaces_most {
+                            most = Some((key, element));
+                        }
+                    }
+                    Some(Value::array(vec![
+                        least.map_or(Value::Nil, |(_, element)| element),
+                        most.map_or(Value::Nil, |(_, element)| element),
+                    ]))
+                }
                 (Value::Integer(count), "times", []) => {
                     for index in 0..*count {
                         self.run_block(block, vec![Value::Integer(index)]);
@@ -4851,6 +5046,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     elements
                         .chunks(width)
                         .map(|chunk| Value::array(chunk.to_vec()))
+                        .collect(),
+                )
+            }
+            // Ruby's each_cons (#110): every run of `size` neighbours, as
+            // each_slice answers its slices — the finished array (ADR 0055).
+            (Value::Array(elements), "each_cons", [Value::Integer(size)]) => {
+                let width = usize::try_from(*size)
+                    .ok()
+                    .filter(|width| *width > 0)
+                    .unwrap_or_else(|| panic!("each_cons takes a positive size, got {size}"));
+                Value::array(
+                    elements
+                        .windows(width)
+                        .map(|window| Value::array(window.to_vec()))
                         .collect(),
                 )
             }

@@ -1863,6 +1863,37 @@ fn combinatorics_and_binary_search_match_ruby() {
     assert_both_oracles_refuse("combinatorics_refusal.pdx", None, &cases);
 }
 
+/// Ruby's Enumerable over runs and groups (#110), on both oracles, the
+/// expected lines Ruby 4.0.6's: `chunk` with its nil, `:_separator`, and
+/// `:_alone` answers; `chunk_while` and `slice_when` asked of each
+/// neighbouring pair; `slice_before` and `slice_after`; `each_cons`
+/// answering the finished array (ADR 0055); `group_by` in first-seen order;
+/// `filter_map` dropping nil and false; `minmax_by`; a hash walking as its
+/// pairs. The refusals are the seed's sentences, Ruby's where it has one.
+#[test]
+fn enumerable_runs_and_groups_match_ruby() {
+    assert_both_print(
+        "evaluator_runs_and_groups.pdx",
+        "p([1, 2, 3, 2, 1].chunk { |x| x == 2 ? nil : 1 })\np([1, 2, 3, 2, 1].chunk { |x| x < 2 ? :_alone : false })\np([1, 2, 3, 3, 2, 1].chunk { |x| x == 2 ? :_separator : 1 })\np([1, 2, 3, 2, 3, 2, 1].chunk { |x| x < 3 })\np([10, 9, 7, 6, 4, 3, 2, 1].chunk_while { |left, right| left - 1 == right })\np([10, 9, 7, 6, 4, 3, 2, 1].slice_when { |left, right| left - 1 != right })\np([1].chunk_while { |left, right| false })\np([].slice_when { |left, right| true })\np([7, 6, 5, 4, 3, 2, 1].slice_before { |x| x == 6 || x == 2 })\np([7, 6, 5, 4, 3, 2, 1].slice_after { |x| x == 6 || x == 2 })\np([7, 6, 5].slice_after { |x| true })\np([4, 3, 2, 1].each_cons(3))\np([4, 3, 2, 1].each_cons(5))\np([\"foo\", \"bar\", \"baz\"].group_by { |word| word[0] })\np([].group_by { |x| x })\np([1, 2, 3, 4, 5, 6, 7, 8].filter_map { |x| x * 2 if x.even? })\np([1, 2].filter_map { |x| false })\np([\"1\", \"2\", \"3\"].minmax_by { |x| x.to_i })\np([].minmax_by { |x| x })\np({one: 1, two: 2, three: 3}.filter_map { |name, number| name if number.odd? })\nmutable seen = []\n[1, 2, 3].chunk_while { |left, right| seen = seen + [[left, right]]; true }\np(seen)\np((1..4).group_by { |x| x.odd? })\n",
+        "[[1, [1]], [1, [3]], [1, [1]]]\n[[:_alone, [1]], [false, [2, 3, 2]], [:_alone, [1]]]\n[[1, [1]], [1, [3, 3]], [1, [1]]]\n[[true, [1, 2]], [false, [3]], [true, [2]], [false, [3]], [true, [2, 1]]]\n[[10, 9], [7, 6], [4, 3, 2, 1]]\n[[10, 9], [7, 6], [4, 3, 2, 1]]\n[[1]]\n[]\n[[7], [6, 5, 4, 3], [2, 1]]\n[[7, 6], [5, 4, 3, 2], [1]]\n[[7], [6], [5]]\n[[4, 3, 2], [3, 2, 1]]\n[]\n{\"f\" => [\"foo\"], \"b\" => [\"bar\", \"baz\"]}\n{}\n[4, 8, 12, 16]\n[]\n[\"1\", \"3\"]\n[nil, nil]\n[:one, :three]\n[[1, 2], [2, 3]]\n{true => [1, 3], false => [2, 4]}\n",
+    );
+    let cases = [
+        (
+            "p([1, 2].each_cons(0))\n",
+            "each_cons takes a positive size, got 0",
+        ),
+        (
+            "p([1].chunk { |x| :_bad })\n",
+            "symbols beginning with an underscore are reserved",
+        ),
+        (
+            "p([1, 2].chunk_while { |a, b| 5 })\n",
+            "chunk_while block must produce true or false, got Some(Integer(5))",
+        ),
+    ];
+    assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
+}
+
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
 /// (4.0.6, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its

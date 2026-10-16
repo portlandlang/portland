@@ -617,6 +617,184 @@ core/enumerable/compact_spec.rb:
   status: partial_intentional
   reason: "No Enumerator.new (ADR 0055), so the value-packing rows stay behind."
   link: docs/ruby/enumerators.md
+core/enumerable/all_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the blockless and the 5-or-nil rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  link: docs/ruby/truthiness.md
+core/enumerable/any_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the blockless and the 0-or-1 rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  link: docs/ruby/truthiness.md
+core/enumerable/none_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the blockless rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  link: docs/ruby/truthiness.md
+core/enumerable/one_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the blockless rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  link: docs/ruby/truthiness.md
+core/enumerable/count_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "A block beside an argument is checked, not ignored; there is no singleton size to ignore; a one-parameter block sees the packed array."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/find_index_spec.rb:
+  pdx: [spec/enumerable/predicates_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055); a block beside an argument is checked, not ignored; no splat parameter, and a one-parameter block sees the packed array."
+  link: docs/ruby/enumerators.md
+core/enumerable/min_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "min takes no count; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
+  link: docs/ruby/ordering.md
+core/enumerable/max_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "max takes no count; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
+  link: docs/ruby/ordering.md
+core/enumerable/min_by_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "min_by takes no count and answers a maybe, so a found nil is a present nil; no blockless Enumerator (ADR 0055); identity is not observable; no reverse-comparable mock."
+  link: docs/ruby/nil-and-optionals.md
+core/enumerable/max_by_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "max_by takes no count and answers a maybe, so a found nil is a present nil; no blockless Enumerator (ADR 0055); identity is not observable; no reverse-comparable mock."
+  link: docs/ruby/nil-and-optionals.md
+core/enumerable/minmax_by_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055); identity is not observable; no reverse-comparable mock."
+  link: docs/ruby/enumerators.md
+core/enumerable/sort_by_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055); the mocked each and map rows are reflection."
+  link: docs/ruby/enumerators.md
+core/enumerable/sum_spec.rb:
+  pdx: [spec/enumerable/extremes_spec.pdx]
+  status: partial_intentional
+  reason: "Rationals wait on #124, so the rows sum integers; symbol-to-block waits on #77."
+  link: docs/ruby/types.md
+core/enumerable/each_with_index_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055); each takes no arguments through each_with_index; no splat parameter (ADR 0014)."
+  link: docs/ruby/enumerators.md
+core/enumerable/each_cons_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "each_cons answers the runs as an array (ADR 0055), so there is no Enumerator, no size, and no block to break out of; a size of 0 refuses where Ruby raises; no to_int conversion (ADR 0036)."
+  link: docs/ruby/enumerators.md
+core/enumerable/take_while_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the 1-or-nil rows stay behind; no blockless Enumerator or Enumerator.new (ADR 0055); break with a value waits on ADR 0012; identity is not observable."
+  link: docs/ruby/truthiness.md
+core/enumerable/drop_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "A negative count refuses where Ruby raises ArgumentError; no to_int conversion (ADR 0036); no Enumerator.new (ADR 0055)."
+  link: docs/ruby/errors.md
+core/enumerable/drop_while_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "The block answers true or false, so the 1-or-nil rows stay behind; no blockless Enumerator or Enumerator.new (ADR 0055); break with a value waits on ADR 0012; identity is not observable."
+  link: docs/ruby/truthiness.md
+core/enumerable/inject_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "inject takes its seed explicitly; the symbol and string method-name forms ride the proc question (#77); values never mutate, so the mid-walk growth row stays behind; no splat parameter."
+  link: docs/ruby/aliases.md
+core/enumerable/cycle_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "cycle takes a count — a cycle with no count never ends, so the unbounded rows refuse on arity; no to_int conversion (ADR 0036); each is gathered once, so the counting rows stay behind."
+  link: docs/ruby/enumerators.md
+core/enumerable/to_h_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "No to_ary conversion (ADR 0036); a non-pair element or block answer refuses where Ruby raises; each takes no arguments through to_h; no splat parameter."
+  link: docs/ruby/aliases.md
+core/enumerable/uniq_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "uniq takes no block; the hash and eql? rows are mocks; no Enumerator.new (ADR 0055)."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/zip_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "zip takes one array and no block; no to_ary or to_enum conversion (ADR 0036); a non-array argument refuses in Portland's words."
+  link: docs/ruby/aliases.md
+core/enumerable/group_by_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055); hash defaults wait on #170; a symbol is never made from text (ADR 0023), so the keys are strings."
+  link: docs/ruby/enumerators.md
+core/enumerable/filter_map_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/chunk_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "chunk answers its runs as an array (ADR 0055), so there is no Enumerator, no with_index, and no size; a reserved symbol refuses where Ruby raises; an argument refuses on arity; no splat parameter."
+  link: docs/ruby/enumerators.md
+core/enumerable/chunk_while_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "chunk_while answers its runs as an array (ADR 0055); a missing block refuses on arity."
+  link: docs/ruby/enumerators.md
+core/enumerable/slice_when_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "slice_when answers its runs as an array (ADR 0055); a missing block refuses on arity; no to_enum."
+  link: docs/ruby/enumerators.md
+core/enumerable/slice_before_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "slice_before answers its runs as an array (ADR 0055); the pattern argument waits on #171, so the mocked === rows stay behind."
+  link: docs/ruby/enumerators.md
+core/enumerable/slice_after_spec.rb:
+  pdx: [spec/enumerable/walks_spec.pdx]
+  status: partial_intentional
+  reason: "slice_after answers its runs as an array (ADR 0055); the pattern argument waits on #171, so the mocked === rows stay behind."
+  link: docs/ruby/enumerators.md
+core/enumerable/chain_spec.rb:
+  status: skipped
+  reason: "There is no Enumerator::Chain to answer (ADR 0055); two walks are joined with +."
+  link: docs/ruby/enumerators.md
+core/enumerable/lazy_spec.rb:
+  status: skipped
+  reason: "There is no Enumerator::Lazy to answer (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/each_entry_spec.rb:
+  status: skipped
+  reason: "each_entry exists to pack several yielded values as one; every walk packs them here, so each is each_entry, and the rest of its rows are enumerators and each taking arguments."
+  link: docs/ruby/enumerators.md
+core/enumerable/each_with_object_spec.rb:
+  status: skipped
+  reason: "each_with_object exists to mutate its memo; values never mutate (ADR 0015), so inject with a seed is the spelling."
+  link: docs/ruby/mutability.md
+core/enumerable/grep_spec.rb:
+  status: skipped
+  reason: "grep takes a pattern, asking ===; the pattern argument waits on #171, and the regex rows on #74."
+  link: https://github.com/portlandlang/portland/issues/171
+core/enumerable/grep_v_spec.rb:
+  status: skipped
+  reason: "grep_v takes a pattern, asking ===; the pattern argument waits on #171, and the regex rows on #74."
+  link: https://github.com/portlandlang/portland/issues/171
+core/enumerable/to_set_spec.rb:
+  status: skipped
+  reason: "There is no Set to answer yet (#123)."
+  link: https://github.com/portlandlang/portland/issues/123
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
   status: partial_intentional

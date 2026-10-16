@@ -15,7 +15,11 @@ No enumerator type exists. The methods that would answer one answer the **finish
 ```ruby
 (1..9).step(3)              # [1, 4, 7] — an array, immediately
 [1, 2, 3, 4].each_slice(2)  # [[1, 2], [3, 4]]
+[1, 2, 3, 4].each_cons(3)   # [[1, 2, 3], [2, 3, 4]]
+[1, 2, 4, 5].slice_when { |left, right| right != left + 1 }  # [[1, 2], [4, 5]]
 ```
+
+The same holds for every method Ruby answers with an enumerator of runs — `each_cons`, `chunk`, `chunk_while`, `slice_when`, `slice_before`, `slice_after` ([#110](https://github.com/portlandlang/portland/issues/110)): the runs come back as an array, and a block is where Ruby takes one.
 
 Because migrating Ruby spells these with a trailing `.to_a`, `Array#to_a` exists as the identity — the harmless end of Ruby's rule — so `(1..9).step(3).to_a` means the same thing in both languages.
 

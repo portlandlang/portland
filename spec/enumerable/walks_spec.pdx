@@ -1,0 +1,406 @@
+# Ruby's Enumerable walks, runs, and groups on an Enumerable struct
+# (#110): `each_with_index`, `each_slice`, `each_cons`, `take_while`,
+# `drop`, `drop_while`, `inject`, `cycle`, `to_h`, `uniq`, `zip`,
+# `group_by`, `filter_map`, `chunk`, `chunk_while`, `slice_when`,
+# `slice_before`, and `slice_after`. A method Ruby answers with an
+# enumerator answers the finished array here (ADR 0055), so `each_cons(2)`
+# is its runs and `.to_a` on it is the identity.
+#
+# From ruby/spec core/enumerable/{each_with_index,each_cons,take_while,
+# drop,drop_while,inject,cycle,to_h,uniq,zip,group_by,filter_map,chunk,
+# chunk_while,slice_when,slice_before,slice_after}_spec.rb. What stays
+# behind: the blockless enumerators and their sizes, `each` taking
+# arguments, to_int and to_ary conversions (ADR 0036), the pattern
+# argument to `slice_before` and `slice_after` (asking `===`), a seedless
+# `inject` and `inject(:+)`, a block answering 1 or nil for a verdict, the
+# splat block parameter, `break` with a value out of a builtin's block,
+# and mocks of `hash` and `eql?`.
+
+require_relative "../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+
+def numerous(list) = Numerous.new(list: list)
+
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#each_with_index" do
+  specify "passes each element and its index to block" do
+    mutable seen = []
+    numerous(DEFAULT).each_with_index { |item, index| seen << [item, index] }
+    expect(seen).to eq([[2, 0], [5, 1], [3, 2], [6, 3], [1, 4], [4, 5]])
+  end
+
+  specify "provides each element to the block" do
+    mutable seen = []
+    answer = Empty.new.each_with_index { |item, index| seen << [item, index] }
+    expect(seen).to eq([])
+    expect(answer).to eq(Empty.new)
+  end
+
+  specify "provides each element to the block and its index" do
+    mutable seen = []
+    answer = numerous(DEFAULT).each_with_index { |item, index| seen << [item, index] }
+    expect(seen).to eq([[2, 0], [5, 1], [3, 2], [6, 3], [1, 4], [4, 5]])
+    expect(answer).to eq(numerous(DEFAULT))
+  end
+end
+
+context "Enumerable#each_cons" do
+  elements = numerous([4, 3, 2, 1])
+  in_threes = [[4, 3, 2], [3, 2, 1]]
+
+  specify "passes element groups to the block" do
+    mutable seen = []
+    elements.each_cons(3).each { |group| seen << group }
+    expect(seen).to eq(in_threes)
+  end
+
+  specify "works when n is >= full length" do
+    full = elements.to_a
+    expect(elements.each_cons(full.length)).to eq([full])
+    expect(elements.each_cons(full.length + 1)).to eq([])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.each_cons(2).to_a).to eq([[[1, 2], [3, 4, 5]], [[3, 4, 5], [6, 7, 8, 9]]])
+  end
+
+  describe "when no block is given" do
+    specify "answers the groups" do
+      expect(elements.each_cons(3).to_a).to eq(in_threes)
+    end
+  end
+end
+
+context "Enumerable#take_while" do
+  elements = numerous([3, 2, 1, :go])
+
+  specify "returns no/all elements for {true/false} block" do
+    expect(elements.take_while { true }).to eq(elements.to_a)
+    expect(elements.take_while { false }).to eq([])
+  end
+
+  specify "passes elements to the block until the first false" do
+    mutable seen = []
+    answer = elements.take_while do |item|
+      seen << item
+      seen.length < 3
+    end
+    expect(answer).to eq([3, 2])
+    expect(seen).to eq([3, 2, 1])
+  end
+end
+
+context "Enumerable#drop" do
+  elements = numerous([3, 2, 1, :go])
+
+  describe "passed a number n as an argument" do
+    specify "returns [] for empty enumerables" do
+      expect(Empty.new.drop(0)).to eq([])
+      expect(Empty.new.drop(2)).to eq([])
+    end
+
+    specify "returns [] if dropping all" do
+      expect(elements.drop(5)).to eq([])
+      expect(numerous([3, 2, 1, :go]).drop(4)).to eq([])
+    end
+
+    specify "drops the first n elements" do
+      expect(elements.drop(2)).to eq([1, :go])
+    end
+  end
+end
+
+context "Enumerable#drop_while" do
+  elements = numerous([3, 2, 1, :go])
+
+  specify "returns no/all elements for {true/false} block" do
+    expect(elements.drop_while { true }).to eq([])
+    expect(elements.drop_while { false }).to eq(elements.to_a)
+  end
+
+  specify "passes elements to the block until the first false" do
+    mutable seen = []
+    answer = elements.drop_while do |item|
+      seen << item
+      seen.length < 3
+    end
+    expect(answer).to eq([1, :go])
+    expect(seen).to eq([3, 2, 1])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.drop_while { |item| item != [6, 7, 8, 9] }).to eq([[6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#inject" do
+  specify "with argument takes a block with an accumulator (with argument as initial value) and the current element. Value of block becomes new accumulator" do
+    mutable seen = []
+    numerous(DEFAULT).inject(0) do |memo, item|
+      seen << [memo, item]
+      item
+    end
+    expect(seen).to eq([[0, 2], [2, 5], [5, 3], [3, 6], [6, 1], [1, 4]])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.inject([]) { |gathered, item| gathered + [item] }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+
+  specify "with inject arguments(legacy rubycon)" do
+    expect(Empty.new.inject(1) { |memo, item| 999 }).to eq(1)
+    expect(numerous([2]).inject(1) { |memo, item| 999 }).to eq(999)
+    expect(numerous([2]).inject(1) { |memo, item| memo }).to eq(1)
+    expect(numerous([2]).inject(1) { |memo, item| item }).to eq(2)
+
+    expect(numerous([1, 2, 3, 4]).inject(100) { |memo, item| memo + item }).to eq(110)
+    expect(numerous([1, 2, 3, 4]).inject(100) { |memo, item| memo * item }).to eq(2400)
+
+    expect(numerous(["a", "b", "c"]).inject("z") { |memo, item| item + memo }).to eq("cbaz")
+  end
+end
+
+context "Enumerable#cycle" do
+  describe "passed a number n as an argument" do
+    specify "returns nil and does nothing for non positive n" do
+      expect(numerous(DEFAULT).cycle(0) { }).to be_nil
+      expect(numerous(DEFAULT).cycle(-22) { }).to be_nil
+    end
+
+    specify "answers the elements repeated n times" do
+      expect(numerous([1, 2]).cycle(3)).to eq([1, 2, 1, 2, 1, 2])
+      expect(Empty.new.cycle(3)).to eq([])
+    end
+
+    specify "gathers whole arrays as elements when each yields multiple" do
+      expect(YieldsMulti.new.cycle(2).to_a).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9], [1, 2], [3, 4, 5], [6, 7, 8, 9]])
+    end
+  end
+end
+
+context "Enumerable#to_h" do
+  specify "converts empty enumerable to empty hash" do
+    expect(Empty.new.to_h).to eq({})
+  end
+
+  specify "converts yielded [key, value] pairs to a hash" do
+    expect(numerous([[:a, 1], [:b, 2]]).to_h).to eq({a: 1, b: 2})
+  end
+
+  specify "uses the last value of a duplicated key" do
+    expect(numerous([[:a, 1], [:b, 2], [:a, 3]]).to_h).to eq({a: 3, b: 2})
+  end
+
+  describe "with block" do
+    specify "converts [key, value] pairs returned by the block to a hash" do
+      expect(numerous([:a, :b]).to_h { |key| [key, key.to_s] }).to eq({a: "a", b: "b"})
+    end
+  end
+end
+
+context "Enumerable#uniq" do
+  specify "returns an array that contains only unique elements" do
+    expect(numerous([0, 1, 1, 2, 0]).uniq).to eq([0, 1, 2])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.uniq).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#zip" do
+  specify "combines each element of the receiver with the element of the same index in arrays given as arguments" do
+    expect(numerous([1, 2, 3]).zip([4, 5, 6])).to eq([[1, 4], [2, 5], [3, 6]])
+  end
+
+  specify "fills resulting array with nils if an argument array is too short" do
+    expect(numerous([1, 2, 3]).zip([4, 5])).to eq([[1, 4], [2, 5], [3, nil]])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.zip(YieldsMulti.new.to_a)).to eq([[[1, 2], [1, 2]], [[3, 4, 5], [3, 4, 5]], [[6, 7, 8, 9], [6, 7, 8, 9]]])
+  end
+end
+
+context "Enumerable#group_by" do
+  specify "returns a hash with values grouped according to the block" do
+    words = numerous(["foo", "bar", "baz"])
+    expect(words.group_by { |word| word[0] }).to eq({"f" => ["foo"], "b" => ["bar", "baz"]})
+  end
+
+  specify "returns an empty hash for empty enumerables" do
+    expect(Empty.new.group_by { |item| item }).to eq({})
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    grouped = YieldsMulti.new.group_by { |item| item }
+    expect(grouped).to eq({[1, 2] => [[1, 2]], [3, 4, 5] => [[3, 4, 5]], [6, 7, 8, 9] => [[6, 7, 8, 9]]})
+  end
+end
+
+context "Enumerable#filter_map" do
+  elements = numerous((1..8).to_a)
+
+  specify "returns an empty array if there are no elements" do
+    expect(Empty.new.filter_map { true }).to eq([])
+  end
+
+  specify "returns an array with truthy results of passing each element to block" do
+    expect(elements.filter_map { |item| item * 2 if item.even? }).to eq([4, 8, 12, 16])
+    expect(elements.filter_map { |item| item * 2 }).to eq([2, 4, 6, 8, 10, 12, 14, 16])
+    expect(elements.filter_map { 0 }).to eq([0, 0, 0, 0, 0, 0, 0, 0])
+    expect(elements.filter_map { false }).to eq([])
+    expect(elements.filter_map { nil }).to eq([])
+  end
+end
+
+context "Enumerable#chunk" do
+  specify "yields the current element and the current chunk to the block" do
+    mutable seen = []
+    numerous([1, 2, 3]).chunk { |item| seen << item }
+    expect(seen).to eq([1, 2, 3])
+  end
+
+  specify "returns elements of the Enumerable in an Array of Arrays, [v, ary], where 'ary' contains the consecutive elements for which the block returned the value 'v'" do
+    elements = numerous([1, 2, 3, 2, 3, 2, 1])
+    expect(elements.chunk { |item| item < 3 ? 1 : 0 }).to eq([[1, [1, 2]], [0, [3]], [1, [2]], [0, [3]], [1, [2, 1]]])
+  end
+
+  specify "returns a partitioned Array of values" do
+    expect(numerous([1, 2, 3]).chunk { |item| item > 2 }.map { |pair| pair.last }).to eq([[1, 2], [3]])
+  end
+
+  specify "returns elements for which the block returns :_alone in separate Arrays" do
+    elements = numerous([1, 2, 3, 2, 1])
+    expect(elements.chunk { |item| item < 2 ? :_alone : false }).to eq([[:_alone, [1]], [false, [2, 3, 2]], [:_alone, [1]]])
+  end
+
+  specify "does not return elements for which the block returns :_separator" do
+    elements = numerous([1, 2, 3, 3, 2, 1])
+    expect(elements.chunk { |item| item == 2 ? :_separator : 1 }).to eq([[1, [1]], [1, [3, 3]], [1, [1]]])
+  end
+
+  specify "does not return elements for which the block returns nil" do
+    elements = numerous([1, 2, 3, 2, 1])
+    expect(elements.chunk { |item| item == 2 ? nil : 1 }).to eq([[1, [1]], [1, [3]], [1, [1]]])
+  end
+end
+
+context "Enumerable#chunk_while" do
+  elements = numerous([10, 9, 7, 6, 4, 3, 2, 1])
+
+  describe "when given a block" do
+    specify "splits chunks between adjacent elements i and j where the block returns false" do
+      expect(elements.chunk_while { |left, right| left - 1 == right }).to eq([[10, 9], [7, 6], [4, 3, 2, 1]])
+    end
+
+    specify "calls the block for length of the receiver enumerable minus one times" do
+      mutable times_called = 0
+      elements.chunk_while do |left, right|
+        times_called += 1
+        left - 1 == right
+      end
+      expect(times_called).to eq(7)
+    end
+  end
+
+  describe "on a single-element array" do
+    specify "ignores the block and returns an enumerator that yields [element]" do
+      expect([1].chunk_while { |left, right| left.even? }).to eq([[1]])
+    end
+  end
+end
+
+context "Enumerable#slice_when" do
+  elements = numerous([10, 9, 7, 6, 4, 3, 2, 1])
+
+  describe "when given a block" do
+    specify "splits chunks between adjacent elements i and j where the block returns true" do
+      expect(elements.slice_when { |left, right| left - 1 != right }).to eq([[10, 9], [7, 6], [4, 3, 2, 1]])
+    end
+
+    specify "calls the block for length of the receiver enumerable minus one times" do
+      mutable times_called = 0
+      elements.slice_when do |left, right|
+        times_called += 1
+        left - 1 != right
+      end
+      expect(times_called).to eq(7)
+    end
+
+    specify "doesn't yield an empty array if the block matches the first or the last time" do
+      expect(elements.slice_when { true }).to eq([[10], [9], [7], [6], [4], [3], [2], [1]])
+    end
+
+    specify "doesn't yield an empty array on a small enumerable" do
+      expect(Empty.new.slice_when { true }).to eq([])
+      expect(numerous([42]).slice_when { true }).to eq([[42]])
+    end
+  end
+end
+
+context "Enumerable#slice_before" do
+  elements = numerous([7, 6, 5, 4, 3, 2, 1])
+
+  describe "when given a block" do
+    describe "and no argument" do
+      specify "calls the block to determine when to yield" do
+        expect(elements.slice_before { |item| item == 6 || item == 2 }).to eq([[7], [6, 5, 4, 3], [2, 1]])
+      end
+    end
+  end
+
+  specify "doesn't yield an empty array if the filter matches the first entry or the last entry" do
+    expect(elements.slice_before { true }).to eq([[7], [6], [5], [4], [3], [2], [1]])
+  end
+end
+
+context "Enumerable#slice_after" do
+  elements = numerous([7, 6, 5, 4, 3, 2, 1])
+
+  describe "when given a block" do
+    describe "and no argument" do
+      specify "calls the block to determine when to yield" do
+        expect(elements.slice_after { |item| item == 6 || item == 2 }).to eq([[7, 6], [5, 4, 3, 2], [1]])
+      end
+    end
+  end
+
+  specify "doesn't yield an empty array if the filter matches the first entry or the last entry" do
+    expect(elements.slice_after { true }).to eq([[7], [6], [5], [4], [3], [2], [1]])
+  end
+end
+
+context "when an iterator method yields more than one value" do
+  specify "processes all yielded values" do
+    expect(YieldsMulti.new.slice_after { |item| item == [3, 4, 5] }).to eq([[[1, 2], [3, 4, 5]], [[6, 7, 8, 9]]])
+  end
+end

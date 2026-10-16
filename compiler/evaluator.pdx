@@ -1005,7 +1005,7 @@ end
 # The names Ruby's Enumerable gives a struct that defines `each` (#110),
 # as far as the array arms carry them — the seed's list.
 def enumerable_name?(name)
-  %w[all? any? collect collect_concat compact count cycle detect drop drop_while each_slice each_with_index entries filter find find_all find_index first flat_map include? inject map max max_by member? min min_by minmax none? one? partition reduce reject reverse_each select sort sort_by sum take take_while tally to_a to_h uniq zip].include?(name)
+  %w[all? any? chunk chunk_while collect collect_concat compact count cycle detect drop drop_while each_cons each_slice each_with_index entries filter filter_map find find_all find_index first flat_map group_by include? inject map max max_by member? min min_by minmax minmax_by none? one? partition reduce reject reverse_each select slice_after slice_before slice_when sort sort_by sum take take_while tally to_a to_h uniq zip].include?(name)
 end
 
 # The elements an Enumerable struct's own `each` yields (#110), gathered by
@@ -2156,6 +2156,7 @@ def evaluate_method_call(node, mutable bindings)
   when "tally" then receiver.tally
   when "zip" then receiver.zip(value_at(arguments, 0))
   when "each_slice" then receiver.each_slice(value_at(arguments, 0))
+  when "each_cons" then receiver.each_cons(value_at(arguments, 0))
   # Guest-aware (#105): a guest symbol, struct, or enum case is a tagged
   # array here, which the host's flatten would open. An array flattens all
   # the way bare; a hash lays its pairs out one level, deeper on request.
@@ -3106,6 +3107,124 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       end
     end
     outcome([result], scope)
+  # Ruby's Enumerable over runs and groups (#110), each riding the host's
+  # own arm by name so a refusal quotes the method written; a hash walks
+  # as its pairs. `chunk` is written out, since a guest symbol is a tagged
+  # array the host's `chunk` would not know as `:_alone`.
+  when "filter_map", "group_by", "chunk_while", "slice_when", "slice_before", "slice_after", "minmax_by"
+    elements = (receiver in Hash) ? receiver.to_a : receiver
+    results = case node.name
+    when "filter_map"
+      elements.filter_map do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        panic("filter_map block produced no value") if step.value.empty?
+        slot_value(step.value)
+      end
+    when "group_by"
+      elements.group_by do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        panic("group_by block produced no value") if step.value.empty?
+        slot_value(step.value)
+      end
+    when "minmax_by"
+      elements.minmax_by do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        panic("minmax_by block produced no value") if step.value.empty?
+        slot_value(step.value)
+      end
+    when "chunk_while"
+      elements.chunk_while do |left, right|
+        step = run_guest_block(block, [left, right], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        slot_value(step.value)
+      end
+    when "slice_when"
+      elements.slice_when do |left, right|
+        step = run_guest_block(block, [left, right], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        slot_value(step.value)
+      end
+    when "slice_before"
+      elements.slice_before do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        slot_value(step.value)
+      end
+    else
+      elements.slice_after do |element|
+        step = run_guest_block(block, [element], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        slot_value(step.value)
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  when "chunk"
+    elements = (receiver in Hash) ? receiver.to_a : receiver
+    mutable runs = []
+    mutable open = false
+    elements.each do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("chunk block produced no value") if step.value.empty?
+      key = slot_value(step.value)
+      if key.nil? || key == ["__symbol__", "_separator"]
+        open = false
+        next
+      end
+      if key == ["__symbol__", "_alone"]
+        runs += [[key, [element]]]
+        open = false
+        next
+      end
+      if (key in ["__symbol__", *]) && value_at(key, 1).start_with?("_")
+        panic("symbols beginning with an underscore are reserved")
+      end
+      if open && value_at(value_at(runs, runs.length - 1), 0) == key
+        last = value_at(runs, runs.length - 1)
+        runs = runs.take(runs.length - 1) + [[key, value_at(last, 1) + [element]]]
+      else
+        runs += [[key, [element]]]
+        open = true
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([runs], scope)
   when "flat_map", "collect_concat"
     results = receiver.flat_map do |element|
       step = run_guest_block(block, [element], scope)
