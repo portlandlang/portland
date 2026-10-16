@@ -515,8 +515,10 @@ def expand_heredoc_line(lines, line_index)
       index = closing
       next
     end
-    refuse_other_heredoc(line, index)
-    terminator = heredoc_terminator(line, index)
+    # Only a `<` can open one; asking at every character would read the
+    # line's characters out again each time.
+    refuse_other_heredoc(line, index) if character == "<"
+    terminator = character == "<" ? heredoc_terminator(line, index) : ""
     if terminator.empty?
       result << character
       index += 1
