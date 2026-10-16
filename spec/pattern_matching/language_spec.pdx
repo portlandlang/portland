@@ -1,0 +1,253 @@
+# The rows of ruby/spec language/pattern_matching_spec.rb that Portland's
+# pattern grammar carries (#115), beside the house specs in this directory.
+# Out, as the ledger records (docs/ruby/pattern-matching.md): the find
+# pattern, positional and Constant[...] forms, the deconstruct protocols,
+# refinements, and the rows that reach eval, lambdas, regexps, or a side
+# effect in the subject; captures are fenced, so an arm that did not match
+# binds nothing. Hash patterns, unless guards, the => capture, reused _
+# names, and pinning a name bound earlier in the pattern wait on #168. A
+# match with no arm and no else refuses rather than raising.
+
+require_relative "../spec_helper"
+
+context "Pattern matching" do
+  describe "Rightward assignment (`=>`) that can be standalone assoc operator that" do
+    specify "deconstructs value" do
+      [0, 1] => [first, second]
+      expect([first, second]).to eq([0, 1])
+    end
+  end
+
+  describe "One-line pattern matching" do
+    specify "can be used to check if a pattern matches for Array-like entities" do
+      expect(([0, 1] in [left, right])).to be_true
+      expect(([0, 1] in [one, two, three])).to be_false
+    end
+  end
+
+  specify "extends case expression with case/in construction" do
+    answer = case [0, 1]
+    in [0] then :foo
+    in [0, 1] then :bar
+    end
+    expect(answer).to eq(:bar)
+  end
+
+  specify "allows using then operator" do
+    answer = case [0, 1]
+    in [0] then :foo
+    in [0, 1] then :bar
+    end
+    expect(answer).to eq(:bar)
+  end
+
+  specify "binds variables" do
+    answer = case [0, 1]
+    in [0, bound] then bound
+    end
+    expect(answer).to eq(1)
+  end
+
+  specify "checks patterns until the first matching" do
+    answer = case [0, 1]
+    in [0] then :foo
+    in [0, 1] then :bar
+    in [0, 1] then :baz
+    end
+    expect(answer).to eq(:bar)
+  end
+
+  specify "executes else clause if no pattern matches" do
+    answer = case [0, 1]
+    in [0] then true
+    else false
+    end
+    expect(answer).to be_false
+  end
+
+  describe "guards" do
+    specify "supports if guard" do
+      vetoed = case 0
+      in 0 if false then true
+      else false
+      end
+      expect(vetoed).to be_false
+
+      allowed = case 0
+      in 0 if true then true
+      else false
+      end
+      expect(allowed).to be_true
+    end
+
+    specify "makes bound variables visible in guard" do
+      answer = case [0, 1]
+      in [bound, 1] if bound >= 0 then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "does not evaluate guard if pattern does not match" do
+      answer = case 0
+      in 1 if (1 / 0) == 0 then true
+      else false
+      end
+      expect(answer).to be_false
+    end
+
+    specify "takes guards into account when there are several matching patterns" do
+      answer = case 0
+      in 0 if false then :foo
+      in 0 if true then :bar
+      end
+      expect(answer).to eq(:bar)
+    end
+
+    specify "executes else clause if no guarded pattern matches" do
+      answer = case 0
+      in 0 if false then true
+      else false
+      end
+      expect(answer).to be_false
+    end
+  end
+
+  describe "value pattern" do
+    specify "matches an object such that pattern === object" do
+      literal = case 0
+      in 0 then true
+      end
+      expect(literal).to be_true
+
+      range = case 0
+      in 0..1 then true
+      else false
+      end
+      expect(range).to be_true
+
+      type = case 0
+      in Integer then true
+      end
+      expect(type).to be_true
+    end
+
+    specify "allows string literal with interpolation" do
+      letter = "x"
+      answer = case "x"
+      in "#{letter + ""}" then true
+      end
+      expect(answer).to be_true
+    end
+  end
+
+  describe "variable pattern" do
+    specify "matches a value and binds variable name to this value" do
+      answer = case 0
+      in anything then anything
+      end
+      expect(answer).to eq(0)
+    end
+
+    specify "makes bounded variable visible outside a case statement scope" do
+      case 0
+      in escaped then escaped
+      end
+      expect(escaped).to eq(0)
+    end
+
+    specify "allow using _ name to drop values" do
+      answer = case [0, 1]
+      in [kept, _] then kept
+      end
+      expect(answer).to eq(0)
+    end
+
+    specify "supports existing variables in a pattern specified with ^ operator" do
+      pinned = 0
+      answer = case 0
+      in ^pinned then true
+      end
+      expect(answer).to be_true
+    end
+  end
+
+  describe "alternative pattern" do
+    specify "matches if any of patterns matches" do
+      answer = case 0
+      in 0 | 1 | 2 then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "support underscore prefixed variables in alternation" do
+      answer = case [0, 1]
+      in [1, _] then false
+      in [0, 0] | [0, _a] then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "can be used as a nested pattern" do
+      answer = case [[1], ["2"]]
+      in [[0] | nil, _] then false
+      in [[1], [1]] then false
+      in [[1], [2 | "2"]] then true
+      end
+      expect(answer).to be_true
+    end
+  end
+
+  describe "Array pattern" do
+    specify "supports form [pat, pat, ...]" do
+      answer = case [0, 1, 2]
+      in [0, 1, 2] then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "binds variables" do
+      answer = case [0, 1, 2]
+      in [first, second, third] then [first, second, third]
+      end
+      expect(answer).to eq([0, 1, 2])
+    end
+
+    specify "supports splat operator *rest" do
+      answer = case [0, 1, 2]
+      in [0, *rest] then rest
+      end
+      expect(answer).to eq([1, 2])
+    end
+
+    specify "does not match partially by default" do
+      answer = case [0, 1, 2, 3]
+      in [1, 2] then true
+      else false
+      end
+      expect(answer).to be_false
+    end
+
+    specify "does match partially from the array beginning if list + , syntax used" do
+      answer = case [0, 1, 2, 3]
+      in [0, 1, *] then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "matches [] with []" do
+      answer = case []
+      in [] then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "can be used as a nested pattern" do
+      answer = case [[1], ["2"]]
+      in [[0] | nil, _] then false
+      in [[1], [1]] then false
+      in [[1], [2 | "2"]] then true
+      end
+      expect(answer).to be_true
+    end
+  end
+end

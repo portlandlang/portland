@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **pattern_matching from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — twenty-eight rows into `spec/pattern_matching/language_spec.pdx`. Five Ruby forms both implementations refuse and the ledger does not rule on are filed as [#168](https://github.com/portlandlang/portland/issues/168): hash patterns on a hash, `unless` guards, the `=> name` capture, reused `_` names, and pinning a name bound earlier in the same pattern.
+
 - **precedence and module from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — the arithmetic and logical rows of precedence into `spec/number/precedence_spec.pdx`; module recorded against the namespace specs.
 
 - **alias, yield, and the hash and string literals ported from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — into `spec/method/{alias,yield}_spec.pdx`, `spec/hash/literal_spec.pdx`, and `spec/string/literal_spec.pdx`. The omitted-value hash shorthand `{name:, port:}` refuses on both implementations and is filed as [#167](https://github.com/portlandlang/portland/issues/167).

@@ -2010,6 +2010,11 @@ language/or_spec.rb:
   status: partial_intentional
   reason: "or and || are dead-identical, so the precedence rows diverge on purpose; the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
   link: docs/ruby/word-operators.md
+language/pattern_matching_spec.rb:
+  pdx: [spec/pattern_matching/language_spec.pdx]
+  status: partial_planned
+  reason: "Hash patterns, unless guards, the => capture, reused _ names, and pinning a name bound earlier in the pattern wait on #168; the find pattern, positional and Constant[...] forms, the deconstruct protocols, refinements, and the eval, lambda, regexp, and side-effect rows stay upstream, and an arm that did not match binds nothing."
+  link: https://github.com/portlandlang/portland/issues/168
 language/precedence_spec.rb:
   pdx: [spec/number/precedence_spec.pdx]
   status: partial_intentional
