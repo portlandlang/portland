@@ -1,5 +1,5 @@
-# The typed-results toolkit under load: failure boxes, or-fallbacks, and !
-# propagation (ADR 0027).
+# The typed-results toolkit under load: failure boxes, or-fallbacks, and the
+# spelled-out propagation guard (ADR 0027, ADR 0044).
 
 def risky(value)
   return failure("odd one out") if value % 5 == 0
@@ -7,7 +7,8 @@ def risky(value)
 end
 
 def doubled_or_zero(value)
-  amount = risky!(value)
+  amount = risky(value)
+  return amount if amount.failure?
   amount + 1
 end
 
