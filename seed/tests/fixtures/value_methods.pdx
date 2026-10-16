@@ -170,6 +170,23 @@ p(counting.to_h { [it, it * 2] })
 p(counting.rfind { it < 3 })
 counting.reverse_each { |number| puts number }
 
+# A hash's own methods (#105).
+menu = {"tea" => 2, "scone" => 3, "gift" => nil}
+p(menu.compact.select { |item, price| price > 2 })
+p(menu.compact.reject { |item, price| price > 2 })
+p(menu.compact.transform_values { |price| price * 100 })
+p(menu.compact.transform_keys { |item| item.upcase })
+p(menu.compact.invert)
+p(menu.compact.to_h { |item, price| [price, item] })
+p(menu.slice("tea", "gift"))
+p(menu.except("gift"))
+p(menu.has_value?(3))
+p(menu.value?(9))
+p(menu.key(2))
+p(menu.values_at("scone", "none"))
+menu.each_key { |item| puts(item) }
+menu.compact.each_value { |price| puts(price) }
+
 # The builtin types' own functions (ADR 0058).
 p(Array.new(3) { |index| index * index })
 p(Array.new(2, "x"))

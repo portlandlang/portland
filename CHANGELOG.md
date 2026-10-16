@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A hash's own methods** ([#105](https://github.com/portlandlang/portland/issues/105)) — on both implementations, answering as Ruby's do: `select`, `filter`, and `reject` answer a hash and hand a one-parameter block the key; `transform_keys` and `transform_values` rewrite one side, a later key winning a collision; `to_h` bare and with a block; `invert`, `compact`, `slice` and `except` of any number of keys, `has_value?`/`value?`, `key` (a maybe), `values_at`, `each_key`, and `each_value`. Keys match by `eql?` as a lookup's do, values by Ruby's `==`.
+
 - **A hash walks as its pairs** ([#105](https://github.com/portlandlang/portland/issues/105)) — Ruby's Enumerable over a hash, on both implementations: `map`, `flat_map`, `any?`/`all?`/`none?`/`one?`, `find`, `find_all`, `count`, `sum`, `min_by`/`max_by`, `sort_by`, `partition`, `first`, `sort`, `min`/`max`/`minmax`, `take`/`drop`, `take_while`, `zip`, `reduce`, `uniq`, and `tally` yield or answer `[key, value]` pairs, which a two-parameter block spreads (ADR 0057). `each_with_index` and `reverse_each` answer the hash itself, as Ruby's do. The names a hash answers for itself — `each`, `select`, `reject`, and kin — are unchanged. On the way: arrays take `count` with a block, and `sort` orders an array of arrays element by element.
 
 - **ruby/spec's `Array.new` and `Integer.sqrt` files ported** ([#104](https://github.com/portlandlang/portland/issues/104), [#107](https://github.com/portlandlang/portland/issues/107)) — `spec/array/construction_spec.pdx` and `spec/number/integer/sqrt_spec.pdx`. `core/array/each_spec.rb`'s multi-parameter row is recorded against ADR 0057: it nil-fills from a symbol.

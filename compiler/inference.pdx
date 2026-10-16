@@ -437,6 +437,17 @@ def call_answer(receiver, node, types)
   when "values"
     return ["array", type_at(receiver, 2)] if receiver in ["hash", *]
     ["array", ["unknown"]]
+  # A hash's own answers (#105).
+  when "invert"
+    return ["hash", type_at(receiver, 2), type_at(receiver, 1)] if receiver in ["hash", *]
+    ["unknown"]
+  when "has_value?", "value?" then ["boolean"]
+  when "key"
+    return ["maybe", type_at(receiver, 1)] if receiver in ["hash", *]
+    ["unknown"]
+  when "values_at", "except", "to_h"
+    return receiver if (receiver in ["hash", *]) && name != "values_at"
+    ["unknown"]
   when "first", "last", "min", "max"
     # With a count, `first(2)` answers a slice, not a maybe; the survey for
     # ADR 0047 shape 3 found this arm calling one an Integer?.
@@ -491,6 +502,8 @@ def synthesize_shape_answer(receiver, name)
   case name
   when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection"
     return receiver if receiver in ["array", *]
+    # A hash's compact and slice answer a hash (#105).
+    return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
     return ["string"] if receiver == ["string"] && name == "slice"
     ["unknown"]
   when "merge"
@@ -534,6 +547,17 @@ def synthesize_block_call(node, receiver, types)
   when "select", "filter", "reject", "each", "each_with_index", "reverse_each"
     return receiver if (receiver in ["array", *]) || (receiver in ["hash", *])
     ["unknown"]
+  # A hash's own walks (#105): the key side or the value side rewritten
+  # by the block, or walked and the hash answered.
+  when "transform_values"
+    return ["hash", type_at(receiver, 1), body] if receiver in ["hash", *]
+    ["unknown"]
+  when "transform_keys"
+    return ["hash", body, type_at(receiver, 2)] if receiver in ["hash", *]
+    ["unknown"]
+  when "each_key", "each_value"
+    return receiver if receiver in ["hash", *]
+    ["unknown"]
   # A hash's sort_by, take_while, and drop_while answer its pairs as an
   # array, as Ruby's do (#105), so only an array keeps its own type here.
   when "sort_by", "take_while", "drop_while", "each_index"
@@ -562,6 +586,8 @@ def block_parameter_type(receiver, index, name, argument_types, parameter_count:
     return ["unknown"]
   end
   if receiver in ["hash", *]
+    # `each_value` and `transform_values` hand the value alone (#105).
+    return type_at(receiver, 2) if index == 0 && (name == "each_value" || name == "transform_values")
     return type_at(receiver, 1) if index == 0
     return type_at(receiver, 2) if index == 1
     return ["unknown"]
@@ -635,7 +661,7 @@ def builtin_table(type)
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[empty?/0 end_with?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 some?/0 start_with?/1 to_s/0]
   in ["array", *] then %w[all?/0& any?/0& assoc/1 at/1 collect/0& collect_concat/0& compact/0 count/0-1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& rassoc/1 reduce/1& reject/0& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 select/0& size/0 slice/2 some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
-  in ["hash", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& count/0-1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_pair/0& each_with_index/0& empty?/0 entries/0 failure?/0 find/0& find_all/0& find_index/0& first/0-1 flat_map/0& has_key?/1 include?/1 inject/1& key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& reduce/1& reverse_each/0& size/0 some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_s/0 uniq/0 values/0 zip/1]
+  in ["hash", *] then %w[all?/0& any?/0& collect/0& collect_concat/0& compact/0 count/0-1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 except/0+ failure?/0 filter/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["range"] then %w[all?/0& any?/0& collect/0& collect_concat/0& count/0-1& detect/0& drop_while/0& each/0& each_with_index/0& failure?/0 filter/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0]
   else
     nil

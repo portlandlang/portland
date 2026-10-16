@@ -1770,6 +1770,21 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A hash's own methods (#105), answering as Ruby's do (4.0.6, the
+/// expected lines): `select`, `filter`, and `reject` answer a hash and hand
+/// a one-parameter block the key; `transform_keys` and `transform_values`
+/// rewrite one side; `to_h` with a block rebuilds from pairs; `invert`,
+/// `compact`, `slice`, `except`, `has_value?`/`value?`, `key`, `values_at`,
+/// `each_key`, and `each_value`.
+#[test]
+fn a_hashs_own_methods_match_ruby() {
+    assert_both_print(
+        "evaluator_hash_own.pdx",
+        "table = {\"a\" => 1, \"b\" => 2, \"c\" => 3}\np(table.select { |key, value| value > 1 })\np(table.filter { |key, value| value < 3 })\np(table.reject { |key, value| value > 1 })\np(table.select { |pair| pair == \"a\" })\np(table.transform_values { |value| value * 10 })\np(table.transform_keys { |key| key.upcase })\np(table.invert)\np(table.to_h)\np(table.to_h { |key, value| [value, key] })\np(table.compact)\np({\"a\" => nil, \"b\" => 1}.compact)\np(table.slice(\"a\", \"c\", \"z\"))\np(table.except(\"b\"))\np(table.has_value?(2))\np(table.value?(9))\np(table.key(2))\np(table.key(9))\np(table.values_at(\"c\", \"a\", \"z\"))\np(table.each_key { |key| key })\np(table.each_value { |value| value })\ntable.each_key { |key| puts(key) }\ntable.each_value { |value| puts(value) }\np({}.select { |key, value| true })\n",
+        "{\"b\" => 2, \"c\" => 3}\n{\"a\" => 1, \"b\" => 2}\n{\"a\" => 1}\n{\"a\" => 1}\n{\"a\" => 10, \"b\" => 20, \"c\" => 30}\n{\"A\" => 1, \"B\" => 2, \"C\" => 3}\n{1 => \"a\", 2 => \"b\", 3 => \"c\"}\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\n{1 => \"a\", 2 => \"b\", 3 => \"c\"}\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\n{\"b\" => 1}\n{\"a\" => 1, \"c\" => 3}\n{\"a\" => 1, \"c\" => 3}\ntrue\nfalse\n\"b\"\nnil\n[3, 1, nil]\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\na\nb\nc\n1\n2\n3\n{}\n",
+    );
+}
+
 /// A hash walks as its pairs (#105): Ruby's Enumerable over a hash yields
 /// `[key, value]`, spread by a two-parameter block (ADR 0057), and
 /// `each_with_index` and `reverse_each` answer the hash itself, as Ruby's

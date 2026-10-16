@@ -2810,6 +2810,76 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
+                // The pairs the block keeps, or the rest, as a hash (#105).
+                // The block is handed the key and the value, so a
+                // one-parameter block sees the key, as Ruby's does.
+                (Value::Hash(pairs), "select" | "filter" | "reject", []) => {
+                    let keeping = name != "reject";
+                    let mut kept = Vec::new();
+                    for (key, value) in pairs.iter().cloned() {
+                        let verdict = self.run_block(block, vec![key.clone(), value.clone()]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(answer)) => {
+                                if answer == keeping {
+                                    kept.push((key, value));
+                                }
+                            }
+                            other => {
+                                panic!("{name} block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::hash(kept))
+                }
+                (Value::Hash(pairs), "each_key" | "each_value", []) => {
+                    for (key, value) in pairs.iter().cloned() {
+                        let handed = if name == "each_key" { key } else { value };
+                        self.run_block(block, vec![handed]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                // One side rewritten by the block; keys that collide after
+                // the rewrite keep the later value, as Ruby's do.
+                (Value::Hash(pairs), "transform_keys" | "transform_values", []) => {
+                    let mut rewritten = Vec::new();
+                    for (key, value) in pairs.iter().cloned() {
+                        let handed = if name == "transform_keys" {
+                            key.clone()
+                        } else {
+                            value.clone()
+                        };
+                        let answer = self.run_block(block, vec![handed]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let answer =
+                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        rewritten.push(if name == "transform_keys" {
+                            Value::array(vec![answer, value])
+                        } else {
+                            Value::array(vec![key, answer])
+                        });
+                    }
+                    Some(array_pairs_to_hash(rewritten.into_iter()))
+                }
+                // Each pair as the block answers it, into a new hash.
+                (Value::Hash(pairs), "to_h", []) => {
+                    let mut built = Vec::new();
+                    for (key, value) in pairs.iter().cloned() {
+                        let pair = self.run_block(block, vec![key, value]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        built.push(pair.unwrap_or_else(|| panic!("to_h block produced no value")));
+                    }
+                    Some(array_pairs_to_hash(built.into_iter()))
+                }
                 // Twins share their survivor's arm (ADR 0036): one body, two
                 // names, drift impossible.
                 (Value::Array(elements), "map" | "collect", []) => {
@@ -3326,6 +3396,52 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Hash(pairs), "keys", []) => {
                 Value::array(pairs.iter().map(|(key, _)| key.clone()).collect())
             }
+            // A hash's own answers (#105): keys match by `eql?` as a lookup's
+            // do, values by Ruby's `==`.
+            (hash @ Value::Hash(_), "to_h", []) => hash.clone(),
+            (Value::Hash(pairs), "invert", []) => array_pairs_to_hash(
+                pairs
+                    .iter()
+                    .map(|(key, value)| Value::array(vec![value.clone(), key.clone()])),
+            ),
+            (Value::Hash(pairs), "compact", []) => Value::hash(
+                pairs
+                    .iter()
+                    .filter(|(_, value)| !matches!(value, Value::Nil))
+                    .cloned()
+                    .collect(),
+            ),
+            (Value::Hash(pairs), "slice", wanted) => Value::hash(
+                wanted
+                    .iter()
+                    .filter_map(|key| pairs.iter().find(|(existing, _)| existing == key).cloned())
+                    .collect(),
+            ),
+            (Value::Hash(pairs), "except", unwanted) => Value::hash(
+                pairs
+                    .iter()
+                    .filter(|(key, _)| !unwanted.contains(key))
+                    .cloned()
+                    .collect(),
+            ),
+            (Value::Hash(pairs), "has_value?" | "value?", [needle]) => {
+                Value::Boolean(pairs.iter().any(|(_, value)| value.ruby_equals(needle)))
+            }
+            (Value::Hash(pairs), "key", [needle]) => pairs
+                .iter()
+                .find(|(_, value)| value.ruby_equals(needle))
+                .map_or(Value::Nil, |(key, _)| Value::present(key.clone())),
+            (Value::Hash(pairs), "values_at", wanted) => Value::array(
+                wanted
+                    .iter()
+                    .map(|key| {
+                        pairs
+                            .iter()
+                            .find(|(existing, _)| existing == key)
+                            .map_or(Value::Nil, |(_, value)| value.clone())
+                    })
+                    .collect(),
+            ),
             // The functional update writ large: the right side wins
             // collisions in place, new keys append in the right's order, and
             // both originals stay untouched (values never mutate, ADR 0015).
