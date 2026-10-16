@@ -1277,6 +1277,156 @@ core/nil/xor_spec.rb:
   reason: "nil has no methods beyond nil? and some? — absence is explicit; handle the nil case first."
   link: docs/ruby/nil-and-optionals.md
 
+# — core/numeric —
+# Numeric is the class Ruby's numbers inherit from, and most of its files
+# drive a mock subclass through coerce, <=>, and to_f. There is no
+# inheritance and no Numeric here (ADR 0028): a number is an Integer or a
+# Float, each specced in spec/number/. The Rational and Complex files
+# (abs2, arg, conjugate, denominator, i, imaginary, numerator, polar, real,
+# rectangular, to_c) wait on #124; step waits on its own rows.
+
+core/numeric/abs_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass through < and -@; there is no inheritance and no Numeric, and abs is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/angle_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  link: docs/ruby/metaprogramming.md
+core/numeric/ceil_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass through to_f; there is no inheritance and no Numeric, and ceil is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015); there is no Numeric subclass to clone either."
+  link: docs/ruby/mutability.md
+core/numeric/coerce_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass; there is no inheritance and no Numeric, and the coercion protocol itself is #155's question."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/comparison_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass; there is no inheritance and no Numeric, and <=> is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/conj_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  link: docs/ruby/metaprogramming.md
+core/numeric/div_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass; there is no inheritance and no Numeric, and div is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/divmod_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass; there is no inheritance and no Numeric, and divmod is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015); there is no Numeric subclass to dup either."
+  link: docs/ruby/mutability.md
+core/numeric/eql_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass; there is no inheritance and no Numeric, and eql? itself is #154's question."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/fdiv_spec.rb:
+  pdx: [spec/number/integer/division_spec.pdx, spec/number/float/division_spec.pdx]
+  status: partial_intentional
+  reason: "The to_f coercion rows drive a mock Numeric subclass, and the bignum row waits on #156; fdiv itself is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/finite_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass; there is no inheritance and no Numeric, and finite? is specced on Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/floor_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass through to_f; there is no inheritance and no Numeric, and floor is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/imag_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  link: docs/ruby/metaprogramming.md
+core/numeric/infinite_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass; there is no inheritance and no Numeric, and infinite? is specced on Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/integer_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass; there is no inheritance and no Numeric, and integer? is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/magnitude_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; magnitude is abs's twin on Integer and Float (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/numeric/modulo_spec.rb:
+  status: skipped
+  reason: "One row compares method objects and the other drives mock Numerics through div, *, and -; modulo is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/negative_spec.rb:
+  pdx: [spec/number/integer/sign_spec.pdx, spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass rows drive a mock Numeric through <; there is no inheritance and no Numeric, and negative? is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/nonzero_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass through zero?; there is no inheritance and no Numeric."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/numeric_spec.rb:
+  status: skipped
+  reason: "The row asks the Numeric class object whether it includes Comparable; there is no Numeric, and ordering is ADR 0054's."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/phase_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  link: docs/ruby/metaprogramming.md
+core/numeric/positive_spec.rb:
+  pdx: [spec/number/integer/sign_spec.pdx, spec/number/float/sign_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass rows drive a mock Numeric through >; there is no inheritance and no Numeric, and positive? is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/quo_spec.rb:
+  pdx: [spec/number/float/division_spec.pdx]
+  status: partial_planned
+  reason: "quo answers a Rational for two integers, which waits on the Rational decision; the Float rows are specced, the bignum rows wait on #156, and the to_r row drives a mock subclass."
+  link: https://github.com/portlandlang/portland/issues/124
+core/numeric/rect_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  link: docs/ruby/metaprogramming.md
+core/numeric/remainder_spec.rb:
+  status: skipped
+  reason: "Every row drives mock Numerics through coerce, %, <, and >; there is no inheritance and no Numeric, and remainder is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/round_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass through to_f; there is no inheritance and no Numeric, and round is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/singleton_method_added_spec.rb:
+  status: skipped
+  reason: "Singleton methods do not exist; the runtime kind is gone."
+  link: docs/ruby/metaprogramming.md
+core/numeric/to_int_spec.rb:
+  status: skipped
+  reason: "to_int is a false alias of to_i that refuses (ADR 0036), and the row drives a mock Numeric subclass."
+  link: docs/ruby/aliases.md
+core/numeric/truncate_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass through to_f; there is no inheritance and no Numeric, and truncate is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/uminus_spec.rb:
+  pdx: [spec/number/integer/operators_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass row drives a mock Numeric through coerce; the two's-complement rows are bignums (#156); unary minus is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/uplus_spec.rb:
+  status: skipped
+  reason: "The row drives a mock Numeric subclass; there is no inheritance and no Numeric, and unary plus is the identity on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/zero_spec.rb:
+  status: skipped
+  reason: "Every row drives a mock Numeric subclass through ==; there is no inheritance and no Numeric, and zero? is specced on Integer and Float."
+  link: docs/ruby/mixins-and-inheritance.md
+
 # — core/range —
 
 core/range/begin_spec.rb:
