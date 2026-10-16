@@ -150,17 +150,29 @@ fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
     let cap = usize::try_from(limit).ok().filter(|cap| *cap > 0);
     let full = |pieces: &Vec<String>| cap.is_some_and(|cap| pieces.len() + 1 == cap);
     let mut pieces: Vec<String> = Vec::new();
+    // Ruby's whitespace is ASCII's six — a U+2008 punctuation space is not
+    // a field break.
+    let ascii_space =
+        |character: char| matches!(character, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
     match separator {
         None | Some(" ") => {
-            let mut rest = text.trim_start();
+            let mut rest = text.trim_start_matches(ascii_space);
+            let mut took_the_rest = false;
             while !rest.is_empty() {
                 if full(&pieces) {
                     pieces.push(rest.to_string());
+                    took_the_rest = true;
                     break;
                 }
-                let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+                let end = rest.find(ascii_space).unwrap_or(rest.len());
                 pieces.push(rest[..end].to_string());
-                rest = rest[end..].trim_start();
+                rest = rest[end..].trim_start_matches(ascii_space);
+            }
+            // Trailing whitespace is one empty field, which a limit keeps:
+            // `" 1 2 ".split(" ", 3)` is `["1", "2", ""]`, and `" "` with a
+            // limit is `[""]`. Without one it drops below with the rest.
+            if limit != 0 && !took_the_rest && text.ends_with(ascii_space) {
+                pieces.push(String::new());
             }
         }
         Some("") => {
@@ -564,6 +576,90 @@ fn parsed_in_base(text: &str, base: u32) -> i64 {
         previous_underscore = false;
     }
     if negative { -value } else { value }
+}
+
+/// `String#to_f` by Ruby's rule (#106), which never fails: the longest
+/// leading run that reads as a decimal number is the answer, and 0.0 when
+/// there is none. Leading whitespace goes; then a sign; digits with a
+/// single underscore allowed between two of them; a fraction only when a
+/// digit follows the point, so `"5."` is 5.0; an exponent only when a
+/// digit follows its sign, so `"5e"` is 5.0 and `"1.2e__3"` is 1.2. No
+/// base prefixes (`"0x10"` is 0.0), no `Infinity` or `NaN`, and a bare
+/// sign keeps its sign: `"-0".to_f` is -0.0.
+fn ruby_to_f(text: &str) -> f64 {
+    let bytes = text.trim_start().as_bytes();
+    let mut at = 0;
+    let mut number = String::new();
+    if at < bytes.len() && (bytes[at] == b'+' || bytes[at] == b'-') {
+        if bytes[at] == b'-' {
+            number.push('-');
+        }
+        at += 1;
+    }
+    // A run of digits, underscores allowed only between two digits; answers
+    // how many bytes it spanned and whether it held a digit at all.
+    let digits = |from: usize, into: &mut String| -> usize {
+        let mut position = from;
+        let mut seen_digit = false;
+        while position < bytes.len() {
+            let byte = bytes[position];
+            if byte.is_ascii_digit() {
+                into.push(byte as char);
+                seen_digit = true;
+                position += 1;
+            } else if byte == b'_'
+                && seen_digit
+                && position + 1 < bytes.len()
+                && bytes[position + 1].is_ascii_digit()
+            {
+                position += 1;
+            } else {
+                break;
+            }
+        }
+        if seen_digit { position } else { from }
+    };
+    let after_whole = digits(at, &mut number);
+    let had_whole = after_whole > at;
+    at = after_whole;
+    if at < bytes.len() && bytes[at] == b'.' {
+        let mut fraction = String::new();
+        let after_fraction = digits(at + 1, &mut fraction);
+        if after_fraction > at + 1 {
+            if !had_whole {
+                number.push('0');
+            }
+            number.push('.');
+            number.push_str(&fraction);
+            at = after_fraction;
+        } else if had_whole && at + 1 < bytes.len() && matches!(bytes[at + 1], b'e' | b'E') {
+            // A bare point before an exponent is Ruby's (4.0) `"1.e-2"`,
+            // which is 0.01.
+            at += 1;
+        }
+    }
+    // A sign with no digits after it is nothing, not a signed zero: only
+    // `"-0"` is -0.0.
+    let has_digits = number.bytes().any(|byte| byte.is_ascii_digit());
+    if !has_digits {
+        return 0.0;
+    }
+    if at < bytes.len() && (bytes[at] == b'e' || bytes[at] == b'E') {
+        let mut exponent = String::new();
+        let mut start = at + 1;
+        if start < bytes.len() && (bytes[start] == b'+' || bytes[start] == b'-') {
+            if bytes[start] == b'-' {
+                exponent.push('-');
+            }
+            start += 1;
+        }
+        let after_exponent = digits(start, &mut exponent);
+        if after_exponent > start {
+            number.push('e');
+            number.push_str(&exponent);
+        }
+    }
+    number.parse().unwrap_or(0.0)
 }
 
 /// The steps of `String#upto` (#106), Ruby's `rb_str_upto_each` rule by
@@ -4449,12 +4545,19 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "reverse", []) => {
                 Value::String(text.graphemes(true).rev().collect())
             }
+            // A negative start counts from the end, as Ruby's does; a start
+            // past either end answers the empty string, never nil (ADR
+            // 0019 — a slice is a collection, never a maybe).
             (Value::String(text), "slice", [Value::Integer(start), Value::Integer(length)]) => {
-                let start = usize::try_from(*start)
-                    .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                Value::String(text.graphemes(true).skip(start).take(length).collect())
+                let count = text.graphemes(true).count() as i64;
+                let start = if *start < 0 { start + count } else { *start };
+                let taken: String = match usize::try_from(start) {
+                    Ok(start) => text.graphemes(true).skip(start).take(length).collect(),
+                    Err(_) => String::new(),
+                };
+                Value::String(taken)
             }
             // Ruby's rules, all of them (#142): see `ruby_split`.
             (Value::String(text), "split", []) => split_value(text, None, 0),
@@ -4480,10 +4583,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or_else(|_| panic!("to_i cannot parse {text:?} — no nil to return"));
                 Value::Integer(value)
             }
-            (Value::String(text), "to_f", []) => {
-                // Ruby's `to_f` never fails — unparseable text is 0.0.
-                Value::Float(text.trim().parse().unwrap_or(0.0))
-            }
+            (Value::String(text), "to_f", []) => Value::Float(ruby_to_f(text)),
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
             (Value::Integer(number), "to_i", []) => Value::Integer(*number),
             // An Integer's `ord` is itself, and its `size` the bytes of a
