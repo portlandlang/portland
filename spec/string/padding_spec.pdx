@@ -1,0 +1,105 @@
+# Padding a string to a width (#106), from ruby/spec core/string/{center,ljust,rjust}_spec.rb.
+# A width counts characters (ADR 0038). The to_int and to_str conversions
+# (ADR 0036), subclasses, encodings, and the refusals — a width that is not
+# an integer, a padding that is not a string, an empty padding — stay upstream.
+
+require_relative "../spec_helper"
+
+context "String#center with length, padding" do
+  specify "returns a new string of specified length with self centered and padded with padstr" do
+    expect("one".center(9, ".")).to eq("...one...")
+    expect("hello".center(20, "123")).to eq("1231231hello12312312")
+    expect("middle".center(13, "-")).to eq("---middle----")
+    expect("".center(1, "abcd")).to eq("a")
+    expect("".center(2, "abcd")).to eq("aa")
+    expect("".center(3, "abcd")).to eq("aab")
+    expect("".center(4, "abcd")).to eq("abab")
+    expect("".center(6, "xy")).to eq("xyxxyx")
+    expect("".center(11, "12345")).to eq("12345123451")
+    expect("|".center(2, "abcd")).to eq("|a")
+    expect("|".center(3, "abcd")).to eq("a|a")
+    expect("|".center(4, "abcd")).to eq("a|ab")
+    expect("|".center(5, "abcd")).to eq("ab|ab")
+    expect("|".center(6, "xy")).to eq("xy|xyx")
+    expect("|".center(7, "xy")).to eq("xyx|xyx")
+    expect("|".center(11, "12345")).to eq("12345|12345")
+    expect("|".center(12, "12345")).to eq("12345|123451")
+    expect("||".center(3, "abcd")).to eq("||a")
+    expect("||".center(4, "abcd")).to eq("a||a")
+    expect("||".center(5, "abcd")).to eq("a||ab")
+    expect("||".center(6, "abcd")).to eq("ab||ab")
+    expect("||".center(8, "xy")).to eq("xyx||xyx")
+    expect("||".center(12, "12345")).to eq("12345||12345")
+    expect("||".center(13, "12345")).to eq("12345||123451")
+  end
+
+  specify "pads with whitespace if no padstr is given" do
+    expect("two".center(5)).to eq(" two ")
+    expect("hello".center(20)).to eq("       hello        ")
+  end
+
+  specify "returns self if it's longer than or as long as the specified length" do
+    expect("".center(0)).to eq("")
+    expect("".center(-1)).to eq("")
+    expect("hello".center(4)).to eq("hello")
+    expect("hello".center(-1)).to eq("hello")
+    expect("this".center(3)).to eq("this")
+    expect("radiology".center(8, "-")).to eq("radiology")
+  end
+end
+
+context "String#ljust with length, padding" do
+  specify "returns a new string of specified length with self left justified and padded with padstr" do
+    expect("hello".ljust(20, "1234")).to eq("hello123412341234123")
+    expect("".ljust(1, "abcd")).to eq("a")
+    expect("".ljust(2, "abcd")).to eq("ab")
+    expect("".ljust(3, "abcd")).to eq("abc")
+    expect("".ljust(4, "abcd")).to eq("abcd")
+    expect("".ljust(6, "abcd")).to eq("abcdab")
+    expect("OK".ljust(3, "abcd")).to eq("OKa")
+    expect("OK".ljust(4, "abcd")).to eq("OKab")
+    expect("OK".ljust(6, "abcd")).to eq("OKabcd")
+    expect("OK".ljust(8, "abcd")).to eq("OKabcdab")
+  end
+
+  specify "pads with whitespace if no padstr is given" do
+    expect("hello".ljust(20)).to eq("hello               ")
+  end
+
+  specify "returns self if it's longer than or as long as the specified length" do
+    expect("".ljust(0)).to eq("")
+    expect("".ljust(-1)).to eq("")
+    expect("hello".ljust(4)).to eq("hello")
+    expect("hello".ljust(-1)).to eq("hello")
+    expect("this".ljust(3)).to eq("this")
+    expect("radiology".ljust(8, "-")).to eq("radiology")
+  end
+end
+
+context "String#rjust with length, padding" do
+  specify "returns a new string of specified length with self right justified and padded with padstr" do
+    expect("hello".rjust(20, "1234")).to eq("123412341234123hello")
+    expect("".rjust(1, "abcd")).to eq("a")
+    expect("".rjust(2, "abcd")).to eq("ab")
+    expect("".rjust(3, "abcd")).to eq("abc")
+    expect("".rjust(4, "abcd")).to eq("abcd")
+    expect("".rjust(6, "abcd")).to eq("abcdab")
+    expect("OK".rjust(3, "abcd")).to eq("aOK")
+    expect("OK".rjust(4, "abcd")).to eq("abOK")
+    expect("OK".rjust(6, "abcd")).to eq("abcdOK")
+    expect("OK".rjust(8, "abcd")).to eq("abcdabOK")
+  end
+
+  specify "pads with whitespace if no padstr is given" do
+    expect("hello".rjust(20)).to eq("               hello")
+  end
+
+  specify "returns self if it's longer than or as long as the specified length" do
+    expect("".rjust(0)).to eq("")
+    expect("".rjust(-1)).to eq("")
+    expect("hello".rjust(4)).to eq("hello")
+    expect("hello".rjust(-1)).to eq("hello")
+    expect("this".rjust(3)).to eq("this")
+    expect("radiology".rjust(8, "-")).to eq("radiology")
+  end
+end

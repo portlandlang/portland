@@ -1,0 +1,135 @@
+# Reading a string as a number in another base (#106), from ruby/spec
+# core/string/{hex,oct}_spec.rb. Ruby's octal literals (077) are written
+# with Portland's 0o prefix (docs/ruby/integer-literals.md); `oct` still
+# reads a 0d prefix in the text, as Ruby's does.
+
+require_relative "../spec_helper"
+
+context "String#hex" do
+  specify "treats leading characters of self as a string of hex digits" do
+    expect("0a".hex).to eq(10)
+    expect("0o".hex).to eq(0)
+    expect("0x".hex).to eq(0)
+    expect("A_BAD_BABE".hex).to eq(0xABADBABE)
+    expect("0b1010".hex).to eq("b1010".hex)
+    expect("0d500".hex).to eq("d500".hex)
+    expect("abcdefG".hex).to eq(0xabcdef)
+  end
+
+  specify "does not accept a sequence of underscores as part of a number" do
+    expect("a__b".hex).to eq(0xa)
+    expect("a____b".hex).to eq(0xa)
+    expect("a___f".hex).to eq(0xa)
+  end
+
+  specify "takes an optional sign" do
+    expect("-1234".hex).to eq(-4660)
+    expect("+1234".hex).to eq(4660)
+  end
+
+  specify "takes an optional 0x" do
+    expect("0x0a".hex).to eq(10)
+    expect("0a".hex).to eq(10)
+  end
+
+  specify "requires that the sign is in front of the 0x if present" do
+    expect("-0x1".hex).to eq(-1)
+    expect("0x-1".hex).to eq(0)
+  end
+
+  specify "returns 0 on error" do
+    expect("".hex).to eq(0)
+    expect("+-5".hex).to eq(0)
+    expect("wombat".hex).to eq(0)
+    expect("0x0x42".hex).to eq(0)
+  end
+
+  specify "returns 0 if sequence begins with underscore" do
+    expect("_a".hex).to eq(0)
+    expect("___b".hex).to eq(0)
+    expect("___0xc".hex).to eq(0)
+  end
+end
+
+context "String#oct" do
+  specify "treats numeric digits as base-8 digits by default" do
+    expect("0".oct).to eq(0)
+    expect("77".oct).to eq(0o77)
+    expect("077".oct).to eq(0o77)
+  end
+
+  specify "accepts numbers formatted as binary" do
+    expect("0b1010".oct).to eq(0b1010)
+  end
+
+  specify "accepts numbers formatted as hexadecimal" do
+    expect("0xFF".oct).to eq(0xFF)
+  end
+
+  specify "accepts numbers formatted as decimal" do
+    expect("0d500".oct).to eq(500)
+  end
+
+  describe "with a leading minus sign" do
+    specify "treats numeric digits as base-8 digits by default" do
+      expect("-12348".oct).to eq(-0o1234)
+    end
+
+    specify "accepts numbers formatted as binary" do
+      expect("-0b0101".oct).to eq(-0b0101)
+    end
+
+    specify "accepts numbers formatted as hexadecimal" do
+      expect("-0xEE".oct).to eq(-0xEE)
+    end
+
+    specify "accepts numbers formatted as decimal" do
+      expect("-0d500".oct).to eq(-500)
+    end
+  end
+
+  describe "with a leading plus sign" do
+    specify "treats numeric digits as base-8 digits by default" do
+      expect("+12348".oct).to eq(0o1234)
+    end
+
+    specify "accepts numbers formatted as binary" do
+      expect("+0b1010".oct).to eq(0b1010)
+    end
+
+    specify "accepts numbers formatted as hexadecimal" do
+      expect("+0xFF".oct).to eq(0xFF)
+    end
+
+    specify "accepts numbers formatted as decimal" do
+      expect("+0d500".oct).to eq(500)
+    end
+  end
+
+  specify "accepts a single underscore separating digits" do
+    expect("755_333".oct).to eq(0o755_333)
+  end
+
+  specify "does not accept a sequence of underscores as part of a number" do
+    expect("7__3".oct).to eq(0o7)
+    expect("7___3".oct).to eq(0o7)
+    expect("7__5".oct).to eq(0o7)
+  end
+
+  specify "ignores characters that are incorrect for the base-8 digits" do
+    expect("0o".oct).to eq(0)
+    expect("5678".oct).to eq(0o567)
+  end
+
+  specify "returns 0 if no characters can be interpreted as a base-8 number" do
+    expect("".oct).to eq(0)
+    expect("+-5".oct).to eq(0)
+    expect("wombat".oct).to eq(0)
+  end
+
+  specify "returns 0 for strings with leading underscores" do
+    expect("_7".oct).to eq(0)
+    expect("_07".oct).to eq(0)
+    expect(" _7".oct).to eq(0)
+  end
+end

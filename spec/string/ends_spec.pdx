@@ -1,0 +1,93 @@
+# A string's ends (#106), from ruby/spec core/string/{chop,chr,delete_prefix,delete_suffix}_spec.rb.
+# The bang forms (values never mutate, ADR 0015), the to_str conversion
+# (ADR 0036), subclasses, encodings, the broken-byte rows, and identity
+# checks stay upstream; chr's row mixing character widths spells one of
+# them with a \u escape Portland does not have.
+
+require_relative "../spec_helper"
+
+context "String#chop" do
+  specify "removes the final character" do
+    expect("abc".chop).to eq("ab")
+  end
+
+  specify "removes the final carriage return" do
+    expect("abc\r".chop).to eq("abc")
+  end
+
+  specify "removes the final newline" do
+    expect("abc\n".chop).to eq("abc")
+  end
+
+  specify "removes the final carriage return, newline" do
+    expect("abc\r\n".chop).to eq("abc")
+  end
+
+  specify "removes the carriage return, newline if they are the only characters" do
+    expect("\r\n".chop).to eq("")
+  end
+
+  specify "does not remove more than the final carriage return, newline" do
+    expect("abc\r\n\r\n".chop).to eq("abc\r\n")
+  end
+
+  specify "removes a multi-byte character" do
+    expect("あれ".chop).to eq("あ")
+  end
+
+  specify "removes the final carriage return, newline from a multibyte String" do
+    expect("あれ\r\n".chop).to eq("あれ")
+  end
+
+  specify "returns an empty string when applied to an empty string" do
+    expect("".chop).to eq("")
+  end
+end
+
+context "String#chr" do
+  specify "returns an empty String if self is an empty String" do
+    expect("".chr).to eq("")
+  end
+
+  specify "returns a 1-character String" do
+    expect("glark".chr.size).to eq(1)
+  end
+
+  specify "returns the character at the start of the String" do
+    expect("Goodbye, world".chr).to eq("G")
+  end
+
+  specify "understands multi-byte characters" do
+    s = "项"
+    expect(s.bytesize).to eq(3)
+    expect(s.chr).to eq(s)
+  end
+end
+
+context "String#delete_prefix" do
+  specify "returns a copy of the string, with the given prefix removed" do
+    expect("hello".delete_prefix("hell")).to eq("o")
+    expect("hello".delete_prefix("hello")).to eq("")
+  end
+
+  specify "returns a copy of the string, when the prefix isn't found" do
+    s = "hello"
+    expect(s.delete_prefix("hello!")).to eq(s)
+    expect(s.delete_prefix("ell")).to eq(s)
+    expect(s.delete_prefix("")).to eq(s)
+  end
+end
+
+context "String#delete_suffix" do
+  specify "returns a copy of the string, with the given suffix removed" do
+    expect("hello".delete_suffix("ello")).to eq("h")
+    expect("hello".delete_suffix("hello")).to eq("")
+  end
+
+  specify "returns a copy of the string, when the suffix isn't found" do
+    s = "hello"
+    expect(s.delete_suffix("!hello")).to eq(s)
+    expect(s.delete_suffix("ell")).to eq(s)
+    expect(s.delete_suffix("")).to eq(s)
+  end
+end

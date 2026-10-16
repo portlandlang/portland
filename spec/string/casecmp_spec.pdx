@@ -1,0 +1,104 @@
+# Comparing strings without regard to case (#106), from ruby/spec
+# core/string/casecmp_spec.rb. `casecmp` folds ASCII only and orders;
+# `casecmp?` folds fully and answers true or false, so "ß" and "ss" differ
+# under one and agree under the other, as Ruby's do. The to_str conversion
+# (ADR 0036), the nil answers for an unconvertible argument, the mixed
+# encodings, the binary-string rows, and subclasses stay upstream.
+
+require_relative "../spec_helper"
+
+context "String#casecmp independent of case" do
+  specify "returns -1 when less than other" do
+    expect("a".casecmp("b")).to eq(-1)
+    expect("A".casecmp("b")).to eq(-1)
+  end
+
+  specify "returns 0 when equal to other" do
+    expect("a".casecmp("a")).to eq(0)
+    expect("A".casecmp("a")).to eq(0)
+  end
+
+  specify "returns 1 when greater than other" do
+    expect("b".casecmp("a")).to eq(1)
+    expect("B".casecmp("a")).to eq(1)
+  end
+
+  describe "in UTF-8 mode" do
+    describe "for non-ASCII characters" do
+      specify "returns -1 when numerically less than other" do
+        expect("Ã".casecmp("ã")).to eq(-1)
+        expect("Ã".casecmp("Ä")).to eq(-1)
+      end
+
+      specify "returns 0 when numerically equal to other" do
+        expect("Ã".casecmp("Ã")).to eq(0)
+      end
+
+      specify "returns 1 when numerically greater than other" do
+        expect("ä".casecmp("Ä")).to eq(1)
+        expect("ä".casecmp("ã")).to eq(1)
+      end
+    end
+
+    describe "for ASCII characters" do
+      specify "returns -1 when less than other" do
+        expect("a".casecmp("b")).to eq(-1)
+        expect("A".casecmp("b")).to eq(-1)
+      end
+
+      specify "returns 0 when equal to other" do
+        expect("a".casecmp("a")).to eq(0)
+        expect("A".casecmp("a")).to eq(0)
+      end
+
+      specify "returns 1 when greater than other" do
+        expect("b".casecmp("a")).to eq(1)
+        expect("B".casecmp("a")).to eq(1)
+      end
+    end
+  end
+
+  describe "for non-ASCII characters" do
+    specify "does not case fold" do
+      expect("ß".casecmp("ss")).to eq(1)
+    end
+  end
+end
+
+context "String#casecmp? independent of case" do
+  specify "returns true when equal to other" do
+    expect("abc".casecmp?("abc")).to be_true
+    expect("abc".casecmp?("ABC")).to be_true
+  end
+
+  specify "returns false when not equal to other" do
+    expect("abc".casecmp?("DEF")).to be_false
+    expect("abc".casecmp?("def")).to be_false
+  end
+
+  describe "for UNICODE characters" do
+    specify "returns true when downcase(:fold) on unicode" do
+      expect("äöü".casecmp?("ÄÖÜ")).to be_true
+    end
+  end
+
+  describe "in UTF-8 mode" do
+    describe "for non-ASCII characters" do
+      specify "returns true when they are the same with normalized case" do
+        expect("Ã".casecmp?("ã")).to be_true
+      end
+
+      specify "returns false when they are unrelated" do
+        expect("Ã".casecmp?("Ä")).to be_false
+      end
+
+      specify "returns true when they have the same bytes" do
+        expect("Ã".casecmp?("Ã")).to be_true
+      end
+    end
+  end
+
+  specify "case folds" do
+    expect("ß".casecmp?("ss")).to be_true
+  end
+end

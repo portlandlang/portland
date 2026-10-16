@@ -1330,8 +1330,33 @@ core/range/step_spec.rb:
 
 # — core/string —
 
+core/string/bytes_spec.rb:
+  pdx: [spec/string/bytes_spec.pdx]
+  status: partial_intentional
+  reason: "bytes answers an array and takes no block; the block form is each_byte's job in Ruby and a walk's here."
+  link: docs/ruby/enumerators.md
+core/string/bytesize_spec.rb:
+  pdx: [spec/string/bytes_spec.pdx]
+core/string/casecmp_spec.rb:
+  pdx: [spec/string/casecmp_spec.pdx]
+core/string/center_spec.rb:
+  pdx: [spec/string/padding_spec.pdx]
+core/string/chars_spec.rb:
+  pdx: [spec/string/chars_spec.pdx]
+  status: partial_intentional
+  reason: "chars answers an array and takes no block; its block form is deprecated Ruby, and each_char's job."
+  link: docs/ruby/enumerators.md
 core/string/chomp_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
+core/string/chop_spec.rb:
+  pdx: [spec/string/ends_spec.pdx]
+core/string/chr_spec.rb:
+  pdx: [spec/string/ends_spec.pdx]
+core/string/codepoints_spec.rb:
+  pdx: [spec/string/bytes_spec.pdx]
+  status: partial_intentional
+  reason: "codepoints answers an array and takes no block; the block form is each_codepoint's job in Ruby and a walk's here."
+  link: docs/ruby/enumerators.md
 core/string/comparison_spec.rb:
   pdx: [spec/string/comparison_spec.pdx]
   status: partial_intentional
@@ -1342,6 +1367,27 @@ core/string/count_spec.rb:
   status: partial_intentional
   reason: "count takes a single character; Ruby's character-set count refuses rather than meaning something else."
   link: docs/ruby/string-count.md
+core/string/delete_prefix_spec.rb:
+  pdx: [spec/string/ends_spec.pdx]
+core/string/delete_suffix_spec.rb:
+  pdx: [spec/string/ends_spec.pdx]
+core/string/each_char_spec.rb:
+  pdx: [spec/string/chars_spec.pdx]
+  status: partial_intentional
+  reason: "each_char without a block is an enumerator in Ruby and nothing here; chars is the array."
+  link: docs/ruby/enumerators.md
+core/string/each_line_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_planned
+  reason: "each_line takes no separator or chomp argument yet; without a block it is an enumerator in Ruby and nothing here."
+  link: https://github.com/portlandlang/portland/issues/106
+core/string/gsub_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_planned
+  reason: "The regex patterns, the hash replacement, and the backslash escapes in a replacement (#161) wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
+core/string/hex_spec.rb:
+  pdx: [spec/string/radix_spec.pdx]
 core/string/index_spec.rb:
   pdx: [spec/string/search_spec.pdx]
   status: partial_planned
@@ -1349,12 +1395,49 @@ core/string/index_spec.rb:
   link: https://github.com/portlandlang/portland/issues/74
 core/string/lines_spec.rb:
   pdx: [spec/string/search_spec.pdx]
+core/string/ljust_spec.rb:
+  pdx: [spec/string/padding_spec.pdx]
 core/string/lstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
+core/string/next_spec.rb:
+  pdx: [spec/string/successor_spec.pdx]
+core/string/oct_spec.rb:
+  pdx: [spec/string/radix_spec.pdx]
+core/string/ord_spec.rb:
+  pdx: [spec/string/bytes_spec.pdx]
+core/string/partition_spec.rb:
+  pdx: [spec/string/partition_spec.pdx]
+  status: partial_planned
+  reason: "The regex rows wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
+core/string/rindex_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_planned
+  reason: "The regex rows wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
+core/string/rjust_spec.rb:
+  pdx: [spec/string/padding_spec.pdx]
+core/string/rpartition_spec.rb:
+  pdx: [spec/string/partition_spec.pdx]
+  status: partial_planned
+  reason: "The regex rows wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
 core/string/rstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 core/string/strip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
+core/string/sub_spec.rb:
+  pdx: [spec/string/search_spec.pdx]
+  status: partial_planned
+  reason: "The regex patterns, the hash replacement, and the backslash escapes in a replacement (#161) wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
+core/string/succ_spec.rb:
+  pdx: [spec/string/successor_spec.pdx]
+core/string/upto_spec.rb:
+  pdx: [spec/string/successor_spec.pdx]
+  status: partial_intentional
+  reason: "upto without a block is an enumerator in Ruby and nothing here."
+  link: docs/ruby/enumerators.md
 
 # — core/symbol —
 # A symbol answers questions about its name, and never builds a new symbol

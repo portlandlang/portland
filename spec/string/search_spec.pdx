@@ -1,11 +1,15 @@
-# Finding and counting inside a string.
+# Finding, counting, and replacing inside a string.
 #
-# From ruby/spec core/string/{index,count,lines}_spec.rb. `sub` and `gsub`
-# stay behind with regex, which is undecided and a real hole — even their
-# plain-string arities lead straight to the pattern question. `count` takes
-# a single character only: Ruby's multi-character count is a character-set
-# count, not a substring count, and following it quietly would be principle
-# 5's exact shape — so more than one character refuses, naming the trap.
+# From ruby/spec core/string/{index,rindex,count,lines,each_line,sub,gsub}_spec.rb.
+# `sub` and `gsub` take a string pattern and a string replacement or a
+# block; the regex patterns, the hash replacement, and Ruby's backslash
+# escapes in a replacement (#161) wait on the regex decision (#74), and the
+# to_str conversions (ADR 0036), subclasses, encodings, and the $~ rows
+# stay upstream. `count` takes a single character only: Ruby's
+# multi-character count is a character-set count, not a substring count,
+# and following it quietly would be principle 5's exact shape — so more
+# than one character refuses, naming the trap. `each_line` takes no
+# separator yet (#106).
 
 require_relative "../spec_helper"
 
@@ -24,5 +28,153 @@ context "String" do
       expect("a\nb\n".lines).to eq(["a\n", "b\n"])
       expect("a\nb".lines).to eq(["a\n", "b"])
     end
+  end
+end
+
+context "String#rindex with String" do
+  specify "returns the index of the last occurrence of the given substring" do
+    expect("blablabla".rindex("")).to eq(9)
+    expect("blablabla".rindex("a")).to eq(8)
+    expect("blablabla".rindex("la")).to eq(7)
+    expect("blablabla".rindex("bla")).to eq(6)
+    expect("blablabla".rindex("abla")).to eq(5)
+    expect("blablabla".rindex("labla")).to eq(4)
+    expect("blablabla".rindex("blabla")).to eq(3)
+    expect("blablabla".rindex("ablabla")).to eq(2)
+    expect("blablabla".rindex("lablabla")).to eq(1)
+    expect("blablabla".rindex("blablabla")).to eq(0)
+
+    expect("blablabla".rindex("l")).to eq(7)
+    expect("blablabla".rindex("bl")).to eq(6)
+    expect("blablabla".rindex("abl")).to eq(5)
+    expect("blablabla".rindex("labl")).to eq(4)
+    expect("blablabla".rindex("blabl")).to eq(3)
+    expect("blablabla".rindex("ablabl")).to eq(2)
+    expect("blablabla".rindex("lablabl")).to eq(1)
+    expect("blablabla".rindex("blablabl")).to eq(0)
+
+    expect("blablabla".rindex("b")).to eq(6)
+  end
+
+  specify "starts the search at the given offset" do
+    expect("blablabla".rindex("bl", 0)).to eq(0)
+    expect("blablabla".rindex("bl", 1)).to eq(0)
+    expect("blablabla".rindex("bl", 2)).to eq(0)
+    expect("blablabla".rindex("bl", 3)).to eq(3)
+
+    expect("blablabla".rindex("bla", 0)).to eq(0)
+    expect("blablabla".rindex("bla", 1)).to eq(0)
+    expect("blablabla".rindex("bla", 2)).to eq(0)
+    expect("blablabla".rindex("bla", 3)).to eq(3)
+
+    expect("blablabla".rindex("blab", 0)).to eq(0)
+    expect("blablabla".rindex("blab", 1)).to eq(0)
+    expect("blablabla".rindex("blab", 2)).to eq(0)
+    expect("blablabla".rindex("blab", 3)).to eq(3)
+    expect("blablabla".rindex("blab", 6)).to eq(3)
+    expect("blablablax".rindex("blab", 6)).to eq(3)
+
+    expect("blablabla".rindex("la", 1)).to eq(1)
+    expect("blablabla".rindex("la", 2)).to eq(1)
+    expect("blablabla".rindex("la", 3)).to eq(1)
+    expect("blablabla".rindex("la", 4)).to eq(4)
+
+    expect("blablabla".rindex("lab", 1)).to eq(1)
+    expect("blablabla".rindex("lab", 2)).to eq(1)
+    expect("blablabla".rindex("lab", 3)).to eq(1)
+    expect("blablabla".rindex("lab", 4)).to eq(4)
+
+    expect("blablabla".rindex("ab", 2)).to eq(2)
+    expect("blablabla".rindex("ab", 3)).to eq(2)
+    expect("blablabla".rindex("ab", 4)).to eq(2)
+    expect("blablabla".rindex("ab", 5)).to eq(5)
+
+    expect("blablabla".rindex("", 0)).to eq(0)
+    expect("blablabla".rindex("", 1)).to eq(1)
+    expect("blablabla".rindex("", 2)).to eq(2)
+    expect("blablabla".rindex("", 7)).to eq(7)
+    expect("blablabla".rindex("", 8)).to eq(8)
+    expect("blablabla".rindex("", 9)).to eq(9)
+    expect("blablabla".rindex("", 10)).to eq(9)
+  end
+
+  specify "starts the search at offset + self.length if offset is negative" do
+    str = "blablabla"
+
+    ["bl", "bla", "blab", "la", "lab", "ab", ""].each do |needle|
+      (-str.length..-1).each do |offset|
+        expect(str.rindex(needle, offset)).to eq(str.rindex(needle, offset + str.length))
+      end
+    end
+  end
+
+  specify "returns nil if the substring isn't found" do
+    expect("blablabla".rindex("B")).to be_nil
+    expect("blablabla".rindex("z")).to be_nil
+    expect("blablabla".rindex("BLA")).to be_nil
+    expect("blablabla".rindex("blablablabla")).to be_nil
+
+    expect("hello".rindex("lo", 0)).to be_nil
+    expect("hello".rindex("lo", 1)).to be_nil
+    expect("hello".rindex("lo", 2)).to be_nil
+
+    expect("hello".rindex("llo", 0)).to be_nil
+    expect("hello".rindex("llo", 1)).to be_nil
+
+    expect("hello".rindex("el", 0)).to be_nil
+    expect("hello".rindex("ello", 0)).to be_nil
+
+    expect("hello".rindex("", -6)).to be_nil
+    expect("hello".rindex("", -7)).to be_nil
+
+    expect("hello".rindex("h", -6)).to be_nil
+  end
+end
+
+context "String#each_line" do
+  specify "splits using default newline separator when none is specified" do
+    mutable first = []
+    "one\ntwo\r\nthree".each_line { |line| first << line }
+    expect(first).to eq(["one\n", "two\r\n", "three"])
+
+    mutable second = []
+    "hello\n\n\nworld".each_line { |line| second << line }
+    expect(second).to eq(["hello\n", "\n", "\n", "world"])
+
+    mutable third = []
+    "\n\n\n\n\n".each_line { |line| third << line }
+    expect(third).to eq(["\n", "\n", "\n", "\n", "\n"])
+  end
+
+  specify "returns self" do
+    expect("hello\nworld".each_line { }).to eq("hello\nworld")
+  end
+end
+
+context "String#sub with pattern, replacement" do
+  specify "doesn't interpret regexp metacharacters if pattern is a string" do
+    expect("12345".sub('\d', "a")).to eq("12345")
+    expect('\d'.sub('\d', "a")).to eq("a")
+  end
+end
+
+context "String#gsub with pattern and replacement" do
+  specify "doesn't interpret regexp metacharacters if pattern is a string" do
+    expect("12345".gsub('\d', "a")).to eq("12345")
+    expect('\d'.gsub('\d', "a")).to eq("a")
+  end
+end
+
+context "String#gsub with pattern and block" do
+  specify "returns a copy of self with all occurrences of pattern replaced with the block's return value" do
+    expect("hello".gsub("l") { "x" }).to eq("hexxo")
+  end
+end
+
+context "String#gsub with a string pattern" do
+  specify "handles multibyte characters" do
+    expect("é".gsub("é", "â")).to eq("â")
+    expect("aé".gsub("é", "â")).to eq("aâ")
+    expect("éa".gsub("é", "â")).to eq("âa")
   end
 end

@@ -1,15 +1,49 @@
-# `chars` — a string as an array of one-character strings.
+# `chars` — a string as an array of one-character strings — and `each_char`,
+# the walk (#106). From ruby/spec core/string/{chars,each_char}_spec.rb and
+# their shared chars rows. A character is a grapheme (ADR 0038). The block
+# form of chars (deprecated Ruby), the blockless each_char (an enumerator),
+# subclasses, encodings, and the invalid-byte rows stay upstream.
 
 require_relative "../spec_helper"
 
-context "String" do
-  describe "#chars" do
-    specify "splits into single characters" do
-      expect("pdx".chars).to eq(["p", "d", "x"])
-    end
+context "String#chars" do
+  specify "splits into single characters" do
+    expect("pdx".chars).to eq(["p", "d", "x"])
+  end
 
-    specify "answers an empty array for the empty string" do
-      expect("".chars).to be_empty
-    end
+  specify "answers an empty array for the empty string" do
+    expect("".chars).to be_empty
+  end
+
+  specify "returns an array when no block given" do
+    expect("hello".chars).to eq(["h", "e", "l", "l", "o"])
+  end
+
+  specify "is unicode aware" do
+    expect("Ç∂éƒg".chars).to eq(["Ç", "∂", "é", "ƒ", "g"])
+  end
+
+  specify "works with multibyte characters" do
+    s = "覇"
+    expect(s.bytesize).to eq(3)
+    expect(s.chars).to eq([s])
+  end
+end
+
+context "String#each_char" do
+  specify "passes each char in self to the given block" do
+    mutable seen = []
+    "hello".each_char { |character| seen << character }
+    expect(seen).to eq(["h", "e", "l", "l", "o"])
+  end
+
+  specify "returns self" do
+    expect("hello".each_char { }).to eq("hello")
+  end
+
+  specify "is unicode aware" do
+    mutable seen = []
+    "Ç∂éƒg".each_char { |character| seen << character }
+    expect(seen).to eq(["Ç", "∂", "é", "ƒ", "g"])
   end
 end

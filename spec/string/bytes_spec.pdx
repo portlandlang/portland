@@ -1,0 +1,73 @@
+# A string's codepoints and bytes (#106), from ruby/spec
+# core/string/{ord,bytes,bytesize,codepoints}_spec.rb. `bytes` and
+# `codepoints` answer arrays and take no block — the block form is each_byte's
+# job in Ruby, and a walk's here; `ord` of an empty string refuses. The
+# broken-encoding rows, force_encoding, unpack, getbyte, Integer#chr, and
+# the type checks stay upstream; so does ord's row over two combining marks,
+# which is one character here (ADR 0038).
+
+require_relative "../spec_helper"
+
+context "String#ord" do
+  specify "returns the codepoint of the first character in the String" do
+    expect("a".ord).to eq(97)
+  end
+
+  specify "ignores subsequent characters" do
+    expect("ʇa".ord).to eq("ʇ".ord)
+  end
+
+  specify "understands multibyte characters" do
+    expect("项".ord).to eq(39033)
+  end
+end
+
+context "String#bytes" do
+  specify "returns #bytesize bytes" do
+    expect("東京Tokyo".bytes.to_a.size).to eq("東京Tokyo".bytesize)
+  end
+
+  specify "yields/returns no bytes for the empty string" do
+    expect("".bytes.to_a).to eq([])
+  end
+end
+
+context "String#bytesize" do
+  specify "returns the length of self in bytes" do
+    expect("hello".bytesize).to eq(5)
+    expect(" ".bytesize).to eq(1)
+  end
+
+  specify "works with strings containing single UTF-8 characters" do
+    expect("晦".bytesize).to eq(3)
+  end
+
+  specify "works with strings containing UTF-8 characters" do
+    expect("c 晦".bytesize).to eq(5)
+  end
+
+  specify "returns 0 for the empty string" do
+    expect("".bytesize).to eq(0)
+  end
+end
+
+context "String#codepoints" do
+  specify "returns an Array when no block is given" do
+    expect("abc".codepoints).to eq([97, 98, 99])
+  end
+
+  specify "yields one codepoint for each character" do
+    s = "顶(ᦇ"
+    expect(s.codepoints.to_a.size).to eq(s.chars.to_a.size)
+  end
+
+  specify "works for multibyte characters" do
+    s = "頙"
+    expect(s.bytesize).to eq(3)
+    expect(s.codepoints.to_a).to eq([38937])
+  end
+
+  specify "yields the codepoints corresponding to the character's position in the String's encoding" do
+    expect("އ".codepoints.to_a).to eq([1927])
+  end
+end
