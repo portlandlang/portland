@@ -172,6 +172,11 @@ fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
                 }
                 pieces.push((*character).to_string());
             }
+            // A limit past the last character — or a negative one — keeps
+            // the empty field after it, as Ruby's `"ab".split("", -1)` does.
+            if limit < 0 || cap.is_some_and(|cap| cap > characters.len()) {
+                pieces.push(String::new());
+            }
         }
         Some(separator) => {
             pieces = match cap {
@@ -447,14 +452,16 @@ fn last_position_of(text: &str, needle: &str, from: Option<i64>) -> Value {
         }
     }
     let limit = (limit.min(length)) as usize;
+    // An empty needle is found where the search starts — at the end itself
+    // when nothing caps it, as Ruby's `"abc".rindex("")` is 3.
+    if needle.is_empty() {
+        return Value::present(Value::Integer(limit as i64));
+    }
     let candidates = starts.iter().enumerate().take(limit + 1);
     for (position, &at) in candidates.rev() {
         if text[at..].starts_with(needle) {
             return Value::present(Value::Integer(position as i64));
         }
-    }
-    if needle.is_empty() {
-        return Value::present(Value::Integer(limit as i64));
     }
     Value::Nil
 }
@@ -532,6 +539,7 @@ fn parsed_in_base(text: &str, base: u32) -> i64 {
     };
     let prefix = match base {
         16 => "0x",
+        10 => "0d",
         8 => "0o",
         2 => "0b",
         _ => "",
@@ -558,8 +566,87 @@ fn parsed_in_base(text: &str, base: u32) -> i64 {
     if negative { -value } else { value }
 }
 
-/// `oct` (#106): octal unless a prefix says otherwise — `0x`, `0b`, or
-/// `0o` — as Ruby's does.
+/// The steps of `String#upto` (#106), Ruby's `rb_str_upto_each` rule by
+/// rule: two single ASCII characters walk by character code, so `"9"`
+/// reaches `"A"` through the punctuation between; two strings of digits
+/// walk as numbers, padded to the first's width; anything else walks by
+/// `succ` from a start no later than the end, until the end is passed or
+/// a step outgrows it. `exclusive` leaves the end out.
+fn string_steps(first: &str, last: &str, exclusive: bool) -> Vec<String> {
+    let mut steps = Vec::new();
+    let single = |text: &str| text.len() == 1 && text.is_ascii();
+    if single(first) && single(last) {
+        let start = first.as_bytes()[0];
+        let end = last.as_bytes()[0];
+        if start > end || (exclusive && start == end) {
+            return steps;
+        }
+        let stop = if exclusive { end - 1 } else { end };
+        for code in start..=stop {
+            steps.push((code as char).to_string());
+        }
+        return steps;
+    }
+    let all_digits =
+        |text: &str| !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit());
+    if all_digits(first) && all_digits(last) {
+        let width = first.len();
+        let (Ok(start), Ok(end)) = (first.parse::<i64>(), last.parse::<i64>()) else {
+            return steps;
+        };
+        let mut number = start;
+        while number < end || (number == end && !exclusive) {
+            steps.push(format!("{number:0width$}"));
+            number += 1;
+        }
+        return steps;
+    }
+    if first > last || (exclusive && first == last) {
+        return steps;
+    }
+    let after_end = string_successor(last);
+    let mut current = first.to_string();
+    while current != after_end {
+        let has_next = exclusive || current != last;
+        steps.push(current.clone());
+        if !has_next {
+            break;
+        }
+        current = string_successor(&current);
+        if exclusive && current == last {
+            break;
+        }
+        if current.len() > last.len() || current.is_empty() {
+            break;
+        }
+    }
+    steps
+}
+
+/// Where a pattern lands in a string, as byte spans — the first only, or
+/// every one — for `sub` and `gsub` (#106). An empty pattern lands at every
+/// character boundary, both ends included, a character being a grapheme
+/// (ADR 0038): `"ab".gsub("", "-")` is `"-a-b-"`.
+fn matched_spans(text: &str, pattern: &str, all: bool) -> Vec<(usize, usize)> {
+    let spans: Vec<(usize, usize)> = if pattern.is_empty() {
+        text.grapheme_indices(true)
+            .map(|(at, _)| (at, at))
+            .chain(std::iter::once((text.len(), text.len())))
+            .collect()
+    } else {
+        text.match_indices(pattern)
+            .map(|(at, found)| (at, at + found.len()))
+            .collect()
+    };
+    if all {
+        spans
+    } else {
+        spans.into_iter().take(1).collect()
+    }
+}
+
+/// `oct` (#106): octal unless a prefix says otherwise — `0x`, `0d`, `0b`,
+/// or `0o` — as Ruby's does.
 fn parsed_octal(text: &str) -> i64 {
     let unsigned = text
         .trim_start()
@@ -567,12 +654,22 @@ fn parsed_octal(text: &str) -> i64 {
         .to_ascii_lowercase();
     let base = if unsigned.starts_with("0x") {
         16
+    } else if unsigned.starts_with("0d") {
+        10
     } else if unsigned.starts_with("0b") {
         2
     } else {
         8
     };
     parsed_in_base(text, base)
+}
+
+/// Ruby's `casecmp?` folds case fully — `downcase(:fold)` — so `"ß"` and
+/// `"ss"` agree. Rust's standard library has no fold; up then down lands
+/// on the same answers for the folds Ruby's spec pins (`ß` → `SS` → `ss`,
+/// `ﬁ` → `FI` → `fi`, a final sigma to the plain one).
+fn case_folded(text: &str) -> String {
+    text.to_uppercase().to_lowercase()
 }
 
 /// Ruby's `Range#overlap?` on integer ranges (#111).
@@ -3153,22 +3250,37 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
-                (Value::String(text), "upto", [Value::String(last)]) => {
-                    let mut current = text.clone();
-                    let too_far = |current: &String| {
-                        current.chars().count() > last.chars().count()
-                            || (current.chars().count() == last.chars().count() && current > last)
-                    };
-                    while !too_far(&current) {
-                        let reached = current == *last;
-                        self.run_block(block, vec![Value::String(current.clone())]);
+                // `sub` and `gsub` with a block (#106): the block's answer, as
+                // text, replaces the first match or every one; an empty
+                // pattern matches at every character boundary, as Ruby's does.
+                (Value::String(text), "sub" | "gsub", [Value::String(pattern)]) => {
+                    let mut result = String::new();
+                    let mut copied_to = 0;
+                    for (start, end) in matched_spans(text, pattern, name == "gsub") {
+                        result.push_str(&text[copied_to..start]);
+                        let matched = Value::String(text[start..end].to_string());
+                        let answer = self.run_block(block, vec![matched]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        if reached {
-                            break;
+                        let answer =
+                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        result.push_str(&joined(&[answer], ""));
+                        copied_to = end;
+                    }
+                    result.push_str(&text[copied_to..]);
+                    Some(Value::String(result))
+                }
+                // A second argument of `true` stops short of the end, as Ruby's
+                // `upto(last, exclusive)` does.
+                (Value::String(text), "upto", [Value::String(last)])
+                | (Value::String(text), "upto", [Value::String(last), Value::Boolean(_)]) => {
+                    let exclusive = matches!(arguments.last(), Some(Value::Boolean(true)));
+                    for step in string_steps(text, last, exclusive) {
+                        self.run_block(block, vec![Value::String(step)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
                         }
-                        current = string_successor(&current);
                     }
                     Some(receiver)
                 }
@@ -4479,7 +4591,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 ordering_value(text.to_ascii_lowercase().cmp(&other.to_ascii_lowercase())),
             ),
             (Value::String(text), "casecmp?", [Value::String(other)]) => {
-                Value::Boolean(text.to_lowercase() == other.to_lowercase())
+                Value::Boolean(case_folded(text) == case_folded(other))
             }
             (Value::String(text), "codepoints", []) => Value::array(
                 text.chars()
@@ -4494,11 +4606,31 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "bytesize", []) => Value::Integer(text.len() as i64),
             (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
             (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
-            (Value::String(text), "sub", [Value::String(pattern), Value::String(replacement)]) => {
-                Value::String(text.replacen(pattern.as_str(), replacement, 1))
+            // Ruby reads `\0`, `\&`, and `\\` in a replacement as escapes;
+            // whether Portland does is undecided (#161), so a backslash
+            // refuses rather than passing through quietly (principle 5).
+            (Value::String(_), "sub" | "gsub", [Value::String(_), Value::String(replacement)])
+                if replacement.contains('\\') =>
+            {
+                refusal("arguments");
+                panic!(
+                    "a backslash in a replacement is undecided (#161) — Ruby reads \\0 and \\\\ as escapes; use a block"
+                )
             }
-            (Value::String(text), "gsub", [Value::String(pattern), Value::String(replacement)]) => {
-                Value::String(text.replace(pattern.as_str(), replacement))
+            (
+                Value::String(text),
+                "sub" | "gsub",
+                [Value::String(pattern), Value::String(replacement)],
+            ) => {
+                let mut result = String::new();
+                let mut copied_to = 0;
+                for (start, end) in matched_spans(text, pattern, name == "gsub") {
+                    result.push_str(&text[copied_to..start]);
+                    result.push_str(replacement);
+                    copied_to = end;
+                }
+                result.push_str(&text[copied_to..]);
+                Value::String(result)
             }
             (Value::String(_), "sub" | "gsub", [other, _]) => panic!(
                 "wrong argument type {} (expected Regexp)",

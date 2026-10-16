@@ -195,9 +195,12 @@ p("ff".hex)
 p("17".oct)
 p(city.sub("l", "L"))
 p(city.gsub("a", "A"))
+p(city.sub("l") { it.upcase })
+p(city.gsub("") { "-" })
 city.each_char { |character| puts(character) }
 "one\ntwo\n".each_line { |line| puts(line) }
 "a".upto("c") { |letter| puts(letter) }
+"a".upto("c", true) { |letter| puts(letter) }
 
 # A hash's own methods (#105).
 menu = {"tea" => 2, "scone" => 3, "gift" => nil}

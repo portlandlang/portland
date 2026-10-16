@@ -2334,6 +2334,31 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
+  # `sub` and `gsub` with a block (#106): the pieces between the matches,
+  # the block's answer at each joint — the first joint only for `sub`. An
+  # empty pattern matches at every character boundary, so its pieces are the
+  # characters with an empty piece at either end.
+  when "sub", "gsub"
+    pattern = value_at(arguments, 0)
+    pieces = pattern.empty? ? [""] + receiver.chars + [""] : receiver.split(pattern, -1)
+    mutable result = ""
+    pieces.each_with_index do |piece, position|
+      if position > 0 && (node.name == "gsub" || position == 1)
+        step = run_guest_block(block, [pattern], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        panic("#{node.name} block produced no value") if step.value.empty?
+        result = result + joined_guest([slot_value(step.value)], "")
+      elsif position > 0
+        result = result + pattern
+      end
+      result = result + piece
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
   when "each_key"
     receiver.each_key do |key|
       step = run_guest_block(block, [key], scope)
@@ -2528,14 +2553,26 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   # An integer's or a string's `upto` (#106): the host walks by its own
-  # rule for the receiver's kind.
+  # rule for the receiver's kind, a string's second argument — exclusive —
+  # handed through.
   when "upto"
-    receiver.upto(value_at(arguments, 0)) do |number|
-      step = run_guest_block(block, [number], scope)
-      scope = compacted_since(entry, step.bindings)
-      if step.signal != "none"
-        interrupt = step
-        break
+    if arguments.length == 2
+      receiver.upto(value_at(arguments, 0), value_at(arguments, 1)) do |number|
+        step = run_guest_block(block, [number], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+      end
+    else
+      receiver.upto(value_at(arguments, 0)) do |number|
+        step = run_guest_block(block, [number], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?

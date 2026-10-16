@@ -77,12 +77,16 @@ shapes = lambda do |receiver, name|
     ["#{receiver}.#{name}(\"a\", 1)", 2, false],
     # A width and a padding, `center(9, "*")` (#106).
     ["#{receiver}.#{name}(1, \"a\")", 2, false],
+    # A string and a flag, `upto("z", true)` (#106).
+    ["#{receiver}.#{name}(\"a\", true)", 2, false],
     ["#{receiver}.#{name} { it }", 0, true],
     ["#{receiver}.#{name} { |a, b| a }", 0, true],
     ["#{receiver}.#{name}(1) { it }", 1, true],
     ["#{receiver}.#{name}(1) { |a, b| a }", 1, true],
     ["#{receiver}.#{name}(\"a\") { it }", 1, true],
     ["#{receiver}.#{name}([1]) { it }", 1, true],
+    # A string, a flag, and a block, `upto("z", true) { }` (#106).
+    ["#{receiver}.#{name}(\"a\", true) { it }", 2, true],
   ]
 end
 
