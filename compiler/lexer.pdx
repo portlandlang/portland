@@ -348,9 +348,12 @@ def heredoc_terminator(line, start)
   characters = line.chars
   return "" unless characters[start] == "<" && characters[start + 1] == "<" && characters[start + 2] == "~"
   mutable index = start + 3
-  mutable quoted = false
-  if characters[index] == "'"
-    quoted = true
+  # `<<~'HERE'` reads its body raw, `<<~"HERE"` interpolates like the bare
+  # form; the answer carries the quote as its last character so the caller
+  # can tell the three apart.
+  mutable quote = ""
+  if characters[index] == "'" || characters[index] == "\""
+    quote = characters[index]
     index += 1
   end
   mutable name = ""
@@ -359,8 +362,11 @@ def heredoc_terminator(line, start)
     index += 1
   end
   return "" if name.empty?
-  return name + "'" if quoted
-  name
+  # A quoted terminator closes on the same line, as the seed requires.
+  if !quote.empty? && (index >= characters.length || characters[index] != quote)
+    panic("unterminated heredoc terminator quote in `<<~#{quote}#{name}`")
+  end
+  name + quote
 end
 
 # Body lines up to the terminator, dedented and encoded as a literal.
@@ -451,17 +457,18 @@ def expand_heredoc_line(lines, line_index)
       index += 1
       next
     end
+    quoted = terminator.end_with?("'") || terminator.end_with?("\"")
     interpolating = !terminator.end_with?("'")
-    name = if interpolating
-      terminator
-    else
+    name = if quoted
       terminator[..(terminator.length - 2)]
+    else
+      terminator
     end
     body = read_heredoc_body(lines, line_index + 1 + consumed, name, interpolating)
     consumed += body.consumed
     result << body.text
     index += 3 + name.length
-    index += 2 unless interpolating
+    index += 2 if quoted
   end
   HeredocLine.new(text: result, consumed: consumed)
 end

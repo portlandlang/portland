@@ -1292,6 +1292,9 @@ def identifier_shaped?(name)
   return false if name.empty?
   table = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
   characters = name.chars
+  # A name starts with a letter or an underscore, never a digit, so `:"9"`
+  # keeps its quotes as Ruby's does.
+  return false if "0123456789".include?(characters[0])
   mutable index = 0
   while index < characters.length
     character = characters[index]

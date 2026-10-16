@@ -234,9 +234,18 @@ impl Value {
 
     /// How a symbol is written back out: `:paid`, or `:"odd key"` when the
     /// name is not identifier-shaped.
+    /// A symbol as source: bare when its name is identifier-shaped — a
+    /// letter or underscore, then letters, digits, and underscores, with a
+    /// `?` or `!` allowed last — and quoted otherwise, so `:"9"` keeps its
+    /// quotes as Ruby's does.
     fn symbol_source(name: &str) -> String {
-        let plain = !name.is_empty()
-            && name.chars().enumerate().all(|(index, character)| {
+        let mut characters = name.chars().enumerate().peekable();
+        let starts_like_a_name = matches!(
+            characters.peek(),
+            Some((_, character)) if character.is_alphabetic() || *character == '_'
+        );
+        let plain = starts_like_a_name
+            && characters.all(|(index, character)| {
                 character.is_alphanumeric()
                     || character == '_'
                     || (index + 1 == name.len() && matches!(character, '?' | '!'))
@@ -245,7 +254,7 @@ impl Value {
         if plain {
             format!(":{name}")
         } else {
-            format!(":{name:?}")
+            format!(":{}", quoted(name))
         }
     }
 
