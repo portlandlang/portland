@@ -1924,6 +1924,11 @@ language/break_spec.rb:
   status: partial_planned
   reason: "break out of a method's own yield waits on #166 and the lambda rows on the proc question (#77); break carries no value (ADR 0012), the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there are no threads."
   link: https://github.com/portlandlang/portland/issues/166
+language/case_spec.rb:
+  pdx: [spec/control_flow/case_when_spec.pdx, spec/control_flow/then_spec.pdx]
+  status: partial_intentional
+  reason: "when asks equality and a type test is an in pattern, so the class rows stay upstream; so do the regex rows (#74), the splat rows (ADR 0014), the bignum rows (#156), the subjectless case (#84), the def-in-expression, eval, and private-=== rows, and the rows whose matching when has an empty body."
+  link: docs/ruby/pattern-matching.md
 language/class_variable_spec.rb:
   status: skipped
   reason: "Class variables do not exist: a value lives in a local, a field, or a constant, and @@name refuses naming those (ADR 0056)."

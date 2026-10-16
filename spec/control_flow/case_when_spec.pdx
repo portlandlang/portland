@@ -35,3 +35,120 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/case_spec.rb (#115). `when` asks equality: a type
+# test is an `in` pattern (spec/pattern_matching/), so the class rows stay
+# upstream, with the regex rows (#74), the splat rows (ADR 0014), the
+# bignum rows (#156), the subjectless case, the def-in-expression, eval,
+# and private-=== rows, and the two rows whose matching when has an empty
+# body, which answers no value here. The `;` spellings are `then` rows.
+context "The 'case'-construct" do
+  specify "evaluates the body of the when clause matching the case target expression" do
+    answer = case 1
+    when 2 then false
+    when 1 then true
+    end
+    expect(answer).to be_true
+  end
+
+  specify "evaluates the body of the when clause whose array expression includes the case target expression" do
+    answer = case 2
+    when 3, 4 then false
+    when 1, 2 then true
+    end
+    expect(answer).to be_true
+  end
+
+  specify "matches an Integer literal whose value does not fit in a 32-bit int" do
+    big = 10_000_000_000
+    answer = case big
+    when 10_000_000_000 then true
+    else false
+    end
+    expect(answer).to be_true
+
+    negative = case -3_000_000_000
+    when -3_000_000_000 then true
+    else false
+    end
+    expect(negative).to be_true
+  end
+
+  specify "evaluates the body of the when clause whose range expression includes the case target expression" do
+    answer = case 5
+    when 21..30 then false
+    when 1..20 then true
+    end
+    expect(answer).to be_true
+  end
+
+  specify "evaluates the 'else'-body when no other expression matches" do
+    answer = case "c"
+    when "a" then "foo"
+    when "b" then "bar"
+    else "zzz"
+    end
+    expect(answer).to eq("zzz")
+  end
+
+  specify "returns the statement following 'then'" do
+    answer = case "a"
+    when "a" then "foo"
+    when "b" then "bar"
+    end
+    expect(answer).to eq("foo")
+  end
+
+  specify "takes lists of values" do
+    far = case "z"
+    when "a", "b", "c", "d" then "foo"
+    when "x", "y", "z" then "bar"
+    end
+    expect(far).to eq("bar")
+
+    near = case "b"
+    when "a", "b", "c", "d" then "foo"
+    when "x", "y", "z" then "bar"
+    end
+    expect(near).to eq("foo")
+  end
+
+  specify "tests an empty array" do
+    answer = case []
+    when [] then "foo"
+    else "bar"
+    end
+    expect(answer).to eq("foo")
+  end
+
+  specify "works even if there's only one when statement" do
+    answer = case 1
+    when 1 then 100
+    end
+    expect(answer).to eq(100)
+  end
+
+  specify "evaluates true as only 'true' when true is the first clause" do
+    answer = case 1
+    when true then "bad"
+    else "good"
+    end
+    expect(answer).to eq("good")
+  end
+
+  specify "evaluates false as only 'false' when false is the first clause" do
+    answer = case nil
+    when false then "bad"
+    when nil then "good"
+    end
+    expect(answer).to eq("good")
+  end
+
+  specify "treats a literal array as its own when argument, rather than a list of arguments" do
+    answer = case "foo"
+    when ["foo", "foo"] then "bad"
+    when "foo" then "good"
+    end
+    expect(answer).to eq("good")
+  end
+end

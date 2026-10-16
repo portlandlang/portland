@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **if, next, break, and return ported from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — twenty-one rows of `if` into `spec/control_flow/if_spec.pdx`, the block rows of `next` and the method rows of `return` into `next_spec.pdx` and `unwinding_spec.pdx`. Found on the way: `break` inside a block handed to a user-defined yielding method refuses as `break outside of a loop` on both implementations where Ruby unwinds the call ([#166](https://github.com/portlandlang/portland/issues/166)).
+- **if, case, next, break, and return ported from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — twenty-one rows of `if` into `spec/control_flow/if_spec.pdx`, twelve of `case` into `case_when_spec.pdx`, the block rows of `next` and the method rows of `return` into `next_spec.pdx` and `unwinding_spec.pdx`. Found on the way: `break` inside a block handed to a user-defined yielding method refuses as `break outside of a loop` on both implementations where Ruby unwinds the call ([#166](https://github.com/portlandlang/portland/issues/166)).
 
 - **Nine more language files ported or recorded** ([#115](https://github.com/portlandlang/portland/issues/115)) — while and until extend `spec/control_flow/{while,until}_spec.pdx`, their optional `do` filed as [#165](https://github.com/portlandlang/portland/issues/165); class_variable, ensure, metaclass, predefined, send, singleton_class, and super are recorded as decided out.
 
