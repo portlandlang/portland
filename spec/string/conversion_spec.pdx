@@ -20,6 +20,15 @@ context "String" do
   end
 end
 
+# From ruby/spec core/string/to_s_spec.rb; the identity check and the
+# subclass row stay upstream.
+context "String#to_s" do
+  specify "returns self when self.class == String" do
+    text = "a string"
+    expect(text.to_s).to eq(text)
+  end
+end
+
 context "to_s, on every value" do
   describe "#to_s" do
     specify "renders numbers, booleans, and collections" do

@@ -71,3 +71,31 @@ context "String#codepoints" do
     expect("އ".codepoints.to_a).to eq([1927])
   end
 end
+
+# The walks, from core/string/{each_byte,each_codepoint}_spec.rb. each_byte's
+# first row ends its string with a NUL Portland cannot spell; the mid-walk
+# mutation rows (values never mutate) and the blockless enumerators stay
+# upstream.
+context "String#each_byte" do
+  specify "passes each byte in self to the given block" do
+    mutable seen = []
+    "hello".each_byte { |byte| seen << byte }
+    expect(seen).to eq([104, 101, 108, 108, 111])
+  end
+
+  specify "returns self" do
+    expect("hello".each_byte { }).to eq("hello")
+  end
+end
+
+context "String#each_codepoint" do
+  specify "yields each codepoint to the block if one is given" do
+    mutable seen = []
+    "abcd".each_codepoint { |codepoint| seen << codepoint }
+    expect(seen).to eq([97, 98, 99, 100])
+  end
+
+  specify "returns self" do
+    expect("foo".each_codepoint { }).to eq("foo")
+  end
+end

@@ -9,3 +9,17 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec core/string/reverse_spec.rb; the bang form (ADR 0015),
+# subclasses, encodings, and the broken-string row stay upstream.
+context "String#reverse" do
+  specify "returns a new string with the characters of self in reverse order" do
+    expect("stressed".reverse).to eq("desserts")
+    expect("m".reverse).to eq("m")
+    expect("".reverse).to eq("")
+  end
+
+  specify "reverses a string with multi byte characters" do
+    expect("微軟正黑體".reverse).to eq("體黑正軟微")
+  end
+end

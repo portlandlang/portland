@@ -47,3 +47,29 @@ context "String#each_char" do
     expect(seen).to eq(["Ç", "∂", "é", "ƒ", "g"])
   end
 end
+
+# `grapheme_clusters` and `each_grapheme_cluster` are chars's and
+# each_char's twins here, a character already being a grapheme. From
+# core/string/{grapheme_clusters,each_grapheme_cluster}_spec.rb and the
+# shared grapheme_clusters rows; the other-encoding rows stay upstream.
+context "String#grapheme_clusters" do
+  specify "returns an array when no block given" do
+    expect("ab🏳️‍🌈🐾".grapheme_clusters).to eq(["a", "b", "🏳️‍🌈", "🐾"])
+  end
+
+  specify "is unicode aware" do
+    expect("Ç∂éƒg".grapheme_clusters).to eq(["Ç", "∂", "é", "ƒ", "g"])
+  end
+end
+
+context "String#each_grapheme_cluster" do
+  specify "passes each grapheme cluster in self to the given block" do
+    mutable seen = []
+    "ab🏳️‍🌈🐾".each_grapheme_cluster { |cluster| seen << cluster }
+    expect(seen).to eq(["a", "b", "🏳️‍🌈", "🐾"])
+  end
+
+  specify "returns self" do
+    expect("hello".each_grapheme_cluster { }).to eq("hello")
+  end
+end

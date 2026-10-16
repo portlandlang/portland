@@ -14,3 +14,13 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec core/string/empty_spec.rb; the NUL and subclass rows stay
+# upstream.
+context "String#empty?" do
+  specify "returns true if the string has a length of zero" do
+    expect("hello").not_to be_empty
+    expect(" ").not_to be_empty
+    expect("").to be_empty
+  end
+end

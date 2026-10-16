@@ -17,3 +17,27 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec core/string/{length,size}_spec.rb; the encoding and
+# broken-byte rows stay upstream, and size's method-object row is written
+# as the twin's answer.
+context "String#length" do
+  specify "returns the length of self" do
+    expect("".length).to eq(0)
+    expect("one".length).to eq(3)
+    expect("two".length).to eq(3)
+    expect("three".length).to eq(5)
+    expect("four".length).to eq(4)
+  end
+
+  specify "returns the length of a string in different encodings" do
+    utf8_str = "こにちわ" * 100
+    expect(utf8_str.length).to eq(400)
+  end
+end
+
+context "String#size" do
+  specify "is an alias of String#length" do
+    expect("こにちわ".size).to eq("こにちわ".length)
+  end
+end

@@ -15,3 +15,24 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec core/string/{plus,multiply}_spec.rb and the shared times
+# rows. The to_str and to_int conversions (ADR 0036), the refusals (a
+# negative count refuses as `negative argument`), subclasses, encodings,
+# and the bignum rows stay upstream.
+context "String#+" do
+  specify "returns a new string containing the given string concatenated to self" do
+    expect("" + "").to eq("")
+    expect("" + "Hello").to eq("Hello")
+    expect("Hello" + "").to eq("Hello")
+    expect("Ruby !" + "= Rubinius").to eq("Ruby != Rubinius")
+  end
+end
+
+context "String#*" do
+  specify "returns a new string containing count copies of self" do
+    expect("cool" * 0).to eq("")
+    expect("cool" * 1).to eq("cool")
+    expect("cool" * 3).to eq("coolcoolcool")
+  end
+end
