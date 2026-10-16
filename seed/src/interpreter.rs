@@ -412,6 +412,32 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// Ruby's spread (ADR 0057): a block of two or more parameters handed
+/// exactly one array binds them from its elements, extra ones dropped. An
+/// array too short refuses where Ruby would fill the rest with nil.
+fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> {
+    if parameters.len() < 2 || arguments.len() != 1 {
+        return arguments;
+    }
+    let Value::Array(elements) = &arguments[0] else {
+        return arguments;
+    };
+    if elements.len() < parameters.len() {
+        let word = if elements.len() == 1 {
+            "element"
+        } else {
+            "elements"
+        };
+        panic!(
+            "block expects {} arguments — {} has {} {word} to spread",
+            parameters.len(),
+            arguments[0].shown(),
+            elements.len()
+        );
+    }
+    elements.iter().take(parameters.len()).cloned().collect()
+}
+
 /// `join` (#104): each element as `to_s` renders it, a nested array joined
 /// into the same string with the same separator, as Ruby's is. A nil
 /// element refuses as interpolating one does, since nil has no `to_s`
@@ -4009,6 +4035,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// are block-local (shadowed, then restored), and names first assigned
     /// inside the block die at `end` (ADR 0001's third closure rule).
     fn run_block(&mut self, block: &Block, arguments: Vec<Value>) -> Option<Value> {
+        let arguments = spread_for_block(&block.parameters, arguments);
         if block.parameters.len() > arguments.len() {
             let expected = block.parameters.len().to_string();
             panic!(

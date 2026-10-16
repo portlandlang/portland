@@ -384,7 +384,7 @@ Comments are `#` to end of line. Names are `snake_case`, and `?`/`!` suffixes ar
 
 Emerging rather than settled — this section describes how the compiler is actually written, and it will grow as more of the language exists.
 
-- **`it` for a single block parameter**, named parameters otherwise. `nodes.map { it.sexp }` reads better than naming a variable you use once. Nesting forces names anyway, since a nested `it` is a shadow.
+- **`it` for a single block parameter**, named parameters otherwise. `nodes.map { it.sexp }` reads better than naming a variable you use once. Nesting forces names anyway, since a nested `it` is a shadow. Two or more parameters spread a yielded array, `pairs.each { |key, value| }`, as Ruby's do; an array too short to fill them refuses rather than nil-filling ([ADR 0057](adr/0057-2026-10-16-block-parameters-spread-a-yielded-array.md)).
 - **`<<` to accumulate, `+=` to concatenate or count.** Building a collection an element at a time is `tokens << token`; adding two whole things is `+=`. The compiler converted about forty-five sites to this rule and kept `+=` where it was genuinely concatenation.
 - **Leading dot for chains that break across lines.**
 - **Keyword arguments at struct construction**, which the language requires, and increasingly at call sites where a bare positional would be a mystery at the call site.

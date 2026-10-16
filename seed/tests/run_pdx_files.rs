@@ -1770,6 +1770,31 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// Block parameters spread a yielded array (ADR 0057, #158): a block taking
+/// two or more parameters that is handed exactly one array binds them from
+/// its elements, extra elements dropped, as Ruby's does (4.0.6, the
+/// expected lines). Where Ruby would fill a missing parameter with nil —
+/// an array too short, or no array at all — Portland refuses.
+#[test]
+fn block_parameters_spread_a_yielded_array() {
+    assert_both_print(
+        "evaluator_block_spread.pdx",
+        "pairs = [[1, 2], [3, 4]]\npairs.each { |left, right| puts(left + right) }\np(pairs.map { |key, value| \"#{key}=#{value}\" })\np([[1, 2, 3]].map { |first, second| first + second })\np(pairs.select { |key, value| value > 2 })\np([[1, \"a\"], [2, \"b\"]].to_h { |number, letter| [letter, number] })\np([1, 2].zip([3, 4]).map { |left, right| left * right })\np({a: 1}.to_a.map { |key, value| value })\np(pairs.sort_by { |key, value| -value })\np([[1, 2]].sum { |left, right| left + right })\np([[1, 2]].flat_map { |left, right| [right, left] })\np(pairs.reduce(0) { |total, pair| total + pair.last })\n",
+        "3\n7\n[\"1=2\", \"3=4\"]\n[3]\n[[3, 4]]\n{\"a\" => 1, \"b\" => 2}\n[3, 8]\n[1]\n[[3, 4], [1, 2]]\n3\n[2, 1]\n6\n",
+    );
+    let cases = [
+        (
+            "[[1], [2, 3]].each { |left, right| p(left) }\n",
+            "block expects 2 arguments — [1] has 1 element to spread",
+        ),
+        (
+            "[[1, 2], :a].each { |left, right| p(left) }\n",
+            "block expects 2 arguments, got 1",
+        ),
+    ];
+    assert_both_oracles_refuse("block_spread_refusal.pdx", None, &cases);
+}
+
 /// `join` (#104): a nested array joins into the same string with the same
 /// separator, as Ruby's does — it had been spliced in as its inspect form —
 /// and a nil element refuses as interpolating one does, since nil has no

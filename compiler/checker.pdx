@@ -596,7 +596,8 @@ def block_scope(node, receiver, scope)
   mutable bound = scope
   argument_types = node.arguments.map { synthesize(it, known_types(scope)) }
   node.block.parameters.each_with_index do |parameter, index|
-    bound = bind_local(bound, parameter, block_parameter_type(receiver, index, node.name, argument_types))
+    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: node.block.parameters.length)
+    bound = bind_local(bound, parameter, bound_type)
   end
   bound
 end
@@ -1102,7 +1103,8 @@ def calls_in_block(node, receiver, locals, globals, found)
   argument_types = node.arguments.map { synthesize(it, locals + globals) }
   mutable inner = locals
   block.parameters.each_with_index do |parameter, index|
-    inner = [[parameter, block_parameter_type(receiver, index, node.name, argument_types)]] + inner
+    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: block.parameters.length)
+    inner = [[parameter, bound_type]] + inner
   end
   calls_in(block.body, forget_types(inner, assigned_names_in_body(block.body)), globals, found)
 end

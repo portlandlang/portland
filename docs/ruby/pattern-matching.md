@@ -32,6 +32,7 @@ What changes from Ruby:
 - **In:** pin `^`, guards, alternatives `|`, one-line `=>` and `in`. **Out for now:** the find pattern (`in [*, x, *]`), until demanded. **Out:** positional struct patterns.
 - **One superset edge** ([ADR 0042](../adr/0042-2026-08-19-then-rows-everywhere.md)): the whole-construct one-liner `case status in :paid then "receipt" end` parses here and not in Ruby, whose subject eats `status in :paid` as the match test and errors. Portland's case subject parses one notch below full expression, so a following `in` is always the first arm; a match-test *subject* takes parens.
 - `pair => [a, b]` is Portland's destructuring; `a, b = pair` multiple assignment stays out.
+- A block's parameters spread a yielded array as Ruby's do — `pairs.each { |key, value| }` — with one difference ([ADR 0057](../adr/0057-2026-10-16-block-parameters-spread-a-yielded-array.md)): where Ruby fills a parameter the array cannot with nil, Portland refuses, naming the array and the count. `|(a, b), c|` nesting waits for a pull.
 
 ## Migration
 

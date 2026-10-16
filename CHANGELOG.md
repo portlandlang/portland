@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Block parameters spread a yielded array** ([ADR 0057](docs/adr/0057-2026-10-16-block-parameters-spread-a-yielded-array.md), [#158](https://github.com/portlandlang/portland/issues/158)) — `pairs.each { |key, value| }`, `list.zip(other).map { |left, right| }`, and every other two-or-more-parameter block handed one array bind from its elements, as Ruby's do, on both implementations. Where Ruby would nil-fill a parameter — an array too short, or no array at all — Portland refuses: `block expects 2 arguments — [1] has 1 element to spread`. The checker types a spreading block's parameters from the element's own element type.
+
 - **`script/bench` has a Ruby column** ([#25](https://github.com/portlandlang/portland/issues/25)) — each bench also runs unchanged under MRI through `bench/shim.rb`, the least Ruby that supplies `mutable`, `failure`, and `failure?`, and its output is checked against the seed's like the hosted one is. A bench Ruby cannot parse (`struct` patterns) or run (the compiler's own front end) shows "—" with its reason. `bench/failures.pdx` spells its or-guard as `||`, identical in Portland, since Ruby's `or` binds looser than `=`.
 
 - **`bench/failures.pdx` runs again** — it still spelled propagation as `risky!(value)`, the operator ADR 0044 unwound; it now uses the spelled-out guard, `return amount if amount.failure?`, and `script/bench` runs all six benches on both implementations.

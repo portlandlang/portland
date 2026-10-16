@@ -68,6 +68,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0054](0054-2026-09-25-ordering.md) — Ordering: `<=>` is Ruby's, `Comparable` is a builtin trait, and strings order
 - [0055](0055-2026-09-25-no-lazy-tier-yet.md) — No lazy tier: eager answers stay, external iteration is declined, and the rest waits on its real pull
 - [0056](0056-2026-09-27-class-is-a-spelling-of-struct.md) — `class` is a spelling of `struct`
+- [0057](0057-2026-10-16-block-parameters-spread-a-yielded-array.md) — Block parameters spread a yielded array
 
 <!-- /generated -->
 

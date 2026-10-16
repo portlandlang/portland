@@ -1972,6 +1972,20 @@ end
 # inner block's `it` from the outer's (principle 4), so an outer block can
 # wear an `it` it never uses, and refusing on that would refuse the seed's
 # own spec suite.
+# Ruby's spread (ADR 0057): a block of two or more parameters handed
+# exactly one guest array binds them from its elements, extras dropped; an
+# array too short refuses where Ruby would nil-fill, in the seed's words.
+def spread_for_block(parameters, arguments)
+  return arguments if parameters.length < 2 || arguments.length != 1
+  single = value_at(arguments, 0)
+  return arguments unless plain_array?(single)
+  if single.length < parameters.length
+    word = single.length == 1 ? "element" : "elements"
+    panic("block expects #{parameters.length} arguments — #{render_inspect(single)} has #{single.length} #{word} to spread")
+  end
+  single.take(parameters.length)
+end
+
 def check_block_count(parameters, given)
   return if parameters == ["it"]
   return unless parameters.length > given
@@ -2024,7 +2038,8 @@ end
 # The bindings handed back are at the *caller's* level, already flowed back —
 # so every call site can thread `result.bindings` on without knowing which of
 # the names inside belonged to the block.
-def run_guest_block(block, arguments, bindings)
+def run_guest_block(block, handed, bindings)
+  arguments = spread_for_block(block.parameters, handed)
   check_block_count(block.parameters, arguments.length)
   mutable scope = bindings
   mutable index = 0
@@ -2082,7 +2097,11 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   mutable interrupt = nil
   case node.name
   when "each", "each_pair"
-    if block.parameters.length == 2
+    # A hash yields its key and value as two arguments. An array yields
+    # one, and a two-parameter guest block over it spreads in
+    # run_guest_block (ADR 0057), which knows a guest symbol's host shape
+    # from an array — the host's own `|first, second|` would not.
+    if block.parameters.length == 2 && (receiver in Hash)
       receiver.each do |first, second|
         step = run_guest_block(block, [first, second], scope)
         scope = compacted_since(entry, step.bindings)
