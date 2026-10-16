@@ -21,3 +21,12 @@ context "a block's implicit `it`" do
     end
   end
 end
+
+# From ruby/spec language/it_parameter_spec.rb. A nested `it` is a shadow
+# and refuses, as does an `it` beside a named parameter; there are no
+# procs or lambdas to call, no arity to ask, and no eval.
+context "The `it` parameter" do
+  specify "provides it in a block" do
+    expect(["a"].map { it }).to eq(["a"])
+  end
+end

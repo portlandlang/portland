@@ -30,3 +30,29 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/loop_spec.rb. A loop is a statement, so the rows
+# that read break's value out of it stay upstream (ADR 0037), as do the redo
+# rows and the scope row, whose miss is a compile-time refusal here.
+context "The loop expression" do
+  specify "repeats the given block until a break is called" do
+    mutable outer_loop = 0
+    loop do
+      outer_loop += 1
+      break if outer_loop == 10
+    end
+    expect(outer_loop).to eq(10)
+  end
+
+  specify "skips to end of body with next" do
+    mutable seen = []
+    mutable index = 0
+    loop do
+      index += 1
+      break if index >= 5
+      next if index == 3
+      seen << index
+    end
+    expect(seen).to eq([1, 2, 4])
+  end
+end

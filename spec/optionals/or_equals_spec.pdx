@@ -1,0 +1,32 @@
+# `||=` is the or-guard's question as a rebind (ADR 0043, #115), from
+# ruby/spec language/optional_assignments_spec.rb's single-variable rows. A
+# declared maybe or a boolean takes it; a false non-boolean refuses, since
+# `||` takes booleans; an undeclared name refuses; assignment is a
+# statement, so the rows reading the assignment's value stay upstream, with
+# the accessor, constant, and index forms and the undecided `&&=`.
+
+require_relative "../spec_helper"
+
+context "Optional variable assignments" do
+  describe "using ||=" do
+    describe "using a single variable" do
+      specify "re-assigns an existing variable set to nil" do
+        mutable value = nil
+        value ||= 10
+        expect(value).to eq(10)
+      end
+
+      specify "does not re-assign a variable with a truthy value" do
+        mutable value = 10
+        value ||= 20
+        expect(value).to eq(10)
+      end
+
+      specify "does not evaluate the right side when not needed" do
+        mutable value = 10
+        value ||= 1 / 0
+        expect(value).to eq(10)
+      end
+    end
+  end
+end

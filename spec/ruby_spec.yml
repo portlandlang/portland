@@ -1914,6 +1914,84 @@ language/BEGIN_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
   link: docs/ruby/removed-syntax.md
+language/and_spec.rb:
+  pdx: [spec/word_operators/truth_spec.pdx]
+  status: partial_intentional
+  reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; assignment is a statement, so the assignment-in-expression rows stay upstream."
+  link: docs/ruby/truthiness.md
+language/comment_spec.rb:
+  pdx: [spec/method/fluent_chain_spec.pdx]
+language/execution_spec.rb:
+  status: skipped
+  reason: "Backticks and %x spawn a shell: %x refuses by name, and backticks have no spelling — the runtime kind is gone."
+  link: docs/ruby/percent-literals.md
+language/file_spec.rb:
+  status: skipped
+  reason: "Every row reaches __FILE__ through eval, require, or load, none of which exist: the runtime kind is gone."
+  link: docs/ruby/metaprogramming.md
+language/line_spec.rb:
+  status: skipped
+  reason: "Every row reaches __LINE__ through eval, require, or load, none of which exist: the runtime kind is gone."
+  link: docs/ruby/metaprogramming.md
+language/heredoc_spec.rb:
+  pdx: [spec/string/heredoc_spec.pdx]
+  status: partial_intentional
+  reason: "Squiggly only (ADR 0020): the plain and dash openers refuse; the backslash-continuation row and the line-number row stay upstream."
+  link: docs/ruby/heredocs.md
+language/it_parameter_spec.rb:
+  pdx: [spec/block/it_spec.pdx]
+  status: partial_intentional
+  reason: "it is the single parameter of a block that names none (ADR 0017): a nested it is a shadow and refuses, and there are no procs or lambdas to call, no arity to ask, and no eval."
+  link: docs/language.md
+language/loop_spec.rb:
+  pdx: [spec/control_flow/loop_spec.pdx]
+  status: partial_intentional
+  reason: "loop is a keyword, not an expression (ADR 0037): break carries no value out of it, the scope row's miss is a compile-time refusal, and redo has no spelling."
+  link: docs/ruby/removed-syntax.md
+language/not_spec.rb:
+  pdx: [spec/word_operators/truth_spec.pdx]
+  status: partial_intentional
+  reason: "not and ! take booleans only: the string and nil rows refuse."
+  link: docs/ruby/truthiness.md
+language/optional_assignments_spec.rb:
+  pdx: [spec/optionals/or_equals_spec.pdx]
+  status: partial_intentional
+  reason: "||= is the or-guard as a rebind: a declared maybe or boolean takes it, a false non-boolean refuses, an undeclared name refuses; the accessor, constant, and index forms, the value-of-assignment rows, and the undecided &&= stay upstream."
+  link: docs/adr/0043-2026-08-19-or-equals.md
+language/or_spec.rb:
+  pdx: [spec/word_operators/truth_spec.pdx]
+  status: partial_intentional
+  reason: "or and || are dead-identical, so the precedence rows diverge on purpose; the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
+  link: docs/ruby/word-operators.md
+language/range_spec.rb:
+  pdx: [spec/range/literal_spec.pdx]
+  status: partial_planned
+  reason: "Range.new has no spelling yet; the rows compare literals and ask the ends."
+  link: https://github.com/portlandlang/portland/issues/111
+language/retry_spec.rb:
+  status: skipped
+  reason: "retry rides begin/rescue, which do not exist: a fallible operation returns its failure."
+  link: docs/ruby/errors.md
+language/safe_navigator_spec.rb:
+  pdx: [spec/optionals/safe_navigation_spec.pdx]
+  status: partial_intentional
+  reason: "There are no assignment methods or operators behind &. — a field does not assign — and no eval."
+  link: docs/ruby/nil-and-optionals.md
+language/safe_spec.rb:
+  status: skipped
+  reason: "$SAFE is a global, and globals are removed syntax."
+  link: docs/ruby/removed-syntax.md
+language/symbol_spec.rb:
+  pdx: [spec/symbol/spellings_spec.pdx]
+  status: partial_intentional
+  reason: "No operator symbols, no globals or instance variables to name, no %s or %I, no symbol from text (so no interpolation in a quoted symbol), and no encodings (ADR 0023)."
+  link: docs/ruby/symbols.md
+language/undef_spec.rb:
+  status: skipped
+  reason: "undef removes a method at runtime; the runtime kind is gone, and a type's method set is declared whole."
+  link: docs/ruby/metaprogramming.md
+language/unless_spec.rb:
+  pdx: [spec/control_flow/unless_spec.pdx]
 language/END_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."

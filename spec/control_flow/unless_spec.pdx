@@ -20,3 +20,51 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/unless_spec.rb. Assignment is a statement here,
+# so the rows bind the whole expression where upstream assigns inside it.
+context "The unless expression" do
+  specify "evaluates the unless body when the expression is false" do
+    taken = unless false
+      true
+    else
+      false
+    end
+    expect(taken).to be_true
+  end
+
+  specify "returns the last statement in the body" do
+    last = unless false
+      "foo"
+      "bar"
+      "baz"
+    end
+    expect(last).to eq("baz")
+  end
+
+  specify "evaluates the else body when the expression is true" do
+    other = unless true
+      "foo"
+    else
+      "bar"
+    end
+    expect(other).to eq("bar")
+  end
+
+  specify "takes an optional then after the expression" do
+    taken = unless false then
+      "baz"
+    end
+    expect(taken).to eq("baz")
+  end
+
+  specify "does not return a value when the expression is true" do
+    empty = unless true then "foo" end
+    expect(empty).to be_nil
+  end
+
+  specify "allows expression and body to be on one line (using 'then')" do
+    one_liner = unless false then "foo" else "bar" end
+    expect(one_liner).to eq("foo")
+  end
+end

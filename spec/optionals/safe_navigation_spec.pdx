@@ -17,3 +17,43 @@ context "the unwrap toolkit" do
     end
   end
 end
+
+# From ruby/spec language/safe_navigator_spec.rb. There are no assignment
+# methods or operators behind `&.` — a field does not assign — so those rows
+# stay upstream, with the eval row.
+context "Safe navigator" do
+  describe "when context is nil" do
+    specify "always returns nil" do
+      expect(nil&.unknown).to be_nil
+      expect([][10]&.unknown).to be_nil
+    end
+
+    specify "can be chained" do
+      expect(nil&.one&.two&.three).to be_nil
+    end
+
+    specify "doesn't evaluate arguments" do
+      expect(nil&.unknown(1 / 0)).to be_nil
+    end
+  end
+
+  describe "when context is false" do
+    specify "calls the method" do
+      expect(false&.to_s).to eq("false")
+    end
+  end
+
+  describe "when context is truthy" do
+    specify "calls the method" do
+      expect(1&.to_s).to eq("1")
+    end
+  end
+
+  specify "takes a list of arguments" do
+    expect([1, 2, 3]&.first(2)).to eq([1, 2])
+  end
+
+  specify "takes a block" do
+    expect([1, 2]&.map { it * 2 }).to eq([2, 4])
+  end
+end

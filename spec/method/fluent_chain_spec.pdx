@@ -1,0 +1,14 @@
+# A method chain continues on a line that opens with a dot, and a comment
+# may sit between the links (#115). From ruby/spec language/comment_spec.rb,
+# whose one row goes through eval; here the chain is written directly.
+
+require_relative "../spec_helper"
+
+context "The comment" do
+  specify "can be placed between fluent dot now" do
+    rendered = 10
+      # some comment
+      .to_s
+    expect(rendered).to eq("10")
+  end
+end

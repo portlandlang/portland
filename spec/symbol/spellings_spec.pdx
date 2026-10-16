@@ -14,3 +14,42 @@ context "Symbol" do
     end
   end
 end
+
+# From ruby/spec language/symbol_spec.rb. No operator symbols, no globals
+# or instance variables to name, no %s or %I, no symbol from text — so no
+# interpolation inside a quoted symbol — and no encodings (ADR 0023); the
+# is_a? checks become equality with themselves.
+context "A Symbol literal" do
+  specify "is a ':' followed by any number of valid characters" do
+    name = :foo
+    expect(name).to eq(:foo)
+    expect(inspect(name)).to eq(":foo")
+  end
+
+  specify "is a ':' followed by any valid variable, method, or constant name" do
+    [:Foo, :foo, :_, :FOO, :_Foo, :_9].each { expect(it).to eq(it) }
+  end
+
+  specify "is a ':' followed by a single- or double-quoted string that may contain otherwise invalid characters" do
+    expect(inspect(:"foo bar")).to eq(":\"foo bar\"")
+    expect(inspect(:"++")).to eq(":\"++\"")
+    expect(inspect(:"9")).to eq(":\"9\"")
+  end
+
+  specify "may contain '::' in the string" do
+    expect(:"Some::Class").to eq(:"Some::Class")
+  end
+
+  specify "is converted to a literal, unquoted representation if the symbol contains only valid characters" do
+    expect(inspect(:"foo")).to eq(":foo")
+    expect(inspect(:"Foo__9")).to eq(":Foo__9")
+  end
+
+  specify "can be an empty string" do
+    expect(inspect(:"")).to eq(":\"\"")
+  end
+
+  specify "can be created from list syntax %i{a b c} without interpolation" do
+    expect(%i{a b}).to eq([:a, :b])
+  end
+end

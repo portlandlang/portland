@@ -42,3 +42,78 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec language/heredoc_spec.rb, its squiggly rows, with the
+# fixture module's heredocs written inline. The plain and dash openers
+# refuse (ADR 0020); the backslash-continuation row and the line-number row
+# stay upstream. The interpolated rows interpolate a local where the fixture
+# interpolates a string literal: a quoted string inside a heredoc's
+# interpolation does not lex yet (#164).
+context "Heredoc string" do
+  specify "allows HEREDOC with <<~'identifier', allowing to indent identifier and content" do
+    message = <<~HEREDOC
+      character density, n.:
+        The number of very weird people in the office.
+    HEREDOC
+    expect(message).to eq("character density, n.:\n  The number of very weird people in the office.\n")
+  end
+
+  specify "trims trailing newline character for blank HEREDOC with <<~'identifier'" do
+    blank = <<~HERE
+    HERE
+    expect(blank).to eq("")
+  end
+
+  specify "allows HEREDOC with <<~identifier, interpolated" do
+    word = "interpolated"
+    unquoted = <<~HERE
+      unquoted #{word}
+    HERE
+    expect(unquoted).to eq("unquoted interpolated\n")
+  end
+
+  specify "allows HEREDOC with <<~\"identifier\", interpolated" do
+    word = "interpolated"
+    doublequoted = <<~"HERE"
+      doublequoted #{word}
+    HERE
+    expect(doublequoted).to eq("doublequoted interpolated\n")
+  end
+
+  specify "allows HEREDOC with <<~'identifier', no interpolation" do
+    singlequoted = <<~'HERE'
+      singlequoted #{"interpolated"}
+    HERE
+    expect(singlequoted).to eq("singlequoted \#{\"interpolated\"}\n")
+  end
+
+  specify "selects the least-indented line and removes its indentation from all the lines" do
+    first = <<~HERE
+      a
+        b
+          c
+    HERE
+    last = <<~HERE
+          a
+        b
+      c
+    HERE
+    expect(first).to eq("a\n  b\n    c\n")
+    expect(last).to eq("    a\n  b\nc\n")
+  end
+
+  specify "selects the least-indented line and removes its indentation from all the lines for <<~'identifier'" do
+    first = <<~'HERE'
+      a
+        b
+          c
+    HERE
+    last = <<~'HERE'
+          a
+        b
+      c
+    HERE
+    expect(first).to eq("a\n  b\n    c\n")
+    expect(last).to eq("    a\n  b\nc\n")
+  end
+end

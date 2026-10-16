@@ -13,3 +13,27 @@ context "Range" do
     end
   end
 end
+
+# From ruby/spec language/range_spec.rb. Range.new has no spelling yet
+# (#111), so the rows compare literals and ask the ends; the identity row
+# stays upstream.
+context "Literal Ranges" do
+  specify "creates range object" do
+    expect(1..10).to eq(1..10)
+  end
+
+  specify "creates range with excluded right boundary" do
+    expect((1...10).exclude_end?).to be_true
+    expect((1..10).exclude_end?).to be_false
+  end
+
+  specify "creates endless ranges" do
+    expect((1..).end).to be_nil
+    expect((1...).exclude_end?).to be_true
+  end
+
+  specify "creates beginless ranges" do
+    expect((..1).begin).to be_nil
+    expect((...1).exclude_end?).to be_true
+  end
+end
