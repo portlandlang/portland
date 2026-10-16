@@ -7,12 +7,12 @@ end
 
 def classify(value)
   case value
-  in nil        then "absent"
-  in 0..9       then "digit"
-  in 10 | 20    then "round"
+  in nil         then "absent"
+  in 0..9        then "digit"
+  in 10 | 20     then "round"
   in Word(text:) then text
-  in String     then "text"
-  in other      then "#{other}"
+  in String      then "text"
+  in other       then "#{other}"
   end
 end
 
