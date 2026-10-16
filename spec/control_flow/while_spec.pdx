@@ -47,3 +47,52 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/while_spec.rb. A loop is a statement (ADR 0037),
+# so the rows reading its value or break's stay upstream, with the
+# `begin ... end while` do-while rows and the redo rows; a name first
+# bound in the body dies each iteration (ADR 0001), so the containing-scope
+# rows stay upstream; the optional `do` waits on #165.
+context "The while expression" do
+  specify "runs while the expression is true" do
+    mutable index = 0
+    while index < 3
+      index += 1
+    end
+    expect(index).to eq(3)
+  end
+
+  specify "stops running body if interrupted by break" do
+    mutable index = 0
+    while index < 10
+      index += 1
+      break if index > 5
+    end
+    expect(index).to eq(6)
+  end
+
+  specify "skips to end of body with next" do
+    mutable seen = []
+    mutable index = 0
+    while index < 4
+      index += 1
+      next if index == 3
+      seen << index
+    end
+    expect(seen).to eq([1, 2, 4])
+  end
+end
+
+context "The while modifier" do
+  specify "runs preceding statement while the condition is true" do
+    mutable index = 0
+    index += 1 while index < 3
+    expect(index).to eq(3)
+  end
+
+  specify "does not run preceding statement if the condition is false" do
+    mutable index = 0
+    index += 1 while false
+    expect(index).to eq(0)
+  end
+end

@@ -46,3 +46,50 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/until_spec.rb, the same way while_spec.pdx takes
+# its file: the value, do-while, redo, and containing-scope rows stay
+# upstream, and the optional `do` waits on #165.
+context "The until expression" do
+  specify "runs while the expression is false" do
+    mutable index = 0
+    until index > 9
+      index += 1
+    end
+    expect(index).to eq(10)
+  end
+
+  specify "stops running body if interrupted by break" do
+    mutable index = 0
+    until index > 9
+      index += 1
+      break if index > 5
+    end
+    expect(index).to eq(6)
+  end
+
+  specify "skips to end of body with next" do
+    mutable seen = []
+    mutable index = 0
+    until index >= 4
+      index += 1
+      next if index == 3
+      seen << index
+    end
+    expect(seen).to eq([1, 2, 4])
+  end
+end
+
+context "The until modifier" do
+  specify "runs preceding statement while the condition is false" do
+    mutable index = 0
+    index += 1 until index > 9
+    expect(index).to eq(10)
+  end
+
+  specify "does not run preceding statement if the condition is true" do
+    mutable index = 0
+    index += 1 until true
+    expect(index).to eq(0)
+  end
+end

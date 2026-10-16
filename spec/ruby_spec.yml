@@ -1919,8 +1919,16 @@ language/and_spec.rb:
   status: partial_intentional
   reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; assignment is a statement, so the assignment-in-expression rows stay upstream."
   link: docs/ruby/truthiness.md
+language/class_variable_spec.rb:
+  status: skipped
+  reason: "Class variables do not exist: a value lives in a local, a field, or a constant, and @@name refuses naming those (ADR 0056)."
+  link: docs/ruby/classes.md
 language/comment_spec.rb:
   pdx: [spec/method/fluent_chain_spec.pdx]
+language/ensure_spec.rb:
+  status: skipped
+  reason: "ensure rides begin/rescue, which do not exist: a fallible operation returns its failure."
+  link: docs/ruby/errors.md
 language/execution_spec.rb:
   status: skipped
   reason: "Backticks and %x spawn a shell: %x refuses by name, and backticks have no spelling — the runtime kind is gone."
@@ -1948,6 +1956,10 @@ language/loop_spec.rb:
   status: partial_intentional
   reason: "loop is a keyword, not an expression (ADR 0037): break carries no value out of it, the scope row's miss is a compile-time refusal, and redo has no spelling."
   link: docs/ruby/removed-syntax.md
+language/metaclass_spec.rb:
+  status: skipped
+  reason: "class << obj opens a singleton class, which does not exist; the runtime kind is gone, and class << self refuses naming the type-function rewrite (ADR 0056)."
+  link: docs/ruby/classes.md
 language/not_spec.rb:
   pdx: [spec/word_operators/truth_spec.pdx]
   status: partial_intentional
@@ -1963,6 +1975,10 @@ language/or_spec.rb:
   status: partial_intentional
   reason: "or and || are dead-identical, so the precedence rows diverge on purpose; the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
   link: docs/ruby/word-operators.md
+language/predefined_spec.rb:
+  status: skipped
+  reason: "The predefined globals ($_, $0, $:, $!, $~ and the rest) are removed syntax; the handful of legitimate uses return as named APIs."
+  link: docs/ruby/removed-syntax.md
 language/range_spec.rb:
   pdx: [spec/range/literal_spec.pdx]
   status: partial_planned
@@ -1981,6 +1997,18 @@ language/safe_spec.rb:
   status: skipped
   reason: "$SAFE is a global, and globals are removed syntax."
   link: docs/ruby/removed-syntax.md
+language/send_spec.rb:
+  status: skipped
+  reason: "send, public_send, and __send__ call a method by a runtime name; the runtime kind is gone, and there are no operator symbols to send."
+  link: docs/ruby/metaprogramming.md
+language/singleton_class_spec.rb:
+  status: skipped
+  reason: "Singleton classes do not exist; the runtime kind is gone, and every value is a value."
+  link: docs/ruby/metaprogramming.md
+language/super_spec.rb:
+  status: skipped
+  reason: "There is no inheritance — declined, not deferred — so super has nothing to reach; traits carry shared behavior (ADR 0028)."
+  link: docs/ruby/mixins-and-inheritance.md
 language/symbol_spec.rb:
   pdx: [spec/symbol/spellings_spec.pdx]
   status: partial_intentional
@@ -1992,6 +2020,16 @@ language/undef_spec.rb:
   link: docs/ruby/metaprogramming.md
 language/unless_spec.rb:
   pdx: [spec/control_flow/unless_spec.pdx]
+language/until_spec.rb:
+  pdx: [spec/control_flow/until_spec.pdx]
+  status: partial_planned
+  reason: "The optional do after the condition waits on #165; a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
+  link: https://github.com/portlandlang/portland/issues/165
+language/while_spec.rb:
+  pdx: [spec/control_flow/while_spec.pdx]
+  status: partial_planned
+  reason: "The optional do after the condition waits on #165; a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
+  link: https://github.com/portlandlang/portland/issues/165
 language/END_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
