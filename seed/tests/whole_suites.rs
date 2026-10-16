@@ -131,9 +131,11 @@ fn the_language_spec_passes_on_both_oracles() {
     // re-parsed into every spec's fresh scope at 0.40s a time; run_specs.pdx
     // parses the harness once and shares it (#69). The ceiling covers the
     // whole batch rather than one file, so it is scaled to match — raised
-    // from 120s to 130s as the #104/#107/#108 ports grew the batch to a
-    // steady 115–125s.
-    let batch = within_seconds(130, "language spec, hosted", || {
+    // from 120s to 130s as the #104/#107/#108 ports grew the batch, and to
+    // 150s with the #105 ports: about 0.15s an example hosted, no file an
+    // outlier (timed file by file, 2026-10-16), so 150s is roughly a
+    // thousand examples.
+    let batch = within_seconds(150, "language spec, hosted", || {
         Command::new(env!("CARGO_BIN_EXE_pdx"))
             .arg(format!(
                 "{}/../spec/run_specs.pdx",
