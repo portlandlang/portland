@@ -1385,14 +1385,13 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
                 .cloned()
                 .collect(),
         ),
+        // A negative count refuses in Ruby's words.
         (Value::String(text), BinaryOperator::Multiply, Value::Integer(count)) => {
-            let count = usize::try_from(count)
-                .unwrap_or_else(|_| panic!("cannot repeat a string {count} times"));
+            let count = usize::try_from(count).unwrap_or_else(|_| panic!("negative argument"));
             Value::String(text.repeat(count))
         }
         (Value::Array(elements), BinaryOperator::Multiply, Value::Integer(count)) => {
-            let count = usize::try_from(count)
-                .unwrap_or_else(|_| panic!("cannot repeat an array {count} times"));
+            let count = usize::try_from(count).unwrap_or_else(|_| panic!("negative argument"));
             let mut repeated = Vec::with_capacity(elements.len() * count);
             for _ in 0..count {
                 repeated.extend(elements.iter().cloned());
@@ -3236,14 +3235,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 // 0038) — its lines with their newlines, and `upto`, its
                 // successors up to and including the end. Each answers the
                 // string.
-                (Value::String(text), "each_char" | "each_line", []) => {
-                    let pieces: Vec<String> = if name == "each_char" {
-                        text.graphemes(true).map(str::to_string).collect()
-                    } else {
+                (Value::String(text), "each_char" | "each_grapheme_cluster" | "each_line", []) => {
+                    let pieces: Vec<String> = if name == "each_line" {
                         text.split_inclusive('\n').map(str::to_string).collect()
+                    } else {
+                        text.graphemes(true).map(str::to_string).collect()
                     };
                     for piece in pieces {
                         self.run_block(block, vec![Value::String(piece)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                // The byte and codepoint walks (#106), each answering the
+                // string, as `bytes` and `codepoints` answer the arrays.
+                (Value::String(text), "each_byte" | "each_codepoint", []) => {
+                    let numbers: Vec<i64> = if name == "each_byte" {
+                        text.bytes().map(|byte| byte as i64).collect()
+                    } else {
+                        text.chars().map(|character| character as i64).collect()
+                    };
+                    for number in numbers {
+                        self.run_block(block, vec![Value::Integer(number)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
@@ -4406,15 +4421,24 @@ impl<W: std::io::Write> Interpreter<W> {
             // A character is a grapheme cluster (ADR 0038): `chars`,
             // `length`, `reverse`, `slice`, and `index` all count what a
             // human sees — one flag, one é, however encoded.
-            (Value::String(text), "chars", []) => Value::array(
+            (Value::String(text), "chars" | "grapheme_clusters", []) => Value::array(
                 text.graphemes(true)
                     .map(|grapheme| Value::String(grapheme.to_string()))
                     .collect(),
             ),
             (Value::String(text), "downcase", []) => Value::String(text.to_lowercase()),
             (Value::String(text), "empty?", []) => Value::Boolean(text.is_empty()),
-            (Value::String(text), "end_with?", [Value::String(suffix)]) => {
-                Value::Boolean(text.ends_with(suffix))
+            // `start_with?` and `end_with?` take any number of candidates and
+            // answer whether one matches, as Ruby's do; a candidate that is
+            // not a string refuses in Ruby's words.
+            (Value::String(text), "end_with?", suffixes) if !suffixes.is_empty() => {
+                Value::Boolean(suffixes.iter().any(|suffix| match suffix {
+                    Value::String(suffix) => text.ends_with(suffix.as_str()),
+                    other => panic!(
+                        "no implicit conversion of {} into String",
+                        other.type_name()
+                    ),
+                }))
             }
             (Value::String(text), "include?", [Value::String(needle)]) => {
                 Value::Boolean(text.contains(needle))
@@ -4440,8 +4464,14 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "split", [Value::String(separator), Value::Integer(limit)]) => {
                 split_value(text, Some(separator), *limit)
             }
-            (Value::String(text), "start_with?", [Value::String(prefix)]) => {
-                Value::Boolean(text.starts_with(prefix))
+            (Value::String(text), "start_with?", prefixes) if !prefixes.is_empty() => {
+                Value::Boolean(prefixes.iter().any(|prefix| match prefix {
+                    Value::String(prefix) => text.starts_with(prefix.as_str()),
+                    other => panic!(
+                        "no implicit conversion of {} into String",
+                        other.type_name()
+                    ),
+                }))
             }
             (Value::String(text), "to_i", []) => {
                 let trimmed = text.trim();
@@ -4651,15 +4681,19 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::String(trimmed.to_string())
             }
             // Ruby's capitalize moves both ways: the first character up, all
-            // the rest down.
+            // the rest down. The first goes to titlecase, so where upcasing
+            // one character makes several — ß to SS — only the first stays
+            // upper: `"ß".capitalize` is `"Ss"`.
             (Value::String(text), "capitalize", []) => {
                 let mut characters = text.chars();
                 match characters.next() {
                     None => Value::String(String::new()),
-                    Some(first) => Value::String(
-                        first.to_uppercase().collect::<String>()
-                            + &characters.as_str().to_lowercase(),
-                    ),
+                    Some(first) => {
+                        let mut upper = first.to_uppercase();
+                        let head: String = upper.next().into_iter().collect();
+                        let expansion = upper.collect::<String>().to_lowercase();
+                        Value::String(head + &expansion + &characters.as_str().to_lowercase())
+                    }
                 }
             }
             (Value::String(text), "swapcase", []) => Value::String(
@@ -7310,7 +7344,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "cannot repeat")]
+    #[should_panic(expected = "negative argument")]
     fn panics_on_repeating_a_string_a_negative_number_of_times() {
         evaluate("\"ab\" * -1");
     }

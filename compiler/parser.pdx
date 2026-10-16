@@ -2037,6 +2037,7 @@ def encode_string(text)
     when "\\" then "\\\\"
     when "\"" then "\\\""
     when "\n" then "\\n"
+    when "\r" then "\\r"
     when "\t" then "\\t"
     else
       character

@@ -198,6 +198,12 @@ p(city.gsub("a", "A"))
 p(city.sub("l") { it.upcase })
 p(city.gsub("") { "-" })
 city.each_char { |character| puts(character) }
+"🇺🇸ok".each_grapheme_cluster { |character| puts(character) }
+"hé".each_byte { |byte| puts(byte) }
+"hé".each_codepoint { |codepoint| puts(codepoint) }
+p("🇺🇸ok".grapheme_clusters)
+p(city.start_with?("x", "port"))
+p(city.end_with?("x", "land"))
 "one\ntwo\n".each_line { |line| puts(line) }
 "a".upto("c") { |letter| puts(letter) }
 "a".upto("c", true) { |letter| puts(letter) }

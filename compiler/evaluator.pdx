@@ -998,8 +998,8 @@ def symbol_text_answer(text, name, arguments)
   when "name", "id2name" then text
   when "length", "size" then text.length
   when "empty?" then text.empty?
-  when "start_with?" then text.start_with?(value_at(arguments, 0))
-  else text.end_with?(value_at(arguments, 0))
+  when "start_with?" then arguments.any? { |prefix| text.start_with?(prefix) }
+  else arguments.any? { |suffix| text.end_with?(suffix) }
   end
 end
 
@@ -1917,6 +1917,7 @@ def evaluate_method_call(node, mutable bindings)
   when "lines" then receiver.lines
   when "reverse" then receiver.reverse
   when "chars" then receiver.chars
+  when "grapheme_clusters" then receiver.chars
   when "abs", "magnitude" then receiver.abs
   # The neighbors ride the host's builtins, synonyms kept on purpose (#79).
   # `next` is `succ`'s third spelling; riding `succ` keeps this source free
@@ -2001,8 +2002,9 @@ def evaluate_method_call(node, mutable bindings)
     when 1 then receiver.split(value_at(arguments, 0))
     else receiver.split(arguments[0], arguments[1])
     end
-  when "start_with?" then receiver.start_with?(value_at(arguments, 0))
-  when "end_with?" then receiver.end_with?(value_at(arguments, 0))
+  # Any number of candidates, one at a time (#106).
+  when "start_with?" then arguments.any? { |prefix| receiver.start_with?(prefix) }
+  when "end_with?" then arguments.any? { |suffix| receiver.end_with?(suffix) }
   # A hash's slice takes any number of keys (#105), folded one at a time
   # in the order given; an array's takes a start and a length.
   when "slice"
@@ -2312,9 +2314,31 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # rebindings threaded through like every other walk's.
   # A string's walks (#106): characters, lines, and successors, each
   # answering the string.
-  when "each_char"
+  when "each_char", "each_grapheme_cluster"
     receiver.each_char do |character|
       step = run_guest_block(block, [character], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "each_byte"
+    receiver.each_byte do |byte|
+      step = run_guest_block(block, [byte], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "each_codepoint"
+    receiver.each_codepoint do |codepoint|
+      step = run_guest_block(block, [codepoint], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step

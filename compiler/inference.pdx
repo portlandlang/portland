@@ -439,7 +439,7 @@ def call_answer(receiver, node, types)
   when "casecmp?" then ["boolean"]
   when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?"
     ["boolean"]
-  when "chars", "split", "lines" then ["array", ["string"]]
+  when "chars", "grapheme_clusters", "split", "lines" then ["array", ["string"]]
   when "keys"
     return ["array", type_at(receiver, 1)] if receiver in ["hash", *]
     ["array", ["unknown"]]
@@ -573,7 +573,7 @@ def synthesize_block_call(node, receiver, types)
     ["unknown"]
   # A string's walks answer the string, and `sub` and `gsub` with a block
   # a new one (#106).
-  when "each_char", "each_line", "sub", "gsub"
+  when "each_char", "each_grapheme_cluster", "each_byte", "each_codepoint", "each_line", "sub", "gsub"
     return receiver if receiver == ["string"]
     ["unknown"]
   # A hash's sort_by, take_while, and drop_while answer its pairs as an
@@ -673,11 +673,11 @@ end
 # sentence handling it.
 def builtin_table(type)
   case type
-  in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/2 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_char/0& each_line/0& empty?/0 end_with?/1 failure?/0 gsub/1-2& hex/0 include?/1 index/1 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1 strip/0 sub/1-2& succ/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0 upto/1-2&]
+  in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/2 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0& empty?/0 end_with?/1+ failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1+ strip/0 sub/1-2& succ/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0 upto/1-2&]
   in ["integer"] then %w[abs/0 between?/2 ceil/0-1 ceildiv/1 clamp/1-2 digits/0-1 div/1 divmod/1 downto/1& even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 odd?/0 ord/0 positive?/0 pow/1 pred/0 remainder/1 round/0-1 size/0 some?/0 succ/0 times/0& to_f/0 to_i/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 div/1 divmod/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]
-  in ["symbol"] then %w[empty?/0 end_with?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 some?/0 start_with?/1 to_s/0]
+  in ["symbol"] then %w[empty?/0 end_with?/1+ failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 some?/0 start_with?/1+ to_s/0]
   in ["array", *] then %w[all?/0& any?/0& assoc/1 at/1 collect/0& collect_concat/0& compact/0 count/0-1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 failure?/0 filter/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& rassoc/1 reduce/1& reject/0& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 select/0& size/0 slice/2 some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
   in ["hash", *] then %w[all?/0& any?/0& assoc/1 collect/0& collect_concat/0& compact/0 count/0-1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 except/0+ failure?/0 filter/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["range"] then %w[all?/0& any?/0& begin/0 collect/0& collect_concat/0& count/0-1& cover?/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& exclude_end?/0 failure?/0 filter/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& nil?/0 none?/0& one?/0& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0]

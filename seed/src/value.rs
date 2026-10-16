@@ -333,6 +333,7 @@ impl Value {
         cut
     }
 
+    /// The value as source (ADR 0026).
     pub fn inspect(&self) -> String {
         match self {
             Value::Array(elements) => {
@@ -360,7 +361,7 @@ impl Value {
             Value::Range { .. } => self.to_string(),
             Value::Some(inner) => format!("some({})", inner.inspect()),
             Value::Failure(inner) => format!("failure({})", inner.inspect()),
-            Value::String(value) => format!("{value:?}"),
+            Value::String(value) => quoted(value),
             Value::Symbol(name) => Value::symbol_source(name),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
@@ -375,6 +376,27 @@ impl Value {
 
 /// Ruby's float rendering: a float always shows its point (`1.0`, never
 /// `1`), and the infinities spell out (ADR 0018).
+/// A string as source: the closed escape set (docs/ruby/string-escapes.md)
+/// written back out — `\\`, `\"`, `\n`, `\r`, `\t` — and every other
+/// character raw, as Ruby's `inspect` leaves a zero-width joiner or a
+/// flag's variation selector alone. Rust's `{:?}` would write those as
+/// `\u{200d}`, which no Portland literal can spell.
+fn quoted(text: &str) -> String {
+    let mut result = String::from("\"");
+    for character in text.chars() {
+        match character {
+            '\\' => result.push_str("\\\\"),
+            '"' => result.push_str("\\\""),
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            other => result.push(other),
+        }
+    }
+    result.push('"');
+    result
+}
+
 fn format_float(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();
