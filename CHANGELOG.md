@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`script/bench` has a Ruby column** ([#25](https://github.com/portlandlang/portland/issues/25)) — each bench also runs unchanged under MRI through `bench/shim.rb`, the least Ruby that supplies `mutable`, `failure`, and `failure?`, and its output is checked against the seed's like the hosted one is. A bench Ruby cannot parse (`struct` patterns) or run (the compiler's own front end) shows "—" with its reason. `bench/failures.pdx` spells its or-guard as `||`, identical in Portland, since Ruby's `or` binds looser than `=`.
+
 - **`bench/failures.pdx` runs again** — it still spelled propagation as `risky!(value)`, the operator ADR 0044 unwound; it now uses the spelled-out guard, `return amount if amount.failure?`, and `script/bench` runs all six benches on both implementations.
 
 - **The hosted language spec's tripwire is 130 seconds** — the ports under #104, #107, and #108 grew the batch to a steady 115–125 s against a 120 s ceiling.

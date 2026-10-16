@@ -15,7 +15,9 @@ end
 mutable total = 0
 mutable index = 1
 while index < 60
-  outcome = doubled_or_zero(index) or 1
+  # `||`, not `or`: identical in Portland, but Ruby's `or` binds looser
+  # than `=`, and this bench runs under both.
+  outcome = doubled_or_zero(index) || 1
   total += outcome
   index += 1
 end
