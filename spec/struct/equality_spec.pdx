@@ -1,10 +1,26 @@
 # Equality is by value, field for field.
+#
+# The rows below the house examples are from ruby/spec
+# core/struct/equal_value_spec.rb's shared rows; the recursive-structure
+# row (values never mutate) stays upstream.
 
 require_relative "../spec_helper"
 
 struct Token
   kind
   text
+end
+
+struct Car
+  make
+  model
+  year
+end
+
+struct Truck
+  make
+  model
+  year
 end
 
 context "a struct" do
@@ -18,5 +34,31 @@ context "a struct" do
     specify "and any differing field breaks it" do
       expect(token).not_to eq(token.with(text: "43"))
     end
+  end
+end
+
+context "Struct#==" do
+  specify "returns true if the other is the same object" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    same_car = car
+    expect(car == same_car).to be_true
+  end
+
+  specify "returns true if the other has all the same fields" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    similar_car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    expect(car == similar_car).to be_true
+  end
+
+  specify "returns false if the other is a different object or has different fields" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    different_car = Car.new(make: "Honda", model: "Accord", year: "1995")
+    expect(car == different_car).to be_false
+  end
+
+  specify "returns false if other is of a different class" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    truck = Truck.new(make: "Honda", model: "Accord", year: "1998")
+    expect(car == truck).to be_false
   end
 end

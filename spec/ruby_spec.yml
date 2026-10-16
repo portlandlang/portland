@@ -1631,6 +1631,100 @@ core/string/upto_spec.rb:
   reason: "upto without a block is an enumerator in Ruby and nothing here."
   link: docs/ruby/enumerators.md
 
+# — core/struct —
+# Upstream builds its fixtures with Struct.new(:a, :b); here they are struct
+# declarations. A struct is a value: no class object, no setters, no
+# instance variables (ADR 0015, ADR 0028). The lookups by name or position
+# wait on #163, eql? and hash on #154.
+
+core/struct/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015); there are no class objects to clone either."
+  link: docs/ruby/mutability.md
+core/struct/constants_spec.rb:
+  status: skipped
+  reason: "There is no Struct class object to hold Struct::Group or Struct::Passwd; the rows assert their absence from Ruby."
+  link: docs/ruby/metaprogramming.md
+core/struct/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015); there are no class objects to dup either."
+  link: docs/ruby/mutability.md
+core/struct/each_pair_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "each_pair without a block is an enumerator in Ruby and nothing here."
+  link: docs/ruby/enumerators.md
+core/struct/each_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "each without a block is an enumerator in Ruby and nothing here."
+  link: docs/ruby/enumerators.md
+core/struct/element_set_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so []= on a struct has nothing to assign and refuses (ADR 0015); with answers an updated copy."
+  link: docs/ruby/mutability.md
+core/struct/equal_value_spec.rb:
+  pdx: [spec/struct/equality_spec.pdx]
+core/struct/filter_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+core/struct/initialize_spec.rb:
+  status: skipped
+  reason: "There is no initialize to override and no instance variables; a struct is built by its fields, or by a defined new (ADR 0031)."
+  link: docs/ruby/metaprogramming.md
+core/struct/inspect_spec.rb:
+  pdx: [spec/inspect_spec.pdx]
+  status: partial_intentional
+  reason: "A struct renders as its constructor reads — Car(make: \"Ford\") — not as #<struct ...>, and inspect is a function (ADR 0026)."
+  link: docs/ruby/inspect.md
+core/struct/instance_variable_get_spec.rb:
+  status: skipped
+  reason: "There are no instance variables to read; a struct's fields are its whole state (ADR 0028)."
+  link: docs/ruby/metaprogramming.md
+core/struct/instance_variables_spec.rb:
+  status: skipped
+  reason: "There are no instance variables to list; a struct's fields are its whole state (ADR 0028)."
+  link: docs/ruby/metaprogramming.md
+core/struct/keyword_init_spec.rb:
+  status: skipped
+  reason: "Every struct takes its fields by keyword; there is no keyword_init flag to ask about and no class object to ask."
+  link: docs/ruby/metaprogramming.md
+core/struct/length_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+core/struct/members_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "members is the instance's; there is no class object to ask and no subclass to withhold it from."
+  link: docs/ruby/metaprogramming.md
+core/struct/new_spec.rb:
+  status: skipped
+  reason: "Struct.new builds a class at runtime; a struct is declared with the struct keyword (ADR 0028), and its name is a literal."
+  link: docs/ruby/metaprogramming.md
+core/struct/select_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "select without a block is an enumerator in Ruby and nothing here."
+  link: docs/ruby/enumerators.md
+core/struct/size_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+core/struct/struct_spec.rb:
+  status: skipped
+  reason: "The rows ask the Struct class object about Enumerable, subclasses, and writers; a struct has none of those (ADR 0015, ADR 0028)."
+  link: docs/ruby/metaprogramming.md
+core/struct/to_a_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+core/struct/to_h_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "The to_ary coercion rows are the implicit-conversion protocol (ADR 0036); the row interpolating a nil field is written with a year, since nil has no to_s (ADR 0006)."
+  link: docs/ruby/aliases.md
+core/struct/to_s_spec.rb:
+  pdx: [spec/inspect_spec.pdx]
+  status: partial_intentional
+  reason: "A struct renders as its constructor reads — Car(make: \"Ford\") — not as #<struct ...> (ADR 0026); there are no anonymous structs."
+  link: docs/ruby/inspect.md
+core/struct/values_spec.rb:
+  pdx: [spec/struct/enumerable_spec.pdx]
+
 # — core/symbol —
 # A symbol answers questions about its name, and never builds a new symbol
 # from text (ADR 0023): the case changers and succ stay behind, and symbols

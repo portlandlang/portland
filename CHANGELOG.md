@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Twenty-two core/struct files ported or recorded** ([#114](https://github.com/portlandlang/portland/issues/114)) — `spec/struct/enumerable_spec.pdx` (to_a, values, to_h, members, size, length, each, each_pair, select, filter) and `==`'s rows into `equality_spec.pdx`; inspect and to_s recorded against ADR 0026's rendering; ten files recorded as decided out — the class object, setters, instance variables, keyword_init, clone and dup. The lookups by name or position (`[]`, dig, values_at, deconstruct_keys) wait on [#163](https://github.com/portlandlang/portland/issues/163).
+
+- **Ruby's Struct views and walks** ([#114](https://github.com/portlandlang/portland/issues/114)) — on both implementations, over the fields in definition order: `to_h` bare or through a block answering a pair, `to_a` and `values`, `members`, `size` and `length`, `each` over the values, `each_pair` over symbol and value, and `select` and `filter` answering an array. A struct's own methods and fields come first, so a field named `size` still wins, as Ruby's accessor does; the checker knows the names on every struct.
+
 - **`inspect` escapes a `#` that would open an interpolation, and core/string's decided-out files are recorded** ([#106](https://github.com/portlandlang/portland/issues/106)) — `inspect("#{")` reads `"\#{"` on both implementations, as Ruby's does before `{`, `$`, and `@`, so what inspect writes reads back as the same string. `core/string/inspect_spec.rb` ports to `spec/string/inspect_spec.pdx` through the `inspect` function; twenty-four files are recorded as decided out — the mutators and the frozen-string family (ADR 0015), to_sym and intern (ADR 0023), the class-object and implicit-conversion entry points (ADR 0036).
 
 - **Four more core/string files ported** ([#106](https://github.com/portlandlang/portland/issues/106)) — to_f into `spec/string/conversion_spec.pdx`, split's string rows into `split_spec.pdx`, and slice and `[]` into `index_spec.pdx` and `slice_spec.pdx`, their past-the-end rows reworded to ADR 0019's answer.
