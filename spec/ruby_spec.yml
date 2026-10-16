@@ -2475,6 +2475,101 @@ language/BEGIN_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
   link: docs/ruby/removed-syntax.md
+language/assignments_spec.rb:
+  pdx: [spec/mutable/compound_spec.pdx, spec/mutable/or_equals_spec.pdx]
+  status: partial_intentional
+  reason: "The compound spellings rebind a mutable (ADR 0001, ADR 0043); &&= is undecided, multiple assignment refuses with its rewrite (#135), and the attribute, index-through-a-method, and frozen rows stay upstream."
+  link: docs/ruby/mutability.md
+language/class_spec.rb:
+  pdx: [spec/struct/class_spec.pdx]
+  status: partial_intentional
+  reason: "class is a spelling of struct (ADR 0056); reopening, inheritance, metaclasses, class variables, Class.new, and the anonymous-class rows are runtime metaprogramming."
+  link: docs/ruby/classes.md
+language/constants_spec.rb:
+  pdx: [spec/namespace/constant_spec.pdx, spec/namespace/resolution_spec.pdx, spec/namespace/top_level_constant_spec.pdx]
+  status: partial_intentional
+  reason: "Bare names resolve outward from where they were written (ADR 0021, ADR 0053); inheritance, included modules, const_missing, private_constant, dynamic assignment, and the singleton class stay upstream."
+  link: docs/ruby/namespaces.md
+language/def_spec.rb:
+  pdx: [spec/method/def_shapes_spec.pdx, spec/method/keywords_spec.pdx]
+  status: partial_intentional
+  reason: "A def answers its last expression and refuses the wrong count (ADR 0045, ADR 0014); the visibility, singleton, metaclass, instance_eval, eval, splat, and frozen rows are runtime metaprogramming."
+  link: docs/ruby/metaprogramming.md
+language/defined_spec.rb:
+  status: skipped
+  reason: "defined? refuses by design: every name is defined before it is read, and a maybe asks some?; the file's thirteen hundred rows are its reflection."
+  link: docs/ruby/removed-syntax.md
+language/delegation_spec.rb:
+  status: skipped
+  reason: "Delegation is spelled with splats and block-pass, both out: splats are deferred (ADR 0014) and a method's block is implicit."
+  link: docs/adr/0014-2026-07-22-keyword-arguments.md
+language/encoding_spec.rb:
+  status: skipped
+  reason: "There is no __ENCODING__: source is ASCII outside strings and comments (#139), and strings are UTF-8 text."
+  link: docs/ruby/characters.md
+language/keyword_arguments_spec.rb:
+  pdx: [spec/method/keywords_spec.pdx]
+  status: partial_intentional
+  reason: "Keyword and positional arguments are strictly separate, unknown and missing keywords refuse (ADR 0014); the splat, **, ruby2_keywords, delegation, proc, and lambda rows stay upstream."
+  link: docs/adr/0014-2026-07-22-keyword-arguments.md
+language/lambda_spec.rb:
+  status: skipped
+  reason: "-> refuses with its rewrite: a block is handed to a method and called with yield; the proc question (#77) holds the rest."
+  link: https://github.com/portlandlang/portland/issues/77
+language/magic_comment_spec.rb:
+  status: skipped
+  reason: "There are no magic comments: source is ASCII outside strings and comments (#139), strings are UTF-8, and frozen_string_literal asks for what is already true (ADR 0015)."
+  link: docs/ruby/characters.md
+language/match_spec.rb:
+  status: skipped
+  reason: "=~ and !~ wait on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
+language/method_spec.rb:
+  pdx: [spec/method/paren_less_spec.pdx, spec/method/keywords_spec.pdx, spec/method/def_shapes_spec.pdx]
+  status: partial_intentional
+  reason: "Positional and keyword arguments by ADR 0014 and paren-less calls by ADR 0032; the splat, block-pass, to_ary, to_hash, proc, lambda, and arity-message rows stay upstream."
+  link: docs/adr/0014-2026-07-22-keyword-arguments.md
+language/order_spec.rb:
+  status: skipped
+  reason: "Its rows rebind a name inside an argument list and pass procs; assignment is a statement here (ADR 0001) and a block is handed, not passed, so no row can be written."
+  link: docs/ruby/mutability.md
+language/predefined/:
+  status: skipped
+  reason: "DATA, __END__, and TOPLEVEL_BINDING are the predefined globals and bindings, removed with the runtime dynamism."
+  link: docs/ruby/removed-syntax.md
+language/private_spec.rb:
+  status: skipped
+  reason: "Visibility is undecided (#133); private refuses naming that until it is."
+  link: https://github.com/portlandlang/portland/issues/133
+language/proc_spec.rb:
+  status: skipped
+  reason: "proc refuses with its rewrite: a block is handed to a method and called with yield; the proc question (#77) holds the rest."
+  link: https://github.com/portlandlang/portland/issues/77
+language/redo_spec.rb:
+  status: skipped
+  reason: "redo refuses by design; a loop that tries again is written as one."
+  link: docs/ruby/removed-syntax.md
+language/regexp/:
+  status: skipped
+  reason: "Regex literals wait on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
+language/regexp_spec.rb:
+  status: skipped
+  reason: "Regex literals wait on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
+language/source_encoding_spec.rb:
+  status: skipped
+  reason: "Source is UTF-8 with ASCII outside strings and comments (#139); there is no encoding comment and no BOM handling to specify."
+  link: docs/ruby/characters.md
+language/throw_spec.rb:
+  status: skipped
+  reason: "throw and catch are the exception machinery; a fallible call answers a failure (ADR 0027), and control leaves a loop with break (ADR 0012)."
+  link: docs/ruby/errors.md
+language/variables_spec.rb:
+  pdx: [spec/mutable/compound_spec.pdx, spec/mutable/capture_spec.pdx]
+  status: partial_intentional
+  reason: "A name is bound once unless mutable (ADR 0001); multiple assignment refuses with its rewrite (#135), and the splat, to_ary, global, instance variable, and attribute rows stay upstream."
+  link: docs/ruby/mutability.md
 language/alias_spec.rb:
   pdx: [spec/method/alias_spec.pdx]
   status: partial_intentional
