@@ -512,6 +512,111 @@ core/comparable/lte_spec.rb:
 
 # — core/enumerable —
 
+core/enumerable/to_a_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "A blockless each_with_index answers no Enumerator (ADR 0055); each takes no arguments through to_a."
+  link: docs/ruby/enumerators.md
+core/enumerable/entries_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/collect_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/collect_concat_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/detect_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/filter_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/find_all_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/member_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/reduce_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of; inject takes its seed explicitly."
+  link: docs/ruby/aliases.md
+core/enumerable/first_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No to_int conversion (ADR 0036); a negative count refuses where Ruby raises ArgumentError; no bignums, no mocks, and each is gathered once rather than consumed only as far as needed."
+  link: docs/ruby/aliases.md
+core/enumerable/take_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No to_int conversion (ADR 0036); a negative count refuses where Ruby raises ArgumentError; no Enumerator.new (ADR 0055), no mocks, and each is gathered once rather than consumed only as far as needed."
+  link: docs/ruby/aliases.md
+core/enumerable/map_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "A yield of several values packs as one array for the block, so the row where a one-parameter block takes the first stays behind; no blockless Enumerator (ADR 0055), no method objects, no subclasses."
+  link: docs/ruby/enumerators.md
+core/enumerable/select_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator and no Enumerator.new (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/reject_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator and no Enumerator.new (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/find_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "The ifnone proc waits on the proc question; no blockless Enumerator (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/sort_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "A block's String answer and an uncomparable pair refuse where Ruby raises; no mocks of <=>, and values never mutate, so there is no frozen to_a."
+  link: docs/ruby/ordering.md
+core/enumerable/include_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "A mock's own == never takes over a builtin's answer here."
+  link: docs/ruby/metaprogramming.md
+core/enumerable/partition_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/reverse_each_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No blockless Enumerator (ADR 0055)."
+  link: docs/ruby/enumerators.md
+core/enumerable/minmax_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "An incomparable or incompatible pair refuses where Ruby raises NoMethodError or ArgumentError."
+  link: docs/ruby/errors.md
+core/enumerable/compact_spec.rb:
+  pdx: [spec/enumerable/trait_spec.pdx]
+  status: partial_intentional
+  reason: "No Enumerator.new (ADR 0055), so the value-packing rows stay behind."
+  link: docs/ruby/enumerators.md
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
   status: partial_intentional

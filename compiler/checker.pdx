@@ -369,6 +369,12 @@ def shape_methods(declaration, traits)
       methods += %w[between? clamp]
       next
     end
+    # The other builtin trait (#110): Ruby's Enumerable over the struct's
+    # own `each`, as far as the array arms carry it.
+    if trait_name == "Enumerable"
+      methods += %w[all? any? collect collect_concat compact count cycle detect drop drop_while each_slice each_with_index entries filter find find_all find_index first flat_map include? inject map max max_by member? min min_by minmax none? one? partition reduce reject reverse_each select sort sort_by sum take take_while tally to_a to_h uniq zip]
+      next
+    end
     matching = traits.select { it.name == trait_name }
     return nil unless matching.length == 1
     methods += def_names(matching.first.methods)

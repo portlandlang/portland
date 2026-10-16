@@ -2722,6 +2722,25 @@ fn portland_evaluator_matches_the_seed_on_constants() {
     );
 }
 
+/// Enumerable (#110), the second builtin trait: a struct that defines `each`
+/// and includes it answers Ruby's Enumerable names through what its `each`
+/// yields, a yield of several values packed as one array; the walks that
+/// answer their receiver answer the struct; and the include without an
+/// `each` refuses at the include, as Comparable's does without a `<=>`.
+#[test]
+fn enumerable_trait_on_both_oracles() {
+    assert_both_print(
+        "enumerable_trait.pdx",
+        "struct Numerous\n  list\n  include Enumerable\n  def each\n    list.each { |item| yield item }\n  end\nend\nstruct Pairs\n  include Enumerable\n  def each\n    yield 1, 2\n    yield 3, 4, 5\n  end\nend\nnumerous = Numerous.new(list: [2, 5, 3, 6, 1, 4])\nnumerous.each { |item| p(item) }\np(numerous.map { |item| item * 2 })\np(numerous.to_a)\np(numerous.sort)\np(numerous.first)\np(numerous.first(2))\np(numerous.min)\np(numerous.include?(3))\np(numerous.count)\np(numerous.inject(0) { |sum, item| sum + item })\np(numerous.each_with_index { |item, index| } == numerous)\np(numerous.reverse_each { |item| } == numerous)\np(numerous.tally)\np(Pairs.new.to_a)\np(Pairs.new.first)\n",
+        "2\n5\n3\n6\n1\n4\n[4, 10, 6, 12, 2, 8]\n[2, 5, 3, 6, 1, 4]\n[1, 2, 3, 4, 5, 6]\n2\n[2, 5]\n1\ntrue\n6\n21\ntrue\ntrue\n{2 => 1, 5 => 1, 3 => 1, 6 => 1, 1 => 1, 4 => 1}\n[[1, 2], [3, 4, 5]]\n[1, 2]\n",
+    );
+    let cases = [(
+        "struct NoEach\n  include Enumerable\nend\n",
+        "NoEach includes Enumerable but defines no 'each' — define it",
+    )];
+    assert_both_oracles_refuse("enumerable_refusal.pdx", None, &cases);
+}
+
 /// `refusals.pdx` — the one place the checker's voice lives (ADR 0047 §4).
 /// Every sentence shape the ADR pins, rendered from its tagged refusal, plus
 /// the rulings the renderer owns: the dump's type spelling, fact–dash–hint

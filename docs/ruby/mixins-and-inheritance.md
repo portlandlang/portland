@@ -40,7 +40,8 @@ The verb is Ruby's; the safety is in the noun. `trait` and `module` are distinct
 
 ## Migrating
 
-- `include Comparable`-style capability modules — become traits, often **zero-character** at the include site: the module body moves under `trait`, and the `include` line does not change. The shim gem ([#36](https://github.com/portlandlang/portland/issues/36)) can even rehearse the strictness in Ruby: `extend Portland::Trait` on a module makes collisions raise at class-definition time.
+- `include Comparable` and `include Enumerable` — port verbatim: both are builtin traits, the first needing your `<=>` (ADR 0054), the second your `each` ([#110](https://github.com/portlandlang/portland/issues/110)); an include without it refuses at the include. An Enumerable struct answers Ruby's names — `map`, `select`, `sort`, `min`, `include?`, `to_a`, and the rest — from what its `each` yields, a yield of several values packed as one array, and the walks that answer their receiver answer the struct.
+- Other `include Comparable`-style capability modules — become traits, often **zero-character** at the include site: the module body moves under `trait`, and the `include` line does not change. The shim gem ([#36](https://github.com/portlandlang/portland/issues/36)) can even rehearse the strictness in Ruby: `extend Portland::Trait` on a module makes collisions raise at class-definition time.
 - Modules with state (`@memo` in a mixin) — do not port; state belongs to the struct that declares it.
 - `include Math`-style namespace injection — a refusal; write the qualified call.
 - Subclassing — flattens: shared behavior into traits, shared *shape* written out per struct. This is the real cost, and ADR 0028 pays it on purpose.

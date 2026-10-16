@@ -401,7 +401,7 @@ def declared_names(bindings)
 end
 
 def declare(name, bindings)
-  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || name == "Comparable"
+  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || name == "Comparable" || name == "Enumerable"
   panic("'#{name}' is already defined — rename one") if declared_names(bindings).include?(name)
   [["__declared__", "declared", declared_names(bindings) + [name]]] + bindings
 end
@@ -688,8 +688,9 @@ def register_in_namespace(statement, home, mutable bindings)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
     merged = merged_methods(name, fields, includes, methods, home, bindings)
-    # The registration's third slot says whether the struct is Comparable.
-    mutable result = [[inner_home, "struct", [fields, value_at(merged, 0), value_at(merged, 1)]]] + declare(inner_home, bindings)
+    # The registration's third slot says whether the struct is Comparable,
+    # the fourth whether it is Enumerable (#110).
+    mutable result = [[inner_home, "struct", [fields, value_at(merged, 0), value_at(merged, 1), value_at(merged, 2)]]] + declare(inner_home, bindings)
     # Type functions (ADR 0031) register as ordinary methods under the
     # struct's namespace — `Token::of` — so the namespace rung dispatches
     # them with no new machinery. Their home is the struct itself: bare
@@ -740,12 +741,19 @@ def merged_methods(struct_name, fields, includes, methods, home, bindings)
   mutable merged = methods
   mutable origins = []
   mutable comparable = false
+  mutable enumerable = false
   includes.each do |written|
-    # `Comparable` is the one builtin trait (ADR 0054): no methods of its
-    # own — the orderings derive from the struct's `<=>`, which must exist.
+    # `Comparable` and `Enumerable` are the two builtin traits (ADR 0054,
+    # #110): no methods of their own — the orderings derive from the
+    # struct's `<=>` and the walks from its `each`, which must exist.
     if written == "Comparable"
       panic("#{struct_name} includes Comparable but defines no '<=>' — define it") unless methods.any? { it.name == "<=>" }
       comparable = true
+      next
+    end
+    if written == "Enumerable"
+      panic("#{struct_name} includes Enumerable but defines no 'each' — define it") unless methods.any? { it.name == "each" }
+      enumerable = true
       next
     end
     slot = resolve_from(bindings, home, written)
@@ -762,7 +770,7 @@ def merged_methods(struct_name, fields, includes, methods, home, bindings)
       merged += [method]
     end
   end
-  [merged, comparable]
+  [merged, comparable, enumerable]
 end
 
 # The trait's method list, or the seed's refusal for whatever `written`
@@ -986,6 +994,42 @@ def struct_comparable?(value, bindings)
   slot = lookup(bindings, value_at(value, 1))
   return false if slot.empty?
   value_at(slot.first[2], 2) == true
+end
+
+def struct_enumerable?(value, bindings)
+  slot = lookup(bindings, value_at(value, 1))
+  return false if slot.empty?
+  value_at(slot.first[2], 3) == true
+end
+
+# The names Ruby's Enumerable gives a struct that defines `each` (#110),
+# as far as the array arms carry them — the seed's list.
+def enumerable_name?(name)
+  %w[all? any? collect collect_concat compact count cycle detect drop drop_while each_slice each_with_index entries filter find find_all find_index first flat_map include? inject map max max_by member? min min_by minmax none? one? partition reduce reject reverse_each select sort sort_by sum take take_while tally to_a to_h uniq zip].include?(name)
+end
+
+# The elements an Enumerable struct's own `each` yields (#110), gathered by
+# running `each` under a block that only keeps what it is given — the
+# `__collector__` marker in the `__block__` slot, which evaluate_yield
+# grows one yield at a time; the body's final slot holds them all.
+def enumerable_elements(receiver, bindings)
+  each = struct_method_for(receiver, "each", bindings)
+  panic("#{value_at(receiver, 1)} includes Enumerable but defines no 'each' — define it") if each.nil?
+  mutable scope = bindings.reject do |triple|
+    triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
+  end
+  scope = [["__self__", "local", receiver]] + scope
+  pairs = value_at(receiver, 2)
+  pairs.each do |pair|
+    scope = [[pair[0], "local", value_at(pair, 1)]] + scope
+  end
+  depth = frame_of(bindings) + 1
+  scope = [["__frame__", "frame", depth]] + scope
+  scope = [["__block__", "block", ["__collector__", []]]] + scope
+  result = run_body(each.body, scope)
+  slot = lookup(result.bindings, "__block__")
+  return [] if slot.empty?
+  value_at(slot.first[2], 1)
 end
 
 # `sort`, `min`, and `max` over structs order by their `<=>` (ADR 0054);
@@ -1747,6 +1791,34 @@ def binary_search(values, count, ranged, block, entry, mutable scope)
   [found, scope, interrupt]
 end
 
+# A struct's own method called with a block (#110): the method's scope as
+# invoke_struct_method builds it, plus the block in the `__block__` slot
+# for its `yield` to reach; what the block rebound comes back to the
+# caller the way a top-level def's does.
+def invoke_struct_method_with_block(receiver, method, arguments, block, bindings)
+  mutable scope = bindings.reject do |triple|
+    triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
+  end
+  scope = [["__self__", "local", receiver]] + scope
+  pairs = value_at(receiver, 2)
+  pairs.each do |pair|
+    scope = [[pair[0], "local", value_at(pair, 1)]] + scope
+  end
+  depth = frame_of(bindings) + 1
+  scope = [["__frame__", "frame", depth]] + scope
+  scope = [["__block__", "block", [block, bindings]]] + scope
+  check_call_count("#{value_at(receiver, 1)} method", method.parameters, arguments.length)
+  scope = bind_parameters(method.parameters, arguments, [], scope)
+  result = run_body(method.body, scope)
+  panic("break outside of a loop") if result.signal == "break"
+  panic("next outside of a loop") if result.signal == "next"
+  after = scope_after_yield(result.bindings, bindings)
+  if result.signal == "return" && result.target.some? && result.target < depth
+    return return_outcome(result.value, after, result.target)
+  end
+  outcome(result.value, after)
+end
+
 def struct_has_field?(instance, field)
   pairs = value_at(instance, 2)
   pairs.any? { it[0] == field }
@@ -1895,7 +1967,7 @@ def evaluate_method_call(node, mutable bindings)
     end
   end
   step = evaluate_expression(node.receiver, bindings)
-  receiver = slot_value(step.value)
+  mutable receiver = slot_value(step.value)
   bindings = step.bindings
   # `&.`: an absent receiver short-circuits; arguments never run.
   if (node in SafeMethodCallNode) && receiver.nil?
@@ -1926,6 +1998,12 @@ def evaluate_method_call(node, mutable bindings)
   # order: `with`, its methods, its fields, then only the four names every
   # value answers. A guest struct is a tagged host array, so `size` on one
   # used to answer 3 (#96). A name that is neither is the miss sentence.
+  # An Enumerable struct (#110) answers Ruby's Enumerable through its own
+  # `each`: the elements it yields, then the array's arm below — after its
+  # own methods and fields, before the Struct views.
+  if (receiver in ["__struct__", *]) && enumerable_name?(node.name) && struct_enumerable?(receiver, bindings) && !struct_has_field?(receiver, node.name)
+    receiver = enumerable_elements(receiver, bindings)
+  end
   if (receiver in ["__struct__", *]) && arguments.empty? && node.block.nil? && !%w[failure? nil? some? to_s].include?(node.name)
     return outcome([struct_field(receiver, node.name)], bindings) if struct_has_field?(receiver, node.name)
     # Ruby's Struct views (#114), after the fields so a field named `size`
@@ -2328,6 +2406,19 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   entry = scope
   block = node.block
   mutable interrupt = nil
+  # A struct's own method takes the block first (#110), as the seed's
+  # dispatch order has it; its `yield` reaches the block.
+  own = struct_method_for(receiver, node.name, scope)
+  return invoke_struct_method_with_block(receiver, own, arguments, block, scope) unless own.nil?
+  # An Enumerable struct (#110) walks through its own `each`: the elements
+  # it yields, then the array's arm.
+  if (receiver in ["__struct__", *]) && enumerable_name?(node.name) && struct_enumerable?(receiver, scope)
+    walked = evaluate_block_call(node, enumerable_elements(receiver, scope), arguments, scope)
+    # The walks that answer their receiver answer the struct, as Ruby's
+    # Enumerable does — not the gathered array.
+    return walked unless walked.signal == "none" && %w[each_with_index reverse_each].include?(node.name)
+    return outcome([receiver], walked.bindings)
+  end
   # Ruby's Struct walks (#114): each over the values, each_pair over symbol
   # and value, select and filter answering an array, and to_h through a
   # block answering a pair — the refusals Ruby's words.
@@ -3149,6 +3240,12 @@ def evaluate_yield(node, mutable bindings)
   handed = slot.first[2]
   block = value_at(handed, 0)
   written_in = value_at(handed, 1)
+  # A gathering block (#110) keeps what it is handed — one value as itself,
+  # several as an array, as Ruby's Enumerable packs them — and answers nil.
+  if block == "__collector__"
+    item = values.length == 1 ? value_at(values, 0) : values
+    return Outcome.new(value: [nil], bindings: [["__block__", "block", ["__collector__", written_in + [item]]]] + bindings, signal: "none", target: nil)
+  end
   result = run_guest_block(block, values, written_in)
   # What the block rebound belongs to the caller, and a method body has no
   # channel to its caller — so the updated caller scope rides home inside

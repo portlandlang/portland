@@ -1,0 +1,393 @@
+# `Enumerable` is the second builtin trait (#110, after ADR 0054's
+# Comparable): a struct that defines `each` and includes it answers Ruby's
+# Enumerable names through what its `each` yields — gathered once, then
+# the array's own arm. A yield of several values packs into one array,
+# as Ruby's Enumerable packs them, for every name alike; the twins
+# (`collect`, `detect`, `entries`, `filter`, `find_all`, `member?`,
+# `reduce`, `collect_concat`) answer what their survivors answer.
+#
+# From ruby/spec core/enumerable/{to_a,entries,collect,collect_concat,
+# detect,filter,find_all,member,reduce,first,take,map,select,find,sort,
+# reject,include,partition,reverse_each,minmax,compact}_spec.rb and
+# shared/take.rb. Upstream's fixtures are classes; here they are structs.
+# What stays behind: the blockless enumerators (ADR 0055), `each` taking
+# arguments, the `ifnone` proc, mocks of `<=>` and `==`, and the rows
+# where a block's one parameter takes the first of several yielded values
+# — here the block sees the packed array.
+
+require_relative "../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+
+def numerous(list) = Numerous.new(list: list)
+
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable" do
+  specify "walks through the struct's own each" do
+    mutable seen = []
+    numerous(DEFAULT).each { |item| seen << item }
+    expect(seen).to eq(DEFAULT)
+  end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).count).to eq(6)
+    expect(numerous(DEFAULT).min).to eq(1)
+    expect(numerous(DEFAULT).max).to eq(6)
+    expect(numerous(DEFAULT).sum).to eq(21)
+    expect(numerous(DEFAULT).inject(0) { |sum, item| sum + item }).to eq(21)
+    expect(numerous(DEFAULT).each_with_index { |item, index| }).to eq(numerous(DEFAULT))
+  end
+
+  specify "answers an empty walk as nothing" do
+    expect(Empty.new.to_a).to eq([])
+    expect(Empty.new.count).to eq(0)
+    expect(Empty.new.min).to be_nil
+  end
+end
+
+context "Enumerable#to_a" do
+  specify "returns an array containing the elements" do
+    expect(numerous([1, nil, "a", 2, false, true]).to_a).to eq([1, nil, "a", 2, false, true])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.to_a).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#entries" do
+  specify "is an alias of Enumerable#to_a" do
+    expect(numerous(DEFAULT).entries).to eq(numerous(DEFAULT).to_a)
+  end
+end
+
+context "Enumerable#first" do
+  specify "returns the first element" do
+    expect(numerous(DEFAULT).first).to eq(2)
+    expect(Empty.new.first).to be_nil
+  end
+
+  specify "returns nil if self is empty" do
+    expect(Empty.new.first).to be_nil
+  end
+
+  specify "returns a gathered array from yield parameters" do
+    expect(YieldsMulti.new.first).to eq([1, 2])
+  end
+
+  describe "when passed an argument" do
+    values = [4, 3, 2, 1, 0, -1]
+
+    specify "returns the first count elements if given a count" do
+      expect(numerous(values).first(2)).to eq([4, 3])
+      expect(numerous(values).first(4)).to eq([4, 3, 2, 1])
+    end
+
+    specify "returns an empty array when passed count on an empty array" do
+      expect(Empty.new.first(0)).to eq([])
+      expect(Empty.new.first(1)).to eq([])
+      expect(Empty.new.first(2)).to eq([])
+    end
+
+    specify "returns an empty array when passed count == 0" do
+      expect(numerous(values).first(0)).to eq([])
+    end
+
+    specify "returns an array containing the first element when passed count == 1" do
+      expect(numerous(values).first(1)).to eq([4])
+    end
+
+    specify "returns the entire array when count > length" do
+      expect(numerous(values).first(100)).to eq(values)
+      expect(numerous(values).first(8)).to eq(values)
+    end
+
+    specify "gathers whole arrays as elements when each yields multiple" do
+      expect(YieldsMulti.new.first(1)).to eq([[1, 2]])
+    end
+  end
+end
+
+context "Enumerable#take" do
+  values = [4, 3, 2, 1, 0, -1]
+
+  specify "returns the first count elements if given a count" do
+    expect(numerous(values).take(2)).to eq([4, 3])
+    expect(numerous(values).take(4)).to eq([4, 3, 2, 1])
+  end
+
+  specify "returns an empty array when passed count on an empty array" do
+    expect(Empty.new.take(0)).to eq([])
+    expect(Empty.new.take(1)).to eq([])
+    expect(Empty.new.take(2)).to eq([])
+  end
+
+  specify "returns an empty array when passed count == 0" do
+    expect(numerous(values).take(0)).to eq([])
+  end
+
+  specify "returns an array containing the first element when passed count == 1" do
+    expect(numerous(values).take(1)).to eq([4])
+  end
+
+  specify "returns the entire array when count > length" do
+    expect(numerous(values).take(100)).to eq(values)
+    expect(numerous(values).take(8)).to eq(values)
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.take(1)).to eq([[1, 2]])
+  end
+end
+
+context "Enumerable#map" do
+  specify "returns a new array with the results of passing each element to block" do
+    entries = [0, 1, 3, 4, 5, 6]
+    expect(numerous(entries).map { |item| item % 2 }).to eq([0, 1, 1, 0, 1, 0])
+    expect(numerous(entries).map { |item| item }).to eq(entries)
+  end
+
+  specify "only yields increasing values for a Range" do
+    expect((1..0).map { |item| item }).to eq([])
+    expect((1..1).map { |item| item }).to eq([1])
+    expect((1..2).map { |item| item }).to eq([1, 2])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.map { |item| item }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#collect" do
+  specify "is an alias of Enumerable#map" do
+    expect(numerous(DEFAULT).collect { |item| item * 2 }).to eq(numerous(DEFAULT).map { |item| item * 2 })
+  end
+end
+
+context "Enumerable#collect_concat" do
+  specify "is an alias of Enumerable#flat_map" do
+    expect(numerous(DEFAULT).collect_concat { |item| [item, item] }).to eq(numerous(DEFAULT).flat_map { |item| [item, item] })
+  end
+end
+
+context "Enumerable#select" do
+  elements = (1..10).to_a
+
+  specify "returns all elements for which the block is not false" do
+    expect(numerous(elements).select { |item| item % 3 == 0 }).to eq([3, 6, 9])
+    expect(numerous(elements).select { |item| true }).to eq(elements)
+    expect(numerous(elements).select { |item| false }).to eq([])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.select { |item| item == [3, 4, 5] }).to eq([[3, 4, 5]])
+  end
+end
+
+context "Enumerable#filter" do
+  specify "is an alias of Enumerable#select" do
+    expect(numerous(DEFAULT).filter { |item| item > 3 }).to eq(numerous(DEFAULT).select { |item| item > 3 })
+  end
+end
+
+context "Enumerable#find_all" do
+  specify "is an alias of Enumerable#select" do
+    expect(numerous(DEFAULT).find_all { |item| item > 3 }).to eq(numerous(DEFAULT).select { |item| item > 3 })
+  end
+end
+
+context "Enumerable#reject" do
+  specify "returns an array of the elements for which block is false" do
+    expect(numerous(DEFAULT).reject { |item| item > 3 }).to eq([2, 3, 1])
+    entries = (1..10).to_a
+    expect(numerous(entries).reject { |item| item % 2 == 0 }).to eq([1, 3, 5, 7, 9])
+    expect(numerous(entries).reject { |item| true }).to eq([])
+    expect(numerous(entries).reject { |item| false }).to eq(entries)
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.reject { |item| item == [3, 4, 5] }).to eq([[1, 2], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#find" do
+  elements = [2, 4, 6, 8, 10]
+
+  specify "returns the first element for which the block is not false" do
+    elements.each do |element|
+      expect(numerous(elements).find { |item| item > element - 1 }).to eq(element)
+    end
+  end
+
+  specify "returns nil when the block is false and there is no ifnone proc given" do
+    expect(numerous(elements).find { |item| false }).to be_nil
+  end
+
+  specify "iterates elements in forward order" do
+    mutable visited = []
+    numerous(elements).find do |element|
+      visited << element
+      false
+    end
+    expect(visited).to eq(elements)
+  end
+
+  specify "stops iterating as soon as an element is found" do
+    mutable visited = []
+    numerous(elements).find do |item|
+      visited << item
+      item == 6
+    end
+    expect(visited).to eq([2, 4, 6])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.find { |item| item == [1, 2] }).to eq([1, 2])
+  end
+end
+
+context "Enumerable#detect" do
+  specify "is an alias of Enumerable#find" do
+    expect(numerous(DEFAULT).detect { |item| item > 3 }).to eq(numerous(DEFAULT).find { |item| item > 3 })
+  end
+end
+
+context "Enumerable#include?" do
+  specify "returns true if any element == argument for numbers" do
+    elements = (0..5).to_a
+    expect(numerous(elements).include?(5)).to be_true
+    expect(numerous(elements).include?(10)).to be_false
+  end
+
+  specify "returns true if any element == argument for other objects" do
+    elements = %w[0 1 2 3 4 5]
+    expect(numerous(elements).include?("5")).to be_true
+    expect(numerous(elements).include?("10")).to be_false
+  end
+
+  specify "returns true if any member of enum equals obj when == compare different classes (legacy rubycon)" do
+    expect(numerous([2, 4, 6, 8, 10]).include?(2.0)).to be_true
+    expect(numerous([2, 4, [6, 8], 10]).include?([6, 8])).to be_true
+    expect(numerous([2, 4, [6, 8], 10]).include?([6.0, 8.0])).to be_true
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.include?([1, 2])).to be_true
+  end
+end
+
+context "Enumerable#member?" do
+  specify "is an alias of Enumerable#include?" do
+    expect(numerous(DEFAULT).member?(3)).to eq(numerous(DEFAULT).include?(3))
+    expect(numerous(DEFAULT).member?(9)).to eq(numerous(DEFAULT).include?(9))
+  end
+end
+
+context "Enumerable#reduce" do
+  specify "is an alias of Enumerable#inject" do
+    expect(numerous(DEFAULT).reduce(0) { |sum, item| sum + item }).to eq(numerous(DEFAULT).inject(0) { |sum, item| sum + item })
+  end
+end
+
+context "Enumerable#sort" do
+  specify "sorts by the natural order as defined by <=>" do
+    expect(numerous(DEFAULT).sort).to eq([1, 2, 3, 4, 5, 6])
+  end
+
+  specify "yields elements to the provided block" do
+    expect(numerous(DEFAULT).sort { |left, right| right <=> left }).to eq([6, 5, 4, 3, 2, 1])
+    expect(numerous([2, 0, 1, 3, 4]).sort { |left, right| -(left <=> right) }).to eq([4, 3, 2, 1, 0])
+  end
+
+  specify "compare values returned by block with 0" do
+    expect(numerous(DEFAULT).sort { |left, right| -(left + right) * (left <=> right) }).to eq([6, 5, 4, 3, 2, 1])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.sort { |left, right| left.first <=> right.first }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#partition" do
+  specify "returns two arrays, the first containing elements for which the block is true, the second containing the rest" do
+    expect(numerous(DEFAULT).partition { |item| item % 2 == 0 }).to eq([[2, 6, 4], [5, 3, 1]])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.partition { |item| item == [3, 4, 5] }).to eq([[[3, 4, 5]], [[1, 2], [6, 7, 8, 9]]])
+  end
+end
+
+context "Enumerable#reverse_each" do
+  specify "traverses enum in reverse order and pass each element to block" do
+    mutable seen = []
+    numerous(DEFAULT).reverse_each { |item| seen << item }
+    expect(seen).to eq([4, 1, 6, 3, 5, 2])
+  end
+
+  specify "answers the struct it walked" do
+    expect(numerous(DEFAULT).reverse_each { |item| }).to eq(numerous(DEFAULT))
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    mutable yielded = []
+    YieldsMulti.new.reverse_each { |item| yielded << item }
+    expect(yielded).to eq([[6, 7, 8, 9], [3, 4, 5], [1, 2]])
+  end
+end
+
+context "Enumerable#minmax" do
+  numbers = numerous([6, 4, 5, 10, 8])
+  strings = numerous(["333", "2", "60", "55555", "1010", "111"])
+
+  specify "min should return the minimum element" do
+    expect(numbers.minmax).to eq([4, 10])
+    expect(strings.minmax).to eq(["1010", "60"])
+  end
+
+  specify "returns [nil, nil] for an empty Enumerable" do
+    expect(Empty.new.minmax).to eq([nil, nil])
+  end
+
+  specify "returns the minimum when using a block rule" do
+    expect(numbers.minmax { |left, right| right <=> left }).to eq([10, 4])
+    expect(strings.minmax { |left, right| left.length <=> right.length }).to eq(["2", "55555"])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.minmax).to eq([[1, 2], [6, 7, 8, 9]])
+  end
+end
+
+context "Enumerable#compact" do
+  specify "returns array without nil elements" do
+    expect(numerous([nil, 1, 2, nil, true]).compact).to eq([1, 2, true])
+  end
+end

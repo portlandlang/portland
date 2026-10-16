@@ -29,6 +29,60 @@ fn range_elements(range: &Value) -> Vec<Value> {
     (*start..=last).map(Value::Integer).collect()
 }
 
+/// The names Ruby's Enumerable gives a struct that defines `each` (#110),
+/// as far as the array arms carry them. Not the array's own — `length`,
+/// `join`, `[]`, `flatten`, the combinatorics — which Enumerable lacks.
+fn enumerable_name(name: &str) -> bool {
+    matches!(
+        name,
+        "all?"
+            | "any?"
+            | "collect"
+            | "collect_concat"
+            | "compact"
+            | "count"
+            | "cycle"
+            | "detect"
+            | "drop"
+            | "drop_while"
+            | "each_slice"
+            | "each_with_index"
+            | "entries"
+            | "filter"
+            | "find"
+            | "find_all"
+            | "find_index"
+            | "first"
+            | "flat_map"
+            | "include?"
+            | "inject"
+            | "map"
+            | "max"
+            | "max_by"
+            | "member?"
+            | "min"
+            | "min_by"
+            | "minmax"
+            | "none?"
+            | "one?"
+            | "partition"
+            | "reduce"
+            | "reject"
+            | "reverse_each"
+            | "select"
+            | "sort"
+            | "sort_by"
+            | "sum"
+            | "take"
+            | "take_while"
+            | "tally"
+            | "to_a"
+            | "to_h"
+            | "uniq"
+            | "zip"
+    )
+}
+
 /// A bounded range's first element and how many it holds — none for an
 /// empty one — for a search that reads elements by position (#111). An
 /// open end has no span to search.
@@ -1781,6 +1835,8 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// `yield`'s scope write-back must land in the one canonical copy, or an
     /// accumulator stops accumulating the moment a yield delegates.
     current_block: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
+    /// What a gathering block has been yielded so far (#110).
+    collected: Vec<Value>,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     /// Method bundles waiting to be included (ADR 0028).
@@ -1807,6 +1863,9 @@ struct StructInfo {
     /// `include Comparable` (ADR 0054): the four orderings, `between?`,
     /// and `clamp` derive from the struct's own `<=>`.
     comparable: bool,
+    /// `include Enumerable` (#110): the walks and views derive from the
+    /// struct's own `each`.
+    enumerable: bool,
     fields: Vec<String>,
     methods: HashMap<String, std::rc::Rc<Method>>,
 }
@@ -1832,6 +1891,9 @@ struct Binding {
 /// (ADR 0025), and handed block (#49) of the method that *wrote* it.
 struct HandedBlock {
     block: Block,
+    /// A block that only gathers what is yielded to it (#110): how an
+    /// Enumerable struct's `each` is read into elements.
+    collects: bool,
     home: usize,
     /// The writer's own handed block — what a `yield` inside this block
     /// reaches, the way Ruby's `yield` always means the lexically enclosing
@@ -1863,6 +1925,7 @@ impl<W: std::io::Write> Interpreter<W> {
             pending: None,
             self_receiver: None,
             current_block: None,
+            collected: Vec::new(),
             enums: HashMap::new(),
             structs: HashMap::new(),
             traits: HashMap::new(),
@@ -2045,7 +2108,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// redefined, and a def, struct, enum, trait, alias, or constant is
     /// defined once — except in the REPL, where redefining is the point.
     fn refuse_redefinition(&self, name: &str) {
-        if Self::builtin_name(name) || name == "Comparable" {
+        if Self::builtin_name(name) || name == "Comparable" || name == "Enumerable" {
             panic!("'{name}' is a builtin — rename yours");
         }
         if self.redefinable {
@@ -2366,16 +2429,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 // Ruby's silent last-include-wins.
                 let mut origin: HashMap<String, String> = HashMap::new();
                 let mut comparable = false;
+                let mut enumerable = false;
                 for written in includes {
-                    // `Comparable` is the one builtin trait (ADR 0054). It
-                    // carries no methods of its own: the four orderings,
-                    // `between?`, and `clamp` derive from the struct's `<=>`,
-                    // which must therefore exist.
+                    // `Comparable` and `Enumerable` are the two builtin traits
+                    // (ADR 0054, #110). They carry no methods of their own:
+                    // the four orderings, `between?`, and `clamp` derive from
+                    // the struct's `<=>`, and the walks and views from its
+                    // `each`, which must therefore exist.
                     if written == "Comparable" {
                         if !method_table.contains_key("<=>") {
                             panic!("{name} includes Comparable but defines no '<=>' — define it");
                         }
                         comparable = true;
+                        continue;
+                    }
+                    if written == "Enumerable" {
+                        if !method_table.contains_key("each") {
+                            panic!("{name} includes Enumerable but defines no 'each' — define it");
+                        }
+                        enumerable = true;
                         continue;
                     }
                     let Some((_, info)) = Self::resolve(&self.module_path, written, &self.traits)
@@ -2430,6 +2502,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.qualified(name),
                     StructInfo {
                         comparable,
+                        enumerable,
                         fields: fields.clone(),
                         methods: method_table,
                     },
@@ -3059,6 +3132,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 let handed = block.clone().map(|block| {
                     std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
                         block,
+                        collects: false,
                         home: self.home_depth,
                         outer: self.current_block.clone(),
                         scope: self.variables.clone(),
@@ -3087,6 +3161,18 @@ impl<W: std::io::Write> Interpreter<W> {
                 // scope before the block's scope takes over (#144).
                 let arguments: Vec<Value> =
                     values.iter().map(|value| self.value_of(value)).collect();
+                // A gathering block (#110) keeps what it is handed — one value
+                // as itself, several as an array, as Ruby's Enumerable packs
+                // them — and answers nil.
+                if handed.borrow().collects {
+                    let item = if arguments.len() == 1 {
+                        arguments.into_iter().next().unwrap_or(Value::Nil)
+                    } else {
+                        Value::array(arguments)
+                    };
+                    self.collected.push(item);
+                    return Some(Value::Nil);
+                }
                 let (block, written_in, home, written_under) = {
                     let handed = handed.borrow();
                     (
@@ -3137,6 +3223,48 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Range", "new") => Some(range_new(&arguments)),
             _ => panic!("{type_name} has no {name}"),
         }
+    }
+
+    /// The elements an Enumerable struct's own `each` yields (#110),
+    /// gathered by handing `each` a block that only keeps what it is given:
+    /// one value yielded lands as itself, several as an array, as Ruby's
+    /// Enumerable packs them.
+    fn enumerable_elements(&mut self, receiver: &Value) -> Vec<Value> {
+        let Value::Struct {
+            name: struct_name, ..
+        } = receiver
+        else {
+            unreachable!("called with a struct")
+        };
+        let each = self
+            .structs
+            .get(struct_name)
+            .and_then(|info| info.methods.get("each"))
+            .cloned()
+            .unwrap_or_else(|| {
+                panic!("{struct_name} includes Enumerable but defines no 'each' — define it")
+            });
+        let gatherer = std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
+            block: Block {
+                body: Vec::new(),
+                parameters: Vec::new(),
+            },
+            collects: true,
+            home: self.home_depth,
+            outer: self.current_block.clone(),
+            scope: self.variables.clone(),
+        }));
+        let outer_block = self.current_block.replace(gatherer);
+        let outer_collected = std::mem::take(&mut self.collected);
+        self.call_struct_method(
+            struct_name.clone(),
+            receiver.clone(),
+            each,
+            Vec::new(),
+            Vec::new(),
+        );
+        self.current_block = outer_block;
+        std::mem::replace(&mut self.collected, outer_collected)
     }
 
     /// Ruby's binary search (#104, #111) over `count` positions, the element
@@ -3484,13 +3612,32 @@ impl<W: std::io::Write> Interpreter<W> {
                 .cloned();
             if let Some(method) = method {
                 let struct_name = struct_name.clone();
-                return self.call_struct_method(
+                // A block handed to a struct's own method (#110) is swapped
+                // in for the call and put back after, as a top-level call's
+                // is: its `yield` reaches it, and what the block rebound
+                // belongs to the caller.
+                let handed = block.map(|block| {
+                    std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
+                        block: block.clone(),
+                        collects: false,
+                        home: self.home_depth,
+                        outer: self.current_block.clone(),
+                        scope: self.variables.clone(),
+                    }))
+                });
+                let outer = std::mem::replace(&mut self.current_block, handed.clone());
+                let result = self.call_struct_method(
                     struct_name,
                     receiver,
                     method,
                     arguments,
                     keyword_arguments,
                 );
+                if let Some(handed) = handed {
+                    self.variables = handed.borrow().scope.clone();
+                }
+                self.current_block = outer;
+                return result;
             }
         }
         if !keyword_arguments.is_empty() {
@@ -3504,12 +3651,59 @@ impl<W: std::io::Write> Interpreter<W> {
             {
                 return Some(value.clone());
             }
+            // An Enumerable struct's elements come before the Struct views
+            // (#110): its `to_a` is what its `each` yields.
+            if let Value::Struct {
+                name: struct_name, ..
+            } = &receiver
+                && enumerable_name(name)
+                && self
+                    .structs
+                    .get(struct_name)
+                    .is_some_and(|info| info.enumerable)
+            {
+                let elements = self.enumerable_elements(&receiver);
+                let answer = self.method_call(
+                    Value::array(elements),
+                    name,
+                    arguments,
+                    keyword_arguments,
+                    block,
+                )?;
+                // The walks that answer their receiver answer the struct,
+                // as Ruby's Enumerable does — not the gathered array.
+                if block.is_some() && matches!(name, "each_with_index" | "reverse_each") {
+                    return Some(receiver);
+                }
+                return Some(answer);
+            }
             // Ruby's Struct views and walks (#114), after the struct's own
             // methods and fields, so a field named `size` still wins — as
             // Ruby's accessor does.
             if let Some(answer) = self.struct_builtin(&receiver, name, block) {
                 return answer;
             }
+        }
+        // An Enumerable struct (#110) answers Ruby's Enumerable through its
+        // own `each`: the elements it yields, then the array's arm — after
+        // its own methods and fields, which came first above.
+        if let Value::Struct {
+            name: struct_name, ..
+        } = &receiver
+            && enumerable_name(name)
+            && self
+                .structs
+                .get(struct_name)
+                .is_some_and(|info| info.enumerable)
+        {
+            let elements = self.enumerable_elements(&receiver);
+            return self.method_call(
+                Value::array(elements),
+                name,
+                arguments,
+                keyword_arguments,
+                block,
+            );
         }
         if let Value::Struct {
             name: struct_name, ..
