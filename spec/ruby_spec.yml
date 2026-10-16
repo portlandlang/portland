@@ -1924,6 +1924,11 @@ language/and_spec.rb:
   status: partial_intentional
   reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; assignment is a statement, so the assignment-in-expression rows stay upstream."
   link: docs/ruby/truthiness.md
+language/block_spec.rb:
+  pdx: [spec/block/parameters_spec.pdx, spec/block/it_spec.pdx]
+  status: partial_intentional
+  reason: "Two or more parameters spread a yielded array, and where Ruby nil-fills a parameter the array cannot Portland refuses (ADR 0057); splat, optional, and keyword parameters, the to_ary protocol, rescue clauses, procs, and the rows whose parameter shadows a local stay upstream."
+  link: docs/ruby/pattern-matching.md
 language/break_spec.rb:
   pdx: [spec/control_flow/unwinding_spec.pdx]
   status: partial_planned

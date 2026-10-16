@@ -1,0 +1,82 @@
+# What a block's parameters take from what is yielded (#115), from
+# ruby/spec language/block_spec.rb. Two or more parameters spread a single
+# yielded array (ADR 0057); where Ruby fills a parameter the array cannot
+# with nil, Portland refuses, so those rows stay upstream, with the splat
+# parameters (ADR 0014), the optional and keyword parameters, the to_ary
+# protocol (ADR 0036), the rescue clauses, the procs, and the rows whose
+# block parameter shadows a local (no-shadow).
+
+require_relative "../spec_helper"
+
+def hand(value)
+  yield value
+end
+
+def hand_two(first, second)
+  yield first, second
+end
+
+def hand_three(first, second, third)
+  yield first, second, third
+end
+
+def run
+  yield
+end
+
+context "A block yielded a single" do
+  describe "Array" do
+    specify "assigns the Array to a single argument" do
+      expect(hand([1, 2]) { |whole| whole }).to eq([1, 2])
+    end
+
+    specify "assigns elements to required arguments" do
+      expect(hand([1, 2, 3]) { |first, second| [first, second] }).to eq([1, 2])
+    end
+  end
+end
+
+context "A block" do
+  specify "captures locals from the surrounding scope" do
+    captured = 1
+    expect(run { captured }).to eq(1)
+  end
+
+  describe "taking zero arguments" do
+    specify "does not raise an exception when no values are yielded" do
+      expect(run { 1 }).to eq(1)
+    end
+
+    specify "does not raise an exception when values are yielded" do
+      expect(hand(0) { 1 }).to eq(1)
+    end
+  end
+
+  describe "taking |a| arguments" do
+    specify "assigns the value yielded to the argument" do
+      expect(hand(1) { |value| value }).to eq(1)
+    end
+
+    specify "assigns the first value yielded to the argument" do
+      expect(hand_two(1, 2) { |value| value }).to eq(1)
+    end
+
+    specify "does not destructure a single Array value" do
+      expect(hand([1, 2]) { |value| value }).to eq([1, 2])
+    end
+  end
+
+  describe "taking |a, b| arguments" do
+    specify "assigns the first two values yielded to the arguments" do
+      expect(hand_three(1, 2, 3) { |first, second| [first, second] }).to eq([1, 2])
+    end
+
+    specify "does not destructure an Array value as one of several values yielded" do
+      expect(hand_two([1, 2], 3) { |first, second| [first, second] }).to eq([[1, 2], 3])
+    end
+
+    specify "destructures a single Array value yielded" do
+      expect(hand([1, 2, 3]) { |first, second| [first, second] }).to eq([1, 2])
+    end
+  end
+end
