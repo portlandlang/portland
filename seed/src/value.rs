@@ -377,19 +377,23 @@ impl Value {
 /// Ruby's float rendering: a float always shows its point (`1.0`, never
 /// `1`), and the infinities spell out (ADR 0018).
 /// A string as source: the closed escape set (docs/ruby/string-escapes.md)
-/// written back out — `\\`, `\"`, `\n`, `\r`, `\t` — and every other
-/// character raw, as Ruby's `inspect` leaves a zero-width joiner or a
-/// flag's variation selector alone. Rust's `{:?}` would write those as
-/// `\u{200d}`, which no Portland literal can spell.
+/// written back out — `\\`, `\"`, `\n`, `\r`, `\t`, and `\#` where a `#`
+/// would otherwise open an interpolation (before `{`, `$`, or `@`, as
+/// Ruby's `inspect` escapes it) — and every other character raw, as Ruby's
+/// `inspect` leaves a zero-width joiner or a flag's variation selector
+/// alone. Rust's `{:?}` would write those as `\u{200d}`, which no Portland
+/// literal can spell.
 fn quoted(text: &str) -> String {
     let mut result = String::from("\"");
-    for character in text.chars() {
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
         match character {
             '\\' => result.push_str("\\\\"),
             '"' => result.push_str("\\\""),
             '\n' => result.push_str("\\n"),
             '\r' => result.push_str("\\r"),
             '\t' => result.push_str("\\t"),
+            '#' if matches!(characters.peek(), Some('{' | '$' | '@')) => result.push_str("\\#"),
             other => result.push(other),
         }
     }

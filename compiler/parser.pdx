@@ -2032,7 +2032,12 @@ end
 # Re-encode a decoded string for sexp display.
 def encode_string(text)
   mutable result = "\""
-  text.chars.each do |character|
+  characters = text.chars
+  characters.each_with_index do |character, index|
+    following = characters.slice(index + 1, 1).join("")
+    # A `#` that would open an interpolation is escaped, as Ruby's inspect
+    # escapes it before `{`, `$`, and `@`.
+    opens_interpolation = character == "#" && (following == "{" || following == "$" || following == "@")
     encoded = case character
     when "\\" then "\\\\"
     when "\"" then "\\\""
@@ -2040,7 +2045,7 @@ def encode_string(text)
     when "\r" then "\\r"
     when "\t" then "\\t"
     else
-      character
+      opens_interpolation ? "\\#" : character
     end
     result << encoded
   end

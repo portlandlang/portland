@@ -207,6 +207,7 @@ p(city.end_with?("x", "land"))
 p("3.5 miles".to_f)
 p(" 1 2 ".split(" ", 3))
 p(city.slice(-4, 2))
+p("#" + "{")
 "one\ntwo\n".each_line { |line| puts(line) }
 "a".upto("c") { |letter| puts(letter) }
 "a".upto("c", true) { |letter| puts(letter) }
