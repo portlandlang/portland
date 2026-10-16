@@ -1914,6 +1914,11 @@ language/BEGIN_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
   link: docs/ruby/removed-syntax.md
+language/alias_spec.rb:
+  pdx: [spec/method/alias_spec.pdx]
+  status: partial_intentional
+  reason: "alias takes two bare names (ADR 0039), so the symbol-spelling rows refuse; there is no redefinition to reverse, no metaclass, eval, attr, splat, or superclass, and no globals to alias."
+  link: docs/ruby/aliases.md
 language/and_spec.rb:
   pdx: [spec/word_operators/truth_spec.pdx]
   status: partial_intentional
@@ -1951,6 +1956,11 @@ language/line_spec.rb:
   status: skipped
   reason: "Every row reaches __LINE__ through eval, require, or load, none of which exist: the runtime kind is gone."
   link: docs/ruby/metaprogramming.md
+language/hash_spec.rb:
+  pdx: [spec/hash/literal_spec.pdx]
+  status: partial_planned
+  reason: "The omitted-value form {a:} waits on #167; the shorthand is the only symbol-key spelling, so :a => 1 refuses, ** is a splat (ADR 0014), and the empty-expression, frozen-key, duplicate-key-warning, and a= key rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/167
 language/heredoc_spec.rb:
   pdx: [spec/string/heredoc_spec.pdx]
   status: partial_intentional
@@ -2030,6 +2040,11 @@ language/singleton_class_spec.rb:
   status: skipped
   reason: "Singleton classes do not exist; the runtime kind is gone, and every value is a value."
   link: docs/ruby/metaprogramming.md
+language/string_spec.rb:
+  pdx: [spec/string/literal_spec.pdx]
+  status: partial_planned
+  reason: "Unicode escapes and adjacent-literal concatenation wait on the string-semantics decision; only #{} interpolates (no instance, class, or global variables), the % delimiters refuse by name, the escape set is closed, and the frozen-comment and encoding rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/75
 language/super_spec.rb:
   status: skipped
   reason: "There is no inheritance — declined, not deferred — so super has nothing to reach; traits carry shared behavior (ADR 0028)."
@@ -2050,6 +2065,11 @@ language/until_spec.rb:
   status: partial_planned
   reason: "The optional do after the condition waits on #165; a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
   link: https://github.com/portlandlang/portland/issues/165
+language/yield_spec.rb:
+  pdx: [spec/method/yield_spec.pdx]
+  status: partial_planned
+  reason: "The lambda rows wait on the proc question; splats are deferred (ADR 0014), and a method called without the block it yields to is a compile-time refusal."
+  link: https://github.com/portlandlang/portland/issues/77
 language/while_spec.rb:
   pdx: [spec/control_flow/while_spec.pdx]
   status: partial_planned

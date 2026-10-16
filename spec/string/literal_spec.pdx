@@ -21,3 +21,33 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec language/string_spec.rb. Only `#{}` interpolates — there
+# are no instance, class, or global variables for `#@x` and `#$x` to read —
+# the % delimiters refuse by name (docs/ruby/percent-literals.md), the
+# escape set is closed (no \u, no character shortcuts), and the frozen
+# comment, encoding, and adjacent-literal rows stay upstream (#75).
+context "Ruby character strings" do
+  specify "don't get interpolated when put in single quotes" do
+    expect('#{ip}').to eq('#{ip}')
+  end
+
+  specify 'get interpolated with #{} when put in double quotes' do
+    ip = "xxx"
+    expect("#{ip}").to eq("xxx")
+  end
+
+  specify "don't get confused by partial interpolation character sequences" do
+    expect("#@").to eq('#@')
+    expect("#@ ").to eq('#@ ')
+    expect("#@@").to eq('#@@')
+    expect("#@@ ").to eq('#@@ ')
+    expect("#$ ").to eq('#$ ')
+  end
+
+  specify "calls #to_s when the object is not a String" do
+    expect("#{503}").to eq("503")
+    expect("#{2.5}").to eq("2.5")
+    expect("#{:paid}").to eq("paid")
+  end
+end

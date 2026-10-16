@@ -80,3 +80,18 @@ context "alias" do
     end
   end
 end
+
+# From ruby/spec language/alias_spec.rb. alias takes two bare names (ADR
+# 0039), so the symbol-spelling rows refuse; there is no redefinition to
+# reverse, no metaclass, eval, attr, splat, or superclass, and no globals.
+def value
+  5
+end
+
+alias __value value
+
+context "The alias keyword" do
+  specify "creates a new name for an existing method" do
+    expect(__value).to eq(5)
+  end
+end

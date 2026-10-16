@@ -22,3 +22,47 @@ context "a method" do
     end
   end
 end
+
+# From ruby/spec language/yield_spec.rb, the literal-block rows: the
+# lambda rows wait on the proc question (#77), splats are deferred (ADR
+# 0014), a method called without the block it yields to is a compile-time
+# refusal, and the upstream `|*a|` catch-all is `it` here.
+def yield_one(argument)
+  yield(argument)
+end
+
+def yield_three(first, second, third)
+  yield(first, second, third)
+end
+
+context "The yield call" do
+  describe "taking a single argument" do
+    describe "yielding to a literal block" do
+      specify "passes an empty Array when the argument is an empty Array" do
+        expect(yield_one([]) { it }).to eq([])
+      end
+
+      specify "passes nil as a value" do
+        expect(yield_one(nil) { it }).to be_nil
+      end
+
+      specify "passes a single value" do
+        expect(yield_one(1) { it }).to eq(1)
+      end
+
+      specify "passes a single, multi-value Array" do
+        expect(yield_one([1, 2, 3]) { it }).to eq([1, 2, 3])
+      end
+    end
+  end
+
+  describe "taking multiple arguments" do
+    specify "passes the arguments to the block" do
+      expect(yield_three(1, 2, 3) { |first, second, third| [first, second, third] }).to eq([1, 2, 3])
+    end
+
+    specify "passes only the first argument if the block takes one parameter" do
+      expect(yield_three(1, 2, 3) { it }).to eq(1)
+    end
+  end
+end

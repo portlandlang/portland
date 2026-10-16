@@ -17,3 +17,32 @@ context "Hash" do
     end
   end
 end
+
+# From ruby/spec language/hash_spec.rb. The shorthand is the only
+# symbol-key spelling, so `:a => 1` refuses (docs/ruby/symbols.md); the
+# omitted-value form `{a:}` waits on #167; `**` is a splat (ADR 0014); the
+# empty-expression, frozen-key, duplicate-key-warning, and `a=` key rows
+# stay upstream.
+context "Hash literal" do
+  specify "{} should return an empty hash" do
+    expect({}.size).to eq(0)
+    expect({}).to eq({})
+  end
+
+  specify "{} should return a new hash populated with the given elements" do
+    built = {a: "a", "b" => 3, 44 => 2.3}
+    expect(built.size).to eq(3)
+    expect(built).to eq({a: "a", "b" => 3, 44 => 2.3})
+  end
+
+  specify "accepts a hanging comma" do
+    built = {a: 1, b: 2,}
+    expect(built.size).to eq(2)
+    expect(built).to eq({a: 1, b: 2})
+  end
+
+  specify "accepts mixed 'key: value' and 'key => value' syntax" do
+    built = {a: 1, "b" => 2, 3 => 4}
+    expect(built).to eq({a: 1, "b" => 2, 3 => 4})
+  end
+end
