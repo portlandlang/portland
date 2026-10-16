@@ -2080,6 +2080,7 @@ impl<'source> Parser<'source> {
         if parens {
             self.skip_newlines();
         }
+        self.refuse_splat_parameter();
         if self.peek_kind() == Some(TokenKind::Identifier) || self.peek_is_keyword("mutable") {
             loop {
                 let mutable = if self.peek_is_keyword("mutable") {
@@ -2147,6 +2148,7 @@ impl<'source> Parser<'source> {
                 // parens because they make newlines free, the bare list
                 // because a trailing comma means more args (Ruby's rule).
                 self.skip_newlines();
+                self.refuse_splat_parameter();
             }
         }
         if parens {
@@ -2160,6 +2162,25 @@ impl<'source> Parser<'source> {
             self.position += 1;
         }
         (parameters, keyword_parameters)
+    }
+
+    /// Ruby's splat parameters (#135) are deferred, not refused for good
+    /// (ADR 0014); until they land, the parse names the deferral and the
+    /// shapes that exist today.
+    fn refuse_splat_parameter(&self) {
+        if let Some(token) = self.tokens.get(self.position)
+            && matches!(token.kind, TokenKind::Star | TokenKind::StarStar)
+        {
+            let name = self
+                .tokens
+                .get(self.position + 1)
+                .filter(|following| following.kind == TokenKind::Identifier)
+                .map_or("", |following| following.text);
+            panic!(
+                "'{}{name}' is a splat, which is deferred (ADR 0014) — take the values by name, or as one array",
+                token.text
+            );
+        }
     }
 
     fn peek_is_keyword(&self, word: &str) -> bool {

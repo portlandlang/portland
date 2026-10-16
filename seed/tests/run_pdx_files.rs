@@ -1863,6 +1863,129 @@ fn combinatorics_and_binary_search_match_ruby() {
     assert_both_oracles_refuse("combinatorics_refusal.pdx", None, &cases);
 }
 
+/// The removed Ruby spellings refuse with their rewrites (#135), on both
+/// oracles: each sentence in ADR 0047's voice — the fact, a dash, the
+/// rewrite its ledger page names — where a parser's words were. The lexer
+/// refuses the words that were keywords, the heredoc openers, globals, the
+/// block-pass and bitwise `&`, and the lambda arrow; the parser the splat
+/// parameters; a name nothing defines and a method no value has answer the
+/// rewrite before the seventh wording. Where the ledger names no rewrite,
+/// the fact stands alone.
+#[test]
+fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
+    let cases = [
+        (
+            "for x in [1] do\nend\n",
+            "'for' is not a Portland loop — walk the collection with 'each'",
+        ),
+        (
+            "$x = 1\n",
+            "'$x' is a global, which Portland does not have — pass the value in, or name a constant",
+        ),
+        (
+            "BEGIN { }\n",
+            "'BEGIN' has no Portland meaning — a program runs top to bottom; write the statements where they go",
+        ),
+        (
+            "raise \"boom\"\n",
+            "'raise' has no Portland meaning — return a failure; the caller handles it with 'or' or 'case/in'",
+        ),
+        (
+            "begin\n  1\nrescue\n  2\nend\n",
+            "'begin' has no Portland meaning — a fallible call answers a failure; handle it with 'or' or 'case/in'",
+        ),
+        (
+            "p([1].fetch(0))\n",
+            "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'",
+        ),
+        (
+            "p([1].push(2))\n",
+            "'push' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead",
+        ),
+        (
+            "p([2, 1].sort!)\n",
+            "'sort!' mutates its receiver, and values never mutate here (ADR 0015) — 'sort' answers the new value; bind it",
+        ),
+        (
+            "p(\"a\".freeze)\n",
+            "'freeze' has nothing to do — values never mutate here (ADR 0015); drop the call",
+        ),
+        (
+            "def f(*args)\n  args\nend\n",
+            "'*args' is a splat, which is deferred (ADR 0014) — take the values by name, or as one array",
+        ),
+        (
+            "def f(a, **rest)\n  a\nend\n",
+            "'**rest' is a splat, which is deferred (ADR 0014) — take the values by name, or as one array",
+        ),
+        (
+            "x = <<-EOS\nhi\n  EOS\np(x)\n",
+            "'<<-EOS' is a dash heredoc — write '<<~EOS'; the content's common indentation is stripped",
+        ),
+        (
+            "x = <<EOS\nhi\nEOS\np(x)\n",
+            "'<<EOS' is a plain heredoc — write '<<~EOS'; the content's common indentation is stripped",
+        ),
+        (
+            "Thread.new { }\n",
+            "'Thread' has no Portland meaning — run independent work in a 'together' block",
+        ),
+        (
+            "send(:p, 1)\n",
+            "'send' has no Portland meaning — the runtime is closed; call the method by name",
+        ),
+        (
+            "p(3 & 1)\n",
+            "'&' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_and', or 'intersection' on arrays",
+        ),
+        (
+            "def f(&block)\n  1\nend\n",
+            "'&block' is a block parameter, which Portland does not have — a method's block is implicit; call it with 'yield'",
+        ),
+        (
+            "p([1].map(&:to_s))\n",
+            "'&:to_s' is a symbol-to-block, which Portland does not have — write the block, '{ it.to_s }'",
+        ),
+        (
+            "f = -> { 1 }\n",
+            "'->' is a lambda, which Portland does not have — hand a block to a method, and it calls the block with 'yield'",
+        ),
+        (
+            "f = proc { 1 }\n",
+            "'proc' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'",
+        ),
+        (
+            "struct Foo\n  attr_reader :x\nend\n",
+            "'attr_reader' has no Portland meaning — a field is read by its bare name",
+        ),
+        (
+            "p(\"a\".to_sym)\n",
+            "'to_sym' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)",
+        ),
+        (
+            "Object.new\n",
+            "'Object' has no Portland meaning — there is no root class; a struct stands alone",
+        ),
+        (
+            "require \"json\"\n",
+            "'require' has no Portland meaning — 'require_relative' loads a file by its path",
+        ),
+        (
+            "alias_method :a, :b\n",
+            "'alias_method' is spelled 'alias' here — 'alias new old', two bare names",
+        ),
+        ("retry\n", "'retry' has no Portland meaning"),
+        ("p(defined?(x))\n", "'defined?' has no Portland meaning"),
+        ("p((1..3).begin)\n", "1"),
+    ];
+    assert_both_oracles_refuse(
+        "removed_spellings_refusal.pdx",
+        None,
+        &cases[..cases.len() - 1],
+    );
+    assert_both_print("evaluator_range_begin.pdx", cases[cases.len() - 1].0, "1\n");
+}
+
 /// Ruby's Enumerable over runs and groups (#110), on both oracles, the
 /// expected lines Ruby 4.0.6's: `chunk` with its nil, `:_separator`, and
 /// `:_alone` answers; `chunk_while` and `slice_when` asked of each

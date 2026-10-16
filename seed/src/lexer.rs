@@ -74,6 +74,91 @@ pub enum TokenKind {
 
 /// The Stage 0 keyword set — grows as the subset does.
 #[rustfmt::skip]
+/// The removed Ruby spellings and their rewrites (#135): each a sentence
+/// in ADR 0047's voice — the fact, a dash, the rewrite its ledger page
+/// names. The lexer asks for the words that were Ruby keywords, the
+/// interpreter for a name nothing defines and a method no value has, so a
+/// Rubyist porting by hand reads the rewrite where the parser's words were.
+pub fn retired_sentence(name: &str) -> Option<String> {
+    let sentence = match name {
+        "for" => "'for' is not a Portland loop — walk the collection with 'each'".to_string(),
+        "BEGIN" | "END" => format!(
+            "'{name}' has no Portland meaning — a program runs top to bottom; write the statements where they go"
+        ),
+        "begin" | "rescue" | "ensure" => format!(
+            "'{name}' has no Portland meaning — a fallible call answers a failure; handle it with 'or' or 'case/in'"
+        ),
+        "raise" => "'raise' has no Portland meaning — return a failure; the caller handles it with 'or' or 'case/in'".to_string(),
+        // The ledger names no rewrite for these; the fact stands alone.
+        "retry" | "redo" | "undef" | "defined?" | "__method__" | "is_a?" | "kind_of?"
+        | "instance_of?" => format!("'{name}' has no Portland meaning"),
+        "send" | "public_send" | "__send__" | "respond_to?" => format!(
+            "'{name}' has no Portland meaning — the runtime is closed; call the method by name"
+        ),
+        "eval" | "instance_eval" | "class_eval" | "define_method" | "method_missing"
+        | "instance_variable_get" | "instance_variable_set" | "const_get" | "singleton_class"
+        | "extend" => format!(
+            "'{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
+        ),
+        "require" => "'require' has no Portland meaning — 'require_relative' loads a file by its path".to_string(),
+        "proc" | "lambda" | "Proc" => format!(
+            "'{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
+        ),
+        "alias_method" => "'alias_method' is spelled 'alias' here — 'alias new old', two bare names".to_string(),
+        "attr_reader" | "attr_writer" | "attr_accessor" => {
+            format!("'{name}' has no Portland meaning — a field is read by its bare name")
+        }
+        "Thread" | "Mutex" | "Queue" | "Fiber" | "Ractor" | "ConditionVariable" => format!(
+            "'{name}' has no Portland meaning — run independent work in a 'together' block"
+        ),
+        "Object" | "BasicObject" | "Kernel" | "Class" | "Module" => format!(
+            "'{name}' has no Portland meaning — there is no root class; a struct stands alone"
+        ),
+        "fetch" => "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'".to_string(),
+        "push" | "pop" | "shift" | "unshift" | "append" | "prepend" | "insert" | "delete_at"
+        | "delete_if" | "keep_if" | "clear" | "concat" | "replace" | "fill" => format!(
+            "'{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
+        ),
+        "map!" | "collect!" | "select!" | "filter!" | "reject!" | "sort!" | "sort_by!" | "uniq!"
+        | "compact!" | "flatten!" | "reverse!" | "shuffle!" | "rotate!" | "slice!" | "upcase!"
+        | "downcase!" | "capitalize!" | "swapcase!" | "strip!" | "lstrip!" | "rstrip!"
+        | "chomp!" | "chop!" | "squeeze!" | "gsub!" | "sub!" | "tr!" | "delete!" | "succ!"
+        | "next!" | "merge!" | "transform_values!" | "transform_keys!" => {
+            let stem = &name[..name.len() - 1];
+            format!(
+                "'{name}' mutates its receiver, and values never mutate here (ADR 0015) — '{stem}' answers the new value; bind it"
+            )
+        }
+        "freeze" | "frozen?" | "dup" | "clone" => format!(
+            "'{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
+        ),
+        "to_sym" | "intern" => format!(
+            "'{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
+        ),
+        _ => return None,
+    };
+    Some(sentence)
+}
+
+/// The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
+/// the word follows a dot — `range.begin` is a method, as Ruby's is.
+const RESERVED_WORDS: [&str; 14] = [
+    "BEGIN",
+    "END",
+    "__method__",
+    "attr_accessor",
+    "attr_reader",
+    "attr_writer",
+    "begin",
+    "defined?",
+    "ensure",
+    "for",
+    "redo",
+    "rescue",
+    "retry",
+    "undef",
+];
+
 const KEYWORDS: [&str; 35] = [
     "alias",
     "and",
@@ -389,7 +474,26 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('?', _) => (TokenKind::Question, 1),
                     ('&', Some('&')) => (TokenKind::AmpersandAmpersand, 2),
                     ('&', Some('.')) => (TokenKind::AmpersandDot, 2),
-                    ('&', _) => panic!("unexpected character '&' at byte {start}"),
+                    // Ruby's block pass, symbol-to-block, and bitwise and
+                    // (#135): each names its rewrite.
+                    ('&', Some(':')) => {
+                        let spelling = &source[start..start + 2 + name_length(source, start + 2)];
+                        let name = &spelling[2..];
+                        panic!(
+                            "'{spelling}' is a symbol-to-block, which Portland does not have — write the block, '{{ it.{name} }}'"
+                        );
+                    }
+                    ('&', Some(following))
+                        if following.is_ascii_alphabetic() || following == '_' =>
+                    {
+                        let spelling = &source[start..start + 1 + name_length(source, start + 1)];
+                        panic!(
+                            "'{spelling}' is a block parameter, which Portland does not have — a method's block is implicit; call it with 'yield'"
+                        );
+                    }
+                    ('&', _) => panic!(
+                        "'&' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_and', or 'intersection' on arrays"
+                    ),
                     ('|', Some('|')) => {
                         if source[start..].starts_with("||=") {
                             (TokenKind::PipePipeEqual, 3)
@@ -419,6 +523,11 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('!', Some('=')) => (TokenKind::NotEqual, 2),
                     ('!', _) => (TokenKind::Bang, 1),
                     ('-', Some('=')) => (TokenKind::MinusEqual, 2),
+                    // Ruby's lambda arrow (#135): a block is handed to a
+                    // method here.
+                    ('-', Some('>')) => panic!(
+                        "'->' is a lambda, which Portland does not have — hand a block to a method, and it calls the block with 'yield'"
+                    ),
                     ('-', _) => (TokenKind::Minus, 1),
                     ('%', Some('=')) => (TokenKind::PercentEqual, 2),
                     ('%', _) => (TokenKind::Percent, 1),
@@ -510,6 +619,14 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     chars.next();
                 }
                 let text = &source[start..end];
+                if RESERVED_WORDS.contains(&text)
+                    && !tokens
+                        .last()
+                        .is_some_and(|token: &Token| token.kind == TokenKind::Dot)
+                    && let Some(sentence) = retired_sentence(text)
+                {
+                    panic!("{sentence}");
+                }
                 let kind = if KEYWORDS.contains(&text) {
                     TokenKind::Keyword
                 } else {
@@ -544,6 +661,20 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 let name = &source[name_start..name_start + name_length];
                 panic!(
                     "'{spelling}' is an instance variable, which Portland does not have — a field is read by its bare name, '{name}'"
+                );
+            }
+            // Ruby's globals and its special-variable zoo (#135): state anyone
+            // anywhere can write was cut with the runtime dynamism.
+            '$' => {
+                let length = name_length(source, start + 1);
+                let end = if length == 0 {
+                    start + 1 + source[start + 1..].chars().next().map_or(0, char::len_utf8)
+                } else {
+                    start + 1 + length
+                };
+                let spelling = &source[start..end];
+                panic!(
+                    "'{spelling}' is a global, which Portland does not have — pass the value in, or name a constant"
                 );
             }
             character if !character.is_ascii() => panic!(
@@ -643,6 +774,13 @@ fn closer_of(opener: char) -> char {
 /// a bare `%` before `[`, `(`, or `{` where a space (or the line's start)
 /// precedes it — Ruby's own reading of `a %(b)` — so `a % (b)` and `a%(b)`
 /// stay modulo.
+/// How many name characters run from `start` — for a spelling to quote.
+fn name_length(source: &str, start: usize) -> usize {
+    source[start..]
+        .find(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+        .unwrap_or(source.len() - start)
+}
+
 fn declined_percent_literal(source: &str, start: usize) -> bool {
     let bytes = source.as_bytes();
     match bytes.get(start + 1) {

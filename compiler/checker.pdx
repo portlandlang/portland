@@ -1131,6 +1131,8 @@ def check_defined(name, node, scope, found)
   return found if scope.locals.any? { it[0] == name }
   return found if scope.globals.any? { it[0] == name }
   return found if builtin_function?(name)
+  # A removed Ruby spelling names its rewrite instead (#135).
+  return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
   noted(found, ["undefined", name], locate(node, scope))
 end
 
@@ -1280,6 +1282,9 @@ def check_builtin_method(node, receiver, scope, found)
   # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
   survivor = alias_survivor(node.name)
   return noted(found, ["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
+  # A removed Ruby method names its rewrite (#135): `fetch`, `push`,
+  # `freeze`, `send`, and kin.
+  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
   spelling = spell_node(node.receiver)
   return found if spelling.nil?
   noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
@@ -1294,6 +1299,7 @@ def check_struct_method(node, receiver, scope, found)
   shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
   return found if shape.nil?
   return found if value_at_checked(shape, 1).include?(node.name)
+  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
   spelling = spell_node(node.receiver)
   return found if spelling.nil?
   noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))

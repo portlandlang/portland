@@ -94,6 +94,9 @@ def render_refusal(refusal)
   # A sentence pinned by an earlier ADR (0034, 0035), carried whole.
   in ["sentence", words] then words
   in ["undefined", name] then "#{spelled(name)} is not defined"
+  # A removed Ruby spelling (#135): the rewrite its ledger page names, the
+  # lexer's table (every file in view loads it first).
+  in ["retired", name] then retired_sentence(name) or "#{spelled(name)} is not defined"
   # One definition per name (ADR 0052) and constants (ADR 0053): the seed's
   # runtime sentences, said at build with the line beneath.
   in ["redefined", name] then sentence("#{spelled(name)} is already defined", "rename one")

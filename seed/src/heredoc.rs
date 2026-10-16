@@ -69,6 +69,23 @@ fn expand_line(lines: &[&str], index: usize) -> (String, usize) {
     (result, consumed)
 }
 
+/// The terminator as written after a plain or dash opener, quotes and all,
+/// for the refusal to quote back.
+fn terminator_spelling(after: &str) -> String {
+    let quote = after
+        .chars()
+        .next()
+        .filter(|character| *character == '"' || *character == '\'');
+    let name: String = after[quote.map_or(0, |_| 1)..]
+        .chars()
+        .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+        .collect();
+    match quote {
+        Some(quote) => format!("{quote}{name}{quote}"),
+        None => name,
+    }
+}
+
 /// Walk past a string literal so its contents can't be mistaken for code.
 fn skip_string(bytes: &[u8], start: usize) -> usize {
     let quote = bytes[start];
@@ -86,6 +103,30 @@ fn skip_string(bytes: &[u8], start: usize) -> usize {
 /// A `<<~TERMINATOR` opener at `position`, if one starts there.
 fn read_opener(line: &str, position: usize) -> Option<(String, bool, usize)> {
     let rest = &line[position..];
+    // Ruby's plain and dash openers (#135): squiggly is the one opener
+    // here, and the rewrite is named — with its one caveat, since `<<~`
+    // strips the content's common indentation.
+    let opens_terminator = |text: &str| {
+        text.starts_with(|character: char| {
+            character.is_ascii_uppercase() || character == '"' || character == '\''
+        })
+    };
+    if let Some(after) = rest.strip_prefix("<<-")
+        && opens_terminator(after)
+    {
+        let name = terminator_spelling(after);
+        panic!(
+            "'<<-{name}' is a dash heredoc — write '<<~{name}'; the content's common indentation is stripped"
+        );
+    }
+    if let Some(after) = rest.strip_prefix("<<")
+        && opens_terminator(after)
+    {
+        let name = terminator_spelling(after);
+        panic!(
+            "'<<{name}' is a plain heredoc — write '<<~{name}'; the content's common indentation is stripped"
+        );
+    }
     let after = rest.strip_prefix("<<~")?;
     let (quote, name_start) = match after.as_bytes().first() {
         Some(b'\'') => (Some('\''), 1),

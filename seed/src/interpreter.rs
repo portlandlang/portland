@@ -3111,6 +3111,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 } else {
                     // ADR 0047's seventh wording (ratified 2026-09-24, #98):
                     // the checker says it at build; this is its runtime row.
+                    // A removed Ruby spelling names its rewrite instead (#135).
+                    if let Some(sentence) = crate::lexer::retired_sentence(name) {
+                        panic!("{sentence}");
+                    }
                     panic!("'{name}' is not defined")
                 }
             }
@@ -3469,7 +3473,14 @@ impl<W: std::io::Write> Interpreter<W> {
         };
         let (struct_name, info) = Self::resolve(&self.module_path, &written, &self.structs)
             .map(|(found, info)| (found, info.clone()))
-            .unwrap_or_else(|| panic!("undefined struct {written}"));
+            .unwrap_or_else(|| {
+                // `Thread.new`, `Object.new` (#135): the rewrite, not a
+                // missing struct.
+                if let Some(sentence) = crate::lexer::retired_sentence(&written) {
+                    panic!("{sentence}");
+                }
+                panic!("undefined struct {written}")
+            });
         let struct_name = &struct_name;
         let fields = info.fields.clone();
         if !arguments.is_empty() {
@@ -3724,6 +3735,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // the propagation toolkit (ADR 0044) and a struct is the commonest
             // thing a fallible def answers (#92).
             if !matches!(name, "failure?" | "nil?" | "some?" | "to_s") {
+                // A removed Ruby method names its rewrite (#135).
+                if let Some(sentence) = crate::lexer::retired_sentence(name) {
+                    panic!("{sentence}");
+                }
                 panic!(
                     "{} is {} {struct_name}, which has no method '{name}'",
                     receiver.shown(),
@@ -5809,6 +5824,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 match (receiver.type_tag(), signature) {
                     (Some(_), None) => {
                         refusal("missing");
+                        // A removed Ruby method names its rewrite (#135):
+                        // `fetch`, `push`, `freeze`, `send`, and kin.
+                        if let Some(sentence) = crate::lexer::retired_sentence(name) {
+                            panic!("{sentence}");
+                        }
                         let type_name = receiver.type_name();
                         panic!(
                             "{} is {} {type_name}, which has no method '{name}'",
@@ -6784,9 +6804,14 @@ impl<W: std::io::Write> Interpreter<W> {
             }
         }
 
-        let method = self
-            .lookup_method(name)
-            .unwrap_or_else(|| panic!("'{name}' is not defined"));
+        let method = self.lookup_method(name).unwrap_or_else(|| {
+            // A removed Ruby spelling names its rewrite (#135) before the
+            // seventh wording says nothing defines it.
+            if let Some(sentence) = crate::lexer::retired_sentence(name) {
+                panic!("{sentence}");
+            }
+            panic!("'{name}' is not defined")
+        });
         let required = method
             .parameters
             .iter()
@@ -6970,10 +6995,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "\"paid\" is a String, which has no method 'to_sym'")]
+    #[should_panic(
+        expected = "'to_sym' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
+    )]
     fn there_is_no_to_sym() {
         // The load-bearing omission (ADR 0023 §3): a symbol built from a
-        // string at runtime could never be checked against a vocabulary.
+        // string at runtime could never be checked against a vocabulary —
+        // and the refusal says so (#135).
         evaluate(r#""paid".to_sym"#);
     }
 

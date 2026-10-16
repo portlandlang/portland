@@ -1661,6 +1661,9 @@ def evaluate_new(node, mutable bindings)
     resolve(bindings, written)
   end
   if slot.empty?
+    # `Thread.new`, `Object.new` (#135): the rewrite, not a missing struct.
+    retired = retired_sentence(written)
+    panic(retired) unless retired.nil?
     puts "evaluator: undefined struct #{written}"
     return outcome([], bindings)
   end
@@ -1850,7 +1853,10 @@ def struct_field(instance, field)
   # A miss is the seed's sentence (ADR 0047 shape 2's runtime row, #90):
   # the value shown, its struct with the article, the name in quotes.
   # Reached only where the checker could not see the receiver's type — a
-  # known struct refuses at build first.
+  # known struct refuses at build first. A removed Ruby method names its
+  # rewrite (#135).
+  retired = retired_sentence(field)
+  panic(retired) unless retired.nil?
   panic("#{shorten(render_inspect(instance))} is #{a_type(["struct", value_at(instance, 1)])}, which has no method #{spelled(field)}")
 end
 
@@ -2341,6 +2347,9 @@ def refuse_missing_builtin(receiver, name)
   return if type.nil?
   methods = builtin_methods(type)
   return if methods.include?(name)
+  # A removed Ruby method names its rewrite (#135).
+  retired = retired_sentence(name)
+  panic(retired) unless retired.nil?
   runtime_name = type_at(type, 0).capitalize
   panic("#{shorten(render_inspect(receiver))} is #{article(runtime_name)} #{runtime_name}, which has no method #{spelled(name)}")
 end
@@ -3535,7 +3544,8 @@ def evaluate_call(node, mutable bindings)
   else
     # The seed's sentence, and a failure rather than a debug line (#98) —
     # reached only where the checker could not judge the name, a struct's
-    # method body or a module's.
-    panic("#{spelled(node.name)} is not defined")
+    # method body or a module's. A removed Ruby spelling names its rewrite
+    # (#135).
+    panic(retired_sentence(node.name) or "#{spelled(node.name)} is not defined")
   end
 end

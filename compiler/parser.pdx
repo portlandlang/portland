@@ -45,10 +45,10 @@ trait Sexp
   def method_call_sexp(node, dot)
     plain = headed_sexp("#{dot} #{node.receiver.sexp} #{node.name}", node.arguments)
     return plain if node.block.nil?
-    mutable spelled = "do"
-    spelled << " |#{node.block.parameters.join(" ")}|" unless node.block.parameters.empty?
+    mutable opener = "do"
+    opener << " |#{node.block.parameters.join(" ")}|" unless node.block.parameters.empty?
     inner = plain.slice(1, plain.length - 2)
-    "(#{inner} #{headed_sexp(spelled, node.block.body)})"
+    "(#{inner} #{headed_sexp(opener, node.block.body)})"
   end
 end
 
@@ -2536,6 +2536,7 @@ end
 def parse_parameter_list(tokens, mutable position, parens)
   mutable parameters = []
   position = skip_newlines_at(tokens, position) if parens
+  refuse_splat_parameter(tokens, position)
   while position < tokens.length && (tokens[position].identifier? || keyword_at?(tokens, position, %w[mutable]))
     # A parameter is a binding site (ADR 0001), so `mutable` marks it
     # rebindable — carried on the node since #45. A `mutable` before a
@@ -2572,6 +2573,7 @@ def parse_parameter_list(tokens, mutable position, parens)
       # because they make newlines free, the bare list because a trailing
       # comma means more args (Ruby's rule).
       position = skip_newlines_at(tokens, position + 1)
+      refuse_splat_parameter(tokens, position)
     end
   end
   return Step.new(node: parameters, position: position) unless parens
@@ -2580,6 +2582,15 @@ def parse_parameter_list(tokens, mutable position, parens)
     return Step.new(node: parameters, position: position + 1)
   end
   Step.new(node: [error_node("expected closing paren after parameters")], position: position)
+end
+
+# Ruby's splat parameters (#135) are deferred, not refused for good (ADR
+# 0014); until they land, the parse names the deferral and the shapes that
+# exist today — the seed's sentence.
+def refuse_splat_parameter(tokens, position)
+  return unless operator_at?(tokens, position, %w[* **])
+  name = position + 1 < tokens.length && tokens[position + 1].identifier? ? tokens[position + 1].text : ""
+  panic "'#{tokens[position].text}#{name}' is a splat, which is deferred (ADR 0014) — take the values by name, or as one array"
 end
 
 # — patterns (ADR 0013) —

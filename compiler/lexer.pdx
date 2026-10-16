@@ -126,6 +126,47 @@ def keyword?(word)
   %w[alias and break case class def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
 end
 
+# The removed Ruby spellings and their rewrites (#135): each a sentence in
+# ADR 0047's voice — the fact, a dash, the rewrite its ledger page names —
+# the seed's words. The lexer asks for the words that were Ruby keywords,
+# the checker and evaluator for a name nothing defines and a method no
+# value has, so a Rubyist porting by hand reads the rewrite where the
+# parser's words were. Nil for a name that is simply not defined. The
+# table lives here, in the one file every other loads first, so the
+# refusal renderer can read it without a cycle in the requires.
+def retired_sentence(name)
+  case name
+  when "for" then "'for' is not a Portland loop — walk the collection with 'each'"
+  when "BEGIN", "END" then "'#{name}' has no Portland meaning — a program runs top to bottom; write the statements where they go"
+  when "begin", "rescue", "ensure" then "'#{name}' has no Portland meaning — a fallible call answers a failure; handle it with 'or' or 'case/in'"
+  when "raise" then "'raise' has no Portland meaning — return a failure; the caller handles it with 'or' or 'case/in'"
+  # The ledger names no rewrite for these; the fact stands alone.
+  when "retry", "redo", "undef", "defined?", "__method__", "is_a?", "kind_of?", "instance_of?" then "'#{name}' has no Portland meaning"
+  when "send", "public_send", "__send__", "respond_to?" then "'#{name}' has no Portland meaning — the runtime is closed; call the method by name"
+  when "eval", "instance_eval", "class_eval", "define_method", "method_missing", "instance_variable_get", "instance_variable_set", "const_get", "singleton_class", "extend"
+    "'#{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
+  when "require" then "'require' has no Portland meaning — 'require_relative' loads a file by its path"
+  when "proc", "lambda", "Proc" then "'#{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
+  when "alias_method" then "'alias_method' is spelled 'alias' here — 'alias new old', two bare names"
+  when "attr_reader", "attr_writer", "attr_accessor" then "'#{name}' has no Portland meaning — a field is read by its bare name"
+  when "Thread", "Mutex", "Queue", "Fiber", "Ractor", "ConditionVariable" then "'#{name}' has no Portland meaning — run independent work in a 'together' block"
+  when "Object", "BasicObject", "Kernel", "Class", "Module" then "'#{name}' has no Portland meaning — there is no root class; a struct stands alone"
+  when "fetch" then "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'"
+  when "push", "pop", "shift", "unshift", "append", "prepend", "insert", "delete_at", "delete_if", "keep_if", "clear", "concat", "replace", "fill"
+    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
+  when "map!", "collect!", "select!", "filter!", "reject!", "sort!", "sort_by!", "uniq!", "compact!", "flatten!", "reverse!", "shuffle!", "rotate!", "slice!", "upcase!", "downcase!", "capitalize!", "swapcase!", "strip!", "lstrip!", "rstrip!", "chomp!", "chop!", "squeeze!", "gsub!", "sub!", "tr!", "delete!", "succ!", "next!", "merge!", "transform_values!", "transform_keys!"
+    stem = name.chop
+    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — '#{stem}' answers the new value; bind it"
+  when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
+  when "to_sym", "intern" then "'#{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
+  else nil
+  end
+end
+
+# The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
+# the word follows a dot — `range.begin` is a method, as Ruby's is.
+def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_reader attr_writer begin defined? ensure for redo rescue retry undef].include?(word)
+
 def two_character_operator?(pair)
   %w[== != <= >= && || += -= *= /= %= => &. << .. :: **].include?(pair)
 end
@@ -343,6 +384,28 @@ def trimmed(line)
   result
 end
 
+# Ruby's plain and dash openers (#135): squiggly is the one opener here,
+# and the rewrite is named — with its one caveat, since `<<~` strips the
+# content's common indentation. The seed's sentences.
+def refuse_other_heredoc(line, start)
+  characters = line.chars
+  return unless characters[start] == "<" && characters[start + 1] == "<"
+  dash = characters[start + 2] == "-"
+  opener_end = dash ? start + 3 : start + 2
+  first = characters[opener_end] or ""
+  quoted = first == "\"" || first == "'"
+  return unless quoted || "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(first)
+  mutable name_end = quoted ? opener_end + 1 : opener_end
+  while name_end < characters.length && name_character?(characters[name_end])
+    name_end += 1
+  end
+  mutable name = characters.slice(quoted ? opener_end + 1 : opener_end, name_end - (quoted ? opener_end + 1 : opener_end)).join("")
+  name = first + name + first if quoted
+  opener = dash ? "<<-" : "<<"
+  kind = dash ? "dash" : "plain"
+  panic "'#{opener}#{name}' is a #{kind} heredoc — write '<<~#{name}'; the content's common indentation is stripped"
+end
+
 # The terminator name right after `<<~`, or "" when this is not an opener.
 def heredoc_terminator(line, start)
   characters = line.chars
@@ -451,6 +514,7 @@ def expand_heredoc_line(lines, line_index)
       index = closing
       next
     end
+    refuse_other_heredoc(line, index)
     terminator = heredoc_terminator(line, index)
     if terminator.empty?
       result << character
@@ -669,6 +733,13 @@ def lex(raw_source, first_line: 1)
           index += 1
         end
       end
+      # A Ruby keyword or perlism (#135) refuses on sight with its rewrite —
+      # unless it follows a dot, where `range.begin` is a method.
+      if reserved_word?(text)
+        previous = tokens[tokens.length - 1] or Token.new(kind: "", text: "", leading_space: false, line: 0)
+        words = retired_sentence(text) or ""
+        panic words unless previous.text == "."
+      end
       kind = if keyword?(text)
         "keyword"
       else
@@ -711,15 +782,53 @@ def lex(raw_source, first_line: 1)
       index += 3
       next
     end
+    # Ruby's lambda arrow (#135): a block is handed to a method here.
+    if character == "-" && characters[index + 1] == ">"
+      panic "'->' is a lambda, which Portland does not have — hand a block to a method, and it calls the block with 'yield'"
+    end
     if index + 1 < characters.length && two_character_operator?(character + characters[index + 1])
       tokens << Token.new(kind: "operator", text: character + characters[index + 1], leading_space: leading, line: line)
       index += 2
       next
     end
+    # Ruby's block pass, symbol-to-block, and bitwise and (#135): each
+    # names its rewrite — `&&` and `&.` were claimed above.
+    if character == "&"
+      following = characters[index + 1] or ""
+      if following == ":"
+        mutable name_end = index + 2
+        while name_end < characters.length && name_character?(characters[name_end])
+          name_end += 1
+        end
+        spelling = characters.slice(index, name_end - index).join("")
+        name = characters.slice(index + 2, name_end - index - 2).join("")
+        panic "'#{spelling}' is a symbol-to-block, which Portland does not have — write the block, '{ it.#{name} }'"
+      end
+      if following != "" && name_start?(following)
+        mutable name_end = index + 1
+        while name_end < characters.length && name_character?(characters[name_end])
+          name_end += 1
+        end
+        spelling = characters.slice(index, name_end - index).join("")
+        panic "'#{spelling}' is a block parameter, which Portland does not have — a method's block is implicit; call it with 'yield'"
+      end
+      panic "'&' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_and', or 'intersection' on arrays"
+    end
     if one_character_operator?(character)
       tokens << Token.new(kind: "operator", text: character, leading_space: leading, line: line)
       index += 1
       next
+    end
+    # Ruby's globals and its special-variable zoo (#135): state anyone
+    # anywhere can write was cut with the runtime dynamism.
+    if character == "$"
+      mutable name_end = index + 1
+      while name_end < characters.length && name_character?(characters[name_end])
+        name_end += 1
+      end
+      name_end += 1 if name_end == index + 1 && name_end < characters.length
+      spelling = characters.slice(index, name_end - index).join("")
+      panic "'#{spelling}' is a global, which Portland does not have — pass the value in, or name a constant"
     end
     # Ruby's instance and class variables have no Portland meaning (ADR
     # 0056; instance state is #103's question), so the lexer names what was
