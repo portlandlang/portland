@@ -1,0 +1,73 @@
+# `Integer#step` (#109): the walk from the receiver to a limit by a stride
+# — one by default — handed to a block one value at a time, or answered as
+# the finished array (ADR 0055), the way a range's step answers.
+#
+# From ruby/spec core/numeric/step_spec.rb and its shared/step.rb, the
+# integer rows. What stays behind: the keyword forms (`to:`, `by:`), the
+# float and Infinity rows (floats step on the ranges question, #149), the
+# ArithmeticSequence and its size, and the limitless `1.step`, which never
+# ends. A stride of 0 refuses in Ruby's words, pinned by a two-oracle test.
+
+require_relative "../../spec_helper"
+
+context "Integer#step" do
+  specify "defaults to step = 1" do
+    mutable seen = []
+    1.step(5) { |value| seen << value }
+    expect(seen).to eq([1, 2, 3, 4, 5])
+  end
+
+  describe "when self, stop and step are Integers" do
+    describe "with a positive step" do
+      specify "yields while increasing self by step until stop is reached" do
+        mutable seen = []
+        1.step(5, 1) { |value| seen << value }
+        expect(seen).to eq([1, 2, 3, 4, 5])
+      end
+
+      specify "yields once when self equals stop" do
+        mutable seen = []
+        1.step(1, 1) { |value| seen << value }
+        expect(seen).to eq([1])
+      end
+
+      specify "does not yield when self is greater than stop" do
+        mutable seen = []
+        2.step(1, 1) { |value| seen << value }
+        expect(seen).to eq([])
+      end
+    end
+
+    describe "with a negative step" do
+      specify "yields while decreasing self by step until stop is reached" do
+        mutable seen = []
+        5.step(1, -1) { |value| seen << value }
+        expect(seen).to eq([5, 4, 3, 2, 1])
+      end
+
+      specify "yields once when self equals stop" do
+        mutable seen = []
+        5.step(5, -1) { |value| seen << value }
+        expect(seen).to eq([5])
+      end
+
+      specify "does not yield when self is less than stop" do
+        mutable seen = []
+        1.step(5, -1) { |value| seen << value }
+        expect(seen).to eq([])
+      end
+    end
+  end
+
+  describe "when no block is given" do
+    specify "answers the walk as an array" do
+      expect(1.step(10, 3)).to eq([1, 4, 7, 10])
+      expect(5.step(1, -2)).to eq([5, 3, 1])
+      expect(2.step(1)).to eq([])
+    end
+  end
+
+  specify "answers the receiver when given a block" do
+    expect(1.step(3) { |value| value }).to eq(1)
+  end
+end

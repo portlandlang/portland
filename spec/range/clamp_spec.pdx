@@ -1,0 +1,72 @@
+# `Range#clamp` (#111): a range with its ends held inside two bounds, or
+# inside a range of them — Ruby 4.1's answer, each row from upstream. An
+# absent end or bound leaves the other side alone; the answer excludes its
+# end when the end it kept was excluded by whichever side supplied it; a
+# range wholly outside the bounds collapses to the nearer bound as an empty
+# range.
+#
+# From ruby/spec core/range/clamp_spec.rb. What stays behind: the duck
+# range and the subclass rows, the String bounds (ranges hold integers,
+# ADR 0019), and the refusals — bounds given backwards refuse as clamp's do
+# everywhere, and a single non-range argument refuses on arity.
+
+require_relative "../spec_helper"
+
+context "Range#clamp" do
+  specify "clamps begin and end to min and max" do
+    expect((1..10).clamp(3, 7)).to eq(3..7)
+    expect((..10).clamp(3, 7)).to eq(3..7)
+  end
+
+  specify "clamps begin and end to a Range" do
+    expect((1..10).clamp(3..7)).to eq(3..7)
+    expect((1..5).clamp(3...7)).to eq(3..5)
+  end
+
+  specify "treats min and max like an inclusive Range" do
+    expect((1...10).clamp(3, 7)).to eq((1...10).clamp(3..7))
+    expect((1...10).clamp(3, 10)).to eq((1...10).clamp(3..10))
+  end
+
+  specify "excludes the end when the returned end is excluded by self or the argument Range" do
+    expect((1...10).clamp(3, 10)).to eq(3...10)
+    expect((1...10).clamp(3..10)).to eq(3...10)
+    expect((1..10).clamp(3...10)).to eq(3...10)
+    expect((..10).clamp(3...10)).to eq(3...10)
+  end
+
+  specify "includes the end when the returned end is not an excluded end" do
+    expect((1...10).clamp(3, 7)).to eq(3..7)
+    expect((0...).clamp(0, 10)).to eq(0..10)
+    expect((1..5).clamp(3...7)).to eq(3..5)
+    expect((..5).clamp(3...7)).to eq(3..5)
+    expect((1..10).clamp(3...)).to eq(3..10)
+  end
+
+  specify "handles beginless and endless argument Ranges" do
+    expect((1..10).clamp(..7)).to eq(1..7)
+    expect((1..10).clamp(...7)).to eq(1...7)
+    expect((1..5).clamp(...7)).to eq(1..5)
+
+    expect((1..10).clamp(3..)).to eq(3..10)
+    expect((1..).clamp(3..)).to eq(3..)
+    expect((1...).clamp(3...)).to eq(3...)
+  end
+
+  specify "returns an inclusive point Range when begin and end are clamped to different equal bounds" do
+    expect((1..10).clamp(3, 3)).to eq(3..3)
+    expect((1..10).clamp(3..3)).to eq(3..3)
+  end
+
+  specify "returns an empty Range when begin and end are clamped to the same side" do
+    expect((1..10).clamp(20, 30)).to eq(20...20)
+    expect((1..10).clamp(-10, 0)).to eq(0...0)
+    expect((..10).clamp(20, 30)).to eq(20...20)
+    expect((1..10).clamp(20..30)).to eq(20...20)
+    expect((1..10).clamp(-10..0)).to eq(0...0)
+    expect((..10).clamp(20..30)).to eq(20...20)
+    expect((1..2).clamp(3, 3)).to eq(3...3)
+    expect((4..10).clamp(3, 3)).to eq(3...3)
+    expect((1..).clamp(..0)).to eq(0...0)
+  end
+end

@@ -29,6 +29,74 @@ fn range_elements(range: &Value) -> Vec<Value> {
     (*start..=last).map(Value::Integer).collect()
 }
 
+/// Ruby's Numeric#step over integers (#109): from `start` toward `limit`
+/// by `stride`, the limit included when the stride lands on it; a stride
+/// of zero refuses in Ruby's words.
+fn integer_steps(start: i64, limit: i64, stride: i64) -> Vec<Value> {
+    if stride == 0 {
+        panic!("step can't be 0");
+    }
+    let mut steps = Vec::new();
+    let mut current = start;
+    while (stride > 0 && current <= limit) || (stride < 0 && current >= limit) {
+        steps.push(Value::Integer(current));
+        current += stride;
+    }
+    steps
+}
+
+/// Ruby 4.1's Range#clamp (#111): each end held inside the bounds, an
+/// absent end or bound leaving the other side alone; the answer excludes
+/// its end when the end it kept was excluded by whichever side supplied
+/// it. A range wholly below the bounds collapses to the low bound, wholly
+/// above to the high one, as an empty exclusive range. Bounds given
+/// backwards refuse, as clamp's do everywhere.
+fn range_clamped(
+    start: Option<i64>,
+    end: Option<i64>,
+    exclusive: bool,
+    low: Option<i64>,
+    high: Option<i64>,
+    high_exclusive: bool,
+) -> Value {
+    if let (Some(low), Some(high)) = (low, high)
+        && low > high
+    {
+        panic!("'clamp' takes the low bound first, got {low} then {high}");
+    }
+    let empty_at = |point: i64| Value::Range {
+        end: Some(point),
+        exclusive: true,
+        start: Some(point),
+    };
+    if let (Some(end), Some(low)) = (end, low)
+        && end < low
+    {
+        return empty_at(low);
+    }
+    if let (Some(start), Some(high)) = (start, high)
+        && start > high
+    {
+        return empty_at(high);
+    }
+    let kept_start = match (start, low) {
+        (Some(start), Some(low)) => Some(start.max(low)),
+        (Some(start), None) => Some(start),
+        (None, low) => low,
+    };
+    let kept_end = match (end, high) {
+        (Some(end), Some(high)) => Some(end.min(high)),
+        (Some(end), None) => Some(end),
+        (None, high) => high,
+    };
+    let kept_exclusive = (end == kept_end && exclusive) || (high == kept_end && high_exclusive);
+    Value::Range {
+        end: kept_end,
+        exclusive: kept_exclusive,
+        start: kept_start,
+    }
+}
+
 /// The names Ruby's Enumerable gives a struct that defines `each` (#110),
 /// as far as the array arms carry them. Not the array's own — `length`,
 /// `join`, `[]`, `flatten`, the combinatorics — which Enumerable lacks.
@@ -4779,6 +4847,30 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
+                // Ruby's Numeric#step with a block (#109): each step handed
+                // over, the receiver answered.
+                (Value::Integer(start), "step", [Value::Integer(limit)]) => {
+                    for value in integer_steps(*start, *limit, 1) {
+                        self.run_block(block, vec![value]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                (
+                    Value::Integer(start),
+                    "step",
+                    [Value::Integer(limit), Value::Integer(stride)],
+                ) => {
+                    for value in integer_steps(*start, *limit, *stride) {
+                        self.run_block(block, vec![value]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
                 (
                     Value::Integer(from),
                     "downto" | "upto",
@@ -5092,6 +5184,48 @@ impl<W: std::io::Write> Interpreter<W> {
                         .collect(),
                 )
             }
+            // Ruby's Numeric#step on an integer (#109): the walk from the
+            // receiver to the limit by the stride — one by default — as the
+            // finished array (ADR 0055), the way a range's step answers.
+            (Value::Integer(start), "step", [Value::Integer(limit)]) => {
+                Value::array(integer_steps(*start, *limit, 1))
+            }
+            (Value::Integer(start), "step", [Value::Integer(limit), Value::Integer(stride)]) => {
+                Value::array(integer_steps(*start, *limit, *stride))
+            }
+            // Ruby 4.1's Range#clamp (#111): the range with its ends held
+            // inside two bounds, or inside a range of them.
+            (
+                Value::Range {
+                    end,
+                    exclusive,
+                    start,
+                },
+                "clamp",
+                [Value::Integer(low), Value::Integer(high)],
+            ) => range_clamped(*start, *end, *exclusive, Some(*low), Some(*high), false),
+            (
+                Value::Range {
+                    end,
+                    exclusive,
+                    start,
+                },
+                "clamp",
+                [
+                    Value::Range {
+                        end: bound_end,
+                        exclusive: bound_exclusive,
+                        start: bound_start,
+                    },
+                ],
+            ) => range_clamped(
+                *start,
+                *end,
+                *exclusive,
+                *bound_start,
+                *bound_end,
+                *bound_exclusive,
+            ),
             (range @ Value::Range { .. }, "min", []) => range_elements(range)
                 .into_iter()
                 .next()

@@ -1340,6 +1340,8 @@ def identifier_shaped?(name)
   # A name starts with a letter or an underscore, never a digit, so `:"9"`
   # keeps its quotes as Ruby's does.
   return false if "0123456789".include?(characters[0])
+  # A bare name is ASCII (#139), so a symbol with any other character keeps
+  # its quotes — the spelling that lexes here.
   mutable index = 0
   while index < characters.length
     character = characters[index]
@@ -2181,7 +2183,9 @@ def evaluate_method_call(node, mutable bindings)
   when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
   # One range for both bounds (#101), or the two bounds.
   when "clamp" then arguments.length == 1 ? receiver.clamp(value_at(arguments, 0)) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
-  when "step" then receiver.step(value_at(arguments, 0))
+  # A range steps by a stride; an integer steps to a limit, by one or by a
+  # stride (#109) — the host answers both.
+  when "step" then arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   # No separator, or a nil one, joins with nothing between (#142, #104).
@@ -2797,6 +2801,20 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   when "times"
     receiver.times do |index|
       step = run_guest_block(block, [index], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  # Ruby's Numeric#step with a block (#109): the host's walk handed over
+  # one value at a time, the receiver answered.
+  when "step"
+    walked = arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
+    walked.each do |value|
+      step = run_guest_block(block, [value], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
         interrupt = step

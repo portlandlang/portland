@@ -2017,6 +2017,26 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// `Integer#step` (#109) and Ruby 4.1's `Range#clamp` (#111) on both
+/// oracles — the step rows Ruby 4.0.7's, the clamp rows upstream's spec —
+/// and a symbol's inspect keeping its quotes beyond ASCII (#139).
+#[test]
+fn integer_step_and_range_clamp_match_ruby() {
+    assert_both_print(
+        "evaluator_step_clamp.pdx",
+        "p(1.step(10, 3))\np(5.step(1, -2))\np(2.step(1))\np(1.step(5))\np(1.step(5, 2) { |x| puts(x) })\np((1..10).clamp(3, 7))\np((..10).clamp(3, 7))\np((1..5).clamp(3...7))\np((1...10).clamp(3, 10))\np((1..10).clamp(3...10))\np((0...).clamp(0, 10))\np((1..10).clamp(...7))\np((1...).clamp(3...))\np((1..10).clamp(3, 3))\np((1..10).clamp(20, 30))\np((1..10).clamp(-10, 0))\np((1..).clamp(..0))\np(inspect(:\"ê\"))\np(inspect(:fred?))\n",
+        "[1, 4, 7, 10]\n[5, 3, 1]\n[]\n[1, 2, 3, 4, 5]\n1\n3\n5\n1\n3..7\n3..7\n3..5\n3...10\n3...10\n0..10\n1...7\n3...\n3..3\n20...20\n0...0\n0...0\n\":\\\"ê\\\"\"\n\":fred?\"\n",
+    );
+    let cases = [
+        ("p(1.step(5, 0))\n", "step can't be 0"),
+        (
+            "p((1..3).clamp(2, 1))\n",
+            "'clamp' takes the low bound first, got 2 then 1",
+        ),
+    ];
+    assert_both_oracles_refuse("step_clamp_refusal.pdx", None, &cases);
+}
+
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
 /// (4.0.6, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its

@@ -1568,6 +1568,11 @@ core/nil/xor_spec.rb:
 # (abs2, arg, conjugate, denominator, i, imaginary, numerator, polar, real,
 # rectangular, to_c) wait on #124; step waits on its own rows.
 
+core/numeric/step_spec.rb:
+  pdx: [spec/number/integer/step_spec.pdx]
+  status: partial_intentional
+  reason: "An integer steps to a limit by an integer stride, handed to a block or answered as the array (ADR 0055); the keyword forms, the float and Infinity rows, the ArithmeticSequence, and the limitless step stay behind; a stride of 0 refuses in Ruby's words."
+  link: docs/ruby/enumerators.md
 core/numeric/abs_spec.rb:
   status: skipped
   reason: "Every row drives a mock Numeric subclass through < and -@; there is no inheritance and no Numeric, and abs is specced on Integer and Float."
@@ -1712,6 +1717,11 @@ core/numeric/zero_spec.rb:
 
 # — core/range —
 
+core/range/clamp_spec.rb:
+  pdx: [spec/range/clamp_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers (ADR 0019), so the String bounds and the duck range stay behind; no subclasses; backwards bounds and a single non-range argument refuse where Ruby raises."
+  link: docs/ruby/ranges.md
 core/range/begin_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
   status: partial_intentional
@@ -2257,6 +2267,11 @@ core/struct/values_spec.rb:
 # from text (ADR 0023): the case changers and succ stay behind, and symbols
 # are not ordered.
 
+core/symbol/inspect_spec.rb:
+  pdx: [spec/symbol/spellings_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function (ADR 0026) answering the literal that lexes here: a bare name is ASCII, and a symbol is a name rather than an operator or a global, so those keep their quotes where Ruby writes them bare; no encodings."
+  link: docs/ruby/symbols.md
 core/symbol/all_symbols_spec.rb:
   status: skipped
   reason: "The symbol table is runtime reflection; every Portland symbol is written literally (ADR 0023)."

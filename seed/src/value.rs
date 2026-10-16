@@ -240,13 +240,16 @@ impl Value {
     /// quotes as Ruby's does.
     fn symbol_source(name: &str) -> String {
         let mut characters = name.chars().enumerate().peekable();
+        // A bare name is ASCII (#139), so a symbol with any other character
+        // keeps its quotes — the spelling that lexes here, which Ruby's
+        // bare `:ê` would not.
         let starts_like_a_name = matches!(
             characters.peek(),
-            Some((_, character)) if character.is_alphabetic() || *character == '_'
+            Some((_, character)) if character.is_ascii_alphabetic() || *character == '_'
         );
         let plain = starts_like_a_name
             && characters.all(|(index, character)| {
-                character.is_alphanumeric()
+                character.is_ascii_alphanumeric()
                     || character == '_'
                     || (index + 1 == name.len() && matches!(character, '?' | '!'))
             });

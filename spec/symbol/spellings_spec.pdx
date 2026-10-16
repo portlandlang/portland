@@ -48,6 +48,71 @@ context "A Symbol literal" do
   specify "can be an empty string" do
     expect(inspect(:"")).to eq(":\"\"")
   end
+end
+
+# `inspect` on a symbol (#112, ADR 0026): the literal that lexes here — bare
+# when the name is identifier-shaped, quoted otherwise. From ruby/spec
+# core/symbol/inspect_spec.rb. A bare name is ASCII (#139), so `:"ê"` keeps
+# its quotes where Ruby writes `:ê`; a symbol is a name, not an operator or
+# a global, so `:"+"`, `:"[]"`, `:"$ruby"`, and `:"@ruby"` keep theirs where
+# Ruby writes them bare; the encoding rows stay upstream.
+context "Symbol#inspect" do
+  specify "returns self as a symbol literal for :fred" do
+    expect(inspect(:fred)).to eq(":fred")
+  end
+
+  specify "returns self as a symbol literal for :fred?" do
+    expect(inspect(:fred?)).to eq(":fred?")
+  end
+
+  specify "returns self as a symbol literal for :fred!" do
+    expect(inspect(:fred!)).to eq(":fred!")
+  end
+
+  specify "returns self as a symbol literal for :BAD!" do
+    expect(inspect(:BAD!)).to eq(":BAD!")
+  end
+
+  specify "returns self as a symbol literal for :_BAD!" do
+    expect(inspect(:_BAD!)).to eq(":_BAD!")
+  end
+
+  specify "returns self as a symbol literal for :\"9\"" do
+    expect(inspect(:"9")).to eq(":\"9\"")
+  end
+
+  specify "returns self as a symbol literal for :\"foo bar\"" do
+    expect(inspect(:"foo bar")).to eq(":\"foo bar\"")
+  end
+
+  specify "returns self as a symbol literal for :\"*foo\"" do
+    expect(inspect(:"*foo")).to eq(":\"*foo\"")
+  end
+
+  specify "returns self as a symbol literal for :\"foo \"" do
+    expect(inspect(:"foo ")).to eq(":\"foo \"")
+  end
+
+  specify "returns self as a symbol literal for :\" foo\"" do
+    expect(inspect(:" foo")).to eq(":\" foo\"")
+  end
+
+  specify "returns self as a symbol literal for :\" \"" do
+    expect(inspect(:" ")).to eq(":\" \"")
+  end
+
+  specify "keeps the quotes on a name beyond ASCII" do
+    expect(inspect(:"ê")).to eq(":\"ê\"")
+    expect(inspect(:"测")).to eq(":\"测\"")
+  end
+
+  specify "keeps the quotes on an operator, a global, or an instance variable name" do
+    expect(inspect(:"+")).to eq(":\"+\"")
+    expect(inspect(:"<=>")).to eq(":\"<=>\"")
+    expect(inspect(:"[]")).to eq(":\"[]\"")
+    expect(inspect(:"$ruby")).to eq(":\"$ruby\"")
+    expect(inspect(:"@ruby")).to eq(":\"@ruby\"")
+  end
 
   specify "can be created from list syntax %i{a b c} without interpolation" do
     expect(%i{a b}).to eq([:a, :b])
