@@ -299,7 +299,52 @@ impl<'source> Parser<'source> {
         Program { statements }
     }
 
+    /// Ruby's multiple assignment, `a, b = pair` (#135): the names before
+    /// the `=`, when a statement starts that way — a pattern destructures
+    /// here.
+    fn multiple_assignment_ahead(&self) -> Option<String> {
+        let mut names = Vec::new();
+        let mut offset = 0;
+        loop {
+            let token = self.tokens.get(self.position + offset)?;
+            if token.kind != TokenKind::Identifier {
+                return None;
+            }
+            names.push(token.text);
+            match self
+                .tokens
+                .get(self.position + offset + 1)
+                .map(|token| token.kind)
+            {
+                Some(TokenKind::Comma) => offset += 2,
+                Some(TokenKind::Equal) if names.len() > 1 => return Some(names.join(", ")),
+                _ => return None,
+            }
+        }
+    }
+
+    /// Ruby's bare hash argument, `render :partial => "x"` (#135): a
+    /// symbol followed by `=>` where an argument was expected — the
+    /// keyword argument is the spelling.
+    fn refuse_bare_hash_argument(&self) {
+        if let Some(token) = self.tokens.get(self.position)
+            && token.kind == TokenKind::Symbol
+            && self.peek_kind_at(1) == Some(TokenKind::FatArrow)
+        {
+            let label = &token.text[1..];
+            panic!(
+                "'{} => …' is a bare hash argument, which Portland does not have — write the keyword argument, '{label}: …'",
+                token.text
+            );
+        }
+    }
+
     fn statement(&mut self) -> Statement {
+        if let Some(names) = self.multiple_assignment_ahead() {
+            panic!(
+                "'{names} = …' is a multiple assignment, which Portland does not have — match the value instead: 'value => [{names}]'"
+            );
+        }
         if self.peek_is_keyword("def") {
             let (definition, type_function) = self.method_definition();
             // `def self.` outside a struct body: a module body accepts it as
@@ -656,6 +701,7 @@ impl<'source> Parser<'source> {
                 if !keyword_arguments.is_empty() {
                     panic!("positional arguments cannot follow keyword arguments");
                 }
+                self.refuse_bare_hash_argument();
                 arguments.push(self.expression());
             }
             if self.peek_kind() != Some(TokenKind::Comma) {
@@ -778,6 +824,7 @@ impl<'source> Parser<'source> {
                 if !keyword_arguments.is_empty() {
                     panic!("positional arguments cannot follow keyword arguments");
                 }
+                self.refuse_bare_hash_argument();
                 arguments.push(self.expression());
             }
             if self.peek_kind() != Some(TokenKind::Comma) {
@@ -1221,6 +1268,26 @@ impl<'source> Parser<'source> {
             let token = self.advance();
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
+            }
+            // Ruby's class macros — `validates :email`, `format :json` — are
+            // calls in a type body, where Portland only declares (#135):
+            // nothing runs at definition time.
+            if let Some(following) = self.tokens.get(self.position)
+                && matches!(
+                    following.kind,
+                    TokenKind::Symbol
+                        | TokenKind::String
+                        | TokenKind::Integer
+                        | TokenKind::Float
+                        | TokenKind::Identifier
+                        | TokenKind::SymbolArray
+                        | TokenKind::WordArray
+                )
+            {
+                panic!(
+                    "'{} {}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def",
+                    token.text, following.text
+                );
             }
             // Ruby's visibility words would otherwise read as fields named
             // `private` — a spelling quietly meaning something else (#132).
@@ -3087,6 +3154,7 @@ impl<'source> Parser<'source> {
                     if !keyword.is_empty() {
                         panic!("positional arguments cannot follow keyword arguments");
                     }
+                    self.refuse_bare_hash_argument();
                     positional.push(self.expression());
                 }
                 self.skip_newlines();

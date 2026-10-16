@@ -1976,6 +1976,26 @@ fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
         ),
         ("retry\n", "'retry' has no Portland meaning"),
         ("p(defined?(x))\n", "'defined?' has no Portland meaning"),
+        (
+            "a, b = [1, 2]\n",
+            "'a, b = …' is a multiple assignment, which Portland does not have — match the value instead: 'value => [a, b]'",
+        ),
+        (
+            "def render(options)\n  options\nend\nrender :partial => \"x\"\n",
+            "':partial => …' is a bare hash argument, which Portland does not have — write the keyword argument, 'partial: …'",
+        ),
+        (
+            "def render(options)\n  options\nend\nrender(1, :partial => \"x\")\n",
+            "':partial => …' is a bare hash argument, which Portland does not have — write the keyword argument, 'partial: …'",
+        ),
+        (
+            "struct Foo\n  validates :email\nend\n",
+            "'validates :email' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def",
+        ),
+        (
+            "module Helpers\n  extend self\nend\n",
+            "'extend' has no Portland meaning — a module's def is already callable as 'Module.name' (ADR 0021)",
+        ),
         ("p((1..3).begin)\n", "1"),
     ];
     assert_both_oracles_refuse(

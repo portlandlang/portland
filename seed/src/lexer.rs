@@ -95,9 +95,9 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         "send" | "public_send" | "__send__" | "respond_to?" => format!(
             "'{name}' has no Portland meaning — the runtime is closed; call the method by name"
         ),
+        "extend" => "'extend' has no Portland meaning — a module's def is already callable as 'Module.name' (ADR 0021)".to_string(),
         "eval" | "instance_eval" | "class_eval" | "define_method" | "method_missing"
-        | "instance_variable_get" | "instance_variable_set" | "const_get" | "singleton_class"
-        | "extend" => format!(
+        | "instance_variable_get" | "instance_variable_set" | "const_get" | "singleton_class" => format!(
             "'{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
         ),
         "require" => "'require' has no Portland meaning — 'require_relative' loads a file by its path".to_string(),
@@ -142,7 +142,7 @@ pub fn retired_sentence(name: &str) -> Option<String> {
 
 /// The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
 /// the word follows a dot — `range.begin` is a method, as Ruby's is.
-const RESERVED_WORDS: [&str; 14] = [
+const RESERVED_WORDS: [&str; 15] = [
     "BEGIN",
     "END",
     "__method__",
@@ -152,6 +152,7 @@ const RESERVED_WORDS: [&str; 14] = [
     "begin",
     "defined?",
     "ensure",
+    "extend",
     "for",
     "redo",
     "rescue",

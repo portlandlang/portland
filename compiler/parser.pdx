@@ -1683,12 +1683,16 @@ def parse_arguments(tokens, mutable position)
     return Step.new(node: arguments, position: position + 1)
   end
   mutable step = parse_argument(tokens, position)
+  # A refused argument (#135) is the whole list's answer, not a prelude to
+  # a missing paren.
+  return Step.new(node: [step.node], position: step.position) if step.node in ErrorNode
   arguments << step.node
   position = skip_newlines_at(tokens, step.position)
   while operator_at?(tokens, position, %w[,])
     position = skip_newlines_at(tokens, position + 1)
     break if operator_at?(tokens, position, %w[)])
     step = parse_argument(tokens, position)
+    return Step.new(node: [step.node], position: step.position) if step.node in ErrorNode
     arguments << step.node
     position = skip_newlines_at(tokens, step.position)
   end
@@ -1798,7 +1802,26 @@ def parse_argument(tokens, position)
     value = parse_expression(tokens, position + 2)
     return Step.new(node: keyword_argument_node(token.text, value.node), position: value.position)
   end
+  # Ruby's bare hash argument, `render :partial => "x"` (#135): the keyword
+  # argument is the spelling — the seed's sentence.
+  if token.symbol? && operator_at?(tokens, position + 1, %w[=>])
+    label = token.text.slice(1, token.text.length - 1)
+    return Step.new(node: error_node("'#{token.text} => …' is a bare hash argument, which Portland does not have — write the keyword argument, '#{label}: …'"), position: skip_line_at(tokens, position))
+  end
   parse_expression(tokens, position)
+end
+
+# The names of a multiple assignment starting at `position` — `a, b =` —
+# or none when the statement is not one (#135).
+def multiple_assignment_names(tokens, mutable position)
+  mutable names = []
+  while position < tokens.length && tokens[position].identifier?
+    names << tokens[position].text
+    return names if operator_at?(tokens, position + 1, %w[=]) && names.length > 1
+    return [] unless operator_at?(tokens, position + 1, %w[,])
+    position += 2
+  end
+  []
 end
 
 def newline_then_dot?(tokens, position)
@@ -2079,6 +2102,13 @@ def parse_statement(tokens, position)
   end
   if token.operator? && token.text == "~"
     return Step.new(node: error_node("a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"), position: skip_line_at(tokens, position))
+  end
+  # Ruby's multiple assignment, `a, b = pair` (#135): a pattern destructures
+  # here — the seed's sentence.
+  names = multiple_assignment_names(tokens, position)
+  unless names.empty?
+    spelled_names = names.join(", ")
+    return Step.new(node: error_node("'#{spelled_names} = …' is a multiple assignment, which Portland does not have — match the value instead: 'value => [#{spelled_names}]'"), position: skip_line_at(tokens, position))
   end
   if token.identifier? && command_start?(tokens, position + 1)
     return parse_command(tokens, position)
@@ -2909,6 +2939,14 @@ def parse_struct(tokens, mutable position)
       position = skip_newlines_at(tokens, constant.position)
       next
     end
+    # Ruby's class macros — `validates :email`, `format :json` — are calls
+    # in a type body, where Portland only declares (#135): nothing runs at
+    # definition time. The seed's sentence.
+    if position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1])
+      refusal = "'#{tokens[position].text} #{tokens[position + 1].text}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def" if refusal.nil?
+      position = skip_newlines_at(tokens, skip_line_at(tokens, position))
+      next
+    end
     # Ruby's visibility words would otherwise read as fields named
     # `private` — a spelling quietly meaning something else (#132).
     if visibility_word?(tokens[position].text)
@@ -3008,6 +3046,10 @@ def parse_type_constant(tokens, position)
 end
 
 def visibility_word?(word) = %w[module_function private private_constant protected public].include?(word)
+
+# A token that, right after a name in a type body, makes the line a call
+# with a paren-less argument rather than a field (#135).
+def type_body_call_argument?(token) = token.symbol? || token.string? || token.identifier? || %w[integer float symbol_array word_array].include?(token.kind)
 
 def visibility_refusal(word) = "'#{word}' has no Portland meaning yet — visibility is undecided (#133); remove it to run"
 
