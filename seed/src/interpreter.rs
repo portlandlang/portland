@@ -29,6 +29,156 @@ fn range_elements(range: &Value) -> Vec<Value> {
     (*start..=last).map(Value::Integer).collect()
 }
 
+/// A bounded range's first element and how many it holds — none for an
+/// empty one — for a search that reads elements by position (#111). An
+/// open end has no span to search.
+fn range_span(range: &Value) -> (i64, usize) {
+    let Value::Range {
+        end,
+        exclusive,
+        start,
+    } = range
+    else {
+        unreachable!("called with a range")
+    };
+    let (Some(start), Some(end)) = (start, end) else {
+        panic!("a range without both ends cannot be searched — give it a start and an end");
+    };
+    let last = if *exclusive { end - 1 } else { *end };
+    let count = (last - start + 1).max(0) as usize;
+    (*start, count)
+}
+
+/// Every way to choose `size` elements from `elements` in order (#104):
+/// Ruby's `combination`, or with `repeating` its `repeated_combination`.
+/// A size below zero or, without repeats, above the length chooses
+/// nothing; size zero chooses the empty arrangement once.
+fn combinations(elements: &[Value], size: i64, repeating: bool) -> Vec<Value> {
+    let Ok(size) = usize::try_from(size) else {
+        return Vec::new();
+    };
+    if !repeating && size > elements.len() {
+        return Vec::new();
+    }
+    if size > 0 && elements.is_empty() {
+        return Vec::new();
+    }
+    let mut chosen: Vec<usize> = Vec::new();
+    let mut found = Vec::new();
+    choose_in_order(elements, size, repeating, 0, &mut chosen, &mut found);
+    found
+}
+
+fn choose_in_order(
+    elements: &[Value],
+    size: usize,
+    repeating: bool,
+    from: usize,
+    chosen: &mut Vec<usize>,
+    found: &mut Vec<Value>,
+) {
+    if chosen.len() == size {
+        found.push(Value::array(
+            chosen
+                .iter()
+                .map(|&position| elements[position].clone())
+                .collect(),
+        ));
+        return;
+    }
+    for position in from..elements.len() {
+        chosen.push(position);
+        let next = if repeating { position } else { position + 1 };
+        choose_in_order(elements, size, repeating, next, chosen, found);
+        chosen.pop();
+    }
+}
+
+/// Every ordering of `size` elements from `elements` (#104), by position
+/// in Ruby's order: `permutation`, or with `repeating` its
+/// `repeated_permutation`.
+fn permutations(elements: &[Value], size: i64, repeating: bool) -> Vec<Value> {
+    let Ok(size) = usize::try_from(size) else {
+        return Vec::new();
+    };
+    if !repeating && size > elements.len() {
+        return Vec::new();
+    }
+    if size > 0 && elements.is_empty() {
+        return Vec::new();
+    }
+    let mut chosen: Vec<usize> = Vec::new();
+    let mut found = Vec::new();
+    arrange(elements, size, repeating, &mut chosen, &mut found);
+    found
+}
+
+fn arrange(
+    elements: &[Value],
+    size: usize,
+    repeating: bool,
+    chosen: &mut Vec<usize>,
+    found: &mut Vec<Value>,
+) {
+    if chosen.len() == size {
+        found.push(Value::array(
+            chosen
+                .iter()
+                .map(|&position| elements[position].clone())
+                .collect(),
+        ));
+        return;
+    }
+    for position in 0..elements.len() {
+        if !repeating && chosen.contains(&position) {
+            continue;
+        }
+        chosen.push(position);
+        arrange(elements, size, repeating, chosen, found);
+        chosen.pop();
+    }
+}
+
+/// `product` (#104): every way to take one element from this array and
+/// one from each of the others, in order. An argument that is not an
+/// array refuses in Ruby's words.
+fn product(elements: &[Value], others: &[Value]) -> Vec<Value> {
+    let mut combined: Vec<Vec<Value>> = elements
+        .iter()
+        .map(|element| vec![element.clone()])
+        .collect();
+    for other in others {
+        let Value::Array(choices) = other else {
+            panic!("no implicit conversion of {} into Array", other.type_name());
+        };
+        combined = combined
+            .iter()
+            .flat_map(|prefix| {
+                choices.iter().map(move |choice| {
+                    let mut longer = prefix.clone();
+                    longer.push(choice.clone());
+                    longer
+                })
+            })
+            .collect();
+    }
+    combined.into_iter().map(Value::array).collect()
+}
+
+/// `cycle(count)` (#104): the elements repeated `count` times over; a
+/// count at or below zero walks nothing.
+fn cycled(elements: &[Value], count: i64) -> Vec<Value> {
+    let Ok(count) = usize::try_from(count) else {
+        return Vec::new();
+    };
+    elements
+        .iter()
+        .cloned()
+        .cycle()
+        .take(elements.len() * count)
+        .collect()
+}
+
 /// Resolve a range against a collection length into clamped `[from, to)`
 /// offsets (ADR 0019 §2). Negative bounds count from the end; everything
 /// out of range clamps, so a slice is always a collection.
@@ -868,11 +1018,19 @@ fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
                 | "index"
                 | "rindex"
                 | "rfind"
+                | "bsearch"
+                | "bsearch_index"
+                | "combination"
+                | "permutation"
+                | "repeated_combination"
+                | "repeated_permutation"
+                | "product"
         );
     }
     matches!(
         name,
         "count"
+            | "cycle"
             | "sum"
             | "first"
             | "sort"
@@ -890,6 +1048,39 @@ fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
 /// `Integer.sqrt` (ADR 0058): the integer square root, exact to the 64-bit
 /// edge, where a float's root would round past 2^53. A negative radicand
 /// refuses in Ruby's words.
+/// `Range.new(first, last)` and `Range.new(first, last, true)` (#111, ADR
+/// 0058): the literal's two spellings as a function. Either end may be
+/// nil, as the literal's may; the third argument is a Boolean, true
+/// leaving the end out. Ends of any other kind wait on ranges over other
+/// orderables (#149).
+fn range_new(arguments: &[Value]) -> Value {
+    let (first, last, exclusive) = match arguments {
+        [first, last] => (first, last, false),
+        [first, last, Value::Boolean(exclusive)] => (first, last, *exclusive),
+        [_, _, other] => panic!(
+            "Range.new takes true or false for exclusive, got {}",
+            other.shown()
+        ),
+        _ => {
+            refusal("arity");
+            panic!("Range.new takes 2 or 3 arguments, got {}", arguments.len())
+        }
+    };
+    let end_of = |value: &Value| match value {
+        Value::Integer(number) => Some(*number),
+        Value::Nil => None,
+        other => panic!(
+            "Range.new takes integer ends here, got {} — ranges over other orderables are undecided (#149)",
+            other.shown()
+        ),
+    };
+    Value::Range {
+        start: end_of(first),
+        end: end_of(last),
+        exclusive,
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -2700,7 +2891,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere.
                 if let Expression::Variable(type_name) = receiver.as_ref()
-                    && matches!(type_name.as_str(), "Array" | "Integer")
+                    && matches!(type_name.as_str(), "Array" | "Integer" | "Range")
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
                 {
@@ -2943,8 +3134,58 @@ impl<W: std::io::Write> Interpreter<W> {
         match (type_name, name) {
             ("Array", "new") => self.array_new(arguments, block),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
+            ("Range", "new") => Some(range_new(&arguments)),
             _ => panic!("{type_name} has no {name}"),
         }
+    }
+
+    /// Ruby's binary search (#104, #111) over `count` positions, the element
+    /// at each read by `element_at`: the block answering true, false, or
+    /// nil finds the first position it accepts; answering a number finds a
+    /// position it calls zero, a negative sending the search left and a
+    /// positive right. Anything else refuses in Ruby's words. `Err` carries
+    /// a block interrupt out.
+    fn binary_search(
+        &mut self,
+        count: usize,
+        element_at: impl Fn(usize) -> Value,
+        block: &Block,
+    ) -> Result<Option<usize>, Option<Value>> {
+        let mut low = 0;
+        let mut high = count;
+        let mut satisfied = false;
+        while low < high {
+            let middle = low + (high - low) / 2;
+            let verdict = self.run_block(block, vec![element_at(middle)]);
+            if let Some(interrupted) = self.block_interrupt() {
+                return Err(interrupted);
+            }
+            let smaller = match verdict {
+                Some(Value::Boolean(true)) => {
+                    satisfied = true;
+                    true
+                }
+                Some(Value::Boolean(false)) | Some(Value::Nil) | None => false,
+                Some(Value::Integer(0)) => return Ok(Some(middle)),
+                Some(Value::Integer(number)) => number < 0,
+                Some(Value::Float(number)) => {
+                    if number == 0.0 {
+                        return Ok(Some(middle));
+                    }
+                    number < 0.0
+                }
+                Some(other) => panic!(
+                    "wrong argument type {} (must be numeric, true, false or nil)",
+                    other.type_name()
+                ),
+            };
+            if smaller {
+                high = middle;
+            } else {
+                low = middle + 1;
+            }
+        }
+        if satisfied { Ok(Some(low)) } else { Ok(None) }
     }
 
     /// Ruby's Struct views and walks (#114) over the fields in definition
@@ -3191,7 +3432,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             if matches!(
                 name,
-                "empty?" | "end_with?" | "length" | "size" | "start_with?"
+                "empty?" | "end_with?" | "length" | "size" | "slice" | "start_with?"
             ) {
                 return self.method_call(
                     Value::String(text.clone()),
@@ -3376,9 +3617,27 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // A range walks as its array — except `index`, `rindex`,
             // `each_index`, and `rfind`, which Ruby's Range lacks (its
-            // Enumerable has `find_index` and `find`).
-            if (block.is_some() && !matches!(name, "index" | "rindex" | "each_index" | "rfind"))
-                || matches!(name, "length" | "size" | "count" | "sum" | "first" | "last")
+            // Enumerable has `find_index` and `find`), and the array's own
+            // combinatorics and `bsearch_index` (#104); `cycle` is
+            // Enumerable's, with or without a block.
+            if (block.is_some()
+                && !matches!(
+                    name,
+                    "index"
+                        | "rindex"
+                        | "each_index"
+                        | "rfind"
+                        | "bsearch_index"
+                        | "combination"
+                        | "permutation"
+                        | "repeated_combination"
+                        | "repeated_permutation"
+                        | "product"
+                ))
+                || matches!(
+                    name,
+                    "length" | "size" | "count" | "sum" | "first" | "last" | "cycle"
+                )
             {
                 let elements = range_elements(&receiver);
                 return self.method_call(
@@ -3706,6 +3965,88 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // The leading run a true-or-false block keeps, or the rest
                 // once it first says false (#104).
+                // Ruby's combinatorics with a block (#104): each arrangement
+                // handed over in turn, the array answered; `cycle` answers nil,
+                // as Ruby's does.
+                (
+                    Value::Array(elements),
+                    "combination"
+                    | "repeated_combination"
+                    | "permutation"
+                    | "repeated_permutation"
+                    | "product"
+                    | "cycle",
+                    others,
+                ) => {
+                    let arrangements = match (name, others) {
+                        ("combination", [Value::Integer(size)]) => {
+                            combinations(elements, *size, false)
+                        }
+                        ("repeated_combination", [Value::Integer(size)]) => {
+                            combinations(elements, *size, true)
+                        }
+                        ("permutation", []) => permutations(elements, elements.len() as i64, false),
+                        ("permutation", [Value::Integer(size)]) => {
+                            permutations(elements, *size, false)
+                        }
+                        ("repeated_permutation", [Value::Integer(size)]) => {
+                            permutations(elements, *size, true)
+                        }
+                        ("product", others) => product(elements, others),
+                        ("cycle", [Value::Integer(count)]) => cycled(elements, *count),
+                        // The table's sentence (#88): `cycle/1&`, so a cycle
+                        // with no count — which never ends — refuses here.
+                        (_, others) => {
+                            refusal("arity");
+                            panic!("'{name}' takes 1 argument, got {}", others.len())
+                        }
+                    };
+                    for arrangement in arrangements {
+                        self.run_block(block, vec![arrangement]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    if name == "cycle" {
+                        return Some(Value::Nil);
+                    }
+                    Some(receiver)
+                }
+                // Binary search (#104, #111), Ruby's two modes by what the
+                // block answers: true, false, or nil finds the first element
+                // the block accepts; a number finds any element the block
+                // calls zero, a negative sending the search left.
+                (Value::Array(elements), "bsearch" | "bsearch_index", []) => {
+                    let elements = elements.as_ref().clone();
+                    let found = self.binary_search(
+                        elements.len(),
+                        |position| elements[position].clone(),
+                        block,
+                    );
+                    match found {
+                        Err(interrupted) => interrupted,
+                        Ok(None) => Some(Value::Nil),
+                        Ok(Some(position)) if name == "bsearch_index" => {
+                            Some(Value::present(Value::Integer(position as i64)))
+                        }
+                        Ok(Some(position)) => Some(Value::present(elements[position].clone())),
+                    }
+                }
+                (Value::Range { .. }, "bsearch", []) => {
+                    let (start, count) = range_span(&receiver);
+                    let found = self.binary_search(
+                        count,
+                        |position| Value::Integer(start + position as i64),
+                        block,
+                    );
+                    match found {
+                        Err(interrupted) => interrupted,
+                        Ok(None) => Some(Value::Nil),
+                        Ok(Some(position)) => {
+                            Some(Value::present(Value::Integer(start + position as i64)))
+                        }
+                    }
+                }
                 (Value::Array(elements), "take_while" | "drop_while", []) => {
                     let mut split = elements.len();
                     for (position, element) in elements.iter().enumerate() {
@@ -4472,6 +4813,39 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // The array turned by a count, the front's elements going to
             // the back — backward for a negative count (#104).
+            // Ruby's combinatorics (#104): without a block each answers the
+            // arrays, as a walk without a block answers an array (ADR 0055).
+            (Value::Array(elements), "combination", [Value::Integer(size)]) => {
+                Value::array(combinations(elements, *size, false))
+            }
+            (Value::Array(elements), "repeated_combination", [Value::Integer(size)]) => {
+                Value::array(combinations(elements, *size, true))
+            }
+            (Value::Array(elements), "permutation", []) => {
+                Value::array(permutations(elements, elements.len() as i64, false))
+            }
+            (Value::Array(elements), "permutation", [Value::Integer(size)]) => {
+                Value::array(permutations(elements, *size, false))
+            }
+            (Value::Array(elements), "repeated_permutation", [Value::Integer(size)]) => {
+                Value::array(permutations(elements, *size, true))
+            }
+            (Value::Array(elements), "product", others) => Value::array(product(elements, others)),
+            // `cycle` takes a count here (`cycle/1&` in the table): a cycle
+            // with no count never ends, so the unbounded form refuses on its
+            // arity rather than hang. A negative or zero count walks
+            // nothing, as Ruby's does.
+            (Value::Array(elements), "cycle", [Value::Integer(count)]) => {
+                Value::array(cycled(elements, *count))
+            }
+            (Value::Array(_), "bsearch" | "bsearch_index", []) => {
+                refusal("arguments");
+                panic!("{name} needs a block — there are no enumerators to hand back")
+            }
+            (Value::Range { .. }, "bsearch", []) => {
+                refusal("arguments");
+                panic!("bsearch needs a block — there are no enumerators to hand back")
+            }
             (Value::Array(elements), "rotate", []) => rotated(elements, 1),
             (Value::Array(elements), "rotate", [Value::Integer(count)]) => {
                 rotated(elements, *count)

@@ -998,6 +998,7 @@ def symbol_text_answer(text, name, arguments)
   when "name", "id2name" then text
   when "length", "size" then text.length
   when "empty?" then text.empty?
+  when "slice" then text.slice(value_at(arguments, 0), value_at(arguments, 1))
   when "start_with?" then arguments.any? { |prefix| text.start_with?(prefix) }
   else arguments.any? { |suffix| text.end_with?(suffix) }
   end
@@ -1557,7 +1558,22 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return outcome([Integer.sqrt(value_at(arguments, 0))], bindings)
   end
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
+  return outcome([range_new(arguments)], bindings) if type_name == "Range" && node.name == "new"
   panic("#{type_name} has no #{node.name}")
+end
+
+# `Range.new(first, last)` and `Range.new(first, last, true)` (#111, ADR
+# 0058): the literal's two spellings as a function; either end may be nil.
+# Ends of any other kind wait on ranges over other orderables (#149).
+def range_new(arguments)
+  panic("Range.new takes 2 or 3 arguments, got #{arguments.length}") unless arguments.length == 2 || arguments.length == 3
+  exclusive = arguments.length == 3 ? value_at(arguments, 2) : false
+  panic("Range.new takes true or false for exclusive, got #{render_inspect(exclusive)}") unless exclusive in Boolean
+  arguments.slice(0, 2).each do |end_value|
+    next if end_value.nil? || (end_value in Integer)
+    panic("Range.new takes integer ends here, got #{render_inspect(end_value)} — ranges over other orderables are undecided (#149)")
+  end
+  build_range(value_at(arguments, 0), value_at(arguments, 1), exclusive)
 end
 
 def evaluate_array_new(node, arguments, mutable bindings)
@@ -1675,6 +1691,62 @@ def struct_with(instance, keyword_values)
   ["__struct__", value_at(instance, 1), updated]
 end
 
+# `product` (#104): every way to take one element from each array in
+# turn, the host's arm folded over the arguments one array at a time.
+def product_of(elements, others)
+  mutable combined = elements.map { [it] }
+  others.each do |other|
+    panic("no implicit conversion of #{type_at(builtin_type_of(other), 0).capitalize} into Array") unless plain_array?(other)
+    combined = combined.flat_map { |prefix| other.map { |choice| prefix + [choice] } }
+  end
+  combined
+end
+
+# Ruby's binary search (#104, #111) over `count` positions, the element at
+# each read from `values` — a host array, or a range's start plus the
+# position: the block answering true, false, or nil finds the first
+# position it accepts; answering a number finds a position it calls zero,
+# a negative sending the search left. Answers [position or nil, scope,
+# interrupt] so the caller can thread the block's rebindings.
+def binary_search(values, count, ranged, block, entry, mutable scope)
+  mutable low = 0
+  mutable high = count
+  mutable satisfied = false
+  mutable found = nil
+  mutable interrupt = nil
+  while low < high && found.nil? && interrupt.nil?
+    middle = low + (high - low) / 2
+    element = ranged ? values.begin + middle : values[middle]
+    step = run_guest_block(block, [element], scope)
+    scope = compacted_since(entry, step.bindings)
+    if step.signal != "none"
+      interrupt = step
+    else
+      verdict = step.value.empty? ? nil : slot_value(step.value)
+      smaller = if verdict == true
+        satisfied = true
+        true
+      elsif verdict == false || verdict.nil?
+        false
+      elsif (verdict in Integer) || (builtin_type_of(verdict).nil? && !(verdict in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *]))
+        # The host's patterns cannot name a float, so a value the table
+        # cannot name and no tag claims is one.
+        found = middle if verdict == 0
+        verdict < 0
+      else
+        panic("wrong argument type #{type_at(builtin_type_of(verdict), 0).capitalize} (must be numeric, true, false or nil)")
+      end
+      if smaller
+        high = middle
+      else
+        low = middle + 1
+      end
+    end
+  end
+  found = low if found.nil? && satisfied && interrupt.nil?
+  [found, scope, interrupt]
+end
+
 def struct_has_field?(instance, field)
   pairs = value_at(instance, 2)
   pairs.any? { it[0] == field }
@@ -1767,7 +1839,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Integer].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Integer Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
@@ -1869,7 +1941,7 @@ def evaluate_method_call(node, mutable bindings)
   end
   # A symbol answers Ruby's text queries about its name (#112), the seed's
   # arm: a guest symbol is a tagged host array, so its name answers instead.
-  if (receiver in ["__symbol__", *]) && %w[empty? end_with? id2name length name size start_with?].include?(node.name)
+  if (receiver in ["__symbol__", *]) && %w[empty? end_with? id2name length name size slice start_with?].include?(node.name)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([symbol_text_answer(value_at(receiver, 1), node.name, arguments)], bindings)
   end
@@ -1887,6 +1959,15 @@ def evaluate_method_call(node, mutable bindings)
   # when a tagless receiver has no `to_s` of its own.
   when "to_s" then to_s_of(receiver, arguments)
   when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(value_at(arguments, 0))
+  # Ruby's combinatorics (#104) ride the host's arms; `product` takes any
+  # number of arrays, folded one at a time; a count-less `cycle` refuses.
+  when "combination" then receiver.combination(value_at(arguments, 0))
+  when "repeated_combination" then receiver.repeated_combination(value_at(arguments, 0))
+  when "permutation" then arguments.empty? ? receiver.permutation : receiver.permutation(value_at(arguments, 0))
+  when "repeated_permutation" then receiver.repeated_permutation(value_at(arguments, 0))
+  when "product" then product_of(receiver, arguments)
+  when "cycle" then receiver.cycle(value_at(arguments, 0))
+  when "bsearch", "bsearch_index" then panic("#{node.name} needs a block — there are no enumerators to hand back")
   when "values_at" then values_at_of(receiver, arguments)
   when "at" then receiver.at(value_at(arguments, 0))
   when "assoc" then receiver.assoc(value_at(arguments, 0))
@@ -2309,6 +2390,59 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       return block_interrupted(interrupt, scope) if interrupt.some?
       return outcome([built], scope)
     end
+  end
+  # Ruby's combinatorics with a block (#104): the host's arrangements handed
+  # over in turn, the array answered — nil for `cycle`, as Ruby's.
+  # `cycle` is Enumerable's, so a hash walks it as its pairs and a range as
+  # its integers; the rest are the array's own.
+  combinatoric = (receiver in Array) && %w[combination repeated_combination permutation repeated_permutation product cycle].include?(node.name)
+  cycling = node.name == "cycle" && !(receiver in String) && !(receiver in Integer) && !(receiver in Boolean) && !(receiver in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *])
+  if combinatoric || cycling
+    # A cycle with no count never ends; the table's arity (`cycle/1&`)
+    # refuses it before this arm, with the seed's sentence.
+    check_builtin_count(receiver, node.name, arguments.length)
+    elements = (receiver in Array) ? receiver : receiver.to_a
+    arrangements = case node.name
+    when "combination" then elements.combination(value_at(arguments, 0))
+    when "repeated_combination" then elements.repeated_combination(value_at(arguments, 0))
+    when "permutation" then arguments.empty? ? elements.permutation : elements.permutation(value_at(arguments, 0))
+    when "repeated_permutation" then elements.repeated_permutation(value_at(arguments, 0))
+    when "product" then product_of(elements, arguments)
+    else elements.cycle(value_at(arguments, 0))
+    end
+    arrangements.each do |arrangement|
+      step = run_guest_block(block, [arrangement], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    return outcome([nil], scope) if node.name == "cycle"
+    return outcome([receiver], scope)
+  end
+  # Binary search (#104, #111), over an array's elements or a bounded
+  # range's integers.
+  # The host's patterns cannot name a range, so what is not an array is
+  # one: the seed answers these two names on arrays and ranges only.
+  if %w[bsearch bsearch_index].include?(node.name) && !(receiver in String) && !(receiver in Hash)
+    ranged = !(receiver in Array)
+    count = if ranged
+      panic("a range without both ends cannot be searched — give it a start and an end") if receiver.begin.nil? || receiver.end.nil?
+      last = receiver.exclude_end? ? receiver.end - 1 : receiver.end
+      [last - receiver.begin + 1, 0].max
+    else
+      receiver.length
+    end
+    searched = binary_search(receiver, count, ranged, block, entry, scope)
+    scope = value_at(searched, 1)
+    interrupted = value_at(searched, 2)
+    return block_interrupted(interrupted, scope) unless interrupted.nil?
+    position = value_at(searched, 0)
+    return outcome([nil], scope) if position.nil?
+    return outcome([position], scope) if node.name == "bsearch_index"
+    return outcome([ranged ? receiver.begin + position : receiver[position]], scope)
   end
   case node.name
   when "each", "each_pair"

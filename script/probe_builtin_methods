@@ -53,6 +53,7 @@ candidates = %w[
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
   chop delete_prefix delete_suffix partition rpartition rindex casecmp casecmp? each_line codepoints bytesize
   each_byte each_codepoint each_grapheme_cluster grapheme_clusters
+  bsearch bsearch_index combination permutation product repeated_combination repeated_permutation cycle
   take drop take_while drop_while rotate values_at each_index push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
   fetch values_at transform_values transform_keys invert key has_value? value? slice except compact each_key each_value to_h
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv begin end exclude_end? cover? overlap?

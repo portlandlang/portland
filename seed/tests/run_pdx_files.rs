@@ -1830,6 +1830,39 @@ fn a_structs_views_and_walks_match_ruby() {
     assert_both_oracles_refuse("struct_views_refusal.pdx", None, &cases);
 }
 
+/// Ruby's combinatorics, `cycle`, and binary search on arrays and ranges
+/// (#104, #111), the expected lines Ruby 4.0.7's: `combination`,
+/// `repeated_combination`, `permutation`, `repeated_permutation`, and
+/// `product` answer their arrangements without a block and hand them over
+/// with one; `cycle` takes a count; `bsearch` and `bsearch_index` run
+/// Ruby's two modes; `Range.new` is the literal as a function (ADR 0058);
+/// a symbol slices its name. The refusals name a count-less cycle, a
+/// block answer of the wrong kind, and a non-integer range end.
+#[test]
+fn combinatorics_and_binary_search_match_ruby() {
+    assert_both_print(
+        "evaluator_combinatorics.pdx",
+        "p([1, 2, 3].combination(2))\np([1, 2, 3, 4].combination(5))\np([1, 2, 3].combination(0))\np([1, 2, 3].permutation(2))\np([1, 2, 3].permutation.length)\np([].permutation)\np([1, 2].repeated_permutation(2))\np([1, 2, 3].repeated_combination(2))\np([1, 2].product([3, 4], [6, 8]))\np([1, 2].product)\np([1, 2].product([]))\np([1, 2, 3].cycle(2))\np([1, 2, 3].cycle(0))\np([].cycle(6))\np([0, 1, 3, 4].bsearch { |x| x >= 2 })\np([0, 1, 2, 3].bsearch { |x| x > 3 })\np([0, 1, 3, 4].bsearch { |x| x <=> 2 })\np([0, 4, 7, 10, 12].bsearch_index { |x| x >= 6 })\np([0, 4, 7, 10, 12].bsearch_index { |x| 1 - x / 4 })\np((0..4).bsearch { |x| x >= 2 })\np((0...3).bsearch { |x| x > 3 })\np((-2..4).bsearch { |x| x < 4 })\np((0...0).bsearch { true })\np((4..2).bsearch { 1 })\np(Range.new(1, 3))\np(Range.new(1, 3, true).to_a)\np(Range.new(nil, 1).begin)\np(:symbol.slice(1, 3))\np(:symbol.slice(-3, 2))\nmutable seen = []\n[1, 2, 3].combination(2) { |pair| seen = seen + [pair] }\np(seen)\np([1, 2].cycle(2) { })\np([1, 2].product([3]) { })\n",
+        "[[1, 2], [1, 3], [2, 3]]\n[]\n[[]]\n[[1, 2], [1, 3], [2, 1], [2, 3], [3, 1], [3, 2]]\n6\n[[]]\n[[1, 1], [1, 2], [2, 1], [2, 2]]\n[[1, 1], [1, 2], [1, 3], [2, 2], [2, 3], [3, 3]]\n[[1, 3, 6], [1, 3, 8], [1, 4, 6], [1, 4, 8], [2, 3, 6], [2, 3, 8], [2, 4, 6], [2, 4, 8]]\n[[1], [2]]\n[]\n[1, 2, 3, 1, 2, 3]\n[]\n[]\n3\nnil\nnil\n2\n2\n2\nnil\n-2\nnil\nnil\n1..3\n[1, 2]\nnil\n\"ymb\"\n\"bo\"\n[[1, 2], [1, 3], [2, 3]]\nnil\n[1, 2]\n",
+    );
+    let cases = [
+        ("p([1, 2].cycle)\n", "'cycle' takes 1 argument, got 0"),
+        (
+            "p([1, 2].cycle { it })\n",
+            "'cycle' takes 1 argument, got 0",
+        ),
+        (
+            "p([1].bsearch { \"1\" })\n",
+            "wrong argument type String (must be numeric, true, false or nil)",
+        ),
+        (
+            "p(Range.new(\"a\", \"c\"))\n",
+            "ranges over other orderables are undecided (#149)",
+        ),
+    ];
+    assert_both_oracles_refuse("combinatorics_refusal.pdx", None, &cases);
+}
+
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
 /// (4.0.6, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its
