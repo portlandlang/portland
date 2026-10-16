@@ -2,6 +2,12 @@
 # the limit is negative, a positive limit caps the pieces, `" "` or no
 # separator splits on runs of whitespace, and `""` splits into characters.
 # Every expected value is Ruby 4.0.7's answer for the same call.
+#
+# The rows below the house examples are from ruby/spec
+# core/string/split_spec.rb, "with String". The regex rows and the block
+# form wait on #74; the to_str and to_int conversions (ADR 0036), $;,
+# subclasses, encodings, the NUL row, and the invalid-string refusals stay
+# upstream.
 
 require_relative "../spec_helper"
 
@@ -47,5 +53,120 @@ context "Array" do
       expect(["a", "b"].join).to eq("ab")
       expect([1, 2].join).to eq("12")
     end
+  end
+end
+
+context "String#split with String" do
+  specify "splits on multibyte characters" do
+    expect("ありがりがとう".split("が")).to eq(["あり", "り", "とう"])
+  end
+
+  specify "returns an array of substrings based on splitting on the given string" do
+    expect("mellow yellow".split("ello")).to eq(["m", "w y", "w"])
+  end
+
+  specify "suppresses trailing empty fields when limit isn't given or 0" do
+    expect("1,2,,3,4,,".split(",")).to eq(["1", "2", "", "3", "4"])
+    expect("1,2,,3,4,,".split(",", 0)).to eq(["1", "2", "", "3", "4"])
+    expect("  a  b  c\nd  ".split("  ")).to eq(["", "a", "b", "c\nd"])
+    expect("  a  あ  c\nd  ".split("  ")).to eq(["", "a", "あ", "c\nd"])
+    expect("hai".split("hai")).to eq([])
+    expect(",".split(",")).to eq([])
+    expect(",".split(",", 0)).to eq([])
+    expect("あ".split("あ")).to eq([])
+    expect("あ".split("あ", 0)).to eq([])
+  end
+
+  specify "does not suppress trailing empty fields when a positive limit is given" do
+    expect(" 1 2 ".split(" ", 2)).to eq(["1", "2 "])
+    expect(" 1 2 ".split(" ", 3)).to eq(["1", "2", ""])
+    expect(" 1 2 ".split(" ", 4)).to eq(["1", "2", ""])
+    expect(" 1 あ ".split(" ", 2)).to eq(["1", "あ "])
+    expect(" 1 あ ".split(" ", 3)).to eq(["1", "あ", ""])
+    expect(" 1 あ ".split(" ", 4)).to eq(["1", "あ", ""])
+
+    expect("1,2,".split(",", 2)).to eq(["1", "2,"])
+    expect("1,2,".split(",", 3)).to eq(["1", "2", ""])
+    expect("1,2,".split(",", 4)).to eq(["1", "2", ""])
+    expect("1,あ,".split(",", 2)).to eq(["1", "あ,"])
+    expect("1,あ,".split(",", 3)).to eq(["1", "あ", ""])
+    expect("1,あ,".split(",", 4)).to eq(["1", "あ", ""])
+  end
+
+  specify "returns an array with one entry if limit is 1: the original string" do
+    expect("hai".split("hai", 1)).to eq(["hai"])
+    expect("x.y.z".split(".", 1)).to eq(["x.y.z"])
+    expect("hello world ".split(" ", 1)).to eq(["hello world "])
+    expect("hi!".split("", 1)).to eq(["hi!"])
+  end
+
+  specify "returns at most limit fields when limit > 1" do
+    expect("hai".split("hai", 2)).to eq(["", ""])
+
+    expect("1,2".split(",", 3)).to eq(["1", "2"])
+
+    expect("1,2,,3,4,,".split(",", 2)).to eq(["1", "2,,3,4,,"])
+    expect("1,2,,3,4,,".split(",", 3)).to eq(["1", "2", ",3,4,,"])
+    expect("1,2,,3,4,,".split(",", 4)).to eq(["1", "2", "", "3,4,,"])
+    expect("1,2,,3,4,,".split(",", 5)).to eq(["1", "2", "", "3", "4,,"])
+    expect("1,2,,3,4,,".split(",", 6)).to eq(["1", "2", "", "3", "4", ","])
+
+    expect("x".split("x", 2)).to eq(["", ""])
+    expect("xx".split("x", 2)).to eq(["", "x"])
+    expect("xx".split("x", 3)).to eq(["", "", ""])
+    expect("xxx".split("x", 2)).to eq(["", "xx"])
+    expect("xxx".split("x", 3)).to eq(["", "", "x"])
+    expect("xxx".split("x", 4)).to eq(["", "", "", ""])
+  end
+
+  specify "doesn't suppress or limit fields when limit is negative" do
+    expect("1,2,,3,4,,".split(",", -1)).to eq(["1", "2", "", "3", "4", "", ""])
+    expect("1,2,,3,4,,".split(",", -5)).to eq(["1", "2", "", "3", "4", "", ""])
+    expect("  a  b  c\nd  ".split("  ", -1)).to eq(["", "a", "b", "c\nd", ""])
+    expect(",".split(",", -1)).to eq(["", ""])
+  end
+
+  specify "ignores leading and continuous whitespace when string is a single space" do
+    expect(" now's  the time  ".split(" ")).to eq(["now's", "the", "time"])
+    expect(" now's  the time  ".split(" ", -1)).to eq(["now's", "the", "time", ""])
+    expect(" now's  the time  ".split(" ", 3)).to eq(["now's", "the", "time  "])
+    expect("\t\n a\t\tb \n\r\r\nc d ".split(" ")).to eq(["a", "b", "c", "d"])
+  end
+
+  describe "when limit is zero" do
+    specify "ignores leading and continuous whitespace when string is a single space" do
+      expect(" now's  the time  ".split(" ", 0)).to eq(["now's", "the", "time"])
+    end
+  end
+
+  specify "splits between characters when its argument is an empty string" do
+    expect("hi!".split("")).to eq(["h", "i", "!"])
+    expect("hi!".split("", -1)).to eq(["h", "i", "!", ""])
+    expect("hi!".split("", 0)).to eq(["h", "i", "!"])
+    expect("hi!".split("", 1)).to eq(["hi!"])
+    expect("hi!".split("", 2)).to eq(["h", "i!"])
+    expect("hi!".split("", 3)).to eq(["h", "i", "!"])
+    expect("hi!".split("", 4)).to eq(["h", "i", "!", ""])
+    expect("hi!".split("", 5)).to eq(["h", "i", "!", ""])
+  end
+
+  specify "returns the original string if no matches are found" do
+    expect("foo".split("bar")).to eq(["foo"])
+    expect("foo".split("bar", -1)).to eq(["foo"])
+    expect("foo".split("bar", 0)).to eq(["foo"])
+    expect("foo".split("bar", 1)).to eq(["foo"])
+    expect("foo".split("bar", 2)).to eq(["foo"])
+    expect("foo".split("bar", 3)).to eq(["foo"])
+  end
+
+  specify "returns an empty array when whitespace is split on whitespace" do
+    expect(" ".split(" ")).to eq([])
+    expect(" \n ".split(" ")).to eq([])
+    expect("  ".split(" ")).to eq([])
+    expect(" \t ".split(" ")).to eq([])
+  end
+
+  specify "doesn't split on non-ascii whitespace" do
+    expect("a　b".split(" ")).to eq(["a　b"])
   end
 end

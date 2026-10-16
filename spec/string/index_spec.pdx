@@ -19,3 +19,20 @@ context "String" do
     end
   end
 end
+
+# From ruby/spec core/string/element_reference_spec.rb's shared slice rows
+# for one index; the to_int conversion, the refusals, and the bignum row
+# stay upstream.
+context "String#[]" do
+  specify "returns the character code of the character at the given index" do
+    expect("hello"[0]).to eq("h")
+    expect("hello"[-1]).to eq("o")
+  end
+
+  specify "returns nil if index is outside of self" do
+    expect("hello"[20]).to be_nil
+    expect("hello"[-20]).to be_nil
+    expect(""[0]).to be_nil
+    expect(""[-1]).to be_nil
+  end
+end

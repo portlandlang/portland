@@ -1,5 +1,13 @@
-# `slice` takes a start and a length. The range spelling lives in
-# spec/range/slicing_spec.pdx, since there the range is the subject.
+# `slice` takes a start and a length. The range spelling's house examples
+# live in spec/range/slicing_spec.pdx, since there the range is the subject;
+# its ruby/spec rows are below.
+#
+# From ruby/spec core/string/{slice,element_reference}_spec.rb and the
+# shared slice rows. A slice is a collection, never a maybe (ADR 0019): where
+# Ruby answers nil for a start outside the string, Portland answers the
+# empty string, and those rows are reworded. A negative length refuses. The
+# to_int conversions (ADR 0036), the bignum rows, subclasses, encodings,
+# slice! (ADR 0015), and the regex and string-pattern rows stay upstream.
 
 require_relative "../spec_helper"
 
@@ -12,5 +20,156 @@ context "String" do
     specify "stops at the end rather than running past it" do
       expect("portland".slice(5, 99)).to eq("and")
     end
+  end
+end
+
+context "String#slice with index, length" do
+  specify "returns the substring starting at the given index with the given length" do
+    expect("hello there".slice(0, 0)).to eq("")
+    expect("hello there".slice(0, 1)).to eq("h")
+    expect("hello there".slice(0, 3)).to eq("hel")
+    expect("hello there".slice(0, 6)).to eq("hello ")
+    expect("hello there".slice(0, 9)).to eq("hello the")
+    expect("hello there".slice(0, 12)).to eq("hello there")
+
+    expect("hello there".slice(1, 0)).to eq("")
+    expect("hello there".slice(1, 1)).to eq("e")
+    expect("hello there".slice(1, 3)).to eq("ell")
+    expect("hello there".slice(1, 6)).to eq("ello t")
+    expect("hello there".slice(1, 9)).to eq("ello ther")
+    expect("hello there".slice(1, 12)).to eq("ello there")
+
+    expect("hello there".slice(3, 0)).to eq("")
+    expect("hello there".slice(3, 1)).to eq("l")
+    expect("hello there".slice(3, 3)).to eq("lo ")
+    expect("hello there".slice(3, 6)).to eq("lo the")
+    expect("hello there".slice(3, 9)).to eq("lo there")
+
+    expect("hello there".slice(4, 0)).to eq("")
+    expect("hello there".slice(4, 3)).to eq("o t")
+    expect("hello there".slice(4, 6)).to eq("o ther")
+    expect("hello there".slice(4, 9)).to eq("o there")
+
+    expect("foo".slice(2, 1)).to eq("o")
+    expect("foo".slice(3, 0)).to eq("")
+    expect("foo".slice(3, 1)).to eq("")
+
+    expect("".slice(0, 0)).to eq("")
+    expect("".slice(0, 1)).to eq("")
+
+    expect("x".slice(0, 0)).to eq("")
+    expect("x".slice(0, 1)).to eq("x")
+    expect("x".slice(1, 0)).to eq("")
+    expect("x".slice(1, 1)).to eq("")
+    expect("x".slice(-1, 0)).to eq("")
+    expect("x".slice(-1, 1)).to eq("x")
+
+    expect("hello there".slice(-3, 2)).to eq("er")
+  end
+
+  specify "answers the empty string if the offset falls outside of self — never nil (ADR 0019)" do
+    expect("hello there".slice(20, 3)).to eq("")
+    expect("hello there".slice(-20, 3)).to eq("")
+
+    expect("".slice(1, 0)).to eq("")
+    expect("".slice(1, 1)).to eq("")
+    expect("".slice(-1, 0)).to eq("")
+    expect("".slice(-1, 1)).to eq("")
+
+    expect("x".slice(2, 0)).to eq("")
+    expect("x".slice(2, 1)).to eq("")
+    expect("x".slice(-2, 0)).to eq("")
+    expect("x".slice(-2, 1)).to eq("")
+  end
+
+  specify "handles repeated application" do
+    expect("hello world".slice(6, 5).slice(0, 1)).to eq("w")
+    expect("hello world".slice(6, 5).slice(0, 5)).to eq("world")
+    expect("hello world".slice(6, 5).slice(1, 1)).to eq("o")
+    expect("hello world".slice(6, 5).slice(1, 4)).to eq("orld")
+    expect("hello world".slice(6, 5).slice(4, 1)).to eq("d")
+    expect("hello world".slice(6, 5).slice(5, 0)).to eq("")
+    expect("hello world".slice(6, 0).slice(-1, 0)).to eq("")
+    expect("hello world".slice(6, 0).slice(1, 1)).to eq("")
+  end
+end
+
+context "String#[] with Range" do
+  specify "returns the substring given by the offsets of the range" do
+    expect("hello there"[1..1]).to eq("e")
+    expect("hello there"[1..3]).to eq("ell")
+    expect("hello there"[1...3]).to eq("el")
+    expect("hello there"[-4..-2]).to eq("her")
+    expect("hello there"[-4...-2]).to eq("he")
+    expect("hello there"[5..-1]).to eq(" there")
+    expect("hello there"[5...-1]).to eq(" ther")
+
+    expect(""[0..0]).to eq("")
+
+    expect("x"[0..0]).to eq("x")
+    expect("x"[0..1]).to eq("x")
+    expect("x"[0...1]).to eq("x")
+    expect("x"[0..-1]).to eq("x")
+    expect("x"[1..1]).to eq("")
+    expect("x"[1..-1]).to eq("")
+  end
+
+  specify "answers the empty string if the beginning of the range falls past the end — never nil (ADR 0019)" do
+    expect("hello there"[12..-1]).to eq("")
+    expect("hello there"[20..25]).to eq("")
+    expect("hello there"[20..1]).to eq("")
+
+    expect(""[-1..-1]).to eq("")
+    expect(""[-1...-1]).to eq("")
+    expect(""[-1..0]).to eq("")
+    expect(""[-1...0]).to eq("")
+  end
+
+  specify "clamps a beginning before the start to the start, as an array's does (ADR 0019)" do
+    expect("hello there"[-20..1]).to eq("he")
+    expect("hello there"[-20..-1]).to eq("hello there")
+  end
+
+  specify "returns an empty string if range.begin is inside self and > real end" do
+    expect("hello there"[1...1]).to eq("")
+    expect("hello there"[4..2]).to eq("")
+    expect("hello"[4..-4]).to eq("")
+    expect("hello there"[-5..-6]).to eq("")
+    expect("hello there"[-2..-4]).to eq("")
+    expect("hello there"[-5..2]).to eq("")
+
+    expect(""[0...0]).to eq("")
+    expect(""[0..-1]).to eq("")
+    expect(""[0...-1]).to eq("")
+
+    expect("x"[0...0]).to eq("")
+    expect("x"[0...-1]).to eq("")
+    expect("x"[1...1]).to eq("")
+    expect("x"[1...-1]).to eq("")
+  end
+
+  specify "handles repeated application" do
+    expect("hello world"[6..11][0..0]).to eq("w")
+    expect("hello world"[6..11][0..4]).to eq("world")
+    expect("hello world"[6..11][1..1]).to eq("o")
+    expect("hello world"[6..11][1..4]).to eq("orld")
+    expect("hello world"[6..11][4..4]).to eq("d")
+    expect("hello world"[6..11][5..4]).to eq("")
+    expect("hello world"[6..5][-1..-1]).to eq("")
+    expect("hello world"[6..5][1..1]).to eq("")
+  end
+
+  specify "works with endless ranges" do
+    expect("hello there"[2..]).to eq("llo there")
+    expect("hello there"[2...]).to eq("llo there")
+    expect("hello there"[-4..]).to eq("here")
+    expect("hello there"[-4...]).to eq("here")
+  end
+
+  specify "works with beginless ranges" do
+    expect("hello there"[..5]).to eq("hello ")
+    expect("hello there"[...5]).to eq("hello")
+    expect("hello there"[..-4]).to eq("hello th")
+    expect("hello there"[...-4]).to eq("hello t")
   end
 end

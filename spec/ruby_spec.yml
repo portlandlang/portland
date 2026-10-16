@@ -1408,6 +1408,11 @@ core/string/each_line_spec.rb:
   status: partial_planned
   reason: "each_line takes no separator or chomp argument yet; without a block it is an enumerator in Ruby and nothing here."
   link: https://github.com/portlandlang/portland/issues/106
+core/string/element_reference_spec.rb:
+  pdx: [spec/string/index_spec.pdx, spec/string/slice_spec.pdx]
+  status: partial_intentional
+  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the regex and string-pattern rows wait on the regex decision (#74)."
+  link: docs/ruby/ranges.md
 core/string/empty_spec.rb:
   pdx: [spec/string/empty_spec.pdx]
 core/string/end_with_spec.rb:
@@ -1477,6 +1482,16 @@ core/string/rstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 core/string/size_spec.rb:
   pdx: [spec/string/length_spec.pdx]
+core/string/slice_spec.rb:
+  pdx: [spec/string/index_spec.pdx, spec/string/slice_spec.pdx]
+  status: partial_intentional
+  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; slice! is a mutator (ADR 0015); the regex and string-pattern rows wait on the regex decision (#74)."
+  link: docs/ruby/ranges.md
+core/string/split_spec.rb:
+  pdx: [spec/string/split_spec.pdx]
+  status: partial_planned
+  reason: "The regex rows and the block form wait on the regex decision."
+  link: https://github.com/portlandlang/portland/issues/74
 core/string/start_with_spec.rb:
   pdx: [spec/string/predicates_spec.pdx]
   status: partial_planned
@@ -1496,6 +1511,8 @@ core/string/swapcase_spec.rb:
   status: partial_intentional
   reason: "Casing is full Unicode, locale-independent (ADR 0038): the :ascii, :turkic, :lithuanian, and :fold options are decided out."
   link: docs/ruby/characters.md
+core/string/to_f_spec.rb:
+  pdx: [spec/string/conversion_spec.pdx]
 core/string/to_s_spec.rb:
   pdx: [spec/string/conversion_spec.pdx]
 core/string/to_str_spec.rb:

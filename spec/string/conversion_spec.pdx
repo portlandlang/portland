@@ -20,6 +20,142 @@ context "String" do
   end
 end
 
+# From ruby/spec core/string/to_f_spec.rb: Ruby's rule, which never fails.
+# The non-printable and encoding rows stay upstream, and "1.e-2" is Ruby
+# 4.0's answer (bug #20705 fixed).
+context "String#to_f" do
+  specify "treats leading characters of self as a floating point number" do
+    expect("123.45e1".to_f).to eq(1234.5)
+    expect("45.67 degrees".to_f).to eq(45.67)
+    expect("0".to_f).to eq(0.0)
+    expect(".5".to_f).to eq(0.5)
+    expect(".5e1".to_f).to eq(5.0)
+    expect("5.".to_f).to eq(5.0)
+    expect("5e".to_f).to eq(5.0)
+    expect("5E".to_f).to eq(5.0)
+  end
+
+  specify "treats special float value strings as characters" do
+    expect("NaN".to_f).to eq(0)
+    expect("Infinity".to_f).to eq(0)
+    expect("-Infinity".to_f).to eq(0)
+  end
+
+  specify "allows for varying case" do
+    expect("123.45e1".to_f).to eq(1234.5)
+    expect("123.45E1".to_f).to eq(1234.5)
+  end
+
+  specify "allows for varying signs" do
+    expect("+123.45e1".to_f).to eq(+123.45e1)
+    expect("-123.45e1".to_f).to eq(-123.45e1)
+    expect("123.45e+1".to_f).to eq(123.45e+1)
+    expect("123.45e-1".to_f).to eq(123.45e-1)
+    expect("+123.45e+1".to_f).to eq(+123.45e+1)
+    expect("+123.45e-1".to_f).to eq(+123.45e-1)
+    expect("-123.45e+1".to_f).to eq(-123.45e+1)
+    expect("-123.45e-1".to_f).to eq(-123.45e-1)
+  end
+
+  specify "allows for underscores, even in the decimal side" do
+    expect("1_234_567.890_1".to_f).to eq(1_234_567.890_1)
+  end
+
+  specify "returns 0 for strings with leading underscores" do
+    expect("_9".to_f).to eq(0)
+  end
+
+  specify "stops if the underscore is not followed by a number" do
+    expect("1__2".to_f).to eq(1.0)
+    expect("1_x2".to_f).to eq(1.0)
+    expect("1.2__3".to_f).to eq(1.2)
+    expect("1.2_x3".to_f).to eq(1.2)
+    expect("1.2e__3".to_f).to eq(1.2)
+    expect("1.2e_x3".to_f).to eq(1.2)
+  end
+
+  specify "stops if the number contains invalid characters" do
+    expect("1x_2".to_f).to eq(1.0)
+    expect("1.2x_3".to_f).to eq(1.2)
+    expect("1.2ex_3".to_f).to eq(1.2)
+  end
+
+  specify "stops if +/- is not followed by a number" do
+    expect("+_1".to_f).to eq(0.0)
+    expect("-_1".to_f).to eq(0.0)
+    expect("+a1".to_f).to eq(0.0)
+    expect("1.1e+_1".to_f).to eq(1.1)
+    expect("1.1e-_1".to_f).to eq(1.1)
+    expect("1.1e-a1".to_f).to eq(1.1)
+  end
+
+  specify "stops if the underscore appears at boundaries" do
+    expect("1_.2".to_f).to eq(1.0)
+    expect("1._2".to_f).to eq(1.0)
+    expect("1.2_e3".to_f).to eq(1.2)
+    expect("1.2e_3".to_f).to eq(1.2)
+  end
+
+  specify "does not allow prefixes to autodetect the base" do
+    expect("0b10".to_f).to eq(0)
+    expect("010".to_f).to eq(10)
+    expect("0o10".to_f).to eq(0)
+    expect("0d10".to_f).to eq(0)
+    expect("0x10".to_f).to eq(0)
+  end
+
+  specify "treats any non-numeric character other than '.', 'e' and '_' as terminals" do
+    expect("blah".to_f).to eq(0)
+    expect("1b5".to_f).to eq(1)
+    expect("1d5".to_f).to eq(1)
+    expect("1o5".to_f).to eq(1)
+    expect("1xx5".to_f).to eq(1)
+    expect("x5".to_f).to eq(0)
+  end
+
+  specify "takes an optional sign" do
+    expect("-45.67 degrees".to_f).to eq(-45.67)
+    expect("+45.67 degrees".to_f).to eq(45.67)
+    expect("-5_5e-5_0".to_f).to eq(-55e-50)
+    expect("-".to_f).to eq(0.0)
+    expect((1.0 / "-0".to_f).to_s).to eq("-Infinity")
+  end
+
+  specify "treats a second 'e' as terminal" do
+    expect("1.234e1e2".to_f).to eq(1.234e1)
+  end
+
+  specify "treats a second '.' as terminal" do
+    expect("1.2.3".to_f).to eq(1.2)
+  end
+
+  specify "treats a '.' after an 'e' as terminal" do
+    expect("1.234e1.9".to_f).to eq(1.234e1)
+  end
+
+  specify "returns 0.0 if the conversion fails" do
+    expect("bad".to_f).to eq(0.0)
+    expect("thx1138".to_f).to eq(0.0)
+  end
+
+  specify "ignores leading and trailing whitespace" do
+    expect("  1.2".to_f).to eq(1.2)
+    expect("1.2  ".to_f).to eq(1.2)
+    expect(" 1.2 ".to_f).to eq(1.2)
+    expect("\t1.2".to_f).to eq(1.2)
+    expect("\n1.2".to_f).to eq(1.2)
+    expect("\r1.2".to_f).to eq(1.2)
+  end
+
+  specify "allows String representation without a fractional part" do
+    expect("1.".to_f).to eq(1.0)
+    expect("+1.".to_f).to eq(1.0)
+    expect("-1.".to_f).to eq(-1.0)
+    expect("1.e+0".to_f).to eq(1.0)
+    expect("1.e-2".to_f).to eq(0.01)
+  end
+end
+
 # From ruby/spec core/string/to_s_spec.rb; the identity check and the
 # subclass row stay upstream.
 context "String#to_s" do
