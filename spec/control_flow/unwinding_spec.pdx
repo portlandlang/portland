@@ -49,3 +49,82 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/return_spec.rb, the rows a method can carry
+# here: the lambda rows wait on the proc question (#77), the ensure rows
+# have no begin to attach to, splats are deferred (ADR 0014), there are no
+# threads, loaded files, or define_method, and a bare `return` answers no
+# value rather than nil — reading it refuses (ADR 0012), so the default row
+# stays upstream. Declarations sit at the top level. (language/break_spec.rb's block rows break out of a method's
+# own yield, which neither implementation unwinds yet — #166.)
+def returns_one
+  return 1
+end
+
+def returns_a_single_element_array
+  return [1]
+end
+
+def returns_a_multi_element_array
+  return [1, 2]
+end
+
+def returns_through_two_blocks
+  [1].each do
+    [1].each do
+      return true
+    end
+    false
+  end
+  false
+end
+
+def returns_within_if
+  mutable seen = ["before if"]
+  if true
+    return seen
+  end
+  seen << "after if"
+  seen
+end
+
+def returns_within_while
+  mutable seen = ["before while"]
+  while true
+    return seen
+  end
+  seen << "after while"
+  seen
+end
+
+context "The return keyword" do
+  specify "returns any object directly" do
+    expect(returns_one).to eq(1)
+  end
+
+  specify "returns an single element array directly" do
+    expect(returns_a_single_element_array).to eq([1])
+  end
+
+  specify "returns an multi element array directly" do
+    expect(returns_a_multi_element_array).to eq([1, 2])
+  end
+
+  describe "within two blocks" do
+    specify "causes the method that lexically encloses the block to return" do
+      expect(returns_through_two_blocks).to be_true
+    end
+  end
+
+  describe "within if" do
+    specify "is allowed" do
+      expect(returns_within_if).to eq(["before if"])
+    end
+  end
+
+  describe "within while loop" do
+    specify "is allowed" do
+      expect(returns_within_while).to eq(["before while"])
+    end
+  end
+end

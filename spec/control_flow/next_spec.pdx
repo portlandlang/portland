@@ -14,3 +14,29 @@ context "control flow" do
     end
   end
 end
+
+# From ruby/spec language/next_spec.rb. The lambda rows wait on the proc
+# question (#77), the ensure rows have no begin to attach to (errors are
+# values), and `next` carries no value here, as `break` does not (ADR
+# 0012), so the rows handing it one stay upstream; the rows here run their
+# blocks through each and a yielding method.
+def yielding_method
+  yield
+  :method_return_value
+end
+
+context "The next statement from within the block" do
+  specify "ends block execution" do
+    mutable seen = []
+    [1].each do
+      seen << 1
+      next
+      seen << 2
+    end
+    expect(seen).to eq([1])
+  end
+
+  specify "returns to the invoking method" do
+    expect(yielding_method { next }).to eq(:method_return_value)
+  end
+end

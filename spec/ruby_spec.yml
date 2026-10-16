@@ -1919,6 +1919,11 @@ language/and_spec.rb:
   status: partial_intentional
   reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; assignment is a statement, so the assignment-in-expression rows stay upstream."
   link: docs/ruby/truthiness.md
+language/break_spec.rb:
+  pdx: [spec/control_flow/unwinding_spec.pdx]
+  status: partial_planned
+  reason: "break out of a method's own yield waits on #166 and the lambda rows on the proc question (#77); break carries no value (ADR 0012), the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there are no threads."
+  link: https://github.com/portlandlang/portland/issues/166
 language/class_variable_spec.rb:
   status: skipped
   reason: "Class variables do not exist: a value lives in a local, a field, or a constant, and @@name refuses naming those (ADR 0056)."
@@ -1946,6 +1951,11 @@ language/heredoc_spec.rb:
   status: partial_intentional
   reason: "Squiggly only (ADR 0020): the plain and dash openers refuse; the backslash-continuation row and the line-number row stay upstream."
   link: docs/ruby/heredocs.md
+language/if_spec.rb:
+  pdx: [spec/control_flow/if_spec.pdx, spec/control_flow/then_spec.pdx]
+  status: partial_intentional
+  reason: "Conditions take booleans only, so the nil, zero, and object rows refuse; the multiple-assignment rows go through eval, the ; spellings are newlines, and the flip-flop rows are removed syntax."
+  link: docs/ruby/truthiness.md
 language/it_parameter_spec.rb:
   pdx: [spec/block/it_spec.pdx]
   status: partial_intentional
@@ -1960,6 +1970,11 @@ language/metaclass_spec.rb:
   status: skipped
   reason: "class << obj opens a singleton class, which does not exist; the runtime kind is gone, and class << self refuses naming the type-function rewrite (ADR 0056)."
   link: docs/ruby/classes.md
+language/next_spec.rb:
+  pdx: [spec/control_flow/next_spec.pdx]
+  status: partial_planned
+  reason: "The lambda rows wait on the proc question; the ensure rows have no begin to attach to, next with several values is a splat (ADR 0014), and next in a method is a compile-time refusal."
+  link: https://github.com/portlandlang/portland/issues/77
 language/not_spec.rb:
   pdx: [spec/word_operators/truth_spec.pdx]
   status: partial_intentional
@@ -1988,6 +2003,11 @@ language/retry_spec.rb:
   status: skipped
   reason: "retry rides begin/rescue, which do not exist: a fallible operation returns its failure."
   link: docs/ruby/errors.md
+language/return_spec.rb:
+  pdx: [spec/control_flow/unwinding_spec.pdx]
+  status: partial_planned
+  reason: "The lambda and define_method rows wait on the proc question; the ensure rows have no begin to attach to, splats are deferred (ADR 0014), a bare return answers no value rather than nil (ADR 0012), and there are no threads or loaded files."
+  link: https://github.com/portlandlang/portland/issues/77
 language/safe_navigator_spec.rb:
   pdx: [spec/optionals/safe_navigation_spec.pdx]
   status: partial_intentional
