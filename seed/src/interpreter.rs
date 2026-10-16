@@ -412,6 +412,54 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// Ruby's `Range#overlap?` on integer ranges (#111).
+fn ranges_overlap(left: &Value, right: &Value) -> bool {
+    let (
+        Value::Range {
+            start: left_start,
+            end: left_end,
+            exclusive: left_exclusive,
+        },
+        Value::Range {
+            start: right_start,
+            end: right_end,
+            exclusive: right_exclusive,
+        },
+    ) = (left, right)
+    else {
+        unreachable!("overlap? is asked of two ranges")
+    };
+    let empty = |start: &Option<i64>, end: &Option<i64>, exclusive: bool| match (start, end) {
+        (Some(start), Some(end)) => {
+            if exclusive {
+                start >= end
+            } else {
+                start > end
+            }
+        }
+        _ => false,
+    };
+    if empty(left_start, left_end, *left_exclusive)
+        || empty(right_start, right_end, *right_exclusive)
+    {
+        return false;
+    }
+    // A start reaches an end when nothing bounds it, or when it sits at or
+    // before the end — before only, where the end is excluded.
+    let reaches = |start: &Option<i64>, end: &Option<i64>, exclusive: bool| match (start, end) {
+        (Some(start), Some(end)) => {
+            if exclusive {
+                start < end
+            } else {
+                start <= end
+            }
+        }
+        _ => true,
+    };
+    reaches(left_start, right_end, *right_exclusive)
+        && reaches(right_start, left_end, *left_exclusive)
+}
+
 /// `flatten` to a depth, Ruby's: each level opens the arrays one deep; a
 /// negative depth opens them all.
 fn flattened_to_depth(elements: &[Value], depth: i64) -> Vec<Value> {
@@ -2810,6 +2858,21 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     _ => {}
                 }
+            }
+            // Whether two ranges share an element (#111), Ruby's rule: an
+            // empty range overlaps nothing, an excluded end does not reach,
+            // an open end reaches everything on its side.
+            if name == "overlap?" && block.is_none() {
+                return Some(match arguments.as_slice() {
+                    [other @ Value::Range { .. }] => {
+                        Value::Boolean(ranges_overlap(&receiver, other))
+                    }
+                    [other] => panic!("wrong argument type {} (expected Range)", other.type_name()),
+                    _ => {
+                        refusal("arity");
+                        panic!("'overlap?' takes 1 argument, got {}", arguments.len())
+                    }
+                });
             }
             // `cover?` and `member?` ask what `include?` asks: a range of
             // integers has no gap between the two.

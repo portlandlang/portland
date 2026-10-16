@@ -1,0 +1,105 @@
+# Two ranges against each other, and a range against a value (#111), from
+# ruby/spec core/range: overlap? and === (through upstream's shared
+# cover_and_include). Ranges hold integers here, so the string, float, and
+# mock rows stay upstream, with nil..nil (no spelling), and a non-range
+# argument, which refuses where Ruby raises TypeError.
+
+require_relative "../spec_helper"
+
+context "Range#overlap?" do
+  specify "returns true if other Range overlaps self" do
+    expect((0..2).overlap?(1..3)).to eq(true)
+    expect((1..3).overlap?(0..2)).to eq(true)
+    expect((0..2).overlap?(0..2)).to eq(true)
+    expect((0..3).overlap?(1..2)).to eq(true)
+    expect((1..2).overlap?(0..3)).to eq(true)
+    expect((0..4).overlap?(4..10)).to eq(true)
+    expect((4..10).overlap?(0..10)).to eq(true)
+  end
+
+  specify "returns false if other Range does not overlap self" do
+    expect((0..2).overlap?(3..4)).to eq(false)
+    expect((0..2).overlap?(-4..-1)).to eq(false)
+  end
+
+  specify "returns true when beginningless and endless Ranges overlap" do
+    expect((0..2).overlap?(..3)).to eq(true)
+    expect((0..2).overlap?(..1)).to eq(true)
+    expect((0..2).overlap?(..0)).to eq(true)
+    expect((..3).overlap?(0..2)).to eq(true)
+    expect((..1).overlap?(0..2)).to eq(true)
+    expect((..0).overlap?(0..2)).to eq(true)
+    expect((0..2).overlap?(-1..)).to eq(true)
+    expect((0..2).overlap?(1..)).to eq(true)
+    expect((0..2).overlap?(2..)).to eq(true)
+    expect((-1..).overlap?(0..2)).to eq(true)
+    expect((1..).overlap?(0..2)).to eq(true)
+    expect((2..).overlap?(0..2)).to eq(true)
+    expect((0..).overlap?(2..)).to eq(true)
+    expect((..0).overlap?(..2)).to eq(true)
+    expect((..10).overlap?(10..)).to eq(true)
+    expect((10..).overlap?(..10)).to eq(true)
+  end
+
+  specify "returns false when beginningless and endless Ranges do not overlap" do
+    expect((0..2).overlap?(..-1)).to eq(false)
+    expect((0..2).overlap?(3..)).to eq(false)
+    expect((..-1).overlap?(0..2)).to eq(false)
+    expect((3..).overlap?(0..2)).to eq(false)
+    expect((..0).overlap?(10..)).to eq(false)
+  end
+
+  specify "return false when self is empty" do
+    expect((2..0).overlap?(1..3)).to eq(false)
+    expect((2...2).overlap?(1..3)).to eq(false)
+    expect((1...1).overlap?(1...1)).to eq(false)
+    expect((2..0).overlap?(2..0)).to eq(false)
+  end
+
+  specify "return false when other Range is empty" do
+    expect((1..3).overlap?(2..0)).to eq(false)
+    expect((1..3).overlap?(2...2)).to eq(false)
+  end
+
+  specify "takes into account exclusive end" do
+    expect((0...2).overlap?(2..4)).to eq(false)
+    expect((2..4).overlap?(0...2)).to eq(false)
+    expect((0...10).overlap?(6..10)).to eq(true)
+    expect((...6).overlap?(4..6)).to eq(true)
+    expect((...10).overlap?(..10)).to eq(true)
+    expect((...4).overlap?(4..10)).to eq(false)
+    expect((...10).overlap?(10..)).to eq(false)
+    expect((10..).overlap?(...10)).to eq(false)
+    expect((6..).overlap?(0...6)).to eq(false)
+  end
+end
+
+context "Range#===" do
+  specify "returns true if other is an element of self" do
+    expect((0..5) === 2).to eq(true)
+    expect((-5..5) === 0).to eq(true)
+    expect((0xffff..0xfffff) === 0xffffd).to eq(true)
+    expect((0xffff..0xfffff) === 0xfffd).to eq(false)
+  end
+
+  specify "returns true if argument is equal to the first value of the range" do
+    expect((0..5) === 0).to eq(true)
+  end
+
+  specify "returns true if argument is equal to the last value of the range" do
+    expect((0..5) === 5).to eq(true)
+    expect((0...5) === 4).to eq(true)
+  end
+
+  specify "returns true if argument is less than the last value of the range and greater than the first value" do
+    expect((20..30) === 28).to eq(true)
+  end
+
+  specify "returns true if argument is sole element in the range" do
+    expect((30..30) === 30).to eq(true)
+  end
+
+  specify "returns false if range is empty" do
+    expect((30...30) === 30).to eq(false)
+  end
+end

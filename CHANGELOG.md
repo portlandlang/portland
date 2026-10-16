@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`overlap?` on ranges, and nine more core/range files** ([#111](https://github.com/portlandlang/portland/issues/111)) — `overlap?` asks whether two ranges share an element by Ruby's rule, on both implementations; `overlap?` and `===` port to `spec/range/overlap_spec.pdx`, and `frozen?`, `dup`, `clone`, `range`, `initialize`, `%`, and `count` are recorded as decided out.
+
 - **Seventeen core/range files ported** ([#111](https://github.com/portlandlang/portland/issues/111)) — `spec/range/ends_spec.pdx`: begin, end, first, last, exclude_end?, to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each, reverse_each, and minmax, their integer rows.
 
 - **A range's own answers** ([#111](https://github.com/portlandlang/portland/issues/111)) — on both implementations, as Ruby's: `begin` and `end` (a maybe where the range is open; `end` is legal after a dot now, as `next` is), `exclude_end?`, `cover?` and `member?` as `include?`, `entries` as `to_a`, and bare `first` and `last` as the ends themselves, so `(0...0).first` is 0 and an open end refuses in Ruby's words. `each`, `each_with_index`, and `reverse_each` answer the range, where they had answered its array.

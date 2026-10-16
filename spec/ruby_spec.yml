@@ -1280,6 +1280,44 @@ core/range/minmax_spec.rb:
   status: partial_intentional
   reason: "Ranges hold integers here; the mock, infinite, open-range, and comparator rows stay upstream."
   link: docs/ruby/ranges.md
+core/range/overlap_spec.rb:
+  pdx: [spec/range/overlap_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string rows stay upstream; nil..nil has no spelling; a non-range argument refuses where Ruby raises TypeError."
+  link: docs/ruby/ranges.md
+core/range/case_compare_spec.rb:
+  pdx: [spec/range/overlap_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, float, mock, and nil..nil rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/frozen_spec.rb:
+  status: skipped
+  reason: "Every value is frozen, so frozen? asks nothing and refuses (ADR 0015); there are no subclasses and no allocate."
+  link: docs/ruby/mutability.md
+core/range/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/range/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/range/range_spec.rb:
+  status: skipped
+  reason: "Asks the Range class for its ancestors — reflection a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/range/initialize_spec.rb:
+  status: skipped
+  reason: "initialize's privacy and Range.allocate are the class object's; a range is a value."
+  link: docs/ruby/metaprogramming.md
+core/range/percent_spec.rb:
+  status: skipped
+  reason: "% answers an Enumerator::ArithmeticSequence, and there are no enumerators (ADR 0055); step answers the finished array."
+  link: docs/ruby/enumerators.md
+core/range/count_spec.rb:
+  status: skipped
+  reason: "A beginless range's count is Infinity in Ruby; here an open range refuses to be walked (ADR 0055)."
+  link: docs/ruby/enumerators.md
 core/range/max_spec.rb:
   pdx: [spec/range/stepping_spec.pdx]
 core/range/min_spec.rb:

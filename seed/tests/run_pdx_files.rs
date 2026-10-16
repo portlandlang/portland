@@ -1770,6 +1770,24 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// `overlap?` (#111): whether two ranges share an element, Ruby's rule
+/// (4.0.6, the expected lines) — an empty range overlaps nothing, an
+/// excluded end does not reach, and an open end reaches everything on its
+/// side. A non-range argument refuses in Ruby's words.
+#[test]
+fn range_overlap_matches_ruby() {
+    assert_both_print(
+        "evaluator_range_overlap.pdx",
+        "p((0..2).overlap?(1..3))\np((1..3).overlap?(0..2))\np((0..2).overlap?(0..2))\np((0..3).overlap?(1..2))\np((0..4).overlap?(4..10))\np((0..2).overlap?(3..4))\np((0..2).overlap?(-4..-1))\np((0..2).overlap?(..3))\np((0..2).overlap?(..0))\np((0..2).overlap?(2..))\np((0..).overlap?(2..))\np((..0).overlap?(..2))\np((0...2).overlap?(2..4))\np((0..2).overlap?(2...2))\np((0...0).overlap?(0..1))\np((3..1).overlap?(0..5))\np((0..2).overlap?(1...1))\n",
+        "true\ntrue\ntrue\ntrue\ntrue\nfalse\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\nfalse\nfalse\nfalse\nfalse\n",
+    );
+    let cases = [(
+        "p((0..2).overlap?(1))\n",
+        "wrong argument type Integer (expected Range)",
+    )];
+    assert_both_oracles_refuse("range_overlap_refusal.pdx", None, &cases);
+}
+
 /// A range's own answers (#111), Ruby's (4.0.6, the expected lines):
 /// `begin` and `end` — `end` legal after a dot, as `next` is — a maybe
 /// where the range is open; `exclude_end?`; `cover?` and `member?` as
