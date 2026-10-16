@@ -1990,6 +1990,11 @@ language/next_spec.rb:
   status: partial_planned
   reason: "The lambda rows wait on the proc question; the ensure rows have no begin to attach to, next with several values is a splat (ADR 0014), and next in a method is a compile-time refusal."
   link: https://github.com/portlandlang/portland/issues/77
+language/module_spec.rb:
+  pdx: [spec/namespace/resolution_spec.pdx, spec/namespace/constant_spec.pdx]
+  status: partial_intentional
+  reason: "A module is a namespace, not a value: there is no Module.new, no reopening, no instance_of?, and no constant that is a class; the qualified spelling nests, which the house rows pin."
+  link: docs/ruby/namespaces.md
 language/not_spec.rb:
   pdx: [spec/word_operators/truth_spec.pdx]
   status: partial_intentional
@@ -2005,6 +2010,11 @@ language/or_spec.rb:
   status: partial_intentional
   reason: "or and || are dead-identical, so the precedence rows diverge on purpose; the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
   link: docs/ruby/word-operators.md
+language/precedence_spec.rb:
+  pdx: [spec/number/precedence_spec.pdx]
+  status: partial_intentional
+  reason: "The bitwise and shift operators are out of the grammar (ADR 0003); the logical operators take booleans only; assignment is a statement, so the chained-assignment rows stay upstream, with the rescue, defined?, flip-flop, class-defining, and eval rows; a bare ternary does not nest."
+  link: docs/ruby/bitwise-operators.md
 language/predefined_spec.rb:
   status: skipped
   reason: "The predefined globals ($_, $0, $:, $!, $~ and the rest) are removed syntax; the handful of legitimate uses return as named APIs."

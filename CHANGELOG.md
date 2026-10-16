@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **precedence and module from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — the arithmetic and logical rows of precedence into `spec/number/precedence_spec.pdx`; module recorded against the namespace specs.
+
 - **alias, yield, and the hash and string literals ported from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — into `spec/method/{alias,yield}_spec.pdx`, `spec/hash/literal_spec.pdx`, and `spec/string/literal_spec.pdx`. The omitted-value hash shorthand `{name:, port:}` refuses on both implementations and is filed as [#167](https://github.com/portlandlang/portland/issues/167).
 
 - **if, case, next, break, and return ported from ruby/spec language/** ([#115](https://github.com/portlandlang/portland/issues/115)) — twenty-one rows of `if` into `spec/control_flow/if_spec.pdx`, twelve of `case` into `case_when_spec.pdx`, the block rows of `next` and the method rows of `return` into `next_spec.pdx` and `unwinding_spec.pdx`. Found on the way: `break` inside a block handed to a user-defined yielding method refuses as `break outside of a loop` on both implementations where Ruby unwinds the call ([#166](https://github.com/portlandlang/portland/issues/166)).

@@ -1,0 +1,71 @@
+# Operator precedence and associativity (#115), from ruby/spec
+# language/precedence_spec.rb. The bitwise and shift operators are out of
+# the grammar (docs/ruby/bitwise-operators.md); the logical operators take
+# booleans only, so the rows with integers or nil as operands stay upstream;
+# assignment is a statement, so the chained-assignment rows stay upstream,
+# with the rescue, defined?, flip-flop, class-defining, and eval rows; a
+# bare ternary does not nest (spec/control_flow/ternary_spec.pdx).
+
+require_relative "../spec_helper"
+
+context "Operators" do
+  specify "! ~ + is right-associative" do
+    expect(!!true).to be_true
+    expect(++2).to eq(2)
+  end
+
+  specify "** is right-associative" do
+    expect(2 ** 2 ** 3).to eq(256)
+  end
+
+  specify "** has higher precedence than unary minus" do
+    expect(-2 ** 2).to eq(-4)
+  end
+
+  specify "unary minus is right-associative" do
+    expect(--2).to eq(2)
+  end
+
+  specify "* / % are left-associative" do
+    expect(2 * 1 / 2).to eq((2 * 1) / 2)
+    expect(2 * 1 / 2).not_to eq(2 * (1 / 2))
+    expect(10 / 7 / 5).to eq((10 / 7) / 5)
+    expect(10 / 7 / 5).not_to eq(10 / (7 / 5))
+    expect(101 % 55 % 7).to eq((101 % 55) % 7)
+    expect(101 % 55 % 7).not_to eq(101 % (55 % 7))
+    expect(50 * 20 / 7 % 42).to eq(((50 * 20) / 7) % 42)
+    expect(50 * 20 / 7 % 42).not_to eq(50 * (20 / (7 % 42)))
+  end
+
+  specify "* / % have higher precedence than + -" do
+    expect(2 + 2 * 2).to eq(6)
+    expect(1 + 10 / 5).to eq(3)
+    expect(2 + 10 % 5).to eq(2)
+    expect(2 - 2 * 2).to eq(-2)
+    expect(1 - 10 / 5).to eq(-1)
+    expect(10 - 10 % 4).to eq(8)
+  end
+
+  specify "+ - are left-associative" do
+    expect(2 - 3 - 4).to eq(-5)
+    expect(4 - 3 + 2).to eq(3)
+  end
+
+  specify "<=> == === != =~ !~ have higher precedence than &&" do
+    expect(false && 3 == false).to be_false
+    expect(false && 3 != true).to be_false
+  end
+
+  specify "&& has higher precedence than ||" do
+    expect(true || false && false).to be_true
+  end
+
+  specify "not is right-associative" do
+    expect((not not false)).to be_false
+  end
+
+  specify "not has higher precedence than or/and" do
+    expect((not false and false)).to be_false
+    expect((not false or true)).to be_true
+  end
+end
