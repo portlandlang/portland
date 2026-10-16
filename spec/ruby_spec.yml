@@ -1330,11 +1330,27 @@ core/range/step_spec.rb:
 
 # — core/string —
 
+core/string/allocate_spec.rb:
+  status: skipped
+  reason: "There is no String class object to allocate from; a string is a value."
+  link: docs/ruby/metaprogramming.md
+core/string/append_as_bytes_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so append_as_bytes has nothing to grow and refuses (ADR 0015); + builds a new string."
+  link: docs/ruby/mutability.md
+core/string/append_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so << on a string has nothing to grow and refuses (ADR 0015); + builds a new string."
+  link: docs/ruby/mutability.md
 core/string/bytes_spec.rb:
   pdx: [spec/string/bytes_spec.pdx]
   status: partial_intentional
   reason: "bytes answers an array and takes no block; the block form is each_byte's job in Ruby and a walk's here."
   link: docs/ruby/enumerators.md
+core/string/bytesplice_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so bytesplice has nothing to splice and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/bytesize_spec.rb:
   pdx: [spec/string/bytes_spec.pdx]
 core/string/capitalize_spec.rb:
@@ -1353,12 +1369,24 @@ core/string/chars_spec.rb:
   status: partial_intentional
   reason: "chars answers an array and takes no block; its block form is deprecated Ruby, and each_char's job."
   link: docs/ruby/enumerators.md
+core/string/chilled_string_spec.rb:
+  status: skipped
+  reason: "Every string is frozen, so there is nothing chilled to warn about or thaw (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/chomp_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 core/string/chop_spec.rb:
   pdx: [spec/string/ends_spec.pdx]
 core/string/chr_spec.rb:
   pdx: [spec/string/ends_spec.pdx]
+core/string/clear_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clear has nothing to empty and refuses (ADR 0015); the empty string is a literal."
+  link: docs/ruby/mutability.md
+core/string/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/codepoints_spec.rb:
   pdx: [spec/string/bytes_spec.pdx]
   status: partial_intentional
@@ -1369,6 +1397,22 @@ core/string/comparison_spec.rb:
   status: partial_intentional
   reason: "No subclasses, one encoding, and no to_str conversion; the chr table needs Array.new with a block."
   link: docs/ruby/characters.md
+core/string/concat_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so concat has nothing to grow and refuses (ADR 0015); + builds a new string."
+  link: docs/ruby/mutability.md
+core/string/dedup_spec.rb:
+  status: skipped
+  reason: "Every string is frozen, so dedup and -@ have nothing to deduplicate (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/string/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/string/element_set_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so []= on a string has nothing to overwrite and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/count_spec.rb:
   pdx: [spec/string/search_spec.pdx]
   status: partial_intentional
@@ -1422,6 +1466,10 @@ core/string/end_with_spec.rb:
   link: https://github.com/portlandlang/portland/issues/74
 core/string/equal_value_spec.rb:
   pdx: [spec/string/equality_spec.pdx]
+core/string/freeze_spec.rb:
+  status: skipped
+  reason: "Every value is frozen, so freeze asks nothing and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/grapheme_clusters_spec.rb:
   pdx: [spec/string/chars_spec.pdx]
   status: partial_intentional
@@ -1441,6 +1489,23 @@ core/string/index_spec.rb:
   status: partial_planned
   reason: "The regex arguments wait on the regex decision."
   link: https://github.com/portlandlang/portland/issues/74
+core/string/initialize_spec.rb:
+  status: skipped
+  reason: "There is no String class object; a string is a literal, and String.new has no spelling."
+  link: docs/ruby/metaprogramming.md
+core/string/insert_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so insert has nothing to splice into and refuses (ADR 0015); slices and + build the new string."
+  link: docs/ruby/mutability.md
+core/string/inspect_spec.rb:
+  pdx: [spec/string/inspect_spec.pdx]
+  status: partial_intentional
+  reason: "The escape set is closed: \\a \\b \\v \\f \\e and the \\x and \\u notation for non-printing characters have no spelling, so those rows stay upstream."
+  link: docs/ruby/string-escapes.md
+core/string/intern_spec.rb:
+  status: skipped
+  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  link: docs/ruby/symbols.md
 core/string/length_spec.rb:
   pdx: [spec/string/length_spec.pdx]
 core/string/lines_spec.rb:
@@ -1451,6 +1516,10 @@ core/string/lstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 core/string/multiply_spec.rb:
   pdx: [spec/string/operators_spec.pdx]
+core/string/new_spec.rb:
+  status: skipped
+  reason: "There is no String class object; a string is a literal, and String.new has no spelling."
+  link: docs/ruby/metaprogramming.md
 core/string/next_spec.rb:
   pdx: [spec/string/successor_spec.pdx]
 core/string/oct_spec.rb:
@@ -1464,6 +1533,14 @@ core/string/partition_spec.rb:
   link: https://github.com/portlandlang/portland/issues/74
 core/string/plus_spec.rb:
   pdx: [spec/string/operators_spec.pdx]
+core/string/prepend_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so prepend has nothing to grow and refuses (ADR 0015); + builds a new string."
+  link: docs/ruby/mutability.md
+core/string/replace_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so replace has nothing to overwrite and refuses (ADR 0015); rebinding is the spelling."
+  link: docs/ruby/mutability.md
 core/string/reverse_spec.rb:
   pdx: [spec/string/reverse_spec.pdx]
 core/string/rindex_spec.rb:
@@ -1480,6 +1557,10 @@ core/string/rpartition_spec.rb:
   link: https://github.com/portlandlang/portland/issues/74
 core/string/rstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
+core/string/setbyte_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so setbyte has nothing to overwrite and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/size_spec.rb:
   pdx: [spec/string/length_spec.pdx]
 core/string/slice_spec.rb:
@@ -1497,6 +1578,10 @@ core/string/start_with_spec.rb:
   status: partial_planned
   reason: "The regex rows wait on the regex decision."
   link: https://github.com/portlandlang/portland/issues/74
+core/string/string_spec.rb:
+  status: skipped
+  reason: "Kernel#String is the implicit-conversion protocol's entry point, and to_str is a false alias that refuses naming to_s (ADR 0036); to_s is the spelling."
+  link: docs/ruby/aliases.md
 core/string/strip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
 core/string/sub_spec.rb:
@@ -1519,11 +1604,27 @@ core/string/to_str_spec.rb:
   status: skipped
   reason: "to_str is the implicit-conversion protocol, which Portland refuses (ADR 0036); to_s is the spelling."
   link: docs/ruby/aliases.md
+core/string/to_sym_spec.rb:
+  status: skipped
+  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  link: docs/ruby/symbols.md
+core/string/try_convert_spec.rb:
+  status: skipped
+  reason: "String.try_convert is the implicit-conversion protocol's entry point, and to_str is a false alias that refuses naming to_s (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/string/uminus_spec.rb:
+  status: skipped
+  reason: "Every string is frozen, so -@ has nothing to freeze or deduplicate (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/upcase_spec.rb:
   pdx: [spec/string/case_spec.pdx]
   status: partial_intentional
   reason: "Casing is full Unicode, locale-independent (ADR 0038): the :ascii, :turkic, :lithuanian, and :fold options are decided out."
   link: docs/ruby/characters.md
+core/string/uplus_spec.rb:
+  status: skipped
+  reason: "Every string is frozen, so +@ has no mutable copy to hand back (ADR 0015)."
+  link: docs/ruby/mutability.md
 core/string/upto_spec.rb:
   pdx: [spec/string/successor_spec.pdx]
   status: partial_intentional

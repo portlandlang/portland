@@ -1,0 +1,56 @@
+# A string as source (#106), from ruby/spec core/string/inspect_spec.rb,
+# through the `inspect` function (ADR 0026). The escape set is closed
+# (docs/ruby/string-escapes.md): `\n`, `\r`, `\t`, `\"`, `\\`, and `\#`
+# where a `#` would open an interpolation; a character outside it is
+# written raw, so the \a \b \v \f \e rows and the \x and \u notation for
+# non-printing characters stay upstream, as do subclasses and encodings.
+
+require_relative "../spec_helper"
+
+context "String#inspect" do
+  specify "returns a string with special characters replaced with \\<char> notation" do
+    expect(inspect("\t")).to eq("\"\\t\"")
+    expect(inspect("\n")).to eq("\"\\n\"")
+    expect(inspect("\r")).to eq("\"\\r\"")
+  end
+
+  specify "returns a string with \" and \\ escaped with a backslash" do
+    expect(inspect("\"")).to eq("\"\\\"\"")
+    expect(inspect("\\")).to eq("\"\\\\\"")
+  end
+
+  specify "returns a string with \\#<char> when # is followed by $, @, {" do
+    expect(inspect("\#$")).to eq("\"\\\#$\"")
+    expect(inspect("\#@")).to eq("\"\\\#@\"")
+    expect(inspect("\#{")).to eq("\"\\\#{\"")
+  end
+
+  specify "returns a string with # not escaped when followed by any other character" do
+    expect(inspect("#")).to eq("\"#\"")
+    expect(inspect("#1")).to eq("\"#1\"")
+  end
+
+  specify "returns a string with printable non-alphanumeric characters unescaped" do
+    [" ", "!", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ";", "<", "=", ">", "?", "@", "[", "]", "^", "_", "`", "{", "|", "}", "~"].each do |character|
+      expect(inspect(character)).to eq("\"#{character}\"")
+    end
+  end
+
+  specify "returns a string with numeric characters unescaped" do
+    "0".upto("9") { |digit| expect(inspect(digit)).to eq("\"#{digit}\"") }
+  end
+
+  specify "returns a string with upper-case alpha characters unescaped" do
+    "A".upto("Z") { |letter| expect(inspect(letter)).to eq("\"#{letter}\"") }
+  end
+
+  specify "returns a string with lower-case alpha characters unescaped" do
+    "a".upto("z") { |letter| expect(inspect(letter)).to eq("\"#{letter}\"") }
+  end
+
+  specify "returns a string with extended characters for Unicode strings" do
+    expect(inspect("é")).to eq("\"é\"")
+    expect(inspect("東京")).to eq("\"東京\"")
+    expect(inspect("🏳️‍🌈")).to eq("\"🏳️‍🌈\"")
+  end
+end
