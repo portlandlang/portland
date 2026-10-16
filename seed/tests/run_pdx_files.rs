@@ -1770,6 +1770,19 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// Symbols order by their names, as Ruby's do (4.0.6, the expected lines),
+/// on both implementations — the seed had refused `:a <=> :b` while the
+/// hosted evaluator ordered its tagged-array shape, so an array of
+/// symbol-keyed pairs sorted on one and not the other (#105).
+#[test]
+fn symbols_order_by_name() {
+    assert_both_print(
+        "evaluator_symbol_ordering.pdx",
+        "p(:a <=> :b)\np(:b <=> :a)\np(:a <=> :a)\np([:b, :a, :c].sort)\np(:a < :b)\np(:b >= :a)\np([[:b, 2], [:a, 1]].sort)\np([:b, :a].min)\n",
+        "-1\n1\n0\n[:a, :b, :c]\ntrue\ntrue\n[[:a, 1], [:b, 2]]\n:a\n",
+    );
+}
+
 /// A hash's own methods (#105), answering as Ruby's do (4.0.6, the
 /// expected lines): `select`, `filter`, and `reject` answer a hash and hand
 /// a one-parameter block the key; `transform_keys` and `transform_values`

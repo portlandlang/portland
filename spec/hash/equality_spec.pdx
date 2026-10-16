@@ -13,3 +13,25 @@ context "Hash" do
     end
   end
 end
+
+# ruby/spec core/hash/equal_value_spec.rb, through its shared hash_eql
+# groups (#105). The mocks counting their == and eql? calls, recursive
+# hashes (values never mutate), to_hash, subclasses, and Hash.new defaults
+# stay upstream.
+
+context "Hash#==" do
+  specify "compares keys with eql? semantics" do
+    expect({1.0 => "x"} == {1.0 => "x"}).to eq(true)
+    expect({1 => "x"} == {1.0 => "x"}).to eq(false)
+    expect({1.0 => "x"} == {1 => "x"}).to eq(false)
+  end
+
+  specify "returns true if and only if other Hash has the same number of keys and each key-value pair matches" do
+    table = {a: 5}
+    expect(table == {}).to eq(false)
+    expect(table == {a: 5}).to eq(true)
+    expect(table == {"a" => 5}).to eq(false)
+    expect(table == {"A" => 5}).to eq(false)
+    expect(table == {a: 6}).to eq(false)
+  end
+end

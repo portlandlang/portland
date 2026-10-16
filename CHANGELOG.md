@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Symbols order by their names** ([#105](https://github.com/portlandlang/portland/issues/105)) — `:a <=> :b`, the four comparisons, and so `[:b, :a].sort` and an array of symbol-keyed pairs, as Ruby's do. The seed had refused while the hosted evaluator ordered its tagged-array shape, so the two implementations disagreed.
+- **Six more core/hash files ported** ([#105](https://github.com/portlandlang/portland/issues/105)) — `transform_values`, `transform_keys`, `to_h`, `[]`, and `inspect` in `spec/hash/transforms_spec.pdx`, and `==` into `spec/hash/equality_spec.pdx`.
+
 - **The hosted language spec's tripwire is 150 seconds** — the #105 ports took the batch to 133 s against 130. Timed file by file, the hosted cost is about 0.15 s an example with no outlier, so the ceiling now says roughly a thousand examples.
 
 - **Twenty-five core/hash files ported, eighteen recorded as decided out** ([#105](https://github.com/portlandlang/portland/issues/105)) — `spec/hash/lookups_spec.pdx` (keys, values, key, value?, invert, compact, slice, each and kin, sort, size, empty?, to_a) and `spec/hash/selection_spec.pdx` (include? and its twins, any?, select, reject, except, values_at). Bare `any?` on a hash asks whether it holds a pair. The mutators and the class-object files are skipped with their rewrites.

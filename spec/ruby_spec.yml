@@ -757,6 +757,36 @@ core/hash/values_at_spec.rb:
   status: partial_intentional
   reason: "The is_a? checks are reflection a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
+core/hash/transform_values_spec.rb:
+  pdx: [spec/hash/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "transform_values! stays behind, since values never mutate; identity, instance_of?, defaults, default_proc, compare_by_identity, subclasses, and blockless Enumerators stay behind too."
+  link: docs/ruby/mutability.md
+core/hash/transform_keys_spec.rb:
+  pdx: [spec/hash/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "transform_keys! stays behind, since values never mutate; a hash argument and its nil refusal, identity, instance_of?, defaults, default_proc, compare_by_identity, subclasses, and blockless Enumerators stay behind too."
+  link: docs/ruby/mutability.md
+core/hash/to_h_spec.rb:
+  pdx: [spec/hash/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "Identity is unobservable, since values never mutate; |*args| does not parse (no splats, ADR 0014); a wrong pair refuses where Ruby raises; no to_ary, subclasses, defaults, or compare_by_identity."
+  link: docs/ruby/mutability.md
+core/hash/element_reference_spec.rb:
+  pdx: [spec/hash/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "No Hash.new defaults or default procs: a miss answers a maybe (ADR 0010); mocks stubbing hash and eql? stay behind."
+  link: docs/ruby/lookups.md
+core/hash/inspect_spec.rb:
+  pdx: [spec/hash/transforms_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(table), not a method (ADR 0026); mocks answering their own inspect, recursive hashes, and a nil key stay behind."
+  link: docs/ruby/inspect.md
+core/hash/equal_value_spec.rb:
+  pdx: [spec/hash/equality_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks counting their == and eql? calls, recursive hashes, to_hash, subclasses, and Hash.new defaults stay behind."
+  link: docs/ruby/metaprogramming.md
 # The mutators: values never mutate, names do (ADR 0015). Each rewrite
 # rebinds a mutable name — `table[key] = value` survives as that sugar.
 core/hash/store_spec.rb:

@@ -909,6 +909,21 @@ def evaluate_binary(node, bindings)
   if (left in ["__struct__", *]) && %w[<=> < <= > >=].include?(node.operator)
     return compare_struct(node.operator, left, right, right_step.bindings)
   end
+  # Symbols order by their names (#105), the seed's rule; a guest symbol
+  # is a tagged array here, so its name is read out before the host
+  # compares.
+  if (left in ["__symbol__", *]) && (right in ["__symbol__", *]) && %w[<=> < <= > >=].include?(node.operator)
+    left_name = value_at(left, 1)
+    right_name = value_at(right, 1)
+    ordered = case node.operator
+              when "<=>" then left_name <=> right_name
+              when "<"   then left_name < right_name
+              when "<="  then left_name <= right_name
+              when ">"   then left_name > right_name
+              else            left_name >= right_name
+              end
+    return outcome([ordered], right_step.bindings)
+  end
   # Arrays order element by element under `<=>` alone, and an element may
   # be a struct, so the walk is the evaluator's rather than the host's.
   if node.operator == "<=>" && guest_array?(left) && guest_array?(right)

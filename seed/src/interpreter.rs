@@ -992,6 +992,23 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
         (Value::String(left), BinaryOperator::Spaceship, Value::String(right)) => Value::Integer(
             ordering_value(crate::value::canonical_ordering(&left, &right)),
         ),
+        // Symbols order by their names, byte by byte, as Ruby's do (#105):
+        // what lets an array of symbol-keyed pairs sort.
+        (Value::Symbol(left), BinaryOperator::Spaceship, Value::Symbol(right)) => {
+            Value::Integer(ordering_value(left.cmp(&right)))
+        }
+        (Value::Symbol(left), BinaryOperator::Less, Value::Symbol(right)) => {
+            Value::Boolean(left < right)
+        }
+        (Value::Symbol(left), BinaryOperator::LessOrEqual, Value::Symbol(right)) => {
+            Value::Boolean(left <= right)
+        }
+        (Value::Symbol(left), BinaryOperator::Greater, Value::Symbol(right)) => {
+            Value::Boolean(left > right)
+        }
+        (Value::Symbol(left), BinaryOperator::GreaterOrEqual, Value::Symbol(right)) => {
+            Value::Boolean(left >= right)
+        }
         (Value::String(left), BinaryOperator::Less, Value::String(right)) => {
             Value::Boolean(crate::value::canonical_ordering(&left, &right).is_lt())
         }
@@ -1306,6 +1323,20 @@ impl<W: std::io::Write> Interpreter<W> {
             }
         }
         ordering_value(left.len().cmp(&right.len()))
+    }
+
+    /// The uniform arrays that sort and pick extremes under `<=>` rather
+    /// than the number and string fast paths: structs by their own,
+    /// arrays element by element, symbols by name (#105).
+    fn orders_by_spaceship(elements: &[Value]) -> bool {
+        Self::all_structs(elements) || Self::all_arrays(elements) || Self::all_symbols(elements)
+    }
+
+    fn all_symbols(elements: &[Value]) -> bool {
+        !elements.is_empty()
+            && elements
+                .iter()
+                .all(|element| matches!(element, Value::Symbol(_)))
     }
 
     fn all_arrays(elements: &[Value]) -> bool {
@@ -3532,14 +3563,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // The extremes are maybes (ADR 0010) and answer the element
             // itself, strings included. Structs and arrays order by `<=>`
             // (ADR 0054), an array element by element (#104).
-            (Value::Array(elements), "max", [])
-                if Self::all_structs(elements) || Self::all_arrays(elements) =>
-            {
+            (Value::Array(elements), "max", []) if Self::orders_by_spaceship(elements) => {
                 self.extreme_by_spaceship(elements, "max")
             }
-            (Value::Array(elements), "min", [])
-                if Self::all_structs(elements) || Self::all_arrays(elements) =>
-            {
+            (Value::Array(elements), "min", []) if Self::orders_by_spaceship(elements) => {
                 self.extreme_by_spaceship(elements, "min")
             }
             (Value::Array(elements), "max", []) => Self::extreme(elements, "max"),
@@ -3625,9 +3652,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // shape). A mix of kinds refuses, naming what broke it.
             // Structs and arrays sort by `<=>` (ADR 0054), an array element
             // by element — a hash's pairs, for one (#105).
-            (Value::Array(elements), "sort", [])
-                if Self::all_structs(elements) || Self::all_arrays(elements) =>
-            {
+            (Value::Array(elements), "sort", []) if Self::orders_by_spaceship(elements) => {
                 self.sort_by_spaceship(elements)
             }
             (Value::Array(elements), "sort", []) => {

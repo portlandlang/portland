@@ -327,6 +327,7 @@ def synthesize_binary(node, types)
   when "<=>"
     return ["integer"] if numeric?(left) && numeric?(right)
     return ["integer"] if left == ["string"] && right == ["string"]
+    return ["integer"] if left == ["symbol"] && right == ["symbol"]
     return ["integer"] if (left in ["array", *]) && (right in ["array", *])
     ["unknown"]
   when "+", "-", "*", "%"

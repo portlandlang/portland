@@ -1317,6 +1317,8 @@ def operator_takes?(operator, left, right)
   when "<", "<=", ">", ">=", "<=>"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["string"]
+    # Symbols order by their names (#105).
+    return true if left == ["symbol"] && right == ["symbol"]
     # Arrays order element by element, under `<=>` alone.
     operator == "<=>" && (left in ["array", *]) && (right in ["array", *])
   when "+"

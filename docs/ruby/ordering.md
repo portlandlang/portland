@@ -10,6 +10,8 @@
 
 ## Portland
 
+Symbols order by their names, byte by byte, as Ruby's do: `:a <=> :b` is -1, and an array of symbol-keyed pairs sorts.
+
 ```ruby
 struct Version
   major

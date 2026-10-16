@@ -1,0 +1,90 @@
+# Rewriting and reading a hash (#105), from ruby/spec core/hash:
+# transform_values, transform_keys, to_h with a block, [], and inspect.
+# Upstream's `&:succ` is a block here, and its ScratchPad a mutable. Staying
+# upstream: the bang forms (values never mutate), identity and instance_of?
+# checks, defaults, default_proc, compare_by_identity, subclasses, frozen
+# hashes, a hash argument to transform_keys and `|*args|` (no splats, ADR
+# 0014), mocks, recursive hashes, a nil key, blockless Enumerators (ADR
+# 0055), and the refusals where Ruby raises.
+
+require_relative "../spec_helper"
+
+context "Hash#transform_values" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "sets the result as transformed values with the given block" do
+    expect(table.transform_values { |value| value.succ }).to eq({a: 2, b: 3, c: 4})
+  end
+
+  specify "makes both hashes to share keys" do
+    key = [1, 2, 3]
+    new_table = {key => 1}.transform_values { |value| value.succ }
+    expect(new_table[key]).to eq(2)
+  end
+end
+
+context "Hash#transform_keys" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "sets the result as transformed keys with the given block" do
+    expect({1 => "a", 2 => "b", 3 => "c"}.transform_keys { |key| key.succ }).to eq({2 => "a", 3 => "b", 4 => "c"})
+  end
+
+  specify "keeps last pair if new keys conflict" do
+    expect(table.transform_keys { |key| :a }).to eq({a: 3})
+  end
+
+  specify "makes both hashes to share values" do
+    value = [1, 2, 3]
+    new_table = {"a" => value}.transform_keys { |key| key.upcase }
+    expect(new_table["A"]).to eq(value)
+  end
+end
+
+context "Hash#to_h" do
+  describe "with block" do
+    specify "converts [key, value] pairs returned by the block to a hash" do
+      expect({a: 1, b: 2}.to_h { |key, value| [key.to_s, value * value] }).to eq({"a" => 1, "b" => 4})
+    end
+
+    specify "passes to a block each pair's key and value as separate arguments" do
+      mutable seen = []
+      {a: 1, b: 2}.to_h do |key, value|
+        seen = seen + [[key, value]]
+        [key, value]
+      end
+      expect(seen.sort).to eq([[:a, 1], [:b, 2]])
+    end
+  end
+end
+
+context "Hash#[]" do
+  specify "returns the value for key" do
+    table = {1 => 2, 3 => 4, "foo" => "bar", [] => "baz"}
+    expect(table[1]).to eq(2)
+    expect(table[3]).to eq(4)
+    expect(table["foo"]).to eq("bar")
+    expect(table[[]]).to eq("baz")
+  end
+
+  specify "returns nil as default value" do
+    expect({0 => 0}[5]).to eq(nil)
+  end
+
+  specify "compares keys with eql? semantics" do
+    expect({1.0 => "x"}[1]).to eq(nil)
+    expect({1.0 => "x"}[1.0]).to eq("x")
+    expect({1 => "x"}[1.0]).to eq(nil)
+    expect({1 => "x"}[1]).to eq("x")
+  end
+end
+
+context "Hash#inspect" do
+  specify "returns a string representation with same order as each()" do
+    expect(inspect({a: [1, 2], b: -2, d: -6})).to eq("{a: [1, 2], b: -2, d: -6}")
+  end
+
+  specify "does not call #to_s on a String returned from #inspect" do
+    expect(inspect({a: "abc"})).to eq("{a: \"abc\"}")
+  end
+end
