@@ -2947,6 +2947,100 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// Ruby's Struct views and walks (#114) over the fields in definition
+    /// order: `to_h` bare, or through a block answering a pair; `to_a` and
+    /// `values`; `members`; `size` and `length`; `each` over the values;
+    /// `each_pair` over symbol and value; and `select` and `filter`
+    /// answering an array. `None` for any other name — the miss sentence's.
+    fn struct_builtin(
+        &mut self,
+        receiver: &Value,
+        name: &str,
+        block: Option<&Block>,
+    ) -> Option<Option<Value>> {
+        let Value::Struct { fields, .. } = receiver else {
+            return None;
+        };
+        let fields: Vec<(String, Value)> = fields.clone();
+        let answer = match (name, block) {
+            ("to_h", None) => Value::hash(
+                fields
+                    .into_iter()
+                    .map(|(field, value)| (Value::Symbol(field), value))
+                    .collect(),
+            ),
+            ("to_a" | "values", None) => {
+                Value::array(fields.into_iter().map(|(_, value)| value).collect())
+            }
+            ("members", None) => Value::array(
+                fields
+                    .into_iter()
+                    .map(|(field, _)| Value::Symbol(field))
+                    .collect(),
+            ),
+            ("size" | "length", None) => Value::Integer(fields.len() as i64),
+            ("each", Some(block)) => {
+                for (_, value) in fields {
+                    self.run_block(block, vec![value]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return Some(interrupted);
+                    }
+                }
+                receiver.clone()
+            }
+            ("each_pair", Some(block)) => {
+                for (field, value) in fields {
+                    self.run_block(block, vec![Value::Symbol(field), value]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return Some(interrupted);
+                    }
+                }
+                receiver.clone()
+            }
+            ("select" | "filter", Some(block)) => {
+                let mut kept = Vec::new();
+                for (_, value) in fields {
+                    let verdict = self.run_block(block, vec![value.clone()]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return Some(interrupted);
+                    }
+                    match verdict {
+                        Some(Value::Boolean(true)) => kept.push(value),
+                        Some(Value::Boolean(false)) => {}
+                        other => panic!("{name} block must produce true or false, got {other:?}"),
+                    }
+                }
+                Value::array(kept)
+            }
+            // The block's answer must be a pair; the refusals are Ruby's words.
+            ("to_h", Some(block)) => {
+                let mut pairs = Vec::new();
+                for (field, value) in fields {
+                    let answer = self.run_block(block, vec![Value::Symbol(field), value]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return Some(interrupted);
+                    }
+                    match answer {
+                        Some(Value::Array(pair)) if pair.len() == 2 => {
+                            pairs.push((pair[0].clone(), pair[1].clone()))
+                        }
+                        Some(Value::Array(pair)) => panic!(
+                            "element has wrong array length (expected 2, was {})",
+                            pair.len()
+                        ),
+                        Some(other) => {
+                            panic!("wrong element type {} (expected array)", other.type_name())
+                        }
+                        None => panic!("to_h block produced no value"),
+                    }
+                }
+                Value::hash(pairs)
+            }
+            _ => return None,
+        };
+        Some(Some(answer))
+    }
+
     /// `Array.new` in Ruby's arities: bare, by count (nil-filled, as
     /// Ruby's), by count and fill, by count and a block handed each index,
     /// or copied from an array.
@@ -3161,16 +3255,27 @@ impl<W: std::io::Write> Interpreter<W> {
         if !keyword_arguments.is_empty() {
             panic!("keyword arguments are only for struct new, with, and struct methods so far");
         }
+        if let Value::Struct { fields, .. } = &receiver
+            && arguments.is_empty()
+        {
+            if block.is_none()
+                && let Some((_, value)) = fields.iter().find(|(field, _)| field == name)
+            {
+                return Some(value.clone());
+            }
+            // Ruby's Struct views and walks (#114), after the struct's own
+            // methods and fields, so a field named `size` still wins — as
+            // Ruby's accessor does.
+            if let Some(answer) = self.struct_builtin(&receiver, name, block) {
+                return answer;
+            }
+        }
         if let Value::Struct {
-            fields,
-            name: struct_name,
+            name: struct_name, ..
         } = &receiver
             && arguments.is_empty()
             && block.is_none()
         {
-            if let Some((_, value)) = fields.iter().find(|(field, _)| field == name) {
-                return Some(value.clone());
-            }
             // to_s and the three predicates fall through to the generic arms —
             // `failure?` included, since `return value if value.failure?` is
             // the propagation toolkit (ADR 0044) and a struct is the commonest

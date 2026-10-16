@@ -340,7 +340,8 @@ end
 
 # Every struct's instance method set, as [name, methods] pairs: its
 # fields, its defs (alias clones included, since they arrive as defs), the
-# defs of each trait it includes, and the five every struct answers. A
+# defs of each trait it includes, the five every struct answers, and
+# Ruby's Struct views and walks (#114). A
 # struct is left out where the tree cannot state its set whole — its name
 # declared twice anywhere (a nested struct sharing a top-level one's), or
 # an included trait not declared exactly once in this file, which may
@@ -359,7 +360,7 @@ def declared_shapes(nodes)
 end
 
 def shape_methods(declaration, traits)
-  mutable methods = %w[failure? nil? some? to_s with] + declaration.fields
+  mutable methods = %w[each each_pair failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields
   methods += def_names(declaration.methods)
   declaration.includes.each do |trait_name|
     # The builtin trait (ADR 0054) adds the two derived methods; the four

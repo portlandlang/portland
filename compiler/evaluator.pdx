@@ -1672,6 +1672,27 @@ def struct_with(instance, keyword_values)
   ["__struct__", value_at(instance, 1), updated]
 end
 
+def struct_has_field?(instance, field)
+  pairs = value_at(instance, 2)
+  pairs.any? { it[0] == field }
+end
+
+# The fields in order, as Ruby's Struct views them (#114): to_h, to_a and
+# values, members, size and length. Nil for any other name.
+def struct_view(instance, name)
+  pairs = value_at(instance, 2)
+  case name
+  when "to_h"
+    mutable built = {}
+    pairs.each { |pair| built[["__symbol__", pair[0]]] = value_at(pair, 1) }
+    built
+  when "to_a", "values" then pairs.map { value_at(it, 1) }
+  when "members" then pairs.map { ["__symbol__", it[0]] }
+  when "size", "length" then pairs.length
+  else nil
+  end
+end
+
 def struct_field(instance, field)
   pairs = instance[2]
   mutable index = 0
@@ -1831,6 +1852,11 @@ def evaluate_method_call(node, mutable bindings)
   # value answers. A guest struct is a tagged host array, so `size` on one
   # used to answer 3 (#96). A name that is neither is the miss sentence.
   if (receiver in ["__struct__", *]) && arguments.empty? && node.block.nil? && !%w[failure? nil? some? to_s].include?(node.name)
+    return outcome([struct_field(receiver, node.name)], bindings) if struct_has_field?(receiver, node.name)
+    # Ruby's Struct views (#114), after the fields so a field named `size`
+    # still wins, as Ruby's accessor does.
+    view = struct_view(receiver, node.name)
+    return outcome([view], bindings) unless view.nil?
     return outcome([struct_field(receiver, node.name)], bindings)
   end
   # `between?` and `clamp` on a struct order by its `<=>` (ADR 0054); host
@@ -2218,6 +2244,69 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   entry = scope
   block = node.block
   mutable interrupt = nil
+  # Ruby's Struct walks (#114): each over the values, each_pair over symbol
+  # and value, select and filter answering an array, and to_h through a
+  # block answering a pair — the refusals Ruby's words.
+  if receiver in ["__struct__", *]
+    pairs = value_at(receiver, 2)
+    case node.name
+    when "each"
+      pairs.each do |pair|
+        step = run_guest_block(block, [value_at(pair, 1)], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+      end
+      return block_interrupted(interrupt, scope) if interrupt.some?
+      return outcome([receiver], scope)
+    when "each_pair"
+      pairs.each do |pair|
+        step = run_guest_block(block, [["__symbol__", pair[0]], value_at(pair, 1)], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+      end
+      return block_interrupted(interrupt, scope) if interrupt.some?
+      return outcome([receiver], scope)
+    when "select", "filter"
+      values = pairs.map { value_at(it, 1) }
+      results = values.select do |value|
+        step = run_guest_block(block, [value], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        slot_value(step.value)
+      end
+      return block_interrupted(interrupt, scope) if interrupt.some?
+      return outcome([results], scope)
+    when "to_h"
+      mutable built = {}
+      pairs.each do |pair|
+        step = run_guest_block(block, [["__symbol__", pair[0]], value_at(pair, 1)], scope)
+        scope = compacted_since(entry, step.bindings)
+        if step.signal != "none"
+          interrupt = step
+          break
+        end
+        answer = slot_value(step.value)
+        unless plain_array?(answer)
+          kind = builtin_type_of(answer)
+          label = kind.nil? ? value_at(answer, 1) : type_at(kind, 0).capitalize
+          panic("wrong element type #{label} (expected array)")
+        end
+        panic("element has wrong array length (expected 2, was #{answer.length})") unless answer.length == 2
+        built[value_at(answer, 0)] = value_at(answer, 1)
+      end
+      return block_interrupted(interrupt, scope) if interrupt.some?
+      return outcome([built], scope)
+    end
+  end
   case node.name
   when "each", "each_pair"
     # A hash yields its key and value as two arguments. An array yields

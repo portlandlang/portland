@@ -1803,6 +1803,33 @@ fn string_methods_first_run_match_ruby() {
     assert_both_oracles_refuse("string_first_run_refusal.pdx", None, &cases);
 }
 
+/// Ruby's Struct views and walks (#114) on a struct's fields in order, the
+/// expected lines Ruby 4.0.7's for an equivalent `Struct.new` (the struct
+/// itself renders as its constructor reads, ADR 0026): `to_h` bare and
+/// through a block, `to_a` and `values`, `members`, `size` and `length`,
+/// `each`, `each_pair`, `select`, and `filter`. A field named for a view
+/// wins, as Ruby's accessor does; a block answer to `to_h` that is not a
+/// pair refuses in Ruby's words.
+#[test]
+fn a_structs_views_and_walks_match_ruby() {
+    assert_both_print(
+        "evaluator_struct_views.pdx",
+        "struct Car\n  make\n  model\n  year\nend\ncar = Car.new(make: \"Ford\", model: \"Ranger\", year: nil)\np(car.to_h)\np(car.to_a)\np(car.values)\np(car.members)\np(car.size)\np(car.length)\ncar.each { |value| p(value) }\ncar.each_pair { |key, value| p([key, value]) }\np(car.select { |value| value == \"Ford\" })\np(car.filter { |value| value.nil? })\np(car.to_h { |key, value| [key.to_s, value.nil? ? \"\" : value.downcase] })\np(car.each { })\np(car.each_pair { })\nstruct Sized\n  size\nend\np(Sized.new(size: 42).size)\n",
+        "{make: \"Ford\", model: \"Ranger\", year: nil}\n[\"Ford\", \"Ranger\", nil]\n[\"Ford\", \"Ranger\", nil]\n[:make, :model, :year]\n3\n3\n\"Ford\"\n\"Ranger\"\nnil\n[:make, \"Ford\"]\n[:model, \"Ranger\"]\n[:year, nil]\n[\"Ford\"]\n[nil]\n{\"make\" => \"ford\", \"model\" => \"ranger\", \"year\" => \"\"}\nCar(make: \"Ford\", model: \"Ranger\", year: nil)\nCar(make: \"Ford\", model: \"Ranger\", year: nil)\n42\n",
+    );
+    let cases = [
+        (
+            "struct Pair\n  left\n  right\nend\np(Pair.new(left: 1, right: 2).to_h { |key, value| [key] })\n",
+            "element has wrong array length (expected 2, was 1)",
+        ),
+        (
+            "struct Pair\n  left\n  right\nend\np(Pair.new(left: 1, right: 2).to_h { |key, value| \"x\" })\n",
+            "wrong element type String (expected array)",
+        ),
+    ];
+    assert_both_oracles_refuse("struct_views_refusal.pdx", None, &cases);
+}
+
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
 /// (4.0.6, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its
