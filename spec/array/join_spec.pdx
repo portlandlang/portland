@@ -13,3 +13,26 @@ context "Array" do
     end
   end
 end
+
+# From ruby/spec core/array/join_spec.rb and its shared rows. The to_str
+# and to_ary conversions (ADR 0036), $,, recursive arrays (values never
+# mutate), encodings, and the refusal rows stay upstream.
+context "Array#join" do
+  specify "returns a string formed by concatenating each element.to_str separated by separator" do
+    expect([1, 2, 3, 4, "foo"].join(" | ")).to eq("1 | 2 | 3 | 4 | foo")
+  end
+
+  specify "uses the same separator with nested arrays" do
+    expect([1, [2, [3, 4], 5], 6].join(":")).to eq("1:2:3:4:5:6")
+  end
+
+  specify "does not separate elements when the passed separator is nil" do
+    expect([1, 2, 3].join(nil)).to eq("123")
+  end
+end
+
+context "Array#join with default separator" do
+  specify "returns an empty string if the Array is empty" do
+    expect([].join).to eq("")
+  end
+end

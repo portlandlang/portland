@@ -1,0 +1,20 @@
+# An array as source (#104), from ruby/spec core/array/inspect_spec.rb,
+# through the `inspect` function (ADR 0026). The mock, encoding, and
+# recursive-array rows stay upstream; `to_s` waits on #160.
+
+require_relative "../spec_helper"
+
+context "Array#inspect" do
+  specify "returns '[]' for an empty Array" do
+    expect(inspect([])).to eq("[]")
+  end
+
+  specify "calls inspect on its elements and joins the results with commas" do
+    expect(inspect([0, 1, 2])).to eq("[0, 1, 2]")
+    expect(inspect([1, "a", :b, nil, [2]])).to eq("[1, \"a\", :b, nil, [2]]")
+  end
+
+  specify "does not call #to_s on a String returned from #inspect" do
+    expect(inspect(["abc"])).to eq("[\"abc\"]")
+  end
+end

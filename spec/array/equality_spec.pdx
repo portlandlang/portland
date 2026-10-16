@@ -1,0 +1,36 @@
+# `Array#==` (#104), from ruby/spec core/array/equal_value_spec.rb and the
+# shared eql rows: element by element, numbers crossing kinds as Ruby's do.
+# The to_ary, mock, and recursive-array rows (values never mutate) stay
+# upstream; `eql?` waits on #154.
+
+require_relative "../spec_helper"
+
+context "Array#==" do
+  specify "returns true if other is the same array" do
+    same = [1]
+    expect(same == same).to be_true
+  end
+
+  specify "returns true if corresponding elements are #eql?" do
+    expect([] == []).to be_true
+    expect([1, 2, 3, 4] == [1, 2, 3, 4]).to be_true
+  end
+
+  specify "returns false if other is shorter than self" do
+    expect([1, 2, 3, 4] == [1, 2, 3]).to be_false
+  end
+
+  specify "returns false if other is longer than self" do
+    expect([1, 2, 3, 4] == [1, 2, 3, 4, 5]).to be_false
+  end
+
+  specify "returns false if any corresponding elements are not #==" do
+    expect(["a", "b", "c"] == ["a", "b", "not equal value"]).to be_false
+  end
+
+  specify "returns true if corresponding elements are #==" do
+    expect([] == []).to be_true
+    expect(["a", "c", 7] == ["a", "c", 7]).to be_true
+    expect([1, 2, 3] == [1.0, 2.0, 3.0]).to be_true
+  end
+end

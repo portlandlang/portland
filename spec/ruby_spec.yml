@@ -197,6 +197,38 @@ core/array/detect_spec.rb:
   status: partial_intentional
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
+core/array/constructor_spec.rb:
+  status: skipped
+  reason: "Array.[] builds what the literal already writes, from a class object that does not exist; the subclass rows have no subclass."
+  link: docs/ruby/metaprogramming.md
+core/array/element_reference_spec.rb:
+  pdx: [spec/array/index_spec.pdx, spec/array/slice_spec.pdx]
+  status: partial_intentional
+  reason: "A slice past the end answers the empty array, never nil (ADR 0019), a negative count refuses, and [index, count] is spelled slice(index, count); the to_int, subclass, and independence rows stay upstream."
+  link: docs/ruby/ranges.md
+core/array/element_set_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so []= on an array is a functional update rebound onto the name (ADR 0015), not the in-place write these rows exercise."
+  link: docs/ruby/mutability.md
+core/array/equal_value_spec.rb:
+  pdx: [spec/array/equality_spec.pdx]
+  status: partial_intentional
+  reason: "The to_ary and mock rows are the implicit-conversion protocol (ADR 0036); the recursive-array rows have nothing to recurse into, since values never mutate."
+  link: docs/ruby/aliases.md
+core/array/inspect_spec.rb:
+  pdx: [spec/array/inspect_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect([...]), not a method (ADR 0026); the mock, encoding, and recursive-array rows stay upstream."
+  link: docs/ruby/inspect.md
+core/array/join_spec.rb:
+  pdx: [spec/array/join_spec.pdx]
+  status: partial_intentional
+  reason: "The to_str and to_ary conversions (ADR 0036), $,, the recursive-array rows, the encoding rows, and the refusals stay upstream."
+  link: docs/ruby/aliases.md
+core/array/slice_spec.rb:
+  status: skipped
+  reason: "slice! removes in place; values never mutate (ADR 0015), and the slice half of the file is the shared rows ported for element_reference."
+  link: docs/ruby/mutability.md
 core/array/bsearch_spec.rb:
   pdx: [spec/array/bsearch_spec.pdx]
   status: partial_intentional

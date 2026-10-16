@@ -4682,12 +4682,21 @@ impl<W: std::io::Write> Interpreter<W> {
                 .into_iter()
                 .last()
                 .map_or(Value::Nil, Value::present),
+            // A negative start counts from the end, as Ruby's does; a start
+            // past either end answers the empty array, never nil (ADR 0019).
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
-                let start = usize::try_from(*start)
-                    .unwrap_or_else(|_| panic!("slice start must not be negative, got {start}"));
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                Value::array(elements.iter().skip(start).take(length).cloned().collect())
+                let start = if *start < 0 {
+                    start + elements.len() as i64
+                } else {
+                    *start
+                };
+                let taken: Vec<Value> = match usize::try_from(start) {
+                    Ok(start) => elements.iter().skip(start).take(length).cloned().collect(),
+                    Err(_) => Vec::new(),
+                };
+                Value::array(taken)
             }
             // `sort` takes a uniform array — all integers or all strings —
             // and refuses a mix, naming the first element that broke it.

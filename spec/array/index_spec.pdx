@@ -16,3 +16,36 @@ context "Array" do
     end
   end
 end
+
+# From ruby/spec core/array/element_reference_spec.rb, the one-index rows;
+# the slices with a count or a range are slice_spec.pdx's, and the to_int
+# and subclass rows stay upstream.
+context "Array#[]" do
+  specify "returns the element at index with [index]" do
+    expect(["a", "b", "c", "d", "e"][1]).to eq("b")
+    four = [1, 2, 3, 4]
+    expect(four[0]).to eq(1)
+    expect(four[1]).to eq(2)
+    expect(four[2]).to eq(3)
+    expect(four[3]).to eq(4)
+    expect(four[4]).to be_nil
+    expect(four[10]).to be_nil
+    expect(four).to eq([1, 2, 3, 4])
+  end
+
+  specify "returns the element at index from the end of the array with [-index]" do
+    expect(["a", "b", "c", "d", "e"][-2]).to eq("d")
+    four = [1, 2, 3, 4]
+    expect(four[-1]).to eq(4)
+    expect(four[-2]).to eq(3)
+    expect(four[-3]).to eq(2)
+    expect(four[-4]).to eq(1)
+    expect(four[-5]).to be_nil
+    expect(four[-10]).to be_nil
+    expect(four).to eq([1, 2, 3, 4])
+  end
+
+  specify "returns nil for a requested index not in the array with [index]" do
+    expect([1, 2, 3, 4][5]).to be_nil
+  end
+end
