@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Nine more core/hash files ported, two recorded as decided out** ([#105](https://github.com/portlandlang/portland/issues/105)) — `assoc`, `rassoc`, `flatten`, the four subset comparisons, `filter`, and `[]=` in `spec/hash/pairs_spec.pdx`; `clone` and `fetch_values` skipped with their reasons. The hosted evaluator's `flatten` no longer opens a guest symbol's tagged shape.
+
+- **`assoc`, `rassoc`, `flatten`, and the subset comparisons on hashes** ([#105](https://github.com/portlandlang/portland/issues/105)) — on both implementations, as Ruby's: `assoc` and `rassoc` ask `==` and answer a maybe pair; `flatten` lays the pairs out one level, or deeper on request; `<=`, `<`, `>=`, and `>` ask whether one hash's pairs all sit in the other, keys by `eql?` and values by `==`.
+
 - **Symbols order by their names** ([#105](https://github.com/portlandlang/portland/issues/105)) — `:a <=> :b`, the four comparisons, and so `[:b, :a].sort` and an array of symbol-keyed pairs, as Ruby's do. The seed had refused while the hosted evaluator ordered its tagged-array shape, so the two implementations disagreed.
 - **Six more core/hash files ported** ([#105](https://github.com/portlandlang/portland/issues/105)) — `transform_values`, `transform_keys`, `to_h`, `[]`, and `inspect` in `spec/hash/transforms_spec.pdx`, and `==` into `spec/hash/equality_spec.pdx`.
 

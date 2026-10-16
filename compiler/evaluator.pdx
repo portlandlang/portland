@@ -1424,6 +1424,15 @@ end
 # `values_at` takes any number of positions (#104); each rides the host's
 # alone, and flat_map joins their answers — one level, so an element that
 # is itself an array stays whole.
+# `flatten` to a depth, the seed's `flattened_to_depth`, opening only guest
+# arrays: a tagged shape stays whole. A negative depth opens them all.
+def flatten_guest(values, depth)
+  return values if depth == 0
+  values.flat_map do |value|
+    plain_array?(value) ? flatten_guest(value, depth - 1) : [value]
+  end
+end
+
 def values_at_of(receiver, arguments)
   arguments.flat_map { |position| receiver.values_at(position) }
 end
@@ -1938,7 +1947,12 @@ def evaluate_method_call(node, mutable bindings)
   when "tally" then receiver.tally
   when "zip" then receiver.zip(value_at(arguments, 0))
   when "each_slice" then receiver.each_slice(value_at(arguments, 0))
-  when "flatten" then receiver.flatten
+  # Guest-aware (#105): a guest symbol, struct, or enum case is a tagged
+  # array here, which the host's flatten would open. An array flattens all
+  # the way bare; a hash lays its pairs out one level, deeper on request.
+  when "flatten"
+    depth = if arguments.empty? then (receiver in Hash) ? 1 : -1 else value_at(arguments, 0) end
+    flatten_guest((receiver in Hash) ? receiver.to_a : receiver, depth)
   when "compact" then receiver.compact
   when "count" then count_of(receiver, arguments)
   when "index", "find_index" then receiver.index(value_at(arguments, 0))

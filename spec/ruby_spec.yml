@@ -787,6 +787,59 @@ core/hash/equal_value_spec.rb:
   status: partial_intentional
   reason: "Mocks counting their == and eql? calls, recursive hashes, to_hash, subclasses, and Hash.new defaults stay behind."
   link: docs/ruby/metaprogramming.md
+core/hash/assoc_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "The instance_of? check is reflection; compare_by_identity and Hash.new defaults stay behind."
+  link: docs/ruby/metaprogramming.md
+core/hash/rassoc_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "The instance_of? check is reflection; Hash.new defaults stay behind."
+  link: docs/ruby/metaprogramming.md
+core/hash/flatten_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "The instance_of? check is reflection; a non-Integer depth refuses where Ruby raises TypeError."
+  link: docs/ruby/metaprogramming.md
+core/hash/lt_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "No to_hash conversion (ADR 0036): a non-hash operand refuses where Ruby raises TypeError."
+  link: docs/ruby/aliases.md
+core/hash/lte_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "No to_hash conversion (ADR 0036): a non-hash operand refuses where Ruby raises TypeError."
+  link: docs/ruby/aliases.md
+core/hash/gt_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "No to_hash conversion (ADR 0036): a non-hash operand refuses where Ruby raises TypeError."
+  link: docs/ruby/aliases.md
+core/hash/gte_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "No to_hash conversion (ADR 0036): a non-hash operand refuses where Ruby raises TypeError."
+  link: docs/ruby/aliases.md
+core/hash/filter_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects; filter! stays behind with select!, since values never mutate."
+  link: docs/ruby/metaprogramming.md
+core/hash/element_set_spec.rb:
+  pdx: [spec/hash/pairs_spec.pdx]
+  status: partial_intentional
+  reason: "[]= is rebinding sugar on a mutable name (ADR 0015), so the rows about send, dup, freeze, and mocks stubbing hash stay behind."
+  link: docs/ruby/mutability.md
+core/hash/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate, so clone has nothing to copy and refuses (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/hash/fetch_values_spec.rb:
+  status: skipped
+  reason: "fetch is retired, fetch_values with it: a lookup miss answers a maybe, and the default is the or-guard."
+  link: docs/ruby/lookups.md
 # The mutators: values never mutate, names do (ADR 0015). Each rewrite
 # rebinds a mutable name — `table[key] = value` survives as that sugar.
 core/hash/store_spec.rb:

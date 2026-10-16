@@ -1770,6 +1770,23 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A hash's pairs by lookup and as a list, and the subset comparisons
+/// (#105): `assoc` and `rassoc` ask Ruby's `==` and answer a maybe pair,
+/// `flatten` lays the pairs out to a depth, and `<=`, `<`, `>=`, `>` ask
+/// whether one hash's pairs all sit in the other (Ruby 4.0.6, the expected
+/// lines). A comparison against a non-hash refuses as any mismatched
+/// operator does.
+#[test]
+fn hash_pairs_and_subsets_match_ruby() {
+    assert_both_print(
+        "evaluator_hash_pairs_subsets.pdx",
+        "table = {apple: :green, orange: :orange, grape: :green, banana: :yellow}\np(table.assoc(:grape))\np(table.assoc(:banana))\np(table.assoc(:green))\np({1.0 => :value}.assoc(1))\np(table.rassoc(:green))\np(table.rassoc(:yellow))\np(table.rassoc(:banana))\np({key: 1.0}.rassoc(1))\np({plato: :greek, witgenstein: [:austrian, :british], russell: :welsh}.flatten)\np({plato: :greek, witgenstein: [:austrian, :british], russell: :welsh}.flatten(2))\np({}.flatten)\np({a: 1} <= {a: 1, b: 2})\np({a: 1} < {a: 1, b: 2})\np({a: 1} < {a: 1})\np({a: 1} <= {a: 1})\np({a: 1, b: 2} >= {a: 1})\np({a: 1, b: 2} > {a: 1})\np({a: 1} > {a: 1})\np({a: 1} <= {a: 2})\np({a: 1} <= {b: 1})\np({a: 1.0} <= {a: 1})\n",
+        "[:grape, :green]\n[:banana, :yellow]\nnil\n[1.0, :value]\n[:apple, :green]\n[:banana, :yellow]\nnil\n[:key, 1.0]\n[:plato, :greek, :witgenstein, [:austrian, :british], :russell, :welsh]\n[:plato, :greek, :witgenstein, :austrian, :british, :russell, :welsh]\n[]\ntrue\ntrue\nfalse\ntrue\ntrue\ntrue\nfalse\nfalse\nfalse\ntrue\n",
+    );
+    let cases = [("p({a: 1} < 1)\n", "cannot apply '<' to ")];
+    assert_both_oracles_refuse("hash_subset_refusal.pdx", None, &cases);
+}
+
 /// Symbols order by their names, as Ruby's do (4.0.6, the expected lines),
 /// on both implementations — the seed had refused `:a <=> :b` while the
 /// hosted evaluator ordered its tagged-array shape, so an array of

@@ -1319,6 +1319,8 @@ def operator_takes?(operator, left, right)
     return true if left == ["string"] && right == ["string"]
     # Symbols order by their names (#105).
     return true if left == ["symbol"] && right == ["symbol"]
+    # Hashes compare as sets of pairs (#105), under everything but `<=>`.
+    return true if operator != "<=>" && (left in ["hash", *]) && (right in ["hash", *])
     # Arrays order element by element, under `<=>` alone.
     operator == "<=>" && (left in ["array", *]) && (right in ["array", *])
   when "+"

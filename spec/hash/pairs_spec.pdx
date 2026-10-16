@@ -1,0 +1,295 @@
+# A hash's pairs by lookup and as a list, and the subset comparisons
+# (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
+# the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method
+# objects. Staying upstream: instance_of? checks, compare_by_identity,
+# Hash.new defaults, to_hash conversion and the TypeError rows (Portland
+# refuses a non-hash operand), and []='s rows about dup, freeze, and mocks.
+
+require_relative "../spec_helper"
+
+context "Hash#assoc" do
+  table = {apple: :green, orange: :orange, grape: :green, banana: :yellow}
+
+  specify "returns a 2-element Array if the argument is == to a key of the Hash" do
+    expect(table.assoc(:grape).size).to eq(2)
+  end
+
+  specify "sets the first element of the Array to the located key" do
+    expect(table.assoc(:banana).first).to eq(:banana)
+  end
+
+  specify "sets the last element of the Array to the value of the located key" do
+    expect(table.assoc(:banana).last).to eq(:yellow)
+  end
+
+  specify "uses #== to compare the argument to the keys" do
+    expect(table.merge({1.0 => :value}).assoc(1)).to eq([1.0, :value])
+  end
+
+  specify "returns nil if the argument is not a key of the Hash" do
+    expect(table.assoc(:green)).to eq(nil)
+  end
+end
+
+context "Hash#rassoc" do
+  table = {apple: :green, orange: :orange, grape: :green, banana: :yellow}
+
+  specify "returns a 2-element Array if the argument is a value of the Hash" do
+    expect(table.rassoc(:orange).size).to eq(2)
+  end
+
+  specify "sets the first element of the Array to the key of the located value" do
+    expect(table.rassoc(:yellow).first).to eq(:banana)
+  end
+
+  specify "sets the last element of the Array to the located value" do
+    expect(table.rassoc(:yellow).last).to eq(:yellow)
+  end
+
+  specify "only returns the first matching key-value pair" do
+    expect(table.rassoc(:green)).to eq([:apple, :green])
+  end
+
+  specify "uses #== to compare the argument to the values" do
+    expect(table.merge({key: 1.0}).rassoc(1)).to eq([:key, 1.0])
+  end
+
+  specify "returns nil if the argument is not a value of the Hash" do
+    expect(table.rassoc(:banana)).to eq(nil)
+  end
+end
+
+context "Hash#flatten" do
+  table = {plato: :greek, witgenstein: [:austrian, :british], russell: :welsh}
+
+  specify "returns an empty Array for an empty Hash" do
+    expect({}.flatten).to eq([])
+  end
+
+  specify "sets each even index of the Array to a key of the Hash" do
+    flat = table.flatten
+    expect(flat[0]).to eq(:plato)
+    expect(flat[2]).to eq(:witgenstein)
+    expect(flat[4]).to eq(:russell)
+  end
+
+  specify "sets each odd index of the Array to the value corresponding to the previous element" do
+    flat = table.flatten
+    expect(flat[1]).to eq(:greek)
+    expect(flat[3]).to eq([:austrian, :british])
+    expect(flat[5]).to eq(:welsh)
+  end
+
+  specify "does not recursively flatten Array values when called without arguments" do
+    expect(table.flatten[3]).to eq([:austrian, :british])
+  end
+
+  specify "does not recursively flatten Hash values when called without arguments" do
+    nested = table.merge({russell: {born: :wales, influenced_by: :mill}})
+    expect(nested.flatten[5] == {born: :wales, influenced_by: :mill}.flatten).to eq(false)
+  end
+
+  specify "recursively flattens Array values when called with an argument >= 2" do
+    flat = table.flatten(2)
+    expect(flat[3]).to eq(:austrian)
+    expect(flat[4]).to eq(:british)
+  end
+
+  specify "recursively flattens Array values to the given depth" do
+    nested = table.merge({russell: [[:born, :wales], [:influenced_by, :mill]]})
+    flat = nested.flatten(2)
+    expect(flat[6]).to eq([:born, :wales])
+    expect(flat[7]).to eq([:influenced_by, :mill])
+  end
+end
+
+context "Hash#<" do
+  table = {a: 1, b: 2}
+  bigger = {a: 1, b: 2, c: 3}
+  unrelated = {c: 3, d: 4}
+  similar = {a: 2, b: 3}
+
+  specify "returns true if self is a subset of the other hash" do
+    expect(table < bigger).to eq(true)
+  end
+
+  specify "returns false if self is not a subset of the other hash" do
+    expect(bigger < table).to eq(false)
+  end
+
+  specify "returns false if both hashes have the same keys but different values" do
+    expect({a: 1} < {a: 2}).to eq(false)
+    expect({a: 2} < {a: 1}).to eq(false)
+  end
+
+  specify "returns false if both hashes are identical" do
+    expect(table < table).to eq(false)
+  end
+
+  specify "returns false when receiver size is larger than argument" do
+    expect(bigger < table).to eq(false)
+    expect(bigger < unrelated).to eq(false)
+  end
+
+  specify "returns false when receiver size is the same as argument" do
+    expect(table < table).to eq(false)
+    expect(table < unrelated).to eq(false)
+    expect(unrelated < table).to eq(false)
+  end
+
+  specify "returns true when receiver is a subset of argument" do
+    expect(table < bigger).to eq(true)
+  end
+
+  specify "returns false when keys match but values don't" do
+    expect(table < similar).to eq(false)
+    expect(similar < table).to eq(false)
+  end
+end
+
+context "Hash#<=" do
+  table = {a: 1, b: 2}
+  bigger = {a: 1, b: 2, c: 3}
+  unrelated = {c: 3, d: 4}
+  similar = {a: 2, b: 3}
+
+  specify "returns true if self is a subset of the other hash" do
+    expect(table <= bigger).to eq(true)
+  end
+
+  specify "returns false if self is not a subset of the other hash" do
+    expect(bigger <= table).to eq(false)
+  end
+
+  specify "returns false if both hashes have the same keys but different values" do
+    expect({a: 1} <= {a: 2}).to eq(false)
+    expect({a: 2} <= {a: 1}).to eq(false)
+  end
+
+  specify "returns true if both hashes are identical" do
+    expect(table <= table).to eq(true)
+  end
+
+  specify "returns false when receiver size is larger than argument" do
+    expect(bigger <= table).to eq(false)
+    expect(bigger <= unrelated).to eq(false)
+  end
+
+  specify "returns false when receiver size is the same as argument" do
+    expect(table <= unrelated).to eq(false)
+    expect(unrelated <= table).to eq(false)
+  end
+
+  specify "returns true when receiver is a subset of argument or equals to argument" do
+    expect(table <= bigger).to eq(true)
+    expect(table <= table).to eq(true)
+  end
+
+  specify "returns false when keys match but values don't" do
+    expect(table <= similar).to eq(false)
+    expect(similar <= table).to eq(false)
+  end
+end
+
+context "Hash#>" do
+  table = {a: 1, b: 2}
+  bigger = {a: 1, b: 2, c: 3}
+  unrelated = {c: 3, d: 4}
+  similar = {a: 2, b: 3}
+
+  specify "returns true if the other hash is a subset of self" do
+    expect(bigger > table).to eq(true)
+  end
+
+  specify "returns false if the other hash is not a subset of self" do
+    expect(table > bigger).to eq(false)
+  end
+
+  specify "returns false if both hashes have the same keys but different values" do
+    expect({a: 1} > {a: 2}).to eq(false)
+    expect({a: 2} > {a: 1}).to eq(false)
+  end
+
+  specify "returns false if both hashes are identical" do
+    expect(table > table).to eq(false)
+  end
+
+  specify "returns false when receiver size is smaller than argument" do
+    expect(table > bigger).to eq(false)
+    expect(unrelated > bigger).to eq(false)
+  end
+
+  specify "returns false when receiver size is the same as argument" do
+    expect(table > table).to eq(false)
+    expect(table > unrelated).to eq(false)
+    expect(unrelated > table).to eq(false)
+  end
+
+  specify "returns true when argument is a subset of receiver" do
+    expect(bigger > table).to eq(true)
+  end
+
+  specify "returns false when keys match but values don't" do
+    expect(table > similar).to eq(false)
+    expect(similar > table).to eq(false)
+  end
+end
+
+context "Hash#>=" do
+  table = {a: 1, b: 2}
+  bigger = {a: 1, b: 2, c: 3}
+  unrelated = {c: 3, d: 4}
+  similar = {a: 2, b: 3}
+
+  specify "returns true if the other hash is a subset of self" do
+    expect(bigger >= table).to eq(true)
+  end
+
+  specify "returns false if the other hash is not a subset of self" do
+    expect(table >= bigger).to eq(false)
+  end
+
+  specify "returns false if both hashes have the same keys but different values" do
+    expect({a: 1} >= {a: 2}).to eq(false)
+    expect({a: 2} >= {a: 1}).to eq(false)
+  end
+
+  specify "returns true if both hashes are identical" do
+    expect(table >= table).to eq(true)
+  end
+
+  specify "returns false when receiver size is smaller than argument" do
+    expect(table >= bigger).to eq(false)
+    expect(unrelated >= bigger).to eq(false)
+  end
+
+  specify "returns false when argument is not a subset or not equals to receiver" do
+    expect(table >= unrelated).to eq(false)
+    expect(unrelated >= table).to eq(false)
+  end
+
+  specify "returns true when argument is a subset of receiver or equals to receiver" do
+    expect(bigger >= table).to eq(true)
+    expect(table >= table).to eq(true)
+  end
+
+  specify "returns false when keys match but values don't" do
+    expect(table >= similar).to eq(false)
+    expect(similar >= table).to eq(false)
+  end
+end
+
+context "Hash#filter" do
+  specify "is an alias of Hash#select" do
+    table = {a: 1, b: 2, c: 3}
+    expect(table.filter { |key, value| value > 1 }).to eq(table.select { |key, value| value > 1 })
+  end
+end
+
+context "Hash#[]=" do
+  specify "associates the key with the value" do
+    mutable table = {a: 1}
+    table[:b] = 2
+    expect(table).to eq({b: 2, a: 1})
+  end
+end

@@ -412,6 +412,33 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `flatten` to a depth, Ruby's: each level opens the arrays one deep; a
+/// negative depth opens them all.
+fn flattened_to_depth(elements: &[Value], depth: i64) -> Vec<Value> {
+    if depth == 0 {
+        return elements.to_vec();
+    }
+    let mut opened = Vec::new();
+    for element in elements {
+        match element {
+            Value::Array(inner) => opened.extend(flattened_to_depth(inner, depth - 1)),
+            other => opened.push(other.clone()),
+        }
+    }
+    opened
+}
+
+/// Ruby's subset comparisons between hashes (#105): `left <= right` when
+/// every pair of `left` sits in `right` — the key by `eql?`, as a lookup
+/// finds it, the value by `==` — and `<` when `right` has more besides.
+fn hash_subset(left: &[(Value, Value)], right: &[(Value, Value)]) -> bool {
+    left.iter().all(|(key, value)| {
+        right
+            .iter()
+            .any(|(other_key, other_value)| other_key == key && value.ruby_equals(other_value))
+    })
+}
+
 /// Whether a hash answers `name` by walking its pairs as an array (#105).
 /// With a block, every Enumerable walk but the ones a hash owns (`each`
 /// yields two values; `select` and kin answer a hash) or Ruby's Hash lacks
@@ -992,6 +1019,19 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
         (Value::String(left), BinaryOperator::Spaceship, Value::String(right)) => Value::Integer(
             ordering_value(crate::value::canonical_ordering(&left, &right)),
         ),
+        // Hashes compare as sets of pairs (#105), Ruby's subset rule.
+        (Value::Hash(left), BinaryOperator::LessOrEqual, Value::Hash(right)) => {
+            Value::Boolean(hash_subset(&left, &right))
+        }
+        (Value::Hash(left), BinaryOperator::Less, Value::Hash(right)) => {
+            Value::Boolean(left.len() < right.len() && hash_subset(&left, &right))
+        }
+        (Value::Hash(left), BinaryOperator::GreaterOrEqual, Value::Hash(right)) => {
+            Value::Boolean(hash_subset(&right, &left))
+        }
+        (Value::Hash(left), BinaryOperator::Greater, Value::Hash(right)) => {
+            Value::Boolean(right.len() < left.len() && hash_subset(&right, &left))
+        }
         // Symbols order by their names, byte by byte, as Ruby's do (#105):
         // what lets an array of symbol-keyed pairs sort.
         (Value::Symbol(left), BinaryOperator::Spaceship, Value::Symbol(right)) => {
@@ -3430,6 +3470,33 @@ impl<W: std::io::Write> Interpreter<W> {
             // A hash's own answers (#105): keys match by `eql?` as a lookup's
             // do, values by Ruby's `==`.
             (hash @ Value::Hash(_), "to_h", []) => hash.clone(),
+            // The first pair whose key — or with `rassoc`, whose value — is
+            // the argument under Ruby's `==`, a maybe (#105).
+            (Value::Hash(pairs), "assoc" | "rassoc", [needle]) => pairs
+                .iter()
+                .find(|(key, value)| {
+                    let side = if name == "assoc" { key } else { value };
+                    side.ruby_equals(needle)
+                })
+                .map_or(Value::Nil, |(key, value)| {
+                    Value::present(Value::array(vec![key.clone(), value.clone()]))
+                }),
+            // The pairs laid out flat, one level by default, deeper on
+            // request: `flatten(2)` opens array values too (#105).
+            (Value::Hash(pairs), "flatten", [] | [Value::Integer(_)]) => {
+                let depth = match arguments.first() {
+                    Some(Value::Integer(depth)) => *depth,
+                    _ => 1,
+                };
+                let laid_out: Vec<Value> = pairs
+                    .iter()
+                    .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
+                    .collect();
+                Value::array(flattened_to_depth(&laid_out, depth))
+            }
+            (Value::Hash(_), "flatten", [other]) => {
+                panic!("flatten takes a depth, got {}", other.shown())
+            }
             // Bare `any?` asks whether the hash holds a pair, as Ruby's
             // does — every pair counts, so no truthiness is asked of one.
             (Value::Hash(pairs), "any?", []) => Value::Boolean(!pairs.is_empty()),
