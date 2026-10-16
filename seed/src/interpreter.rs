@@ -412,6 +412,29 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `Integer.sqrt` (ADR 0058): the integer square root, exact to the 64-bit
+/// edge, where a float's root would round past 2^53. A negative radicand
+/// refuses in Ruby's words.
+fn integer_sqrt(arguments: &[Value]) -> Value {
+    let number = match arguments {
+        [Value::Integer(number)] => *number,
+        [other] => panic!("Integer.sqrt takes an Integer, got {}", other.shown()),
+        _ => panic!("Integer.sqrt takes 1 argument, got {}", arguments.len()),
+    };
+    if number < 0 {
+        panic!("Numerical argument is out of domain - \"isqrt\"");
+    }
+    let radicand = number as i128;
+    let mut root = (number as f64).sqrt() as i128;
+    while root * root > radicand {
+        root -= 1;
+    }
+    while (root + 1) * (root + 1) <= radicand {
+        root += 1;
+    }
+    Value::Integer(root as i64)
+}
+
 /// Ruby's spread (ADR 0057): a block of two or more parameters handed
 /// exactly one array binds them from its elements, extra ones dropped. An
 /// array too short refuses where Ruby would fill the rest with nil.
@@ -2155,6 +2178,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 receiver,
                 safe,
             } => {
+                // The builtin types carry Ruby's type functions (ADR 0058):
+                // `Array.new`, `Integer.sqrt`. The name is not a value, and
+                // a struct or local wearing it wins, as everywhere.
+                if let Expression::Variable(type_name) = receiver.as_ref()
+                    && matches!(type_name.as_str(), "Array" | "Integer")
+                    && !self.variables.contains_key(type_name)
+                    && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
+                {
+                    let arguments: Vec<Value> = arguments
+                        .iter()
+                        .map(|argument| self.value_of(argument))
+                        .collect();
+                    return self.builtin_type_function(type_name, name, arguments, block.as_ref());
+                }
                 // `Name.new(...)` constructs a struct; the name is not a value.
                 if name == "new" {
                     // A defined `new` replaces the raw constructor everywhere
@@ -2373,6 +2410,61 @@ impl<W: std::io::Write> Interpreter<W> {
 
     /// `Name.new(field: value, ...)` — validate against the definition and
     /// build the value with fields in definition order.
+    /// `Array.new` and `Integer.sqrt` (ADR 0058), answering as Ruby's do:
+    /// an array bare, by count (nil-filled, as Ruby's), by count and fill,
+    /// by count and a block handed each index, or copied from an array;
+    /// an integer square root taken exactly, where a float would round
+    /// past 2^53. The refusals are Ruby's words where Ruby has them.
+    fn builtin_type_function(
+        &mut self,
+        type_name: &str,
+        name: &str,
+        arguments: Vec<Value>,
+        block: Option<&Block>,
+    ) -> Option<Value> {
+        match (type_name, name) {
+            ("Array", "new") => self.array_new(arguments, block),
+            ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
+            _ => panic!("{type_name} has no {name}"),
+        }
+    }
+
+    /// `Array.new` in Ruby's arities: bare, by count (nil-filled, as
+    /// Ruby's), by count and fill, by count and a block handed each index,
+    /// or copied from an array.
+    fn array_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
+        match arguments.as_slice() {
+            [] => Some(Value::array(Vec::new())),
+            [Value::Array(elements)] => Some(Value::array(elements.as_ref().clone())),
+            [Value::Integer(count)] | [Value::Integer(count), _] => {
+                if *count < 0 {
+                    panic!("negative array size");
+                }
+                let count = *count as usize;
+                if let Some(block) = block {
+                    if arguments.len() == 2 {
+                        panic!("Array.new takes a fill or a block, not both");
+                    }
+                    let mut built = Vec::with_capacity(count);
+                    for index in 0..count {
+                        let value = self.run_block(block, vec![Value::Integer(index as i64)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        built.push(
+                            value.unwrap_or_else(|| panic!("Array.new block produced no value")),
+                        );
+                    }
+                    return Some(Value::array(built));
+                }
+                let fill = arguments.get(1).cloned().unwrap_or(Value::Nil);
+                Some(Value::array(vec![fill; count]))
+            }
+            [_, _, _, ..] => panic!("Array.new takes 0 to 2 arguments, got {}", arguments.len()),
+            [other, ..] => panic!("Array.new takes a count or an array, got {}", other.shown()),
+        }
+    }
+
     fn construct_struct(
         &mut self,
         receiver: &Expression,

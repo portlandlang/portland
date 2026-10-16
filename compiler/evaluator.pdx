@@ -1513,6 +1513,54 @@ def evaluate_index(node, bindings)
 end
 
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
+# `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
+# shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
+# `Array.new` by count, count and fill, or array. The block form counts on
+# the host and hands each index to the guest block.
+def evaluate_builtin_type_function(node, mutable bindings)
+  mutable arguments = []
+  node.arguments.each do |argument|
+    step = evaluate_expression(argument, bindings)
+    bindings = step.bindings
+    arguments << slot_value(step.value)
+  end
+  type_name = node.receiver.name
+  if type_name == "Integer" && node.name == "sqrt"
+    panic("Integer.sqrt takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    return outcome([Integer.sqrt(value_at(arguments, 0))], bindings)
+  end
+  return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
+  panic("#{type_name} has no #{node.name}")
+end
+
+def evaluate_array_new(node, arguments, mutable bindings)
+  return outcome([Array.new], bindings) if arguments.empty?
+  panic("Array.new takes 0 to 2 arguments, got #{arguments.length}") if arguments.length > 2
+  count = value_at(arguments, 0)
+  unless (count in Integer) || plain_array?(count)
+    panic("Array.new takes a count or an array, got #{render_inspect(count)}")
+  end
+  if node.block.some?
+    panic("Array.new takes a fill or a block, not both") if arguments.length == 2
+    entry = bindings
+    mutable scope = bindings
+    mutable interrupt = nil
+    built = Array.new(count) do |index|
+      step = run_guest_block(node.block, [index], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    return outcome([built], scope)
+  end
+  built = if arguments.length == 2 then Array.new(count, value_at(arguments, 1)) else Array.new(count) end
+  outcome([built], bindings)
+end
+
 def evaluate_new(node, mutable bindings)
   # A struct name is bare (resolved outward) or a `::` path (absolute).
   written = if node.receiver in PathNode
@@ -1669,6 +1717,11 @@ end
 
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
+  # The builtin types carry Ruby's type functions (ADR 0058): the name is
+  # not a value, and a struct or local wearing it wins, as everywhere.
+  if (node.receiver in IdentifierNode) && %w[Array Integer].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+    return evaluate_builtin_type_function(node, bindings)
+  end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
     return evaluate_new(node, bindings)
   end

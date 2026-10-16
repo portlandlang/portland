@@ -390,9 +390,22 @@ end
 # `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
 # form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
 def synthesize_safe_call(node, types)
+  if builtin_type_function?(node, types)
+    return ["array", ["unknown"]] if node.name == "new"
+    return ["integer"] if node.name == "sqrt"
+  end
   receiver = synthesize(node.receiver, types)
   plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
   maybe_of(call_answer(plain, node, types))
+end
+
+# Ruby's type functions on the builtin types (ADR 0058): `Array.new`
+# answers an array, `Integer.sqrt` an integer. A struct or local wearing
+# the name wins, as everywhere, so only an unbound name is the type's.
+def builtin_type_function?(node, types)
+  return false unless node.receiver in IdentifierNode
+  return false unless %w[Array Integer].include?(node.receiver.name)
+  synthesize_name(node.receiver.name, types) == ["unknown"]
 end
 
 def call_answer(receiver, node, types)

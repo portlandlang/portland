@@ -833,7 +833,10 @@ def check_arity(node, scope, found)
 end
 
 def check_method_call(node, scope, mutable found)
-  found = check_node(node.receiver, scope, found)
+  # A builtin type's name is defined as a type function's receiver and
+  # nowhere else (ADR 0058): `Array.new(3)` passes, a bare `Array` is
+  # still undefined.
+  found = check_node(node.receiver, scope, found) unless builtin_type_function?(node, known_types(scope))
   found = check_body(node.arguments, scope, found)
   receiver = synthesize(node.receiver, known_types(scope))
   found = check_maybe_method(node, receiver, scope, found) if node in MethodCallNode

@@ -1770,6 +1770,41 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// The builtin types carry Ruby's type functions (ADR 0058, #159):
+/// `Array.new` bare, by count, by count and fill, by count and block, or
+/// from an array; `Integer.sqrt` exactly, past where a float would round
+/// (Ruby 4.0.6, the expected lines). A negative count or a negative
+/// radicand refuses in Ruby's words; a fill beside a block, or an argument
+/// of the wrong kind, refuses naming it.
+#[test]
+fn builtin_type_functions_match_ruby() {
+    assert_both_print(
+        "evaluator_builtin_type_functions.pdx",
+        "p(Array.new)\np(Array.new(3))\np(Array.new(3, 0))\np(Array.new(2, \"x\"))\np(Array.new(3) { |index| index * 2 })\np(Array.new(0) { 1 })\np(Array.new([4, 5, 6]))\np(Integer.sqrt(24))\np(Integer.sqrt(25))\np(Integer.sqrt(0))\np(Integer.sqrt(9223372036854775807))\n",
+        "[]\n[nil, nil, nil]\n[0, 0, 0]\n[\"x\", \"x\"]\n[0, 2, 4]\n[]\n[4, 5, 6]\n4\n5\n0\n3037000499\n",
+    );
+    let cases = [
+        ("p(Array.new(-1))\n", "negative array size"),
+        (
+            "p(Integer.sqrt(-1))\n",
+            "Numerical argument is out of domain - \"isqrt\"",
+        ),
+        (
+            "p(Array.new(\"a\"))\n",
+            "Array.new takes a count or an array, got \"a\"",
+        ),
+        (
+            "p(Integer.sqrt(2.5))\n",
+            "Integer.sqrt takes an Integer, got 2.5",
+        ),
+        (
+            "p(Array.new(2, 0) { 1 })\n",
+            "Array.new takes a fill or a block, not both",
+        ),
+    ];
+    assert_both_oracles_refuse("builtin_type_function_refusal.pdx", None, &cases);
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

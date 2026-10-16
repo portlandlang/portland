@@ -169,6 +169,11 @@ p([[1, :one]].to_h)
 p(counting.to_h { [it, it * 2] })
 p(counting.rfind { it < 3 })
 counting.reverse_each { |number| puts number }
+
+# The builtin types' own functions (ADR 0058).
+p(Array.new(3) { |index| index * index })
+p(Array.new(2, "x"))
+p(Integer.sqrt(24))
 p(counting.values_at(0, 2..3, 9))
 counting.each_index { |position| puts position }
 

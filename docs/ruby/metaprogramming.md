@@ -16,6 +16,8 @@ The replacement is **compile-time macros**: the metaprogramming joy (generating 
 
 This cut is not incidental — the cut-list and the "what blocks static safety and speed" list are nearly the same set. Deleting runtime dynamism is what buys inferred static types, AOT compilation, and fearless inlining.
 
+A builtin type is not a class object either — nothing to `allocate` from, no ancestors to ask about, no `instance_method` to compare — but its name carries Ruby's type functions ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)): `Array.new(3) { |index| index * 2 }` and `Integer.sqrt(24)` answer as Ruby's do, and the name on its own still refuses.
+
 ## Migration
 
 - Code that _uses_ metaprogrammed APIs (a `has_many`-style DSL) can look unchanged — the DSL words become macros.
