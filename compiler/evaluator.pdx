@@ -2215,8 +2215,22 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
-  when "select", "filter", "find_all"
+  when "select", "filter"
     results = receiver.select do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
+  # By its own name, since a hash's `find_all` answers its pairs as an
+  # array where its `select` answers a hash (#105).
+  when "find_all"
+    results = receiver.find_all do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
@@ -2493,6 +2507,18 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
+  when "count"
+    result = receiver.count do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([result], scope)
   when "one?"
     result = receiver.one? do |element|
       step = run_guest_block(block, [element], scope)

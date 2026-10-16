@@ -1770,6 +1770,19 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A hash walks as its pairs (#105): Ruby's Enumerable over a hash yields
+/// `[key, value]`, spread by a two-parameter block (ADR 0057), and
+/// `each_with_index` and `reverse_each` answer the hash itself, as Ruby's
+/// do (4.0.6, the expected lines). Arrays take `count` with a block too.
+#[test]
+fn a_hash_walks_as_its_pairs() {
+    assert_both_print(
+        "evaluator_hash_walks.pdx",
+        "table = {\"a\" => 1, \"b\" => 2, \"c\" => 3}\np(table.map { |key, value| \"#{key}=#{value}\" })\np(table.flat_map { |key, value| [key, value] })\np(table.any? { |key, value| value > 2 })\np(table.all? { |key, value| value > 0 })\np(table.none? { |key, value| value > 5 })\np(table.one? { |key, value| value == 2 })\np(table.find { |key, value| value == 2 })\np(table.detect { |key, value| value == 9 })\np(table.find_all { |key, value| value > 1 })\np(table.count)\np(table.count { |key, value| value.odd? })\np(table.sum { |key, value| value })\np(table.min_by { |key, value| -value })\np(table.max_by { |key, value| value })\np(table.sort_by { |key, value| -value })\np(table.partition { |key, value| value > 1 })\np(table.first)\np(table.first(2))\np(table.sort)\np(table.min)\np(table.max)\np(table.take(1))\np(table.drop(2))\np(table.take_while { |key, value| value < 3 })\np(table.zip([7, 8, 9]))\np(table.reduce(0) { |total, pair| total + pair.last })\np(table.uniq)\np(table.minmax)\np(table.each_with_index { |pair, index| pair })\np(table.reverse_each { |key, value| key })\ntable.each_with_index { |pair, index| puts(\"#{pair.first}#{index}\") }\ntable.reverse_each { |key, value| puts(key) }\np([1, 2, 3].count { it.odd? })\n",
+        "[\"a=1\", \"b=2\", \"c=3\"]\n[\"a\", 1, \"b\", 2, \"c\", 3]\ntrue\ntrue\ntrue\ntrue\n[\"b\", 2]\nnil\n[[\"b\", 2], [\"c\", 3]]\n3\n2\n6\n[\"c\", 3]\n[\"c\", 3]\n[[\"c\", 3], [\"b\", 2], [\"a\", 1]]\n[[[\"b\", 2], [\"c\", 3]], [[\"a\", 1]]]\n[\"a\", 1]\n[[\"a\", 1], [\"b\", 2]]\n[[\"a\", 1], [\"b\", 2], [\"c\", 3]]\n[\"a\", 1]\n[\"c\", 3]\n[[\"a\", 1]]\n[[\"c\", 3]]\n[[\"a\", 1], [\"b\", 2]]\n[[[\"a\", 1], 7], [[\"b\", 2], 8], [[\"c\", 3], 9]]\n6\n[[\"a\", 1], [\"b\", 2], [\"c\", 3]]\n[[\"a\", 1], [\"c\", 3]]\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\n{\"a\" => 1, \"b\" => 2, \"c\" => 3}\na0\nb1\nc2\nc\nb\na\n2\n",
+    );
+}
+
 /// The builtin types carry Ruby's type functions (ADR 0058, #159):
 /// `Array.new` bare, by count, by count and fill, by count and block, or
 /// from an array; `Integer.sqrt` exactly, past where a float would round

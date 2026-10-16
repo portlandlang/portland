@@ -412,6 +412,50 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// Whether a hash answers `name` by walking its pairs as an array (#105).
+/// With a block, every Enumerable walk but the ones a hash owns (`each`
+/// yields two values; `select` and kin answer a hash) or Ruby's Hash lacks
+/// (`index` and its kin, `each_slice`'s self-answer). Without one, the
+/// handful of Enumerable answers Ruby gives over the pairs.
+fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
+    if with_block {
+        return !matches!(
+            name,
+            "each"
+                | "each_pair"
+                | "each_key"
+                | "each_value"
+                | "each_slice"
+                | "each_index"
+                | "select"
+                | "filter"
+                | "reject"
+                | "filter_map"
+                | "to_h"
+                | "transform_keys"
+                | "transform_values"
+                | "index"
+                | "rindex"
+                | "rfind"
+        );
+    }
+    matches!(
+        name,
+        "count"
+            | "sum"
+            | "first"
+            | "sort"
+            | "min"
+            | "max"
+            | "minmax"
+            | "take"
+            | "drop"
+            | "zip"
+            | "tally"
+            | "uniq"
+    )
+}
+
 /// `Integer.sqrt` (ADR 0058): the integer square root, exact to the 64-bit
 /// edge, where a float's root would round past 2^53. A negative radicand
 /// refuses in Ruby's words.
@@ -2706,6 +2750,46 @@ impl<W: std::io::Write> Interpreter<W> {
                 );
             }
         }
+        // A hash walks as its pairs (#105): Ruby's Enumerable over a hash
+        // yields `[key, value]`, which a two-parameter block spreads (ADR
+        // 0057). The names a hash answers for itself — `each`, `select`,
+        // `reject`, and kin, which yield two values or answer a hash — stay
+        // its own; the two Enumerable walks that answer the hash itself are
+        // run here so they do.
+        if let Value::Hash(pairs) = &receiver
+            && hash_walks_as_pairs(name, block.is_some())
+        {
+            let elements: Vec<Value> = pairs
+                .iter()
+                .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
+                .collect();
+            if let Some(block) = block
+                && matches!(name, "each_with_index" | "reverse_each")
+            {
+                if !arguments.is_empty() {
+                    refusal("arity");
+                    panic!("'{name}' takes 0 arguments, got {}", arguments.len());
+                }
+                let ordered: Vec<Value> = if name == "reverse_each" {
+                    elements.into_iter().rev().collect()
+                } else {
+                    elements
+                };
+                for (index, pair) in ordered.into_iter().enumerate() {
+                    let handed = if name == "each_with_index" {
+                        vec![pair, Value::Integer(index as i64)]
+                    } else {
+                        vec![pair]
+                    };
+                    self.run_block(block, handed);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
+            }
+            return self.method_call(Value::array(elements), name, arguments, Vec::new(), block);
+        }
         if let Some(block) = block {
             return match (&receiver, name, arguments.as_slice()) {
                 (Value::Array(elements), "each", []) => {
@@ -2883,6 +2967,24 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                     }
                     Some(Value::array(vec![Value::array(kept), Value::array(rest)]))
+                }
+                // How many elements the block says true of (#105).
+                (Value::Array(elements), "count", []) => {
+                    let mut counted = 0;
+                    for element in elements.iter().cloned() {
+                        let verdict = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        match verdict {
+                            Some(Value::Boolean(true)) => counted += 1,
+                            Some(Value::Boolean(false)) => {}
+                            other => {
+                                panic!("count block must produce true or false, got {other:?}")
+                            }
+                        }
+                    }
+                    Some(Value::Integer(counted))
                 }
                 // Exactly one element the block says true of (#104).
                 (Value::Array(elements), "one?", []) => {
@@ -3402,7 +3504,11 @@ impl<W: std::io::Write> Interpreter<W> {
             // and answers the elements themselves, so `[1, 2.5]` keeps its
             // Integer where a float key would have rewritten it (Ruby's
             // shape). A mix of kinds refuses, naming what broke it.
-            (Value::Array(elements), "sort", []) if Self::all_structs(elements) => {
+            // Structs and arrays sort by `<=>` (ADR 0054), an array element
+            // by element — a hash's pairs, for one (#105).
+            (Value::Array(elements), "sort", [])
+                if Self::all_structs(elements) || Self::all_arrays(elements) =>
+            {
                 self.sort_by_spaceship(elements)
             }
             (Value::Array(elements), "sort", []) => {
