@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Ruby's string methods, first run** ([#106](https://github.com/portlandlang/portland/issues/106)) — twenty-four on both implementations, answering as Ruby's: `center`, `ljust`, `rjust`; `chop`, `chr`, `delete_prefix`, `delete_suffix`; `succ`/`next` by Ruby's own carry rule, so `"a-9"` steps to `"a-10"` and `"1999zzz"` to `"2000aaa"`; `ord`; `partition`, `rpartition`, `rindex`; `casecmp`, `casecmp?`; `each_char`, `each_line`, `upto`; `codepoints`, `bytes`, `bytesize`; `hex`, `oct`; and `sub` and `gsub` with a string pattern. Widths and positions count graphemes (ADR 0038). Character sets, regex patterns, and the mutators are not among them.
+
 - **`overlap?` on ranges, and nine more core/range files** ([#111](https://github.com/portlandlang/portland/issues/111)) — `overlap?` asks whether two ranges share an element by Ruby's rule, on both implementations; `overlap?` and `===` port to `spec/range/overlap_spec.pdx`, and `frozen?`, `dup`, `clone`, `range`, `initialize`, `%`, and `count` are recorded as decided out.
 
 - **Seventeen core/range files ported** ([#111](https://github.com/portlandlang/portland/issues/111)) — `spec/range/ends_spec.pdx`: begin, end, first, last, exclude_end?, to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each, reverse_each, and minmax, their integer rows.

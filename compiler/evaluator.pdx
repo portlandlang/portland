@@ -1885,6 +1885,26 @@ def evaluate_method_call(node, mutable bindings)
   when "size" then receiver.size
   when "ord" then receiver.ord
   when "empty?" then receiver.empty?
+  # Ruby's string methods, first run (#106), each riding the seed's.
+  when "center" then arguments.length == 2 ? receiver.center(value_at(arguments, 0), value_at(arguments, 1)) : receiver.center(value_at(arguments, 0))
+  when "ljust" then arguments.length == 2 ? receiver.ljust(value_at(arguments, 0), value_at(arguments, 1)) : receiver.ljust(value_at(arguments, 0))
+  when "rjust" then arguments.length == 2 ? receiver.rjust(value_at(arguments, 0), value_at(arguments, 1)) : receiver.rjust(value_at(arguments, 0))
+  when "chop" then receiver.chop
+  when "chr" then receiver.chr
+  when "delete_prefix" then receiver.delete_prefix(value_at(arguments, 0))
+  when "delete_suffix" then receiver.delete_suffix(value_at(arguments, 0))
+  when "partition" then receiver.partition(value_at(arguments, 0))
+  when "rpartition" then receiver.rpartition(value_at(arguments, 0))
+  when "rindex" then arguments.length == 2 ? receiver.rindex(value_at(arguments, 0), value_at(arguments, 1)) : receiver.rindex(value_at(arguments, 0))
+  when "casecmp" then receiver.casecmp(value_at(arguments, 0))
+  when "casecmp?" then receiver.casecmp?(value_at(arguments, 0))
+  when "codepoints" then receiver.codepoints
+  when "bytes" then receiver.bytes
+  when "bytesize" then receiver.bytesize
+  when "hex" then receiver.hex
+  when "oct" then receiver.oct
+  when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))
+  when "gsub" then receiver.gsub(value_at(arguments, 0), value_at(arguments, 1))
   when "upcase" then receiver.upcase
   when "downcase" then receiver.downcase
   # The trimmers, the case moves, and the line splitter ride the host.
@@ -2290,6 +2310,30 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     outcome([results], scope)
   # A hash's one-value walks (#105): each rides the host's by name, its
   # rebindings threaded through like every other walk's.
+  # A string's walks (#106): characters, lines, and successors, each
+  # answering the string.
+  when "each_char"
+    receiver.each_char do |character|
+      step = run_guest_block(block, [character], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
+  when "each_line"
+    receiver.each_line do |line|
+      step = run_guest_block(block, [line], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
   when "each_key"
     receiver.each_key do |key|
       step = run_guest_block(block, [key], scope)
@@ -2483,6 +2527,8 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
+  # An integer's or a string's `upto` (#106): the host walks by its own
+  # rule for the receiver's kind.
   when "upto"
     receiver.upto(value_at(arguments, 0)) do |number|
       step = run_guest_block(block, [number], scope)

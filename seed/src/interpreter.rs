@@ -412,6 +412,169 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
     }
 }
 
+/// `center`, `ljust`, and `rjust` (#106): the text padded to `width`
+/// graphemes with `padding` repeated, `center` giving the extra to the
+/// right as Ruby's does. An empty padding refuses in Ruby's words.
+fn padded(text: &str, width: i64, padding: &str, method: &str) -> String {
+    if padding.is_empty() {
+        panic!("zero width padding");
+    }
+    let length = text.graphemes(true).count() as i64;
+    if width <= length {
+        return text.to_string();
+    }
+    let total = (width - length) as usize;
+    let (left, right) = match method {
+        "ljust" => (0, total),
+        "rjust" => (total, 0),
+        _ => (total / 2, total - total / 2),
+    };
+    let fill = |count: usize| -> String { padding.graphemes(true).cycle().take(count).collect() };
+    format!("{}{}{}", fill(left), text, fill(right))
+}
+
+/// `rindex` (#106): the last grapheme position where `needle` starts, at
+/// or before `from` when given (counted from the end if negative), a
+/// maybe.
+fn last_position_of(text: &str, needle: &str, from: Option<i64>) -> Value {
+    let starts: Vec<usize> = text.grapheme_indices(true).map(|(at, _)| at).collect();
+    let length = starts.len() as i64;
+    let mut limit = from.unwrap_or(length);
+    if limit < 0 {
+        limit += length;
+        if limit < 0 {
+            return Value::Nil;
+        }
+    }
+    let limit = (limit.min(length)) as usize;
+    let candidates = starts.iter().enumerate().take(limit + 1);
+    for (position, &at) in candidates.rev() {
+        if text[at..].starts_with(needle) {
+            return Value::present(Value::Integer(position as i64));
+        }
+    }
+    if needle.is_empty() {
+        return Value::present(Value::Integer(limit as i64));
+    }
+    Value::Nil
+}
+
+/// Ruby's `String#succ` (#106), the rule `rb_str_succ` follows: the
+/// rightmost alphanumeric steps up — digit to digit, letter to letter of
+/// the same case — and a wrap carries leftward into the next alphanumeric.
+/// A carry crosses a non-alphanumeric only into one of the same kind
+/// (digit to digit, letter to letter), which is why `"a-9"` steps to
+/// `"a-10"` while `"1999zzz"` steps to `"2000aaa"`; a carry with nowhere
+/// to go inserts a `1`, `a`, or `A` just left of where it started. A
+/// string with no alphanumerics steps its last character up.
+fn string_successor(text: &str) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
+    let mut characters: Vec<char> = text.chars().collect();
+    if !characters.iter().any(char::is_ascii_alphanumeric) {
+        let last = characters.len() - 1;
+        if let Some(stepped) = char::from_u32(characters[last] as u32 + 1) {
+            characters[last] = stepped;
+        }
+        return characters.into_iter().collect();
+    }
+    let mut index = characters.len();
+    let mut carry: Option<char> = None;
+    let mut carry_position = 0;
+    let mut crossed_gap = false;
+    let mut last_wrapped: Option<char> = None;
+    while index > 0 {
+        index -= 1;
+        let character = characters[index];
+        if !character.is_ascii_alphanumeric() {
+            if carry.is_some() {
+                crossed_gap = true;
+            }
+            continue;
+        }
+        if let Some(wrapped) = last_wrapped
+            && crossed_gap
+            && wrapped.is_ascii_digit() != character.is_ascii_digit()
+        {
+            break;
+        }
+        let (stepped, wraps, extra) = match character {
+            '9' => ('0', true, '1'),
+            'z' => ('a', true, 'a'),
+            'Z' => ('A', true, 'A'),
+            other => ((other as u8 + 1) as char, false, other),
+        };
+        characters[index] = stepped;
+        if !wraps {
+            carry = None;
+            break;
+        }
+        carry = Some(extra);
+        carry_position = index;
+        last_wrapped = Some(character);
+        crossed_gap = false;
+    }
+    if let Some(extra) = carry {
+        characters.insert(carry_position, extra);
+    }
+    characters.into_iter().collect()
+}
+
+/// `hex` and the prefixed half of `oct` (#106): a sign, an optional
+/// prefix, then digits of the base with underscores between, read as far
+/// as they go; anything else is 0, as Ruby's are.
+fn parsed_in_base(text: &str, base: u32) -> i64 {
+    let trimmed = text.trim_start();
+    let (negative, rest) = match trimmed.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed)),
+    };
+    let prefix = match base {
+        16 => "0x",
+        8 => "0o",
+        2 => "0b",
+        _ => "",
+    };
+    let rest = rest
+        .strip_prefix(prefix)
+        .or_else(|| rest.strip_prefix(&prefix.to_uppercase()))
+        .unwrap_or(rest);
+    let mut value: i64 = 0;
+    let mut previous_underscore = true;
+    for character in rest.chars() {
+        if character == '_' && !previous_underscore {
+            previous_underscore = true;
+            continue;
+        }
+        let Some(digit) = character.to_digit(base) else {
+            break;
+        };
+        value = value
+            .saturating_mul(base as i64)
+            .saturating_add(digit as i64);
+        previous_underscore = false;
+    }
+    if negative { -value } else { value }
+}
+
+/// `oct` (#106): octal unless a prefix says otherwise — `0x`, `0b`, or
+/// `0o` — as Ruby's does.
+fn parsed_octal(text: &str) -> i64 {
+    let unsigned = text
+        .trim_start()
+        .trim_start_matches(['-', '+'])
+        .to_ascii_lowercase();
+    let base = if unsigned.starts_with("0x") {
+        16
+    } else if unsigned.starts_with("0b") {
+        2
+    } else {
+        8
+    };
+    parsed_in_base(text, base)
+}
+
 /// Ruby's `Range#overlap?` on integer ranges (#111).
 fn ranges_overlap(left: &Value, right: &Value) -> bool {
     let (
@@ -2972,6 +3135,43 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         if let Some(block) = block {
             return match (&receiver, name, arguments.as_slice()) {
+                // A string's walks (#106): its characters — graphemes (ADR
+                // 0038) — its lines with their newlines, and `upto`, its
+                // successors up to and including the end. Each answers the
+                // string.
+                (Value::String(text), "each_char" | "each_line", []) => {
+                    let pieces: Vec<String> = if name == "each_char" {
+                        text.graphemes(true).map(str::to_string).collect()
+                    } else {
+                        text.split_inclusive('\n').map(str::to_string).collect()
+                    };
+                    for piece in pieces {
+                        self.run_block(block, vec![Value::String(piece)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                (Value::String(text), "upto", [Value::String(last)]) => {
+                    let mut current = text.clone();
+                    let too_far = |current: &String| {
+                        current.chars().count() > last.chars().count()
+                            || (current.chars().count() == last.chars().count() && current > last)
+                    };
+                    while !too_far(&current) {
+                        let reached = current == *last;
+                        self.run_block(block, vec![Value::String(current.clone())]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        if reached {
+                            break;
+                        }
+                        current = string_successor(&current);
+                    }
+                    Some(receiver)
+                }
                 (Value::Array(elements), "each", []) => {
                     for element in elements.iter().cloned() {
                         self.run_block(block, vec![element]);
@@ -4204,6 +4404,106 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Float(number), "truncate", []) => {
                 float_to_integer(*number, number.trunc(), "truncate")
             }
+            // Ruby's string methods, first run (#106): padding, ends,
+            // succession, partitions, the byte and codepoint views, the
+            // number parses, and string-pattern substitution. Widths and
+            // positions count graphemes (ADR 0038).
+            (Value::String(text), "center" | "ljust" | "rjust", [Value::Integer(width)]) => {
+                Value::String(padded(text, *width, " ", name))
+            }
+            (
+                Value::String(text),
+                "center" | "ljust" | "rjust",
+                [Value::Integer(width), Value::String(padding)],
+            ) => Value::String(padded(text, *width, padding, name)),
+            (Value::String(text), "chop", []) => {
+                let mut graphemes: Vec<&str> = text.graphemes(true).collect();
+                graphemes.pop();
+                Value::String(graphemes.concat())
+            }
+            (Value::String(text), "chr", []) => {
+                Value::String(text.graphemes(true).next().unwrap_or("").to_string())
+            }
+            (Value::String(text), "delete_prefix", [Value::String(prefix)]) => Value::String(
+                text.strip_prefix(prefix.as_str())
+                    .unwrap_or(text)
+                    .to_string(),
+            ),
+            (Value::String(text), "delete_suffix", [Value::String(suffix)]) => Value::String(
+                text.strip_suffix(suffix.as_str())
+                    .unwrap_or(text)
+                    .to_string(),
+            ),
+            (Value::String(text), "succ" | "next", []) => Value::String(string_successor(text)),
+            (Value::String(text), "ord", []) => match text.chars().next() {
+                Some(character) => Value::Integer(character as i64),
+                None => panic!("empty string"),
+            },
+            (Value::String(text), "partition", [Value::String(separator)]) => {
+                match text.find(separator.as_str()) {
+                    Some(at) => Value::array(vec![
+                        Value::String(text[..at].to_string()),
+                        Value::String(separator.clone()),
+                        Value::String(text[at + separator.len()..].to_string()),
+                    ]),
+                    None => Value::array(vec![
+                        Value::String(text.clone()),
+                        Value::String(String::new()),
+                        Value::String(String::new()),
+                    ]),
+                }
+            }
+            (Value::String(text), "rpartition", [Value::String(separator)]) => {
+                match text.rfind(separator.as_str()) {
+                    Some(at) => Value::array(vec![
+                        Value::String(text[..at].to_string()),
+                        Value::String(separator.clone()),
+                        Value::String(text[at + separator.len()..].to_string()),
+                    ]),
+                    None => Value::array(vec![
+                        Value::String(String::new()),
+                        Value::String(String::new()),
+                        Value::String(text.clone()),
+                    ]),
+                }
+            }
+            (Value::String(text), "rindex", [Value::String(needle)]) => {
+                last_position_of(text, needle, None)
+            }
+            (Value::String(text), "rindex", [Value::String(needle), Value::Integer(from)]) => {
+                last_position_of(text, needle, Some(*from))
+            }
+            // `casecmp` folds ASCII case only, as Ruby's does; `casecmp?`
+            // folds all of Unicode.
+            (Value::String(text), "casecmp", [Value::String(other)]) => Value::Integer(
+                ordering_value(text.to_ascii_lowercase().cmp(&other.to_ascii_lowercase())),
+            ),
+            (Value::String(text), "casecmp?", [Value::String(other)]) => {
+                Value::Boolean(text.to_lowercase() == other.to_lowercase())
+            }
+            (Value::String(text), "codepoints", []) => Value::array(
+                text.chars()
+                    .map(|character| Value::Integer(character as i64))
+                    .collect(),
+            ),
+            (Value::String(text), "bytes", []) => Value::array(
+                text.bytes()
+                    .map(|byte| Value::Integer(byte as i64))
+                    .collect(),
+            ),
+            (Value::String(text), "bytesize", []) => Value::Integer(text.len() as i64),
+            (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
+            (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
+            (Value::String(text), "sub", [Value::String(pattern), Value::String(replacement)]) => {
+                Value::String(text.replacen(pattern.as_str(), replacement, 1))
+            }
+            (Value::String(text), "gsub", [Value::String(pattern), Value::String(replacement)]) => {
+                Value::String(text.replace(pattern.as_str(), replacement))
+            }
+            (Value::String(_), "sub" | "gsub", [other, _]) => panic!(
+                "wrong argument type {} (expected Regexp)",
+                other.type_name()
+            ),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
             (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
             (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),

@@ -427,8 +427,16 @@ def call_answer(receiver, node, types)
   when "length", "size", "count", "index", "find_index", "rindex", "gcd", "lcm", "pow", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate", "div", "ceildiv"
     synthesize_numeric_answer(receiver, name, arguments_empty: node.arguments.empty?)
   when "to_f", "fdiv", "quo", "next_float", "prev_float" then ["float"]
-  when "to_s", "upcase", "downcase", "capitalize", "swapcase", "reverse", "strip", "lstrip", "rstrip", "chomp", "join", "inspect"
+  when "to_s", "upcase", "downcase", "capitalize", "swapcase", "reverse", "strip", "lstrip", "rstrip", "chomp", "join", "inspect", "center", "ljust", "rjust", "chop", "chr", "delete_prefix", "delete_suffix", "sub", "gsub"
     synthesize_text_answer(receiver, name)
+  # A string's number views (#106).
+  when "ord", "bytesize", "hex", "oct", "casecmp" then ["integer"]
+  when "rindex"
+    return ["maybe", ["integer"]] if receiver == ["string"]
+    ["unknown"]
+  when "partition", "rpartition" then ["array", ["string"]]
+  when "codepoints", "bytes" then ["array", ["integer"]]
+  when "casecmp?" then ["boolean"]
   when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?"
     ["boolean"]
   when "chars", "split", "lines" then ["array", ["string"]]
@@ -563,6 +571,10 @@ def synthesize_block_call(node, receiver, types)
   when "each_key", "each_value"
     return receiver if receiver in ["hash", *]
     ["unknown"]
+  # A string's walks answer the string (#106).
+  when "each_char", "each_line"
+    return receiver if receiver == ["string"]
+    ["unknown"]
   # A hash's sort_by, take_while, and drop_while answer its pairs as an
   # array, as Ruby's do (#105), so only an array keeps its own type here.
   when "sort_by", "take_while", "drop_while", "each_index"
@@ -660,7 +672,7 @@ end
 # sentence handling it.
 def builtin_table(type)
   case type
-  in ["string"] then %w[between?/2 capitalize/0 chars/0 chomp/0 clamp/2 count/1 downcase/0 empty?/0 end_with?/1 failure?/0 include?/1 index/1 length/0 lines/0 lstrip/0 nil?/0 reverse/0 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1 strip/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0]
+  in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/2 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_char/0& each_line/0& empty?/0 end_with?/1 failure?/0 gsub/2 hex/0 include?/1 index/1 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1 strip/0 sub/2 succ/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0 upto/1&]
   in ["integer"] then %w[abs/0 between?/2 ceil/0-1 ceildiv/1 clamp/1-2 digits/0-1 div/1 divmod/1 downto/1& even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 odd?/0 ord/0 positive?/0 pow/1 pred/0 remainder/1 round/0-1 size/0 some?/0 succ/0 times/0& to_f/0 to_i/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 div/1 divmod/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[failure?/0 nil?/0 some?/0 to_s/0]

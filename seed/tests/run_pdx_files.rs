@@ -1770,6 +1770,30 @@ fn integer_rounding_matches_ruby() {
     assert_both_oracles_refuse("integer_rounding_refusal.pdx", None, &cases);
 }
 
+/// A first run of Ruby's string methods (#106), the ones with no regex,
+/// character set, or mutation in them, answering as Ruby 4.0.6's do (the
+/// expected lines): padding, `chop`, `chr`, the prefix and suffix drops,
+/// `succ`, `ord`, `partition`s, `rindex`, `casecmp`s, `each_char`,
+/// `each_line`, `codepoints`, `bytes`, `bytesize`, `hex`, `oct`, `sub` and
+/// `gsub` with a string pattern, and `upto`. Characters are graphemes
+/// (ADR 0038), which these ASCII rows cannot tell from scalars.
+#[test]
+fn string_methods_first_run_match_ruby() {
+    assert_both_print(
+        "evaluator_string_first_run.pdx",
+        "p(\"hello\".center(9, \"*\"))\np(\"hello\".center(10, \"ab\"))\np(\"hello\".center(3))\np(\"hello\".ljust(8))\np(\"hello\".ljust(8, \"12\"))\np(\"hello\".rjust(8, \"0\"))\np(\"hello\".chop)\np(\"\".chop)\np(\"hello\\n\".chop)\np(\"hello\".chr)\np(\"\".chr)\np(\"hello\".delete_prefix(\"he\"))\np(\"hello\".delete_prefix(\"lo\"))\np(\"hello\".delete_suffix(\"lo\"))\np(\"hello\".succ)\np(\"az\".succ)\np(\"zz\".succ)\np(\"a9\".succ)\np(\"Zz\".succ)\np(\"\".succ)\np(\"hello\".next)\np(\"a\".ord)\np(\"é\".ord)\np(\"hello\".partition(\"l\"))\np(\"hello\".partition(\"x\"))\np(\"hello\".rpartition(\"l\"))\np(\"hello\".rpartition(\"x\"))\np(\"hello\".rindex(\"l\"))\np(\"hello\".rindex(\"x\"))\np(\"hello\".rindex(\"l\", 2))\np(\"hello\".casecmp(\"HELLO\"))\np(\"hello\".casecmp(\"help\"))\np(\"hello\".casecmp?(\"HELLO\"))\np(\"hello\".casecmp?(\"help\"))\nmutable lines = []\n\"a\\nb\\n\".each_line { |line| lines = lines + [line] }\np(lines)\nmutable characters = []\n\"héy\".each_char { |character| characters = characters + [character] }\np(characters)\np(\"héllo\".codepoints)\np(\"hé\".bytes)\np(\"hé\".bytesize)\np(\"0x1f\".hex)\np(\"ff\".hex)\np(\"zz\".hex)\np(\"0o17\".oct)\np(\"17\".oct)\np(\"hello\".sub(\"l\", \"L\"))\np(\"hello\".gsub(\"l\", \"L\"))\np(\"hello\".sub(\"x\", \"L\"))\nmutable steps = []\n\"a\".upto(\"e\") { |step| steps = steps + [step] }\np(steps)\np(\"***\".succ)\np(\"a-9\".succ)\np(\"1999zzz\".succ)\np(\"ZZZ9999\".succ)\n",
+        "\"**hello**\"\n\"abhelloaba\"\n\"hello\"\n\"hello   \"\n\"hello121\"\n\"000hello\"\n\"hell\"\n\"\"\n\"hello\"\n\"h\"\n\"\"\n\"llo\"\n\"hello\"\n\"hel\"\n\"hellp\"\n\"ba\"\n\"aaa\"\n\"b0\"\n\"AAa\"\n\"\"\n\"hellp\"\n97\n233\n[\"he\", \"l\", \"lo\"]\n[\"hello\", \"\", \"\"]\n[\"hel\", \"l\", \"o\"]\n[\"\", \"\", \"hello\"]\n3\nnil\n2\n0\n-1\ntrue\nfalse\n[\"a\\n\", \"b\\n\"]\n[\"h\", \"é\", \"y\"]\n[104, 233, 108, 108, 111]\n[104, 195, 169]\n3\n31\n255\n0\n15\n15\n\"heLlo\"\n\"heLLo\"\n\"hello\"\n[\"a\", \"b\", \"c\", \"d\", \"e\"]\n\"**+\"\n\"a-10\"\n\"2000aaa\"\n\"AAAA0000\"\n",
+    );
+    let cases = [
+        ("p(\"hello\".center(9, \"\"))\n", "zero width padding"),
+        (
+            "p(\"hello\".sub(1, \"x\"))\n",
+            "wrong argument type Integer (expected Regexp)",
+        ),
+    ];
+    assert_both_oracles_refuse("string_first_run_refusal.pdx", None, &cases);
+}
+
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
 /// (4.0.6, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its
