@@ -2037,6 +2037,18 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// A collection's `to_s` is its `inspect` (ADR 0060), on both oracles, the
+/// expected lines Ruby 4.0.7's; `join` still renders elements by their
+/// own `to_s`.
+#[test]
+fn collection_to_s_is_inspect_on_both_oracles() {
+    assert_both_print(
+        "evaluator_collection_to_s.pdx",
+        "p([1, \"two\", :a, nil, [2, \"x\"], {a: 1}].to_s)\np(\"#{{a: 1, \"b\" => 2}}\")\nputs([1, \"two\"].to_s)\nputs(\"got #{[1, \"two\"]}\")\np([1, [2, \"x\"]].join(\",\"))\n",
+        "\"[1, \\\"two\\\", :a, nil, [2, \\\"x\\\"], {a: 1}]\"\n\"{a: 1, \\\"b\\\" => 2}\"\n[1, \"two\"]\ngot [1, \"two\"]\n\"1,2,x\"\n",
+    );
+}
+
 /// Ruby's bit math as named methods (ADR 0003, locked by #157), the
 /// expected lines Ruby 4.0.7's answers to the operator forms; a shift past
 /// 64 bits, a negative bit_count, and the `^` and `>>` glyphs refuse on

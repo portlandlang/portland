@@ -453,29 +453,13 @@ fn format_float(value: f64) -> String {
 impl fmt::Display for Value {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Array(elements) => {
-                write!(formatter, "[")?;
-                for (index, element) in elements.iter().enumerate() {
-                    if index > 0 {
-                        write!(formatter, ", ")?;
-                    }
-                    write!(formatter, "{element}")?;
-                }
-                write!(formatter, "]")
-            }
+            // A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's:
+            // `"got #{names}"` shows the quotes and colons that tell `["1"]`
+            // from `[1]`.
+            Value::Array(_) | Value::Hash(_) => write!(formatter, "{}", self.inspect()),
             Value::Boolean(value) => write!(formatter, "{value}"),
             Value::EnumCase { .. } => write!(formatter, "{}", self.inspect()),
             Value::Float(value) => write!(formatter, "{}", format_float(*value)),
-            Value::Hash(pairs) => {
-                write!(formatter, "{{")?;
-                for (index, (key, value)) in pairs.iter().enumerate() {
-                    if index > 0 {
-                        write!(formatter, ", ")?;
-                    }
-                    write!(formatter, "{key} => {value}")?;
-                }
-                write!(formatter, "}}")
-            }
             Value::Integer(value) => write!(formatter, "{value}"),
             Value::Range {
                 end,

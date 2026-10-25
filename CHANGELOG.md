@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A collection's `to_s` is its `inspect`** ([ADR 0060](docs/adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md), [#160](https://github.com/portlandlang/portland/issues/160)) — on both implementations, `[1, "two"].to_s` is `[1, "two"]` and `"#{{a: 1}}"` is `{a: 1}`, as Ruby's; `join` and the scalars are unchanged. core/array/to_s and core/hash/to_s ported into `spec/string/conversion_spec.pdx`.
+
 - **Ruby's bit math as named methods; ADR 0003 locked** ([#157](https://github.com/portlandlang/portland/issues/157)) — on both implementations: `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shift_left`, `shift_right` (a negative count shifts the other way; past 64 bits refuses, #156), Ruby's own `allbits?`, `anybits?`, `nobits?`, `bit_length`, `bit_count`, and `n[i]` reading one bit, every answer Ruby's; `^` and `>>` refuse naming their methods, as `&` already did. Twelve core/integer files ported into `spec/number/integer/bits_spec.pdx`.
 
 - **`eql?` on every value; `hash` stays unexposed** ([ADR 0059](docs/adr/0059-2026-10-25-eql-on-every-value-and-no-hash.md), [#154](https://github.com/portlandlang/portland/issues/154)) — on both implementations: `eql?` is Ruby's hash-key equality, same kind and same value with no promotion between numbers, element by element through arrays, hashes, ranges, and structs; `value.hash` refuses naming why. The seven core `eql_spec` files port into `spec/eql_spec.pdx`; the seven `hash_spec` files are recorded as decided out; the ledger gains [equality.md](docs/ruby/equality.md).

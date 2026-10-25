@@ -219,6 +219,11 @@ core/array/hash_spec.rb:
   status: skipped
   reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
   link: docs/ruby/equality.md
+core/array/to_s_spec.rb:
+  pdx: [spec/string/conversion_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of; a collection's to_s is its inspect (ADR 0060)."
+  link: docs/ruby/inspect.md
 core/array/equal_value_spec.rb:
   pdx: [spec/array/equality_spec.pdx]
   status: partial_intentional
@@ -1173,6 +1178,11 @@ core/hash/hash_spec.rb:
   status: skipped
   reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
   link: docs/ruby/equality.md
+core/hash/to_s_spec.rb:
+  pdx: [spec/string/conversion_spec.pdx]
+  status: partial_intentional
+  reason: "Compares the two answers rather than method objects, which a closed runtime has none of; a collection's to_s is its inspect (ADR 0060)."
+  link: docs/ruby/inspect.md
 core/hash/equal_value_spec.rb:
   pdx: [spec/hash/equality_spec.pdx]
   status: partial_intentional

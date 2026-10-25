@@ -71,6 +71,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0057](0057-2026-10-16-block-parameters-spread-a-yielded-array.md) — Block parameters spread a yielded array
 - [0058](0058-2026-10-16-builtin-types-carry-type-functions.md) — The builtin types carry Ruby's type functions
 - [0059](0059-2026-10-25-eql-on-every-value-and-no-hash.md) — `eql?` on every value; `hash` stays unexposed
+- [0060](0060-2026-10-25-a-collections-to-s-is-its-inspect.md) — A collection's `to_s` is its `inspect`
 
 <!-- /generated -->
 

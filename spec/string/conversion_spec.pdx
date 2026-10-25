@@ -171,7 +171,31 @@ context "to_s, on every value" do
       expect(42.to_s).to eq("42")
       expect(2.5.to_s).to eq("2.5")
       expect(true.to_s).to eq("true")
-      expect([1, "two"].to_s).to eq("[1, two]")
+      expect([1, "two"].to_s).to eq("[1, \"two\"]")
     end
+  end
+end
+
+# A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's, and
+# interpolation follows: the quotes and colons are what tell `["1"]` from
+# `[1]` in a log line. From ruby/spec core/array/to_s_spec.rb and
+# core/hash/to_s_spec.rb, which compare method objects; here the two
+# answers are compared. `join` is unaffected: it renders each element with
+# its own `to_s`, as Ruby's does.
+context "Array#to_s" do
+  specify "is an alias of Array#inspect" do
+    list = [1, "two", :a, nil, [2, "x"], {a: 1}]
+    expect(list.to_s).to eq(inspect(list))
+    expect(list.to_s).to eq("[1, \"two\", :a, nil, [2, \"x\"], {a: 1}]")
+    expect("#{[1, "two"]}").to eq("[1, \"two\"]")
+    expect([1, [2, "x"]].join(",")).to eq("1,2,x")
+  end
+end
+
+context "Hash#to_s" do
+  specify "is an alias of Hash#inspect" do
+    pairs = {a: 1, "b" => 2}
+    expect(pairs.to_s).to eq(inspect(pairs))
+    expect("#{pairs}").to eq("{a: 1, \"b\" => 2}")
   end
 end

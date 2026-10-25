@@ -1387,17 +1387,8 @@ def render(value)
   return render_inspect(value) if value.failure?
   return value_at(value, 1) if value in ["__symbol__", *]
   return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *]
-  if plain_array?(value)
-    rendered = value.map { render(it) }
-    return "[" + rendered.join(", ") + "]"
-  end
-  if value in Hash
-    mutable pairs = []
-    value.each do |key, entry|
-      pairs << "#{render(key)} => #{render(entry)}"
-    end
-    return "{" + pairs.join(", ") + "}"
-  end
+  # A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's.
+  return render_inspect(value) if plain_array?(value) || (value in Hash)
   "#{value}"
 end
 

@@ -7681,7 +7681,7 @@ end
     #[test]
     fn a_nested_hash_after_a_call_name_is_a_block_holding_it() {
         let source = "def twice\n  puts(\"got #{yield}\")\nend\ntwice {{name: 1}}\n";
-        assert_eq!(output_of(source), "got {name => 1}\n");
+        assert_eq!(output_of(source), "got {name: 1}\n");
     }
 
     /// ADR 0024: one reading is not an ambiguity, so the braces are this call's
@@ -8047,7 +8047,7 @@ end
     fn puts_prints_hashes_readably() {
         assert_eq!(
             output_of("puts({\"a\" => 1, \"b\" => 2})"),
-            "{a => 1, b => 2}\n"
+            "{\"a\" => 1, \"b\" => 2}\n"
         );
     }
 
@@ -9111,7 +9111,7 @@ end
         assert_eq!(output_of("puts 1 + 2"), "3\n");
         assert_eq!(output_of("name = \"pdx\"\nputs name\n"), "pdx\n");
         assert_eq!(output_of("puts true"), "true\n");
-        assert_eq!(output_of("puts %w[rose city]"), "[rose, city]\n");
+        assert_eq!(output_of("puts %w[rose city]"), "[\"rose\", \"city\"]\n");
         assert_eq!(
             output_of("def shout(word)\n  puts(word.upcase)\nend\nshout \"pdx\"\n"),
             "PDX\n"
