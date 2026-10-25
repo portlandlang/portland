@@ -1486,10 +1486,6 @@ core/integer/eql_spec.rb:
   status: partial_intentional
   reason: "Integers are 64-bit, so the bignum rows are written with fixnums; rationals wait on #124."
   link: docs/ruby/equality.md
-core/integer/hash_spec.rb:
-  status: skipped
-  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
-  link: docs/ruby/equality.md
 core/integer/equal_value_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
   status: partial_intentional
