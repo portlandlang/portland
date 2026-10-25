@@ -129,6 +129,7 @@ pub fn retired_sentence(name: &str) -> Option<String> {
                 "'{name}' mutates its receiver, and values never mutate here (ADR 0015) — '{stem}' answers the new value; bind it"
             )
         }
+        "hash" => "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)".to_string(),
         "freeze" | "frozen?" | "dup" | "clone" => format!(
             "'{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
         ),

@@ -3802,7 +3802,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // `failure?` included, since `return value if value.failure?` is
             // the propagation toolkit (ADR 0044) and a struct is the commonest
             // thing a fallible def answers (#92).
-            if !matches!(name, "failure?" | "nil?" | "some?" | "to_s") {
+            if !matches!(name, "eql?" | "failure?" | "nil?" | "some?" | "to_s") {
                 // A removed Ruby method names its rewrite (#135).
                 if let Some(sentence) = crate::lexer::retired_sentence(name) {
                     panic!("{sentence}");
@@ -4905,6 +4905,11 @@ impl<W: std::io::Write> Interpreter<W> {
             // which side of the sad line a value sits on, and every value has
             // an answer.
             (_, "failure?", []) => Value::Boolean(matches!(receiver, Value::Failure(_))),
+            // `eql?` is universal too (ADR 0059): the equality a hash key
+            // matches by — same kind, same value, no promotion between
+            // numbers, element by element through collections and structs —
+            // which is what `PartialEq` on a value already is.
+            (_, "eql?", [other]) => Value::Boolean(&receiver == other),
             (Value::Nil, name, _) => {
                 panic!("nil has no method '{name}' — handle the nil case first")
             }

@@ -158,6 +158,7 @@ def retired_sentence(name)
   when "map!", "collect!", "select!", "filter!", "reject!", "sort!", "sort_by!", "uniq!", "compact!", "flatten!", "reverse!", "shuffle!", "rotate!", "slice!", "upcase!", "downcase!", "capitalize!", "swapcase!", "strip!", "lstrip!", "rstrip!", "chomp!", "chop!", "squeeze!", "gsub!", "sub!", "tr!", "delete!", "succ!", "next!", "merge!", "transform_values!", "transform_keys!"
     stem = name.chop
     "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — '#{stem}' answers the new value; bind it"
+  when "hash" then "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)"
   when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
   when "to_sym", "intern" then "'#{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
   else nil

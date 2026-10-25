@@ -1,0 +1,188 @@
+# `eql?` on every value (ADR 0059): the equality a hash key matches by —
+# same kind and same value, no promotion between numbers, element by
+# element through arrays, hashes, ranges, and structs. `hash` is not
+# exposed; `value.hash` refuses, pinned by a two-oracle test.
+#
+# From ruby/spec core/{array,hash,range,struct,integer,float,string}/
+# eql_spec.rb and their shared files. What stays behind: the mocks counting
+# their calls, the recursive arrays and hashes (values never mutate, so
+# none can hold itself), to_ary and to_hash, subclasses, Hash.new defaults,
+# bignums, rationals, encodings, and the String rows Ruby's `<=>` answers.
+
+require_relative "spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+
+context "Integer#eql?" do
+  specify "returns true for the same value" do
+    expect(42.eql?(42)).to be_true
+  end
+
+  specify "returns false for a different Integer value" do
+    expect(42.eql?(43)).to be_false
+  end
+
+  specify "returns false for a Float with the same numeric value" do
+    expect(42.eql?(42.0)).to be_false
+  end
+end
+
+context "Float#eql?" do
+  specify "returns true if other is a Float equal to self" do
+    expect(0.0.eql?(0.0)).to be_true
+    expect(0.0.eql?(-0.0)).to be_true
+  end
+
+  specify "returns false if other is a Float not equal to self" do
+    expect(1.0.eql?(1.1)).to be_false
+  end
+
+  specify "returns false if other is not a Float" do
+    expect(1.0.eql?(1)).to be_false
+    expect(1.0.eql?(:one)).to be_false
+  end
+
+  specify "is never true of NaN" do
+    nan = 0.0 / 0.0
+    expect(nan.eql?(nan)).to be_false
+  end
+end
+
+context "String#eql?" do
+  specify "returns true if self <=> string returns 0" do
+    expect("hello".eql?("hello")).to be_true
+  end
+
+  specify "returns false if self <=> string does not return 0" do
+    expect("more".eql?("MORE")).to be_false
+    expect("less".eql?("greater")).to be_false
+  end
+
+  describe "when given a non-String" do
+    specify "returns false" do
+      expect("hello".eql?(5)).to be_false
+      expect("hello".eql?(:hello)).to be_false
+    end
+  end
+end
+
+context "Array#eql?" do
+  specify "returns true if other is the same array" do
+    list = [1]
+    expect(list.eql?(list)).to be_true
+  end
+
+  specify "returns true if corresponding elements are #eql?" do
+    expect([].eql?([])).to be_true
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4])).to be_true
+  end
+
+  specify "returns false if other is shorter than self" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3])).to be_false
+  end
+
+  specify "returns false if other is longer than self" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4, 5])).to be_false
+  end
+
+  specify "returns false if any corresponding elements are not #eql?" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4.0])).to be_false
+  end
+
+  specify "returns false if other is not a kind of Array" do
+    expect([1, 2, 3].eql?(123)).to be_false
+  end
+end
+
+context "Hash#eql?" do
+  specify "does not compare values when keys don't match" do
+    expect({1 => "x"}.eql?({2 => "x"})).to be_false
+  end
+
+  specify "returns false when the numbers of keys differ without comparing any elements" do
+    expect({}.eql?({1 => 1})).to be_false
+    expect({1 => 1}.eql?({})).to be_false
+  end
+
+  specify "compares keys with eql? semantics" do
+    expect({1.0 => "x"}.eql?({1.0 => "x"})).to be_true
+    expect({1 => "x"}.eql?({1.0 => "x"})).to be_false
+    expect({1.0 => "x"}.eql?({1 => "x"})).to be_false
+  end
+
+  specify "returns true if and only if other Hash has the same number of keys and each key-value pair matches" do
+    expect({a: 5}.eql?({})).to be_false
+    expect({a: 5}.eql?({a: 5})).to be_true
+    expect({a: 5}.eql?({"a" => 5})).to be_false
+    expect({a: 5}.eql?({"A" => 5})).to be_false
+    expect({a: 5}.eql?({a: 6})).to be_false
+  end
+
+  specify "compares the values in self to values in other hash" do
+    expect({1 => 2}.eql?({1 => 2.0})).to be_false
+    expect({1 => [2]}.eql?({1 => [2]})).to be_true
+  end
+end
+
+context "Range#eql?" do
+  specify "returns true if other has same begin, end, and exclude_end? values" do
+    expect((0..2).eql?(0..2)).to be_true
+    expect((5..10).eql?(Range.new(5, 10))).to be_true
+    expect((0xffff..0xfffff).eql?(0xffff..0xfffff)).to be_true
+  end
+
+  specify "returns false if one of the attributes differs" do
+    expect((1482..1911).eql?(1482...1911)).to be_false
+    expect((0xffff..0xfffff).eql?(0xffff...0xfffff)).to be_false
+    expect((1..3).eql?(1..4)).to be_false
+  end
+
+  specify "returns false if other is not a Range" do
+    expect((1..10).eql?(1)).to be_false
+    expect((1..10).eql?("a")).to be_false
+  end
+
+  specify "works for endless Ranges" do
+    expect((1..).eql?(1..)).to be_true
+    expect((1..).eql?(1...)).to be_false
+  end
+end
+
+context "Struct#eql?" do
+  specify "returns true if the other is the same object" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    expect(car.eql?(car)).to be_true
+  end
+
+  specify "returns true if the other has all the same fields" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    similar_car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    expect(car.eql?(similar_car)).to be_true
+  end
+
+  specify "returns false if the other is a different object or has different fields" do
+    car = Car.new(make: "Honda", model: "Accord", year: "1998")
+    different_car = Car.new(make: "Honda", model: "Accord", year: "1995")
+    expect(car.eql?(different_car)).to be_false
+  end
+
+  specify "returns false if any corresponding elements are not #eql?" do
+    car = Car.new(make: "Honda", model: "Accord", year: 1998)
+    similar_car = Car.new(make: "Honda", model: "Accord", year: 1998.0)
+    expect(car.eql?(similar_car)).to be_false
+  end
+end
+
+context "eql? on the rest" do
+  specify "nil, booleans, and symbols are eql? to themselves and nothing else" do
+    expect(nil.eql?(nil)).to be_true
+    expect(true.eql?(true)).to be_true
+    expect(true.eql?(false)).to be_false
+    expect(:a.eql?(:a)).to be_true
+    expect(:a.eql?("a")).to be_false
+  end
+end

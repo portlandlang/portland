@@ -210,6 +210,15 @@ core/array/element_set_spec.rb:
   status: skipped
   reason: "Values never mutate, so []= on an array is a functional update rebound onto the name (ADR 0015), not the in-place write these rows exercise."
   link: docs/ruby/mutability.md
+core/array/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "The mock, to_ary, and subclass rows stay upstream; values never mutate, so no array can hold itself."
+  link: docs/ruby/equality.md
+core/array/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/array/equal_value_spec.rb:
   pdx: [spec/array/equality_spec.pdx]
   status: partial_intentional
@@ -863,6 +872,12 @@ core/float/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
   link: docs/ruby/mutability.md
+core/float/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+core/float/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/float/equal_value_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
   status: partial_intentional
@@ -1149,6 +1164,15 @@ core/hash/inspect_spec.rb:
   status: partial_intentional
   reason: "inspect is a function, inspect(table), not a method (ADR 0026); mocks answering their own inspect, recursive hashes, and a nil key stay behind."
   link: docs/ruby/inspect.md
+core/hash/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Mocks counting their eql? and hash calls, recursive hashes, to_hash, subclasses, and Hash.new defaults stay behind."
+  link: docs/ruby/equality.md
+core/hash/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/hash/equal_value_spec.rb:
   pdx: [spec/hash/equality_spec.pdx]
   status: partial_intentional
@@ -1457,6 +1481,15 @@ core/integer/zero_spec.rb:
   status: partial_intentional
   reason: "Asking a method object for its owner is reflection a closed runtime does not have."
   link: docs/ruby/metaprogramming.md
+core/integer/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows are written with fixnums; rationals wait on #124."
+  link: docs/ruby/equality.md
+core/integer/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/integer/equal_value_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
   status: partial_intentional
@@ -1757,6 +1790,15 @@ core/range/inspect_spec.rb:
   status: partial_intentional
   reason: "inspect is a function, inspect(range), not a method (ADR 0026); ranges hold integers here, and a nil..nil range has no spelling."
   link: docs/ruby/inspect.md
+core/range/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Ranges hold integers here, so the string, float, struct-endpoint, subclass, and mock rows stay upstream."
+  link: docs/ruby/equality.md
+core/range/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/range/equal_value_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
   status: partial_intentional
@@ -2001,6 +2043,15 @@ core/string/end_with_spec.rb:
   status: partial_planned
   reason: "The regex rows wait on the regex decision."
   link: https://github.com/portlandlang/portland/issues/74
+core/string/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Strings are UTF-8 text, so the encoding rows stay upstream; no mocks, no subclasses."
+  link: docs/ruby/equality.md
+core/string/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/string/equal_value_spec.rb:
   pdx: [spec/string/equality_spec.pdx]
 core/string/freeze_spec.rb:
@@ -2200,6 +2251,15 @@ core/struct/element_set_spec.rb:
   status: skipped
   reason: "Values never mutate, so []= on a struct has nothing to assign and refuses (ADR 0015); with answers an updated copy."
   link: docs/ruby/mutability.md
+core/struct/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Values never mutate, so the recursive-structure row has nothing to build; a different struct with the same fields is a different type, as upstream's Struct.new row says."
+  link: docs/ruby/equality.md
+core/struct/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
+  link: docs/ruby/equality.md
 core/struct/equal_value_spec.rb:
   pdx: [spec/struct/equality_spec.pdx]
 core/struct/filter_spec.rb:

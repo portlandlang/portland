@@ -2037,6 +2037,9 @@ def evaluate_method_call(node, mutable bindings)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
+  # `eql?` is universal (ADR 0059): the host's own, which on a guest's
+  # tagged shapes is element by element, as the seed's is.
+  when "eql?" then receiver.eql?(value_at(arguments, 0))
   # The failure predicate rides the host like its presence siblings —
   # before ADR 0044 it was reachable only through `!`, so this arm was a
   # green-but-never-covered hosted gap.

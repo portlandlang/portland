@@ -31,6 +31,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Constants](constants.md) — `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
+- [Equality](equality.md) — `==` and `eql?` migrate unchanged; `hash` and `equal?` do not exist.
 - [Error handling: results, not raises](errors.md) — `begin/rescue/raise` do not exist; a fallible operation returns its value or a failure, and the unwrap toolkit you already use for absence handles it — failure is absence with a reason.
 - [Heredocs](heredocs.md) — Squiggly `<<~` only, SCREAMING_CAPS terminators; `<<` stays the append operator.
 - [`inspect` is a function, not a method](inspect.md) — the rendering is Ruby's, the spelling is `inspect(value)` — a function, because Portland's nil has no methods and absence is inspect's most important input.

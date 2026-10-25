@@ -49,7 +49,7 @@ candidates = %w[
   ceil finite? floor infinite? nan? next_float prev_float round to_i truncate
   capitalize chars chomp downcase end_with? lines lstrip rstrip split start_with? strip swapcase upcase
   id2name name
-  nil? some? failure? to_s
+  nil? some? failure? to_s eql?
   each_char sub gsub center ljust rjust tr delete squeeze ord chr bytes hex oct freeze frozen? dup clone
   chop delete_prefix delete_suffix partition rpartition rindex casecmp casecmp? each_line codepoints bytesize
   each_byte each_codepoint each_grapheme_cluster grapheme_clusters

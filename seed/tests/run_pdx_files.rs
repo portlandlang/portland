@@ -2037,6 +2037,23 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// `eql?` on every value (ADR 0059), the expected lines Ruby 4.0.7's: same
+/// kind and same value, no promotion, element by element; and `hash`
+/// refusing with its sentence on both oracles.
+#[test]
+fn eql_matches_ruby_and_hash_refuses_on_both_oracles() {
+    assert_both_print(
+        "evaluator_eql.pdx",
+        "p(1.eql?(1.0))\np(1.0.eql?(1.0))\np(0.0.eql?(-0.0))\np([1, 2].eql?([1, 2.0]))\np({1 => 1}.eql?({1.0 => 1}))\np((0..1).eql?(0..1))\np(\"a\".eql?(\"a\"))\np(:a.eql?(:a))\np(nil.eql?(nil))\np((1..).eql?(1..))\np((1..).eql?(1...))\np(1.eql?(1))\np((0.0 / 0.0).eql?(0.0 / 0.0))\np([1, [2]].eql?([1, [2]]))\np(true.eql?(true))\np(\"a\".eql?(:a))\n",
+        "false\ntrue\ntrue\nfalse\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\ntrue\nfalse\ntrue\ntrue\nfalse\n",
+    );
+    let cases = [(
+        "p(\"a\".hash)\n",
+        "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)",
+    )];
+    assert_both_oracles_refuse("hash_refusal.pdx", None, &cases);
+}
+
 /// `Integer#step` (#109) and Ruby 4.1's `Range#clamp` (#111) on both
 /// oracles — the step rows Ruby 4.0.7's, the clamp rows upstream's spec —
 /// and a symbol's inspect keeping its quotes beyond ASCII (#139).

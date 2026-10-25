@@ -360,7 +360,7 @@ def declared_shapes(nodes)
 end
 
 def shape_methods(declaration, traits)
-  mutable methods = %w[each each_pair failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields
+  mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields
   methods += def_names(declaration.methods)
   declaration.includes.each do |trait_name|
     # The builtin trait (ADR 0054) adds the two derived methods; the four
@@ -1265,7 +1265,7 @@ end
 def check_maybe_method(node, receiver, scope, found)
   return found unless receiver in ["maybe", *]
   return found unless known?(receiver)
-  return found if %w[failure? nil? some? to_s].include?(node.name)
+  return found if %w[eql? failure? nil? some? to_s].include?(node.name)
   spelling = spell_node(node.receiver)
   return found if spelling.nil?
   noted(found, ["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
