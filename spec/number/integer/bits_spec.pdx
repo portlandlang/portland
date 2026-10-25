@@ -1,0 +1,308 @@
+# Ruby's bit math as named methods (ADR 0003, locked by #157): the
+# operators are out of the grammar, the capability is here under names —
+# `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shift_left`, `shift_right` —
+# beside Ruby's own `allbits?`, `anybits?`, `nobits?`, `bit_length`,
+# `bit_count`, and the bit read `n[i]`. Every answer here is Ruby's.
+#
+# From ruby/spec core/integer/{bit_and,bit_or,bit_xor,complement,
+# left_shift,right_shift,allbits,anybits,nobits,bit_length,bit_count,
+# element_reference}_spec.rb, the fixnum rows. What stays behind: the
+# bignum rows (integers are 64-bit, #156), coerce and to_int (ADR 0036), a
+# Float operand (refuses here where Ruby raises TypeError), and the
+# two-argument and range forms of `n[i]`.
+
+require_relative "../../spec_helper"
+
+context "Integer#bit_and" do
+  specify "returns self bitwise AND other" do
+    expect(256.bit_and(16)).to eq(0)
+    expect(2010.bit_and(5)).to eq(0)
+    expect(65535.bit_and(1)).to eq(1)
+  end
+
+  specify "returns self bitwise AND other when one operand is negative" do
+    expect(1.shift_left(33).bit_and(-1)).to eq(1.shift_left(33))
+    expect(-1.bit_and(1.shift_left(33))).to eq(1.shift_left(33))
+    expect((-(1.shift_left(33)) - 1).bit_and(5)).to eq(5)
+  end
+
+  specify "returns self bitwise AND other when both operands are negative" do
+    expect(-5.bit_and(-1)).to eq(-5)
+    expect(-3.bit_and(-4)).to eq(-4)
+    expect(-12.bit_and(-13)).to eq(-16)
+    expect(-13.bit_and(-12)).to eq(-16)
+  end
+end
+
+context "Integer#bit_or" do
+  specify "returns self bitwise OR other" do
+    expect(1.bit_or(0)).to eq(1)
+    expect(5.bit_or(4)).to eq(5)
+    expect(5.bit_or(6)).to eq(7)
+    expect(248.bit_or(4096)).to eq(4344)
+  end
+
+  specify "returns self bitwise OR other when one operand is negative" do
+    expect(1.shift_left(33).bit_or(-1)).to eq(-1)
+    expect(-1.bit_or(1.shift_left(33))).to eq(-1)
+    expect((-(1.shift_left(33)) - 1).bit_or(5)).to eq(-8589934593)
+  end
+
+  specify "returns self bitwise OR other when both operands are negative" do
+    expect(-5.bit_or(-1)).to eq(-1)
+    expect(-3.bit_or(-4)).to eq(-3)
+    expect(-12.bit_or(-13)).to eq(-9)
+    expect(-13.bit_or(-12)).to eq(-9)
+  end
+end
+
+context "Integer#bit_xor" do
+  specify "returns self bitwise EXCLUSIVE OR other" do
+    expect(3.bit_xor(5)).to eq(6)
+    expect(-2.bit_xor(-255)).to eq(255)
+  end
+
+  specify "returns self bitwise XOR other when one operand is negative" do
+    expect(1.shift_left(33).bit_xor(-1)).to eq(-8589934593)
+    expect(-1.bit_xor(1.shift_left(33))).to eq(-8589934593)
+    expect((-(1.shift_left(33)) - 1).bit_xor(5)).to eq(-8589934598)
+  end
+
+  specify "returns self bitwise XOR other when both operands are negative" do
+    expect(-5.bit_xor(-1)).to eq(4)
+    expect(-3.bit_xor(-4)).to eq(1)
+    expect(-12.bit_xor(-13)).to eq(7)
+    expect(-13.bit_xor(-12)).to eq(7)
+  end
+end
+
+context "Integer#bit_not" do
+  specify "returns self with each bit flipped" do
+    expect(0.bit_not).to eq(-1)
+    expect(1221.bit_not).to eq(-1222)
+    expect(-2.bit_not).to eq(1)
+    expect(-599.bit_not).to eq(598)
+  end
+end
+
+context "Integer#shift_left (with n << m)" do
+  specify "returns n shifted left m bits when n > 0, m > 0" do
+    expect(1.shift_left(1)).to eq(2)
+  end
+
+  specify "returns n shifted left m bits when n < 0, m > 0" do
+    expect(-1.shift_left(1)).to eq(-2)
+    expect(-7.shift_left(1)).to eq(-14)
+    expect(-42.shift_left(2)).to eq(-168)
+  end
+
+  specify "returns n shifted right m bits when n > 0, m < 0" do
+    expect(2.shift_left(-1)).to eq(1)
+  end
+
+  specify "returns n shifted right m bits when n < 0, m < 0" do
+    expect(-2.shift_left(-1)).to eq(-1)
+  end
+
+  specify "returns 0 when n == 0" do
+    expect(0.shift_left(1)).to eq(0)
+  end
+
+  specify "returns n when n > 0, m == 0" do
+    expect(1.shift_left(0)).to eq(1)
+  end
+
+  specify "returns n when n < 0, m == 0" do
+    expect(-1.shift_left(0)).to eq(-1)
+  end
+
+  specify "returns 0 when n > 0, m < 0 and n < 2**-m" do
+    expect(3.shift_left(-2)).to eq(0)
+    expect(7.shift_left(-3)).to eq(0)
+    expect(127.shift_left(-7)).to eq(0)
+    expect(7.shift_left(-32)).to eq(0)
+    expect(7.shift_left(-64)).to eq(0)
+  end
+
+  specify "returns -1 when n < 0, m < 0 and n > -(2**-m)" do
+    expect(-3.shift_left(-2)).to eq(-1)
+    expect(-7.shift_left(-3)).to eq(-1)
+    expect(-127.shift_left(-7)).to eq(-1)
+    expect(-7.shift_left(-32)).to eq(-1)
+    expect(-7.shift_left(-64)).to eq(-1)
+  end
+end
+
+context "Integer#shift_right (with n >> m)" do
+  specify "returns n shifted right m bits when n > 0, m > 0" do
+    expect(2.shift_right(1)).to eq(1)
+  end
+
+  specify "returns n shifted right m bits when n < 0, m > 0" do
+    expect(-2.shift_right(1)).to eq(-1)
+    expect(-7.shift_right(1)).to eq(-4)
+    expect(-42.shift_right(2)).to eq(-11)
+  end
+
+  specify "returns n shifted left m bits when n > 0, m < 0" do
+    expect(1.shift_right(-1)).to eq(2)
+  end
+
+  specify "returns n shifted left m bits when n < 0, m < 0" do
+    expect(-1.shift_right(-1)).to eq(-2)
+  end
+
+  specify "returns 0 when n == 0" do
+    expect(0.shift_right(1)).to eq(0)
+  end
+
+  specify "returns n when n > 0, m == 0" do
+    expect(1.shift_right(0)).to eq(1)
+  end
+
+  specify "returns n when n < 0, m == 0" do
+    expect(-1.shift_right(0)).to eq(-1)
+  end
+
+  specify "returns 0 when n > 0, m > 0 and n < 2**m" do
+    expect(3.shift_right(2)).to eq(0)
+    expect(7.shift_right(3)).to eq(0)
+    expect(127.shift_right(7)).to eq(0)
+    expect(7.shift_right(32)).to eq(0)
+    expect(7.shift_right(64)).to eq(0)
+  end
+
+  specify "returns -1 when n < 0, m > 0 and n > -(2**m)" do
+    expect(-3.shift_right(2)).to eq(-1)
+    expect(-7.shift_right(3)).to eq(-1)
+    expect(-127.shift_right(7)).to eq(-1)
+    expect(-7.shift_right(32)).to eq(-1)
+    expect(-7.shift_right(64)).to eq(-1)
+  end
+end
+
+context "Integer#allbits?" do
+  specify "returns true if and only if all the bits of the argument are set in the receiver" do
+    expect(42.allbits?(42)).to be_true
+    expect(0b1010_1010.allbits?(0b1000_0010)).to be_true
+    expect(0b1010_1010.allbits?(0b1000_0001)).to be_false
+    expect(0b1000_0010.allbits?(0b1010_1010)).to be_false
+  end
+
+  specify "handles negative values using two's complement notation" do
+    expect(0b1.bit_not.allbits?(42)).to be_true
+    expect(-42.allbits?(-42)).to be_true
+    expect(0b1010_1010.bit_not.allbits?(0b1110_1011.bit_not)).to be_true
+    expect(0b1010_1010.bit_not.allbits?(0b1000_0010.bit_not)).to be_false
+  end
+end
+
+context "Integer#anybits?" do
+  specify "returns true if and only if all the bits of the argument are set in the receiver" do
+    expect(42.anybits?(42)).to be_true
+    expect(0b1010_1010.anybits?(0b1000_0010)).to be_true
+    expect(0b1010_1010.anybits?(0b1000_0001)).to be_true
+    expect(0b1000_0010.anybits?(0b0010_1100)).to be_false
+  end
+
+  specify "handles negative values using two's complement notation" do
+    expect(0b1.bit_not.anybits?(42)).to be_true
+    expect(-42.anybits?(-42)).to be_true
+    expect(0b1010_1010.bit_not.anybits?(0b1010_1010)).to be_false
+  end
+end
+
+context "Integer#nobits?" do
+  specify "returns true if and only if all no bits of the argument are set in the receiver" do
+    expect(42.nobits?(42)).to be_false
+    expect(0b1010_1010.nobits?(0b1000_0010)).to be_false
+    expect(0b1010_1010.nobits?(0b1000_0001)).to be_false
+    expect(0b0100_0101.nobits?(0b1010_1010)).to be_true
+  end
+
+  specify "handles negative values using two's complement notation" do
+    expect(0b1101.bit_not.nobits?(0b1101)).to be_true
+    expect(-42.nobits?(-42)).to be_false
+    expect(0b1101.bit_not.nobits?(0b10.bit_not)).to be_false
+  end
+end
+
+context "Integer#bit_length" do
+  specify "returns the position of the leftmost bit of a positive number" do
+    expect(0.bit_length).to eq(0)
+    expect(1.bit_length).to eq(1)
+    expect(2.bit_length).to eq(2)
+    expect(3.bit_length).to eq(2)
+    expect(4.bit_length).to eq(3)
+    expect(0xff.bit_length).to eq(8)
+    expect(0x100.bit_length).to eq(9)
+    expect((2 ** 12 - 1).bit_length).to eq(12)
+    expect((2 ** 12).bit_length).to eq(13)
+    expect((2 ** 12 + 1).bit_length).to eq(13)
+    expect(9223372036854775807.bit_length).to eq(63)
+  end
+
+  specify "returns the position of the leftmost 0 bit of a negative number" do
+    expect(-1.bit_length).to eq(0)
+    expect(-2.bit_length).to eq(1)
+    expect(-3.bit_length).to eq(2)
+    expect(-4.bit_length).to eq(2)
+    expect(-5.bit_length).to eq(3)
+    expect((-(2 ** 12) - 1).bit_length).to eq(13)
+    expect((-(2 ** 12)).bit_length).to eq(12)
+    expect((-(2 ** 12) + 1).bit_length).to eq(12)
+    expect(-0x101.bit_length).to eq(9)
+    expect(-0x100.bit_length).to eq(8)
+    expect(-0xff.bit_length).to eq(8)
+  end
+end
+
+context "Integer#bit_count" do
+  specify "returns the number of set bits in the binary representation" do
+    expect(0.bit_count).to eq(0)
+    expect(1.bit_count).to eq(1)
+    expect(2.bit_count).to eq(1)
+    expect(3.bit_count).to eq(2)
+    expect(7.bit_count).to eq(3)
+    expect(0b10101.bit_count).to eq(3)
+    expect(0xff.bit_count).to eq(8)
+    expect(0x100.bit_count).to eq(1)
+    expect(9223372036854775807.bit_count).to eq(63)
+  end
+end
+
+context "Integer#[]" do
+  specify "behaves like (n >> b) & 1" do
+    expect(0b101[1]).to eq(0)
+    expect(0b101[2]).to eq(1)
+  end
+
+  specify "returns 1 if the nth bit is set" do
+    expect(15[1]).to eq(1)
+  end
+
+  specify "returns 1 if the nth bit is set (in two's-complement representation)" do
+    expect(-1[1]).to eq(1)
+  end
+
+  specify "returns 0 if the nth bit is not set" do
+    expect(8[2]).to eq(0)
+  end
+
+  specify "returns 0 if the nth bit is not set (in two's-complement representation)" do
+    expect(-2[0]).to eq(0)
+  end
+
+  specify "returns 0 if the nth bit is greater than the most significant bit" do
+    expect(2[3]).to eq(0)
+  end
+
+  specify "returns 1 if self is negative and the nth bit is greater than the most significant bit" do
+    expect(-1[3]).to eq(1)
+  end
+
+  specify "returns 0 when passed a negative argument" do
+    expect(3[-1]).to eq(0)
+    expect(-1[-1]).to eq(0)
+  end
+end

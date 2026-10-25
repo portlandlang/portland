@@ -2072,6 +2072,18 @@ def evaluate_method_call(node, mutable bindings)
   when "take" then receiver.take(value_at(arguments, 0))
   when "drop" then receiver.drop(value_at(arguments, 0))
   when "gcd" then receiver.gcd(value_at(arguments, 0))
+  # Ruby's bit math as named methods (ADR 0003, #157): the host's own.
+  when "bit_and" then receiver.bit_and(value_at(arguments, 0))
+  when "bit_or" then receiver.bit_or(value_at(arguments, 0))
+  when "bit_xor" then receiver.bit_xor(value_at(arguments, 0))
+  when "bit_not" then receiver.bit_not
+  when "shift_left" then receiver.shift_left(value_at(arguments, 0))
+  when "shift_right" then receiver.shift_right(value_at(arguments, 0))
+  when "allbits?" then receiver.allbits?(value_at(arguments, 0))
+  when "anybits?" then receiver.anybits?(value_at(arguments, 0))
+  when "nobits?" then receiver.nobits?(value_at(arguments, 0))
+  when "bit_length" then receiver.bit_length
+  when "bit_count" then receiver.bit_count
   when "lcm" then receiver.lcm(value_at(arguments, 0))
   when "digits" then arguments.empty? ? receiver.digits : receiver.digits(value_at(arguments, 0))
   when "gcdlcm" then receiver.gcdlcm(value_at(arguments, 0))

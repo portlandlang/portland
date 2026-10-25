@@ -1481,6 +1481,66 @@ core/integer/zero_spec.rb:
   status: partial_intentional
   reason: "Asking a method object for its owner is reflection a closed runtime does not have."
   link: docs/ruby/metaprogramming.md
+core/integer/bit_and_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is bit_and (ADR 0003); integers are 64-bit, so the bignum rows stay upstream; coerce, to_int, and a Float operand refuse where Ruby raises or coerces."
+  link: docs/ruby/bitwise-operators.md
+core/integer/bit_or_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is bit_or (ADR 0003); integers are 64-bit, so the bignum rows stay upstream; coerce, to_int, and a Float operand refuse where Ruby raises or coerces."
+  link: docs/ruby/bitwise-operators.md
+core/integer/bit_xor_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is bit_xor (ADR 0003); integers are 64-bit, so the bignum rows stay upstream; coerce, to_int, and a Float operand refuse where Ruby raises or coerces."
+  link: docs/ruby/bitwise-operators.md
+core/integer/complement_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is bit_not (ADR 0003); integers are 64-bit, so the bignum rows stay upstream."
+  link: docs/ruby/bitwise-operators.md
+core/integer/left_shift_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is shift_left (ADR 0003); integers are 64-bit, so the bignum rows stay upstream and a shift past 64 bits refuses; to_int, nil, and a String count refuse where Ruby raises."
+  link: docs/ruby/bitwise-operators.md
+core/integer/right_shift_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "The operator is shift_right (ADR 0003); integers are 64-bit, so the bignum rows stay upstream; to_int, nil, and a String count refuse where Ruby raises."
+  link: docs/ruby/bitwise-operators.md
+core/integer/allbits_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows stay upstream; to_int and a non-Integer argument refuse where Ruby coerces or raises."
+  link: docs/ruby/bitwise-operators.md
+core/integer/anybits_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows stay upstream; to_int and a non-Integer argument refuse where Ruby coerces or raises."
+  link: docs/ruby/bitwise-operators.md
+core/integer/nobits_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows stay upstream; to_int and a non-Integer argument refuse where Ruby coerces or raises."
+  link: docs/ruby/bitwise-operators.md
+core/integer/bit_length_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows stay upstream and fixnum_max is 2**63 - 1."
+  link: docs/ruby/bitwise-operators.md
+core/integer/bit_count_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum rows stay upstream; a negative receiver refuses where Ruby raises ArgumentError."
+  link: docs/ruby/bitwise-operators.md
+core/integer/element_reference_spec.rb:
+  pdx: [spec/number/integer/bits_spec.pdx]
+  status: partial_intentional
+  reason: "n[i] reads one bit as Ruby's does; the two-argument and range forms, to_int, a Float position, and the bignum rows stay upstream."
+  link: docs/ruby/bitwise-operators.md
 core/integer/eql_spec.rb:
   pdx: [spec/eql_spec.pdx]
   status: partial_intentional

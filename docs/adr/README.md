@@ -14,7 +14,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 
 - [0001](0001-2026-07-20-mutable-keyword.md) — The mutability keyword is `mutable`
 - [0002](0002-2026-07-20-together-task-sigil.md) — The `together` task sigil is `~`
-- [0003](0003-2026-07-20-bitwise-operators-out.md) — Bitwise operators out of the grammar _(tentative)_
+- [0003](0003-2026-07-20-bitwise-operators-out.md) — Bitwise operators out of the grammar
 - [0004](0004-2026-07-20-together-meanwhile.md) — Concurrency vocabulary: `together` + `meanwhile` + `~` _(tentative)_
 - [0005](0005-2026-07-22-optionals-wrapper-model.md) — Optionals are a wrapper, with a collapsed-feeling surface
 - [0006](0006-2026-07-22-absence-word-nil.md) — The absence word is `nil`

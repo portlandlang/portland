@@ -786,6 +786,10 @@ def lex(raw_source, first_line: 1)
       index += 3
       next
     end
+    # Ruby's right shift (ADR 0003): a named method here.
+    if character == ">" && characters[index + 1] == ">"
+      panic "'>>' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'shift_right'"
+    end
     # Ruby's lambda arrow (#135): a block is handed to a method here.
     if character == "-" && characters[index + 1] == ">"
       panic "'->' is a lambda, which Portland does not have — hand a block to a method, and it calls the block with 'yield'"

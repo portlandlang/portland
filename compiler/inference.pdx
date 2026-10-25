@@ -438,7 +438,7 @@ def call_answer(receiver, node, types)
   when "partition", "rpartition" then ["array", ["string"]]
   when "codepoints", "bytes" then ["array", ["integer"]]
   when "casecmp?" then ["boolean"]
-  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?"
+  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "allbits?", "anybits?", "nobits?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?"
     ["boolean"]
   when "chars", "grapheme_clusters", "split", "lines" then ["array", ["string"]]
   when "keys"
@@ -711,7 +711,7 @@ end
 def builtin_table(type)
   case type
   in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/2 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0& empty?/0 end_with?/1+ eql?/1 failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1+ strip/0 sub/1-2& succ/0 swapcase/0 to_f/0 to_i/0 to_s/0 upcase/0 upto/1-2&]
-  in ["integer"] then %w[abs/0 between?/2 ceil/0-1 ceildiv/1 clamp/1-2 digits/0-1 div/1 divmod/1 downto/1& eql?/1 even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 odd?/0 ord/0 positive?/0 pow/1 pred/0 remainder/1 round/0-1 size/0 some?/0 step/1-2& succ/0 times/0& to_f/0 to_i/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
+  in ["integer"] then %w[abs/0 allbits?/1 anybits?/1 between?/2 bit_and/1 bit_count/0 bit_length/0 bit_not/0 bit_or/1 bit_xor/1 ceil/0-1 ceildiv/1 clamp/1-2 digits/0-1 div/1 divmod/1 downto/1& eql?/1 even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 nobits?/1 odd?/0 ord/0 positive?/0 pow/1 pred/0 remainder/1 round/0-1 shift_left/1 shift_right/1 size/0 some?/0 step/1-2& succ/0 times/0& to_f/0 to_i/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[empty?/0 end_with?/1+ eql?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 slice/2 some?/0 start_with?/1+ to_s/0]

@@ -1256,6 +1256,9 @@ end
 
 def parse_addition(tokens, position)
   mutable step = parse_multiplication(tokens, position)
+  # Ruby's exclusive or (ADR 0003): a named method here. The caret pins a
+  # name inside a pattern, so only the operator position refuses.
+  panic "'^' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_xor'" if operator_at?(tokens, step.position, %w[^])
   while operator_at?(tokens, step.position, %w[+ -])
     operator = tokens[step.position].text
     right = parse_multiplication(tokens, skip_newlines_at(tokens, step.position + 1))

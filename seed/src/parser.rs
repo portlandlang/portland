@@ -2569,6 +2569,14 @@ impl<'source> Parser<'source> {
 
     fn addition(&mut self) -> Expression {
         let mut left = self.multiplication();
+        // Ruby's exclusive or (ADR 0003): a named method here. The caret
+        // pins a name inside a pattern, so only the operator position
+        // refuses.
+        if self.peek_kind() == Some(TokenKind::Caret) {
+            panic!(
+                "'^' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_xor'"
+            );
+        }
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::Minus) => Some(BinaryOperator::Subtract),
             Some(TokenKind::Plus) => Some(BinaryOperator::Add),

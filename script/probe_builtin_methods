@@ -56,6 +56,7 @@ candidates = %w[
   bsearch bsearch_index combination permutation product repeated_combination repeated_permutation cycle
   take drop take_while drop_while rotate values_at each_index push pop shift unshift each_cons min_by max_by sample shuffle group_by partition each_with_object
   chunk chunk_while filter_map minmax_by slice_after slice_before slice_when
+  bit_and bit_or bit_xor bit_not shift_left shift_right allbits? anybits? nobits? bit_length bit_count
   fetch values_at transform_values transform_keys invert key has_value? value? slice except compact each_key each_value to_h
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv begin end exclude_end? cover? overlap?
   inspect class hash is_a? respond_to? send tap then itself instance_of?

@@ -1211,6 +1211,45 @@ fn range_new(arguments: &[Value]) -> Value {
     }
 }
 
+/// Ruby's shift (ADR 0003): left by a positive count, right by a negative
+/// one, arithmetic either way, so a negative number keeps its sign and a
+/// right shift past every bit answers 0 or -1. Integers are 64-bit here
+/// (#156), so a left shift past that refuses rather than wrapping.
+fn shifted(number: i64, count: i64) -> i64 {
+    if count >= 0 {
+        if number == 0 {
+            return 0;
+        }
+        if count >= 64 {
+            panic!(
+                "shift_left by {count} overflows a 64-bit integer — integers are 64-bit here (#156)"
+            );
+        }
+        let wide = i128::from(number) << count;
+        i64::try_from(wide).unwrap_or_else(|_| {
+            panic!(
+                "shift_left by {count} overflows a 64-bit integer — integers are 64-bit here (#156)"
+            )
+        })
+    } else if count <= -64 {
+        if number < 0 { -1 } else { 0 }
+    } else {
+        number >> -count
+    }
+}
+
+/// Ruby's `Integer#[]`: the bit at a position, two's complement, so a
+/// position past the top answers the sign bit; a negative position is 0.
+fn bit_at(number: i64, position: i64) -> i64 {
+    if position < 0 {
+        return 0;
+    }
+    if position >= 64 {
+        return if number < 0 { 1 } else { 0 };
+    }
+    (number >> position) & 1
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -1631,6 +1670,10 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
         // A symbol indexes its name, answering text (#112).
         (Value::Symbol(text), Value::Integer(_) | Value::Range { .. }) => {
             index_read(&Value::String(text.clone()), index)
+        }
+        // An integer indexes its bits (ADR 0003, #157), as Ruby's does.
+        (Value::Integer(number), Value::Integer(position)) => {
+            Value::Integer(bit_at(*number, *position))
         }
         _ => panic!("cannot index {receiver:?} with {index:?}"),
     }
@@ -5510,6 +5553,45 @@ impl<W: std::io::Write> Interpreter<W> {
             ) => float_divmod(&receiver, argument),
             // Euclid on magnitudes — the answer never carries a sign, and a
             // zero yields the other side's magnitude (Ruby 4.0.6, probed).
+            // Ruby's bit math as named methods (ADR 0003, locked by #157):
+            // the operators stay out of the grammar, the capability stays.
+            (Value::Integer(number), "bit_and", [Value::Integer(other)]) => {
+                Value::Integer(number & other)
+            }
+            (Value::Integer(number), "bit_or", [Value::Integer(other)]) => {
+                Value::Integer(number | other)
+            }
+            (Value::Integer(number), "bit_xor", [Value::Integer(other)]) => {
+                Value::Integer(number ^ other)
+            }
+            (Value::Integer(number), "bit_not", []) => Value::Integer(!number),
+            (Value::Integer(number), "shift_left", [Value::Integer(count)]) => {
+                Value::Integer(shifted(*number, *count))
+            }
+            (Value::Integer(number), "shift_right", [Value::Integer(count)]) => {
+                Value::Integer(shifted(*number, -count))
+            }
+            (Value::Integer(number), "allbits?", [Value::Integer(mask)]) => {
+                Value::Boolean(number & mask == *mask)
+            }
+            (Value::Integer(number), "anybits?", [Value::Integer(mask)]) => {
+                Value::Boolean(number & mask != 0)
+            }
+            (Value::Integer(number), "nobits?", [Value::Integer(mask)]) => {
+                Value::Boolean(number & mask == 0)
+            }
+            // The position of the highest bit that differs from the sign
+            // bit, as Ruby's: 0 for 0 and -1, 8 for 0xff and -0x100.
+            (Value::Integer(number), "bit_length", []) => {
+                let flipped = if *number < 0 { !number } else { *number };
+                Value::Integer(64 - i64::from(flipped.leading_zeros()))
+            }
+            (Value::Integer(number), "bit_count", []) => {
+                if *number < 0 {
+                    panic!("bit_count takes a non-negative integer, got {number}");
+                }
+                Value::Integer(i64::from(number.count_ones()))
+            }
             (Value::Integer(number), "gcd", [Value::Integer(other)]) => {
                 integer_gcd(*number, *other)
             }

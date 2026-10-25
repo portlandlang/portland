@@ -24,7 +24,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 - [Aliases](aliases.md) — The famous twins ship with Ruby's meanings; the long tail of Ruby's remaining aliases refuses by naming the surviving spelling.
-- [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead.
+- [Bitwise operators](bitwise-operators.md) — Out of the grammar; named methods instead — `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shift_left`, `shift_right`, and Ruby's own `allbits?`, `anybits?`, `nobits?`, `bit_length`, `bit_count`, and `n[i]`.
 - [Characters](characters.md) — A character is a grapheme cluster and string equality is canonical — `"🇺🇸".length` is 1 and composed `é` equals decomposed `é`, where Ruby counts scalars and compares bytes.
 - [`class`: four jobs, four homes](classes.md) — `class` is a spelling of `struct`, and its four jobs have homes: data-with-behavior is a `struct` (either word), shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects are an open question.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.

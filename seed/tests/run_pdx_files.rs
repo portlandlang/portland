@@ -2037,6 +2037,38 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// Ruby's bit math as named methods (ADR 0003, locked by #157), the
+/// expected lines Ruby 4.0.7's answers to the operator forms; a shift past
+/// 64 bits, a negative bit_count, and the `^` and `>>` glyphs refuse on
+/// both oracles.
+#[test]
+fn bit_methods_match_ruby_and_the_glyphs_refuse_on_both_oracles() {
+    assert_both_print(
+        "evaluator_bits.pdx",
+        "p(256.bit_and(16))\np(-12.bit_and(-13))\np(-5.bit_or(3))\np(-1.bit_xor(1))\np(1221.bit_not)\np(1.shift_left(33))\np(-2.shift_left(-1))\np(-7.shift_left(-64))\np(-42.shift_right(2))\np(-1.shift_right(-1))\np(3.shift_right(64))\np(-3.shift_right(64))\np(-5.bit_length)\np(-0x101.bit_length)\np(0xff.bit_count)\np(-1[100])\np(5[-1])\np(0b101[2])\np(0b10000010.anybits?(0b00101100))\np(42.nobits?(42))\n",
+        "0\n-16\n-5\n-2\n-1222\n8589934592\n-1\n-1\n-11\n-2\n0\n-1\n3\n9\n8\n1\n0\n1\nfalse\nfalse\n",
+    );
+    let cases = [
+        (
+            "p(1.shift_left(64))\n",
+            "shift_left by 64 overflows a 64-bit integer — integers are 64-bit here (#156)",
+        ),
+        (
+            "p(-1.bit_count)\n",
+            "bit_count takes a non-negative integer, got -1",
+        ),
+        (
+            "p(3 ^ 1)\n",
+            "'^' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'bit_xor'",
+        ),
+        (
+            "p(8 >> 1)\n",
+            "'>>' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'shift_right'",
+        ),
+    ];
+    assert_both_oracles_refuse("bits_refusal.pdx", None, &cases);
+}
+
 /// `eql?` on every value (ADR 0059), the expected lines Ruby 4.0.7's: same
 /// kind and same value, no promotion, element by element; and `hash`
 /// refusing with its sentence on both oracles.

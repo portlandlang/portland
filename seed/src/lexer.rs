@@ -512,6 +512,10 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('=', Some('>')) => (TokenKind::FatArrow, 2),
                     ('=', _) => (TokenKind::Equal, 1),
                     ('>', Some('=')) => (TokenKind::GreaterEqual, 2),
+                    // Ruby's right shift (ADR 0003): a named method here.
+                    ('>', Some('>')) => panic!(
+                        "'>>' is a bitwise operator, which is out of the grammar (ADR 0003) — write 'shift_right'"
+                    ),
                     ('>', _) => (TokenKind::Greater, 1),
                     // `<=>` before `<=` (ADR 0054).
                     ('<', Some('=')) if source[start..].starts_with("<=>") => {
