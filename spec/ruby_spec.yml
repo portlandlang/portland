@@ -2772,3 +2772,94 @@ language/rescue_spec.rb:
   status: skipped
   reason: "begin/rescue/raise do not exist: a fallible operation returns its failure."
   link: docs/ruby/errors.md
+
+# — never-port (#118, approved 2026-10-25) —
+# The areas Portland will never take in, each a directory skipped whole so
+# the dashboard measures what Portland owes: the C-extension API, the ruby
+# executable's flags, the reflection and runtime-hook families, the
+# implementation's own tools, and Windows.
+
+optional/capi/:
+  status: skipped
+  reason: "Portland has no C-extension API; a native boundary, if one comes, is its own design (#78)."
+  link: https://github.com/portlandlang/portland/issues/118
+command_line/:
+  status: skipped
+  reason: "These test the ruby executable's flags and switches, not the language."
+  link: https://github.com/portlandlang/portland/issues/118
+core/marshal/:
+  status: skipped
+  reason: "Marshal serializes arbitrary objects by walking an open runtime, which Portland does not have; serialization is a library over values."
+  link: docs/ruby/metaprogramming.md
+core/method/:
+  status: skipped
+  reason: "Method objects are reflection — the runtime is closed, and a block is handed rather than held (#77)."
+  link: docs/ruby/metaprogramming.md
+library/win32ole/:
+  status: skipped
+  reason: "Windows-only; Portland targets Apple silicon."
+  link: https://github.com/portlandlang/portland/issues/118
+core/basicobject/:
+  status: skipped
+  reason: "BasicObject is the root of a class hierarchy Portland does not have (ADR 0028); a struct stands alone."
+  link: docs/ruby/metaprogramming.md
+core/objectspace/:
+  status: skipped
+  reason: "ObjectSpace is heap reflection over an open runtime."
+  link: docs/ruby/metaprogramming.md
+core/unboundmethod/:
+  status: skipped
+  reason: "UnboundMethod is reflection — the runtime is closed."
+  link: docs/ruby/metaprogramming.md
+core/tracepoint/:
+  status: skipped
+  reason: "TracePoint hooks the runtime as it runs; what you read in the source is what runs."
+  link: docs/ruby/metaprogramming.md
+core/binding/:
+  status: skipped
+  reason: "A Binding is a reified scope, the basis of eval; scopes are not values here."
+  link: docs/ruby/metaprogramming.md
+library/objectspace/:
+  status: skipped
+  reason: "ObjectSpace::WeakMap and kin are heap reflection over an open runtime."
+  link: docs/ruby/metaprogramming.md
+core/gc/:
+  status: skipped
+  reason: "There is no garbage collector to drive (#12)."
+  link: https://github.com/portlandlang/portland/issues/12
+core/refinement/:
+  status: skipped
+  reason: "Refinements reopen classes at runtime; a definition is written once and never rewired."
+  link: docs/ruby/redefinition.md
+library/coverage/:
+  status: skipped
+  reason: "A tool of the Ruby implementation itself."
+  link: https://github.com/portlandlang/portland/issues/118
+library/ripper/:
+  status: skipped
+  reason: "A tool of the Ruby implementation itself — Ruby's own parser as a library."
+  link: https://github.com/portlandlang/portland/issues/118
+library/irb/:
+  status: skipped
+  reason: "A tool of the Ruby implementation itself."
+  link: https://github.com/portlandlang/portland/issues/118
+library/mkmf/:
+  status: skipped
+  reason: "A tool of the Ruby implementation itself, for building C extensions, which Portland has none of."
+  link: https://github.com/portlandlang/portland/issues/118
+library/fiddle/:
+  status: skipped
+  reason: "A foreign-function bridge for the Ruby implementation; a native boundary, if one comes, is its own design (#78)."
+  link: https://github.com/portlandlang/portland/issues/118
+library/rubygems/gem/:
+  status: skipped
+  reason: "RubyGems' own API; what a Portland package is waits on #131."
+  link: https://github.com/portlandlang/portland/issues/118
+library/drb/:
+  status: skipped
+  reason: "Distributed Ruby moves objects between open runtimes."
+  link: https://github.com/portlandlang/portland/issues/118
+optional/thread_safety/:
+  status: skipped
+  reason: "No threads: concurrency is together and meanwhile (ADR 0029)."
+  link: docs/ruby/concurrency.md
