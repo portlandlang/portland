@@ -12,9 +12,9 @@ The OS surface is core: `File`, `Dir`, `ENV`, `Time`, `Process`, `Signal`, `IO` 
 
 ## Portland
 
-**Core** needs no `require`, ships inside `pdx`, and is versioned with the language: the builtin types, plus what Ruby made core — `Set`, `Math`, `Random`, `Time` — as each is decided. Core also owns the **floor**: a small set of coarse primitives, one crossing each, that are the only things written in Rust. Today those are `read_file`, `write_file`, `argv`, `puts`, and `p`; the first wave adds a wall clock, a monotonic clock, entropy, a write to stderr, a file append, and JSON parse and generate over `serde_json` as a recorded loan.
+**Core** needs no `require`, ships inside `pdx`, and is versioned with the language: the builtin types, plus what Ruby made core — `Set`, `Math`, `Random`, `Time` — as each is decided. Core also owns the **floor**: a small set of coarse primitives, one crossing each, that are the only things written in Rust. Today those are `read_file`, `write_file`, `argv`, `puts`, and `p`; the first wave adds a wall clock, a monotonic clock, entropy, a write to stderr, and a file append. Core also holds anything Rust-backed that is not a floor crossing — today `JSON.parse` and `JSON.generate` over `serde_json`, a recorded loan; a Rust-backed library cannot be a tile, so `json` is core until it is written in Portland.
 
-**Default tiles** are Portland packages installed beside `pdx` — their own version and repo, upgradable without upgrading the language — that load by `require "name"` with no manifest line. The first five, in the corpus's order: `json`, `base64`, `logger`, `securerandom`, `benchmark`. Each is spelled as Ruby spells it: `JSON.parse`, `Base64.strict_encode64`, `Logger.new`, `SecureRandom.hex`, `Benchmark.measure`.
+**Default tiles** are Portland packages installed beside `pdx` — their own version and repo, upgradable without upgrading the language — that load by `require "name"` with no manifest line. The first four, in the corpus's order: `base64`, `logger`, `securerandom`, `benchmark`. Each is spelled as Ruby spells it: `Base64.strict_encode64`, `Logger.new`, `SecureRandom.hex`, `Benchmark.measure`.
 
 **External tiles** are declared in the manifest and installed. Everything else lives here.
 
@@ -26,7 +26,7 @@ The OS surface is core: `File`, `Dir`, `ENV`, `Time`, `Process`, `Signal`, `IO` 
 
 ## Migration
 
-- `require "json"`, `require "logger"`, and the rest of the first five migrate verbatim once their tiles exist — _free_. Until then they refuse, pointing here ([#116](https://github.com/portlandlang/portland/issues/116) row 4).
+- `require "logger"` and the rest of the first four migrate verbatim once their tiles exist — _free_. Until then they refuse, pointing here ([#116](https://github.com/portlandlang/portland/issues/116) row 4). `require "json"` is a no-op while `json` is core, as `require "set"` is in Ruby 4 — whether it refuses or is accepted silently is #116's.
 - A Gemfile line for a bundled gem (`gem "csv"`, `gem "base64"`) has no Portland twin; a default tile needs none, and an external tile's declaration is [#174](https://github.com/portlandlang/portland/issues/174)'s shape — _gem-supplied_ in the linter's terms, since the manifest is not Ruby.
 - `require "ostruct"` and the other declined names fail loudly at the require, never silently; the rewrite is the one the cited ledger page names.
 - `File.open(path) { |file| file.each_line { } }` has no translation until the fine model lands; `File.read(path).lines.each { }` is the coarse spelling, and it holds the whole file.
