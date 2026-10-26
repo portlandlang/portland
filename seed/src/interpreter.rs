@@ -6558,7 +6558,6 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "panic"
                 | "puts"
                 | "rand"
-                | "read_file"
                 | "require_relative"
                 | "some"
                 | "srand"
@@ -7477,9 +7476,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 // The first fallible operations (ADR 0027): a failure comes
                 // back instead of a panic, and the caller decides. String
                 // payloads for now — struct payloads wait for library types.
-                // The bare spelling rides `System.read_file`'s until it
-                // retires (ADR 0068).
-                ("read_file", [Value::String(path)]) => return Some(read_file_value(path)),
+                // `read_file` has moved under `System` (ADR 0068); this one
+                // follows.
                 ("write_file", [Value::String(path), Value::String(content)]) => {
                     return match std::fs::write(path, content) {
                         Ok(()) => None,
@@ -8429,6 +8427,14 @@ end
     )]
     fn argv_retired_names_its_member() {
         evaluate("argv.length");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)"
+    )]
+    fn read_file_retired_names_its_member() {
+        evaluate("read_file(\"haiku.txt\")");
     }
 
     #[test]

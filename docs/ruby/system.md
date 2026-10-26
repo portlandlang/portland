@@ -2,7 +2,7 @@
 
 **Summary:** Ruby has no module for the host boundary — its syscall-touching functions are scattered across `Kernel`, `File`, `Process`, `ENV`, `IO`, and `Time`; Portland gathers every host-touching primitive under `System`, public but not published, and keeps Ruby's spellings on the wrappers written over it.
 
-**Status:** decided ([ADR 0068](../adr/0068-2026-10-25-system-is-the-floor-module.md), 2026-10-25); `System.arguments` built on both implementations the same day, the rest of the first members in [#176](https://github.com/portlandlang/portland/issues/176).
+**Status:** decided ([ADR 0068](../adr/0068-2026-10-25-system-is-the-floor-module.md), 2026-10-25); `System.arguments` and `System.read_file` built on both implementations the same day with the bare placeholders retired, the rest of the first members in [#176](https://github.com/portlandlang/portland/issues/176).
 
 ## Ruby
 

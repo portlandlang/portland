@@ -2482,6 +2482,10 @@ fn system_read_file_on_both_oracles() {
                 "p(System.read_file(1))\n",
                 "System.read_file takes a String, got 1",
             ),
+            (
+                "p(read_file(\"haiku.txt\"))\n",
+                "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)",
+            ),
         ],
     );
 }
@@ -3722,7 +3726,7 @@ fn portland_evaluator_matches_the_seed_on_traits() {
 fn portland_evaluator_matches_the_seed_on_failures() {
     assert_evaluator_matches_seed(
         "evaluator_failures.pdx",
-        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs(\"present\" or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky(flag)\n  return value if value.failure?\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky(flag)\n    return checked if checked.failure?\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs read_file(\"/tmp/portland-definitely-missing\").failure?\n",
+        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs(\"present\" or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky(flag)\n  return value if value.failure?\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky(flag)\n    return checked if checked.failure?\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = System.read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs System.read_file(\"/tmp/portland-definitely-missing\").failure?\n",
     );
 }
 
