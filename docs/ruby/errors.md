@@ -21,9 +21,9 @@ Failure is an exception in flight: invisible at the call site, caught by ancestr
 ## Portland (this draft)
 
 ```ruby
-content = read_file(path) or ""
+content = System.read_file(path) or ""
 
-case read_file(path)
+case System.read_file(path)
 in reason then "could not read — #{reason}"
 end
 ```

@@ -14,7 +14,7 @@
 require_relative "refusals"
 
 path = System.arguments.first or panic "types.pdx: needs a file to infer"
-source = read_file(path) or panic "types.pdx: cannot read #{path}"
+source = System.read_file(path) or panic "types.pdx: cannot read #{path}"
 nodes = parse_program(lex(source))
 infer_program(nodes).each do |pair|
   puts "#{pair.first}: #{render_type(type_at(pair, 1))}"

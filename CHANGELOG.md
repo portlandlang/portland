@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The callers read `System.read_file`** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — the five drivers, the checker's file read, the hosted evaluator's `require_relative`, the spec driver, the failure spec, the seed's own unit tests, the `word_count` fixture, and the lexer bench no longer call bare `read_file`; `language.md` and the errors ledger spell the member. The hosted evaluator still answers a guest's bare `read_file`, and the seed still defines it, until it retires.
+
 - **`System.read_file`, the floor's second member** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, one whole file as a string or a failure naming the path and the OS's reason, `System.read_file "/nope": No such file or directory (os error 2)`; the wrong count or kind of argument refuses naming it, where bare `read_file` only ever said the name was undefined. Bare `read_file` rides the same crossing, so its failure now names `System.read_file` too, until it retires. Pinned by a two-oracle test and `spec/system/read_file_spec.pdx`.
 
 - **Bare `argv` retires** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, `argv` as a call refuses with `'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)`, the retired-spelling table's shape; a local may still wear the name. The seed's bare-builtin list loses its one host-touching entry.

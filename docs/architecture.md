@@ -62,7 +62,7 @@ The interpreter runs on a **512 MB-stack thread**. On the default 8 MB main stac
 | `inference.pdx` | 700   | type synthesis (#9 increments 3a–3b, ADR 0040) — the checker reads it; `unknown` is an opinion withheld, never an error |
 | `refusals.pdx`  | 140   | the refusal renderer (ADR 0047 §4) — the one place the checker's voice lives; a check hands it a tagged refusal, never a sentence |
 
-Plus five small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `check.pdx` checks without running, `types.pdx` dumps inferred binding types, `run.pdx` checks and evaluates a file. Each is a handful of lines around one composed expression — `evaluate_program(parse_program(lex(read_file(path))))`, with `path` the first of `System.arguments`.
+Plus five small drivers that make each stage runnable on its own: `tokenize.pdx` dumps a token stream, `parse.pdx` prints one S-expression per statement, `check.pdx` checks without running, `types.pdx` dumps inferred binding types, `run.pdx` checks and evaluates a file. Each is a handful of lines around one composed expression — `evaluate_program(parse_program(lex(System.read_file(path))))`, with `path` the first of `System.arguments`.
 
 Two milestones are reached: **`parser.pdx` parses the whole compiler including itself**, and **`evaluator.pdx` runs the fixture suite byte-identically to the seed**. The evaluator also dispatches on its own AST using `case/in` struct patterns, and the AST nodes print themselves via a `sexp` method — Portland matching on Portland, which is the point.
 

@@ -8390,14 +8390,15 @@ end
     #[test]
     fn reads_a_real_fixture_file() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/haiku.txt");
-        let source = format!("read_file(\"{path}\").include?(\"carpet\")");
+        let source = format!("System.read_file(\"{path}\").include?(\"carpet\")");
         assert_eq!(evaluate(&source), Some(Value::Boolean(true)));
     }
 
     #[test]
     fn writes_then_reads_a_file() {
         let path = "/tmp/portland-seed-write-test.txt";
-        let source = format!("write_file(\"{path}\", \"teal carpet\")\nread_file(\"{path}\")\n");
+        let source =
+            format!("write_file(\"{path}\", \"teal carpet\")\nSystem.read_file(\"{path}\")\n");
         assert_eq!(
             evaluate(&source),
             Some(Value::String("teal carpet".to_string()))
@@ -8408,11 +8409,11 @@ end
     fn reading_a_missing_file_answers_a_failure() {
         // ADR 0027: the first fallible operation — a failure, not a panic.
         assert_eq!(
-            evaluate("read_file(\"no_such_file.txt\").failure?"),
+            evaluate("System.read_file(\"no_such_file.txt\").failure?"),
             Some(Value::Boolean(true))
         );
         assert_eq!(
-            evaluate("read_file(\"no_such_file.txt\") or \"fallback\""),
+            evaluate("System.read_file(\"no_such_file.txt\") or \"fallback\""),
             Some(Value::String("fallback".to_string()))
         );
     }

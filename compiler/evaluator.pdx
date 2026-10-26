@@ -3585,10 +3585,10 @@ def evaluate_require(name, bindings)
   # declared crosses, bare locals do not — in either direction. A require is
   # not a paste.
   scope = [["__file__", "file", target]] + loaded + bindings.reject { local?(it) }
-  # `read_file` answers a failure now (ADR 0027), which lets this refusal
-  # finally wear the seed's wording — one recorded divergence retired. The
-  # message names the *requested* path, as the seed's does.
-  source = read_file(target) or panic "require_relative #{inspect(name)}: No such file or directory (os error 2)"
+  # `System.read_file` answers a failure (ADR 0027), which lets this refusal
+  # wear the seed's wording — one recorded divergence retired. The message
+  # names the *requested* path, as the seed's does.
+  source = System.read_file(target) or panic "require_relative #{inspect(name)}: No such file or directory (os error 2)"
   result = run_body(parse_program(lex(source)), scope)
   # Everything the file declared stays in scope — that is the point of a
   # require. Its locals drop, the requirer's come back, and `__file__` is put

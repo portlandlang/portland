@@ -5,7 +5,7 @@
 require_relative "parser"
 
 path = System.arguments.first or panic "parse.pdx: needs a file to parse"
-source = read_file(path) or panic "parse.pdx: cannot read #{path}"
+source = System.read_file(path) or panic "parse.pdx: cannot read #{path}"
 parse_program(lex(source)).each do |node|
   puts node.sexp
 end

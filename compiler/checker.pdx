@@ -208,7 +208,7 @@ end
 def resolve_closure(path, mutable checked, mutable files, required)
   key = canonical_path(path)
   return [checked, files] if checked.any? { it[0] == key }
-  source = read_file(path) or panic "check: cannot read #{path}"
+  source = System.read_file(path) or panic "check: cannot read #{path}"
   nodes = parse_program(lex(source))
   checked = [[key, nil]] + checked
   requires = required_files(nodes, path)
