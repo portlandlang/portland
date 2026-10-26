@@ -2333,6 +2333,10 @@ core/struct/values_at_spec.rb:
   status: skipped
   reason: "A struct's fields are names only (ADR 0062): values_at refuses naming to_h.values_at for names decided at runtime; there is no positional access."
   link: docs/ruby/classes.md
+core/struct/deconstruct_spec.rb:
+  status: skipped
+  reason: "Struct patterns are keyword-only (ADR 0062), so there is no positional deconstruct; to_a answers the values in order."
+  link: docs/ruby/classes.md
 core/struct/deconstruct_keys_spec.rb:
   status: skipped
   reason: "Struct patterns are keyword-only with no deconstruct_keys (ADR 0062); the fields are the pattern surface."
