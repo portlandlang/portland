@@ -57,6 +57,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [String escapes](string-escapes.md) — The escape set is closed — Ruby passes an unknown escape through as its bare character, and Portland refuses it.
 - [The superset](superset.md) — The inventory of Portland grammar Ruby cannot parse — the locked-until-flip tier, in one place.
 - [Symbols](symbols.md) — `:foo` survives with its spelling intact, but the set can be declared and checked; no `to_sym`, and hash shorthand is the only symbol-key form.
+- [`System`](system.md) — Ruby has no module for the host boundary — its syscall-touching functions are scattered across `Kernel`, `File`, `Process`, `ENV`, `IO`, and `Time`; Portland gathers every host-touching primitive under `System`, public but not published, and keeps Ruby's spellings on the wrappers written over it.
 - [Truthiness](truthiness.md) — Conditions take booleans, and nothing else.
 - [Types](types.md) — Static and inferred, written only at public boundaries; duck typing becomes structural.
 - [Word operators: `or`, `and`, `not`](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed.

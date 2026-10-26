@@ -25,7 +25,7 @@ The compiler does not emit binaries yet — it checks, then runs programs throug
 This distinction is the one to keep straight, because "there's a lot of Rust here" is misleading:
 
 - **The disposable seed** (`seed/`, ~7,900 lines). Crude on purpose. It never has to be good — it has to exist and be correct. It is **deleted at Stage 2** and nothing in it is a commitment.
-- **The permanent-but-shrinking floor** (does not exist yet). Memory, LLVM/MLIR glue, GPU dispatch, syscalls. The irreducible bottom that cannot be written in Portland. The standing design pressure is to push this boundary _down_.
+- **The permanent-but-shrinking floor** (does not exist yet). Memory, LLVM/MLIR glue, GPU dispatch, syscalls. The irreducible bottom that cannot be written in Portland. The standing design pressure is to push this boundary _down_. Its Portland face is the `System` module ([ADR 0068](adr/0068-2026-10-25-system-is-the-floor-module.md)): a member touches the host or it is not a member, and the share of members still written in Rust is the boundary made into a number.
 
 Almost all the Rust you can see today is the first kind. That is why its crudeness is a non-issue and why adding `rustyline` to it was an easy call — you do not optimize something you plan to delete.
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`System` is the floor module** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — a member touches the host or it is not a member; core, never a tile; public but not published, a social rule stated in the file itself. Today's `read_file`, `write_file`, `argv` move in as `System.read_file`, `System.write_file`, `System.arguments` when #176 builds; Ruby's spellings stay on the wrappers. The bare functions' bucket (`puts`, `p`, `rand` — Ruby's `Kernel`) and shell execution ([#179](https://github.com/portlandlang/portland/issues/179)) are named as undecided. Nothing built; the ledger gains [system.md](docs/ruby/system.md).
+
 - **Formatting is `format(template, values)`, not `template % values`** ([ADR 0067](docs/adr/0067-2026-10-25-format-is-a-function-not-the-percent-operator.md), [#172](https://github.com/portlandlang/portland/issues/172)) — recorded, not yet built: Ruby's directives whole under the function, `sprintf` as its twin, `%` staying arithmetic with the rewrite named. The build waits for a pull; #172 stays open as the buildable ticket.
 
 - **Pattern arguments take the `when` rule** ([ADR 0066](docs/adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md), [#171](https://github.com/portlandlang/portland/issues/171)) — on both implementations, `all?`, `any?`, `none?`, `one?`, `grep`, `grep_v`, `slice_before`, and `slice_after` take a pattern: a range covers a number, anything else asks `==`; `grep(3..7) { }` is `filter_map` under that rule; a pattern beside a block refuses. core/enumerable/grep and grep_v ported into `spec/enumerable/grep_spec.pdx`, the pattern rows of all, any, none, and one into `predicates_spec.pdx`.

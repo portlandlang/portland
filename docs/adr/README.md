@@ -79,6 +79,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0065](0065-2026-10-25-randomness-rubys-both.md) — Randomness: Ruby's both, step for step
 - [0066](0066-2026-10-25-pattern-arguments-take-the-when-rule.md) — Pattern arguments take the `when` rule
 - [0067](0067-2026-10-25-format-is-a-function-not-the-percent-operator.md) — Formatting is `format(template, values)`, not `template % values`
+- [0068](0068-2026-10-25-system-is-the-floor-module.md) — `System` is the floor module: a member touches the host, or it is not a member
 
 <!-- /generated -->
 

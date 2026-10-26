@@ -1,0 +1,33 @@
+# 0068 — `System` is the floor module: a member touches the host, or it is not a member
+
+- **Status:** Accepted (ruled by the deciding user 2026-10-25 in discussion following [#78](https://github.com/portlandlang/portland/issues/78); nothing built — the first members are [#176](https://github.com/portlandlang/portland/issues/176))
+- **Date:** 2026-10-25
+- **Issue:** [#176](https://github.com/portlandlang/portland/issues/176)
+
+## Context
+
+[ADR 0064](0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) drew the floor coarse and asked that its primitives "live under one module name so every crossing is greppable, as `mutable` and `panic` are", without naming the module. Today the host-touching builtins have no home: `read_file`, `write_file`, and `argv` are bare names in a twelve-entry list (`builtin_name` in the seed's `interpreter.rs`) that also holds `puts`, `p`, `some`, `failure`, `inspect`, `panic`, `rand`, `srand`, and `require_relative` — language constructs, Ruby's bare functions, and syscalls in one `match`, repeated as a `case` in `evaluator.pdx`.
+
+Prior art is plentiful and agrees (principle 10). Elixir's `System` module is almost exactly this: `System.get_env`, `System.argv`, `System.monotonic_time`, `System.os_time`, `System.halt`, `System.pid`. Java's `System` class is the same idea older: `System.out`, `System.err`, `System.getenv`, `System.nanoTime`, `System.exit`. Rust keeps the identical layer *private* — `std::sys` is the platform floor, and the public `std::fs`, `std::io`, `std::env`, `std::time` are written over it. Ruby has no such module; its `System`-shaped functions are scattered across `Kernel`, `File`, `Process`, `ENV`, `IO`, and `Time`, and the one thing it does spell `system` is `Kernel#system`, shell execution — which is [#179](https://github.com/portlandlang/portland/issues/179)'s open question and not this ADR's.
+
+## Decision
+
+1. **The floor module is named `System`.** Every primitive ADR 0064 names — the two clocks, entropy, the write to standard error, the file append — is a `System` member, and today's bare `read_file`, `write_file`, and `argv` move in as `System.read_file`, `System.write_file`, and `System.arguments`. Members take the shape `Array.new` and `Integer.sqrt` already have ([ADR 0058](0058-2026-10-16-builtin-types-carry-type-functions.md)): functions under a type-like name, with `System` on its own refusing as a value.
+1. **A method is in `System` if and only if it touches the host** — it crosses the floor now, or it is Portland written directly over something that does. Not "miscellaneous", not "utilities". `System.read_file` qualifies forever, whether its body is Rust or Portland over `System.open`; a string helper never does. JSON over `serde_json` touches no host and is therefore *not* a member, which is what moved `json` to core in ADR 0064's correction.
+1. **`System` is core.** It ships inside `pdx`, needs no `require`, and is the one module that can never be a tile, because a tile is Portland and the floor by definition is not.
+1. **Public, not published.** `System` is callable from any program — hiding what the language is made of would be a lie, and tooling written in Portland will want it in a pinch — but it is not user API. Portland has no mechanism for "public but internal", and none is being added; this is a social rule, as Rails's "don't use these internals" is. The `System` source file says so at its top, in so many words, and the user-facing docs teach `File.read`, `Time.now`, `ARGV`, and `warn` — never the member underneath. A later check that flags a program calling `System` where a core spelling exists is welcome and is not designed here.
+1. **Member names are the floor's and unabbreviated;** Ruby's spellings stay on the wrappers. `System.arguments` under `ARGV`, `System.environment` under `ENV`, `System.wall_clock_time` under `Time.now`, `System.write_standard_error` under `warn`. Two audiences, two spellings, no fight — the house's unabbreviation rule governs the first, principle 2 the second. The names in [#176](https://github.com/portlandlang/portland/issues/176) are proposals until built.
+1. **The Rust-or-Portland ratio of `System` is the Stage 3 progress bar.** A caller cannot tell which a member is. Today every member is Rust; the day `System.read_file` is Portland over `System.open`, `System.read`, and `System.close`, the count moves. Nothing else in the repo makes the primitive boundary a number.
+
+## Not decided here
+
+- **The bare functions' bucket.** `puts`, `p`, `print`, `format`, `rand`, `srand` are Ruby's `Kernel` functions, callable bare because `Kernel` is mixed into `Object`; Portland has neither. They are written over `System` — `puts` is formatting and the nil and failure refusals, then one `System.write_standard_output` per line — but where `def puts` lives and what the module is called is open. `Kernel` is the lean, with a prelude rule making it the one module whose functions need no qualification against [ADR 0021](0021-2026-07-24-namespaces-and-modules.md). It also waits on splats ([ADR 0014](0014-2026-07-22-keyword-arguments.md)): `puts` takes any number of arguments and Portland cannot yet spell that signature, so `puts` stays a host builtin for a reason that has nothing to do with touching the host.
+- **`panic`, `some`, `failure`, `require_relative`** are language constructs, not functions — the parser knows `panic`, the other two construct values as `nil` does, and `require_relative` is build-time under [ADR 0049](0049-2026-09-24-the-whole-program-door.md). They leave `builtin_name`'s list only when that list is reorganised, not for `System`.
+- **Shell execution** — [#179](https://github.com/portlandlang/portland/issues/179). If it is in, `System.spawn` is its one coarse member; the Ruby name `system` is unrelated to the module and the ledger says so.
+
+## Consequences
+
+- The seed gains a `System` receiver in `builtin_type_function` and loses three bare names; the builtin method table in `compiler/inference.pdx` gains one receiver with the member list, reprobed by `script/probe_builtin_methods` as AGENT.md requires. The evaluator's `when "read_file"` becomes a `System` arm. Built in [#176](https://github.com/portlandlang/portland/issues/176), not here.
+- `grep -r 'System\.'` over a program is the floor audit; `portland report` ([#30](https://github.com/portlandlang/portland/issues/30)) gets a fourth count beside `panic`, `mutable`, `parallel`.
+- `architecture.md`'s floor paragraph names `System` as the floor's Portland face, and `language.md`'s IO paragraph points here.
+- A Rubyist reading `System.read_file` will think of `Kernel#system` once. Ledger: [system.md](../ruby/system.md).
