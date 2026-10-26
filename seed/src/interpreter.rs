@@ -1499,6 +1499,19 @@ fn write_file_value(path: &str, content: &str) -> Value {
     }
 }
 
+/// `System.write_standard_error` (ADR 0068): the text as given to fd 2,
+/// answering the bytes written — `warn` and a logger's default output are
+/// this crossing with a newline.
+fn write_standard_error(text: &str) -> Value {
+    use std::io::Write;
+    match std::io::stderr().write_all(text.as_bytes()) {
+        Ok(()) => Value::Integer(text.len() as i64),
+        Err(error) => Value::Failure(Box::new(Value::String(format!(
+            "System.write_standard_error: {error}"
+        )))),
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -3636,7 +3649,42 @@ impl<W: std::io::Write> Interpreter<W> {
                     arguments.len()
                 ),
             },
+            ("System", "write_standard_output") => match arguments.as_slice() {
+                [Value::String(text)] => Some(self.write_standard_output(text)),
+                [other] => panic!(
+                    "System.write_standard_output takes a String, got {}",
+                    other.shown()
+                ),
+                _ => panic!(
+                    "System.write_standard_output takes 1 argument, got {}",
+                    arguments.len()
+                ),
+            },
+            ("System", "write_standard_error") => match arguments.as_slice() {
+                [Value::String(text)] => Some(write_standard_error(text)),
+                [other] => panic!(
+                    "System.write_standard_error takes a String, got {}",
+                    other.shown()
+                ),
+                _ => panic!(
+                    "System.write_standard_error takes 1 argument, got {}",
+                    arguments.len()
+                ),
+            },
             _ => panic!("{type_name} has no {name}"),
+        }
+    }
+
+    /// `System.write_standard_output` (ADR 0068): the text as given, no
+    /// newline added, to the interpreter's output — stdout for `pdx`, a
+    /// buffer under test — answering the bytes written. `puts` and `p` are
+    /// this crossing with a rendering and a newline in front of it.
+    fn write_standard_output(&mut self, text: &str) -> Value {
+        match self.output.write_all(text.as_bytes()) {
+            Ok(()) => Value::Integer(text.len() as i64),
+            Err(error) => Value::Failure(Box::new(Value::String(format!(
+                "System.write_standard_output: {error}"
+            )))),
         }
     }
 

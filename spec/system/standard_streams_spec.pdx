@@ -1,0 +1,27 @@
+# `System.write_standard_output` and `System.write_standard_error` (ADR
+# 0068): the text as given — no newline added, no rendering — to the two
+# standard streams, answering the bytes written. `puts` and `p` are a
+# rendering and a newline over the first. The spec harness counts only the
+# `- ` lines it prints, so a line written here passes through harmlessly.
+
+require_relative "../spec_helper"
+
+context "System.write_standard_output" do
+  specify "writes the text as given and answers the bytes written" do
+    expect(System.write_standard_output("System.write_standard_output wrote this line itself\n")).to eq(52)
+  end
+
+  specify "adds no newline of its own" do
+    expect(System.write_standard_output("")).to eq(0)
+  end
+
+  specify "counts bytes, not characters" do
+    expect(System.write_standard_output("é\n")).to eq(3)
+  end
+end
+
+context "System.write_standard_error" do
+  specify "answers the bytes written, with nothing on standard output" do
+    expect(System.write_standard_error("")).to eq(0)
+  end
+end

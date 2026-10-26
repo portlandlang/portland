@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`System.write_standard_output` and `System.write_standard_error`** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, the text as given to the two streams, no newline added, answering the bytes written; the wrong count or kind of argument refuses naming the member. The hosted `puts` and `p` are now a rendering and a newline over the first, so the floor has one crossing to standard output and the differential suite proves it byte-identical. Pinned by a two-oracle test and `spec/system/standard_streams_spec.pdx`.
+
 - **A type function's answer is the same on a plain call as behind `&.`** ([#181](https://github.com/portlandlang/portland/issues/181)) — inference answered `Array.new`, `Integer.sqrt`, and `System.arguments` only on the safe-call path, so in every real program they were Unknown; one `type_function_answer` now serves both paths, and `System.arguments.first` is a `String?` a chain can read off. Pinned by a `types.pdx` dump test.
 
 - **The dev profile is `opt-level = 1`** ([#180](https://github.com/portlandlang/portland/issues/180)) — every test shells out to the seed, so the suite's time was the unoptimized interpreter's: the hosted self-parse of `parser.pdx` took 9.9s and takes 2.0s, the integration tests 25–34s and take 6s, the whole suites 250s and take 43s, `script/test` end to end five minutes and takes 53s, for a build-after-edit of 3.8s instead of 1.1s. The self-parse tripwire returns to the one 20s ceiling.

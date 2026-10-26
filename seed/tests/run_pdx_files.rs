@@ -2553,6 +2553,57 @@ fn system_write_file_on_both_oracles() {
     );
 }
 
+/// `System.write_standard_output` and `System.write_standard_error` (ADR
+/// 0068, #176): the text as given, no newline added, answering the bytes
+/// written, on both oracles — and the hosted `puts` and `p` are now spelled
+/// over the first, so a guest's output is still byte-identical to the seed's.
+#[test]
+fn system_standard_streams_on_both_oracles() {
+    assert_both_print(
+        "system_standard_streams.pdx",
+        "System.write_standard_output(\"rose \")\nSystem.write_standard_output(\"city\\n\")\np(System.write_standard_output(\"teal\\n\"))\np(System.write_standard_error(\"\"))\nputs\nputs \"after\"\n",
+        "rose city\nteal\n5\n0\n\nafter\n",
+    );
+    let sample = std::env::temp_dir().join("system_standard_error.pdx");
+    std::fs::write(
+        &sample,
+        "count = System.write_standard_error(\"to stderr\\n\")\nputs count\n",
+    )
+    .unwrap();
+    for hosted in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_pdx"));
+        if hosted {
+            command.arg(portland_run());
+        }
+        let output = command.arg(&sample).output().expect("failed to run pdx");
+        assert!(output.status.success(), "hosted {hosted}: failed to run");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "10\n",
+            "hosted {hosted}: stdout"
+        );
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap(),
+            "to stderr\n",
+            "hosted {hosted}: stderr"
+        );
+    }
+    assert_both_oracles_refuse(
+        "system_standard_streams_refusal.pdx",
+        None,
+        &[
+            (
+                "System.write_standard_output(1)\n",
+                "System.write_standard_output takes a String, got 1",
+            ),
+            (
+                "System.write_standard_error\n",
+                "System.write_standard_error takes 1 argument, got 0",
+            ),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

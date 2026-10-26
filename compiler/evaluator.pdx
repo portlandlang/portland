@@ -1641,6 +1641,15 @@ def evaluate_builtin_type_function(node, mutable bindings)
     end
     return outcome([System.write_file(path, content)], bindings)
   end
+  # The two standard streams, text as given, answering the bytes written —
+  # the host's own crossings, so a guest's stdout is the host's stdout.
+  if type_name == "System" && (node.name == "write_standard_output" || node.name == "write_standard_error")
+    panic("System.#{node.name} takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    text = value_at(arguments, 0)
+    panic("System.#{node.name} takes a String, got #{render_inspect(text)}") unless text in String
+    return outcome([System.write_standard_output(text)], bindings) if node.name == "write_standard_output"
+    return outcome([System.write_standard_error(text)], bindings)
+  end
   panic("System has no #{node.name}") if type_name == "System"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses
@@ -3667,18 +3676,20 @@ def evaluate_call(node, mutable bindings)
     return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings)
   end
   case node.name
+  # `puts` and `p` are a rendering and a newline over the floor's one
+  # crossing to standard output (ADR 0068).
   when "puts"
-    puts "" if arguments.empty?
+    System.write_standard_output("\n") if arguments.empty?
     arguments.each do |argument|
       # The refusals come before the rendering, with the seed's wording.
       panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("puts got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      puts render(argument)
+      System.write_standard_output("#{render(argument)}\n")
     end
     outcome([], bindings)
   when "p"
     arguments.each do |argument|
-      puts render_inspect(argument)
+      System.write_standard_output("#{render_inspect(argument)}\n")
     end
     outcome(arguments, bindings)
   when "some"
