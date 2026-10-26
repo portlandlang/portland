@@ -1,0 +1,659 @@
+# Formatting (ADR 0067, #172), from ruby/spec core/kernel/shared/sprintf.rb
+# — the rows core/string/modulo_spec.rb, core/kernel/sprintf_spec.rb, and
+# core/kernel/format_spec.rb all share. Portland spells them `format(...)`
+# and `sprintf(...)`; `"%d" % x` refuses naming `format`. Every answer here
+# is Ruby 4.0.7's byte for byte, the near-tie float rows included (2.675 is
+# "2.68" where correct rounding would say "2.67"), because the seed carries
+# MRI's own digit rounding.
+#
+# Stays upstream: the rows that convert through to_int, to_i, to_str, and
+# to_s mocks or BasicObject (no open runtime); Hash#default and KeyError's
+# receiver and key (ADR 0063, no exceptions); $VERBOSE warnings; encodings
+# (#119). The rows that raise — too few arguments, a malformed template,
+# a value of the wrong kind — refuse in Ruby's words and are pinned in
+# seed/tests/run_pdx_files.rs on both oracles. `%c` of a string answers its
+# first grapheme (ADR 0038), where Ruby's answers its first codepoint.
+
+require_relative "../spec_helper"
+
+context "format" do
+  describe "integer formats" do
+    specify "converts String argument with Kernel#Integer" do
+      expect(format("%d", "0b1010")).to eq("10")
+      expect(format("%d", "112")).to eq("112")
+      expect(format("%d", "0127")).to eq("87")
+      expect(format("%d", "0xc4")).to eq("196")
+      expect(format("%d", "0")).to eq("0")
+    end
+
+    describe "b" do
+      specify "converts argument as a binary number" do
+        expect(format("%b", 10)).to eq("1010")
+        expect(format("%B", 10)).to eq("1010")
+      end
+
+      specify "displays negative number as a two's complement prefixed with '..1'" do
+        expect(format("%b", -10)).to eq("..10110")
+        expect(format("%B", -10)).to eq("..10110")
+      end
+
+      specify "collapse negative number representation if it equals 1" do
+        expect(format("%b", -1)).to eq("..1")
+        expect(format("%B", -1)).to eq("..1")
+      end
+    end
+
+    describe "d" do
+      specify "converts argument as a decimal number" do
+        expect(format("%d", 112)).to eq("112")
+        expect(format("%d", -112)).to eq("-112")
+        expect(format("%i", 112)).to eq("112")
+        expect(format("%i", -112)).to eq("-112")
+        expect(format("%u", 112)).to eq("112")
+        expect(format("%u", -112)).to eq("-112")
+      end
+
+      specify "works well with large numbers" do
+        expect(format("%d", 1234567890987654321)).to eq("1234567890987654321")
+        expect(format("%i", 1234567890987654321)).to eq("1234567890987654321")
+        expect(format("%u", 1234567890987654321)).to eq("1234567890987654321")
+      end
+    end
+
+    describe "o" do
+      specify "converts argument as an octal number" do
+        expect(format("%o", 87)).to eq("127")
+      end
+
+      specify "displays negative number as a two's complement prefixed with '..7'" do
+        expect(format("%o", -87)).to eq("..7651")
+      end
+
+      specify "collapse negative number representation if it equals 7" do
+        expect(format("%o", -1)).to eq("..7")
+      end
+    end
+
+    describe "x" do
+      specify "converts argument as a hexadecimal number" do
+        expect(format("%x", 196)).to eq("c4")
+      end
+
+      specify "displays negative number as a two's complement prefixed with '..f'" do
+        expect(format("%x", -196)).to eq("..f3c")
+      end
+
+      specify "collapse negative number representation if it equals f" do
+        expect(format("%x", -1)).to eq("..f")
+      end
+    end
+
+    describe "X" do
+      specify "converts argument as a hexadecimal number with uppercase letters" do
+        expect(format("%X", 196)).to eq("C4")
+      end
+
+      specify "displays negative number as a two's complement prefixed with '..f'" do
+        expect(format("%X", -196)).to eq("..F3C")
+      end
+
+      specify "collapse negative number representation if it equals F" do
+        expect(format("%X", -1)).to eq("..F")
+      end
+    end
+
+    specify "converts to the empty string if precision is 0 and value is 0" do
+      expect(format("%.b", 0)).to eq("")
+      expect(format("%.0d", 0)).to eq("")
+      expect(format("%.0o", 0)).to eq("")
+      expect(format("%.0x", 0)).to eq("")
+      expect(format("%.0X", 0)).to eq("")
+    end
+
+    specify "pads the empty string if precision is 0 and value is 0" do
+      expect(format("%2.b", 0)).to eq("  ")
+      expect(format("%2.0d", 0)).to eq("  ")
+      expect(format("%2.0x", 0)).to eq("  ")
+    end
+  end
+
+  describe "float formats" do
+    describe "e" do
+      specify "converts argument into exponential notation [-]d.dddddde[+-]dd" do
+        expect(format("%e", 109.52)).to eq("1.095200e+02")
+        expect(format("%e", -109.52)).to eq("-1.095200e+02")
+        expect(format("%e", 0.10952)).to eq("1.095200e-01")
+        expect(format("%e", -0.10952)).to eq("-1.095200e-01")
+        expect(format("%E", 109.52)).to eq("1.095200E+02")
+        expect(format("%E", -0.10952)).to eq("-1.095200E-01")
+      end
+
+      specify "cuts excessive digits and keeps only 6 ones" do
+        expect(format("%e", 1.123456789)).to eq("1.123457e+00")
+      end
+
+      specify "rounds the last significant digit to the closest one" do
+        expect(format("%e", 1.555555555)).to eq("1.555556e+00")
+        expect(format("%e", -1.555555555)).to eq("-1.555556e+00")
+        expect(format("%e", 1.444444444)).to eq("1.444444e+00")
+      end
+
+      specify "displays Float::INFINITY as Inf" do
+        expect(format("%e", Float::INFINITY)).to eq("Inf")
+        expect(format("%e", -Float::INFINITY)).to eq("-Inf")
+      end
+
+      specify "displays Float::NAN as NaN" do
+        expect(format("%e", Float::NAN)).to eq("NaN")
+        expect(format("%E", -Float::NAN)).to eq("NaN")
+      end
+    end
+
+    describe "f" do
+      specify "converts floating point argument as [-]ddd.dddddd" do
+        expect(format("%f", 10.952)).to eq("10.952000")
+        expect(format("%f", -10.952)).to eq("-10.952000")
+      end
+
+      specify "cuts excessive digits and keeps only 6 ones" do
+        expect(format("%f", 1.123456789)).to eq("1.123457")
+      end
+
+      specify "rounds the last significant digit to the closest one" do
+        expect(format("%f", 1.555555555)).to eq("1.555556")
+        expect(format("%f", -1.555555555)).to eq("-1.555556")
+        expect(format("%f", 1.444444444)).to eq("1.444444")
+      end
+
+      specify "rounds as MRI rounds, half to even on the digits it generated" do
+        expect(format("%.2f", 2.675)).to eq("2.68")
+        expect(format("%.2f", 1.005)).to eq("1.00")
+        expect(format("%.2f", 2.665)).to eq("2.66")
+        expect(format("%.0f", 0.5)).to eq("0")
+        expect(format("%.0f", 1.5)).to eq("2")
+        expect(format("%.0f", 2.5)).to eq("2")
+        expect(format("%.2f", 0.005)).to eq("0.01")
+        expect(format("%.3f", 0.0025)).to eq("0.002")
+        expect(format("%.2f", 256.59499999999997)).to eq("256.60")
+        expect(format("%.17f", 2.675)).to eq("2.67499999999999982")
+        expect(format("%.20f", 0.1)).to eq("0.10000000000000000555")
+      end
+
+      specify "displays Float::INFINITY as Inf" do
+        expect(format("%f", Float::INFINITY)).to eq("Inf")
+        expect(format("%f", -Float::INFINITY)).to eq("-Inf")
+      end
+
+      specify "displays Float::NAN as NaN" do
+        expect(format("%f", Float::NAN)).to eq("NaN")
+        expect(format("%f", -Float::NAN)).to eq("NaN")
+      end
+    end
+
+    describe "g" do
+      specify "converts a floating point number using exponential form when the exponent is less than -4" do
+        expect(format("%g", 0.0000123456)).to eq("1.23456e-05")
+        expect(format("%g", -0.0000123456)).to eq("-1.23456e-05")
+        expect(format("%g", 0.000000000123456)).to eq("1.23456e-10")
+        expect(format("%G", -0.000000000123456)).to eq("-1.23456E-10")
+      end
+
+      specify "converts a floating point number using exponential form when the exponent is greater than or equal to the precision (6 by default)" do
+        expect(format("%g", 1234567)).to eq("1.23457e+06")
+        expect(format("%g", 1234567890123)).to eq("1.23457e+12")
+        expect(format("%g", -1234567)).to eq("-1.23457e+06")
+      end
+
+      specify "converts a floating point number in dd.dddd form otherwise" do
+        expect(format("%g", 0.0001)).to eq("0.0001")
+        expect(format("%g", -0.0001)).to eq("-0.0001")
+        expect(format("%g", 123456)).to eq("123456")
+        expect(format("%g", -123456)).to eq("-123456")
+      end
+
+      specify "cuts excessive digits in fractional part and keeps only 4 ones" do
+        expect(format("%g", 12.12341111)).to eq("12.1234")
+        expect(format("%g", -12.12341111)).to eq("-12.1234")
+      end
+
+      specify "rounds the last significant digit to the closest one in fractional part" do
+        expect(format("%g", 1.555555555)).to eq("1.55556")
+        expect(format("%g", -1.555555555)).to eq("-1.55556")
+        expect(format("%g", 1.444444444)).to eq("1.44444")
+      end
+
+      specify "cuts fraction part to have only 6 digits at all" do
+        expect(format("%g", 1.1234567)).to eq("1.12346")
+        expect(format("%g", 12.1234567)).to eq("12.1235")
+        expect(format("%g", 123.1234567)).to eq("123.123")
+        expect(format("%g", 1234.1234567)).to eq("1234.12")
+        expect(format("%g", 12345.1234567)).to eq("12345.1")
+        expect(format("%g", 123456.1234567)).to eq("123456")
+      end
+
+      specify "displays Float::INFINITY as Inf and Float::NAN as NaN" do
+        expect(format("%g", Float::INFINITY)).to eq("Inf")
+        expect(format("%g", -Float::INFINITY)).to eq("-Inf")
+        expect(format("%g", Float::NAN)).to eq("NaN")
+        expect(format("%G", -Float::NAN)).to eq("NaN")
+      end
+    end
+
+    describe "a" do
+      specify "converts floating point argument as [-]0xh.hhhhp[+-]dd" do
+        expect(format("%a", 196)).to eq("0x1.88p+7")
+        expect(format("%a", -196)).to eq("-0x1.88p+7")
+        expect(format("%a", 196.1)).to eq("0x1.8833333333333p+7")
+        expect(format("%a", 0.01)).to eq("0x1.47ae147ae147bp-7")
+        expect(format("%a", -0.01)).to eq("-0x1.47ae147ae147bp-7")
+      end
+
+      specify "converts floating point argument as [-]0xh.hhhhp[+-]dd and use uppercase X and P" do
+        expect(format("%A", 196)).to eq("0X1.88P+7")
+        expect(format("%A", 0.01)).to eq("0X1.47AE147AE147BP-7")
+      end
+
+      specify "displays Float::INFINITY as Inf and Float::NAN as NaN" do
+        expect(format("%a", Float::INFINITY)).to eq("Inf")
+        expect(format("%A", -Float::INFINITY)).to eq("-Inf")
+        expect(format("%a", Float::NAN)).to eq("NaN")
+      end
+    end
+  end
+
+  describe "other formats" do
+    describe "c" do
+      specify "displays character if argument is a numeric code of character" do
+        expect(format("%c", 97)).to eq("a")
+      end
+
+      specify "displays character if argument is a single character string" do
+        expect(format("%c", "a")).to eq("a")
+      end
+
+      specify "displays only the first character if argument is a string of several characters" do
+        expect(format("%c", "abc")).to eq("a")
+      end
+
+      specify "displays only the first character if argument is a string of several multibyte characters" do
+        expect(format("%c", "あいうえお")).to eq("あ")
+      end
+
+      specify "displays no characters if argument is an empty string" do
+        expect(format("%c", "")).to eq("")
+      end
+    end
+
+    describe "p" do
+      specify "displays argument.inspect value" do
+        expect(format("%p", "a")).to eq("\"a\"")
+        expect(format("%p", [1, "a"])).to eq("[1, \"a\"]")
+        expect(format("%p", :sym)).to eq(":sym")
+      end
+
+      specify "substitutes 'nil' for nil" do
+        expect(format("%p", nil)).to eq("nil")
+      end
+    end
+
+    describe "s" do
+      specify "substitute argument passes as a string" do
+        expect(format("%s", "abc")).to eq("abc")
+      end
+
+      specify "substitutes '' for nil" do
+        expect(format("%s", nil)).to eq("")
+      end
+
+      specify "converts argument to string with to_s" do
+        expect(format("%s", 1.0)).to eq("1.0")
+        expect(format("%s", :sym)).to eq("sym")
+        expect(format("%s", true)).to eq("true")
+        expect(format("%s", [1, "a"])).to eq("[1, \"a\"]")
+      end
+
+      specify "formats a partial substring without including omitted characters" do
+        expect(sprintf("%.3s", "aabbccddhelloddccbbaa".slice(8, 5))).to eq("hel")
+      end
+
+      specify "formats string with precision" do
+        expect(format("%.3s", "hello")).to eq("hel")
+        expect(format("%-3.3s", "hello")).to eq("hel")
+      end
+
+      specify "formats string with width" do
+        expect(format("%6s", "abc")).to eq("   abc")
+        expect(format("%6s", "abcdefg")).to eq("abcdefg")
+      end
+
+      specify "formats string with width and precision" do
+        expect(format("%4.6s", "abc")).to eq(" abc")
+        expect(format("%4.6s", "abcdefg")).to eq("abcdef")
+      end
+
+      specify "formats nil with width" do
+        expect(format("%6s", nil)).to eq("      ")
+      end
+
+      specify "formats nil with precision" do
+        expect(format("%.6s", nil)).to eq("")
+      end
+
+      specify "formats nil with width and precision" do
+        expect(format("%4.6s", nil)).to eq("    ")
+      end
+
+      specify "formats multibyte string with precision" do
+        expect(format("%.2s", "été")).to eq("ét")
+      end
+    end
+
+    describe "%" do
+      specify "is escaped by %" do
+        expect(format("%%")).to eq("%")
+        expect(format("%%d")).to eq("%d")
+      end
+    end
+  end
+
+  describe "flags" do
+    describe "space" do
+      specify "leaves a space at the start of non-negative numbers" do
+        expect(format("% b", 10)).to eq(" 1010")
+        expect(format("% d", 112)).to eq(" 112")
+        expect(format("% o", 87)).to eq(" 127")
+        expect(format("% x", 196)).to eq(" c4")
+        expect(format("% X", 196)).to eq(" C4")
+        expect(format("% e", 109.52)).to eq(" 1.095200e+02")
+        expect(format("% f", 10.952)).to eq(" 10.952000")
+        expect(format("% g", 12.1234)).to eq(" 12.1234")
+        expect(format("% a", 196)).to eq(" 0x1.88p+7")
+      end
+
+      specify "does not leave a space at the start of negative numbers" do
+        expect(format("% b", -10)).to eq("-1010")
+        expect(format("% d", -112)).to eq("-112")
+        expect(format("% x", -196)).to eq("-c4")
+        expect(format("% e", -109.52)).to eq("-1.095200e+02")
+        expect(format("% f", -10.952)).to eq("-10.952000")
+        expect(format("% a", -196)).to eq("-0x1.88p+7")
+      end
+
+      specify "prevents converting negative argument to two's complement form" do
+        expect(format("% b", -10)).to eq("-1010")
+        expect(format("% o", -87)).to eq("-127")
+        expect(format("% X", -196)).to eq("-C4")
+      end
+
+      specify "treats several white spaces as one" do
+        expect(format("%     b", 10)).to eq(" 1010")
+        expect(format("%     d", 112)).to eq(" 112")
+        expect(format("%     f", 10.952)).to eq(" 10.952000")
+      end
+    end
+
+    describe "(digit)$" do
+      specify "specifies the absolute argument number for this field" do
+        expect(format("%2$b", 0, 10)).to eq("1010")
+        expect(format("%2$d", 0, 112)).to eq("112")
+        expect(format("%2$x", 0, 196)).to eq("c4")
+        expect(format("%2$e", 0, 109.52)).to eq("1.095200e+02")
+        expect(format("%2$f", 0, 10.952)).to eq("10.952000")
+        expect(format("%2$g", 0, 12.1234)).to eq("12.1234")
+        expect(format("%2$a", 0, 196)).to eq("0x1.88p+7")
+        expect(format("%2$c", 1, 97)).to eq("a")
+        expect(format("%2$p", "a", [])).to eq("[]")
+        expect(format("%2$s", "-", "abc")).to eq("abc")
+      end
+
+      specify "ignores '-' sign" do
+        expect(format("%2$d", 1, 2, 3)).to eq("2")
+        expect(format("%-2$d", 1, 2, 3)).to eq("2")
+      end
+    end
+
+    describe "#" do
+      specify "increases the precision until the first digit will be `0' if it is not formatted as complements" do
+        expect(format("%#o", 87)).to eq("0127")
+      end
+
+      specify "does nothing for negative argument" do
+        expect(format("%#o", -87)).to eq("..7651")
+      end
+
+      specify "prefixes the result with 0x, 0X, 0b and 0B respectively for non-zero argument" do
+        expect(format("%#b", 10)).to eq("0b1010")
+        expect(format("%#b", -10)).to eq("0b..10110")
+        expect(format("%#B", 10)).to eq("0B1010")
+        expect(format("%#x", 196)).to eq("0xc4")
+        expect(format("%#x", -196)).to eq("0x..f3c")
+        expect(format("%#X", -196)).to eq("0X..F3C")
+      end
+
+      specify "does nothing for zero argument" do
+        expect(format("%#b", 0)).to eq("0")
+        expect(format("%#x", 0)).to eq("0")
+        expect(format("%#o", 0)).to eq("0")
+        expect(format("%#.1o", 0)).to eq("0")
+      end
+
+      specify "does nothing for zero argument when combined with zero precision" do
+        expect(format("%#.0b", 0)).to eq("")
+        expect(format("%#.0x", 0)).to eq("")
+      end
+
+      specify "increases the precision if precision zero is requested with zero argument" do
+        expect(format("%#.0o", 0)).to eq("0")
+      end
+
+      specify "forces a decimal point to be added, even if no digits follow" do
+        expect(format("%#.0a", 16.25)).to eq("0x1.p+4")
+        expect(format("%#.0e", 100)).to eq("1.e+02")
+        expect(format("%#.0E", 100)).to eq("1.E+02")
+        expect(format("%#.0f", 123.4)).to eq("123.")
+        expect(format("%#g", 123456)).to eq("123456.")
+      end
+
+      specify "changes format from dd.dddd to exponential form for gG" do
+        expect(format("%#.0g", 123.4)).to eq("1.e+02")
+      end
+
+      specify "does not remove trailing zeros" do
+        expect(format("%#g", 123.4)).to eq("123.400")
+      end
+    end
+
+    describe "+" do
+      specify "adds a leading plus sign to non-negative numbers" do
+        expect(format("%+b", 10)).to eq("+1010")
+        expect(format("%+d", 112)).to eq("+112")
+        expect(format("%+o", 87)).to eq("+127")
+        expect(format("%+x", 196)).to eq("+c4")
+        expect(format("%+e", 109.52)).to eq("+1.095200e+02")
+        expect(format("%+f", 10.952)).to eq("+10.952000")
+        expect(format("%+g", 12.1234)).to eq("+12.1234")
+        expect(format("%+a", 196)).to eq("+0x1.88p+7")
+      end
+
+      specify "does not use two's complement form for negative numbers for formats bBoxX" do
+        expect(format("%+b", -10)).to eq("-1010")
+        expect(format("%+o", -87)).to eq("-127")
+        expect(format("%+x", -196)).to eq("-c4")
+        expect(format("%+X", -196)).to eq("-C4")
+      end
+    end
+
+    describe "-" do
+      specify "left-justifies the result of conversion if width is specified" do
+        expect(format("%-10b", 10)).to eq("1010      ")
+        expect(format("%-10d", 112)).to eq("112       ")
+        expect(format("%-10x", 196)).to eq("c4        ")
+        expect(format("%-20e", 109.52)).to eq("1.095200e+02        ")
+        expect(format("%-20f", 10.952)).to eq("10.952000           ")
+        expect(format("%-20g", 12.1234)).to eq("12.1234             ")
+        expect(format("%-20a", 196)).to eq("0x1.88p+7           ")
+        expect(format("%-10c", 97)).to eq("a         ")
+        expect(format("%-10p", [])).to eq("[]        ")
+        expect(format("%-10s", "abc")).to eq("abc       ")
+      end
+    end
+
+    describe "0 (zero)" do
+      specify "pads with zeros, not spaces" do
+        expect(format("%010b", 10)).to eq("0000001010")
+        expect(format("%010d", 112)).to eq("0000000112")
+        expect(format("%010o", 87)).to eq("0000000127")
+        expect(format("%010x", 196)).to eq("00000000c4")
+        expect(format("%020e", 109.52)).to eq("000000001.095200e+02")
+        expect(format("%020f", 10.952)).to eq("0000000000010.952000")
+        expect(format("%020g", 12.1234)).to eq("000000000000012.1234")
+        expect(format("%020a", 196)).to eq("0x000000000001.88p+7")
+      end
+
+      specify "uses radix-1 when displays negative argument as a two's complement" do
+        expect(format("%010b", -10)).to eq("..11110110")
+        expect(format("%010o", -87)).to eq("..77777651")
+        expect(format("%010x", -196)).to eq("..ffffff3c")
+        expect(format("%010X", -196)).to eq("..FFFFFF3C")
+      end
+    end
+
+    describe "*" do
+      specify "uses the previous argument as the field width" do
+        expect(format("%*b", 10, 10)).to eq("      1010")
+        expect(format("%*d", 10, 112)).to eq("       112")
+        expect(format("%*e", 20, 109.52)).to eq("        1.095200e+02")
+        expect(format("%*f", 20, 10.952)).to eq("           10.952000")
+        expect(format("%*c", 10, 97)).to eq("         a")
+        expect(format("%*s", 10, "abc")).to eq("       abc")
+      end
+
+      specify "left-justifies the result if width is negative" do
+        expect(format("%*b", -10, 10)).to eq("1010      ")
+        expect(format("%*d", -10, 112)).to eq("112       ")
+        expect(format("%*f", -20, 10.952)).to eq("10.952000           ")
+        expect(format("%*s", -10, "abc")).to eq("abc       ")
+      end
+
+      specify "uses the specified argument as the width if * is followed by a number and $" do
+        expect(format("%1$*2$b", 10, 10)).to eq("      1010")
+        expect(format("%1$*2$d", 112, 10)).to eq("       112")
+        expect(format("%1$*2$f", 10.952, 20)).to eq("           10.952000")
+        expect(format("%1$*2$s", "abc", 10)).to eq("       abc")
+      end
+
+      specify "left-justifies the result if specified with $ argument is negative" do
+        expect(format("%1$*2$b", 10, -10)).to eq("1010      ")
+        expect(format("%1$*2$d", 112, -10)).to eq("112       ")
+        expect(format("%1$*2$s", "abc", -10)).to eq("abc       ")
+      end
+    end
+  end
+
+  describe "width" do
+    specify "specifies the minimum number of characters that will be written to the result" do
+      expect(format("%10b", 10)).to eq("      1010")
+      expect(format("%10d", 112)).to eq("       112")
+      expect(format("%10o", 87)).to eq("       127")
+      expect(format("%10x", 196)).to eq("        c4")
+      expect(format("%20e", 109.52)).to eq("        1.095200e+02")
+      expect(format("%20f", 10.952)).to eq("           10.952000")
+      expect(format("%20g", 12.1234)).to eq("             12.1234")
+      expect(format("%20a", 196)).to eq("           0x1.88p+7")
+      expect(format("%10c", 97)).to eq("         a")
+      expect(format("%10p", [])).to eq("        []")
+      expect(format("%10s", "abc")).to eq("       abc")
+    end
+
+    specify "is ignored if argument's actual length is greater" do
+      expect(format("%5d", 1234567890)).to eq("1234567890")
+    end
+
+    specify "counts graphemes, as every width here does" do
+      expect(format("%3s|", "🇺🇸")).to eq("  🇺🇸|")
+    end
+  end
+
+  describe "precision" do
+    specify "controls the number of decimal places displayed for integer types" do
+      expect(format("%.6b", 10)).to eq("001010")
+      expect(format("%.5d", 112)).to eq("00112")
+      expect(format("%.5o", 87)).to eq("00127")
+      expect(format("%.5x", 196)).to eq("000c4")
+      expect(format("%.5X", 196)).to eq("000C4")
+    end
+
+    specify "controls the number of decimal places displayed in fraction part for float types" do
+      expect(format("%.10e", 109.52)).to eq("1.0952000000e+02")
+      expect(format("%.10f", 10.952)).to eq("10.9520000000")
+      expect(format("%.10a", 196)).to eq("0x1.8800000000p+7")
+    end
+
+    specify "does not affect G format" do
+      expect(format("%.10g", 12.1234)).to eq("12.1234")
+      expect(format("%.10g", 123456789)).to eq("123456789")
+    end
+
+    specify "determines the maximum number of characters to be copied from the string" do
+      expect(format("%.1p", [1])).to eq("[")
+      expect(format("%.2p", [1])).to eq("[1")
+      expect(format("%.10p", [1])).to eq("[1]")
+      expect(format("%.0p", [1])).to eq("")
+      expect(format("%.1s", "abc")).to eq("a")
+      expect(format("%.2s", "abc")).to eq("ab")
+      expect(format("%.10s", "abc")).to eq("abc")
+      expect(format("%.0s", "abc")).to eq("")
+    end
+  end
+
+  describe "reference by name" do
+    describe "%<name>s style" do
+      specify "uses value passed in a hash argument" do
+        expect(format("%<foo>d", foo: 123)).to eq("123")
+      end
+
+      specify "supports flags, width, precision and type" do
+        expect(format("%+20.10<foo>f", foo: 10.952)).to eq("      +10.9520000000")
+      end
+
+      specify "allows to place name in any position" do
+        expect(format("%+15.5<foo>f", foo: 10.952)).to eq("      +10.95200")
+        expect(format("%+15<foo>.5f", foo: 10.952)).to eq("      +10.95200")
+        expect(format("%+<foo>15.5f", foo: 10.952)).to eq("      +10.95200")
+        expect(format("%<foo>+15.5f", foo: 10.952)).to eq("      +10.95200")
+      end
+    end
+
+    describe "%{name} style" do
+      specify "uses value passed in a hash argument" do
+        expect(format("%{foo}", foo: 123)).to eq("123")
+      end
+
+      specify "does not support type style" do
+        expect(format("%{foo}d", foo: 123)).to eq("123d")
+      end
+
+      specify "supports flags, width and precision" do
+        expect(format("%-20.5{foo}", foo: "123456789")).to eq("12345               ")
+      end
+
+      specify "accepts a nil value for an existing key" do
+        expect(format("%{foo}", foo: nil)).to eq("")
+      end
+
+      specify "converts value to String with to_s" do
+        expect(format("%{foo}", foo: 42)).to eq("42")
+        expect(format("%{foo}", foo: :sym)).to eq("sym")
+      end
+    end
+  end
+
+  specify "does not raise error when passed more arguments than needed" do
+    expect(sprintf("%s %d %c", "string", 2, "c", [])).to eq("string 2 c")
+  end
+
+  specify "sprintf is format's twin" do
+    expect(sprintf("%05.2f|%-10s|%+d", 3.14159, "pdx", 5)).to eq("03.14|pdx       |+5")
+    expect(sprintf("%<a>s %{b}", a: 1, b: 2)).to eq(format("%<a>s %{b}", a: 1, b: 2))
+  end
+end

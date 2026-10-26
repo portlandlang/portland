@@ -2243,6 +2243,11 @@ core/string/ljust_spec.rb:
   pdx: [spec/string/padding_spec.pdx]
 core/string/lstrip_spec.rb:
   pdx: [spec/string/trim_spec.pdx]
+core/string/modulo_spec.rb:
+  pdx: [spec/string/format_spec.pdx]
+  status: partial_intentional
+  reason: "Formatting is format(template, values...), not the % operator (ADR 0067): the shared sprintf rows are ported against format, and \"%d\" % x refuses naming it. The rows that convert through to_int, to_i, to_str, and to_s mocks or BasicObject, Hash#default, KeyError's receiver and key, $VERBOSE warnings, and encodings stay upstream; the rows that raise refuse in Ruby's words, pinned in seed/tests."
+  link: docs/ruby/conversions.md
 core/string/multiply_spec.rb:
   pdx: [spec/string/operators_spec.pdx]
 core/string/new_spec.rb:
@@ -2665,6 +2670,16 @@ core/enumerator/:
   status: skipped
   reason: "There are no enumerators; methods that would answer one answer the finished collection."
   link: docs/ruby/enumerators.md
+core/kernel/sprintf_spec.rb:
+  pdx: [spec/string/format_spec.pdx]
+  status: partial_intentional
+  reason: "The shared sprintf rows are ported against format and sprintf (ADR 0067); the to_str mock row and the public_methods reflection row stay upstream, with the rows the shared examples leave behind (mocks, Hash#default, KeyError's receiver, $VERBOSE, encodings)."
+  link: docs/ruby/conversions.md
+core/kernel/format_spec.rb:
+  pdx: [spec/string/format_spec.pdx]
+  status: partial_intentional
+  reason: "format and sprintf are twins here too (ADR 0067), pinned by an example that compares their answers; the instance_method and method reflection rows stay upstream, since the runtime is closed."
+  link: docs/ruby/conversions.md
 core/fiber/:
   status: skipped
   reason: "No Fiber: concurrency is together and meanwhile."

@@ -110,8 +110,9 @@ def synthesize(node, types)
   in MethodCallNode then synthesize_call(node, types)
   in SafeMethodCallNode then synthesize_safe_call(node, types)
   # A bare call reaches a def the scan already typed (3b); its name shares
-  # the list with the locals under the no-shadow rule.
-  in CallNode then synthesize_name(node.name, types)
+  # the list with the locals under the no-shadow rule. `format` and
+  # `sprintf` (ADR 0067) answer a string.
+  in CallNode then synthesize_bare_call(node, types)
   in IfNode then synthesize_if(node, types)
   in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
@@ -313,6 +314,11 @@ def synthesize_name(name, types)
   found = types.find { it[0] == name }
   return ["unknown"] if found.nil?
   type_at(found, 1)
+end
+
+def synthesize_bare_call(node, types)
+  return ["string"] if (node.name == "format" || node.name == "sprintf") && synthesize_name(node.name, types) == ["unknown"]
+  synthesize_name(node.name, types)
 end
 
 # The arithmetic and comparison operators, ADR 0018's shapes: whole numbers

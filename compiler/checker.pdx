@@ -1139,7 +1139,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[failure fields inspect p panic puts rand require_relative some srand].include?(name)
+def builtin_function?(name) = %w[failure fields format inspect p panic puts rand require_relative some sprintf srand].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it
@@ -1324,6 +1324,9 @@ def check_operator(node, scope, found)
   right = synthesize(node.right, types)
   return found unless plain_value?(left) && plain_value?(right)
   return found if operator_takes?(node.operator, left, right)
+  # `"%d" % x` is Ruby's formatting operator; here formatting is a function
+  # (ADR 0067), and the refusal names it, as the seed's does.
+  return noted(found, ["string_percent"], locate(node, scope)) if node.operator == "%" && left == ["string"]
   noted(found, ["operator", node.operator, left, right], locate(node, scope))
 end
 

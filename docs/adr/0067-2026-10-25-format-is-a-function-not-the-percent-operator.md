@@ -1,6 +1,6 @@
 # 0067 — Formatting is `format(template, values)`, not `template % values`
 
-- **Status:** Accepted, not yet built (ruled by the deciding user 2026-10-25 on the recommendation in [#172](https://github.com/portlandlang/portland/issues/172), choosing its option 2; the build waits for a pull, and [#172](https://github.com/portlandlang/portland/issues/172) stays open as the buildable ticket)
+- **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#172](https://github.com/portlandlang/portland/issues/172), choosing its option 2; built on both implementations 2026-10-26 with Ruby's directives whole and MRI's digit rounding, core/string/modulo and core/kernel/{format,sprintf} ported against `format`)
 - **Date:** 2026-10-25
 - **Issue:** [#172](https://github.com/portlandlang/portland/issues/172)
 

@@ -84,6 +84,7 @@ def render_refusal(refusal)
   in ["no_method", spelling, type, name] then "#{spelled(spelling)} is #{a_type(type)}, which has no method #{spelled(name)}"
   in ["unhandled_maybe", spelling, type, name] then sentence("#{spelled(spelling)} is #{a_type(type)}", "handle the nil case before #{spelled("." + name)}")
   in ["operator", operator, left, right] then "cannot apply #{spelled(operator)} to #{render_type(left)} and #{render_type(right)}"
+  in ["string_percent"] then "'%' on a string is formatting, which is spelled 'format(\"%d\", x)' here"
   in ["unary", operator, operand] then "cannot apply #{spelled(operator)} to #{render_type(operand)}"
   in ["annotation", name, computed, written] then sentence("#{spelled(name)} answers #{render_type(computed)}, not the annotated #{written}", "change one")
   in ["arity", name, expected, got] then "#{name} expects #{expected} #{plural("argument", expected)}, got #{got}"

@@ -2192,6 +2192,11 @@ fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
         // holds — not the `eql?` a hash key matches by.
         (left, BinaryOperator::Equals, right) => Value::Boolean(left.ruby_equals(&right)),
         (left, BinaryOperator::NotEquals, right) => Value::Boolean(!left.ruby_equals(&right)),
+        // `%` stays arithmetic (ADR 0067): Ruby's formatting operator names
+        // the function that does the same job here.
+        (Value::String(_), BinaryOperator::Modulo, _) => {
+            panic!("'%' on a string is formatting, which is spelled 'format(\"%d\", x)' here")
+        }
         (left, operator, right) => {
             panic!(
                 "cannot apply '{}' to {} and {}",
@@ -6726,6 +6731,7 @@ impl<W: std::io::Write> Interpreter<W> {
         matches!(
             name,
             "failure"
+                | "format"
                 | "inspect"
                 | "p"
                 | "panic"
@@ -6733,6 +6739,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "rand"
                 | "require_relative"
                 | "some"
+                | "sprintf"
                 | "srand"
         )
     }
@@ -7213,10 +7220,19 @@ impl<W: std::io::Write> Interpreter<W> {
                 name,
             } => {
                 // Builtin type patterns (#27): `in String`, `in Integer`, …
-                // — the type predicate, pattern-flavored. No reflection API.
+                // — the type predicate, pattern-flavored, the same names
+                // `when` matches by. No reflection API.
                 if matches!(
                     name.as_str(),
-                    "Array" | "Boolean" | "Hash" | "Integer" | "Random" | "String"
+                    "Array"
+                        | "Boolean"
+                        | "Float"
+                        | "Hash"
+                        | "Integer"
+                        | "Random"
+                        | "Range"
+                        | "String"
+                        | "Symbol"
                 ) {
                     if !pattern_fields.is_empty() {
                         panic!("the builtin type pattern {name} takes no fields");
@@ -7226,9 +7242,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         ("Array", Value::Array(_))
                             | ("Boolean", Value::Boolean(_))
                             | ("Hash", Value::Hash(_))
+                            | ("Float", Value::Float(_))
                             | ("Integer", Value::Integer(_))
                             | ("Random", Value::Random(_))
+                            | ("Range", Value::Range { .. })
                             | ("String", Value::String(_))
+                            | ("Symbol", Value::Symbol(_))
                     );
                     return if matched { Some(Vec::new()) } else { None };
                 }
@@ -7547,6 +7566,22 @@ impl<W: std::io::Write> Interpreter<W> {
             if self.lookup_method(name).is_none() {
                 panic!("`fields` is the raw constructor — it only exists inside def self.new");
             }
+        }
+        // Formatting is a function, not the `%` operator (ADR 0067): Ruby's
+        // directives whole, the keyword arguments its `%<name>d` and
+        // `%{name}` references. `sprintf` is the twin.
+        if self.lookup_method(name).is_none() && (name == "format" || name == "sprintf") {
+            let template = match arguments.first() {
+                Some(Value::String(template)) => template,
+                Some(other) => panic!(
+                    "no implicit conversion of {} into String",
+                    other.type_name()
+                ),
+                None => panic!("too few arguments"),
+            };
+            let formatted =
+                crate::format::format_values(template, &arguments[1..], &keyword_arguments);
+            return Some(Value::String(formatted));
         }
         if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() {
             panic!("{name} takes no keyword arguments");

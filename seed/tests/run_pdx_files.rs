@@ -2662,6 +2662,113 @@ fn system_first_wave_on_both_oracles() {
     );
 }
 
+/// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// Ruby's directives whole, on both oracles — the seed's engine and the
+/// hosted walk that hands it one directive at a time agree byte for byte,
+/// and the answers are Ruby 4.0.7's, near-tie rounding included. Every
+/// refusal is Ruby's sentence; `"%d" % x` names the function.
+#[test]
+fn format_on_both_oracles() {
+    assert_both_print(
+        "format_directives.pdx",
+        "puts format(\"%b %o %x %X %d|%b %o %x %X|%#b %#x %#o|%010b|%010x\", 10, 87, 196, 196, -112, -10, -87, -196, -1, 10, -196, 87, -10, -196)\n\
+         puts format(\"% d %+d %-6d|%06d|%5.3d|%.0d|%*d|\", 112, 112, 112, -5, 7, 0, 5, 7) + format(\"%1$*2$d|%2$s %1$s\", 3, 4)\n\
+         puts format(\"%e %E %f %g %G %a %A|%.2f %.2f %.0f %.0f %.3f %.2e\", 109.52, 0.10952, 10.952, 0.0000123456, 1234567, 196, 0.01, 2.675, 1.005, 0.5, 1.5, 0.0025, 2.675)\n\
+         puts format(\"%#.0f %#g %#.0g %.10g|%f %+e % g %010f %f\", 123.4, 123.4, 123.4, 12.1234, 1.0 / 0.0, 1.0 / 0.0, 0.0 / 0.0, -1.0 / 0.0, -0.0)\n\
+         puts format(\"%c%c%c|%p %p %s %s|%.3s|%-3.3s|%6s|%4.6s|%4.6s|%.2s|%%|%%d\", 97, \"abc\", \"あいう\", nil, :sym, nil, [1, \"a\"], \"hello\", \"hello\", \"abc\", \"abc\", nil, \"été\")\n\
+         puts format(\"%<foo>d|%+20.10<foo>f|%<foo>+15.5f\", foo: 10.952) + format(\"|%{bar}|%{bar}d|%-8.3{bar}|%{baz}|\", bar: \"123456789\", baz: nil)\n\
+         puts format(\"%d %d %d %d|%f %f|%d %d\", \"0b1010\", \"0127\", \"0xc4\", \" -0x1f \", 3, \"1_000.5\", 3.99, -3.99)\n\
+         puts sprintf(\"%05.2f|%-10s|%+d\", 3.14159, \"pdx\", 5)\n",
+        "1010 127 c4 C4 -112|..10110 ..7651 ..f3c ..F|0b1010 0x..f3c 0127|..11110110|..ffffff3c\n\
+         \x20112 +112 112   |-00005|  007||    7|   3|4 3\n\
+         1.095200e+02 1.095200E-01 10.952000 1.23456e-05 1.23457E+06 0x1.88p+7 0X1.47AE147AE147BP-7|2.68 1.00 0 2 0.002 2.68e+00\n\
+         123. 123.400 1.e+02 12.1234|Inf +Inf  NaN       -Inf -0.000000\n\
+         aaあ|nil :sym  [1, \"a\"]|hel|hel|   abc| abc|    |ét|%|%d\n\
+         10|      +10.9520000000|      +10.95200|123456789|123456789d|123     ||\n\
+         10 87 196 -31|3.000000 1000.500000|3 -3\n\
+         03.14|pdx       |+5\n",
+    );
+    assert_both_oracles_refuse(
+        "format_refusal.pdx",
+        None,
+        &[
+            ("format(\"%d %d\", 1)\n", "too few arguments"),
+            ("format(\"%4$d\", 1, 2, 3)\n", "too few arguments"),
+            (
+                "format(\"%1$d %d\", 1, 2)\n",
+                "unnumbered(1) mixed with numbered",
+            ),
+            (
+                "format(\"%d %1$d\", 1, 2)\n",
+                "numbered(1) after unnumbered(1)",
+            ),
+            (
+                "format(\"%d %<foo>d\", 1, foo: 2)\n",
+                "named<foo> after unnumbered(1)",
+            ),
+            (
+                "format(\"%<foo>d %d\", 1, foo: 2)\n",
+                "unnumbered(1) mixed with named",
+            ),
+            ("format(\"%*10d\", 10, 112)\n", "width given twice"),
+            ("format(\"%5 d\", 3)\n", "flag after width"),
+            ("format(\"%.-1f\", 3.14)\n", "flag after precision"),
+            ("format(\"%.5.3d\", 3)\n", "precision given twice"),
+            ("format(\"%q\", 1)\n", "malformed format string - %q"),
+            (
+                "format(\"%\")\n",
+                "incomplete format specifier; use %% (double %) instead",
+            ),
+            ("format(\" % \")\n", "malformed format string"),
+            (
+                "format(\"hello %1$\", \"foo\")\n",
+                "malformed format string",
+            ),
+            ("format(\"%5%\")\n", "invalid format character - %"),
+            ("format(\"%<foo>s\", bar: 1)\n", "key<foo> not found"),
+            ("format(\"%{foo}\", bar: 1)\n", "key{foo} not found"),
+            ("format(\"%d\", nil)\n", "can't convert nil into Integer"),
+            ("format(\"%d\", [1])\n", "can't convert Array into Integer"),
+            (
+                "format(\"%d\", :sym)\n",
+                "can't convert Symbol into Integer",
+            ),
+            ("format(\"%f\", true)\n", "can't convert true into Float"),
+            (
+                "format(\"%d\", \"abc\")\n",
+                "invalid value for Integer(): \"abc\"",
+            ),
+            (
+                "format(\"%f\", \"abc\")\n",
+                "invalid value for Float(): \"abc\"",
+            ),
+            (
+                "format(\"%c\", [])\n",
+                "no implicit conversion of Array into Integer",
+            ),
+            (
+                "format(\"%c\", nil)\n",
+                "no implicit conversion from nil to integer",
+            ),
+            ("format(\"%c\", -1)\n", "invalid character"),
+            (
+                "format(\"%*d\", \"5\", 1)\n",
+                "no implicit conversion of String into Integer",
+            ),
+            ("format(\"%d\", 1.0 / 0.0)\n", "Infinity"),
+            ("format()\n", "too few arguments"),
+            (
+                "format(1)\n",
+                "no implicit conversion of Integer into String",
+            ),
+            (
+                "p(\"%d\" % 1)\n",
+                "'%' on a string is formatting, which is spelled 'format(\"%d\", x)' here",
+            ),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

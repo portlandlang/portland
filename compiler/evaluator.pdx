@@ -389,7 +389,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[failure inspect p panic puts rand require_relative some srand].include?(name)
+  %w[failure format inspect p panic puts rand require_relative some sprintf srand].include?(name)
 end
 
 # The top of a file: no frame and no namespace around these bindings.
@@ -526,22 +526,23 @@ end
 def match_builtin_type(pattern, subject)
   matched = case pattern.name
   when "Boolean" then subject in Boolean
-  when "Hash" then subject in Hash
+  when "Float"   then subject in Float
+  when "Hash"    then subject in Hash
   when "Integer" then subject in Integer
-  when "Random" then subject in Random
-  when "String" then subject in String
-  when "Array"
-    # Guest struct instances are tagged host arrays — exclude them.
-    (subject in Array) && !(subject in ["__struct__", *])
-  else
-    false
+  when "Random"  then subject in Random
+  when "Range"   then subject in Range
+  when "String"  then subject in String
+  when "Symbol"  then subject in ["__symbol__", *]
+  # Guest structs, symbols, and enum cases are tagged host arrays — not arrays.
+  when "Array"   then plain_array?(subject)
+  else false
   end
   return [] if matched
   nil
 end
 
 def match_struct(pattern, subject, bindings)
-  if %w[Array Boolean Hash Integer Random String].include?(pattern.name)
+  if %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
@@ -2006,6 +2007,271 @@ def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
     return return_outcome(result.value, bindings, result.target)
   end
   outcome(result.value, bindings)
+end
+
+# — formatting (ADR 0067) —
+#
+# `format(template, values...)` and its twin `sprintf`. The template walk is
+# here — directives, flags, width, precision, `*` and `n$` from the
+# arguments, `%<name>d` and `%{name}` from the keyword arguments, and every
+# refusal of a malformed template in Ruby's words, as the seed says them.
+# Rendering one directive is the host's own `format`, handed that directive
+# alone and its one value, so every digit is the seed's byte for byte, and
+# the host's sentence for a wrong value reaches the guest unchanged.
+#
+# Portland has no splat yet (ADR 0014), so the host's `format` cannot be
+# handed the whole argument list at once; one directive at a time is what a
+# fixed arity allows, and it mirrors how the seed walks the template anyway.
+
+# The formatted string: `values` are the positional arguments after the
+# template, `named` the keyword arguments as `[label, value]` pairs.
+def format_template(template, values, named)
+  letters = template.chars
+  mutable output = ""
+  mutable at = 0
+  # Which style the template draws its values in — "unset", "unnumbered",
+  # "numbered", or "named" — and how many unnumbered values are used up.
+  mutable sourcing = "unset"
+  mutable used = 0
+  while at < letters.length
+    if letters[at] != "%"
+      output += letters[at]
+      at += 1
+    else
+      step = format_directive(letters, at + 1, values, named, sourcing, used)
+      output += step[0]
+      at = step[1]
+      sourcing = step[2]
+      used = step[3]
+    end
+  end
+  output
+end
+
+# One directive, `at` just past its `%`. Answers `[text, after, sourcing,
+# used]`: what it rendered, where the template continues, and the sourcing
+# state it leaves behind.
+def format_directive(letters, start, values, named, start_sourcing, start_used)
+  mutable at = start
+  mutable sourcing = start_sourcing
+  mutable used = start_used
+  mutable flags = ""
+  mutable width = nil
+  mutable precision = nil
+  mutable position = nil
+  mutable name = nil
+  mutable saw_width = false
+  mutable saw_precision = false
+  loop do
+    if at >= letters.length
+      panic("incomplete format specifier; use %% (double %) instead") if letters[at - 1] == "%"
+      panic("malformed format string")
+    end
+    letter = letters[at]
+    if letter == " " || letter == "#" || letter == "+" || letter == "-" || letter == "0"
+      panic("flag after precision") if saw_precision
+      panic("flag after width") if saw_width
+      flags += letter
+      at += 1
+    elsif digit?(letter)
+      digits = read_format_digits(letters, at)
+      number = digits[0]
+      after = digits[1]
+      if after < letters.length && letters[after] == "$"
+        panic("value given twice - #{number}$") unless position.nil?
+        sourcing = note_numbered(sourcing, used, number)
+        position = number
+        at = after + 1
+      else
+        panic("width given twice") if saw_width
+        panic("width after precision") if saw_precision
+        saw_width = true
+        width = number
+        at = after
+      end
+    elsif letter == "*"
+      panic("width given twice") if saw_width
+      panic("width after precision") if saw_precision
+      saw_width = true
+      star = format_star(letters, at + 1, values, sourcing, used)
+      count = star[0]
+      at = star[1]
+      sourcing = star[2]
+      used = star[3]
+      if count < 0
+        flags += "-"
+        width = -count
+      else
+        width = count
+      end
+    elsif letter == "."
+      panic("precision given twice") if saw_precision
+      saw_precision = true
+      at += 1
+      if at < letters.length && letters[at] == "*"
+        star = format_star(letters, at + 1, values, sourcing, used)
+        precision = star[0] < 0 ? 0 : star[0]
+        at = star[1]
+        sourcing = star[2]
+        used = star[3]
+      else
+        digits = read_format_digits(letters, at)
+        precision = digits[0]
+        at = digits[1]
+      end
+    elsif letter == "<" || letter == "{"
+      close = letter == "<" ? ">" : "}"
+      mutable finish = at + 1
+      while finish < letters.length && letters[finish] != close
+        finish += 1
+      end
+      panic("malformed name - unmatched parenthesis") if finish >= letters.length
+      key = letters.slice(at + 1, finish - at - 1).join
+      panic("named#{letter}#{key}#{close} after <#{name[0]}>") unless name.nil?
+      sourcing = note_named(sourcing, used, letter, key, close)
+      name = [key, letter]
+      at = finish + 1
+      if letter == "{"
+        # `%{name}` takes no type: it is `%s` of the value, and whatever
+        # follows is the template's own text.
+        value = named_value(named, key, "{", "}")
+        text = format(single_directive(flags, width, precision, "s"), format_text(value))
+        return [text, at, sourcing, used]
+      end
+    elsif letter == "%"
+      panic("invalid format character - %") if saw_width || saw_precision || !flags.empty? || !position.nil?
+      return ["%", at + 1, sourcing, used]
+    elsif letter == "\n" || letter.ord == 0
+      panic("malformed format string")
+    else
+      panic("malformed format string - %#{letter}") unless "bBdiuoxXeEfgGaAcps".include?(letter)
+      found = directive_value(name, position, values, named, sourcing, used)
+      # Read raw: an index lifts a stored nil to some(nil), and the host
+      # must see the guest's nil as nil.
+      text = format_one(flags, width, precision, letter, value_at(found, 0))
+      return [text, at + 1, found[1], found[2]]
+    end
+  end
+end
+
+# One directive rendered by the host, the guest's value made into one the
+# host reads as Ruby would: text directives take the guest's own rendering
+# (a tagged symbol or struct is not a host string), numbers pass through,
+# and anything else refuses in Ruby's words before the host sees a tag.
+def format_one(flags, width, precision, letter, value)
+  return format(single_directive(flags, width, precision, "s"), format_text(value)) if letter == "s"
+  return format(single_directive(flags, width, precision, "s"), render_inspect(value)) if letter == "p"
+  if letter == "c"
+    return format(single_directive(flags, width, precision, "c"), value) if value.nil? || (value in Integer) || (value in String)
+    panic("no implicit conversion of #{format_type_name(value)} into Integer")
+  end
+  if value.nil? || (value in Integer) || (value in Float) || (value in String) || (value in Boolean)
+    return format(single_directive(flags, width, precision, letter), value)
+  end
+  target = "eEfgGaA".include?(letter) ? "Float" : "Integer"
+  panic("can't convert #{format_type_name(value)} into #{target}")
+end
+
+# `%s` of a guest value: Ruby's `to_s`, with nil as the empty string.
+def format_text(value)
+  return "" if value.nil?
+  render(value)
+end
+
+# A guest value's type as a refusal names it, Ruby's way: nil, true, and
+# false as themselves, a struct by its name, everything else by its kind.
+def format_type_name(value)
+  return "nil" if value.nil?
+  return "true" if value == true
+  return "false" if value == false
+  return "Symbol" if value in ["__symbol__", *]
+  return value_at(value, 1) if value in ["__struct__", *]
+  type = builtin_type_of(value)
+  return "Object" if type.nil?
+  type_at(type, 0).capitalize
+end
+
+# The value a typed directive renders, by the template's one sourcing
+# style — named, numbered, or the next in order. Answers `[value, sourcing,
+# used]`; the mixing check comes before the count check, as the seed's does.
+def directive_value(name, position, values, named, sourcing, used)
+  return [named_value(named, name[0], "<", ">"), sourcing, used] unless name.nil?
+  return [numbered_value(values, position), sourcing, used] unless position.nil?
+  style = note_unnumbered(sourcing, used)
+  [numbered_value(values, used + 1), style, used + 1]
+end
+
+# One directive's template on its own, every width and precision written
+# out, for the host to render with its one value.
+def single_directive(flags, width, precision, letter)
+  width_text = width.nil? ? "" : width.to_s
+  precision_text = precision.nil? ? "" : ".#{precision}"
+  "%#{flags}#{width_text}#{precision_text}#{letter}"
+end
+
+# A run of decimal digits as a number, and where it ended: `[number, after]`.
+def read_format_digits(letters, start)
+  mutable at = start
+  mutable number = 0
+  while at < letters.length && digit?(letters[at])
+    number = number * 10 + letters[at].to_i
+    at += 1
+  end
+  [number, at]
+end
+
+# `*` or `*n$`: a width or precision read from the arguments. Answers
+# `[count, after, sourcing, used]`.
+def format_star(letters, start, values, start_sourcing, start_used)
+  if start < letters.length && digit?(letters[start]) && letters[start] != "0"
+    digits = read_format_digits(letters, start)
+    after = digits[1]
+    if after < letters.length && letters[after] == "$"
+      style = note_numbered(start_sourcing, start_used, digits[0])
+      return [integer_for_star(numbered_value(values, digits[0])), after + 1, style, start_used]
+    end
+  end
+  style = note_unnumbered(start_sourcing, start_used)
+  value = numbered_value(values, start_used + 1)
+  [integer_for_star(value), start, style, start_used + 1]
+end
+
+# A `*` width or precision must be an Integer; Ruby's words otherwise.
+def integer_for_star(value)
+  return value if value in Integer
+  panic("no implicit conversion from nil to integer") if value.nil?
+  panic("no implicit conversion of #{format_type_name(value)} into Integer")
+end
+
+def note_numbered(sourcing, used, number)
+  panic("numbered(#{number}) after unnumbered(#{used})") if sourcing == "unnumbered"
+  panic("numbered(#{number}) after named") if sourcing == "named"
+  "numbered"
+end
+
+def note_named(sourcing, used, open, key, close)
+  panic("named#{open}#{key}#{close} after unnumbered(#{used})") if sourcing == "unnumbered"
+  panic("named#{open}#{key}#{close} after numbered") if sourcing == "numbered"
+  "named"
+end
+
+def note_unnumbered(sourcing, used)
+  panic("unnumbered(#{used + 1}) mixed with numbered") if sourcing == "numbered"
+  panic("unnumbered(#{used + 1}) mixed with named") if sourcing == "named"
+  "unnumbered"
+end
+
+# The `index`th positional value, counted from one, raw — a stored nil
+# stays nil. Ruby's one sentence for every missing argument.
+def numbered_value(values, index)
+  panic("too few arguments") if index > values.length
+  value_at(values, index - 1)
+end
+
+def named_value(named, key, open, close)
+  pair = named.find { it[0] == key }
+  panic("key#{open}#{key}#{close} not found") if pair.nil?
+  value_at(pair, 1)
 end
 
 # Guest receivers are host values, so host method dispatch does the work.
@@ -3728,6 +3994,22 @@ def evaluate_call(node, mutable bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
   # The ambient generator (ADR 0065): the host's own `rand` and `srand`.
+  # Formatting is a function (ADR 0067): formatting.pdx walks the template
+  # and the host renders each directive, so the digits are the seed's.
+  when "format", "sprintf"
+    panic("too few arguments") if arguments.empty?
+    template = value_at(arguments, 0)
+    unless template in String
+      shown = template.nil? ? "nil" : type_at(builtin_type_of(template), 0).capitalize
+      panic("no implicit conversion of #{shown} into String")
+    end
+    # Gathered by hand rather than sliced: a slice lifts a stored nil to
+    # some(nil), and a guest nil must reach the host as nil.
+    mutable rest = []
+    arguments.each_with_index do |argument, index|
+      rest << argument if index > 0
+    end
+    outcome([format_template(template, rest, keyword_values)], bindings)
   when "rand" then outcome([arguments.empty? ? rand : rand(value_at(arguments, 0))], bindings)
   when "srand" then outcome([arguments.empty? ? srand : srand(value_at(arguments, 0))], bindings)
   when "panic"

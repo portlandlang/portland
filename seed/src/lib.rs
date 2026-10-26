@@ -5,6 +5,7 @@
 
 pub mod ast;
 pub mod builtins;
+pub mod format;
 pub mod heredoc;
 pub mod interpreter;
 pub mod lexer;

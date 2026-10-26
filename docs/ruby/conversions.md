@@ -18,10 +18,12 @@
 
 ## Formatting: `format`, not `%`
 
-Ruby's format mini-language — `%05.2f`, `%-10s`, `%<name>d` — is kept whole, as the function `format(template, values...)` with `sprintf` as its twin ([ADR 0067](../adr/0067-2026-10-25-format-is-a-function-not-the-percent-operator.md), decided 2026-10-25, not yet built). `%` stays arithmetic: `"%d" % x` will refuse naming the rewrite, `format("%d", x)`, so one operator never means remainder on a number and formatting on a string.
+Ruby's format mini-language — `%05.2f`, `%-10s`, `%<name>d` — is kept whole, as the function `format(template, values...)` with `sprintf` as its twin ([ADR 0067](../adr/0067-2026-10-25-format-is-a-function-not-the-percent-operator.md), decided 2026-10-25, built 2026-10-26 on both implementations). Every directive Ruby has — `%d %i %u %b %B %o %x %X %e %E %f %g %G %a %A %c %p %s %%`, the flags, width, precision, `*`, `n$`, `%<name>d` and `%{name}` from keyword arguments — and every answer is Ruby 4.0.7's byte for byte, the near-tie float rounding included: `format("%.2f", 2.675)` is `"2.68"` here as in MRI, because the seed carries MRI's own digit rounding rather than a correctly rounded one. The refusals are Ruby's sentences: `too few arguments`, `malformed format string - %q`, `can't convert nil into Integer`, `key<foo> not found`. `%` stays arithmetic: `"%d" % x` refuses with `'%' on a string is formatting, which is spelled 'format("%d", x)' here`, so one operator never means remainder on a number and formatting on a string.
+
+Two differences a Rubyist meets: width and precision on `%s`, `%p`, and `%c` count graphemes, and `%c` of a string is its first grapheme ([characters.md](characters.md)), where Ruby counts codepoints; and the conversions Ruby makes through `to_int`, `to_i`, `to_str`, and `to_s` on arbitrary objects do not happen — a value is an Integer, Float, String, or nil to a numeric directive, or it refuses.
 
 ## Migrating
 
 - `params[:page].to_i`, `"3 apples".to_i`, `line.split(",").map { it.to_i }` — port verbatim, same answers.
-- `format(...)` and `sprintf(...)` — port verbatim once built; `template % values` becomes `format(template, *values)`, a mechanical rewrite, and the `%<name>d` hash form becomes keyword arguments.
+- `format(...)` and `sprintf(...)` — port verbatim; `template % values` becomes `format(template, *values)`, a mechanical rewrite, and the `%<name>d` hash form becomes keyword arguments.
 - `Integer(input)` for validation — today, read with `to_i` and check the text yourself, or wait for the type function; `nil.to_i` becomes `value or 0`.
