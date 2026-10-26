@@ -2078,7 +2078,8 @@ def evaluate_method_call(node, mutable bindings)
   when "lcm" then receiver.lcm(value_at(arguments, 0))
   when "digits" then arguments.empty? ? receiver.digits : receiver.digits(value_at(arguments, 0))
   when "gcdlcm" then receiver.gcdlcm(value_at(arguments, 0))
-  when "to_i" then receiver.to_i
+  # `to_i` by Ruby's rule (ADR 0061), with a base — the host's own.
+  when "to_i" then arguments.empty? ? receiver.to_i : receiver.to_i(value_at(arguments, 0))
   # Twins ride their survivor's builtin (ADR 0036); `member?` rides the
   # host twin because its survivor depends on the receiver's type.
   # `size` asks the host by its own name: an Integer answers it (its

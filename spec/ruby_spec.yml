@@ -2250,6 +2250,11 @@ core/string/swapcase_spec.rb:
   status: partial_intentional
   reason: "Casing is full Unicode, locale-independent (ADR 0038): the :ascii, :turkic, :lithuanian, and :fold options are decided out."
   link: docs/ruby/characters.md
+core/string/to_i_spec.rb:
+  pdx: [spec/string/radix_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the long-string and base-36 round-trip rows past 2**63 stay upstream; the to_int base row is a mock; an illegal base refuses in Ruby's words."
+  link: docs/ruby/conversions.md
 core/string/to_f_spec.rb:
   pdx: [spec/string/conversion_spec.pdx]
 core/string/to_s_spec.rb:

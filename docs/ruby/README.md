@@ -29,6 +29,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [`class`: four jobs, four homes](classes.md) — `class` is a spelling of `struct`, and its four jobs have homes: data-with-behavior is a `struct` (either word), shared behavior is a `trait`, construction logic is `def self.` on the type with `new` definable, and stateful objects are an open question.
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Constants](constants.md) — `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
+- [Conversions: `to_i`, `to_f`, `to_s`](conversions.md) — `to_i` and `to_f` are Ruby's lenient readers — leading digits count, garbage is 0 — and `to_s` is universal except on nil; the strict `Integer()` and `Float()` wait for a pull.
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Equality](equality.md) — `==` and `eql?` migrate unchanged; `hash` and `equal?` do not exist.

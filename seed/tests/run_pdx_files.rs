@@ -2037,6 +2037,27 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// `to_i` by Ruby's rule (ADR 0061) on both oracles, the expected lines
+/// Ruby 4.0.7's; an illegal base refuses in Ruby's words and a number past
+/// 64 bits in the seed's.
+#[test]
+fn to_i_matches_ruby_and_refuses_on_both_oracles() {
+    assert_both_print(
+        "evaluator_to_i.pdx",
+        "p(\"_123\".to_i)\np(\"1_2_3asdf\".to_i)\np(\"0_0_010\".to_i(2))\np(\"010__1\".to_i(2))\np(\" \\t\\n123\".to_i)\np(\"++2\".to_i)\np(\"+0d56\".to_i)\np(\"-hello_world\".to_i(32))\np(\"5e10\".to_i)\np(\"01778\".to_i(0))\np(\"-0b112\".to_i(0))\np(\"0xFAZ\".to_i(0))\np(\"0b11\".to_i(8))\np(\"0b11\".to_i(16))\np(\"0b-1\".to_i(2))\np(\"\".to_i)\np(\"-\".to_i)\np(\"1__2\".to_i)\np(\"12_\".to_i)\np(\"08\".to_i(0))\np(\"0_8\".to_i(8))\n",
+        "0\n123\n2\n2\n123\n0\n56\n-18306744\n5\n127\n-3\n250\n0\n2833\n0\n0\n0\n1\n12\n0\n0\n",
+    );
+    let cases = [
+        ("p(\"\".to_i(1))\n", "invalid radix 1"),
+        ("p(\"\".to_i(37))\n", "invalid radix 37"),
+        (
+            "p(\"99999999999999999999\".to_i)\n",
+            "to_i overflows a 64-bit integer on \"99999999999999999999\" — integers are 64-bit here (#156)",
+        ),
+    ];
+    assert_both_oracles_refuse("to_i_refusal.pdx", None, &cases);
+}
+
 /// A collection's `to_s` is its `inspect` (ADR 0060), on both oracles, the
 /// expected lines Ruby 4.0.7's; `join` still renders elements by their
 /// own `to_s`.

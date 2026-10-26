@@ -1022,6 +1022,79 @@ fn matched_spans(text: &str, pattern: &str, all: bool) -> Vec<(usize, usize)> {
     }
 }
 
+/// `String#to_i` by Ruby's rule (ADR 0061), which never fails: leading
+/// whitespace, one sign, the prefix of the base asked for — any of them,
+/// or a bare `0` for octal, when the base is 0 — then digits of the base
+/// with single underscores between digits; the first thing that is none
+/// of these ends the number, and nothing parsed is 0. A base outside 2 to
+/// 36 refuses in Ruby's words; a number past 64 bits refuses (#156).
+fn ruby_to_i(text: &str, base: i64) -> i64 {
+    if base == 1 || !(0..=36).contains(&base) {
+        panic!("invalid radix {base}");
+    }
+    let trimmed = text.trim_start_matches([' ', '\t', '\n', '\u{b}', '\u{c}', '\r']);
+    let (negative, rest) = match trimmed.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed)),
+    };
+    let lowered = rest.to_ascii_lowercase();
+    let (base, rest) = if base == 0 {
+        if let Some(after) = lowered.strip_prefix("0b") {
+            (2, after.to_string())
+        } else if let Some(after) = lowered.strip_prefix("0o") {
+            (8, after.to_string())
+        } else if let Some(after) = lowered.strip_prefix("0d") {
+            (10, after.to_string())
+        } else if let Some(after) = lowered.strip_prefix("0x") {
+            (16, after.to_string())
+        } else if lowered.starts_with('0') {
+            (8, lowered.clone())
+        } else {
+            (10, lowered.clone())
+        }
+    } else {
+        let prefix = match base {
+            2 => "0b",
+            8 => "0o",
+            10 => "0d",
+            16 => "0x",
+            _ => "",
+        };
+        let after = if prefix.is_empty() {
+            lowered.clone()
+        } else {
+            lowered
+                .strip_prefix(prefix)
+                .map_or_else(|| lowered.clone(), str::to_string)
+        };
+        (base as u32, after)
+    };
+    let mut value: i64 = 0;
+    let mut previous_underscore = true;
+    for character in rest.chars() {
+        if character == '_' {
+            if previous_underscore {
+                break;
+            }
+            previous_underscore = true;
+            continue;
+        }
+        let Some(digit) = character.to_digit(base) else {
+            break;
+        };
+        value = value
+            .checked_mul(i64::from(base))
+            .and_then(|scaled| scaled.checked_add(i64::from(digit)))
+            .unwrap_or_else(|| {
+                panic!(
+                    "to_i overflows a 64-bit integer on {text:?} — integers are 64-bit here (#156)"
+                )
+            });
+        previous_underscore = false;
+    }
+    if negative { -value } else { value }
+}
+
 /// `oct` (#106): octal unless a prefix says otherwise — `0x`, `0d`, `0b`,
 /// or `0o` — as Ruby's does.
 fn parsed_octal(text: &str) -> i64 {
@@ -5703,12 +5776,11 @@ impl<W: std::io::Write> Interpreter<W> {
                     ),
                 }))
             }
-            (Value::String(text), "to_i", []) => {
-                let trimmed = text.trim();
-                let value = trimmed
-                    .parse()
-                    .unwrap_or_else(|_| panic!("to_i cannot parse {text:?} — no nil to return"));
-                Value::Integer(value)
+            // `to_i` by Ruby's rule (ADR 0061): leading digits count, garbage
+            // is 0, and a base may be named.
+            (Value::String(text), "to_i", []) => Value::Integer(ruby_to_i(text, 10)),
+            (Value::String(text), "to_i", [Value::Integer(base)]) => {
+                Value::Integer(ruby_to_i(text, *base))
             }
             (Value::String(text), "to_f", []) => Value::Float(ruby_to_f(text)),
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
@@ -7911,9 +7983,10 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "to_i cannot parse")]
-    fn panics_on_an_unparsable_to_i() {
-        evaluate("\"pdx\".to_i");
+    fn to_i_answers_zero_for_garbage_as_rubys_does() {
+        // ADR 0061: leading digits count, and nothing parsed is 0.
+        assert_eq!(evaluate("\"pdx\".to_i"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("\"12abc\".to_i"), Some(Value::Integer(12)));
     }
 
     #[test]
