@@ -1,6 +1,6 @@
 # 0068 — `System` is the floor module: a member touches the host, or it is not a member
 
-- **Status:** Accepted (ruled by the deciding user 2026-10-25 in discussion following [#78](https://github.com/portlandlang/portland/issues/78); nothing built — the first members are [#176](https://github.com/portlandlang/portland/issues/176))
+- **Status:** Accepted (ruled by the deciding user 2026-10-25 in discussion following [#78](https://github.com/portlandlang/portland/issues/78); `System.arguments` built on both implementations the same day, the rest of the first members in [#176](https://github.com/portlandlang/portland/issues/176))
 - **Date:** 2026-10-25
 - **Issue:** [#176](https://github.com/portlandlang/portland/issues/176)
 

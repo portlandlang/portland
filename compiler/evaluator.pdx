@@ -83,7 +83,10 @@ def evaluate_program(nodes)
   # `require_relative` resolves against the file doing the requiring, so that
   # path has to be in scope from the first statement. `argv.first` is it: the
   # compiler was handed the guest program's path, and run.pdx read the same value.
-  run_body(nodes, [["__file__", "file", argv.first or "."]] + builtin_constants)
+  # What follows the path is the guest's own: `System.arguments` (ADR 0068)
+  # answers it, where the seed answers the whole command line.
+  guest_arguments = if argv.empty? then [] else argv.slice(1, argv.length - 1) end
+  run_body(nodes, [["__file__", "file", argv.first or "."], ["__arguments__", "arguments", guest_arguments]] + builtin_constants)
 end
 
 # The constants every program starts with (#152): `Float`'s, the seed's
@@ -1611,6 +1614,13 @@ def evaluate_builtin_type_function(node, mutable bindings)
     panic("Integer.sqrt takes 1 argument, got #{arguments.length}") unless arguments.length == 1
     return outcome([Integer.sqrt(value_at(arguments, 0))], bindings)
   end
+  # The floor's first member (ADR 0068): the guest's arguments, bound by the
+  # driver that started it, since the host's own `argv` is the driver's.
+  if type_name == "System" && node.name == "arguments"
+    panic("System.arguments takes 0 arguments, got #{arguments.length}") unless arguments.empty?
+    return outcome([arguments_of(bindings)], bindings)
+  end
+  panic("System has no #{node.name}") if type_name == "System"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses
   # naming the or-guard — the seed's sentences.
@@ -1948,7 +1958,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Random Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
@@ -3532,6 +3542,14 @@ end
 def file_of(bindings)
   slot = lookup(bindings, "__file__")
   return "." if slot.empty?
+  value_at(slot.first, 2)
+end
+
+# The guest program's arguments, bound by its driver (`__arguments__`); a
+# program nobody handed any has none.
+def arguments_of(bindings)
+  slot = lookup(bindings, "__arguments__")
+  return [] if slot.empty?
   value_at(slot.first, 2)
 end
 

@@ -2392,6 +2392,55 @@ fn builtin_type_functions_match_ruby() {
     assert_both_oracles_refuse("builtin_type_function_refusal.pdx", None, &cases);
 }
 
+/// `System.arguments` (ADR 0068, #176), the floor's first member: the
+/// strings the program was started with, on both oracles — the hosted run
+/// is handed them after the program's own path, and answers the same list
+/// the seed does. Handed none, the list is empty; handed an argument, the
+/// member refuses by count. The bare `argv` placeholder still answers the
+/// same list on the seed until it retires; hosted it never did (#176).
+#[test]
+fn system_arguments_on_both_oracles() {
+    let sample = std::env::temp_dir().join("system_arguments.pdx");
+    std::fs::write(
+        &sample,
+        "p(System.arguments)\np(System.arguments.first)\np(System.arguments.length)\n",
+    )
+    .unwrap();
+    let expected = "[\"alpha\", \"beta\"]\n\"alpha\"\n2\n";
+    let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .arg("alpha")
+        .arg("beta")
+        .output()
+        .expect("failed to run pdx");
+    assert!(direct.status.success(), "the seed failed to run");
+    assert_eq!(String::from_utf8(direct.stdout).unwrap(), expected);
+    let hosted = within_seconds(20, "system_arguments.pdx", || {
+        Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(portland_run())
+            .arg(&sample)
+            .arg("alpha")
+            .arg("beta")
+            .output()
+            .expect("failed to run pdx")
+    });
+    assert!(hosted.status.success(), "the hosted run failed");
+    assert_eq!(String::from_utf8(hosted.stdout).unwrap(), expected);
+
+    assert_both_print("system_arguments_none.pdx", "p(System.arguments)\n", "[]\n");
+    assert_both_oracles_refuse(
+        "system_arguments_refusal.pdx",
+        None,
+        &[
+            (
+                "p(System.arguments(1))\n",
+                "System.arguments takes 0 arguments, got 1",
+            ),
+            ("p(System)\n", "'System' is not defined"),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

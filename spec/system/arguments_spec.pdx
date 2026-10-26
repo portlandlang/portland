@@ -1,0 +1,17 @@
+# The floor's first member (ADR 0068): `System.arguments` is the list of
+# strings the program was started with, what Ruby's `ARGV` holds. A spec
+# runs with nothing after its path on either oracle, so the list is empty
+# here; the two-oracle test in seed/tests pins a run that was handed some.
+
+require_relative "../spec_helper"
+
+context "System.arguments" do
+  specify "is the strings the program was started with — none, for a spec" do
+    expect(System.arguments).to eq([])
+  end
+
+  specify "is an array, so the collection methods apply" do
+    expect(System.arguments.length).to eq(0)
+    expect(System.arguments.first).to eq(nil)
+  end
+end

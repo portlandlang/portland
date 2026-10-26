@@ -37,7 +37,9 @@ harness_program = parse_program(lex(harness_source))
 # The checker's memo of files already checked rides across the specs, so
 # the helper every spec requires is checked once here, not a hundred times.
 mutable checked = check_closure(harness_path, [])
-harness = run_body(harness_program, [["__file__", "file", harness_path]] + builtin_constants)
+# A spec run direct is `pdx the_spec.pdx` with nothing after it, so hosted
+# `System.arguments` answers the same empty list (ADR 0068).
+harness = run_body(harness_program, [["__file__", "file", harness_path], ["__arguments__", "arguments", []]] + builtin_constants)
 already_loaded = [["__loaded__", "loaded", [canonical_path(harness_path)]]]
 
 argv.slice(1, argv.length - 1).each do |path|

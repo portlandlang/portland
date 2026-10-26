@@ -397,6 +397,7 @@ def synthesize_safe_call(node, types)
     return ["random"] if node.name == "new" && node.receiver.name == "Random"
     return ["array", ["unknown"]] if node.name == "new"
     return ["integer"] if node.name == "sqrt"
+    return ["array", ["string"]] if node.name == "arguments"
   end
   receiver = synthesize(node.receiver, types)
   plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
@@ -404,11 +405,13 @@ def synthesize_safe_call(node, types)
 end
 
 # Ruby's type functions on the builtin types (ADR 0058): `Array.new`
-# answers an array, `Integer.sqrt` an integer. A struct or local wearing
-# the name wins, as everywhere, so only an unbound name is the type's.
+# answers an array, `Integer.sqrt` an integer; the floor module's members
+# (ADR 0068) take the same shape, `System.arguments` an array of strings.
+# A struct or local wearing the name wins, as everywhere, so only an
+# unbound name is the type's.
 def builtin_type_function?(node, types)
   return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Hash Integer Random Range].include?(node.receiver.name)
+  return false unless %w[Array Hash Integer Random Range System].include?(node.receiver.name)
   synthesize_name(node.receiver.name, types) == ["unknown"]
 end
 

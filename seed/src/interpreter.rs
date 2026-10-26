@@ -3311,11 +3311,12 @@ impl<W: std::io::Write> Interpreter<W> {
             } => {
                 // The builtin types carry Ruby's type functions (ADR 0058):
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
-                // a struct or local wearing it wins, as everywhere.
+                // a struct or local wearing it wins, as everywhere. `System`
+                // is the floor module (ADR 0068), the same shape.
                 if let Expression::Variable(type_name) = receiver.as_ref()
                     && matches!(
                         type_name.as_str(),
-                        "Array" | "Hash" | "Integer" | "Random" | "Range"
+                        "Array" | "Hash" | "Integer" | "Random" | "Range" | "System"
                     )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
@@ -3566,6 +3567,8 @@ impl<W: std::io::Write> Interpreter<W> {
     /// by count and a block handed each index, or copied from an array;
     /// an integer square root taken exactly, where a float would round
     /// past 2^53. The refusals are Ruby's words where Ruby has them.
+    /// `System.arguments` (ADR 0068) is the floor's first member: the
+    /// strings the process was started with, `ARGV`'s underneath.
     fn builtin_type_function(
         &mut self,
         type_name: &str,
@@ -3579,8 +3582,28 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
             ("Random", "new") => Some(random_new(&arguments)),
             ("Range", "new") => Some(range_new(&arguments)),
+            ("System", "arguments") => {
+                if !arguments.is_empty() {
+                    panic!(
+                        "System.arguments takes 0 arguments, got {}",
+                        arguments.len()
+                    );
+                }
+                Some(self.process_arguments())
+            }
             _ => panic!("{type_name} has no {name}"),
         }
+    }
+
+    /// The process's arguments as an array of strings — what `System.arguments`
+    /// answers, and the bare `argv` placeholder until it retires (ADR 0068).
+    fn process_arguments(&self) -> Value {
+        let arguments = self
+            .arguments
+            .iter()
+            .map(|argument| Value::String(argument.clone()))
+            .collect();
+        Value::array(arguments)
     }
 
     /// `sample` and `shuffle` (ADR 0065), drawing from the generator named
@@ -7435,14 +7458,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.random = crate::random::Mt::new(*seed);
                     return Some(Value::Integer(previous));
                 }
-                ("argv", []) => {
-                    let arguments = self
-                        .arguments
-                        .iter()
-                        .map(|argument| Value::String(argument.clone()))
-                        .collect();
-                    return Some(Value::array(arguments));
-                }
+                ("argv", []) => return Some(self.process_arguments()),
                 // The first fallible operations (ADR 0027): a failure comes
                 // back instead of a panic, and the caller decides. String
                 // payloads for now — struct payloads wait for library types.
