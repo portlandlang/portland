@@ -16,7 +16,12 @@
 - **`to_s` is universal** except on nil, which has no methods ([nil and optionals](nil-and-optionals.md)); a collection's `to_s` is its `inspect` ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)).
 - **`Integer(text)` and `Float(text)`**, the strict forms, do not exist yet; they arrive as type functions ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)) when a port pulls for them.
 
+## Formatting: `format`, not `%`
+
+Ruby's format mini-language — `%05.2f`, `%-10s`, `%<name>d` — is kept whole, as the function `format(template, values...)` with `sprintf` as its twin ([ADR 0067](../adr/0067-2026-10-25-format-is-a-function-not-the-percent-operator.md), decided 2026-10-25, not yet built). `%` stays arithmetic: `"%d" % x` will refuse naming the rewrite, `format("%d", x)`, so one operator never means remainder on a number and formatting on a string.
+
 ## Migrating
 
 - `params[:page].to_i`, `"3 apples".to_i`, `line.split(",").map { it.to_i }` — port verbatim, same answers.
+- `format(...)` and `sprintf(...)` — port verbatim once built; `template % values` becomes `format(template, *values)`, a mechanical rewrite, and the `%<name>d` hash form becomes keyword arguments.
 - `Integer(input)` for validation — today, read with `to_i` and check the text yourself, or wait for the type function; `nil.to_i` becomes `value or 0`.

@@ -78,6 +78,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0064](0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) — The standard library: a core, default tiles, and external tiles
 - [0065](0065-2026-10-25-randomness-rubys-both.md) — Randomness: Ruby's both, step for step
 - [0066](0066-2026-10-25-pattern-arguments-take-the-when-rule.md) — Pattern arguments take the `when` rule
+- [0067](0067-2026-10-25-format-is-a-function-not-the-percent-operator.md) — Formatting is `format(template, values)`, not `template % values`
 
 <!-- /generated -->
 

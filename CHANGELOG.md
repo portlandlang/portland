@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Formatting is `format(template, values)`, not `template % values`** ([ADR 0067](docs/adr/0067-2026-10-25-format-is-a-function-not-the-percent-operator.md), [#172](https://github.com/portlandlang/portland/issues/172)) — recorded, not yet built: Ruby's directives whole under the function, `sprintf` as its twin, `%` staying arithmetic with the rewrite named. The build waits for a pull; #172 stays open as the buildable ticket.
+
 - **Pattern arguments take the `when` rule** ([ADR 0066](docs/adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md), [#171](https://github.com/portlandlang/portland/issues/171)) — on both implementations, `all?`, `any?`, `none?`, `one?`, `grep`, `grep_v`, `slice_before`, and `slice_after` take a pattern: a range covers a number, anything else asks `==`; `grep(3..7) { }` is `filter_map` under that rule; a pattern beside a block refuses. core/enumerable/grep and grep_v ported into `spec/enumerable/grep_spec.pdx`, the pattern rows of all, any, none, and one into `predicates_spec.pdx`.
 
 - **Randomness, Ruby's both** ([ADR 0065](docs/adr/0065-2026-10-25-randomness-rubys-both.md), [#169](https://github.com/portlandlang/portland/issues/169)) — on both implementations: `rand`, `srand`, `Random.new(seed)`, `random.rand`, `random.seed`, `sample`, `shuffle`, and the `random:` keyword, with Ruby's MT19937 step for step — `Random.new(42).rand(10)` is 6 and `%w[a b c].shuffle(random: Random.new(1))` is `["a", "c", "b"]` here as in CRuby. core/array/sample and shuffle and five core/random files ported into `spec/random/random_spec.pdx`; five recorded; the ledger gains [randomness.md](docs/ruby/randomness.md).
