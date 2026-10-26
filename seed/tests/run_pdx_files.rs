@@ -2490,6 +2490,39 @@ fn system_read_file_on_both_oracles() {
     );
 }
 
+/// `System.write_file` (ADR 0068, #176): the whole file replaced, answering
+/// the bytes written as Ruby's `File.write` does (4.0.7: 11 for "teal
+/// carpet"), or a failure naming the path and the OS's reason — so `or`
+/// reads the same on a write as on a read, where the bare placeholder
+/// produced no value on success and broke the or-guard. Both oracles.
+#[test]
+fn system_write_file_on_both_oracles() {
+    let target = std::env::temp_dir().join("system_write_file_target.txt");
+    let _ = std::fs::remove_file(&target);
+    let source = format!(
+        "p(System.write_file({target:?}, \"teal carpet\"))\np(System.read_file({target:?}))\nwritten = System.write_file({target:?}, \"rose\") or panic \"unreachable\"\np(written)\np(System.read_file({target:?}))\np(System.write_file(\"/nonexistent/dir/file.txt\", \"x\"))\np(System.write_file(\"/nonexistent/dir/file.txt\", \"x\").failure?)\n"
+    );
+    assert_both_print(
+        "system_write_file.pdx",
+        &source,
+        "11\n\"teal carpet\"\n4\n\"rose\"\nfailure(\"System.write_file \\\"/nonexistent/dir/file.txt\\\": No such file or directory (os error 2)\")\ntrue\n",
+    );
+    assert_both_oracles_refuse(
+        "system_write_file_refusal.pdx",
+        None,
+        &[
+            (
+                "p(System.write_file(\"a\"))\n",
+                "System.write_file takes 2 arguments, got 1",
+            ),
+            (
+                "p(System.write_file(1, \"a\"))\n",
+                "System.write_file takes two Strings, got 1 and \"a\"",
+            ),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

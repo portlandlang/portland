@@ -1,0 +1,32 @@
+# `System.write_file` (ADR 0068): the whole file replaced with the content,
+# answering the bytes written as Ruby's `File.write` does, or a failure
+# (ADR 0027) the caller handles. A value on both branches is what lets the
+# or-guard read the same on a write as on a read.
+
+require_relative "../spec_helper"
+
+context "System.write_file" do
+  target = "/tmp/portland-spec-write_file.txt"
+
+  specify "replaces the file's content and answers the bytes written" do
+    expect(System.write_file(target, "teal carpet")).to eq(11)
+    expect(System.read_file(target)).to eq("teal carpet")
+    expect(System.write_file(target, "")).to eq(0)
+    expect(System.read_file(target)).to eq("")
+  end
+
+  specify "counts bytes, not characters" do
+    expect(System.write_file(target, "é")).to eq(2)
+  end
+
+  specify "answers a failure for a path that cannot be written, naming it" do
+    missing = System.write_file("/nonexistent/portland/file.txt", "x")
+    expect(missing.failure?).to eq(true)
+    expect(inspect(missing)).to eq("failure(\"System.write_file \\\"/nonexistent/portland/file.txt\\\": No such file or directory (os error 2)\")")
+  end
+
+  specify "the or-guard passes the count through on success and takes the fallback on a failure" do
+    expect((System.write_file(target, "rose") or -1)).to eq(4)
+    expect((System.write_file("/nonexistent/portland/file.txt", "rose") or -1)).to eq(-1)
+  end
+end

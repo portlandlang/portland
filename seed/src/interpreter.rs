@@ -1485,6 +1485,20 @@ fn read_file_value(path: &str) -> Value {
     }
 }
 
+/// `System.write_file` (ADR 0068): the whole file replaced with `content`,
+/// answering the bytes written as Ruby's `File.write` does — so the call has
+/// a value on both branches and `or panic` reads the same as a read's — or a
+/// failure naming the path and the OS's reason. One crossing: open, write,
+/// close.
+fn write_file_value(path: &str, content: &str) -> Value {
+    match std::fs::write(path, content) {
+        Ok(()) => Value::Integer(content.len() as i64),
+        Err(error) => Value::Failure(Box::new(Value::String(format!(
+            "System.write_file {path:?}: {error}"
+        )))),
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -3607,6 +3621,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 [Value::String(path)] => Some(read_file_value(path)),
                 [other] => panic!("System.read_file takes a String, got {}", other.shown()),
                 _ => panic!("System.read_file takes 1 argument, got {}", arguments.len()),
+            },
+            ("System", "write_file") => match arguments.as_slice() {
+                [Value::String(path), Value::String(content)] => {
+                    Some(write_file_value(path, content))
+                }
+                [path, content] => panic!(
+                    "System.write_file takes two Strings, got {} and {}",
+                    path.shown(),
+                    content.shown()
+                ),
+                _ => panic!(
+                    "System.write_file takes 2 arguments, got {}",
+                    arguments.len()
+                ),
             },
             _ => panic!("{type_name} has no {name}"),
         }
@@ -8395,8 +8423,9 @@ end
     #[test]
     fn writes_then_reads_a_file() {
         let path = "/tmp/portland-seed-write-test.txt";
-        let source =
-            format!("write_file(\"{path}\", \"teal carpet\")\nSystem.read_file(\"{path}\")\n");
+        let source = format!(
+            "System.write_file(\"{path}\", \"teal carpet\")\nSystem.read_file(\"{path}\")\n"
+        );
         assert_eq!(
             evaluate(&source),
             Some(Value::String("teal carpet".to_string()))

@@ -1630,6 +1630,17 @@ def evaluate_builtin_type_function(node, mutable bindings)
     panic("System.read_file takes a String, got #{render_inspect(path)}") unless path in String
     return outcome([System.read_file(path)], bindings)
   end
+  # The whole file replaced, answering the bytes written as Ruby's
+  # `File.write` does, or a failure — again the host's own crossing.
+  if type_name == "System" && node.name == "write_file"
+    panic("System.write_file takes 2 arguments, got #{arguments.length}") unless arguments.length == 2
+    path = value_at(arguments, 0)
+    content = value_at(arguments, 1)
+    unless (path in String) && (content in String)
+      panic("System.write_file takes two Strings, got #{render_inspect(path)} and #{render_inspect(content)}")
+    end
+    return outcome([System.write_file(path, content)], bindings)
+  end
   panic("System has no #{node.name}") if type_name == "System"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses
