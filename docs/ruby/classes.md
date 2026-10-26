@@ -57,6 +57,8 @@ end
 
 `class` itself is a second spelling of `struct` ([ADR 0056](../adr/0056-2026-09-27-class-is-a-spelling-of-struct.md)): `class Token` and `struct Token` declare the same type. Inheritance, `class Token < Node`, refuses with the trait rewrite named; `class << self` refuses naming `def self.`; and an instance variable, `@text`, refuses naming the bare field until #103 decides what instance state is.
 
+A struct's fields are names only ([ADR 0062](../adr/0062-2026-10-25-struct-fields-are-names-only.md)): `token.text` is the one spelling, and the checker knows every field. Ruby's `token[:text]`, `token["text"]`, `token[0]`, `dig`, `values_at`, and `deconstruct_keys` refuse naming it — `a Token is read by its field names, not indexed — write '.text', or 'to_h[name]' for a name decided at runtime` — since a lookup by a runtime name is the reflection the closed runtime removes, and a position treats a record as a tuple. `to_h[name]` answers a maybe for the dynamic case, `to_a[0]` the positional one.
+
 ## Migration
 
 - `class Token` holding data keeps its `class` line (ADR 0056); the field list becomes explicit, and each `@text` read becomes a bare `text`.
@@ -64,4 +66,5 @@ end
 - A `def self.new ... super` override needs one edit — `super` to `fields(...)` — and `super` anywhere refuses with the rewrite named (there is no hierarchy to climb).
 - `def self.of`-style constructors move unchanged, in structs and in modules both — a module-body `def self.` is accepted as a plain `def`.
 - `class << self` blocks flatten to one `def self.` per function.
+- `record[:field]` becomes `record.field`; `record[name]` with a runtime name becomes `record.to_h[name] or fallback`.
 - Stateful classes are the honest cost today: rewrite as values threaded through returns, or wait for #103's answer before migrating that code.

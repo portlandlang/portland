@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A struct's fields are names only** ([ADR 0062](docs/adr/0062-2026-10-25-struct-fields-are-names-only.md), [#163](https://github.com/portlandlang/portland/issues/163)) — on both implementations, `car[:make]`, `car["make"]`, `car[0]`, `dig`, `values_at`, and `deconstruct_keys` refuse naming the field spelling, with `to_h` and `to_a` for a name or position decided at runtime. The four core/struct files are recorded as decided out.
+
 - **`to_i` by Ruby's rule, with a base** ([ADR 0061](docs/adr/0061-2026-10-25-to-i-by-rubys-rule.md), [#162](https://github.com/portlandlang/portland/issues/162)) — on both implementations: leading whitespace, a sign, the base's prefix, digits with single underscores, and 0 for garbage — `"12abc".to_i` is 12, `"0xFAZ".to_i(0)` is 250, `"".to_i(37)` refuses as `invalid radix 37`; a number past 64 bits refuses. core/string/to_i ported into `spec/string/radix_spec.pdx`; the ledger gains [conversions.md](docs/ruby/conversions.md).
 
 - **A collection's `to_s` is its `inspect`** ([ADR 0060](docs/adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md), [#160](https://github.com/portlandlang/portland/issues/160)) — on both implementations, `[1, "two"].to_s` is `[1, "two"]` and `"#{{a: 1}}"` is `{a: 1}`, as Ruby's; `join` and the scalars are unchanged. core/array/to_s and core/hash/to_s ported into `spec/string/conversion_spec.pdx`.

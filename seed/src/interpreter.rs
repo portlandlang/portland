@@ -1311,6 +1311,24 @@ fn shifted(number: i64, count: i64) -> i64 {
     }
 }
 
+/// The refusal for indexing a struct (ADR 0062): a field is read by its
+/// bare name, and a name decided at runtime goes through `to_h`.
+fn struct_lookup_sentence(struct_name: &str, key: &Value) -> String {
+    match key {
+        Value::Symbol(field) | Value::String(field) => format!(
+            "a {struct_name} is read by its field names, not indexed — write '.{field}', or 'to_h[name]' for a name decided at runtime"
+        ),
+        Value::Integer(_) => format!(
+            "a {struct_name} is read by its field names, not by position — write the field, or 'to_a[{}]'",
+            key.shown()
+        ),
+        other => format!(
+            "a {struct_name} is read by its field names, not indexed with {}",
+            other.shown()
+        ),
+    }
+}
+
 /// Ruby's `Integer#[]`: the bit at a position, two's complement, so a
 /// position past the top answers the sign bit; a negative position is 0.
 fn bit_at(number: i64, position: i64) -> i64 {
@@ -1748,6 +1766,9 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
         (Value::Integer(number), Value::Integer(position)) => {
             Value::Integer(bit_at(*number, *position))
         }
+        // A struct's fields are names only (ADR 0062): read by the bare
+        // name, never by a runtime name or a position.
+        (Value::Struct { name, .. }, key) => panic!("{}", struct_lookup_sentence(name, key)),
         _ => panic!("cannot index {receiver:?} with {index:?}"),
     }
 }
@@ -3919,6 +3940,13 @@ impl<W: std::io::Write> Interpreter<W> {
             // the propagation toolkit (ADR 0044) and a struct is the commonest
             // thing a fallible def answers (#92).
             if !matches!(name, "eql?" | "failure?" | "nil?" | "some?" | "to_s") {
+                // Ruby's Struct lookups by a runtime name (ADR 0062): the
+                // fields are names only, and `to_h` carries the dynamic case.
+                if matches!(name, "dig" | "values_at" | "deconstruct_keys") {
+                    panic!(
+                        "'{name}' is not a {struct_name}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.{name}'"
+                    );
+                }
                 // A removed Ruby method names its rewrite (#135).
                 if let Some(sentence) = crate::lexer::retired_sentence(name) {
                     panic!("{sentence}");
@@ -6156,6 +6184,18 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     (None, _) => {
                         refusal("missing");
+                        // Ruby's Struct lookups by a runtime name (ADR 0062):
+                        // the fields are names only, and `to_h` carries the
+                        // dynamic case.
+                        if let Value::Struct {
+                            name: struct_name, ..
+                        } = &receiver
+                            && matches!(name, "dig" | "values_at" | "deconstruct_keys")
+                        {
+                            panic!(
+                                "'{name}' is not a {struct_name}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.{name}'"
+                            );
+                        }
                         let shown: Vec<String> =
                             arguments.iter().map(|argument| argument.shown()).collect();
                         panic!(

@@ -1299,6 +1299,11 @@ def check_struct_method(node, receiver, scope, found)
   shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
   return found if shape.nil?
   return found if value_at_checked(shape, 1).include?(node.name)
+  # Ruby's Struct lookups by a runtime name (ADR 0062): the fields are
+  # names only, and `to_h` carries the dynamic case — the seed's sentence.
+  if %w[dig values_at deconstruct_keys].include?(node.name)
+    return noted(found, ["sentence", "'#{node.name}' is not a #{type_at(receiver, 1)}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.#{node.name}'"], locate(node, scope))
+  end
   return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
   spelling = spell_node(node.receiver)
   return found if spelling.nil?

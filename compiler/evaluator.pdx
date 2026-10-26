@@ -1573,6 +1573,21 @@ def evaluate_index(node, bindings)
   receiver = slot_value(receiver_step.value)
   # A symbol indexes its name, answering text (#112), the seed's arm.
   return outcome([value_at(receiver, 1)[slot_value(index_step.value)]], index_step.bindings) if receiver in ["__symbol__", *]
+  # A struct's fields are names only (ADR 0062) — the seed's sentences.
+  if receiver in ["__struct__", *]
+    key = slot_value(index_step.value)
+    struct_name = value_at(receiver, 1)
+    if key in ["__symbol__", *]
+      panic("a #{struct_name} is read by its field names, not indexed — write '.#{value_at(key, 1)}', or 'to_h[name]' for a name decided at runtime")
+    end
+    if key in String
+      panic("a #{struct_name} is read by its field names, not indexed — write '.#{key}', or 'to_h[name]' for a name decided at runtime")
+    end
+    if key in Integer
+      panic("a #{struct_name} is read by its field names, not by position — write the field, or 'to_a[#{key}]'")
+    end
+    panic("a #{struct_name} is read by its field names, not indexed with #{render_inspect(key)}")
+  end
 
   outcome([receiver[slot_value(index_step.value)]], index_step.bindings)
 end
@@ -1847,7 +1862,11 @@ def struct_field(instance, field)
   # the value shown, its struct with the article, the name in quotes.
   # Reached only where the checker could not see the receiver's type — a
   # known struct refuses at build first. A removed Ruby method names its
-  # rewrite (#135).
+  # rewrite (#135); Ruby's Struct lookups by a runtime name name theirs
+  # (ADR 0062).
+  if %w[dig values_at deconstruct_keys].include?(field)
+    panic("'#{field}' is not a #{value_at(instance, 1)}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.#{field}'")
+  end
   retired = retired_sentence(field)
   panic(retired) unless retired.nil?
   panic("#{shorten(render_inspect(instance))} is #{a_type(["struct", value_at(instance, 1)])}, which has no method #{spelled(field)}")

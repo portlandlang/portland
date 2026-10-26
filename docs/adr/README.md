@@ -73,6 +73,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0059](0059-2026-10-25-eql-on-every-value-and-no-hash.md) — `eql?` on every value; `hash` stays unexposed
 - [0060](0060-2026-10-25-a-collections-to-s-is-its-inspect.md) — A collection's `to_s` is its `inspect`
 - [0061](0061-2026-10-25-to-i-by-rubys-rule.md) — `to_i` by Ruby's rule: leading digits count, garbage is 0
+- [0062](0062-2026-10-25-struct-fields-are-names-only.md) — A struct's fields are names only
 
 <!-- /generated -->
 

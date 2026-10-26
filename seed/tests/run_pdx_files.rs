@@ -2037,6 +2037,48 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// A struct's fields are names only (ADR 0062): indexing by name or
+/// position, and `dig`, `values_at`, `deconstruct_keys`, refuse naming the
+/// field spelling on both oracles; `to_h` carries the dynamic case.
+#[test]
+fn struct_fields_are_names_only_on_both_oracles() {
+    let car =
+        "struct Car\n  make\n  model\nend\ncar = Car.new(make: \"Honda\", model: \"Accord\")\n";
+    assert_both_print(
+        "evaluator_struct_to_h_lookup.pdx",
+        &format!("{car}p(car.to_h[:make])\np(car.to_a[1])\n"),
+        "\"Honda\"\n\"Accord\"\n",
+    );
+    let symbol = format!("{car}p(car[:make])\n");
+    let text = format!("{car}p(car[\"make\"])\n");
+    let position = format!("{car}p(car[0])\n");
+    let dig = format!("{car}p(car.dig(:make))\n");
+    let values_at = format!("{car}p(car.values_at(0))\n");
+    let cases = [
+        (
+            symbol.as_str(),
+            "a Car is read by its field names, not indexed — write '.make', or 'to_h[name]' for a name decided at runtime",
+        ),
+        (
+            text.as_str(),
+            "a Car is read by its field names, not indexed — write '.make', or 'to_h[name]' for a name decided at runtime",
+        ),
+        (
+            position.as_str(),
+            "a Car is read by its field names, not by position — write the field, or 'to_a[0]'",
+        ),
+        (
+            dig.as_str(),
+            "'dig' is not a Car's — its fields are read by their bare names; for a name decided at runtime, write 'to_h.dig'",
+        ),
+        (
+            values_at.as_str(),
+            "'values_at' is not a Car's — its fields are read by their bare names; for a name decided at runtime, write 'to_h.values_at'",
+        ),
+    ];
+    assert_both_oracles_refuse("struct_lookup_refusal.pdx", None, &cases);
+}
+
 /// `to_i` by Ruby's rule (ADR 0061) on both oracles, the expected lines
 /// Ruby 4.0.7's; an illegal base refuses in Ruby's words and a number past
 /// 64 bits in the seed's.
