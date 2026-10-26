@@ -45,7 +45,7 @@ Delimiters: `()` 41.5% of sites, `[]` 29.0%, `{}` 23.4%, everything else under 2
 | `%s(name)` | `'%s(' is not a Portland literal — write :name, or :"odd name" for a name with spaces` | `:name` |
 | `%W[#{env}-web db]` | `'%W[' is not a Portland literal — write %w[] when no word interpolates, or ["#{a}", "b"] when one does` | `["#{env}-web", "db"]` |
 | `%I[#{env}_admin]` | `'%I[' is not a Portland literal — write %i[]; a symbol does not interpolate` | symbols do not interpolate ([symbols.md](symbols.md)) |
-| `%x(ls)` | `'%x(' is not a Portland literal — there is no shell execution` | nothing yet — the OS surface is [#78](https://github.com/portlandlang/portland/issues/78) |
+| `%x(ls)` | `'%x(' is not a Portland literal — there is no shell execution` | nothing yet — whether Portland spawns a process at all is [#179](https://github.com/portlandlang/portland/issues/179); the wording overstates the ruling and changes when that decides |
 | `%w|a b|` | `'%w|' is not a Portland delimiter — write %w[], %w(), or %w{}` | `%w[a b]` |
 
 **Deferred:** `%r{...}` refuses with `'%r{' is not a Portland literal — there is no regex yet` until [#74](https://github.com/portlandlang/portland/issues/74) decides regex.
