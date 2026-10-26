@@ -20,9 +20,11 @@ use std::process::Command;
 /// 2026-10-25 (#180): `parser.pdx` had grown from 1,961 to 3,453 lines, the
 /// self-parse to 12.8s locally and 22–30s on the runner, which now runs
 /// about 2× a dev machine, and the 20s ceiling failed seven of ten runs in
-/// a day, three of them docs-only commits. The self-parse's own ceiling is
-/// 45s — 1.5× the runner's worst day, and the 5× regression that prompted
-/// the tripwire would still fire. Every other shelled-out case keeps 20s.
+/// a day, three of them docs-only commits. The ceiling went to 45s for a
+/// day; then the dev profile went to `opt-level = 1` (Cargo.toml, #180) and
+/// the self-parse fell to 2.0s locally, so every case is back under one
+/// 20s ceiling with roughly 5× headroom on the runner — the 5× regression
+/// that prompted the tripwire would fire again.
 fn within_seconds<T>(limit: u64, label: &str, work: impl FnOnce() -> T) -> T {
     let started = std::time::Instant::now();
     let result = work();
@@ -430,12 +432,10 @@ fn portland_parser_handles_commands_and_literals() {
 #[test]
 fn portland_parser_parses_the_whole_compiler_including_itself() {
     // The summit of #18: Portland parsing Portland, all of it. Also the
-    // slowest thing in the suite by a wide margin, so it carries the tripwire
-    // — at its own ceiling (#180), since the `macos-26` runner parses
-    // `parser.pdx` in 22–30s against 12.8s here.
+    // slowest thing in the suite by a wide margin, so it carries the tripwire.
     for file in ["lexer.pdx", "tokenize.pdx", "parse.pdx", "parser.pdx"] {
         let target = format!("{}/../compiler/{file}", env!("CARGO_MANIFEST_DIR"));
-        let output = within_seconds(45, &format!("parsing {file}"), || {
+        let output = within_seconds(20, &format!("parsing {file}"), || {
             Command::new(env!("CARGO_BIN_EXE_pdx"))
                 .arg(portland_parse())
                 .arg(&target)

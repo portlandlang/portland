@@ -1,3 +1,12 @@
 [workspace]
 resolver = "3"
 members = ["crate", "seed"]
+
+# The seed is an interpreter, and every test shells out to it: the suite's
+# time is the seed's speed, not the tests'. Measured 2026-10-26 (#180), the
+# hosted self-parse of parser.pdx took 9.9s unoptimized and 1.7s in release;
+# `opt-level = 1` gets 2.0s of that for a build-after-edit of 3.8s instead
+# of 1.1s. A rebuild costs about three seconds more; every run of the suite
+# saves minutes. Debug assertions and debuginfo stay on.
+[profile.dev]
+opt-level = 1

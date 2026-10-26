@@ -37,7 +37,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 |                        |                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------- |
-| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks; `--fast` skips the two whole-suite tests (about 20s instead of 2 minutes) |
+| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks; `--fast` skips the two whole-suite tests (about 15s instead of a minute) |
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |

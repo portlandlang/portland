@@ -5,9 +5,9 @@
 #   script/test --all    everything
 #   script/test --fast   everything but seed/tests/whole_suites.rs: the
 #                        language spec on both implementations and the
-#                        checker over the compiler's own source, each over a
-#                        minute. About twenty seconds of tests instead of two
-#                        minutes.
+#                        checker over the compiler's own source, about twenty
+#                        seconds each. About fifteen seconds of tests instead
+#                        of a minute.
 #
 # Each group is its own labeled step, so the output says what ran — the whole
 # suites run in the background alongside the rest and print last. cargo's
@@ -73,7 +73,7 @@ step "docs checks — script/docs/check"
 script/docs/check
 
 if [ "$scope" = all ]; then
-  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (about two minutes, started with the unit tests)"
+  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (under a minute, started with the unit tests)"
   whole_suites_status=0
   wait "$whole_suites_pid" || whole_suites_status=$?
   cat "$whole_suites_output"

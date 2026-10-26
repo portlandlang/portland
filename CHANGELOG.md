@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The dev profile is `opt-level = 1`** ([#180](https://github.com/portlandlang/portland/issues/180)) — every test shells out to the seed, so the suite's time was the unoptimized interpreter's: the hosted self-parse of `parser.pdx` took 9.9s and takes 2.0s, the integration tests 25–34s and take 6s, the whole suites 250s and take 43s, `script/test` end to end five minutes and takes 53s, for a build-after-edit of 3.8s instead of 1.1s. The self-parse tripwire returns to the one 20s ceiling.
+
 - **Bare `write_file` retires** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, a call refuses with `'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)`; the seed's bare-builtin list now holds only language constructs and Ruby's bare functions, nothing that touches the host.
 
 - **`System.write_file`, the floor's third member** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, the whole file replaced, answering the bytes written as Ruby's `File.write` does, or a failure naming the path and the OS's reason; the wrong count or kind of argument refuses naming it. A value on both branches is the fix for bare `write_file`, which produced no value on success, so `write_file(path, text) or panic "…"` refused on the line that worked; hosted, bare `write_file` was never answered at all. Pinned by a two-oracle test and `spec/system/write_file_spec.pdx`; bare `write_file` retires next.
