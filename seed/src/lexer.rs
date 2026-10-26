@@ -142,6 +142,7 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         // Portland's own placeholders, retired when the floor module arrived.
         "argv" => "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)".to_string(),
         "read_file" => "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)".to_string(),
+        "write_file" => "'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)".to_string(),
         _ => return None,
     };
     Some(sentence)

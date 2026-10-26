@@ -6589,7 +6589,6 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "require_relative"
                 | "some"
                 | "srand"
-                | "write_file"
         )
     }
 
@@ -7500,19 +7499,6 @@ impl<W: std::io::Write> Interpreter<W> {
                     let previous = self.random.seed;
                     self.random = crate::random::Mt::new(*seed);
                     return Some(Value::Integer(previous));
-                }
-                // The first fallible operations (ADR 0027): a failure comes
-                // back instead of a panic, and the caller decides. String
-                // payloads for now — struct payloads wait for library types.
-                // `read_file` has moved under `System` (ADR 0068); this one
-                // follows.
-                ("write_file", [Value::String(path), Value::String(content)]) => {
-                    return match std::fs::write(path, content) {
-                        Ok(()) => None,
-                        Err(error) => Some(Value::Failure(Box::new(Value::String(format!(
-                            "write_file {path:?}: {error}"
-                        ))))),
-                    };
                 }
                 ("require_relative", [Value::String(path)]) => {
                     return Some(Value::Boolean(self.require_relative(path)));
@@ -8464,6 +8450,14 @@ end
     )]
     fn read_file_retired_names_its_member() {
         evaluate("read_file(\"haiku.txt\")");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)"
+    )]
+    fn write_file_retired_names_its_member() {
+        evaluate("write_file(\"haiku.txt\", \"rose\")");
     }
 
     #[test]

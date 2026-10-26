@@ -2519,6 +2519,10 @@ fn system_write_file_on_both_oracles() {
                 "p(System.write_file(1, \"a\"))\n",
                 "System.write_file takes two Strings, got 1 and \"a\"",
             ),
+            (
+                "write_file(\"a.txt\", \"x\")\n",
+                "'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)",
+            ),
         ],
     );
 }
