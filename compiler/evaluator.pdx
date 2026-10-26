@@ -1650,6 +1650,30 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return outcome([System.write_standard_output(text)], bindings) if node.name == "write_standard_output"
     return outcome([System.write_standard_error(text)], bindings)
   end
+  # The two clocks, whole nanoseconds — the host's own reading.
+  if type_name == "System" && (node.name == "wall_clock_time" || node.name == "monotonic_time")
+    panic("System.#{node.name} takes 0 arguments, got #{arguments.length}") unless arguments.empty?
+    return outcome([System.wall_clock_time], bindings) if node.name == "wall_clock_time"
+    return outcome([System.monotonic_time], bindings)
+  end
+  # Bytes from the kernel's random source, as integers 0–255.
+  if type_name == "System" && node.name == "entropy"
+    panic("System.entropy takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    count = value_at(arguments, 0)
+    panic("System.entropy takes an Integer, got #{render_inspect(count)}") unless count in Integer
+    panic("System.entropy takes a byte count of 0 or more, got #{count}") if count < 0
+    return outcome([System.entropy(count)], bindings)
+  end
+  # Content added at the file's end, answering the bytes written, or a failure.
+  if type_name == "System" && node.name == "append_file"
+    panic("System.append_file takes 2 arguments, got #{arguments.length}") unless arguments.length == 2
+    path = value_at(arguments, 0)
+    content = value_at(arguments, 1)
+    unless (path in String) && (content in String)
+      panic("System.append_file takes two Strings, got #{render_inspect(path)} and #{render_inspect(content)}")
+    end
+    return outcome([System.append_file(path, content)], bindings)
+  end
   panic("System has no #{node.name}") if type_name == "System"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses

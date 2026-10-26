@@ -19,6 +19,11 @@ name = "pdx"
 path = "src/main.rs"
 
 [dependencies]
+# The floor's two syscalls (ADR 0068): `clock_gettime` for the clocks and
+# `getentropy` for `System.entropy`. Rust's `std` reads neither out loud —
+# its random source is private, and `Instant` has no absolute reading — so
+# the seed declares them through libc, which rustyline already pulls in.
+libc = "0.2.189"
 rustyline = "18.0.1"
 # The Unicode floor for ADR 0038: what a character is (grapheme clusters)
 # and when two strings are equal (canonical equivalence). Prior art over

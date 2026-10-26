@@ -1,0 +1,30 @@
+# `System.append_file(path, content)` (ADR 0068): the content added at the
+# file's end, the file created if it was not there, answering the bytes
+# written as `System.write_file` does, or a failure (ADR 0027) the caller
+# handles. One crossing per call — what a logger writing to a file is
+# spelled over, one call a line.
+
+require_relative "../spec_helper"
+
+context "System.append_file" do
+  target = "/tmp/portland-spec-append_file.txt"
+
+  specify "adds to the end of a file and answers the bytes written" do
+    System.write_file(target, "rose\n")
+    expect(System.append_file(target, "city\n")).to eq(5)
+    expect(System.read_file(target)).to eq("rose\ncity\n")
+  end
+
+  specify "creates the file when it is not there" do
+    fresh = "/tmp/portland-spec-append_file-fresh.txt"
+    System.write_file(fresh, "")
+    expect(System.append_file(fresh, "first\n")).to eq(6)
+    expect(System.read_file(fresh)).to eq("first\n")
+  end
+
+  specify "answers a failure for a path that cannot be opened, naming it" do
+    missing = System.append_file("/nonexistent/portland/file.txt", "x")
+    expect(missing.failure?).to eq(true)
+    expect((missing or -1)).to eq(-1)
+  end
+end

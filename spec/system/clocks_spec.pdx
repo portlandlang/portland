@@ -1,0 +1,30 @@
+# The two clocks (ADR 0068), each one reading of `clock_gettime(2)` in
+# whole nanoseconds. `System.wall_clock_time` is the real clock since the
+# Unix epoch, what `Time.now` is spelled over; `System.monotonic_time` is a
+# clock that only ever moves forward, what a benchmark subtracts. Neither is
+# a `Time`; the arithmetic and formatting are Portland's to write over them.
+
+require_relative "../spec_helper"
+
+context "System.wall_clock_time" do
+  specify "answers nanoseconds since the Unix epoch, as an integer" do
+    now = System.wall_clock_time
+    expect(now in Integer).to eq(true)
+    # 2023-11-14 in nanoseconds: any clock set to the present is past it.
+    expect(now > 1700000000000000000).to eq(true)
+  end
+end
+
+context "System.monotonic_time" do
+  specify "never steps backwards between two readings" do
+    before = System.monotonic_time
+    after = System.monotonic_time
+    expect(after >= before).to eq(true)
+  end
+
+  specify "is positive and an integer" do
+    reading = System.monotonic_time
+    expect(reading in Integer).to eq(true)
+    expect(reading > 0).to eq(true)
+  end
+end

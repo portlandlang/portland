@@ -404,8 +404,10 @@ end
 # error; the evaluator refuses it.
 def type_function_answer(node)
   case node.name
-  when "sqrt"      then ["integer"]
-  when "arguments" then ["array", ["string"]]
+  when "sqrt"                              then ["integer"]
+  when "arguments"                         then ["array", ["string"]]
+  when "wall_clock_time", "monotonic_time" then ["integer"]
+  when "entropy"                           then ["array", ["integer"]]
   when "new"
     case node.receiver.name
     when "Hash"   then ["hash", ["unknown"], ["unknown"]]

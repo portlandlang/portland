@@ -2604,6 +2604,64 @@ fn system_standard_streams_on_both_oracles() {
     );
 }
 
+/// The rest of the first wave (ADR 0064, ADR 0068, #176) on both oracles:
+/// the two clocks in whole nanoseconds — the wall clock past 2023 and the
+/// monotonic clock never stepping back — entropy as integers 0–255 in the
+/// count asked for (past getentropy's 256-per-call ceiling too), and
+/// `append_file` adding to a file's end, creating it, answering the bytes.
+#[test]
+fn system_first_wave_on_both_oracles() {
+    assert_both_print(
+        "system_clocks_and_entropy.pdx",
+        "p(System.wall_clock_time > 1700000000000000000)\nbefore = System.monotonic_time\nafter = System.monotonic_time\np(after >= before)\np(after > 0)\nbytes = System.entropy(16)\np(bytes.length)\np(bytes.all? { it >= 0 && it <= 255 })\np(System.entropy(0))\np(System.entropy(300).length)\n",
+        "true\ntrue\ntrue\n16\ntrue\n[]\n300\n",
+    );
+    // The sample empties the file itself, since both oracles run it in turn.
+    let target = std::env::temp_dir().join("system_append_file_target.txt");
+    let source = format!(
+        "System.write_file({target:?}, \"\")\np(System.append_file({target:?}, \"rose\\n\"))\np(System.append_file({target:?}, \"city\\n\"))\np(System.read_file({target:?}))\np(System.append_file(\"/nonexistent/dir/file.txt\", \"x\"))\n"
+    );
+    assert_both_print(
+        "system_append_file.pdx",
+        &source,
+        "5\n5\n\"rose\\ncity\\n\"\nfailure(\"System.append_file \\\"/nonexistent/dir/file.txt\\\": No such file or directory (os error 2)\")\n",
+    );
+    assert_both_oracles_refuse(
+        "system_first_wave_refusal.pdx",
+        None,
+        &[
+            (
+                "p(System.wall_clock_time(1))\n",
+                "System.wall_clock_time takes 0 arguments, got 1",
+            ),
+            (
+                "p(System.monotonic_time(1))\n",
+                "System.monotonic_time takes 0 arguments, got 1",
+            ),
+            (
+                "p(System.entropy(\"a\"))\n",
+                "System.entropy takes an Integer, got \"a\"",
+            ),
+            (
+                "p(System.entropy(-1))\n",
+                "System.entropy takes a byte count of 0 or more, got -1",
+            ),
+            (
+                "p(System.entropy)\n",
+                "System.entropy takes 1 argument, got 0",
+            ),
+            (
+                "p(System.append_file(\"a\"))\n",
+                "System.append_file takes 2 arguments, got 1",
+            ),
+            (
+                "p(System.append_file(1, \"a\"))\n",
+                "System.append_file takes two Strings, got 1 and \"a\"",
+            ),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

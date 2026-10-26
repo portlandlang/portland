@@ -97,6 +97,7 @@ version = "0.0.0"
 name = "portland-seed"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "rustyline",
  "unicode-normalization",
  "unicode-segmentation",

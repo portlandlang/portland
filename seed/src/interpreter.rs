@@ -1512,6 +1512,58 @@ fn write_standard_error(text: &str) -> Value {
     }
 }
 
+/// The two clocks (ADR 0068), each one `clock_gettime(2)` call answering
+/// whole nanoseconds: `System.wall_clock_time` is `CLOCK_REALTIME`, since
+/// the Unix epoch, what `Time.now` is spelled over; `System.monotonic_time`
+/// is `CLOCK_MONOTONIC`, from an arbitrary start that never goes backwards,
+/// what a benchmark subtracts. 64 bits of nanoseconds reach the year 2262.
+fn clock_nanoseconds(clock: libc::clockid_t) -> i64 {
+    let mut now = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `now` is a valid, writable timespec for the call's duration,
+    // and the clock ids used are the two Darwin defines.
+    let status = unsafe { libc::clock_gettime(clock, &mut now) };
+    assert_eq!(status, 0, "clock_gettime failed");
+    now.tv_sec * 1_000_000_000 + now.tv_nsec
+}
+
+/// `System.entropy(byte_count)` (ADR 0068): bytes from the kernel's random
+/// source via `getentropy(2)`, which hands out at most 256 per call, as an
+/// array of integers 0–255 — the only shape Portland has for bytes until
+/// #119 decides. What `SecureRandom` is spelled over, and the seed an
+/// unseeded `Random` draws.
+pub fn entropy_bytes(count: usize) -> Vec<u8> {
+    let mut bytes = vec![0u8; count];
+    for chunk in bytes.chunks_mut(256) {
+        // SAFETY: `chunk` is a valid, writable buffer of `chunk.len()` bytes,
+        // and 256 is getentropy's documented ceiling per call.
+        let status = unsafe { libc::getentropy(chunk.as_mut_ptr().cast(), chunk.len()) };
+        assert_eq!(status, 0, "getentropy failed");
+    }
+    bytes
+}
+
+/// `System.append_file` (ADR 0068): `content` added at the file's end, the
+/// file created if it was not there, answering the bytes written or a
+/// failure naming the path — one crossing: open with `O_APPEND`, write,
+/// close. What a logger writing to a file is spelled over, one call a line.
+fn append_file_value(path: &str, content: &str) -> Value {
+    use std::io::Write;
+    let appended = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(content.as_bytes()));
+    match appended {
+        Ok(()) => Value::Integer(content.len() as i64),
+        Err(error) => Value::Failure(Box::new(Value::String(format!(
+            "System.append_file {path:?}: {error}"
+        )))),
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -3668,6 +3720,51 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
                 _ => panic!(
                     "System.write_standard_error takes 1 argument, got {}",
+                    arguments.len()
+                ),
+            },
+            ("System", "wall_clock_time") => {
+                if !arguments.is_empty() {
+                    panic!(
+                        "System.wall_clock_time takes 0 arguments, got {}",
+                        arguments.len()
+                    );
+                }
+                Some(Value::Integer(clock_nanoseconds(libc::CLOCK_REALTIME)))
+            }
+            ("System", "monotonic_time") => {
+                if !arguments.is_empty() {
+                    panic!(
+                        "System.monotonic_time takes 0 arguments, got {}",
+                        arguments.len()
+                    );
+                }
+                Some(Value::Integer(clock_nanoseconds(libc::CLOCK_MONOTONIC)))
+            }
+            ("System", "entropy") => match arguments.as_slice() {
+                [Value::Integer(count)] if *count >= 0 => Some(Value::array(
+                    entropy_bytes(*count as usize)
+                        .into_iter()
+                        .map(|byte| Value::Integer(i64::from(byte)))
+                        .collect(),
+                )),
+                [Value::Integer(count)] => {
+                    panic!("System.entropy takes a byte count of 0 or more, got {count}")
+                }
+                [other] => panic!("System.entropy takes an Integer, got {}", other.shown()),
+                _ => panic!("System.entropy takes 1 argument, got {}", arguments.len()),
+            },
+            ("System", "append_file") => match arguments.as_slice() {
+                [Value::String(path), Value::String(content)] => {
+                    Some(append_file_value(path, content))
+                }
+                [path, content] => panic!(
+                    "System.append_file takes two Strings, got {} and {}",
+                    path.shown(),
+                    content.shown()
+                ),
+                _ => panic!(
+                    "System.append_file takes 2 arguments, got {}",
                     arguments.len()
                 ),
             },

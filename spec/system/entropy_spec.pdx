@@ -1,0 +1,25 @@
+# `System.entropy(byte_count)` (ADR 0068): bytes from the kernel's random
+# source, `getentropy(2)`, as an array of integers 0–255 — the shape bytes
+# take until #119 decides what a byte string is. What `SecureRandom` is
+# spelled over.
+
+require_relative "../spec_helper"
+
+context "System.entropy" do
+  specify "answers the number of bytes asked for" do
+    expect(System.entropy(16).length).to eq(16)
+    expect(System.entropy(0)).to eq([])
+  end
+
+  specify "every byte is an integer from 0 to 255" do
+    expect(System.entropy(64).all? { it >= 0 && it <= 255 }).to eq(true)
+  end
+
+  specify "reaches past getentropy's 256 bytes per call" do
+    expect(System.entropy(1000).length).to eq(1000)
+  end
+
+  specify "two draws of 32 bytes are not the same bytes" do
+    expect(System.entropy(32) == System.entropy(32)).to eq(false)
+  end
+end

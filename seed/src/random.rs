@@ -247,13 +247,13 @@ pub fn sampled<T: Clone>(elements: &[T], count: usize, generator: &mut Mt) -> Ve
     copy
 }
 
-/// A seed from the process's entropy, for a generator nobody seeded.
+/// A seed from the kernel's entropy, for a generator nobody seeded — the
+/// same crossing `System.entropy` is (ADR 0068), eight bytes of it.
 pub fn entropy_seed() -> i64 {
-    use std::hash::{BuildHasher, Hasher};
-    let hashed = std::collections::hash_map::RandomState::new()
-        .build_hasher()
-        .finish();
-    (hashed >> 1) as i64
+    let bytes = crate::interpreter::entropy_bytes(8);
+    let mut seed = [0u8; 8];
+    seed.copy_from_slice(&bytes);
+    (i64::from_ne_bytes(seed) >> 1).abs()
 }
 
 #[cfg(test)]
