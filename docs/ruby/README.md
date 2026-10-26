@@ -50,6 +50,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Redefinition](redefinition.md) — A top-level name is defined once — a second `def`, `struct`, `enum`, `trait`, `alias`, or constant of the same name refuses, and a builtin's name is never taken.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
+- [The standard library](standard-library.md) — Ruby's current shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 - [`String#count` and character sets](string-count.md) — `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.
 - [String escapes](string-escapes.md) — The escape set is closed — Ruby passes an unknown escape through as its bare character, and Portland refuses it.
