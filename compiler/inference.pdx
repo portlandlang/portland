@@ -385,23 +385,36 @@ end
 # already lives by, read back as types. Partial lookups answer maybes
 # (ADR 0040 §3). Unlisted names answer unknown, never an error.
 def synthesize_call(node, types)
+  return type_function_answer(node) if builtin_type_function?(node, types)
   call_answer(synthesize(node.receiver, types), node, types)
 end
 
 # `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
 # form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
 def synthesize_safe_call(node, types)
-  if builtin_type_function?(node, types)
-    return ["range"] if node.name == "new" && node.receiver.name == "Range"
-    return ["hash", ["unknown"], ["unknown"]] if node.name == "new" && node.receiver.name == "Hash"
-    return ["random"] if node.name == "new" && node.receiver.name == "Random"
-    return ["array", ["unknown"]] if node.name == "new"
-    return ["integer"] if node.name == "sqrt"
-    return ["array", ["string"]] if node.name == "arguments"
-  end
+  return type_function_answer(node) if builtin_type_function?(node, types)
   receiver = synthesize(node.receiver, types)
   plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
   maybe_of(call_answer(plain, node, types))
+end
+
+# What a type function answers, the same on a plain call and behind `&.`
+# (#181 — for a while only the safe path knew, and `Array.new(3)` in a plain
+# call was Unknown). A name no type function has answers unknown, never an
+# error; the evaluator refuses it.
+def type_function_answer(node)
+  case node.name
+  when "sqrt"      then ["integer"]
+  when "arguments" then ["array", ["string"]]
+  when "new"
+    case node.receiver.name
+    when "Hash"   then ["hash", ["unknown"], ["unknown"]]
+    when "Random" then ["random"]
+    when "Range"  then ["range"]
+    else ["array", ["unknown"]]
+    end
+  else ["unknown"]
+  end
 end
 
 # Ruby's type functions on the builtin types (ADR 0058): `Array.new`

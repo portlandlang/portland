@@ -1271,6 +1271,32 @@ fn portland_types_dumps_synthesized_bindings() {
     );
 }
 
+/// A type function's answer is the same on a plain call as behind `&.`
+/// (#181): `Array.new(3)` is an array, `Integer.sqrt(9)` an integer,
+/// `System.arguments` an array of strings, and a chain off any of them
+/// reads as a chain off the value. A member no type function has stays
+/// Unknown, never an error.
+#[test]
+fn portland_types_type_functions_in_plain_calls() {
+    let sample = std::env::temp_dir().join("inference_type_functions.pdx");
+    std::fs::write(
+        &sample,
+        "sized = Array.new(3)\nroot = Integer.sqrt(9)\nnames = System.arguments\nfirst = System.arguments.first\nsafe = Array&.new(2)\ncontent = System.read_file(\"haiku.txt\")\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "types.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "sized: [Unknown]\nroot: Integer\nnames: [String]\nfirst: String?\nsafe: [Unknown]\ncontent: Unknown\n"
+    );
+}
+
 /// Increment 3b (#9): method returns read off bodies — defaults lend
 /// their parameter types, early returns must agree with the last
 /// statement, a missing else makes a maybe — block parameters bound from
