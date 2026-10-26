@@ -1,6 +1,6 @@
-# A tiny wc: counts lines and words of each file named in argv.
+# A tiny wc: counts lines and words of each file named on the command line.
 
-argv().each do |path|
+System.arguments.each do |path|
   content = read_file(path) or panic "wc: cannot read #{path}"
   lines = content.split("\n").reject do |line|
     line.empty?

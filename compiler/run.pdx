@@ -12,9 +12,10 @@ require_relative "evaluator"
 
 # `read_file` answers a failure now (ADR 0027); a tool that cannot read its
 # input has nothing to do but say so.
-source = read_file(argv.first) or panic "run.pdx: cannot read #{argv.first}"
+path = System.arguments.first or panic "run.pdx: needs a file to run"
+source = read_file(path) or panic "run.pdx: cannot read #{path}"
 program = parse_program(lex(source))
 # Run mode: a program about to run is a closed world, so the entry's own
 # defs are read with what every caller passes (ADR 0049 §4).
-check_program_closure(argv.first, [])
+check_program_closure(path, [])
 evaluate_program(program)

@@ -4,7 +4,8 @@
 
 require_relative "lexer"
 
-source = read_file(argv.first) or panic "tokenize.pdx: cannot read #{argv.first}"
+path = System.arguments.first or panic "tokenize.pdx: needs a file to tokenize"
+source = read_file(path) or panic "tokenize.pdx: cannot read #{path}"
 lex(source).each do |token|
   puts "#{token.kind} #{token.text}"
 end

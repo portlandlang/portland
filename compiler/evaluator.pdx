@@ -81,12 +81,14 @@ end
 
 def evaluate_program(nodes)
   # `require_relative` resolves against the file doing the requiring, so that
-  # path has to be in scope from the first statement. `argv.first` is it: the
-  # compiler was handed the guest program's path, and run.pdx read the same value.
-  # What follows the path is the guest's own: `System.arguments` (ADR 0068)
-  # answers it, where the seed answers the whole command line.
-  guest_arguments = if argv.empty? then [] else argv.slice(1, argv.length - 1) end
-  run_body(nodes, [["__file__", "file", argv.first or "."], ["__arguments__", "arguments", guest_arguments]] + builtin_constants)
+  # path has to be in scope from the first statement. The first argument is
+  # it: the compiler was handed the guest program's path, and run.pdx read
+  # the same value. What follows the path is the guest's own: its
+  # `System.arguments` (ADR 0068) answers that, where the host's answers the
+  # whole command line.
+  host_arguments = System.arguments
+  guest_arguments = if host_arguments.empty? then [] else host_arguments.slice(1, host_arguments.length - 1) end
+  run_body(nodes, [["__file__", "file", host_arguments.first or "."], ["__arguments__", "arguments", guest_arguments]] + builtin_constants)
 end
 
 # The constants every program starts with (#152): `Float`'s, the seed's
