@@ -74,6 +74,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0060](0060-2026-10-25-a-collections-to-s-is-its-inspect.md) — A collection's `to_s` is its `inspect`
 - [0061](0061-2026-10-25-to-i-by-rubys-rule.md) — `to_i` by Ruby's rule: leading digits count, garbage is 0
 - [0062](0062-2026-10-25-struct-fields-are-names-only.md) — A struct's fields are names only
+- [0063](0063-2026-10-25-a-hash-has-no-default.md) — A hash has no default
 
 <!-- /generated -->
 

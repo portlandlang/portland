@@ -1610,6 +1610,19 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return outcome([Integer.sqrt(value_at(arguments, 0))], bindings)
   end
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
+  # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses
+  # naming the or-guard — the seed's sentences.
+  if type_name == "Hash" && node.name == "new"
+    if node.block.some?
+      panic("'Hash.new { }' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or fallback'")
+    end
+    return outcome([{}], bindings) if arguments.empty?
+    if arguments.length == 1
+      shown = render_inspect(value_at(arguments, 0))
+      panic("'Hash.new(#{shown})' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or #{shown}'")
+    end
+    panic("Hash.new takes no arguments, got #{arguments.length}")
+  end
   return outcome([range_new(arguments)], bindings) if type_name == "Range" && node.name == "new"
   panic("#{type_name} has no #{node.name}")
 end
@@ -1929,7 +1942,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Integer Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))

@@ -46,3 +46,14 @@ context "Hash literal" do
     expect(built).to eq({a: 1, "b" => 2, 3 => 4})
   end
 end
+
+# `Hash.new` (ADR 0063, ADR 0058): the empty hash as a type function, for
+# migrating code. A hash has no default: `Hash.new(0)` and the block form
+# refuse naming the or-guard, pinned by a two-oracle test, and `default`
+# and `default_proc` do not exist. From ruby/spec core/hash/new_spec.rb.
+context "Hash.new" do
+  specify "creates an empty Hash if passed no arguments" do
+    expect(Hash.new).to eq({})
+    expect(Hash.new.size).to eq(0)
+  end
+end

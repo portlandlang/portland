@@ -393,6 +393,7 @@ end
 def synthesize_safe_call(node, types)
   if builtin_type_function?(node, types)
     return ["range"] if node.name == "new" && node.receiver.name == "Range"
+    return ["hash", ["unknown"], ["unknown"]] if node.name == "new" && node.receiver.name == "Hash"
     return ["array", ["unknown"]] if node.name == "new"
     return ["integer"] if node.name == "sqrt"
   end
@@ -406,7 +407,7 @@ end
 # the name wins, as everywhere, so only an unbound name is the type's.
 def builtin_type_function?(node, types)
   return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Integer Range].include?(node.receiver.name)
+  return false unless %w[Array Hash Integer Range].include?(node.receiver.name)
   synthesize_name(node.receiver.name, types) == ["unknown"]
 end
 

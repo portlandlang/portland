@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A hash has no default** ([ADR 0063](docs/adr/0063-2026-10-25-a-hash-has-no-default.md), [#170](https://github.com/portlandlang/portland/issues/170)) — on both implementations, `Hash.new` bare builds `{}` as a type function; `Hash.new(0)` and `Hash.new { }` refuse naming the or-guard, and `default` and `default_proc` do not exist. core/hash/new ported into `spec/hash/literal_spec.pdx`; default and default_proc recorded as decided out.
+
 - **A struct's fields are names only** ([ADR 0062](docs/adr/0062-2026-10-25-struct-fields-are-names-only.md), [#163](https://github.com/portlandlang/portland/issues/163)) — on both implementations, `car[:make]`, `car["make"]`, `car[0]`, `dig`, `values_at`, and `deconstruct_keys` refuse naming the field spelling, with `to_h` and `to_a` for a name or position decided at runtime. The four core/struct files are recorded as decided out.
 
 - **`to_i` by Ruby's rule, with a base** ([ADR 0061](docs/adr/0061-2026-10-25-to-i-by-rubys-rule.md), [#162](https://github.com/portlandlang/portland/issues/162)) — on both implementations: leading whitespace, a sign, the base's prefix, digits with single underscores, and 0 for garbage — `"12abc".to_i` is 12, `"0xFAZ".to_i(0)` is 250, `"".to_i(37)` refuses as `invalid radix 37`; a number past 64 bits refuses. core/string/to_i ported into `spec/string/radix_spec.pdx`; the ledger gains [conversions.md](docs/ruby/conversions.md).

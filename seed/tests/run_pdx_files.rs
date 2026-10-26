@@ -2037,6 +2037,34 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// A hash has no default (ADR 0063): `Hash.new` bare is `{}` on both
+/// oracles; a default value or block, and `default` and `default_proc`,
+/// refuse naming the or-guard.
+#[test]
+fn hash_new_and_the_no_default_refusals_on_both_oracles() {
+    assert_both_print(
+        "evaluator_hash_new.pdx",
+        "p(Hash.new)\np(Hash.new.size)\np(Hash.new == {})\n",
+        "{}\n0\ntrue\n",
+    );
+    let cases = [
+        (
+            "p(Hash.new(0))\n",
+            "'Hash.new(0)' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or 0'",
+        ),
+        (
+            "p(Hash.new { |hash, key| 1 })\n",
+            "'Hash.new { }' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or fallback'",
+        ),
+        (
+            "p({a: 1}.default)\n",
+            "'default' has no Portland meaning — a hash has no default (ADR 0063); a lookup answers a maybe, so write 'hash[key] or fallback'",
+        ),
+        ("p(Hash.new(1, 2))\n", "Hash.new takes no arguments, got 2"),
+    ];
+    assert_both_oracles_refuse("hash_default_refusal.pdx", None, &cases);
+}
+
 /// A struct's fields are names only (ADR 0062): indexing by name or
 /// position, and `dig`, `values_at`, `deconstruct_keys`, refuse naming the
 /// field spelling on both oracles; `to_h` carries the dynamic case.

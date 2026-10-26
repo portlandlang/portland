@@ -1341,6 +1341,26 @@ fn bit_at(number: i64, position: i64) -> i64 {
     (number >> position) & 1
 }
 
+/// `Hash.new` (ADR 0063): the empty hash, as a type function for migrating
+/// code (ADR 0058). A default value or block refuses naming the or-guard —
+/// a hash has no default here; a lookup answers a maybe.
+fn hash_new(arguments: &[Value], with_block: bool) -> Value {
+    if with_block {
+        panic!(
+            "'Hash.new {{ }}' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or fallback'"
+        );
+    }
+    match arguments {
+        [] => Value::hash(Vec::new()),
+        [default] => panic!(
+            "'Hash.new({})' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or {}'",
+            default.shown(),
+            default.shown()
+        ),
+        _ => panic!("Hash.new takes no arguments, got {}", arguments.len()),
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -3177,7 +3197,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere.
                 if let Expression::Variable(type_name) = receiver.as_ref()
-                    && matches!(type_name.as_str(), "Array" | "Integer" | "Range")
+                    && matches!(type_name.as_str(), "Array" | "Hash" | "Integer" | "Range")
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
                 {
@@ -3436,6 +3456,7 @@ impl<W: std::io::Write> Interpreter<W> {
     ) -> Option<Value> {
         match (type_name, name) {
             ("Array", "new") => self.array_new(arguments, block),
+            ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
             ("Range", "new") => Some(range_new(&arguments)),
             _ => panic!("{type_name} has no {name}"),

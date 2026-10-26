@@ -1017,6 +1017,19 @@ core/float/zero_spec.rb:
 
 # — core/hash —
 
+core/hash/new_spec.rb:
+  pdx: [spec/hash/literal_spec.pdx]
+  status: partial_intentional
+  reason: "Hash.new bare builds {} (ADR 0058); a default value or block refuses naming the or-guard, since a hash has no default (ADR 0063), and the capacity keyword is an allocation hint."
+  link: docs/ruby/lookups.md
+core/hash/default_spec.rb:
+  status: skipped
+  reason: "A hash has no default (ADR 0063): default refuses naming the or-guard, and a lookup answers a maybe."
+  link: docs/ruby/lookups.md
+core/hash/default_proc_spec.rb:
+  status: skipped
+  reason: "A hash has no default (ADR 0063): default_proc refuses naming the or-guard, and a default proc would be a mutating callback inside a value (ADR 0015)."
+  link: docs/ruby/lookups.md
 core/hash/dig_spec.rb:
   pdx: [spec/hash/queries_spec.pdx]
 core/hash/fetch_spec.rb:

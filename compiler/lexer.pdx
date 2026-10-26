@@ -153,6 +153,7 @@ def retired_sentence(name)
   when "Thread", "Mutex", "Queue", "Fiber", "Ractor", "ConditionVariable" then "'#{name}' has no Portland meaning — run independent work in a 'together' block"
   when "Object", "BasicObject", "Kernel", "Class", "Module" then "'#{name}' has no Portland meaning — there is no root class; a struct stands alone"
   when "fetch" then "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'"
+  when "default", "default_proc" then "'#{name}' has no Portland meaning — a hash has no default (ADR 0063); a lookup answers a maybe, so write 'hash[key] or fallback'"
   when "push", "pop", "shift", "unshift", "append", "prepend", "insert", "delete_at", "delete_if", "keep_if", "clear", "concat", "replace", "fill"
     "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
   when "map!", "collect!", "select!", "filter!", "reject!", "sort!", "sort_by!", "uniq!", "compact!", "flatten!", "reverse!", "shuffle!", "rotate!", "slice!", "upcase!", "downcase!", "capitalize!", "swapcase!", "strip!", "lstrip!", "rstrip!", "chomp!", "chop!", "squeeze!", "gsub!", "sub!", "tr!", "delete!", "succ!", "next!", "merge!", "transform_values!", "transform_keys!"

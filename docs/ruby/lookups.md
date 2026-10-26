@@ -32,8 +32,11 @@ h.fetch(:key) { |key| load(key) }   # ⇒ h[:key] or load(:key)
 
 The middle rewrite is an upgrade, not a trade: `or`'s right side only runs on absence, so the lazy behavior Ruby reserves for the block arity is the only behavior. And `fetch`'s stored-nil rule survives exactly — a stored nil is `some(nil)`, which the or-guard treats as present (ADR 0005's wrapper earning its keep).
 
+**A hash has no default** ([ADR 0063](../adr/0063-2026-10-25-a-hash-has-no-default.md)): `[]` on every hash answers a maybe, and the or-guard is the default, written at the lookup. `Hash.new` bare builds `{}` ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)'s type function); `Hash.new(0)` and `Hash.new { |hash, key| }` refuse naming the rewrite — `'Hash.new(0)' gives a hash a default, which Portland does not have — a lookup answers a maybe; write 'hash[key] or 0'` — and `default` and `default_proc` do not exist. A default would make `[]` total on some hashes and partial on others, and a default proc is a mutating callback inside a value.
+
 ## Migration
 
 - `hash[key] || default`, `array.first || default` — compile verbatim, same meaning.
+- `Hash.new(0)` counting — `counts[word] = (counts[word] or 0) + 1`, or `tally`; `Hash.new { |h, k| h[k] = [] }` grouping — `group_by`.
 - Bare `array[i]` / `hash[k]` used as if always-present — loud compile error (unhandled maybe), fixed with the unwrap toolkit.
 - `fetch` — mechanical linter rewrite per the table above, marked **unsafe autocorrect** (RuboCop's `-A` tier): pre-flip Ruby is collapsed and can't distinguish a stored nil from a missing key, so hashes that store nil/false diverge until the flip.

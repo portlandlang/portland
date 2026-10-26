@@ -115,6 +115,9 @@ pub fn retired_sentence(name: &str) -> Option<String> {
             "'{name}' has no Portland meaning — there is no root class; a struct stands alone"
         ),
         "fetch" => "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'".to_string(),
+        "default" | "default_proc" => format!(
+            "'{name}' has no Portland meaning — a hash has no default (ADR 0063); a lookup answers a maybe, so write 'hash[key] or fallback'"
+        ),
         "push" | "pop" | "shift" | "unshift" | "append" | "prepend" | "insert" | "delete_at"
         | "delete_if" | "keep_if" | "clear" | "concat" | "replace" | "fill" => format!(
             "'{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
