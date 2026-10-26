@@ -394,6 +394,7 @@ def synthesize_safe_call(node, types)
   if builtin_type_function?(node, types)
     return ["range"] if node.name == "new" && node.receiver.name == "Range"
     return ["hash", ["unknown"], ["unknown"]] if node.name == "new" && node.receiver.name == "Hash"
+    return ["random"] if node.name == "new" && node.receiver.name == "Random"
     return ["array", ["unknown"]] if node.name == "new"
     return ["integer"] if node.name == "sqrt"
   end
@@ -407,7 +408,7 @@ end
 # the name wins, as everywhere, so only an unbound name is the type's.
 def builtin_type_function?(node, types)
   return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Hash Integer Range].include?(node.receiver.name)
+  return false unless %w[Array Hash Integer Random Range].include?(node.receiver.name)
   synthesize_name(node.receiver.name, types) == ["unknown"]
 end
 
@@ -716,8 +717,9 @@ def builtin_table(type)
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[empty?/0 end_with?/1+ eql?/1 failure?/0 id2name/0 length/0 name/0 nil?/0 size/0 slice/2 some?/0 start_with?/1+ to_s/0]
-  in ["array", *] then %w[all?/0& any?/0& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0& one?/0& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 select/0& size/0 slice/2 slice_after/0& slice_before/0& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
+  in ["array", *] then %w[all?/0& any?/0& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0& one?/0& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0& slice_before/0& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
   in ["hash", *] then %w[all?/0& any?/0& assoc/1 chunk/0& chunk_while/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 except/0+ eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0& one?/0& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0& slice_before/0& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
+  in ["random"] then %w[eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
   in ["range"] then %w[all?/0& any?/0& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& exclude_end?/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0& one?/0& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0& slice_before/0& slice_when/0& some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0]
   else
     nil

@@ -742,7 +742,7 @@ end
 # A builtin type's name, as a `when` value or a `===` pattern tests for it
 # (#151): a type, not a value, so not a name to find defined.
 def builtin_type_name?(node)
-  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Range String Symbol].include?(node.name)
+  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(node.name)
 end
 
 def check_case_in(node, scope, mutable found)
@@ -1139,7 +1139,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[argv failure fields inspect p panic puts read_file require_relative some write_file].include?(name)
+def builtin_function?(name) = %w[argv failure fields inspect p panic puts rand read_file require_relative some srand write_file].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it

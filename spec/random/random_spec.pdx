@@ -1,0 +1,256 @@
+# Randomness (ADR 0064): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb and
+# core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), float ranges (#149), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../spec_helper"
+
+context "Random.new" do
+  specify "returns a new instance of Random" do
+    expect((Random.new in Random)).to be_true
+  end
+
+  specify "uses a random seed value if none is supplied" do
+    expect((Random.new.seed in Integer)).to be_true
+  end
+
+  specify "returns Random instances initialized with different seeds" do
+    expect(Random.new.seed == Random.new.seed).to be_false
+  end
+
+  specify "accepts an Integer seed value as an argument" do
+    expect(Random.new(2).seed).to eq(2)
+  end
+
+  specify "accepts (and truncates) a Float seed value as an argument" do
+    expect(Random.new(3.4).seed).to eq(3)
+  end
+end
+
+context "Random#seed" do
+  specify "returns the same generated seed when repeatedly called on the same object" do
+    generator = Random.new
+    expect(generator.seed).to eq(generator.seed)
+  end
+
+  specify "returns the seed given in the constructor" do
+    generator = Random.new(36788)
+    expect(generator.seed).to eq(36788)
+  end
+end
+
+context "Random#==" do
+  specify "returns true if the two objects have the same state" do
+    expect(Random.new(42) == Random.new(42)).to be_true
+  end
+
+  specify "returns false if the two objects have different state" do
+    drawn = Random.new(42)
+    drawn.rand
+    expect(drawn == Random.new(42)).to be_false
+  end
+
+  specify "returns true if the two objects have the same seed" do
+    expect(Random.new(42) == Random.new(42.5)).to be_true
+  end
+
+  specify "returns false if the two objects have a different seed" do
+    expect(Random.new(42) == Random.new(41)).to be_false
+  end
+
+  specify "returns false if the other object is not a Random" do
+    expect(Random.new(42) == 42).to be_false
+    expect(Random.new(42) == [Random.new(42)]).to be_false
+  end
+end
+
+context "Random#rand" do
+  specify "returns a Float >= 0 and < 1 if no max argument is passed" do
+    generator = Random.new
+    floats = (1..50).map { generator.rand }
+    expect(floats.all? { |drawn| drawn >= 0.0 && drawn < 1.0 }).to be_true
+  end
+
+  specify "returns an Integer >= 0 and < the max argument if an Integer argument is passed" do
+    generator = Random.new
+    integers = (1..50).map { generator.rand(34) }
+    expect(integers.all? { |drawn| drawn >= 0 && drawn < 34 }).to be_true
+  end
+
+  specify "returns the same sequence for a given seed" do
+    first = Random.new(33)
+    second = Random.new(33)
+    expect((1..10).map { first.rand(90) }).to eq((1..10).map { second.rand(90) })
+    expect((1..10).map { first.rand }).to eq((1..10).map { second.rand })
+  end
+
+  specify "draws CRuby's numbers for a given seed" do
+    generator = Random.new(42)
+    expect((1..5).map { generator.rand(10) }).to eq([6, 3, 7, 4, 6])
+    expect(Random.new(42).rand).to eq(0.3745401188473625)
+    expect(Random.new(42).rand(1.5)).to eq(0.5618101782710437)
+    expect(Random.new(1234).rand(1000000)).to eq(486191)
+    expect(Random.new(42).rand(1099511627776)).to eq(441507790259)
+  end
+
+  specify "eventually returns all possible values" do
+    generator = Random.new(33)
+    expect((1..200).map { generator.rand(10) }.uniq.sort).to eq((0..9).to_a)
+  end
+
+  describe "with Range" do
+    specify "returns an element from the Range" do
+      expect((Random.new.rand(20..43) in Integer)).to be_true
+    end
+
+    specify "works with inclusive ranges" do
+      generator = Random.new(33)
+      expect((1..40).map { generator.rand(3..5) }.uniq.sort).to eq([3, 4, 5])
+    end
+
+    specify "works with exclusive ranges" do
+      generator = Random.new(33)
+      expect((1..20).map { generator.rand(3...5) }.uniq.sort).to eq([3, 4])
+    end
+
+    specify "draws CRuby's number for a given seed" do
+      expect(Random.new(42).rand(1..6)).to eq(4)
+      expect(Random.new(42).rand(5...6)).to eq(5)
+    end
+  end
+end
+
+context "Kernel#rand" do
+  specify "returns a float if no argument is passed" do
+    expect(rand.to_s.include?(".")).to be_true
+  end
+
+  specify "returns an integer for an integer argument" do
+    expect((rand(77) in Integer)).to be_true
+  end
+
+  specify "returns an integer for a float argument greater than 1" do
+    expect(rand(1.3)).to eq(0)
+  end
+
+  specify "returns a float for an argument between -1 and 1" do
+    expect(rand(0).to_s.include?(".")).to be_true
+    expect(rand(0.5).to_s.include?(".")).to be_true
+  end
+
+  specify "ignores the sign of the argument" do
+    expect([0, 1, 2, 3].include?(rand(-4))).to be_true
+  end
+
+  specify "never returns a value greater or equal to any passed in max argument" do
+    expect((1..100).map { rand(10) }.all? { |drawn| drawn < 10 }).to be_true
+  end
+
+  describe "with a range" do
+    specify "returns an Integer between the two Integers" do
+      drawn = rand(1..5)
+      expect(drawn >= 1 && drawn <= 5).to be_true
+    end
+  end
+end
+
+context "Kernel#srand" do
+  specify "returns the previous argument to srand if one was given and no argument is supplied" do
+    srand(34)
+    expect(srand).to eq(34)
+  end
+
+  specify "returns the previous argument to srand if one was given and 0 is supplied" do
+    srand(34)
+    expect(srand(0)).to eq(34)
+  end
+
+  specify "seeds rand such that its return value is deterministic" do
+    srand(176542)
+    first = (1..20).map { rand }
+    srand(176542)
+    second = (1..20).map { rand }
+    expect(first).to eq(second)
+  end
+end
+
+context "Array#shuffle" do
+  specify "returns the same values, in a usually different order" do
+    list = [1, 2, 3, 4, 5, 6, 7, 8]
+    shuffled = (1..10).map { list.shuffle }
+    expect(shuffled.all? { |drawn| drawn.sort == list }).to be_true
+    expect(shuffled.any? { |drawn| drawn != list }).to be_true
+  end
+
+  specify "is not destructive" do
+    list = [1, 2, 3]
+    list.shuffle
+    expect(list).to eq([1, 2, 3])
+  end
+
+  specify "matches CRuby with random:" do
+    expect(%w[a b c].shuffle(random: Random.new(1))).to eq(%w[a c b])
+    expect((0..10).to_a.shuffle(random: Random.new(10))).to eq([2, 6, 8, 5, 7, 10, 3, 1, 0, 4, 9])
+  end
+
+  specify "matches CRuby with srand" do
+    srand(123)
+    expect(%w[a b c d e f g h i j k].shuffle).to eq(%w[a e f h i j d b g k c])
+  end
+end
+
+context "Array#sample" do
+  specify "returns nil for an empty Array" do
+    expect([].sample).to be_nil
+  end
+
+  specify "returns nil for an empty array when called without n and a Random is given" do
+    expect([].sample(random: Random.new(42))).to be_nil
+  end
+
+  specify "returns a single value when not passed a count" do
+    expect([4].sample).to eq(4)
+  end
+
+  specify "returns a single value when not passed a count and a Random is given" do
+    expect([4].sample(random: Random.new(42))).to eq(4)
+  end
+
+  specify "returns an empty Array when passed zero" do
+    expect([4].sample(0)).to eq([])
+  end
+
+  specify "returns elements from the Array" do
+    list = [1, 2, 3, 4]
+    expect(list.sample(3).all? { |drawn| list.include?(drawn) }).to be_true
+  end
+
+  specify "returns at most the number of elements in the Array" do
+    expect([1, 2, 3, 4].sample(20).size).to eq(4)
+  end
+
+  specify "does not return the same value if the Array has unique values" do
+    expect([1, 2, 3, 4].sample(20).sort).to eq([1, 2, 3, 4])
+  end
+
+  specify "may return the same value if the array is not unique" do
+    expect([4, 4].sample(2)).to eq([4, 4])
+  end
+
+  specify "matches CRuby with random:" do
+    expect([1, 2, 3, 4, 5].sample(random: Random.new(42))).to eq(4)
+    expect([1, 2, 3, 4, 5].sample(2, random: Random.new(42))).to eq([4, 1])
+    expect([1, 2, 3, 4, 5].sample(3, random: Random.new(42))).to eq([4, 1, 5])
+    expect([1, 2, 3, 4, 5].sample(5, random: Random.new(42))).to eq([4, 1, 5, 2, 3])
+    expect([1, 2, 3, 4].sample(4, random: Random.new(7))).to eq([4, 1, 3, 2])
+    twelve = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    expect(twelve.sample(11, random: Random.new(42))).to eq([70, 50, 100, 80, 110, 10, 90, 30, 20, 40, 120])
+  end
+end

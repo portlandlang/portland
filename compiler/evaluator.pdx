@@ -284,6 +284,7 @@ def guest_type_matches(name, subject, bindings)
   when "Hash" then return Hash === subject
   when "Integer" then return Integer === subject
   when "Range" then return Range === subject
+  when "Random" then return Random === subject
   when "String" then return String === subject
   end
   slot = resolve(bindings, name)
@@ -383,7 +384,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[argv failure inspect p panic puts read_file require_relative some write_file].include?(name)
+  %w[argv failure inspect p panic puts rand read_file require_relative some srand write_file].include?(name)
 end
 
 # The top of a file: no frame and no namespace around these bindings.
@@ -522,6 +523,7 @@ def match_builtin_type(pattern, subject)
   when "Boolean" then subject in Boolean
   when "Hash" then subject in Hash
   when "Integer" then subject in Integer
+  when "Random" then subject in Random
   when "String" then subject in String
   when "Array"
     # Guest struct instances are tagged host arrays — exclude them.
@@ -534,7 +536,7 @@ def match_builtin_type(pattern, subject)
 end
 
 def match_struct(pattern, subject, bindings)
-  if %w[Array Boolean Hash Integer String].include?(pattern.name)
+  if %w[Array Boolean Hash Integer Random String].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
@@ -1624,6 +1626,10 @@ def evaluate_builtin_type_function(node, mutable bindings)
     panic("Hash.new takes no arguments, got #{arguments.length}")
   end
   return outcome([range_new(arguments)], bindings) if type_name == "Range" && node.name == "new"
+  # `Random.new(seed)` (ADR 0064): the host's generator, Ruby's MT19937.
+  if type_name == "Random" && node.name == "new"
+    return outcome([arguments.empty? ? Random.new : Random.new(value_at(arguments, 0))], bindings)
+  end
   panic("#{type_name} has no #{node.name}")
 end
 
@@ -1942,7 +1948,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Random Range].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
@@ -2018,6 +2024,23 @@ def evaluate_method_call(node, mutable bindings)
     end
   end
   return evaluate_block_call(node, receiver, arguments, bindings) if node.block.some?
+  # `sample(random:)` and `shuffle(random:)` (ADR 0064): the one keyword a
+  # builtin takes, handed to the host's own.
+  if plain_array?(receiver) && %w[sample shuffle].include?(node.name) && !keyword_values.empty?
+    keyword_values.each do |pair|
+      panic("'#{node.name}' takes one keyword, random:, got #{pair[0]}:") unless pair[0] == "random"
+    end
+    source = value_at(keyword_values.first, 1)
+    panic("'random:' takes a Random, got #{render_inspect(source)}") unless source in Random
+    drawn = if node.name == "shuffle"
+      receiver.shuffle(random: source)
+    elsif arguments.empty?
+      receiver.sample(random: source)
+    else
+      receiver.sample(value_at(arguments, 0), random: source)
+    end
+    return outcome([drawn], bindings)
+  end
   # `with` copies-and-updates before any dispatch, like the seed (#27).
   if node.name == "with" && (receiver in ["__struct__", *])
     return outcome([struct_with(receiver, keyword_values)], bindings)
@@ -2107,6 +2130,12 @@ def evaluate_method_call(node, mutable bindings)
   when "nobits?" then receiver.nobits?(value_at(arguments, 0))
   when "bit_length" then receiver.bit_length
   when "bit_count" then receiver.bit_count
+  # A generator's draws and seed, and the ambient sample and shuffle (ADR
+  # 0064): the host's, so a seeded sequence is Ruby's.
+  when "rand" then arguments.empty? ? receiver.rand : receiver.rand(value_at(arguments, 0))
+  when "seed" then receiver.seed
+  when "shuffle" then receiver.shuffle
+  when "sample" then arguments.empty? ? receiver.sample : receiver.sample(value_at(arguments, 0))
   when "lcm" then receiver.lcm(value_at(arguments, 0))
   when "digits" then arguments.empty? ? receiver.digits : receiver.digits(value_at(arguments, 0))
   when "gcdlcm" then receiver.gcdlcm(value_at(arguments, 0))
@@ -2365,6 +2394,7 @@ def builtin_type_of(value)
   return ["boolean"] if value in Boolean
   return ["hash", ["unknown"], ["unknown"]] if value in Hash
   return ["array", ["unknown"]] if plain_array?(value)
+  return ["random"] if value in Random
   nil
 end
 
@@ -3596,6 +3626,9 @@ def evaluate_call(node, mutable bindings)
     outcome([render_inspect(slot_value(arguments))], bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
+  # The ambient generator (ADR 0064): the host's own `rand` and `srand`.
+  when "rand" then outcome([arguments.empty? ? rand : rand(value_at(arguments, 0))], bindings)
+  when "srand" then outcome([arguments.empty? ? srand : srand(value_at(arguments, 0))], bindings)
   when "panic"
     panic(slot_value(arguments))
   else

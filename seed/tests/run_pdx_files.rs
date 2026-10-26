@@ -2037,6 +2037,33 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
+/// Randomness, Ruby's both (ADR 0064), on both oracles: every seeded
+/// number CRuby's — `rand`, `rand(n)`, `rand(range)`, `shuffle` and
+/// `sample` with `random:`, `srand` — and the refusals of a generator's
+/// restrictive `rand` and a stray keyword.
+#[test]
+fn randomness_matches_cruby_on_both_oracles() {
+    assert_both_print(
+        "evaluator_random.pdx",
+        "dice = Random.new(42)\np((1..5).map { dice.rand(10) })\np(Random.new(42).rand)\np(Random.new(42).rand(1.5))\np(Random.new(42).rand(1..6))\np(Random.new(1099511627776).rand(10))\np(Random.new(-42).rand(10))\np(%w[a b c].shuffle(random: Random.new(1)))\np((0..10).to_a.shuffle(random: Random.new(10)))\np([1, 2, 3, 4, 5].sample(random: Random.new(42)))\np([1, 2, 3, 4, 5].sample(3, random: Random.new(42)))\np([1, 2, 3, 4, 5].sample(5, random: Random.new(42)))\nsrand(123)\np(%w[a b c d e f g h i j k].shuffle)\np(srand(7))\np(Random.new(42) == Random.new(42))\np(inspect(Random.new(42)))\np([].sample)\np(rand(1.5))\n",
+        "[6, 3, 7, 4, 6]\n0.3745401188473625\n0.5618101782710437\n4\n1\n6\n[\"a\", \"c\", \"b\"]\n[2, 6, 8, 5, 7, 10, 3, 1, 0, 4, 9]\n4\n[4, 1, 5]\n[4, 1, 5, 2, 3]\n[\"a\", \"e\", \"f\", \"h\", \"i\", \"j\", \"d\", \"b\", \"g\", \"k\", \"c\"]\n123\ntrue\n\"Random.new(42)\"\nnil\n0\n",
+    );
+    let cases = [
+        ("p(Random.new(42).rand(0))\n", "invalid argument - 0"),
+        ("p(Random.new(42).rand(-2.5))\n", "invalid argument - -2.5"),
+        (
+            "p([1, 2].shuffle(seed: 5))\n",
+            "'shuffle' takes one keyword, random:, got seed:",
+        ),
+        (
+            "p([1, 2].sample(random: 5))\n",
+            "'random:' takes a Random, got 5",
+        ),
+        ("p([1, 2].sample(-1))\n", "negative sample number"),
+    ];
+    assert_both_oracles_refuse("random_refusal.pdx", None, &cases);
+}
+
 /// A hash has no default (ADR 0063): `Hash.new` bare is `{}` on both
 /// oracles; a default value or block, and `default` and `default_proc`,
 /// refuse naming the or-guard.

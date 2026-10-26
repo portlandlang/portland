@@ -9,4 +9,5 @@ pub mod heredoc;
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+pub mod random;
 pub mod value;

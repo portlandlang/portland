@@ -60,6 +60,10 @@ pub enum Value {
         fields: Vec<(String, Value)>,
         name: String,
     },
+    /// A random number generator (ADR 0064): Ruby's MT19937, seeded, and
+    /// advancing as it is drawn from — the one value that moves, since a
+    /// generator that answered the same number twice would not be one.
+    Random(std::rc::Rc<std::cell::RefCell<crate::random::Mt>>),
 }
 
 /// Two strings are equal when they are the same *text*, not the same bytes
@@ -151,6 +155,9 @@ impl PartialEq for Value {
                     name: right_name,
                 },
             ) => left_name == right_name && left_fields == right_fields,
+            // Two generators are equal when seeded alike and drawn alike,
+            // as Ruby's are.
+            (Value::Random(left), Value::Random(right)) => *left.borrow() == *right.borrow(),
             _ => false,
         }
     }
@@ -290,6 +297,7 @@ impl Value {
             Value::Float(_) => Some("float"),
             Value::Hash(_) => Some("hash"),
             Value::Integer(_) => Some("integer"),
+            Value::Random(_) => Some("random"),
             Value::Range { .. } => Some("range"),
             Value::String(_) => Some("string"),
             Value::Symbol(_) => Some("symbol"),
@@ -308,6 +316,7 @@ impl Value {
             Value::Hash(_) => "Hash".to_string(),
             Value::Integer(_) => "Integer".to_string(),
             Value::Nil => "nil".to_string(),
+            Value::Random(_) => "Random".to_string(),
             Value::Range { .. } => "Range".to_string(),
             Value::String(_) => "String".to_string(),
             Value::Struct { name, .. } => name.clone(),
@@ -352,6 +361,9 @@ impl Value {
                 let inner: Vec<String> = elements.iter().map(|element| element.inspect()).collect();
                 format!("[{}]", inner.join(", "))
             }
+            // The spelling that builds one from the same seed; where it has
+            // been drawn from is not written, as Ruby's is not.
+            Value::Random(generator) => format!("Random.new({})", generator.borrow().seed),
             Value::Boolean(value) => value.to_string(),
             Value::EnumCase { name, payload } => {
                 let inner: Vec<String> = payload
@@ -476,6 +488,7 @@ impl fmt::Display for Value {
                 Ok(())
             }
             Value::Nil => write!(formatter, "nil"),
+            Value::Random(_) => write!(formatter, "{}", self.inspect()),
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::Failure(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),

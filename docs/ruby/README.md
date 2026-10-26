@@ -47,6 +47,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 - [The `%` literal family](percent-literals.md) — `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.
+- [Randomness](randomness.md) — `rand`, `srand`, `Random.new(seed)`, `sample`, and `shuffle` are Ruby's, and the generator is Ruby's step for step, so a seeded sequence is the same number in both languages.
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Redefinition](redefinition.md) — A top-level name is defined once — a second `def`, `struct`, `enum`, `trait`, `alias`, or constant of the same name refuses, and a builtin's name is never taken.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.

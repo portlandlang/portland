@@ -336,6 +336,16 @@ core/array/one_spec.rb:
   status: skipped
   reason: "Its examples grow the array mid-walk and pass a pattern beside a block; values never mutate, and one? takes a true-or-false block."
   link: docs/ruby/mutability.md
+core/array/sample_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "The fairness measurement, the mocks of rand and to_int, random: Random the class, and subclasses stay upstream; a negative count refuses where Ruby raises; a single sample is a maybe."
+  link: docs/ruby/randomness.md
+core/array/shuffle_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "The mocks of rand and to_int and random: Random the class stay upstream; values never mutate, so shuffle! stays behind too; the CRuby sequences are pinned by value."
+  link: docs/ruby/randomness.md
 core/array/rotate_spec.rb:
   pdx: [spec/array/positions_spec.pdx]
   status: partial_intentional
@@ -1826,6 +1836,56 @@ core/numeric/zero_spec.rb:
   status: skipped
   reason: "Every row drives a mock Numeric subclass through ==; there is no inheritance and no Numeric, and zero? is specced on Integer and Float."
   link: docs/ruby/mixins-and-inheritance.md
+
+# — core/random —
+# Ruby's both (ADR 0064): the ambient rand, srand, sample, and shuffle, and
+# the explicit Random.new(seed), drawing Ruby's own MT19937 step for step.
+
+core/random/new_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "Rationals and Complex wait on #124, so their seed rows stay upstream."
+  link: docs/ruby/randomness.md
+core/random/rand_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "Random.rand and Random.srand as class methods are the bare rand and srand here; bignum bounds (#156), float ranges (#149), the to_int mocks, and the custom range types stay upstream."
+  link: docs/ruby/randomness.md
+core/random/seed_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "The to_int mock stays upstream."
+  link: docs/ruby/randomness.md
+core/random/equal_value_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "Two generators are equal by seed and position, which is what the state rows ask without reaching into it."
+  link: docs/ruby/randomness.md
+core/random/srand_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "Random.srand is the bare srand here, and the arbitrary-seed rows compare two draws of entropy."
+  link: docs/ruby/randomness.md
+core/random/new_seed_spec.rb:
+  status: skipped
+  reason: "Random.new_seed is spelled Random.new.seed here (ADR 0064)."
+  link: docs/ruby/randomness.md
+core/random/default_spec.rb:
+  status: skipped
+  reason: "Random::DEFAULT is the ambient generator, which the bare rand, sample, and shuffle draw from (ADR 0064)."
+  link: docs/ruby/randomness.md
+core/random/bytes_spec.rb:
+  status: skipped
+  reason: "Random bytes wait on what a byte string is here (#119)."
+  link: https://github.com/portlandlang/portland/issues/119
+core/random/urandom_spec.rb:
+  status: skipped
+  reason: "The OS's entropy is where an unseeded generator's seed comes from; it is not a method (ADR 0064)."
+  link: docs/ruby/randomness.md
+core/random/random_number_spec.rb:
+  status: skipped
+  reason: "Random::Formatter is a mixin for byte sources (#119); its random_number is rand."
+  link: https://github.com/portlandlang/portland/issues/119
 
 # — core/range —
 

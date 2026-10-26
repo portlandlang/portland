@@ -1341,6 +1341,74 @@ fn bit_at(number: i64, position: i64) -> i64 {
     (number >> position) & 1
 }
 
+/// `Random.new(seed)` (ADR 0064): a generator seeded as Ruby seeds one — a
+/// float seed truncated, no seed drawn from entropy.
+fn random_new(arguments: &[Value]) -> Value {
+    let seed = match arguments {
+        [] => crate::random::entropy_seed(),
+        [Value::Integer(seed)] => *seed,
+        [Value::Float(seed)] => seed.trunc() as i64,
+        [other] => panic!("Random.new takes an integer seed, got {}", other.shown()),
+        _ => panic!("Random.new takes 0 or 1 argument, got {}", arguments.len()),
+    };
+    Value::Random(std::rc::Rc::new(std::cell::RefCell::new(
+        crate::random::Mt::new(seed),
+    )))
+}
+
+/// `rand(bound)` by Ruby's two rules (ADR 0064). A generator's own
+/// `rand` is restrictive: a bound of 0 or below refuses in Ruby's words. The
+/// bare `rand` is Kernel's: a float bound is truncated to an integer, 0
+/// falls back to a float in [0, 1), and a negative bound counts as its
+/// magnitude. A range draws an integer within it.
+fn random_rand(generator: &mut crate::random::Mt, bound: &Value, restrictive: bool) -> Value {
+    match bound {
+        Value::Range {
+            end,
+            exclusive,
+            start,
+        } => {
+            let (Some(start), Some(end)) = (start, end) else {
+                panic!("invalid argument - {}", bound.shown());
+            };
+            let last = if *exclusive { end - 1 } else { *end };
+            if last < *start {
+                panic!("invalid argument - {}", bound.shown());
+            }
+            let span = (last - start) as u64;
+            Value::Integer(start + generator.limited(span) as i64)
+        }
+        Value::Float(limit) if restrictive => {
+            if *limit < 0.0 {
+                panic!("invalid argument - {}", bound.shown());
+            }
+            if *limit == 0.0 {
+                panic!("invalid argument - {}", bound.shown());
+            }
+            Value::Float(limit * generator.real())
+        }
+        Value::Float(limit) => random_rand(generator, &Value::Integer(limit.trunc() as i64), false),
+        Value::Integer(limit) => {
+            let limit = if restrictive {
+                if *limit <= 0 {
+                    panic!("invalid argument - {limit}");
+                }
+                *limit
+            } else {
+                if *limit == 0 {
+                    return Value::Float(generator.real());
+                }
+                limit.abs()
+            };
+            Value::Integer(generator.limited(limit as u64 - 1) as i64)
+        }
+        other => panic!(
+            "rand takes a count, a float, or a range, got {}",
+            other.shown()
+        ),
+    }
+}
+
 /// `Hash.new` (ADR 0063): the empty hash, as a type function for migrating
 /// code (ADR 0058). A default value or block refuses naming the or-guard —
 /// a hash has no default here; a lookup answers a maybe.
@@ -2070,6 +2138,9 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     current_block: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
     /// What a gathering block has been yielded so far (#110).
     collected: Vec<Value>,
+    /// The ambient generator (ADR 0064): what bare `rand`, `sample`, and
+    /// `shuffle` draw from, seeded from entropy until `srand` reseeds it.
+    random: crate::random::Mt,
     enums: HashMap<String, EnumInfo>,
     structs: HashMap<String, StructInfo>,
     /// Method bundles waiting to be included (ADR 0028).
@@ -2159,6 +2230,7 @@ impl<W: std::io::Write> Interpreter<W> {
             self_receiver: None,
             current_block: None,
             collected: Vec::new(),
+            random: crate::random::Mt::new(crate::random::entropy_seed()),
             enums: HashMap::new(),
             structs: HashMap::new(),
             traits: HashMap::new(),
@@ -3197,7 +3269,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere.
                 if let Expression::Variable(type_name) = receiver.as_ref()
-                    && matches!(type_name.as_str(), "Array" | "Hash" | "Integer" | "Range")
+                    && matches!(
+                        type_name.as_str(),
+                        "Array" | "Hash" | "Integer" | "Random" | "Range"
+                    )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
                 {
@@ -3458,8 +3533,54 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Array", "new") => self.array_new(arguments, block),
             ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
+            ("Random", "new") => Some(random_new(&arguments)),
             ("Range", "new") => Some(range_new(&arguments)),
             _ => panic!("{type_name} has no {name}"),
+        }
+    }
+
+    /// `sample` and `shuffle` (ADR 0064), drawing from the generator named
+    /// by `random:` or, without one, from the ambient generator — CRuby's
+    /// walks, so a seeded answer is Ruby's. A single `sample` is a maybe:
+    /// an empty array has nothing to draw.
+    fn drawn_from(
+        &mut self,
+        elements: &[Value],
+        name: &str,
+        arguments: &[Value],
+        keyword_arguments: &[(String, Value)],
+    ) -> Value {
+        let mut named = None;
+        for (label, value) in keyword_arguments {
+            if label != "random" {
+                panic!("'{name}' takes one keyword, random:, got {label}:");
+            }
+            match value {
+                Value::Random(generator) => named = Some(generator.clone()),
+                other => panic!("'random:' takes a Random, got {}", other.shown()),
+            }
+        }
+        let draw = |generator: &mut crate::random::Mt| match (name, arguments) {
+            ("shuffle", []) => Value::array(crate::random::shuffled(elements, generator)),
+            ("sample", []) => {
+                if elements.is_empty() {
+                    Value::Nil
+                } else {
+                    let index = generator.upto(elements.len());
+                    Value::present(elements[index].clone())
+                }
+            }
+            ("sample", [Value::Integer(count)]) => {
+                let count =
+                    usize::try_from(*count).unwrap_or_else(|_| panic!("negative sample number"));
+                Value::array(crate::random::sampled(elements, count, generator))
+            }
+            ("sample", [other]) => panic!("sample takes a count, got {}", other.shown()),
+            _ => panic!("'{name}' takes 0 arguments, got {}", arguments.len()),
+        };
+        match named {
+            Some(generator) => draw(&mut generator.borrow_mut()),
+            None => draw(&mut self.random),
         }
     }
 
@@ -3884,6 +4005,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.current_block = outer;
                 return result;
             }
+        }
+        // `sample(random:)` and `shuffle(random:)` (ADR 0064): the one
+        // keyword a builtin takes, naming the generator to draw from.
+        if let Value::Array(elements) = &receiver
+            && matches!(name, "sample" | "shuffle")
+            && !keyword_arguments.is_empty()
+        {
+            let elements = elements.clone();
+            return Some(self.drawn_from(&elements, name, &arguments, &keyword_arguments));
         }
         if !keyword_arguments.is_empty() {
             panic!("keyword arguments are only for struct new, with, and struct methods so far");
@@ -5285,6 +5415,24 @@ impl<W: std::io::Write> Interpreter<W> {
             // An array already is one — the harmless end of Ruby's rule.
             (receiver @ Value::Array(_), "to_a" | "entries", []) => receiver.clone(),
             // Counts into a hash, keys in first-seen order.
+            // `sample` and `shuffle` from the ambient generator (ADR 0064);
+            // the `random:` keyword forms arrive through `drawn_from`.
+            (Value::Array(elements), "sample" | "shuffle", []) => {
+                let elements = elements.clone();
+                self.drawn_from(&elements, name, &[], &[])
+            }
+            (Value::Array(elements), "sample", [Value::Integer(_)]) => {
+                let elements = elements.clone();
+                self.drawn_from(&elements, name, &arguments, &[])
+            }
+            // A generator's own draws (ADR 0064): `rand` with no bound, a
+            // count, a float, or a range, and the seed it was built from.
+            (Value::Random(generator), "rand", []) => Value::Float(generator.borrow_mut().real()),
+            (Value::Random(generator), "rand", [bound]) => {
+                let mut generator = generator.borrow_mut();
+                random_rand(&mut generator, bound, true)
+            }
+            (Value::Random(generator), "seed", []) => Value::Integer(generator.borrow().seed),
             (Value::Array(elements), "tally", []) => {
                 let mut counts: Vec<(Value, i64)> = Vec::new();
                 for element in elements.iter() {
@@ -6239,9 +6387,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "p"
                 | "panic"
                 | "puts"
+                | "rand"
                 | "read_file"
                 | "require_relative"
                 | "some"
+                | "srand"
                 | "write_file"
         )
     }
@@ -6725,7 +6875,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // — the type predicate, pattern-flavored. No reflection API.
                 if matches!(
                     name.as_str(),
-                    "Array" | "Boolean" | "Hash" | "Integer" | "String"
+                    "Array" | "Boolean" | "Hash" | "Integer" | "Random" | "String"
                 ) {
                     if !pattern_fields.is_empty() {
                         panic!("the builtin type pattern {name} takes no fields");
@@ -6736,6 +6886,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Boolean", Value::Boolean(_))
                             | ("Hash", Value::Hash(_))
                             | ("Integer", Value::Integer(_))
+                            | ("Random", Value::Random(_))
                             | ("String", Value::String(_))
                     );
                     return if matched { Some(Vec::new()) } else { None };
@@ -6823,7 +6974,15 @@ impl<W: std::io::Write> Interpreter<W> {
     fn type_matches(&self, name: &str, subject: &Value) -> Option<bool> {
         if matches!(
             name,
-            "Array" | "Boolean" | "Float" | "Hash" | "Integer" | "Range" | "String" | "Symbol"
+            "Array"
+                | "Boolean"
+                | "Float"
+                | "Hash"
+                | "Integer"
+                | "Random"
+                | "Range"
+                | "String"
+                | "Symbol"
         ) {
             return Some(subject.type_name() == name);
         }
@@ -7124,6 +7283,27 @@ impl<W: std::io::Write> Interpreter<W> {
         // model exists; names and shapes are placeholders, not decisions.
         if self.lookup_method(name).is_none() {
             match (name, arguments.as_slice()) {
+                // The ambient generator (ADR 0064): Ruby's Kernel#rand, which
+                // takes a count, a float it truncates, or a range, and falls
+                // back to a float in [0, 1) for nothing or 0; `srand`
+                // reseeds it and answers the seed before.
+                ("rand", []) => return Some(Value::Float(self.random.real())),
+                ("rand", [bound]) => {
+                    let answer = random_rand(&mut self.random, bound, false);
+                    return Some(answer);
+                }
+                // Ruby reads `srand(0)` as "a fresh random seed", like no
+                // argument at all.
+                ("srand", []) | ("srand", [Value::Integer(0)]) => {
+                    let previous = self.random.seed;
+                    self.random = crate::random::Mt::new(crate::random::entropy_seed());
+                    return Some(Value::Integer(previous));
+                }
+                ("srand", [Value::Integer(seed)]) => {
+                    let previous = self.random.seed;
+                    self.random = crate::random::Mt::new(*seed);
+                    return Some(Value::Integer(previous));
+                }
                 ("argv", []) => {
                     let arguments = self
                         .arguments
