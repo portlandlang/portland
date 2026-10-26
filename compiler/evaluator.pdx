@@ -389,7 +389,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[argv failure inspect p panic puts rand read_file require_relative some srand write_file].include?(name)
+  %w[failure inspect p panic puts rand read_file require_relative some srand write_file].include?(name)
 end
 
 # The top of a file: no frame and no namespace around these bindings.
@@ -1617,7 +1617,7 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return outcome([Integer.sqrt(value_at(arguments, 0))], bindings)
   end
   # The floor's first member (ADR 0068): the guest's arguments, bound by the
-  # driver that started it, since the host's own `argv` is the driver's.
+  # driver that started it, since the host's own are the driver's.
   if type_name == "System" && node.name == "arguments"
     panic("System.arguments takes 0 arguments, got #{arguments.length}") unless arguments.empty?
     return outcome([arguments_of(bindings)], bindings)

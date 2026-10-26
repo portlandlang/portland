@@ -150,7 +150,7 @@ fn runs_mini_lexer_pdx() {
 }
 
 #[test]
-fn runs_word_count_pdx_with_argv() {
+fn runs_word_count_pdx_with_arguments() {
     let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .arg("tests/fixtures/word_count.pdx")
@@ -2403,8 +2403,8 @@ fn builtin_type_functions_match_ruby() {
 /// strings the program was started with, on both oracles — the hosted run
 /// is handed them after the program's own path, and answers the same list
 /// the seed does. Handed none, the list is empty; handed an argument, the
-/// member refuses by count. The bare `argv` placeholder still answers the
-/// same list on the seed until it retires; hosted it never did (#176).
+/// member refuses by count. The bare `argv` placeholder is retired, and
+/// names the member in its refusal on both oracles.
 #[test]
 fn system_arguments_on_both_oracles() {
     let sample = std::env::temp_dir().join("system_arguments.pdx");
@@ -2444,8 +2444,14 @@ fn system_arguments_on_both_oracles() {
                 "System.arguments takes 0 arguments, got 1",
             ),
             ("p(System)\n", "'System' is not defined"),
+            (
+                "p(argv)\n",
+                "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)",
+            ),
         ],
     );
+    // A local may wear the retired name; only the bare call is gone.
+    assert_both_print("argv_as_a_local.pdx", "argv = 3\np(argv)\n", "3\n");
 }
 
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking

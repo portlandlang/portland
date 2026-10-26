@@ -162,6 +162,8 @@ def retired_sentence(name)
   when "hash" then "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)"
   when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
   when "to_sym", "intern" then "'#{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
+  # Portland's own placeholder, retired when the floor module arrived.
+  when "argv" then "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)"
   else nil
   end
 end

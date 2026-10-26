@@ -2284,7 +2284,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    /// Command-line arguments exposed to the program via `argv()`.
+    /// Command-line arguments exposed to the program via `System.arguments`.
     /// The path of the file being run, for `require_relative` resolution.
     pub fn set_current_file(&mut self, path: std::path::PathBuf) {
         self.current_file = Some(path);
@@ -3596,7 +3596,7 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// The process's arguments as an array of strings — what `System.arguments`
-    /// answers, and the bare `argv` placeholder until it retires (ADR 0068).
+    /// answers (ADR 0068).
     fn process_arguments(&self) -> Value {
         let arguments = self
             .arguments
@@ -6535,8 +6535,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn builtin_name(name: &str) -> bool {
         matches!(
             name,
-            "argv"
-                | "failure"
+            "failure"
                 | "inspect"
                 | "p"
                 | "panic"
@@ -7458,7 +7457,6 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.random = crate::random::Mt::new(*seed);
                     return Some(Value::Integer(previous));
                 }
-                ("argv", []) => return Some(self.process_arguments()),
                 // The first fallible operations (ADR 0027): a failure comes
                 // back instead of a panic, and the caller decides. String
                 // payloads for now — struct payloads wait for library types.
@@ -8408,8 +8406,16 @@ end
     }
 
     #[test]
-    fn argv_is_empty_by_default() {
-        assert_eq!(evaluate("argv().length"), Some(Value::Integer(0)));
+    fn arguments_are_empty_by_default() {
+        assert_eq!(evaluate("System.arguments.length"), Some(Value::Integer(0)));
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)"
+    )]
+    fn argv_retired_names_its_member() {
+        evaluate("argv.length");
     }
 
     #[test]
@@ -9644,7 +9650,7 @@ end
 
     #[test]
     fn bare_builtins_resolve_too() {
-        assert_eq!(evaluate("argv.length"), Some(Value::Integer(0)));
+        assert_eq!(evaluate("inspect(7).length"), Some(Value::Integer(1)));
     }
 
     #[test]

@@ -139,6 +139,8 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         "to_sym" | "intern" => format!(
             "'{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
         ),
+        // Portland's own placeholder, retired when the floor module arrived.
+        "argv" => "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)".to_string(),
         _ => return None,
     };
     Some(sentence)

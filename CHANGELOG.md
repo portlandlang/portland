@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Bare `argv` retires** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, `argv` as a call refuses with `'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)`, the retired-spelling table's shape; a local may still wear the name. The seed's bare-builtin list loses its one host-touching entry.
+
 - **The drivers read `System.arguments`** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — `run.pdx`, `check.pdx`, `parse.pdx`, `tokenize.pdx`, `types.pdx`, the spec driver, the hosted evaluator's own read of the command line, and the `word_count` fixture no longer touch bare `argv`; a driver handed no file says so (`run.pdx: needs a file to run`) instead of failing on the read. Nothing in the repo calls `argv` now except its own tests, so it can retire.
 
 - **The self-parse tripwire is 45s** ([#180](https://github.com/portlandlang/portland/issues/180)) — the `macos-26` runner parses `parser.pdx` in 22–30s today against a 20s ceiling set when the file was half its length, and failed seven of ten runs on 2026-10-25, three of them docs-only; the ceiling is recalibrated to the measured numbers for that one case, every other shelled-out case keeping 20s. #180 holds the real question, where the time went.
