@@ -2454,6 +2454,38 @@ fn system_arguments_on_both_oracles() {
     assert_both_print("argv_as_a_local.pdx", "argv = 3\np(argv)\n", "3\n");
 }
 
+/// `System.read_file` (ADR 0068, #176): one whole file as a string, or a
+/// failure naming the path and the OS's reason (ADR 0027), on both oracles.
+/// The wrong count or kind of argument refuses naming it, where the bare
+/// placeholder only ever said the name was undefined.
+#[test]
+fn system_read_file_on_both_oracles() {
+    let haiku = std::env::temp_dir().join("system_read_file_haiku.txt");
+    std::fs::write(&haiku, "rose city\nteal carpet\n").unwrap();
+    let source = format!(
+        "p(System.read_file({haiku:?}))\np(System.read_file(\"/nonexistent/file.txt\"))\np(System.read_file(\"/nonexistent/file.txt\").failure?)\n"
+    );
+    assert_both_print(
+        "system_read_file.pdx",
+        &source,
+        "\"rose city\\nteal carpet\\n\"\nfailure(\"System.read_file \\\"/nonexistent/file.txt\\\": No such file or directory (os error 2)\")\ntrue\n",
+    );
+    assert_both_oracles_refuse(
+        "system_read_file_refusal.pdx",
+        None,
+        &[
+            (
+                "p(System.read_file)\n",
+                "System.read_file takes 1 argument, got 0",
+            ),
+            (
+                "p(System.read_file(1))\n",
+                "System.read_file takes a String, got 1",
+            ),
+        ],
+    );
+}
+
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
 /// its elements, extra elements dropped, as Ruby's does (4.0.6, the

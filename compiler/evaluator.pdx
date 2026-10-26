@@ -1622,6 +1622,14 @@ def evaluate_builtin_type_function(node, mutable bindings)
     panic("System.arguments takes 0 arguments, got #{arguments.length}") unless arguments.empty?
     return outcome([arguments_of(bindings)], bindings)
   end
+  # One whole file as a string, or a failure (ADR 0027) — the host's own
+  # crossing answers both, and both are plain values the guest can hold.
+  if type_name == "System" && node.name == "read_file"
+    panic("System.read_file takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    path = value_at(arguments, 0)
+    panic("System.read_file takes a String, got #{render_inspect(path)}") unless path in String
+    return outcome([System.read_file(path)], bindings)
+  end
   panic("System has no #{node.name}") if type_name == "System"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses

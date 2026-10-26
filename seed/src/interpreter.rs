@@ -1473,6 +1473,18 @@ fn hash_new(arguments: &[Value], with_block: bool) -> Value {
     }
 }
 
+/// `System.read_file` (ADR 0068): one whole file as a string, or a failure
+/// (ADR 0027) naming the path and the OS's reason. One crossing — open, read
+/// to the end, close — the coarse floor ADR 0064 drew.
+fn read_file_value(path: &str) -> Value {
+    match std::fs::read_to_string(path) {
+        Ok(content) => Value::String(content),
+        Err(error) => Value::Failure(Box::new(Value::String(format!(
+            "System.read_file {path:?}: {error}"
+        )))),
+    }
+}
+
 fn integer_sqrt(arguments: &[Value]) -> Value {
     let number = match arguments {
         [Value::Integer(number)] => *number,
@@ -3591,6 +3603,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 Some(self.process_arguments())
             }
+            ("System", "read_file") => match arguments.as_slice() {
+                [Value::String(path)] => Some(read_file_value(path)),
+                [other] => panic!("System.read_file takes a String, got {}", other.shown()),
+                _ => panic!("System.read_file takes 1 argument, got {}", arguments.len()),
+            },
             _ => panic!("{type_name} has no {name}"),
         }
     }
@@ -7460,14 +7477,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 // The first fallible operations (ADR 0027): a failure comes
                 // back instead of a panic, and the caller decides. String
                 // payloads for now — struct payloads wait for library types.
-                ("read_file", [Value::String(path)]) => {
-                    return Some(match std::fs::read_to_string(path) {
-                        Ok(content) => Value::String(content),
-                        Err(error) => Value::Failure(Box::new(Value::String(format!(
-                            "read_file {path:?}: {error}"
-                        )))),
-                    });
-                }
+                // The bare spelling rides `System.read_file`'s until it
+                // retires (ADR 0068).
+                ("read_file", [Value::String(path)]) => return Some(read_file_value(path)),
                 ("write_file", [Value::String(path), Value::String(content)]) => {
                     return match std::fs::write(path, content) {
                         Ok(()) => None,

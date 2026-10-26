@@ -1,0 +1,23 @@
+# `System.read_file` (ADR 0068): one whole file as a string, or a failure
+# (ADR 0027) the caller handles. Portland runs on macOS only, so `/dev/null`
+# is a file every run can read, and its content is always the empty string;
+# the two-oracle test in seed/tests reads a file with content in it.
+
+require_relative "../spec_helper"
+
+context "System.read_file" do
+  specify "answers a file's whole content as a string" do
+    expect(System.read_file("/dev/null")).to eq("")
+  end
+
+  specify "answers a failure for a file that cannot be read, naming the path" do
+    missing = System.read_file("/nonexistent/portland/file.txt")
+    expect(missing.failure?).to eq(true)
+    expect(inspect(missing)).to eq("failure(\"System.read_file \\\"/nonexistent/portland/file.txt\\\": No such file or directory (os error 2)\")")
+  end
+
+  specify "the or-guard takes the fallback on a failure" do
+    content = System.read_file("/nonexistent/portland/file.txt") or "fallback"
+    expect(content).to eq("fallback")
+  end
+end

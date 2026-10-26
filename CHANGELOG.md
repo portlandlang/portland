@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`System.read_file`, the floor's second member** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, one whole file as a string or a failure naming the path and the OS's reason, `System.read_file "/nope": No such file or directory (os error 2)`; the wrong count or kind of argument refuses naming it, where bare `read_file` only ever said the name was undefined. Bare `read_file` rides the same crossing, so its failure now names `System.read_file` too, until it retires. Pinned by a two-oracle test and `spec/system/read_file_spec.pdx`.
+
 - **Bare `argv` retires** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — on both implementations, `argv` as a call refuses with `'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)`, the retired-spelling table's shape; a local may still wear the name. The seed's bare-builtin list loses its one host-touching entry.
 
 - **The drivers read `System.arguments`** ([ADR 0068](docs/adr/0068-2026-10-25-system-is-the-floor-module.md), [#176](https://github.com/portlandlang/portland/issues/176)) — `run.pdx`, `check.pdx`, `parse.pdx`, `tokenize.pdx`, `types.pdx`, the spec driver, the hosted evaluator's own read of the command line, and the `word_count` fixture no longer touch bare `argv`; a driver handed no file says so (`run.pdx: needs a file to run`) instead of failing on the read. Nothing in the repo calls `argv` now except its own tests, so it can retire.
