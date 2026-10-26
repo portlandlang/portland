@@ -2037,7 +2037,25 @@ fn enumerable_runs_and_groups_match_ruby() {
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
 }
 
-/// Randomness, Ruby's both (ADR 0064), on both oracles: every seeded
+/// Pattern arguments take the `when` rule (ADR 0066), on both oracles, the
+/// expected lines Ruby 4.0.7's: a range covers, anything else asks `==`,
+/// through the predicates, grep, grep_v, and the slices; a pattern beside
+/// a block refuses.
+#[test]
+fn pattern_arguments_match_ruby_on_both_oracles() {
+    assert_both_print(
+        "evaluator_pattern_arguments.pdx",
+        "p([1, 2.0, 3].all?(1..3))\np([1, 2, 3].any?(2))\np([\"a\", \"b\"].grep(\"a\"))\np([1, 2, 3, 4, 5, 6, 7, 8].grep(3..7))\np([1, 2, 3, 4, 5, 6, 7, 8].grep(3..7) { |x| x + 1 })\np([1, 2, 3].grep_v(2))\np([1, 2, 3].grep_v(2) { |x| x * 10 })\np([7, 6, 5, 4, 3, 2, 1].slice_before(6))\np([7, 6, 5, 4, 3, 2, 1].slice_after(6))\np([7, 6, 5, 4, 3, 2, 1].slice_before(4..6))\np([1, 2, 3].none?(4..9))\np([1, 2, 2].one?(2))\np([].all?(1))\np([].one?(1))\np([:a, :b].grep(:a))\np({a: 1, b: 2}.any?([:a, 1]))\n",
+        "true\ntrue\n[\"a\"]\n[3, 4, 5, 6, 7]\n[4, 5, 6, 7, 8]\n[1, 3]\n[10, 30]\n[[7], [6, 5, 4, 3, 2, 1]]\n[[7, 6], [5, 4, 3, 2, 1]]\n[[7], [6], [5], [4, 3, 2, 1]]\ntrue\nfalse\ntrue\nfalse\n[:a]\ntrue\n",
+    );
+    let cases = [(
+        "p([1, 2].all?(1) { true })\n",
+        "'all?' takes a pattern or a block, not both",
+    )];
+    assert_both_oracles_refuse("pattern_argument_refusal.pdx", None, &cases);
+}
+
+/// Randomness, Ruby's both (ADR 0065), on both oracles: every seeded
 /// number CRuby's — `rand`, `rand(n)`, `rand(range)`, `shuffle` and
 /// `sample` with `random:`, `srand` — and the refusals of a generator's
 /// restrictive `rand` and a stray keyword.

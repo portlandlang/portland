@@ -1007,7 +1007,7 @@ end
 # The names Ruby's Enumerable gives a struct that defines `each` (#110),
 # as far as the array arms carry them — the seed's list.
 def enumerable_name?(name)
-  %w[all? any? chunk chunk_while collect collect_concat compact count cycle detect drop drop_while each_cons each_slice each_with_index entries filter filter_map find find_all find_index first flat_map group_by include? inject map max max_by member? min min_by minmax minmax_by none? one? partition reduce reject reverse_each select slice_after slice_before slice_when sort sort_by sum take take_while tally to_a to_h uniq zip].include?(name)
+  %w[all? any? chunk chunk_while collect collect_concat compact count cycle detect drop drop_while each_cons each_slice each_with_index entries filter filter_map find find_all find_index first flat_map grep grep_v group_by include? inject map max max_by member? min min_by minmax minmax_by none? one? partition reduce reject reverse_each select slice_after slice_before slice_when sort sort_by sum take take_while tally to_a to_h uniq zip].include?(name)
 end
 
 # The elements an Enumerable struct's own `each` yields (#110), gathered by
@@ -1626,7 +1626,7 @@ def evaluate_builtin_type_function(node, mutable bindings)
     panic("Hash.new takes no arguments, got #{arguments.length}")
   end
   return outcome([range_new(arguments)], bindings) if type_name == "Range" && node.name == "new"
-  # `Random.new(seed)` (ADR 0064): the host's generator, Ruby's MT19937.
+  # `Random.new(seed)` (ADR 0065): the host's generator, Ruby's MT19937.
   if type_name == "Random" && node.name == "new"
     return outcome([arguments.empty? ? Random.new : Random.new(value_at(arguments, 0))], bindings)
   end
@@ -2024,7 +2024,7 @@ def evaluate_method_call(node, mutable bindings)
     end
   end
   return evaluate_block_call(node, receiver, arguments, bindings) if node.block.some?
-  # `sample(random:)` and `shuffle(random:)` (ADR 0064): the one keyword a
+  # `sample(random:)` and `shuffle(random:)` (ADR 0065): the one keyword a
   # builtin takes, handed to the host's own.
   if plain_array?(receiver) && %w[sample shuffle].include?(node.name) && !keyword_values.empty?
     keyword_values.each do |pair|
@@ -2288,8 +2288,17 @@ def evaluate_method_call(node, mutable bindings)
   when "end" then receiver.end
   when "cover?" then receiver.cover?(value_at(arguments, 0))
   when "overlap?" then receiver.overlap?(value_at(arguments, 0))
-  # Bare `any?` on a hash asks whether it holds a pair (#105).
-  when "any?" then receiver.any?
+  # Bare `any?` on a hash asks whether it holds a pair (#105); with a
+  # pattern (ADR 0065), the predicates, grep, and the slices ask the
+  # host's `when` rule — a range covers, anything else asks `==`.
+  when "any?" then arguments.empty? ? receiver.any? : receiver.any?(value_at(arguments, 0))
+  when "all?" then receiver.all?(value_at(arguments, 0))
+  when "none?" then receiver.none?(value_at(arguments, 0))
+  when "one?" then receiver.one?(value_at(arguments, 0))
+  when "grep" then receiver.grep(value_at(arguments, 0))
+  when "grep_v" then receiver.grep_v(value_at(arguments, 0))
+  when "slice_before" then receiver.slice_before(value_at(arguments, 0))
+  when "slice_after" then receiver.slice_after(value_at(arguments, 0))
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))
   when "key" then receiver.key(value_at(arguments, 0))
   # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
@@ -2489,6 +2498,11 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   entry = scope
   block = node.block
   mutable interrupt = nil
+  # A pattern beside a block refuses (ADR 0066) rather than letting one
+  # silently win — the seed's sentence.
+  if %w[all? any? none? one? slice_before slice_after].include?(node.name) && !arguments.empty? && (plain_array?(receiver) || (receiver in Hash) || (receiver in Range))
+    panic("'#{node.name}' takes a pattern or a block, not both")
+  end
   # A struct's own method takes the block first (#110), as the seed's
   # dispatch order has it; its `yield` reaches the block.
   own = struct_method_for(receiver, node.name, scope)
@@ -3203,6 +3217,23 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       end
     end
     outcome([result], scope)
+  # `grep` and `grep_v` with a block (ADR 0065): the host picks the matches,
+  # the guest block answers for each. A pattern beside a block on the
+  # predicates refuses rather than letting one silently win.
+  when "grep", "grep_v"
+    matched = node.name == "grep" ? receiver.grep(value_at(arguments, 0)) : receiver.grep_v(value_at(arguments, 0))
+    results = matched.map do |element|
+      step = run_guest_block(block, [element], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+      panic("#{node.name} block produced no value") if step.value.empty?
+      slot_value(step.value)
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([results], scope)
   # Ruby's Enumerable over runs and groups (#110), each riding the host's
   # own arm by name so a refusal quotes the method written; a hash walks
   # as its pairs. `chunk` is written out, since a guest symbol is a tagged
@@ -3626,7 +3657,7 @@ def evaluate_call(node, mutable bindings)
     outcome([render_inspect(slot_value(arguments))], bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
-  # The ambient generator (ADR 0064): the host's own `rand` and `srand`.
+  # The ambient generator (ADR 0065): the host's own `rand` and `srand`.
   when "rand" then outcome([arguments.empty? ? rand : rand(value_at(arguments, 0))], bindings)
   when "srand" then outcome([arguments.empty? ? srand : srand(value_at(arguments, 0))], bindings)
   when "panic"

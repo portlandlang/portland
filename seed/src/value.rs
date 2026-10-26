@@ -60,7 +60,7 @@ pub enum Value {
         fields: Vec<(String, Value)>,
         name: String,
     },
-    /// A random number generator (ADR 0064): Ruby's MT19937, seeded, and
+    /// A random number generator (ADR 0065): Ruby's MT19937, seeded, and
     /// advancing as it is drawn from — the one value that moves, since a
     /// generator that answered the same number twice would not be one.
     Random(std::rc::Rc<std::cell::RefCell<crate::random::Mt>>),

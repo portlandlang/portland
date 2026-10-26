@@ -644,22 +644,22 @@ core/enumerable/compact_spec.rb:
 core/enumerable/all_spec.rb:
   pdx: [spec/enumerable/predicates_spec.pdx]
   status: partial_intentional
-  reason: "The block answers true or false, so the blockless and the 5-or-nil rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  reason: "The block answers true or false, so the blockless and the 5-or-nil rows stay behind; a pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
   link: docs/ruby/truthiness.md
 core/enumerable/any_spec.rb:
   pdx: [spec/enumerable/predicates_spec.pdx]
   status: partial_intentional
-  reason: "The block answers true or false, so the blockless and the 0-or-1 rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  reason: "The block answers true or false, so the blockless and the 0-or-1 rows stay behind; a pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
   link: docs/ruby/truthiness.md
 core/enumerable/none_spec.rb:
   pdx: [spec/enumerable/predicates_spec.pdx]
   status: partial_intentional
-  reason: "The block answers true or false, so the blockless rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  reason: "The block answers true or false, so the blockless rows stay behind; a pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
   link: docs/ruby/truthiness.md
 core/enumerable/one_spec.rb:
   pdx: [spec/enumerable/predicates_spec.pdx]
   status: partial_intentional
-  reason: "The block answers true or false, so the blockless rows stay behind; the pattern argument waits on #171; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
+  reason: "The block answers true or false, so the blockless rows stay behind; a pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; no exceptions, no splat parameter, and a one-parameter block sees the packed array."
   link: docs/ruby/truthiness.md
 core/enumerable/count_spec.rb:
   pdx: [spec/enumerable/predicates_spec.pdx]
@@ -784,12 +784,12 @@ core/enumerable/slice_when_spec.rb:
 core/enumerable/slice_before_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
   status: partial_intentional
-  reason: "slice_before answers its runs as an array (ADR 0055); the pattern argument waits on #171, so the mocked === rows stay behind."
+  reason: "slice_before answers its runs as an array (ADR 0055); a pattern argument takes the when rule (ADR 0066), so the mocked === rows stay behind."
   link: docs/ruby/enumerators.md
 core/enumerable/slice_after_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
   status: partial_intentional
-  reason: "slice_after answers its runs as an array (ADR 0055); the pattern argument waits on #171, so the mocked === rows stay behind."
+  reason: "slice_after answers its runs as an array (ADR 0055); a pattern argument takes the when rule (ADR 0066), so the mocked === rows stay behind."
   link: docs/ruby/enumerators.md
 core/enumerable/chain_spec.rb:
   status: skipped
@@ -808,13 +808,15 @@ core/enumerable/each_with_object_spec.rb:
   reason: "each_with_object exists to mutate its memo; values never mutate (ADR 0015), so inject with a seed is the spelling."
   link: docs/ruby/mutability.md
 core/enumerable/grep_spec.rb:
-  status: skipped
-  reason: "grep takes a pattern, asking ===; the pattern argument waits on #171, and the regex rows on #74."
-  link: https://github.com/portlandlang/portland/issues/171
+  pdx: [spec/enumerable/grep_spec.pdx]
+  status: partial_intentional
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks and grep(Object) stay behind, a type not being a value; the regex and $~ rows wait on #74."
+  link: docs/ruby/pattern-matching.md
 core/enumerable/grep_v_spec.rb:
-  status: skipped
-  reason: "grep_v takes a pattern, asking ===; the pattern argument waits on #171, and the regex rows on #74."
-  link: https://github.com/portlandlang/portland/issues/171
+  pdx: [spec/enumerable/grep_spec.pdx]
+  status: partial_intentional
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; the regex and $~ rows wait on #74."
+  link: docs/ruby/pattern-matching.md
 core/enumerable/to_set_spec.rb:
   status: skipped
   reason: "There is no Set to answer yet (#123)."
@@ -1838,7 +1840,7 @@ core/numeric/zero_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 
 # — core/random —
-# Ruby's both (ADR 0064): the ambient rand, srand, sample, and shuffle, and
+# Ruby's both (ADR 0065): the ambient rand, srand, sample, and shuffle, and
 # the explicit Random.new(seed), drawing Ruby's own MT19937 step for step.
 
 core/random/new_spec.rb:
@@ -1868,11 +1870,11 @@ core/random/srand_spec.rb:
   link: docs/ruby/randomness.md
 core/random/new_seed_spec.rb:
   status: skipped
-  reason: "Random.new_seed is spelled Random.new.seed here (ADR 0064)."
+  reason: "Random.new_seed is spelled Random.new.seed here (ADR 0065)."
   link: docs/ruby/randomness.md
 core/random/default_spec.rb:
   status: skipped
-  reason: "Random::DEFAULT is the ambient generator, which the bare rand, sample, and shuffle draw from (ADR 0064)."
+  reason: "Random::DEFAULT is the ambient generator, which the bare rand, sample, and shuffle draw from (ADR 0065)."
   link: docs/ruby/randomness.md
 core/random/bytes_spec.rb:
   status: skipped
@@ -1880,7 +1882,7 @@ core/random/bytes_spec.rb:
   link: https://github.com/portlandlang/portland/issues/119
 core/random/urandom_spec.rb:
   status: skipped
-  reason: "The OS's entropy is where an unseeded generator's seed comes from; it is not a method (ADR 0064)."
+  reason: "The OS's entropy is where an unseeded generator's seed comes from; it is not a method (ADR 0065)."
   link: docs/ruby/randomness.md
 core/random/random_number_spec.rb:
   status: skipped

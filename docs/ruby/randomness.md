@@ -2,7 +2,7 @@
 
 **Summary:** `rand`, `srand`, `Random.new(seed)`, `sample`, and `shuffle` are Ruby's, and the generator is Ruby's step for step, so a seeded sequence is the same number in both languages.
 
-**Status:** decided ([ADR 0064](../adr/0064-2026-10-25-randomness-rubys-both.md), 2026-10-25, out of [#169](https://github.com/portlandlang/portland/issues/169)). Built in the seed and the compiler, differentially pinned against CRuby's sequences.
+**Status:** decided ([ADR 0065](../adr/0065-2026-10-25-randomness-rubys-both.md), 2026-10-25, out of [#169](https://github.com/portlandlang/portland/issues/169)). Built in the seed and the compiler, differentially pinned against CRuby's sequences.
 
 ## Ruby
 

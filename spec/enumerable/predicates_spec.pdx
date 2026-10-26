@@ -311,3 +311,89 @@ context "Enumerable#find_index" do
     end
   end
 end
+
+# The pattern argument (ADR 0066): the `when` rule on each element — a
+# range covers a number, anything else asks `==`. From the "when given a
+# pattern argument" rows of all, any, none, and one; the `===` mocks, the
+# type-name patterns (a type is not a value here), and the ignored block
+# stay behind — a pattern beside a block refuses instead.
+context "Enumerable#all? when given a pattern argument" do
+  specify "always returns true on empty enumeration" do
+    expect(Empty.new.all?(1..9)).to be_true
+    expect([].all?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns false or nil" do
+    expect(numerous(DEFAULT).all?(1..6)).to be_true
+    expect([1, 42, 3].all?(1..42)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns false or nil" do
+    expect(numerous([0, 1, 2, -1]).all?(0..9)).to be_false
+    expect([1, 2, 3, -1].all?(0..9)).to be_false
+  end
+
+  specify "calls the pattern with gathered array when yielded with multiple arguments" do
+    expect(YieldsMulti.new.any?([1, 2])).to be_true
+    expect(YieldsMulti.new.all?([1, 2])).to be_false
+  end
+end
+
+context "Enumerable#any? when given a pattern argument" do
+  specify "always returns false on empty enumeration" do
+    expect(Empty.new.any?(1..9)).to be_false
+    expect([].any?(1..9)).to be_false
+  end
+
+  specify "returns true if the pattern ever returns a truthy value" do
+    expect(numerous([0, 1, 2, -1]).any?(2)).to be_true
+    expect([1, 42, 3].any?(42)).to be_true
+    expect({a: 1, b: 2}.any?([:b, 2])).to be_true
+  end
+
+  specify "returns false if the block never returns other than false or nil" do
+    expect(numerous([0, 1, 2, -1]).any?(7..9)).to be_false
+    expect([1, 2, 3].any?(9)).to be_false
+    expect({a: 1}.any?([:b, 1])).to be_false
+  end
+end
+
+context "Enumerable#none? when given a pattern argument" do
+  specify "always returns true on empty enumeration" do
+    expect(Empty.new.none?(1..9)).to be_true
+    expect([].none?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns a truthy value" do
+    expect(numerous([0, 1, 2, -1]).none?(3)).to be_true
+    expect([1, 42, 3].none?(50..60)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns other than false or nil" do
+    expect(numerous([0, 1, 2, -1]).none?(-9..-1)).to be_false
+    expect([1, 2, 3, -1].none?(-1)).to be_false
+  end
+end
+
+context "Enumerable#one? when given a pattern argument" do
+  specify "always returns false on empty enumeration" do
+    expect(Empty.new.one?(1..9)).to be_false
+    expect([].one?(1..9)).to be_false
+  end
+
+  specify "returns true if the pattern returns a truthy value only once" do
+    expect(numerous([0, 1, 2, -1]).one?(1)).to be_true
+    expect([1, 2, 42, 3].one?(42)).to be_true
+    expect({a: 1, b: 2}.one?([:b, 2])).to be_true
+  end
+
+  specify "returns false if the pattern returns a truthy value more than once" do
+    expect([1, 2, 3].one?(1..3)).to be_false
+    expect({a: 1, b: 2}.one?([:a, 1])).to be_true
+  end
+
+  specify "returns false if the pattern never returns a truthy value" do
+    expect(numerous([0, 1, 2, -1]).one?(9)).to be_false
+    expect([1, 2, 3].one?(7..9)).to be_false
+  end
+end

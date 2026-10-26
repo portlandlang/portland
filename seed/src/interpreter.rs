@@ -126,6 +126,8 @@ fn enumerable_name(name: &str) -> bool {
             | "find_index"
             | "first"
             | "flat_map"
+            | "grep"
+            | "grep_v"
             | "group_by"
             | "include?"
             | "inject"
@@ -407,6 +409,48 @@ fn range_covers(start: Option<i64>, end: Option<i64>, exclusive: bool, probe: f6
         }
     });
     above && below
+}
+
+/// A pattern argument's match (ADR 0065): the `when` rule applied to a
+/// value — a range covers a number, anything else asks `==`.
+fn pattern_matches(pattern: &Value, element: &Value) -> bool {
+    match (pattern, element) {
+        (
+            Value::Range {
+                end,
+                exclusive,
+                start,
+            },
+            Value::Integer(_) | Value::Float(_),
+        ) => range_covers(*start, *end, *exclusive, as_float(element)),
+        (Value::Range { .. }, _) => false,
+        _ => pattern.ruby_equals(element),
+    }
+}
+
+/// Ruby's slice_before and slice_after by a pattern (ADR 0065): runs cut
+/// before, or after, each element the pattern matches.
+fn sliced_runs(elements: &[Value], before: bool, pattern: &Value) -> Vec<Value> {
+    let mut runs: Vec<Vec<Value>> = Vec::new();
+    let mut open = false;
+    for element in elements.iter().cloned() {
+        let matched = pattern_matches(pattern, &element);
+        if before {
+            if matched || runs.is_empty() {
+                runs.push(vec![element]);
+            } else {
+                runs.last_mut().expect("a run exists").push(element);
+            }
+        } else {
+            if open {
+                runs.last_mut().expect("a run exists").push(element);
+            } else {
+                runs.push(vec![element]);
+            }
+            open = !matched;
+        }
+    }
+    runs.into_iter().map(Value::array).collect()
 }
 
 fn split_value(text: &str, separator: Option<&str>, limit: i64) -> Value {
@@ -1341,7 +1385,7 @@ fn bit_at(number: i64, position: i64) -> i64 {
     (number >> position) & 1
 }
 
-/// `Random.new(seed)` (ADR 0064): a generator seeded as Ruby seeds one — a
+/// `Random.new(seed)` (ADR 0065): a generator seeded as Ruby seeds one — a
 /// float seed truncated, no seed drawn from entropy.
 fn random_new(arguments: &[Value]) -> Value {
     let seed = match arguments {
@@ -1356,7 +1400,7 @@ fn random_new(arguments: &[Value]) -> Value {
     )))
 }
 
-/// `rand(bound)` by Ruby's two rules (ADR 0064). A generator's own
+/// `rand(bound)` by Ruby's two rules (ADR 0065). A generator's own
 /// `rand` is restrictive: a bound of 0 or below refuses in Ruby's words. The
 /// bare `rand` is Kernel's: a float bound is truncated to an integer, 0
 /// falls back to a float in [0, 1), and a negative bound counts as its
@@ -2138,7 +2182,7 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     current_block: Option<std::rc::Rc<std::cell::RefCell<HandedBlock>>>,
     /// What a gathering block has been yielded so far (#110).
     collected: Vec<Value>,
-    /// The ambient generator (ADR 0064): what bare `rand`, `sample`, and
+    /// The ambient generator (ADR 0065): what bare `rand`, `sample`, and
     /// `shuffle` draw from, seeded from entropy until `srand` reseeds it.
     random: crate::random::Mt,
     enums: HashMap<String, EnumInfo>,
@@ -3539,7 +3583,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    /// `sample` and `shuffle` (ADR 0064), drawing from the generator named
+    /// `sample` and `shuffle` (ADR 0065), drawing from the generator named
     /// by `random:` or, without one, from the ambient generator — CRuby's
     /// walks, so a seeded answer is Ruby's. A single `sample` is a maybe:
     /// an empty array has nothing to draw.
@@ -4006,7 +4050,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 return result;
             }
         }
-        // `sample(random:)` and `shuffle(random:)` (ADR 0064): the one
+        // `sample(random:)` and `shuffle(random:)` (ADR 0065): the one
         // keyword a builtin takes, naming the generator to draw from.
         if let Value::Array(elements) = &receiver
             && matches!(name, "sample" | "shuffle")
@@ -4946,6 +4990,32 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(results))
                 }
+                // `grep` and `grep_v` with a block (ADR 0065): the matches
+                // handed over, their answers gathered. A pattern beside a
+                // block on the predicates refuses rather than letting one
+                // silently win, as Ruby's warning-then-pattern does.
+                (Value::Array(elements), "grep" | "grep_v", [pattern]) => {
+                    let wanted = name == "grep";
+                    let mut results = Vec::new();
+                    for element in elements.iter().cloned() {
+                        if pattern_matches(pattern, &element) != wanted {
+                            continue;
+                        }
+                        let result = self.run_block(block, vec![element]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        results.push(
+                            result.unwrap_or_else(|| panic!("{name} block produced no value")),
+                        );
+                    }
+                    Some(Value::array(results))
+                }
+                (
+                    Value::Array(_),
+                    "all?" | "any?" | "none?" | "one?" | "slice_before" | "slice_after",
+                    [_],
+                ) => panic!("'{name}' takes a pattern or a block, not both"),
                 // Ruby's filter_map (#110): the block's answers, less nil
                 // and false — Ruby's cut, a nil meaning "skip this one".
                 (Value::Array(elements), "filter_map", []) => {
@@ -5415,7 +5485,68 @@ impl<W: std::io::Write> Interpreter<W> {
             // An array already is one — the harmless end of Ruby's rule.
             (receiver @ Value::Array(_), "to_a" | "entries", []) => receiver.clone(),
             // Counts into a hash, keys in first-seen order.
-            // `sample` and `shuffle` from the ambient generator (ADR 0064);
+            // Ruby's pattern arguments (ADR 0065): the `when` rule on each
+            // element — a range covers, anything else asks `==`.
+            (Value::Array(elements), "all?", [pattern]) => Value::Boolean(
+                elements
+                    .iter()
+                    .all(|element| pattern_matches(pattern, element)),
+            ),
+            (Value::Array(elements), "any?", [pattern]) => Value::Boolean(
+                elements
+                    .iter()
+                    .any(|element| pattern_matches(pattern, element)),
+            ),
+            (Value::Array(elements), "none?", [pattern]) => Value::Boolean(
+                !elements
+                    .iter()
+                    .any(|element| pattern_matches(pattern, element)),
+            ),
+            (Value::Array(elements), "one?", [pattern]) => Value::Boolean(
+                elements
+                    .iter()
+                    .filter(|element| pattern_matches(pattern, element))
+                    .count()
+                    == 1,
+            ),
+            (Value::Array(elements), "grep", [pattern]) => Value::array(
+                elements
+                    .iter()
+                    .filter(|element| pattern_matches(pattern, element))
+                    .cloned()
+                    .collect(),
+            ),
+            (Value::Array(elements), "grep_v", [pattern]) => Value::array(
+                elements
+                    .iter()
+                    .filter(|element| !pattern_matches(pattern, element))
+                    .cloned()
+                    .collect(),
+            ),
+            (Value::Array(elements), "slice_before" | "slice_after", [pattern]) => {
+                Value::array(sliced_runs(elements, name == "slice_before", pattern))
+            }
+            // A hash walks its pairs for the pattern forms, as for the rest
+            // of Ruby's Enumerable (#105).
+            (
+                Value::Hash(pairs),
+                "all?" | "any?" | "none?" | "one?" | "grep" | "grep_v" | "slice_before"
+                | "slice_after",
+                [pattern],
+            ) => {
+                let elements: Vec<Value> = pairs
+                    .iter()
+                    .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
+                    .collect();
+                return self.method_call(
+                    Value::array(elements),
+                    name,
+                    vec![pattern.clone()],
+                    Vec::new(),
+                    None,
+                );
+            }
+            // `sample` and `shuffle` from the ambient generator (ADR 0065);
             // the `random:` keyword forms arrive through `drawn_from`.
             (Value::Array(elements), "sample" | "shuffle", []) => {
                 let elements = elements.clone();
@@ -5425,7 +5556,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 let elements = elements.clone();
                 self.drawn_from(&elements, name, &arguments, &[])
             }
-            // A generator's own draws (ADR 0064): `rand` with no bound, a
+            // A generator's own draws (ADR 0065): `rand` with no bound, a
             // count, a float, or a range, and the seed it was built from.
             (Value::Random(generator), "rand", []) => Value::Float(generator.borrow_mut().real()),
             (Value::Random(generator), "rand", [bound]) => {
@@ -7283,7 +7414,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // model exists; names and shapes are placeholders, not decisions.
         if self.lookup_method(name).is_none() {
             match (name, arguments.as_slice()) {
-                // The ambient generator (ADR 0064): Ruby's Kernel#rand, which
+                // The ambient generator (ADR 0065): Ruby's Kernel#rand, which
                 // takes a count, a float it truncates, or a range, and falls
                 // back to a float in [0, 1) for nothing or 0; `srand`
                 // reseeds it and answers the seed before.

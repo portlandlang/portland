@@ -1,4 +1,4 @@
-# Randomness (ADR 0064): Ruby's both — the ambient `rand`, `srand`,
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
 # `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
 # Ruby's generator step for step, so every seeded number here is the one
 # CRuby draws.

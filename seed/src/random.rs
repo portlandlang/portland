@@ -1,4 +1,4 @@
-//! Ruby's random number generator, step for step (ADR 0064): MT19937 as
+//! Ruby's random number generator, step for step (ADR 0065): MT19937 as
 //! `random.c` seeds and draws it, so a seeded sequence here is the one
 //! Ruby would produce — `Random.new(42).rand(10)` is 6 in both, and
 //! `shuffle(random: Random.new(1))` lands the same order. The limited

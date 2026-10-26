@@ -1,0 +1,87 @@
+# `grep` and `grep_v` (ADR 0066): a pattern argument matches the way a
+# `when` clause would — a range covers a number, anything else asks `==` —
+# so `grep(pattern)` is `select` under that rule, `grep(pattern) { }` is
+# `filter_map`, and `grep_v` the complement.
+#
+# From ruby/spec core/enumerable/{grep,grep_v}_spec.rb. What stays behind:
+# the mocks defining `===`, the regex rows and the `$~` rows (#74), and
+# `grep(Object)`, since a type is not a value here.
+
+require_relative "../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+
+def numerous(list) = Numerous.new(list: list)
+
+context "Enumerable#grep" do
+  evens = numerous([2, 4, 6, 8, 10])
+
+  specify "grep without a block should return an array of all elements === pattern" do
+    expect(numerous(["2", "a", "nil", "3", false]).grep("2")).to eq(["2"])
+  end
+
+  specify "grep the enumerable (rubycon legacy)" do
+    expect(numerous([]).grep(1)).to eq([])
+    expect(evens.grep(3..7)).to eq([4, 6])
+    expect(evens.grep(3..7) { |item| item + 1 }).to eq([5, 7])
+  end
+
+  specify "correctly handles non-string elements" do
+    expect([:a, "b", "z", :c, 42, nil].grep(:a)).to eq([:a])
+  end
+
+  describe "with a block" do
+    digits = numerous((0..9).to_a)
+
+    specify "returns an Array of matched elements that mapped by the block" do
+      expect(digits.grep(1..9) { |item| item * 2 }).to eq([2, 4, 6, 8, 10, 12, 14, 16, 18])
+    end
+
+    specify "calls the block with gathered array when yielded with multiple arguments" do
+      expect(YieldsMulti.new.grep([3, 4, 5]) { |item| item }).to eq([[3, 4, 5]])
+    end
+  end
+end
+
+context "Enumerable#grep_v" do
+  digits = numerous((0..9).to_a)
+
+  describe "without block" do
+    specify "returns an Array of matched elements" do
+      expect(digits.grep_v(5..9)).to eq([0, 1, 2, 3, 4])
+      expect(digits.grep_v(3)).to eq([0, 1, 2, 4, 5, 6, 7, 8, 9])
+    end
+
+    specify "compares pattern with gathered array when yielded with multiple arguments" do
+      expect(YieldsMulti.new.grep_v([3, 4, 5])).to eq([[1, 2], [6, 7, 8, 9]])
+    end
+  end
+
+  describe "with block" do
+    specify "returns an Array of matched elements that mapped by the block" do
+      expect(digits.grep_v(5..9) { |item| item * 2 }).to eq([0, 2, 4, 6, 8])
+    end
+
+    specify "calls the block with gathered array when yielded with multiple arguments" do
+      expect(YieldsMulti.new.grep_v([3, 4, 5]) { |item| item }).to eq([[1, 2], [6, 7, 8, 9]])
+    end
+  end
+end

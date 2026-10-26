@@ -34,6 +34,10 @@ What changes from Ruby:
 - `pair => [a, b]` is Portland's destructuring; `a, b = pair` multiple assignment stays out.
 - A block's parameters spread a yielded array as Ruby's do — `pairs.each { |key, value| }` — with one difference ([ADR 0057](../adr/0057-2026-10-16-block-parameters-spread-a-yielded-array.md)): where Ruby fills a parameter the array cannot with nil, Portland refuses, naming the array and the count. `|(a, b), c|` nesting waits for a pull.
 
+## Pattern arguments
+
+Ruby's Enumerable takes a pattern where it also takes a block — `all?(1..3)`, `any?(2)`, `none?`, `one?`, `grep(3..7)`, `grep_v`, `slice_before(pattern)`, `slice_after(pattern)` — asking `pattern === element`. Here they take one too ([ADR 0066](../adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md)), under the `when` rule: a range covers a number, anything else asks `==`. `grep(3..7) { it + 1 }` is `filter_map` under that rule. A pattern beside a block refuses — `'all?' takes a pattern or a block, not both` — and a type name is not a pattern argument, since a type is not a value: `all? { it in Integer }` is the spelling. A regex pattern waits on [#74](https://github.com/portlandlang/portland/issues/74).
+
 ## Migration
 
 - `case/in` code compiles verbatim where patterns are the supported set; non-exhaustive matches become compile errors naming the missing case — loud, never silent, and strictly fewer runtime crashes.

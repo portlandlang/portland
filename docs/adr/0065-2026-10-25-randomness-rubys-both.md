@@ -1,4 +1,4 @@
-# 0064 — Randomness: Ruby's both, step for step
+# 0065 — Randomness: Ruby's both, step for step
 
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 against the recommendation in [#169](https://github.com/portlandlang/portland/issues/169), choosing its option 2; built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
