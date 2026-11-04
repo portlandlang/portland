@@ -2,7 +2,9 @@
 
 **Summary:** `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` answer what Ruby's json gem answers, byte for byte — `null` is `nil`, keys are strings or (with `symbolize_names: true`) symbols, duplicate keys and bad documents are failures in Ruby's sentences — with two loud differences: a struct does not silently stringify, and a number past 64 bits is a failure rather than a bignum.
 
-**Status:** decided ([ADR 0072](../adr/0072-2026-11-03-json-is-core-written-twice.md), 2026-11-03, out of [#182](https://github.com/portlandlang/portland/issues/182)); not yet built — #182 is the build issue. Core, no `require`; written in Rust in the seed and in Portland on the compiler side.
+**Status:** decided ([ADR 0072](../adr/0072-2026-11-03-json-is-core-written-twice.md), 2026-11-03, out of [#182](https://github.com/portlandlang/portland/issues/182)) and built the same day on both implementations, differentially pinned: the seed's hand-written `json.rs` and the compiler's `json.pdx`, the first library written in Portland. Core, no `require`. Verified against Ruby 4.0.7 with json 3.1.0; the probes are in #182.
+
+Three small prints to know about. The gem's float writer takes its digits from Grisu2, which is not always the shortest spelling; Portland takes the shortest, so a rare float may print a digit shorter here than there, and every other spelling (`1e+20`, `0.00000015`, `100.0`) is the gem's. The gem's error fragment is the raw C string when the text starts with a space, tab, newline, or NUL — nothing for a NUL, everything up to one otherwise, unquoted — and so is Portland's, `invalid ASCII control character in string: \tb" at line 1 column 3`. And `generate`'s nesting failure keeps the gem's whole sentence, `nesting of 101 is too deep. Did you try to serialize objects with circular references?`, although no Portland value can be circular.
 
 ## Ruby
 

@@ -1,6 +1,6 @@
 # 0072 — JSON is core, written twice: `null` is `nil`, keys may be symbols, Ruby's answers byte for byte
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03 on the recommendations in [#182](https://github.com/portlandlang/portland/issues/182); recorded, not built — the build is [#182](https://github.com/portlandlang/portland/issues/182))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03 on the recommendations in [#182](https://github.com/portlandlang/portland/issues/182); built on both implementations 2026-11-03 under [#182](https://github.com/portlandlang/portland/issues/182), with the json gem's Grisu2 digits taken as the shortest spelling instead — see [json.md](../ruby/json.md))
 - **Date:** 2026-11-03
 - **Issue:** [#182](https://github.com/portlandlang/portland/issues/182)
 - **Amends:** [ADR 0064](0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) decision 5 — the `serde_json` loan is not taken

@@ -17,6 +17,9 @@ require_relative "paths"
 # The renderer's helpers (ADR 0047) — the runtime rows of its sentences
 # are spelled with the same quoting, article, and truncation as the build's.
 require_relative "refusals"
+# JSON is core, written twice (ADR 0072): the Portland twin the hosted
+# evaluator runs for `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate`.
+require_relative "json"
 
 # signal is "none", or an unwinding "break" / "next" / "return"
 # (a return's value rides in the value slot). A return also carries the
@@ -1047,6 +1050,88 @@ end
 def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
 
 # What a symbol's name answers for one of its text queries (#112).
+# `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` (ADR 0072), run
+# by the Portland twin in json.pdx rather than the host's arms, so the
+# differential suite compares two implementations. The twin speaks plain
+# values; a guest's symbols are tagged arrays here, so the document's
+# symbols become tags on the way out and a guest's become symbols on the
+# way in — which `to_sym` (ADR 0071) made possible.
+def evaluate_json(node, mutable bindings)
+  mutable arguments = []
+  mutable symbolize_names = false
+  node.arguments.each do |argument|
+    if argument in KeywordArgumentNode
+      panic("JSON.#{node.name} takes no keyword arguments, got #{argument.label}:") unless node.name == "parse"
+      panic("JSON.parse does not take #{argument.label}: yet — symbolize_names: is its one keyword (ADR 0072)") unless argument.label == "symbolize_names"
+      step = evaluate_expression(argument.value, bindings)
+      bindings = step.bindings
+      flag = slot_value(step.value)
+      panic("JSON.parse takes true or false for symbolize_names:, got #{render_inspect(flag)}") unless flag in Boolean
+      symbolize_names = flag
+    else
+      step = evaluate_expression(argument, bindings)
+      bindings = step.bindings
+      arguments << slot_value(step.value)
+    end
+  end
+  panic("JSON.#{node.name} takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+  argument = value_at(arguments, 0)
+  case node.name
+  when "parse"
+    panic("no implicit conversion of #{json_type_label(argument)} into String") unless argument in String
+    outcome([json_guest_value(json_parse(argument, symbolize_names))], bindings)
+  when "generate"         then outcome([json_generate(json_host_value(argument))], bindings)
+  when "pretty_generate"  then outcome([json_pretty_generate(json_host_value(argument))], bindings)
+  else panic("JSON has no #{node.name}")
+  end
+end
+
+# A guest value's type as Ruby's conversion refusal names it.
+def json_type_label(value)
+  return "nil" if value.nil?
+  return "Symbol" if value in ["__symbol__", *]
+  return value_at(value, 1) if value in ["__struct__", *]
+  return ":#{value_at(value, 1)}" if value in ["__enum_case__", *]
+  return "Array" if plain_array?(value)
+  case value
+  in Integer then "Integer"
+  in Float   then "Float"
+  in Boolean then "Boolean"
+  in Hash    then "Hash"
+  in Range   then "Range"
+  in Random  then "Random"
+  else "String"
+  end
+end
+
+# A parsed document for the guest: its symbols become the tagged shape.
+def json_guest_value(value)
+  return value if value.failure?
+  return ["__symbol__", value.to_s] if value in Symbol
+  return value.map { json_guest_value(it) } if value in Array
+  return value unless value in Hash
+  mutable pairs = []
+  value.each do |key, element|
+    pairs << [json_guest_value(key), json_guest_value(element)]
+  end
+  pairs.to_h
+end
+
+# A guest value for the twin: its tagged symbols become symbols, and a
+# struct or a payload-carrying case refuses before the twin sees it.
+def json_host_value(value)
+  return value_at(value, 1).to_sym if value in ["__symbol__", *]
+  panic("a #{value_at(value, 1)} is not JSON — generate its 'to_h'") if value in ["__struct__", *]
+  panic(":#{value_at(value, 1)} carries a payload, which is not JSON — generate its 'to_h'") if value in ["__enum_case__", *]
+  return value.map { json_host_value(it) } if plain_array?(value)
+  return value unless value in Hash
+  mutable pairs = []
+  value.each do |key, element|
+    pairs << [json_host_value(key), json_host_value(element)]
+  end
+  pairs.to_h
+end
+
 def symbol_case_answer(text, name)
   case name
   when "capitalize"   then text.capitalize
@@ -1618,6 +1703,7 @@ end
 # `Array.new` by count, count and fill, or array. The block form counts on
 # the host and hands each index to the guest block.
 def evaluate_builtin_type_function(node, mutable bindings)
+  return evaluate_json(node, bindings) if node.receiver.name == "JSON"
   mutable arguments = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument, bindings)
@@ -2290,7 +2376,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
@@ -2507,7 +2593,9 @@ def evaluate_method_call(node, mutable bindings)
   when "ljust" then arguments.length == 2 ? receiver.ljust(value_at(arguments, 0), value_at(arguments, 1)) : receiver.ljust(value_at(arguments, 0))
   when "rjust" then arguments.length == 2 ? receiver.rjust(value_at(arguments, 0), value_at(arguments, 1)) : receiver.rjust(value_at(arguments, 0))
   when "chop" then receiver.chop
-  when "chr" then receiver.chr
+  # A string's first character, or an integer's codepoint as a character
+  # with the one encoding named (ADR 0069) — the host's own arms.
+  when "chr" then arguments.empty? ? receiver.chr : receiver.chr(value_at(arguments, 0))
   when "delete_prefix" then receiver.delete_prefix(value_at(arguments, 0))
   when "delete_suffix" then receiver.delete_suffix(value_at(arguments, 0))
   when "partition" then receiver.partition(value_at(arguments, 0))

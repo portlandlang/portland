@@ -8,6 +8,7 @@ pub mod builtins;
 pub mod format;
 pub mod heredoc;
 pub mod interpreter;
+pub mod json;
 pub mod lexer;
 pub mod parser;
 pub mod random;

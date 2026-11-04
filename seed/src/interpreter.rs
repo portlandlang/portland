@@ -3415,11 +3415,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 // The builtin types carry Ruby's type functions (ADR 0058):
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere. `System`
-                // is the floor module (ADR 0068), the same shape.
+                // is the floor module (ADR 0068) and `JSON` is core (ADR
+                // 0072), the same shape.
                 if let Expression::Variable(type_name) = receiver.as_ref()
                     && matches!(
                         type_name.as_str(),
-                        "Array" | "Hash" | "Integer" | "Random" | "Range" | "System"
+                        "Array" | "Hash" | "Integer" | "JSON" | "Random" | "Range" | "System"
                     )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
@@ -3428,7 +3429,17 @@ impl<W: std::io::Write> Interpreter<W> {
                         .iter()
                         .map(|argument| self.value_of(argument))
                         .collect();
-                    return self.builtin_type_function(type_name, name, arguments, block.as_ref());
+                    let keyword_arguments: Vec<(String, Value)> = keyword_arguments
+                        .iter()
+                        .map(|(label, value)| (label.clone(), self.value_of(value)))
+                        .collect();
+                    return self.builtin_type_function(
+                        type_name,
+                        name,
+                        arguments,
+                        keyword_arguments,
+                        block.as_ref(),
+                    );
                 }
                 // `Name.new(...)` constructs a struct; the name is not a value.
                 if name == "new" {
@@ -3677,9 +3688,52 @@ impl<W: std::io::Write> Interpreter<W> {
         type_name: &str,
         name: &str,
         arguments: Vec<Value>,
+        keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
     ) -> Option<Value> {
+        // `JSON.parse` takes the one keyword; no other type function takes any.
+        if let Some((label, _)) = keyword_arguments.first()
+            && (type_name, name) != ("JSON", "parse")
+        {
+            panic!("{type_name}.{name} takes no keyword arguments, got {label}:");
+        }
         match (type_name, name) {
+            // JSON is core, written by hand (ADR 0072): a document in, its
+            // value or a failure out; a value in, the json gem's text out.
+            ("JSON", "parse") => {
+                let mut symbolize_names = false;
+                for (label, value) in &keyword_arguments {
+                    match (label.as_str(), value) {
+                        ("symbolize_names", Value::Boolean(flag)) => symbolize_names = *flag,
+                        ("symbolize_names", other) => panic!(
+                            "JSON.parse takes true or false for symbolize_names:, got {}",
+                            other.shown()
+                        ),
+                        (other, _) => panic!(
+                            "JSON.parse does not take {other}: yet — symbolize_names: is its one keyword (ADR 0072)"
+                        ),
+                    }
+                }
+                match arguments.as_slice() {
+                    [Value::String(text)] => Some(crate::json::parse(text, symbolize_names)),
+                    [other] => panic!(
+                        "no implicit conversion of {} into String",
+                        other.type_name()
+                    ),
+                    _ => panic!("JSON.parse takes 1 argument, got {}", arguments.len()),
+                }
+            }
+            ("JSON", "generate") => match arguments.as_slice() {
+                [value] => Some(crate::json::generate(value)),
+                _ => panic!("JSON.generate takes 1 argument, got {}", arguments.len()),
+            },
+            ("JSON", "pretty_generate") => match arguments.as_slice() {
+                [value] => Some(crate::json::pretty_generate(value)),
+                _ => panic!(
+                    "JSON.pretty_generate takes 1 argument, got {}",
+                    arguments.len()
+                ),
+            },
             ("Array", "new") => self.array_new(arguments, block),
             ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
@@ -6115,6 +6169,33 @@ impl<W: std::io::Write> Interpreter<W> {
                     values_at_position(elements, position, &mut picked);
                 }
                 Value::array(picked)
+            }
+            // `Integer#chr`: a codepoint's character. Bare, Ruby answers a
+            // one-byte string up to 255, which above 127 is a byte and not
+            // UTF-8 text (ADR 0069), so that half refuses naming the
+            // encoding; with `Encoding::UTF_8` any scalar value answers, in
+            // Ruby's words at the edges.
+            (Value::Integer(code), "chr", []) => match u8::try_from(*code) {
+                Ok(byte) if byte.is_ascii() => Value::String(char::from(byte).to_string()),
+                Ok(_) => panic!(
+                    "{code}.chr is a single byte, which is not UTF-8 text here (ADR 0069) — write 'chr(Encoding::UTF_8)' for the character"
+                ),
+                Err(_) => panic!("{code} out of char range"),
+            },
+            (Value::Integer(code), "chr", [Value::String(encoding)]) => {
+                if encoding != "UTF-8" {
+                    panic!(
+                        "'chr' takes Encoding::UTF_8, the one encoding a string has (ADR 0069), got {encoding:?}"
+                    );
+                }
+                let scalar = u32::try_from(*code)
+                    .ok()
+                    .filter(|scalar| *scalar <= 0x10FFFF)
+                    .unwrap_or_else(|| panic!("{code} out of char range"));
+                match char::from_u32(scalar) {
+                    Some(character) => Value::String(character.to_string()),
+                    None => panic!("invalid codepoint 0x{scalar:X} in UTF-8"),
+                }
             }
             // The last position of a value, from the far end (#104).
             (Value::Array(elements), "rindex", [needle]) => elements

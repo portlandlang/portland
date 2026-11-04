@@ -2659,6 +2659,161 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// JSON on both oracles (ADR 0072): the seed's hand-written `json.rs` and the
+/// compiler's Portland twin `json.pdx` answer what Ruby's json gem 3.1.0
+/// answers — verified against Ruby 4.0.7 on 2026-11-03 and recorded in
+/// #182 — byte for byte: `null` as nil told apart from a missing key, the
+/// gem's float spellings, its escapes, its pretty form, and every failure in
+/// its sentence with its position.
+#[test]
+fn json_on_both_oracles() {
+    assert_both_print(
+        "json_parse.pdx",
+        "document = JSON.parse(\"{\\\"a\\\":null,\\\"b\\\":[1,2.5,\\\"x\\\",true],\\\"c\\\":{\\\"d\\\":\\\"\\\\u00e9\\\\n\\\"}}\")\n\
+         p document\n\
+         p document[\"a\"]\n\
+         p document[\"missing\"]\n\
+         p document.key?(\"a\")\n\
+         p JSON.parse(\"{\\\"a\\\":{\\\"b\\\":1}}\", symbolize_names: true)\n\
+         p JSON.parse(\" 2 \"), JSON.parse(\"\\\"x\\\"\"), JSON.parse(\"null\")\n\
+         p JSON.parse(\"[-0, -0.0, 1E2, 1e+2, 1e-2, 0.5, 1e400, 1e-400]\")\n\
+         p JSON.parse(\"\\\"\\\\uD83D\\\\uDE00 \\\\/ \\\\\\\"\\\"\")\n\
+         p JSON.parse(\"\")\n\
+         p JSON.parse(\"[1,]\")\n\
+         p JSON.parse(\"{a:1}\")\n\
+         p JSON.parse(\"NaN\")\n\
+         p JSON.parse(\"{\\\"a\\\":1,\\\"a\\\":2}\")\n\
+         p JSON.parse(\"{\\\"x\\\":{\\\"a\\\":1,\\\"a\\\":2}}\")\n\
+         p JSON.parse(\"{\\\"a\\\":1} x\")\n\
+         p JSON.parse(\"\\\"\\\\ud83d\\\"\")\n\
+         p JSON.parse(\"\\\"\\\\ud83d\\\\u0041\\\"\")\n\
+         p JSON.parse(\"\\\"\\\\udc00\\\"\")\n\
+         p JSON.parse(\"\\\"\\\\u12\\\"\")\n\
+         p JSON.parse(\"\\\"\\\\q\\\"\")\n\
+         p JSON.parse(\"\\\"a\\tb\\\"\")\n\
+         p JSON.parse(\"\\\"abc\")\n\
+         p JSON.parse(\"[1 2]\")\n\
+         p JSON.parse(\"{\\\"a\\\" 1}\")\n\
+         p JSON.parse(\"{\\\"a\\\":1,}\")\n\
+         p JSON.parse(\"{\\\"a\\\":1 \\\"b\\\":2}\")\n\
+         p JSON.parse(\"01\")\n\
+         p JSON.parse(\"[1]\\n\\n x\")\n\
+         p JSON.parse(\"{\\\"é\\\":1} x\")\n\
+         p JSON.parse(\"99999999999999999999\")\n\
+         p JSON.parse(\"[1,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]\")\n\
+         p JSON.parse(\"/* c */ 1\")\n\
+         p JSON.parse(\"\".ljust(101, \"[\") + \"\".ljust(101, \"]\")).length\n\
+         p JSON.parse(\"\".ljust(101, \"[\") + \"1\" + \"\".ljust(101, \"]\"))\n",
+        "{\"a\" => nil, \"b\" => [1, 2.5, \"x\", true], \"c\" => {\"d\" => \"é\\n\"}}\n\
+         some(nil)\n\
+         nil\n\
+         true\n\
+         {a: {b: 1}}\n\
+         2\n\
+         \"x\"\n\
+         nil\n\
+         [0, -0.0, 100.0, 100.0, 0.01, 0.5, Infinity, 0.0]\n\
+         \"😀 / \\\"\"\n\
+         failure(\"unexpected end of input at line 1 column 1\")\n\
+         failure(\"unexpected character: ']' at line 1 column 4\")\n\
+         failure(\"expected object key, got 'a:1}' at line 1 column 2\")\n\
+         failure(\"unexpected token 'NaN' at line 1 column 1\")\n\
+         failure(\"duplicate key \\\"a\\\" at line 1 column 1\")\n\
+         failure(\"duplicate key \\\"a\\\" at line 1 column 6\")\n\
+         failure(\"unexpected token at end of stream 'x' at line 1 column 9\")\n\
+         failure(\"incomplete surrogate pair at '\\\\ud83d\\\"' at line 1 column 2\")\n\
+         failure(\"invalid surrogate pair at '\\\\ud83d\\\\u0041\\\"' at line 1 column 2\")\n\
+         failure(\"unpaired trailing surrogate at '\\\\udc00\\\"' at line 1 column 2\")\n\
+         failure(\"incomplete unicode character escape sequence at '\\\\u12\\\"' at line 1 column 2\")\n\
+         failure(\"invalid escape character in string: '\\\\q\\\"' at line 1 column 2\")\n\
+         failure(\"invalid ASCII control character in string: \\tb\\\" at line 1 column 3\")\n\
+         failure(\"unexpected end of input, expected closing \\\" at line 1 column 5\")\n\
+         failure(\"expected ',' or ']' after array value at line 1 column 4\")\n\
+         failure(\"expected ':' after object key at line 1 column 6\")\n\
+         failure(\"expected object key, got: '}' at line 1 column 8\")\n\
+         failure(\"expected ',' or '}' after object value, got: '\\\"b\\\":2}' at line 1 column 8\")\n\
+         failure(\"invalid number: '01' at line 1 column 1\")\n\
+         failure(\"unexpected token at end of stream 'x' at line 3 column 2\")\n\
+         failure(\"unexpected token at end of stream 'x' at line 1 column 9\")\n\
+         failure(\"99999999999999999999 overflows the 64-bit integers at line 1 column 1\")\n\
+         failure(\"unexpected character: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' at line 1 column 4\")\n\
+         failure(\"unexpected token '/*' at line 1 column 1\")\n\
+         1\n\
+         failure(\"nesting of 101 is too deep\")\n",
+    );
+    assert_both_print(
+        "json_generate.pdx",
+        "p JSON.generate([1, 1.0, 1e20, 0.1, -0.0, 1.5e-7, 1e-5, 100.0, 1234567.0, 123456789012345680.0, 1e-10, 5e-324, 0.30000000000000004])\n\
+         puts JSON.generate(\"é\\n\\t\\\"\\\\/\u{1}\u{7f}\u{2028}\")\n\
+         p JSON.generate({a: 1, 1 => 2, 1.5 => 3, nil => 4, true => 5, [1, \"a\"] => 6, 1e20 => 7})\n\
+         p JSON.generate(:sym), JSON.generate(nil), JSON.generate([[], {}, [[]], {\"a\" => {}}])\n\
+         p JSON.generate(0.0 / 0.0), JSON.generate([1, 1.0 / 0.0]), JSON.generate(-1.0 / 0.0)\n\
+         puts JSON.pretty_generate({\"a\" => [1, {\"b\" => nil}], \"e\" => [], \"f\" => {}})\n\
+         puts JSON.pretty_generate(1), JSON.pretty_generate([])\n\
+         mutable deep = []\n\
+         99.times { deep = [deep] }\n\
+         p JSON.generate(deep).length\n\
+         p JSON.generate([deep])\n",
+        "\"[1,1.0,1e+20,0.1,-0.0,0.00000015,0.00001,100.0,1234567.0,1.2345678901234568e+17,1e-10,5e-324,0.30000000000000004]\"\n\
+         \"é\\n\\t\\\"\\\\/\\u0001\u{7f}\u{2028}\"\n\
+         \"{\\\"a\\\":1,\\\"1\\\":2,\\\"1.5\\\":3,\\\"\\\":4,\\\"true\\\":5,\\\"[1, \\\\\\\"a\\\\\\\"]\\\":6,\\\"1.0e+20\\\":7}\"\n\
+         \"\\\"sym\\\"\"\n\
+         \"null\"\n\
+         \"[[],{},[[]],{\\\"a\\\":{}}]\"\n\
+         failure(\"NaN not allowed in JSON\")\n\
+         failure(\"Infinity not allowed in JSON\")\n\
+         failure(\"-Infinity not allowed in JSON\")\n\
+         {\n\
+         \x20 \"a\": [\n\
+         \x20   1,\n\
+         \x20   {\n\
+         \x20     \"b\": null\n\
+         \x20   }\n\
+         \x20 ],\n\
+         \x20 \"e\": [],\n\
+         \x20 \"f\": {}\n\
+         }\n\
+         1\n\
+         []\n\
+         200\n\
+         failure(\"nesting of 101 is too deep. Did you try to serialize objects with circular references?\")\n",
+    );
+    assert_both_oracles_refuse(
+        "json_refusal.pdx",
+        None,
+        &[
+            (
+                "p JSON.parse(nil)\n",
+                "no implicit conversion of nil into String",
+            ),
+            (
+                "p JSON.parse(1)\n",
+                "no implicit conversion of Integer into String",
+            ),
+            (
+                "p JSON.parse(\"1\", \"2\")\n",
+                "JSON.parse takes 1 argument, got 2",
+            ),
+            (
+                "p JSON.parse(\"1\", max_nesting: 5)\n",
+                "JSON.parse does not take max_nesting: yet — symbolize_names: is its one keyword (ADR 0072)",
+            ),
+            (
+                "p JSON.generate(1..3)\n",
+                "a Range is not JSON — generate its 'to_a'",
+            ),
+            (
+                "struct Token\n  text\nend\np JSON.generate([Token.new(text: \"x\")])\n",
+                "a Token is not JSON — generate its 'to_h'",
+            ),
+            (
+                "p JSON.generate(1, 2)\n",
+                "JSON.generate takes 1 argument, got 2",
+            ),
+        ],
+    );
+}
+
 /// A symbol made from text (ADR 0071) on both oracles: `to_sym`, `intern`,
 /// a symbol's own `to_sym`, an interpolated symbol with the string's
 /// escapes, and the one refusal — an interpolated symbol where a pattern

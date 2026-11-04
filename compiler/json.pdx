@@ -1,0 +1,586 @@
+# JSON, core and written twice (ADR 0072). This is the Portland twin of the
+# seed's `json.rs`: `json_parse`, `json_generate`, and `json_pretty_generate`
+# answering what Ruby's json gem (3.1.0 on Ruby 4.0.7) answers, byte for
+# byte — its sentences, its positions, its float spellings — and what the
+# hosted evaluator runs when a program says `JSON.parse`. The seed is the
+# oracle; the differential suite holds the two together. This file is also
+# the first library written in Portland, and the one that becomes a tile
+# when the tile system exists (#174); it stands alone on purpose, requiring
+# nothing.
+#
+# A bad document answers a failure (ADR 0027): parsing is a fallible
+# operation on data. A wrong program refuses: a struct handed to generate.
+#
+# The walk is over codepoints, since the gem counts a column in characters
+# and quotes its fragments in bytes; `chr(Encoding::UTF_8)` turns a codepoint
+# back into text. That primitive was this file's one pull.
+
+# The gem's `max_nesting`: a 101st open container is too deep.
+JSON_MAX_NESTING = 100
+
+# How much of the document an error quotes, in bytes.
+JSON_FRAGMENT_LENGTH = 32
+
+# What a parse step hands back: the value read, and where the next one
+# starts. A failure takes this struct's place when the document is bad.
+struct JsonStep
+  value
+  position
+end
+
+# `JSON.parse(text)`: the document's value, or a failure carrying the gem's
+# sentence. `symbolize_names` makes the keys symbols (ADR 0071).
+def json_parse(text, symbolize_names)
+  codes = text.codepoints
+  index = json_skip_whitespace(codes, 0)
+  return index if index.failure?
+  return json_fail(codes, "unexpected end of input", index) if index >= codes.length
+  step = json_value(codes, index, 0, symbolize_names)
+  return step if step.failure?
+  after = json_skip_whitespace(codes, step.position)
+  return after if after.failure?
+  return json_fail(codes, "unexpected token at end of stream #{json_fragment(codes, after)}", after) if after < codes.length
+  step.value
+end
+
+# `JSON.generate(value)`: the gem's compact text, or a failure for NaN,
+# Infinity, and a document nested past 100.
+def json_generate(value) = json_write(value, false, 0)
+
+# `JSON.pretty_generate(value)`: two-space indentation, `"key": value`,
+# empties kept as `[]` and `{}`.
+def json_pretty_generate(value) = json_write(value, true, 0)
+
+# — reading —
+
+# The codepoint at `index`, which every caller has bounds-checked; a lookup
+# answers a maybe, so the `or` is the unwrap and never the answer.
+def json_code_at(codes, index) = codes[index] or 0
+
+def json_digit?(code) = code >= "0".ord && code <= "9".ord
+
+# Space, tab, newline, and return. A `/` would start one of the gem's
+# optional comments, which are off, so it is an unexpected token.
+def json_skip_whitespace(codes, start)
+  mutable index = start
+  while index < codes.length
+    code = json_code_at(codes, index)
+    return json_fail(codes, "unexpected token #{json_fragment(codes, index)}", index) if code == "/".ord
+    return index unless code == 32 || code == 9 || code == 10 || code == 13
+    index += 1
+  end
+  index
+end
+
+def json_value(codes, start, nesting, symbolize)
+  index = json_skip_whitespace(codes, start)
+  return index if index.failure?
+  return json_fail(codes, "unexpected end of input", index) if index >= codes.length
+  code = json_code_at(codes, index)
+  return json_keyword(codes, index, "null", nil) if code == "n".ord
+  return json_keyword(codes, index, "true", true) if code == "t".ord
+  return json_keyword(codes, index, "false", false) if code == "f".ord
+  return json_number(codes, index) if code == "-".ord || json_digit?(code)
+  return json_string(codes, index) if code == "\"".ord
+  return json_array(codes, index, nesting, symbolize) if code == "[".ord
+  return json_object(codes, index, nesting, symbolize) if code == "{".ord
+  # The gem's NaN and Infinity are off, so their first letters are
+  # unexpected tokens like any other word.
+  return json_fail(codes, "unexpected token #{json_fragment(codes, index)}", index) if code == "N".ord || code == "I".ord
+  return json_fail(codes, "unexpected NULL byte: #{json_fragment(codes, index)}", index) if code == 0
+  json_fail(codes, "unexpected character: #{json_fragment(codes, index)}", index)
+end
+
+def json_keyword(codes, index, word, value)
+  expected = word.codepoints
+  mutable offset = 0
+  while offset < expected.length
+    matches = index + offset < codes.length && json_code_at(codes, index + offset) == json_code_at(expected, offset)
+    return json_fail(codes, "unexpected token #{json_fragment(codes, index)}", index) unless matches
+    offset += 1
+  end
+  JsonStep.new(value: value, position: index + expected.length)
+end
+
+def json_digits_end(codes, start)
+  mutable index = start
+  while index < codes.length && json_digit?(json_code_at(codes, index))
+    index += 1
+  end
+  index
+end
+
+# The gem's grammar: an optional minus, digits with no leading zero, an
+# optional fraction with at least one digit, an optional exponent with at
+# least one digit. A fraction or exponent makes a Float; otherwise an
+# Integer, and one past 64 bits is a failure (ADR 0070) where Ruby widens
+# to a bignum.
+def json_number(codes, start)
+  mutable index = start
+  index += 1 if json_code_at(codes, index) == "-".ord
+  first_digit = index < codes.length ? json_code_at(codes, index) : -1
+  digits_end = json_digits_end(codes, index)
+  digits = digits_end - index
+  return json_invalid_number(codes, start) if (first_digit == "0".ord && digits > 1) || digits == 0
+  index = digits_end
+  mutable integer = true
+  if index < codes.length && json_code_at(codes, index) == ".".ord
+    integer = false
+    fraction_end = json_digits_end(codes, index + 1)
+    return json_invalid_number(codes, start) if fraction_end == index + 1
+    index = fraction_end
+  end
+  if index < codes.length && (json_code_at(codes, index) == "e".ord || json_code_at(codes, index) == "E".ord)
+    integer = false
+    index += 1
+    index += 1 if index < codes.length && (json_code_at(codes, index) == "+".ord || json_code_at(codes, index) == "-".ord)
+    exponent_end = json_digits_end(codes, index)
+    return json_invalid_number(codes, start) if exponent_end == index
+    index = exponent_end
+  end
+  token = json_text(codes, start, index)
+  return JsonStep.new(value: token.to_f, position: index) unless integer
+  return json_fail(codes, "#{token} overflows the 64-bit integers", start) if json_overflows?(token)
+  JsonStep.new(value: token.to_i, position: index)
+end
+
+def json_invalid_number(codes, start) = json_fail(codes, "invalid number: #{json_fragment(codes, start)}", start)
+
+# Past 64 bits, by the digits alone: more than nineteen is past, nineteen
+# compares against the edge, fewer always fit.
+def json_overflows?(token)
+  negative = token.start_with?("-")
+  digits = negative ? token.slice(1, token.length - 1) : token
+  return false if digits.length < 19
+  return true if digits.length > 19
+  limit = negative ? "9223372036854775808" : "9223372036854775807"
+  digits > limit
+end
+
+# The text between two indexes, codepoints back to characters.
+def json_text(codes, from, to)
+  mutable text = ""
+  mutable index = from
+  while index < to
+    text << json_code_at(codes, index).chr(Encoding::UTF_8)
+    index += 1
+  end
+  text
+end
+
+# A string, `quote` on its opening quote. The scan finds the closing quote
+# first — a control character or the end of input refuse before any escape
+# is read, as the gem's does — then the escapes are decoded.
+def json_string(codes, quote)
+  content = quote + 1
+  mutable index = content
+  mutable closed = false
+  while index < codes.length && !closed
+    code = json_code_at(codes, index)
+    if code == "\"".ord
+      closed = true
+    elsif code == "\\".ord
+      index += 2
+    elsif code < 32
+      return json_fail(codes, "invalid ASCII control character in string: #{json_fragment(codes, index)}", index)
+    else
+      index += 1
+    end
+  end
+  return json_fail(codes, "unexpected end of input, expected closing \"", index) unless closed
+  text = json_unescape(codes, content, index)
+  return text if text.failure?
+  JsonStep.new(value: text, position: index + 1)
+end
+
+def json_unescape(codes, from, to)
+  mutable text = ""
+  mutable index = from
+  while index < to
+    code = json_code_at(codes, index)
+    if code != "\\".ord
+      text << code.chr(Encoding::UTF_8)
+      index += 1
+      next
+    end
+    escaped = json_code_at(codes, index + 1)
+    if escaped == "u".ord
+      unicode = json_unicode_escape(codes, index, to)
+      return unicode if unicode.failure?
+      text << unicode.value
+      index = unicode.position
+      next
+    end
+    return json_fail(codes, "Invalid unescaped newline character (\\n) in string: #{json_fragment(codes, index)}", index) if escaped == 10
+    return json_fail(codes, "Invalid unescaped NULL character (\\0) in string: #{json_fragment(codes, index)}", index) if escaped == 0
+    return json_fail(codes, "invalid ASCII control character in string: #{json_fragment(codes, index)}", index) if escaped < 32
+    decoded = json_simple_escape(escaped)
+    return json_fail(codes, "invalid escape character in string: #{json_fragment(codes, index)}", index) if decoded.nil?
+    text << decoded
+    index += 2
+  end
+  text
+end
+
+# The gem's one-letter escapes, or nil for a letter it does not know.
+def json_simple_escape(code)
+  return "\n" if code == "n".ord
+  return "\r" if code == "r".ord
+  return "\t" if code == "t".ord
+  return 8.chr if code == "b".ord
+  return 12.chr if code == "f".ord
+  return code.chr(Encoding::UTF_8) if code == "\"".ord || code == "\\".ord || code == "/".ord
+  nil
+end
+
+# `\uXXXX` at `backslash`, with a surrogate pair folded into one character.
+def json_unicode_escape(codes, backslash, to)
+  code = json_hex_escape(codes, backslash + 2, to, backslash)
+  return code if code.failure?
+  mutable scalar = code
+  mutable after = backslash + 6
+  if code >= 0xD800 && code <= 0xDBFF
+    paired = after + 6 <= to && json_code_at(codes, after) == "\\".ord && json_code_at(codes, after + 1) == "u".ord
+    return json_fail(codes, "incomplete surrogate pair at #{json_fragment(codes, backslash)}", backslash) unless paired
+    low = json_hex_escape(codes, after + 2, to, after)
+    return low if low.failure?
+    return json_fail(codes, "invalid surrogate pair at #{json_fragment(codes, backslash)}", backslash) unless low >= 0xDC00 && low <= 0xDFFF
+    scalar = 0x10000 + (code - 0xD800) * 1024 + (low - 0xDC00)
+    after += 6
+  elsif code >= 0xDC00 && code <= 0xDFFF
+    return json_fail(codes, "unpaired trailing surrogate at #{json_fragment(codes, backslash)}", backslash)
+  end
+  JsonStep.new(value: scalar.chr(Encoding::UTF_8), position: after)
+end
+
+# Four hex digits at `at`, inside a string ending at `to`; `backslash` is
+# where the escape began, which is what the sentence points at.
+def json_hex_escape(codes, at, to, backslash)
+  return json_incomplete_unicode(codes, backslash) if at + 4 > to
+  mutable code = 0
+  mutable index = at
+  while index < at + 4
+    digit = json_hex_digit(json_code_at(codes, index))
+    return json_incomplete_unicode(codes, backslash) if digit < 0
+    code = code * 16 + digit
+    index += 1
+  end
+  code
+end
+
+def json_hex_digit(code)
+  return code - "0".ord if json_digit?(code)
+  return code - "a".ord + 10 if code >= "a".ord && code <= "f".ord
+  return code - "A".ord + 10 if code >= "A".ord && code <= "F".ord
+  -1
+end
+
+def json_incomplete_unicode(codes, backslash) = json_fail(codes, "incomplete unicode character escape sequence at #{json_fragment(codes, backslash)}", backslash)
+
+def json_array(codes, open, nesting, symbolize)
+  index = json_skip_whitespace(codes, open + 1)
+  return index if index.failure?
+  return JsonStep.new(value: [], position: index + 1) if index < codes.length && json_code_at(codes, index) == "]".ord
+  depth = nesting + 1
+  return failure("nesting of #{depth} is too deep") if depth > JSON_MAX_NESTING
+  mutable elements = []
+  mutable position = index
+  mutable closed = false
+  until closed
+    step = json_value(codes, position, depth, symbolize)
+    return step if step.failure?
+    elements << step.value
+    after = json_skip_whitespace(codes, step.position)
+    return after if after.failure?
+    next_code = after < codes.length ? json_code_at(codes, after) : -1
+    if next_code == ",".ord
+      position = after + 1
+    elsif next_code == "]".ord
+      position = after + 1
+      closed = true
+    else
+      return json_fail(codes, "expected ',' or ']' after array value", after)
+    end
+  end
+  JsonStep.new(value: elements, position: position)
+end
+
+def json_object(codes, open, nesting, symbolize)
+  index = json_skip_whitespace(codes, open + 1)
+  return index if index.failure?
+  return JsonStep.new(value: {}, position: index + 1) if index < codes.length && json_code_at(codes, index) == "}".ord
+  depth = nesting + 1
+  return failure("nesting of #{depth} is too deep") if depth > JSON_MAX_NESTING
+  mutable pairs = []
+  mutable position = index
+  mutable closed = false
+  until closed
+    key_at = json_skip_whitespace(codes, position)
+    return key_at if key_at.failure?
+    unless key_at < codes.length && json_code_at(codes, key_at) == "\"".ord
+      # The gem's two sentences: the first key, and a key after a comma.
+      got = pairs.empty? ? "got" : "got:"
+      return json_fail(codes, "expected object key, #{got} #{json_fragment(codes, key_at)}", key_at)
+    end
+    key = json_string(codes, key_at)
+    return key if key.failure?
+    colon_at = json_skip_whitespace(codes, key.position)
+    return colon_at if colon_at.failure?
+    unless colon_at < codes.length && json_code_at(codes, colon_at) == ":".ord
+      return json_fail(codes, "expected ':' after object key", colon_at) if pairs.empty?
+      return json_fail(codes, "expected ':' after object key, got: #{json_fragment(codes, colon_at)}", colon_at)
+    end
+    step = json_value(codes, colon_at + 1, depth, symbolize)
+    return step if step.failure?
+    pairs << [symbolize ? key.value.to_sym : key.value, step.value]
+    after = json_skip_whitespace(codes, step.position)
+    return after if after.failure?
+    next_code = after < codes.length ? json_code_at(codes, after) : -1
+    if next_code == ",".ord
+      position = after + 1
+    elsif next_code == "}".ord
+      position = after + 1
+      closed = true
+    else
+      return json_fail(codes, "expected ',' or '}' after object value, got: #{json_fragment(codes, after)}", after)
+    end
+  end
+  # json 3.1 refuses a duplicate key once the object closes, and points at
+  # the object's own opening brace.
+  mutable seen = []
+  pairs.each do |pair_key, _pair_value|
+    return json_fail(codes, "duplicate key #{inspect(pair_key.to_s)}", open) if seen.include?(pair_key)
+    seen << pair_key
+  end
+  JsonStep.new(value: pairs.to_h, position: position)
+end
+
+# The sentence with the gem's position: the line, and the column in
+# characters from the line's start, both counted from 1.
+def json_fail(codes, message, at)
+  place = at > codes.length ? codes.length : at
+  mutable line = 1
+  mutable line_start = 0
+  mutable index = 0
+  while index < place
+    if json_code_at(codes, index) == 10
+      line += 1
+      line_start = index + 1
+    end
+    index += 1
+  end
+  column = place - line_start + 1
+  failure("#{message} at line #{line} column #{column}")
+end
+
+def json_stop?(code) = code == 0 || code == 10 || code == 32 || code == 9 || code == 13
+
+# A codepoint's width in UTF-8, since the gem's fragment limit is in bytes.
+def json_utf8_width(code)
+  return 1 if code < 0x80
+  return 2 if code < 0x800
+  return 3 if code < 0x10000
+  4
+end
+
+# What the gem quotes after a sentence: `EOF` at the end, else the text from
+# `at` up to a NUL, newline, space, tab, or return, at most 32 bytes without
+# splitting a character, in quotes. When the text *starts* with one of
+# those stops the gem prints the raw C string instead — nothing for a NUL,
+# everything up to the first NUL for the others, unquoted — and so does
+# this.
+def json_fragment(codes, at)
+  return "EOF" if at >= codes.length
+  mutable text = ""
+  mutable index = at
+  if json_stop?(json_code_at(codes, at))
+    while index < codes.length && json_code_at(codes, index) != 0
+      text << json_code_at(codes, index).chr(Encoding::UTF_8)
+      index += 1
+    end
+    return text
+  end
+  mutable bytes = 0
+  while index < codes.length && !json_stop?(json_code_at(codes, index))
+    width = json_utf8_width(json_code_at(codes, index))
+    break if bytes + width > JSON_FRAGMENT_LENGTH
+    text << json_code_at(codes, index).chr(Encoding::UTF_8)
+    bytes += width
+    index += 1
+  end
+  "'#{text}'"
+end
+
+# — writing —
+
+def json_write(value, pretty, depth)
+  case value
+  in nil     then "null"
+  in true    then "true"
+  in false   then "false"
+  in Integer then value.to_s
+  in Float   then json_float(value)
+  in String  then json_quote(value)
+  in Symbol  then json_quote(value.to_s)
+  in Array   then json_write_array(value, pretty, depth)
+  in Hash    then json_write_hash(value, pretty, depth)
+  in Range   then panic("a Range is not JSON — generate its 'to_a'")
+  else panic("#{inspect(value)} is not JSON — generate its 'to_h'")
+  end
+end
+
+# One container deeper; the gem counts every array and hash, empties
+# included, and the 101st is too deep.
+def json_too_deep(depth) = failure("nesting of #{depth} is too deep. Did you try to serialize objects with circular references?")
+
+def json_indent(depth) = "".ljust(depth * 2, " ")
+
+def json_write_array(elements, pretty, depth)
+  deeper = depth + 1
+  return json_too_deep(deeper) if deeper > JSON_MAX_NESTING
+  return "[]" if elements.empty?
+  mutable out = "["
+  elements.each_with_index do |element, index|
+    out << "," if index > 0
+    if pretty
+      out << "\n"
+      out << json_indent(deeper)
+    end
+    text = json_write(element, pretty, deeper)
+    return text if text.failure?
+    out << text
+  end
+  if pretty
+    out << "\n"
+    out << json_indent(depth)
+  end
+  out << "]"
+  out
+end
+
+def json_write_hash(pairs, pretty, depth)
+  deeper = depth + 1
+  return json_too_deep(deeper) if deeper > JSON_MAX_NESTING
+  return "{}" if pairs.empty?
+  mutable out = "{"
+  mutable index = 0
+  pairs.each do |key, element|
+    out << "," if index > 0
+    if pretty
+      out << "\n"
+      out << json_indent(deeper)
+    end
+    out << json_quote(json_key_text(key))
+    out << ":"
+    out << " " if pretty
+    text = json_write(element, pretty, deeper)
+    return text if text.failure?
+    out << text
+    index += 1
+  end
+  if pretty
+    out << "\n"
+    out << json_indent(depth)
+  end
+  out << "}"
+  out
+end
+
+# A hash key as the gem writes it: a string as is, a symbol by its name,
+# anything else by its `to_s` — `1`, `1.5`, `true`, `[1, "a"]`, and the
+# empty string for nil. Ruby writes `"#<struct a=1>"` for a struct and
+# `"1..3"` for a range — silent garbage — where this refuses (ADR 0072 §5).
+def json_key_text(key)
+  case key
+  in nil then ""
+  in String then key
+  in Symbol | Integer | Float | true | false | Array | Hash then key.to_s
+  in Range then panic("a Range is not JSON — generate its 'to_a'")
+  else panic("#{inspect(key)} is not JSON — generate its 'to_h'")
+  end
+end
+
+# The gem's escapes: the quote, the backslash, the five named controls,
+# `\u00xx` for the other controls, and everything else raw — `/`, DEL,
+# U+2028, every non-ASCII character.
+def json_quote(text)
+  mutable out = "\""
+  text.codepoints.each do |code|
+    if code == "\"".ord
+      out << "\\\""
+    elsif code == "\\".ord
+      out << "\\\\"
+    elsif code == 8
+      out << "\\b"
+    elsif code == 12
+      out << "\\f"
+    elsif code == 10
+      out << "\\n"
+    elsif code == 13
+      out << "\\r"
+    elsif code == 9
+      out << "\\t"
+    elsif code < 32
+      out << "\\u"
+      out << code.to_s(16).rjust(4, "0")
+    else
+      out << code.chr(Encoding::UTF_8)
+    end
+  end
+  out << "\""
+  out
+end
+
+# The gem's float writer, `fpconv.c`'s `emit_digits` over the shortest
+# round-trip digits — which `Float#to_s` already has, in Ruby's layout, so
+# this reads them out of it and lays them out again: `1e+20` where `to_s`
+# says `1.0e+20`, `0.00000015` where it says `1.5e-07`, `100.0` with its
+# point kept. The gem takes its digits from Grisu2, which is not always the
+# shortest spelling; this takes the shortest (recorded in docs/ruby/json.md).
+def json_float(value)
+  return failure("#{value} not allowed in JSON") if value.nan? || value.infinite?
+  text = value.to_s
+  negative = text.start_with?("-")
+  body = negative ? text.slice(1, text.length - 1) : text
+  return text if body == "0.0"
+  parts = body.split("e")
+  mantissa = parts[0] or ""
+  exponent = parts.length > 1 ? (parts[1] or "0").to_i : 0
+  halves = mantissa.split(".")
+  whole = halves[0] or ""
+  fraction = halves.length > 1 ? (halves[1] or "") : ""
+  mutable digits = whole + fraction
+  mutable point = exponent - fraction.length
+  while digits.start_with?("0")
+    digits = digits.slice(1, digits.length - 1)
+  end
+  while digits.end_with?("0")
+    digits = digits.slice(0, digits.length - 1)
+    point += 1
+  end
+  sign = negative ? "-" : ""
+  sign + json_emit_digits(digits, point)
+end
+
+# `digits × 10^point`, laid out as `fpconv.c` lays it out.
+def json_emit_digits(digits, point)
+  count = digits.length
+  exponent = (point + count - 1).abs
+  if point >= 0 && exponent < 15
+    return digits + "".ljust(point, "0") + ".0"
+  end
+  if point < 0 && (point > -7 || exponent < 10)
+    offset = count + point
+    return "0." + "".ljust(0 - offset, "0") + digits if offset <= 0
+    return digits.slice(0, offset) + "." + digits.slice(offset, count - offset)
+  end
+  mutable out = digits.slice(0, 1)
+  if count > 1
+    out << "."
+    out << digits.slice(1, count - 1)
+  end
+  out << "e"
+  out << (point + count - 1 < 0 ? "-" : "+")
+  out << exponent.to_s
+  out
+end

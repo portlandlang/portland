@@ -62,7 +62,7 @@ candidates = %w[
   fetch values_at transform_values transform_keys invert key has_value? value? slice except compact each_key each_value to_h
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv begin end exclude_end? cover? overlap?
   inspect class hash is_a? respond_to? send tap then itself instance_of?
-  append prepend concat replace to_ary to_int to_str to_sym
+  append prepend concat replace to_ary to_int to_str to_sym intern
 ].uniq.sort
 
 # [call text, positional count, block?]

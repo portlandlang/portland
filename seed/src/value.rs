@@ -52,8 +52,9 @@ pub enum Value {
     Failure(Box<Value>),
     String(String),
     /// `:name` — a name rather than data (ADR 0023). Holds the name without
-    /// its colon. Interning is an optimisation the seed does not need: there
-    /// is no `to_sym`, so every symbol in a program is written literally.
+    /// its colon. Interning is an optimisation the seed does not need: a
+    /// symbol is a tagged string, made from text by `to_sym` (ADR 0071) or
+    /// written literally, and dies with its last reference.
     Symbol(String),
     /// Immutable named record; fields stay in definition order.
     Struct {
