@@ -1,0 +1,30 @@
+# 0072 — JSON is core, written twice: `null` is `nil`, keys may be symbols, Ruby's answers byte for byte
+
+- **Status:** Accepted (ruled by the deciding user 2026-11-03 on the recommendations in [#182](https://github.com/portlandlang/portland/issues/182); recorded, not built — the build is [#182](https://github.com/portlandlang/portland/issues/182))
+- **Date:** 2026-11-03
+- **Issue:** [#182](https://github.com/portlandlang/portland/issues/182)
+- **Amends:** [ADR 0064](0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) decision 5 — the `serde_json` loan is not taken
+
+## Context
+
+[ADR 0064](0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) put `json` in core while it was a `serde_json` loan, with two decisions left to the Rust↔Portland mapping. Deciding them meant probing the installed json gem (3.1.0 on Ruby 4.0.7), and the probe changed the engine question: json 3.1 **refuses duplicate keys** (`duplicate key "a" at line 1 column 1`) where serde_json keeps the last silently; it keeps insertion order where serde's map sorts unless a feature is on; its error sentences (`unexpected character: ']' at line 1 column 4`, `expected object key, got 'a:1}'`, `unexpected end of input`, `incomplete surrogate pair`, `nesting of 101 is too deep`) are its own; and its float writer is neither `Float#to_s` nor anyone else's — `1e+20` where `to_s` says `1.0e+20`, `0.00000015` where `to_s` says `1.5e-07`. Matching Ruby through serde would have meant a feature flag, a custom visitor, a rewrite of every error, and a hand-written generator anyway.
+
+The reframe: the seed is disposable Rust whatever engine it holds. What lasts is the Portland version, and the house already writes every piece of the compiler twice — `lexer.rs` and `lexer.pdx`, the seed as oracle and the Portland twin pinned to it byte for byte (principle 7).
+
+## Decision
+
+1. **`null` is `nil`.** `{"a": null}` parses to a hash whose `"a"` is nil, and Portland's optionals already tell that apart from a missing key: `document["a"]` is `some(nil)`, `document["missing"]` is `nil`, `document.key?("a")` is true — a distinction Ruby's `JSON.parse` cannot make. No second absence word.
+1. **Keys are strings, and may be symbols.** `JSON.parse` answers string keys, as Ruby's does; `symbolize_names: true` answers symbol keys, which [ADR 0071](0071-2026-11-03-a-symbol-may-be-made-from-text.md) made possible the same day — a symbol made from a document's text is a `Symbol` of no declared vocabulary, and `document[:name]` is an open position.
+1. **Numbers split on Ruby's rule.** A fraction or exponent makes a Float, otherwise an Integer; `1E2` is `100.0`, `-0` is `0`, `1e400` is `Infinity`. An integer past 64 bits is a **failure**, not a refusal: `JSON.parse` is a fallible operation on data ([ADR 0027](0027-2026-07-27-errors-as-typed-results.md)), where [ADR 0070](0070-2026-11-03-integers-are-64-bit-for-now.md)'s refusal is for a literal in source.
+1. **Ruby's answers at every edge.** Duplicate keys fail with Ruby's sentence; insertion order is kept; nesting past 100 fails with `nesting of 101 is too deep`; a lone surrogate, a trailing comma, a bare word, an empty document, and text after the value each fail with json 3.1's sentence, read from its `parser.c` rather than recalled. Top-level scalars parse. A non-string handed to `parse` refuses — `no implicit conversion of nil into String` — since that is the program's mistake, not the document's.
+1. **`generate` and `pretty_generate` answer Ruby's text.** `/` unescaped, control characters as `\u0001`, U+2028 LINE SEPARATOR left raw, symbols as strings, a hash with symbol keys as string keys, the json gem's float writer (`1e+20`, `0.00000015`, `100.0`, `-0.0`), two-space `pretty_generate` with `"key": value` and empties kept as `[]` and `{}`. `NaN` and `Infinity` fail with `NaN not allowed in JSON`. A struct, a range, or an enum case **refuses**, naming `to_h` — Ruby generates `"#<struct a=1>"`, silent garbage, and that is a divergence Portland is loud about on purpose (principle 5).
+1. **Written twice, no dependency.** The seed implements the parser and the generators in Rust by hand, the oracle; the compiler implements them in Portland (`compiler/json.pdx`), and the hosted evaluator runs the Portland version rather than delegating, so the differential suite compares two independent implementations against Ruby's fixtures. `serde_json` is not taken; the seed stays at its dependencies. JSON is core as ADR 0064 said — `JSON.parse`, `JSON.generate`, `JSON.pretty_generate` as type functions ([ADR 0058](0058-2026-10-16-builtin-types-carry-type-functions.md)), no `require` — and the Portland version is the one that becomes a tile when the tile system exists ([#174](https://github.com/portlandlang/portland/issues/174)), with nothing to rewrite.
+1. **Not now.** `to_json` on every value (a monkeypatch onto `Object` in Ruby, a universal method here — its own question), `JSON.dump` and `JSON.load` (different nil semantics; `load` runs `create_additions`), `object_class:`, `array_class:`, `allow_nan:`, `max_nesting:`.
+
+## Consequences
+
+- ADR 0064 decision 5 is amended: there is no loan. `json` is core because it is Rust in the seed, as every builtin is, and Portland on the compiler side from day one.
+- The Portland `json.pdx` is the first library written in Portland and a dry run for the default tiles; where it pulls for a primitive — a codepoint-to-character step for `\uXXXX` escapes, a string builder cheaper than `+=` — the pull is recorded and answered on its own terms.
+- Inference: `JSON.parse` answers Unknown (the shape is the document's), `JSON.generate` and `JSON.pretty_generate` a String, through `type_function_answer`.
+- ruby/spec has no `library/json`; the fixtures are the json gem's answers, verified by running Ruby 4.0.7 and pinned in a two-oracle test and `spec/json/`.
+- Ledger: [json.md](../ruby/json.md). [#182](https://github.com/portlandlang/portland/issues/182) is the build issue.

@@ -83,6 +83,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0069](0069-2026-11-03-strings-are-utf-8-always.md) — Strings are UTF-8, always; bytes are a type that waits for its pull
 - [0070](0070-2026-11-03-integers-are-64-bit-for-now.md) — Integers are 64-bit for now; past the edge refuses, and bignums stay possible
 - [0071](0071-2026-11-03-a-symbol-may-be-made-from-text.md) — A symbol may be made from text; a declared vocabulary still refuses it
+- [0072](0072-2026-11-03-json-is-core-written-twice.md) — JSON is core, written twice: `null` is `nil`, keys may be symbols, Ruby's answers byte for byte
 
 <!-- /generated -->
 
