@@ -28,7 +28,7 @@ dice.seed          # 42
 - **A single `sample` is a maybe**: `[].sample` is nil, `[4].sample` is 4 under the or-guard like any lookup.
 - **`srand(0)` means a fresh random seed**, as Ruby's does.
 - **A generator moves.** It is the one value that does, by nature; two are equal by seed and position, and `inspect(Random.new(42))` is `Random.new(42)`.
-- **Not here:** `Random.bytes`, `urandom`, `Random::Formatter` ([#119](https://github.com/portlandlang/portland/issues/119)); `Random::DEFAULT`, which the bare functions are; `random: Random` the class; float ranges ([#149](https://github.com/portlandlang/portland/issues/149)); `sample`'s `random:` object that is not a Random.
+- **Not here:** `Random.bytes`, `urandom`, `Random::Formatter` (they answer bytes, a type that waits for its pull — [#183](https://github.com/portlandlang/portland/issues/183), out of [ADR 0069](../adr/0069-2026-11-03-strings-are-utf-8-always.md)); `Random::DEFAULT`, which the bare functions are; `random: Random` the class; float ranges ([#149](https://github.com/portlandlang/portland/issues/149)); `sample`'s `random:` object that is not a Random.
 
 ## Migration
 

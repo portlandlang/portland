@@ -106,7 +106,9 @@ def builtin_constants
     ["Float::MIN_10_EXP", "constant", -307],
     ["Float::MIN_EXP", "constant", -1021],
     ["Float::NAN", "constant", 0.0 / 0.0],
-    ["Float::RADIX", "constant", 2]
+    ["Float::RADIX", "constant", 2],
+    # The one encoding a string has (ADR 0069), spelled as Ruby spells it.
+    ["Encoding::UTF_8", "constant", "UTF-8"]
   ]
 end
 
@@ -2495,6 +2497,9 @@ def evaluate_method_call(node, mutable bindings)
   when "codepoints" then receiver.codepoints
   when "bytes" then receiver.bytes
   when "bytesize" then receiver.bytesize
+  # A string is UTF-8, always (ADR 0069): the host's one answer to each.
+  when "encoding" then receiver.encoding
+  when "valid_encoding?" then receiver.valid_encoding?
   when "hex" then receiver.hex
   when "oct" then receiver.oct
   when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))

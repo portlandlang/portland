@@ -1,0 +1,25 @@
+# A string is UTF-8, always (ADR 0069, #119), from ruby/spec
+# core/string/encoding_spec.rb and core/string/valid_encoding_spec.rb: the
+# one row of each that survives a language with a single encoding and no
+# tag to force. Ruby answers US-ASCII for an ASCII-only literal and the
+# forced or transcoded encoding otherwise; here every string answers
+# `Encoding::UTF_8`, and no sequence a string can hold is invalid in it.
+
+require_relative "../spec_helper"
+
+context "String#encoding for Strings with \\u escapes" do
+  specify "returns UTF-8" do
+    expect("䁀".encoding).to eq(Encoding::UTF_8)
+    expect("a".encoding).to eq(Encoding::UTF_8)
+    expect("".encoding).to eq(Encoding::UTF_8)
+    expect(Encoding::UTF_8).to eq("UTF-8")
+  end
+end
+
+context "String#valid_encoding?" do
+  specify "returns true if the String's encoding is valid" do
+    expect("a".valid_encoding?).to eq(true)
+    expect("腥ȡ".valid_encoding?).to eq(true)
+    expect("".valid_encoding?).to eq(true)
+  end
+end

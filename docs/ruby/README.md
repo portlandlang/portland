@@ -30,6 +30,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Constants](constants.md) — `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
 - [Conversions: `to_i`, `to_f`, `to_s`](conversions.md) — `to_i` and `to_f` are Ruby's lenient readers — leading digits count, garbage is 0 — and `to_s` is universal except on nil; the strict `Integer()` and `Float()` wait for a pull.
+- [Encodings and binary data](encodings.md) — A string is UTF-8 text, always — no encoding tag, so `encoding` answers `Encoding::UTF_8` and `valid_encoding?` is true on every string, `force_encoding` and `encode` have no meaning, and binary data is a different type that does not exist yet; `pack` and `unpack` wait for it.
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Equality](equality.md) — `==` and `eql?` migrate unchanged; `hash` and `equal?` do not exist.

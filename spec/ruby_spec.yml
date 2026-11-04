@@ -2179,6 +2179,11 @@ core/string/element_reference_spec.rb:
   link: docs/ruby/ranges.md
 core/string/empty_spec.rb:
   pdx: [spec/string/empty_spec.pdx]
+core/string/encoding_spec.rb:
+  pdx: [spec/string/encoding_spec.pdx]
+  status: partial_intentional
+  reason: "A string is UTF-8, always (ADR 0069): encoding answers Encoding::UTF_8 on every string, so only the UTF-8 row ports; the US-ASCII, force_encoding, encode!, and default_internal/external rows describe tags Portland has none of."
+  link: docs/ruby/encodings.md
 core/string/end_with_spec.rb:
   pdx: [spec/string/predicates_spec.pdx]
   status: partial_planned
@@ -2364,6 +2369,11 @@ core/string/uplus_spec.rb:
   status: skipped
   reason: "Every string is frozen, so +@ has no mutable copy to hand back (ADR 0015)."
   link: docs/ruby/mutability.md
+core/string/valid_encoding_spec.rb:
+  pdx: [spec/string/encoding_spec.pdx]
+  status: partial_intentional
+  reason: "A string is UTF-8, always (ADR 0069): no sequence a string can hold is invalid in it, so valid_encoding? is true and only that row ports; the force_encoding rows describe tags Portland has none of."
+  link: docs/ruby/encodings.md
 core/string/upto_spec.rb:
   pdx: [spec/string/successor_spec.pdx]
   status: partial_intentional
@@ -2680,6 +2690,26 @@ core/kernel/format_spec.rb:
   status: partial_intentional
   reason: "format and sprintf are twins here too (ADR 0067), pinned by an example that compares their answers; the instance_method and method reflection rows stay upstream, since the runtime is closed."
   link: docs/ruby/conversions.md
+core/encoding/:
+  status: skipped
+  reason: "A string is UTF-8, always (ADR 0069): there is no encoding tag, so no Encoding objects, lists, converters, defaults, or errors to port."
+  link: docs/ruby/encodings.md
+core/string/valid_encoding/:
+  status: skipped
+  reason: "A string is UTF-8, always (ADR 0069): every string is valid in the one encoding it has; the one surviving row is in core/string/valid_encoding_spec.rb's entry."
+  link: docs/ruby/encodings.md
+core/string/b_spec.rb:
+  status: skipped
+  reason: "A string is UTF-8, always (ADR 0069): there is no BINARY tag to retag as; bytes are a type that waits for its pull (#183)."
+  link: docs/ruby/encodings.md
+core/string/force_encoding_spec.rb:
+  status: skipped
+  reason: "A string is UTF-8, always (ADR 0069): there is no encoding tag to force."
+  link: docs/ruby/encodings.md
+core/string/scrub_spec.rb:
+  status: skipped
+  reason: "A string is UTF-8, always (ADR 0069): no sequence a string can hold is invalid, so there is nothing to scrub."
+  link: docs/ruby/encodings.md
 core/fiber/:
   status: skipped
   reason: "No Fiber: concurrency is together and meanwhile."

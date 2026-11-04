@@ -391,10 +391,17 @@ fn builtin_constants() -> HashMap<String, Value> {
         ("NAN", Value::Float(f64::NAN)),
         ("RADIX", Value::Integer(2)),
     ];
-    float_constants
+    let mut constants: HashMap<String, Value> = float_constants
         .into_iter()
         .map(|(name, value)| (format!("Float::{name}"), value))
-        .collect()
+        .collect();
+    // The one encoding a string has (ADR 0069), spelled as Ruby spells it so
+    // `text.encoding == Encoding::UTF_8` ports verbatim.
+    constants.insert(
+        "Encoding::UTF_8".to_string(),
+        Value::String("UTF-8".to_string()),
+    );
+    constants
 }
 
 /// Whether a number sits inside an integer range, either end open (ADR
@@ -6479,6 +6486,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect(),
             ),
             (Value::String(text), "bytesize", []) => Value::Integer(text.len() as i64),
+            // A string is UTF-8, always (ADR 0069): there is one encoding to
+            // answer, and no sequence a string can hold is invalid in it.
+            (Value::String(_), "encoding", []) => Value::String("UTF-8".to_string()),
+            (Value::String(_), "valid_encoding?", []) => Value::Boolean(true),
             (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
             (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
             // Ruby reads `\0`, `\&`, and `\\` in a replacement as escapes;
