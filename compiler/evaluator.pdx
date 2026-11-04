@@ -1047,6 +1047,16 @@ end
 def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
 
 # What a symbol's name answers for one of its text queries (#112).
+def symbol_case_answer(text, name)
+  case name
+  when "capitalize"   then text.capitalize
+  when "downcase"     then text.downcase
+  when "succ", "next" then text.succ
+  when "swapcase"     then text.swapcase
+  else text.upcase
+  end
+end
+
 def symbol_text_answer(text, name, arguments)
   case name
   when "name", "id2name" then text
@@ -2407,6 +2417,12 @@ def evaluate_method_call(node, mutable bindings)
   if (receiver in ["__symbol__", *]) && %w[intern to_sym].include?(node.name)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([receiver], bindings)
+  end
+  # The case changers and `succ` answer a symbol of the changed name, as
+  # Ruby's do: the host string's answer, tagged a symbol again.
+  if (receiver in ["__symbol__", *]) && %w[capitalize downcase next succ swapcase upcase].include?(node.name)
+    check_builtin_count(receiver, node.name, arguments.length)
+    return outcome([["__symbol__", symbol_case_answer(value_at(receiver, 1), node.name)]], bindings)
   end
   # A symbol answers Ruby's text queries about its name (#112), the seed's
   # arm: a guest symbol is a tagged host array, so its name answers instead.

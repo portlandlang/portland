@@ -4196,6 +4196,26 @@ impl<W: std::io::Write> Interpreter<W> {
             if matches!(name, "to_sym" | "intern") && arguments.is_empty() {
                 return Some(receiver.clone());
             }
+            // The case changers and `succ` answer a symbol of the changed
+            // name, as Ruby's do — the string's answer, made a symbol again.
+            if matches!(
+                name,
+                "capitalize" | "downcase" | "next" | "succ" | "swapcase" | "upcase"
+            ) && arguments.is_empty()
+            {
+                return self
+                    .method_call(
+                        Value::String(text.clone()),
+                        name,
+                        arguments,
+                        keyword_arguments,
+                        None,
+                    )
+                    .map(|answer| match answer {
+                        Value::String(changed) => Value::Symbol(changed),
+                        other => other,
+                    });
+            }
             if matches!(
                 name,
                 "empty?" | "end_with?" | "length" | "size" | "slice" | "start_with?"

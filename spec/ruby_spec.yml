@@ -2528,9 +2528,7 @@ core/symbol/all_symbols_spec.rb:
   reason: "The symbol table is runtime reflection; every Portland symbol is written literally (ADR 0023)."
   link: docs/ruby/symbols.md
 core/symbol/capitalize_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
 core/symbol/case_compare_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
   status: partial_intentional
@@ -2545,9 +2543,7 @@ core/symbol/comparison_spec.rb:
   reason: "Symbols are not ordered (ADR 0023)."
   link: docs/ruby/symbols.md
 core/symbol/downcase_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
 core/symbol/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
@@ -2580,9 +2576,10 @@ core/symbol/name_spec.rb:
   reason: "A bare non-ASCII symbol like :ルビー doesn't lex (names are ASCII outside a string), and a string's frozenness or identity can't be observed where values never mutate."
   link: docs/ruby/mutability.md
 core/symbol/next_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
+  status: partial_intentional
+  reason: "The one row compares method objects, which a closed runtime has none of; next is succ's twin, asked of the two answers."
+  link: docs/ruby/metaprogramming.md
 core/symbol/size_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
   status: partial_intentional
@@ -2594,13 +2591,9 @@ core/symbol/start_with_spec.rb:
   reason: "start_with? takes one argument here; the several-argument and to_str forms come with the string port, and regexps wait on #74."
   link: https://github.com/portlandlang/portland/issues/106
 core/symbol/succ_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
 core/symbol/swapcase_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
 core/symbol/symbol_spec.rb:
   status: skipped
   reason: "Symbols are not ordered, so not Comparable (ADR 0023), and there is no Symbol class object to allocate from."
@@ -2627,9 +2620,7 @@ core/symbol/to_sym_spec.rb:
   reason: "A symbol's to_sym is itself (ADR 0071); the operator, instance-variable, and class-variable symbols in upstream's list have no spelling here (ADR 0023 §2)."
   link: docs/ruby/symbols.md
 core/symbol/upcase_spec.rb:
-  status: skipped
-  reason: "Builds a symbol from computed text, and every Portland symbol is written literally (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/case_changers_spec.pdx]
 core/symbol/equal_value_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
   status: partial_intentional
