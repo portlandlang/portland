@@ -2,7 +2,7 @@
 
 **Summary:** `Math.sqrt`, `Math.log`, `Math::PI`, and the rest of Ruby's module functions are builtins spelled as Ruby spells them; a domain error is a failure in Ruby's own sentence, and `include Math` refuses.
 
-**Status:** decided ([ADR 0083](../adr/0083-2026-11-03-math-is-rubys.md), 2026-11-03, out of [#126](https://github.com/portlandlang/portland/issues/126)); not built — the build is [#196](https://github.com/portlandlang/portland/issues/196). `core/math/` ports under it. `Integer.sqrt` is already built ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)).
+**Status:** decided ([ADR 0083](../adr/0083-2026-11-03-math-is-rubys.md), 2026-11-03, out of [#126](https://github.com/portlandlang/portland/issues/126)) and built the same day on both implementations under [#196](https://github.com/portlandlang/portland/issues/196): every function in `core/math/`, ported whole into `spec/math/functions_spec.pdx` against Ruby 4.0.7's answers. `Integer.sqrt` was already built ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)). Two of Ruby's edges kept on purpose: `Math.log(x, 1)` answers NaN as Ruby's does, and `gamma` answers the exact factorial for the integers 1 through 23 as Ruby's table does.
 
 ## Ruby
 
@@ -20,7 +20,7 @@ Math.log(0)                # -Infinity
 
 - **Every function and both constants, Ruby's spellings, Ruby's answers.** Integers and floats go in, floats come out.
 - **A domain error is a failure** ([errors.md](errors.md)), with Ruby's sentence, so a caller unwraps it as any failure: `Math.sqrt(x) or 0.0`.
-- **`include Math` refuses** — a namespace is not a mixin ([namespaces.md](namespaces.md)); `Math.sqrt` is the one spelling, which is Ruby's own convention made law.
+- **`include Math` refuses** — a namespace is not a mixin ([namespaces.md](namespaces.md)): `Math is a namespace, not a trait — namespaces are never injected; write Math.method(...)`. `Math.sqrt` is the one spelling, which is Ruby's own convention made law.
 - **A non-number argument refuses at build time**, where Ruby raises `TypeError` at the call.
 
 ## Migration

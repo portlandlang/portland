@@ -111,7 +111,10 @@ def builtin_constants
     ["Float::NAN", "constant", 0.0 / 0.0],
     ["Float::RADIX", "constant", 2],
     # The one encoding a string has (ADR 0069), spelled as Ruby spells it.
-    ["Encoding::UTF_8", "constant", "UTF-8"]
+    ["Encoding::UTF_8", "constant", "UTF-8"],
+    # `Math`'s two constants (ADR 0083), Ruby's values.
+    ["Math::PI", "constant", 3.141592653589793],
+    ["Math::E", "constant", 2.718281828459045]
   ]
 end
 
@@ -1056,6 +1059,50 @@ end
 def guest_structs?(values) = guest_array?(values) && !values.empty? && values.all? { it in ["__struct__", *] }
 
 # What a symbol's name answers for one of its text queries (#112).
+# `Math` (ADR 0083): Ruby's module functions, the host's own arms — a
+# domain error comes back as the host's failure, a wrong count or kind of
+# argument as the host's refusal, so the sentences are the seed's.
+def evaluate_math(name, arguments)
+  given = arguments.length
+  expected = if %w[atan2 hypot ldexp].include?(name) then 2 elsif name == "log" then "1..2" else 1 end
+  unless (name == "log" && (given == 1 || given == 2)) || given == expected
+    panic("wrong number of arguments (given #{given}, expected #{expected})")
+  end
+  first = value_at(arguments, 0)
+  second = value_at(arguments, 1)
+  case name
+  when "sqrt"   then Math.sqrt(first)
+  when "cbrt"   then Math.cbrt(first)
+  when "sin"    then Math.sin(first)
+  when "cos"    then Math.cos(first)
+  when "tan"    then Math.tan(first)
+  when "asin"   then Math.asin(first)
+  when "acos"   then Math.acos(first)
+  when "atan"   then Math.atan(first)
+  when "sinh"   then Math.sinh(first)
+  when "cosh"   then Math.cosh(first)
+  when "tanh"   then Math.tanh(first)
+  when "asinh"  then Math.asinh(first)
+  when "acosh"  then Math.acosh(first)
+  when "atanh"  then Math.atanh(first)
+  when "exp"    then Math.exp(first)
+  when "expm1"  then Math.expm1(first)
+  when "log2"   then Math.log2(first)
+  when "log10"  then Math.log10(first)
+  when "log1p"  then Math.log1p(first)
+  when "erf"    then Math.erf(first)
+  when "erfc"   then Math.erfc(first)
+  when "gamma"  then Math.gamma(first)
+  when "lgamma" then Math.lgamma(first)
+  when "frexp"  then Math.frexp(first)
+  when "hypot"  then Math.hypot(first, second)
+  when "atan2"  then Math.atan2(first, second)
+  when "ldexp"  then Math.ldexp(first, second)
+  when "log"    then given == 1 ? Math.log(first) : Math.log(first, second)
+  else panic("Math has no #{name}")
+  end
+end
+
 # `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` (ADR 0072), run
 # by the Portland twin in json.pdx rather than the host's arms, so the
 # differential suite compares two implementations. The twin speaks plain
@@ -1748,8 +1795,9 @@ end
 # the host and hands each index to the guest block.
 def evaluate_builtin_type_function(node, mutable bindings)
   return evaluate_json(node, bindings) if node.receiver.name == "JSON"
-  # A type's `name` is its spelling (ADR 0074); `System` is not a type.
-  return outcome([node.receiver.name], bindings) if node.name == "name" && node.arguments.empty? && node.receiver.name != "System"
+  # A type's `name` is its spelling (ADR 0074); `System` and `Math` are
+  # function namespaces, not types.
+  return outcome([node.receiver.name], bindings) if node.name == "name" && node.arguments.empty? && !%w[Math System].include?(node.receiver.name)
   mutable arguments = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument, bindings)
@@ -1820,6 +1868,7 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return outcome([System.append_file(path, content)], bindings)
   end
   panic("System has no #{node.name}") if type_name == "System"
+  return outcome([evaluate_math(node.name, arguments)], bindings) if type_name == "Math"
   return evaluate_array_new(node, arguments, bindings) if type_name == "Array" && node.name == "new"
   # `Hash.new` (ADR 0063): the empty hash; a default value or block refuses
   # naming the or-guard — the seed's sentences.
@@ -2422,7 +2471,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Math Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   # `Name.new(...)` constructs through the written name; a local holding a

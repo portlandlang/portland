@@ -2659,6 +2659,51 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// `Math` on both oracles (ADR 0083): Ruby's module functions, Ruby's
+/// answers — the hosted evaluator hands each call to the host's own — with
+/// domain errors as failures in Ruby's sentence and the wrong argument
+/// refusing in Ruby's words.
+#[test]
+fn math_on_both_oracles() {
+    assert_both_print(
+        "math.pdx",
+        "p Math.sqrt(4), Math.cbrt(-27), Math.hypot(3, 4), Math.log(8, 2), Math.log2(8), Math.log10(1000), Math.log(0)\n\
+         p Math.exp(1), Math.sin(0), Math.atan2(1, 1), Math.gamma(5), Math.gamma(23), Math.lgamma(5), Math.frexp(1234), Math.ldexp(0.6025390625, 11)\n\
+         p Math.erf(1), Math.erfc(1), Math.atanh(1), Math.log(8, 1).nan?, Math.sqrt(0.0 / 0.0).nan?, Math.gamma(-0.0)\n\
+         p Math::PI, Math::E, Math.acos(-1) == Math::PI\n\
+         p Math.sqrt(-1), Math.log(8, -2), Math.gamma(-1), Math.acosh(0.5), Math.log1p(-2), Math.lgamma(-1.0 / 0.0)\n",
+        "2.0\n-3.0\n5.0\n3.0\n3.0\n3.0\n-Infinity\n\
+         2.718281828459045\n0.0\n0.7853981633974483\n24.0\n1.1240007277776077e+21\n[3.1780538303479453, 1]\n[0.6025390625, 11]\n1234.0\n\
+         0.8427007929497148\n0.15729920705028516\nInfinity\ntrue\ntrue\n-Infinity\n\
+         3.141592653589793\n2.718281828459045\ntrue\n\
+         failure(\"Numerical argument is out of domain - sqrt\")\nfailure(\"Numerical argument is out of domain - log\")\nfailure(\"Numerical argument is out of domain - gamma\")\nfailure(\"Numerical argument is out of domain - acosh\")\nfailure(\"Numerical argument is out of domain - log1p\")\nfailure(\"Numerical argument is out of domain - lgamma\")\n",
+    );
+    assert_both_oracles_refuse(
+        "math_refusal.pdx",
+        None,
+        &[
+            ("p Math.sqrt(\"1\")\n", "can't convert String into Float"),
+            ("p Math.sqrt(nil)\n", "can't convert nil into Float"),
+            (
+                "p Math.hypot(1)\n",
+                "wrong number of arguments (given 1, expected 2)",
+            ),
+            (
+                "p Math.sqrt(1, 2)\n",
+                "wrong number of arguments (given 2, expected 1)",
+            ),
+            (
+                "p Math.ldexp(1.0, \"2\")\n",
+                "no implicit conversion of String into Integer",
+            ),
+            (
+                "struct Box\n  side\n  include Math\nend\np Box.new(side: 4)\n",
+                "Math is a namespace, not a trait — namespaces are never injected; write Math.method(...)",
+            ),
+        ],
+    );
+}
+
 /// `Name = Data.define(:a, :b)` declares `struct Name` (ADR 0084) on both
 /// oracles — at the top level, in a module, with a `do … end` body of
 /// methods — and `Data.define` anywhere else, or with anything but symbols,

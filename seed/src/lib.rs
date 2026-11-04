@@ -10,6 +10,7 @@ pub mod heredoc;
 pub mod interpreter;
 pub mod json;
 pub mod lexer;
+pub mod math;
 pub mod parser;
 pub mod random;
 pub mod value;

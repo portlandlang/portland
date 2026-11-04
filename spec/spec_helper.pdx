@@ -159,6 +159,28 @@ def eq(expected)
   EqualMatcher.new(expected: expected)
 end
 
+# ruby/spec's `be_close(expected, tolerance)`: within the tolerance, strictly.
+struct CloseMatcher
+  expected
+  tolerance
+
+  def matches?(actual)
+    (actual - expected).abs < tolerance
+  end
+
+  def failure_message(actual)
+    "expected within #{inspect(tolerance)} of #{inspect(expected)}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected anything but within #{inspect(tolerance)} of #{inspect(expected)}"
+  end
+end
+
+def be_close(expected, tolerance)
+  CloseMatcher.new(expected: expected, tolerance: tolerance)
+end
+
 struct BooleanMatcher
   wanted
 

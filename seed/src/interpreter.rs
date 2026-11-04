@@ -401,6 +401,9 @@ fn builtin_constants() -> HashMap<String, Value> {
         "Encoding::UTF_8".to_string(),
         Value::String("UTF-8".to_string()),
     );
+    // `Math`'s two constants (ADR 0083), Ruby's values.
+    constants.insert("Math::PI".to_string(), Value::Float(std::f64::consts::PI));
+    constants.insert("Math::E".to_string(), Value::Float(std::f64::consts::E));
     constants
 }
 
@@ -2909,12 +2912,18 @@ impl<W: std::io::Write> Interpreter<W> {
                                 "{written} is a struct, not a trait — a struct is a value; hold one in a field"
                             );
                         }
+                        // A namespace holds methods, locals, or constants under
+                        // its name — `Math::PI` makes `Math` one (ADR 0083).
                         if self
                             .methods
                             .keys()
                             .any(|key| key.starts_with(&format!("{written}::")))
                             || self
                                 .variables
+                                .keys()
+                                .any(|key| key.starts_with(&format!("{written}::")))
+                            || self
+                                .constants
                                 .keys()
                                 .any(|key| key.starts_with(&format!("{written}::")))
                         {
@@ -3421,7 +3430,14 @@ impl<W: std::io::Write> Interpreter<W> {
                 if let Expression::Variable(type_name) = receiver.as_ref()
                     && matches!(
                         type_name.as_str(),
-                        "Array" | "Hash" | "Integer" | "JSON" | "Random" | "Range" | "System"
+                        "Array"
+                            | "Hash"
+                            | "Integer"
+                            | "JSON"
+                            | "Math"
+                            | "Random"
+                            | "Range"
+                            | "System"
                     )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
@@ -3725,9 +3741,16 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("{type_name}.{name} takes no keyword arguments, got {label}:");
         }
         // A type's `name` is its spelling (ADR 0074); the function
-        // namespaces `System` and `JSON` are not types.
-        if name == "name" && arguments.is_empty() && !matches!(type_name, "JSON" | "System") {
+        // namespaces `System`, `JSON`, and `Math` are not types.
+        if name == "name"
+            && arguments.is_empty()
+            && !matches!(type_name, "JSON" | "Math" | "System")
+        {
             return Some(Value::String(type_name.to_string()));
+        }
+        // `Math` is Ruby's, with domain errors as failures (ADR 0083).
+        if type_name == "Math" {
+            return Some(crate::math::call(name, &arguments));
         }
         match (type_name, name) {
             // JSON is core, written by hand (ADR 0072): a document in, its

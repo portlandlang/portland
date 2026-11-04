@@ -412,9 +412,20 @@ end
 # error; the evaluator refuses it.
 def type_function_answer(node) = type_function_answer_for(node.receiver.name, node.name)
 
+# `Math` (ADR 0083): the total functions answer a Float; one that may answer
+# a domain failure is unknown, as every fallible builtin is; `frexp` and
+# `lgamma` answer a pair.
+def math_answer(name)
+  return ["array", ["unknown"]] if name == "frexp" || name == "lgamma"
+  return ["unknown"] if %w[acos acosh asin atanh gamma log log10 log1p log2 sqrt].include?(name)
+  return ["float"] if %w[atan atan2 cbrt cos cosh erf erfc exp expm1 hypot ldexp sin sinh tan tanh asinh].include?(name)
+  ["unknown"]
+end
+
 # The same answers reached through a type value, `value.class.new` (ADR
 # 0074), where there is no receiver node to read the type's name from.
 def type_function_answer_for(type_name, name)
+  return math_answer(name) if type_name == "Math"
   case name
   when "sqrt"                              then ["integer"]
   when "arguments"                         then ["array", ["string"]]
@@ -441,7 +452,7 @@ end
 # unbound name is the type's.
 def builtin_type_function?(node, types)
   return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Hash Integer JSON Random Range System].include?(node.receiver.name)
+  return false unless %w[Array Hash Integer JSON Math Random Range System].include?(node.receiver.name)
   # Unbound, or bound to nothing but itself as a type value (ADR 0074).
   answered = synthesize_name(node.receiver.name, types)
   answered == ["unknown"] || answered == ["type", node.receiver.name]
@@ -459,7 +470,7 @@ def call_answer(receiver, node, types)
   # own answers.
   if receiver in ["type", *]
     type_name = type_at(receiver, 1)
-    return type_function_answer_for(type_name, name) if %w[Array Hash Integer JSON Random Range System].include?(type_name)
+    return type_function_answer_for(type_name, name) if %w[Array Hash Integer JSON Math Random Range System].include?(type_name)
     return ["struct", type_name] if name == "new"
     return synthesize_name(type_name + "." + name, types)
   end
