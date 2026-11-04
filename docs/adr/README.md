@@ -82,6 +82,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0068](0068-2026-10-25-system-is-the-floor-module.md) — `System` is the floor module: a member touches the host, or it is not a member
 - [0069](0069-2026-11-03-strings-are-utf-8-always.md) — Strings are UTF-8, always; bytes are a type that waits for its pull
 - [0070](0070-2026-11-03-integers-are-64-bit-for-now.md) — Integers are 64-bit for now; past the edge refuses, and bignums stay possible
+- [0071](0071-2026-11-03-a-symbol-may-be-made-from-text.md) — A symbol may be made from text; a declared vocabulary still refuses it
 
 <!-- /generated -->
 

@@ -314,7 +314,7 @@ config[:name]                        # => "pdx"
 mixed = {"string" => 1, sym: 2}      # the rocket stays for other keys
 ```
 
-`{:name => "pdx"}` is refused with the rewrite named. **There is no `String#to_sym`** — a symbol built from a string at runtime could never be checked against a vocabulary, so cutting it is what makes checking possible at all. Operator symbols (`:+`, `:[]`) went with the `send` and `&:` family that needed them.
+`{:name => "pdx"}` is refused with the rewrite named. **There is no `String#to_sym` yet** — it was cut so a symbol could never be built from text, and [ADR 0071](adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md) brings it back (not yet built): a symbol made from text is a `Symbol` of no declared vocabulary, welcome anywhere a symbol is a value and refused where a vocabulary is checked, with `case/in` as the gate. Operator symbols (`:+`, `:[]`) went with the `send` and `&:` family that needed them.
 
 An **enum** declares a closed vocabulary of symbol cases, and a case may carry a keyword-only payload (ADR 0022):
 
