@@ -724,7 +724,21 @@ impl<'source> Parser<'source> {
                 {
                     panic!("duplicate keyword argument {label}");
                 }
-                keyword_arguments.push((label, self.expression()));
+                // `build(name:)` — a label with no value takes the name's own
+                // (ADR 0078), resolved as any bare name is.
+                let value = match self.peek_kind() {
+                    Some(TokenKind::Comma | TokenKind::RightParen) | None => {
+                        Expression::Variable(label.clone())
+                    }
+                    // Ruby reads the next line as the value when one is there
+                    // and omits it when not — two readings of one line
+                    // ending, so it asks (ranges.md's rule).
+                    Some(TokenKind::Newline) => panic!(
+                        "'{label}:' at the end of a line is ambiguous — write '{label}: {label}', or put the value on this line"
+                    ),
+                    _ => self.expression(),
+                };
+                keyword_arguments.push((label, value));
             } else {
                 if !keyword_arguments.is_empty() {
                     panic!("positional arguments cannot follow keyword arguments");
@@ -847,7 +861,21 @@ impl<'source> Parser<'source> {
                 {
                     panic!("duplicate keyword argument {label}");
                 }
-                keyword_arguments.push((label, self.expression()));
+                // `build(name:)` — a label with no value takes the name's own
+                // (ADR 0078), resolved as any bare name is.
+                let value = match self.peek_kind() {
+                    Some(TokenKind::Comma | TokenKind::RightParen) | None => {
+                        Expression::Variable(label.clone())
+                    }
+                    // Ruby reads the next line as the value when one is there
+                    // and omits it when not — two readings of one line
+                    // ending, so it asks (ranges.md's rule).
+                    Some(TokenKind::Newline) => panic!(
+                        "'{label}:' at the end of a line is ambiguous — write '{label}: {label}', or put the value on this line"
+                    ),
+                    _ => self.expression(),
+                };
+                keyword_arguments.push((label, value));
             } else {
                 if !keyword_arguments.is_empty() {
                     panic!("positional arguments cannot follow keyword arguments");
@@ -3023,11 +3051,13 @@ impl<'source> Parser<'source> {
                         // the only spelling of one (ADR 0023 §1). The lexer
                         // hands us `name` then `:` because the colon binds to
                         // the name on its left.
+                        let mut shorthand_name = None;
                         let key = if self.peek_kind() == Some(TokenKind::Identifier)
                             && self.peek_kind_at(1) == Some(TokenKind::Colon)
                         {
                             let name = self.advance().text.to_string();
                             self.position += 1; // the `:`
+                            shorthand_name = Some(name.clone());
                             Expression::Symbol(name)
                         } else {
                             let rocketed = self.tokens.get(self.position).copied();
@@ -3056,7 +3086,26 @@ impl<'source> Parser<'source> {
                             self.position += 1; // the `=>`
                             key
                         };
-                        let value = self.expression();
+                        // `{name:}` — a key with no value takes the name's own
+                        // (ADR 0078), resolved as any bare name is.
+                        // Newlines inside the braces end nothing (#143), so a
+                        // label at a line's end takes the next line's value when
+                        // one is there, as Ruby's does, and its own name when the
+                        // closer or a comma follows.
+                        let value = match shorthand_name {
+                            Some(name) => {
+                                self.skip_newlines();
+                                if matches!(
+                                    self.peek_kind(),
+                                    Some(TokenKind::Comma | TokenKind::RightBrace)
+                                ) {
+                                    Expression::Variable(name)
+                                } else {
+                                    self.expression()
+                                }
+                            }
+                            None => self.expression(),
+                        };
                         pairs.push((key, value));
                         self.skip_newlines();
                         if self.peek_kind() != Some(TokenKind::Comma) {
@@ -3195,7 +3244,18 @@ impl<'source> Parser<'source> {
                     if keyword.iter().any(|(existing, _)| *existing == label) {
                         panic!("duplicate keyword argument {label}");
                     }
-                    keyword.push((label, self.expression()));
+                    // `build(name:)` — a label with no value takes the name's
+                    // own (ADR 0078). Newlines inside the parens end nothing,
+                    // so a label at a line's end reads the next line's value
+                    // as Ruby does; the ambiguity is the paren-less call's.
+                    self.skip_newlines();
+                    let value = match self.peek_kind() {
+                        Some(TokenKind::Comma | TokenKind::RightParen) => {
+                            Expression::Variable(label.clone())
+                        }
+                        _ => self.expression(),
+                    };
+                    keyword.push((label, value));
                 } else {
                     if !keyword.is_empty() {
                         panic!("positional arguments cannot follow keyword arguments");

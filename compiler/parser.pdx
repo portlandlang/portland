@@ -1430,11 +1430,11 @@ def parse_dot(tokens, receiver, mutable position, safe)
     else
       tokens[0..opener - 1]
     end
-    mutable step = parse_argument(argument_tokens, position)
+    mutable step = parse_command_argument(argument_tokens, position)
     arguments << step.node
     position = step.position
     while operator_at?(argument_tokens, position, %w[,])
-      step = parse_argument(argument_tokens, position + 1)
+      step = parse_command_argument(argument_tokens, position + 1)
       arguments << step.node
       position = step.position
     end
@@ -1784,7 +1784,16 @@ def parse_hash(tokens, mutable position)
     # `{name: "pdx"}` — shorthand, and the only symbol-key spelling
     # (ADR 0023 §1). The lexer hands back `name` then `:`.
     if tokens[position].identifier? && operator_at?(tokens, position + 1, %w[:])
-      shorthand = parse_expression(tokens, position + 2)
+      # `{name:}` — a key with no value takes the name's own (ADR 0078),
+      # resolved as any bare name is.
+      # Newlines inside the braces end nothing, so a label at a line's end
+      # takes the next line's value when one is there, as Ruby's does.
+      value_start = skip_newlines_at(tokens, position + 2)
+      shorthand = if operator_at?(tokens, value_start, %w[, }])
+        Step.new(node: identifier_node(tokens[position].text, line: line_at(tokens, position)), position: value_start)
+      else
+        parse_expression(tokens, value_start)
+      end
       pairs << pair_node(symbol_node(tokens[position].text), shorthand.node)
       position = skip_newlines_at(tokens, shorthand.position)
       if operator_at?(tokens, position, %w[,])
@@ -1816,11 +1825,40 @@ def parse_hash(tokens, mutable position)
   end
 end
 
+# A label at the end of a line (ADR 0078): Ruby reads the next line as the
+# value when one is there and omits it when not, two readings of one line
+# ending, so Portland asks — the seed's sentence.
+def omitted_value_sentence(name) = "'#{name}:' at the end of a line is ambiguous — write '#{name}: #{name}', or put the value on this line"
+
+# A paren-less call's argument: its line is the whole argument list, so a
+# label with nothing after it on the line is the ambiguous case (ADR 0078)
+# — Ruby would read the next line as the value, or omit it at the end of
+# the file; Portland asks.
+def parse_command_argument(tokens, position)
+  token = tokens[position]
+  if token.identifier? && operator_at?(tokens, position + 1, %w[:]) && (position + 2 >= tokens.length || tokens[position + 2].kind == "newline")
+    return Step.new(node: error_node(omitted_value_sentence(token.text)), position: position + 2)
+  end
+  parse_argument(tokens, position)
+end
+
 # One argument: `label: value` makes a keyword argument, else an expression.
 def parse_argument(tokens, position)
   token = tokens[position]
   if token.identifier? && operator_at?(tokens, position + 1, %w[:])
-    value = parse_expression(tokens, position + 2)
+    # `build(name:)` — a label with no value takes the name's own (ADR
+    # 0078), resolved as any bare name is.
+    # Inside parens newlines end nothing, so the value may sit on the next
+    # line as Ruby's may; a paren-less call's arguments end with its line,
+    # so a label there with nothing after it is the ambiguous case.
+    value_start = skip_newlines_at(tokens, position + 2)
+    if value_start >= tokens.length
+      return Step.new(node: error_node(omitted_value_sentence(token.text)), position: value_start)
+    end
+    if operator_at?(tokens, value_start, %w[, )])
+      return Step.new(node: keyword_argument_node(token.text, identifier_node(token.text, line: token.line)), position: value_start)
+    end
+    value = parse_expression(tokens, value_start)
     return Step.new(node: keyword_argument_node(token.text, value.node), position: value.position)
   end
   # Ruby's bare hash argument, `render :partial => "x"` (#135): the keyword
@@ -2368,11 +2406,11 @@ def parse_command(tokens, mutable position)
   else
     tokens[0..opener - 1]
   end
-  mutable step = parse_argument(argument_tokens, position + 1)
+  mutable step = parse_command_argument(argument_tokens, position + 1)
   mutable arguments = [step.node]
   position = step.position
   while operator_at?(argument_tokens, position, %w[,])
-    step = parse_argument(argument_tokens, position + 1)
+    step = parse_command_argument(argument_tokens, position + 1)
     arguments << step.node
     position = step.position
   end

@@ -2659,6 +2659,29 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// `{name:, port:}` and `build(name:, port:)` read as Ruby 3.1 reads them
+/// (ADR 0078) on both oracles — a key or label with no value takes the
+/// name's own — and the one line-ending Ruby reads two ways refuses.
+#[test]
+fn omitted_values_on_both_oracles() {
+    assert_both_print(
+        "omitted_values.pdx",
+        "name = \"pdx\"\nport = 8080\ndef build(name:, port:) = \"#{name}:#{port}\"\n\
+         p({name:, port:})\np({port:, name: \"other\"})\np({name:,\n   port:})\n\
+         puts build(name:, port:)\nputs build(name: \"x\", port:)\nputs build(name:,\n  port:)\n\
+         p build(port:\n  1, name:)\np({name:\n})\n",
+        "{name: \"pdx\", port: 8080}\n{port: 8080, name: \"other\"}\n{name: \"pdx\", port: 8080}\npdx:8080\nx:8080\npdx:8080\n\"pdx:1\"\n{name: \"pdx\"}\n",
+    );
+    assert_both_oracles_refuse(
+        "omitted_value_at_line_end.pdx",
+        None,
+        &[(
+            "name = 1\nputs name:\np 1\n",
+            "'name:' at the end of a line is ambiguous — write 'name: name', or put the value on this line",
+        )],
+    );
+}
+
 /// Ruby's optional `do` after a `while` or `until` condition is declined
 /// (ADR 0079) on both oracles, with the rewrite named.
 #[test]

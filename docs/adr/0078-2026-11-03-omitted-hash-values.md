@@ -1,6 +1,6 @@
 # 0078 — `{name:, port:}` reads as Ruby 3.1 reads it
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#167](https://github.com/portlandlang/portland/issues/167); not built — the build is [#191](https://github.com/portlandlang/portland/issues/191))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#167](https://github.com/portlandlang/portland/issues/167); built on both implementations the same day under [#191](https://github.com/portlandlang/portland/issues/191), with one refinement found in the build: a paren-less call's label at the end of its line refuses, since Ruby reads it two ways — see [symbols.md](../ruby/symbols.md))
 - **Date:** 2026-11-03
 - **Issue:** [#167](https://github.com/portlandlang/portland/issues/167)
 

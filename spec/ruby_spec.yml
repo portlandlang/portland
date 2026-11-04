@@ -3181,9 +3181,9 @@ language/line_spec.rb:
   link: docs/ruby/metaprogramming.md
 language/hash_spec.rb:
   pdx: [spec/hash/literal_spec.pdx]
-  status: partial_planned
-  reason: "The omitted-value form {a:} is decided (ADR 0078) and waits on its build; the shorthand is the only symbol-key spelling, so :a => 1 refuses, ** is a splat (ADR 0014), and the empty-expression, frozen-key, duplicate-key-warning, and a= key rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/191
+  status: partial_intentional
+  reason: "The shorthand is the only symbol-key spelling, so :a => 1 refuses; ** is a splat (ADR 0014); the empty-expression, frozen-key, duplicate-key-warning, a= key, and a!:/a?: syntax-error rows stay upstream."
+  link: docs/ruby/symbols.md
 language/heredoc_spec.rb:
   pdx: [spec/string/heredoc_spec.pdx]
   status: partial_intentional

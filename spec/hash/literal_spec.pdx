@@ -19,10 +19,10 @@ context "Hash" do
 end
 
 # From ruby/spec language/hash_spec.rb. The shorthand is the only
-# symbol-key spelling, so `:a => 1` refuses (docs/ruby/symbols.md); the
-# omitted-value form `{a:}` waits on #167; `**` is a splat (ADR 0014); the
-# empty-expression, frozen-key, duplicate-key-warning, and `a=` key rows
-# stay upstream.
+# symbol-key spelling, so `:a => 1` refuses (docs/ruby/symbols.md); `**` is
+# a splat (ADR 0014); the empty-expression, frozen-key,
+# duplicate-key-warning, `a=` key, and `a!:`/`a?:` syntax-error rows stay
+# upstream.
 context "Hash literal" do
   specify "{} should return an empty hash" do
     expect({}.size).to eq(0)
@@ -55,5 +55,48 @@ context "Hash.new" do
   specify "creates an empty Hash if passed no arguments" do
     expect(Hash.new).to eq({})
     expect(Hash.new.size).to eq(0)
+  end
+end
+
+# `{name:}` — a key with no value takes the name's own, as Ruby 3.1 reads it
+# (ADR 0078); the bare name resolves as any does, a local first and then a
+# method. From ruby/spec language/hash_spec.rb's "hash with omitted value"
+# rows; the mixed-syntax row drops its `:d => 4`, which refuses here.
+def bar = "baz"
+
+def foo(val) = {bar:, val:}
+
+context "Hash literal with omitted value" do
+  specify "accepts short notation 'key' for 'key: value' syntax" do
+    a = 1
+    b = 2
+    c = 3
+    expect({a:}).to eq({a: 1})
+    expect({a:, b:, c:}).to eq({a: 1, b: 2, c: 3})
+  end
+
+  specify "ignores hanging comma on short notation" do
+    a = 1
+    b = 2
+    c = 3
+    expect({a:, b:, c:,}).to eq({a: 1, b: 2, c: 3})
+  end
+
+  specify "accepts mixed syntax" do
+    a = 1
+    e = 5
+    expect({a:, b: 2, "c" => 3, e:}).to eq({a: 1, b: 2, "c" => 3, e: 5})
+  end
+
+  specify "works with methods and local vars" do
+    expect(foo(1)).to eq({bar: "baz", val: 1})
+  end
+
+  specify "takes the next line's value inside the braces, as Ruby does" do
+    a = 1
+    expect({a:
+    }).to eq({a: 1})
+    expect({a:
+      2}).to eq({a: 2})
   end
 end
