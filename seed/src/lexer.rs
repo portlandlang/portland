@@ -142,6 +142,10 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         "freeze" | "frozen?" | "dup" | "clone" => format!(
             "'{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
         ),
+        // `Data.define` is a spelling of `struct` at a constant's top level
+        // (ADR 0084); anywhere else it is the runtime class-building Portland
+        // does not do.
+        "Data" => "'Data.define' builds a type at runtime, which Portland does not do — write 'Name = Data.define(:a, :b)' at the top level, which declares 'struct Name' (ADR 0084)".to_string(),
         // Portland's own placeholders, retired when the floor module arrived.
         "argv" => "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)".to_string(),
         "read_file" => "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)".to_string(),

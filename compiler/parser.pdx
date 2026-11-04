@@ -2164,6 +2164,8 @@ def parse_statement(tokens, position)
   if token.operator? && token.text == "~"
     return Step.new(node: error_node("a task line belongs inside `together` — every task lives in the block that joins it (ADR 0029)"), position: skip_line_at(tokens, position))
   end
+  # `Point = Data.define(:x, :y)` is `struct Point` (ADR 0084).
+  return parse_data_define(tokens, position) if data_define_at?(tokens, position)
   # Ruby's multiple assignment, `a, b = pair` (#135): a pattern destructures
   # here — the seed's sentence.
   names = multiple_assignment_names(tokens, position)
@@ -2955,6 +2957,47 @@ def parse_enum(tokens, mutable position)
   return Step.new(node: error_node("enum #{name} has no cases — a vocabulary needs words"), position: position + 1) if cases.empty?
 
   Step.new(node: enum_def_node(name, cases, line: line), position: position + 1)
+end
+
+# `Point = Data.define(:x, :y)`, with an optional `do … end` body, is
+# `struct Point` with those fields (ADR 0084): a declaration wearing a
+# call's clothes — the seed's reading. The struct parser reads a token list
+# of its own, the `class` header with the fields as bare lines and the
+# block's body as the struct's, and the step resumes in the real list after
+# the call, or after the block's `end`.
+def data_define_at?(tokens, position)
+  return false unless position + 5 < tokens.length
+  token = tokens[position]
+  return false unless token.identifier? && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(token.text.slice(0, 1))
+  operator_at?(tokens, position + 1, %w[=]) && tokens[position + 2].text == "Data" && operator_at?(tokens, position + 3, %w[.]) && tokens[position + 4].text == "define" && operator_at?(tokens, position + 5, %w[(])
+end
+
+def parse_data_define(tokens, position)
+  line = line_at(tokens, position)
+  newline = Token.new(kind: "newline", text: "", leading_space: false, line: line)
+  mutable header = [Token.new(kind: "keyword", text: "class", leading_space: false, line: line), Token.new(kind: "identifier", text: tokens[position].text, leading_space: true, line: line), newline]
+  mutable index = position + 6
+  while index < tokens.length && !operator_at?(tokens, index, %w[)])
+    token = tokens[index]
+    unless token.symbol? && !token.text.start_with?(":\"")
+      return Step.new(node: error_node("Data.define takes field names as symbols — write Data.define(:x, :y)"), position: skip_line_at(tokens, index))
+    end
+    header << Token.new(kind: "identifier", text: symbol_name(token.text), leading_space: true, line: line)
+    header << newline
+    index += 1
+    index += 1 if operator_at?(tokens, index, %w[,])
+  end
+  return Step.new(node: error_node("expected ) to close Data.define"), position: index) unless operator_at?(tokens, index, %w[)])
+  index += 1
+  if keyword_at?(tokens, index, %w[do])
+    block = parse_block(tokens, index + 1, false)
+    body = tokens[(index + 1)..(block.position - 1)]
+    declared = parse_struct(header + body, 1)
+    return Step.new(node: declared.node, position: block.position)
+  end
+  closer = Token.new(kind: "keyword", text: "end", leading_space: false, line: line)
+  declared = parse_struct(header + [closer], 1)
+  Step.new(node: declared.node, position: index)
 end
 
 def parse_struct(tokens, mutable position)

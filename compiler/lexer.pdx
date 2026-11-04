@@ -165,6 +165,9 @@ def retired_sentence(name)
     "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — '#{stem}' answers the new value; bind it"
   when "hash" then "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)"
   when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
+  # `Data.define` is a spelling of `struct` at a constant's top level (ADR
+  # 0084); anywhere else it is the runtime class-building Portland does not do.
+  when "Data" then "'Data.define' builds a type at runtime, which Portland does not do — write 'Name = Data.define(:a, :b)' at the top level, which declares 'struct Name' (ADR 0084)"
   # Portland's own placeholders, retired when the floor module arrived.
   when "argv" then "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)"
   when "read_file" then "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)"

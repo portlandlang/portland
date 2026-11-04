@@ -373,6 +373,11 @@ impl<'source> Parser<'source> {
                 "'{names} = …' is a multiple assignment, which Portland does not have — match the value instead: 'value => [{names}]'"
             );
         }
+        // `Point = Data.define(:x, :y)` is `struct Point` (ADR 0084).
+        if self.data_define_ahead() {
+            self.rewrite_data_define();
+            return self.struct_definition();
+        }
         if self.peek_is_keyword("def") {
             let (definition, type_function) = self.method_definition();
             // `def self.` outside a struct body: a module body accepts it as
@@ -1105,6 +1110,91 @@ impl<'source> Parser<'source> {
             panic!("enum {name} has no cases — a vocabulary needs words");
         }
         Statement::EnumDefinition { cases, name }
+    }
+
+    /// `Point = Data.define(:x, :y)`, with an optional `do … end` body, is
+    /// `struct Point` with those fields (ADR 0084): a declaration wearing a
+    /// call's clothes. Desugared here by rewriting the tokens into the
+    /// `class` header the body parser already reads — the fields as bare
+    /// lines, the block's body as the struct's, an `end` supplied when
+    /// there is no block.
+    fn data_define_ahead(&self) -> bool {
+        let token_at = |offset: usize| self.tokens.get(self.position + offset);
+        token_at(0).is_some_and(|token| {
+            token.kind == TokenKind::Identifier
+                && token
+                    .text
+                    .starts_with(|character: char| character.is_ascii_uppercase())
+        }) && token_at(1).is_some_and(|token| token.kind == TokenKind::Equal)
+            && token_at(2).is_some_and(|token| token.text == "Data")
+            && token_at(3).is_some_and(|token| token.kind == TokenKind::Dot)
+            && token_at(4).is_some_and(|token| token.text == "define")
+            && token_at(5).is_some_and(|token| token.kind == TokenKind::LeftParen)
+    }
+
+    fn rewrite_data_define(&mut self) {
+        let start = self.position;
+        let name = self.tokens[start];
+        let mut index = start + 6; // past the `(`
+        let mut fields: Vec<Token<'source>> = Vec::new();
+        while let Some(token) = self.tokens.get(index) {
+            if token.kind == TokenKind::RightParen {
+                break;
+            }
+            if token.kind != TokenKind::Symbol || token.text.starts_with(":\"") {
+                panic!("Data.define takes field names as symbols — write Data.define(:x, :y)");
+            }
+            fields.push(Token {
+                kind: TokenKind::Identifier,
+                leading_space: true,
+                text: &token.text[1..],
+            });
+            index += 1;
+            if self.tokens.get(index).map(|token| token.kind) == Some(TokenKind::Comma) {
+                index += 1;
+            }
+        }
+        if self.tokens.get(index).map(|token| token.kind) != Some(TokenKind::RightParen) {
+            panic!("expected ) to close Data.define");
+        }
+        index += 1; // past the `)`
+        let has_body = self
+            .tokens
+            .get(index)
+            .is_some_and(|token| token.kind == TokenKind::Keyword && token.text == "do");
+        if has_body {
+            index += 1; // the `do`; the body and its `end` are the struct's
+        }
+        let newline = Token {
+            kind: TokenKind::Newline,
+            leading_space: false,
+            text: "\n",
+        };
+        let mut replacement = vec![
+            Token {
+                kind: TokenKind::Keyword,
+                leading_space: false,
+                text: "class",
+            },
+            Token {
+                kind: TokenKind::Identifier,
+                leading_space: true,
+                text: name.text,
+            },
+            newline,
+        ];
+        for field in fields {
+            replacement.push(field);
+            replacement.push(newline);
+        }
+        if !has_body {
+            replacement.push(Token {
+                kind: TokenKind::Keyword,
+                leading_space: false,
+                text: "end",
+            });
+        }
+        self.tokens.splice(start..index, replacement);
     }
 
     fn struct_definition(&mut self) -> Statement {

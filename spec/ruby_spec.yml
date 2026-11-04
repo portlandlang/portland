@@ -1898,6 +1898,73 @@ core/random/random_number_spec.rb:
   reason: "Random::Formatter is a mixin for byte sources (#119); its random_number is rand."
   link: https://github.com/portlandlang/portland/issues/119
 
+# — core/data —
+# `Name = Data.define(:a, :b)` is a spelling of `struct Name` (ADR 0084), so
+# the rows about construction, with, equality, to_h, and members are the
+# struct's; the anonymous, subclassing, and overridden-initialize rows build
+# classes at runtime.
+
+core/data/constants_spec.rb:
+  status: skipped
+  reason: "Data is not a constant here: Data.define is a spelling of struct at a constant's top level (ADR 0084), and the name on its own refuses."
+  link: docs/ruby/classes.md
+core/data/deconstruct_keys_spec.rb:
+  status: skipped
+  reason: "A struct's fields are names only (ADR 0062): deconstruct_keys refuses, and a struct pattern binds the fields directly."
+  link: docs/ruby/classes.md
+core/data/deconstruct_spec.rb:
+  status: skipped
+  reason: "Positional struct patterns are out; a struct pattern is keyword-only (ADR 0013)."
+  link: docs/ruby/pattern-matching.md
+core/data/define_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "A field name is a symbol literal, so the string rows refuse; the anonymous forms build a class at runtime, so the type is a constant's (ADR 0084), and a type's members are read off a value."
+  link: docs/ruby/classes.md
+core/data/eql_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015)."
+  link: docs/ruby/classes.md
+core/data/equal_value_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015)."
+  link: docs/ruby/classes.md
+core/data/hash_spec.rb:
+  status: skipped
+  reason: "There is no hash (ADR 0059); a value is a hash key by eql?."
+  link: docs/ruby/equality.md
+core/data/initialize_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "Construction is by keyword (ADR 0062): the positional and [] rows refuse naming the keywords, string keywords are the implicit-conversion protocol (ADR 0036), and the subclass and overridden-initialize rows are def self.new's (ADR 0031) on a class built at runtime."
+  link: docs/ruby/classes.md
+core/data/inspect_spec.rb:
+  status: skipped
+  reason: "The one row compares method objects, which a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
+core/data/members_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "members is read off a value; the type-level row and the subclass row are a class object's."
+  link: docs/ruby/classes.md
+core/data/to_h_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "The block rows are to_h's on any struct (spec/struct/enumerable_spec.pdx); the to_ary coercion rows are the implicit-conversion protocol (ADR 0036)."
+  link: docs/ruby/aliases.md
+core/data/to_s_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "A struct renders as its constructor reads — Measure(amount: 42, unit: \"km\") — not as #<data ...> (ADR 0026); the anonymous and recursive rows build classes at runtime or need mutation."
+  link: docs/ruby/inspect.md
+core/data/with_spec.rb:
+  pdx: [spec/struct/data_define_spec.pdx]
+  status: partial_intentional
+  reason: "with takes keywords (ADR 0028): the positional row refuses, string keywords are the implicit-conversion protocol (ADR 0036), and the overridden-initialize rows build a class at runtime."
+  link: docs/ruby/classes.md
+
 # — core/range —
 
 core/range/clamp_spec.rb:

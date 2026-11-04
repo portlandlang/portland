@@ -2659,6 +2659,34 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// `Name = Data.define(:a, :b)` declares `struct Name` (ADR 0084) on both
+/// oracles — at the top level, in a module, with a `do … end` body of
+/// methods — and `Data.define` anywhere else, or with anything but symbols,
+/// refuses by name.
+#[test]
+fn data_define_on_both_oracles() {
+    assert_both_print(
+        "data_define.pdx",
+        "Point = Data.define(:x, :y)\nmodule Shop\n  Price = Data.define(:cents)\nend\nMovie = Data.define(:title, :year) do\n  def label = \"#{title} (#{year})\"\n\n  def self.classic = Movie.new(title: \"Metropolis\", year: 1927)\nend\nEmpty = Data.define()\n\
+         p Point.new(x: 1, y: 2)\np Point.new(x: 1, y: 2).with(y: 5)\np Shop::Price.new(cents: 68)\nputs Movie.new(title: \"Matrix\", year: 1999).label\np Movie.classic\np Empty.new\np Point.new(x: 1, y: 2) == Point.new(x: 1, y: 2)\np Point.new(x: 1, y: 2).to_h\n",
+        "Point(x: 1, y: 2)\nPoint(x: 1, y: 5)\nShop::Price(cents: 68)\nMatrix (1999)\nMovie(title: \"Metropolis\", year: 1927)\nEmpty()\ntrue\n{x: 1, y: 2}\n",
+    );
+    assert_both_oracles_refuse(
+        "data_define_refusal.pdx",
+        None,
+        &[
+            (
+                "point_class = Data.define(:x)\n",
+                "'Data.define' builds a type at runtime, which Portland does not do — write 'Name = Data.define(:a, :b)' at the top level, which declares 'struct Name' (ADR 0084)",
+            ),
+            (
+                "Point = Data.define(\"x\", \"y\")\n",
+                "Data.define takes field names as symbols — write Data.define(:x, :y)",
+            ),
+        ],
+    );
+}
+
 /// `value.class` answers the type (ADR 0074) on both oracles: a struct's
 /// qualified name or a builtin's, with `name`, `new`, and the type functions
 /// reachable through it, `==` by identity, and a bare type name as the same
