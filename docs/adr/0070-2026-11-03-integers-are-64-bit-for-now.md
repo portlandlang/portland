@@ -18,6 +18,6 @@ Ruby's Integer has arbitrary precision: `2 ** 100` answers, and `922337203685477
 ## Consequences
 
 - Ledger: [integers.md](../ruby/integers.md), the page the manifest's fifty "no bignums" reasons can now link. The entries that said "wait on #156" point at it.
-- The seed's `format` ([ADR 0067](0067-2026-10-25-format-is-a-function-not-the-percent-operator.md)) refuses a `%d` of a string or float past the edge with `integer … is past 64 bits`; aligning that sentence with `overflows the 64-bit integers` is a two-line change owed to the house wording, not made here since this ADR records and does not build.
+- The seed's `format` ([ADR 0067](0067-2026-10-25-format-is-a-function-not-the-percent-operator.md)) refuses a `%d` of a string or float past the edge with `integer … is past 64 bits`; aligning that sentence with `overflows the 64-bit integers` is a two-line change owed to the house wording, not made here since this ADR records and does not build. (Made later the same day: `format("%d", 1e19)` refuses with `1.0e+19 overflows the 64-bit integers`.)
 - Sizing the cost is [ruby_research](https://github.com/portlandlang/ruby_research)'s: a corpus pass counting literals past `i64` and the patterns that overflow in practice (`**` with large exponents, factorials, hash and CRC arithmetic) would turn "nothing has pulled" into a number. Not run yet.
 - [#156](https://github.com/portlandlang/portland/issues/156) closes; the reopening signal is a real file that needs an exact integer past 2⁶³.

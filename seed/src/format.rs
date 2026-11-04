@@ -354,7 +354,7 @@ fn integer_of(value: &Value) -> i64 {
             }
             let whole = number.trunc();
             if whole >= 9_223_372_036_854_775_808.0 || whole < -9_223_372_036_854_775_808.0 {
-                panic!("integer {whole} is past 64 bits");
+                panic!("{} overflows the 64-bit integers", value.shown());
             }
             whole as i64
         }
@@ -402,7 +402,7 @@ fn strict_integer(text: &str) -> i64 {
         magnitude = magnitude
             .checked_mul(i64::from(base))
             .and_then(|magnitude| magnitude.checked_add(i64::from(digit)))
-            .unwrap_or_else(|| panic!("integer {trimmed} is past 64 bits"));
+            .unwrap_or_else(|| panic!("{trimmed} overflows the 64-bit integers"));
     }
     if negative { -magnitude } else { magnitude }
 }
@@ -1461,5 +1461,20 @@ mod tests {
     #[should_panic(expected = "key<foo> not found")]
     fn a_missing_key_is_rubys() {
         format_values("%<foo>s", &[], &[("bar".to_string(), integer(1))]);
+    }
+
+    // ADR 0070's one sentence for the edge, where Ruby would widen to a
+    // bignum: a float past the edge and a string with too many digits both
+    // refuse the way `2 ** 64` does.
+    #[test]
+    #[should_panic(expected = "1.0e+19 overflows the 64-bit integers")]
+    fn a_float_past_the_edge_overflows() {
+        run("%d", &[Value::Float(1e19)]);
+    }
+
+    #[test]
+    #[should_panic(expected = "99999999999999999999 overflows the 64-bit integers")]
+    fn a_string_past_the_edge_overflows() {
+        run("%d", &[Value::String("99999999999999999999".to_string())]);
     }
 }
