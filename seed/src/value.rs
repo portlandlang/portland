@@ -61,6 +61,11 @@ pub enum Value {
         fields: Vec<(String, Value)>,
         name: String,
     },
+    /// A type as a value (ADR 0074): what `value.class` answers, holding the
+    /// qualified name — `Shop::Token`, or `Integer` for a builtin. It has
+    /// `name`, `new`, and its type functions, and nothing else: there is no
+    /// class object to reflect on, since nothing can change at runtime.
+    Type(String),
     /// A random number generator (ADR 0065): Ruby's MT19937, seeded, and
     /// advancing as it is drawn from — the one value that moves, since a
     /// generator that answered the same number twice would not be one.
@@ -146,6 +151,7 @@ impl PartialEq for Value {
             (Value::Some(left), Value::Some(right)) => left == right,
             (Value::Failure(left), Value::Failure(right)) => left == right,
             (Value::Symbol(left), Value::Symbol(right)) => left == right,
+            (Value::Type(left), Value::Type(right)) => left == right,
             (
                 Value::Struct {
                     fields: left_fields,
@@ -322,6 +328,7 @@ impl Value {
             Value::String(_) => "String".to_string(),
             Value::Struct { name, .. } => name.clone(),
             Value::Symbol(_) => "Symbol".to_string(),
+            Value::Type(_) => "Type".to_string(),
             other => format!("{other:?}"),
         }
     }
@@ -388,6 +395,7 @@ impl Value {
             Value::Failure(inner) => format!("failure({})", inner.inspect()),
             Value::String(value) => quoted(value),
             Value::Symbol(name) => Value::symbol_source(name),
+            Value::Type(name) => name.clone(),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
                     .iter()
@@ -495,6 +503,7 @@ impl fmt::Display for Value {
             Value::String(value) => write!(formatter, "{value}"),
             // `puts :paid` shows the name; `p :paid` shows the literal.
             Value::Symbol(name) => write!(formatter, "{name}"),
+            Value::Type(name) => write!(formatter, "{name}"),
             Value::Struct { .. } => write!(formatter, "{}", self.inspect()),
         }
     }

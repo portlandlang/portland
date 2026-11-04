@@ -1404,7 +1404,9 @@ def parse_dot(tokens, receiver, mutable position, safe)
   # after a dot it can only be a method name — admitted narrowly (#79), not
   # keywords wholesale.
   # `end` after a dot is a range's far end (#111), admitted like `next`.
-  keyword_method = token.keyword? && (token.text == "next" || token.text == "end")
+  # `class` declares a type as a statement and asks a value for its type
+  # after a dot (ADR 0074), the same way.
+  keyword_method = token.keyword? && (token.text == "next" || token.text == "end" || token.text == "class")
   unless token.identifier? || keyword_method
     return Step.new(node: error_node("expected method name after dot, got #{token.text}"), position: position + 1)
   end

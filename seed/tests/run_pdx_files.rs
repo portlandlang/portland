@@ -2659,6 +2659,40 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// `value.class` answers the type (ADR 0074) on both oracles: a struct's
+/// qualified name or a builtin's, with `name`, `new`, and the type functions
+/// reachable through it, `==` by identity, and a bare type name as the same
+/// value; nil, an enum case, and a type itself have no class.
+#[test]
+fn value_class_on_both_oracles() {
+    assert_both_print(
+        "value_class.pdx",
+        "module Shop\n  struct Token\n    text\n    def twin = self.class.new(text: text)\n    def self.blank = Shop::Token.new(text: \"\")\n  end\nend\n\
+         struct Plain\n  a\n  def self.new(a:)\n    fields(a: a + 1)\n  end\nend\n\
+         token = Shop::Token.new(text: \"x\")\np token.class\np token.class.name\np token.class == Shop::Token\np token.class == token.twin.class\np token.twin\np token.class.blank\np Plain.new(a: 1).class.new(a: 5)\n\
+         p 1.class, \"a\".class, :s.class, [1].class, 1.5.class, true.class, {a: 1}.class, (1..2).class\np 1.class.name, [1].class.new(2, 0), 9.class.sqrt(16)\nputs token.class\np inspect(token.class)\np({token.class => 1}[Shop::Token.new(text: \"y\").class])\nkind = Plain\np kind.new(a: 1)\np kind == Plain\n",
+        "Shop::Token\n\"Shop::Token\"\ntrue\ntrue\nShop::Token(text: \"x\")\nShop::Token(text: \"\")\nPlain(a: 6)\nInteger\nString\nSymbol\nArray\nFloat\nBoolean\nHash\nRange\n\"Integer\"\n[0, 0]\n4\nShop::Token\n\"Shop::Token\"\n1\nPlain(a: 2)\ntrue\n",
+    );
+    assert_both_oracles_refuse(
+        "value_class_refusal.pdx",
+        None,
+        &[
+            (
+                "x = nil\np x.class\n",
+                "nil has no method 'class' — handle the nil case first",
+            ),
+            (
+                "enum Status\n  :paid\n  :pending(on:)\nend\np :pending(on: 1).class\n",
+                ":pending is an enum case, which has no class — match it with case/in",
+            ),
+            (
+                "struct Token\n  text\nend\np Token.new(text: \"x\").class.class\n",
+                "Token is a type, which has no class",
+            ),
+        ],
+    );
+}
+
 /// `attr_reader :size, :label` is a spelling of the field list (ADR 0075)
 /// on both oracles, mixing with bare lines; outside a type body, and with
 /// anything but symbols after it, it refuses in one sentence.

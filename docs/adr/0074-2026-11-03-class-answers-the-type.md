@@ -1,6 +1,6 @@
 # 0074 — `value.class` answers the type
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#148](https://github.com/portlandlang/portland/issues/148); not built — the build is [#187](https://github.com/portlandlang/portland/issues/187))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#148](https://github.com/portlandlang/portland/issues/148); built on both implementations the same day under [#187](https://github.com/portlandlang/portland/issues/187); one consequence found in the build: a type's bare name, `Token` or `Integer` on its own, is the type value too, since ruling 3's `value.class == Foo` needs it)
 - **Date:** 2026-11-03
 - **Issue:** [#148](https://github.com/portlandlang/portland/issues/148)
 

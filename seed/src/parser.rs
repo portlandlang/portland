@@ -2840,9 +2840,11 @@ impl<'source> Parser<'source> {
                     // receiver's message, so after a dot it can only be a
                     // method name — admitted narrowly (#79), not keywords
                     // wholesale. `end` closes a body as a statement and is
-                    // a range's far end after a dot (#111), the same way.
-                    let keyword_method =
-                        token.kind == TokenKind::Keyword && matches!(token.text, "next" | "end");
+                    // a range's far end after a dot (#111), the same way;
+                    // `class` declares a type as a statement and asks a
+                    // value for its type after a dot (ADR 0074).
+                    let keyword_method = token.kind == TokenKind::Keyword
+                        && matches!(token.text, "next" | "end" | "class");
                     if token.kind != TokenKind::Identifier && !keyword_method {
                         panic!("expected method name after dot, got {token:?}");
                     }

@@ -3113,16 +3113,17 @@ impl<W: std::io::Write> Interpreter<W> {
             )),
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Float(value) => Some(Value::Float(*value)),
-            // `Foo::BAR` names a constant; `Foo::Bar` names a type and is
-            // only meaningful as a receiver, which is handled before we get
-            // here (ADR 0021).
+            // `Foo::BAR` names a constant; `Foo::Bar` names a type, which as
+            // a receiver is handled before we get here (ADR 0021) and on its
+            // own is the type as a value (ADR 0074), what `value.class`
+            // answers — so `token.class == Shop::Token` compares two of them.
             Expression::Path(path) => {
                 let joined = path.join("::");
                 if let Some(value) = self.constants.get(&joined) {
                     return Some(value.clone());
                 }
                 if self.structs.contains_key(&joined) {
-                    panic!("{joined} is a type, not a value");
+                    return Some(Value::Type(joined));
                 }
                 panic!("undefined name {joined}");
             }
@@ -3441,8 +3442,15 @@ impl<W: std::io::Write> Interpreter<W> {
                         block.as_ref(),
                     );
                 }
-                // `Name.new(...)` constructs a struct; the name is not a value.
-                if name == "new" {
+                // `Name.new(...)` constructs a struct through its written
+                // name. Any other receiver — `self.class.new`, a local holding
+                // a type (ADR 0074) — is a value, dispatched below.
+                let names_a_type = match receiver.as_ref() {
+                    Expression::Variable(written) => !self.variables.contains_key(written),
+                    Expression::Path(_) => true,
+                    _ => false,
+                };
+                if name == "new" && names_a_type {
                     // A defined `new` replaces the raw constructor everywhere
                     // (ADR 0031): while it runs, `fields(...)` is the raw
                     // layer, and only there — the target is cleared across
@@ -3567,6 +3575,25 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.call_struct_method(struct_name, receiver, method, Vec::new(), Vec::new())
                 } else if self.lookup_method(name).is_some() || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
+                } else if let Some((qualified, _)) =
+                    Self::resolve(&self.module_path, name, &self.structs)
+                {
+                    // A type's name on its own is the type as a value (ADR
+                    // 0074), what `value.class` answers.
+                    Some(Value::Type(qualified))
+                } else if matches!(
+                    name.as_str(),
+                    "Array"
+                        | "Boolean"
+                        | "Float"
+                        | "Hash"
+                        | "Integer"
+                        | "Random"
+                        | "Range"
+                        | "String"
+                        | "Symbol"
+                ) {
+                    Some(Value::Type(name.clone()))
                 } else {
                     // ADR 0047's seventh wording (ratified 2026-09-24, #98):
                     // the checker says it at build; this is its runtime row.
@@ -3696,6 +3723,11 @@ impl<W: std::io::Write> Interpreter<W> {
             && (type_name, name) != ("JSON", "parse")
         {
             panic!("{type_name}.{name} takes no keyword arguments, got {label}:");
+        }
+        // A type's `name` is its spelling (ADR 0074); the function
+        // namespaces `System` and `JSON` are not types.
+        if name == "name" && arguments.is_empty() && !matches!(type_name, "JSON" | "System") {
+            return Some(Value::String(type_name.to_string()));
         }
         match (type_name, name) {
             // JSON is core, written by hand (ADR 0072): a document in, its
@@ -4191,6 +4223,81 @@ impl<W: std::io::Write> Interpreter<W> {
 
     /// The struct this `new` receiver resolves to, when that struct defined
     /// its own `new` (ADR 0031): `(qualified struct, qualified function)`.
+    /// What `value.class` answers (ADR 0074): a struct's qualified name, a
+    /// builtin's type name. An enum case, a wrapper, and a type itself have
+    /// no class to answer and say so.
+    fn class_of(value: &Value) -> Value {
+        match value {
+            Value::Struct { name, .. } => Value::Type(name.clone()),
+            Value::EnumCase { name, .. } => {
+                panic!(":{name} is an enum case, which has no class — match it with case/in")
+            }
+            Value::Type(name) => panic!("{name} is a type, which has no class"),
+            Value::Some(_) | Value::Failure(_) => {
+                panic!("{} has no class — unwrap it first", value.inspect())
+            }
+            other => Value::Type(other.type_name()),
+        }
+    }
+
+    /// A method on a type value: `name`, `new`, and the type's own functions —
+    /// what the written name `Token` answers, reached through a value.
+    fn type_receiver_call(
+        &mut self,
+        type_name: &str,
+        name: &str,
+        arguments: Vec<Value>,
+        keyword_arguments: Vec<(String, Value)>,
+        block: Option<&Block>,
+    ) -> Option<Value> {
+        if name == "name" && arguments.is_empty() {
+            return Some(Value::String(type_name.to_string()));
+        }
+        if matches!(
+            type_name,
+            "Array"
+                | "Boolean"
+                | "Float"
+                | "Hash"
+                | "Integer"
+                | "JSON"
+                | "Random"
+                | "Range"
+                | "String"
+                | "Symbol"
+                | "System"
+        ) {
+            return self.builtin_type_function(
+                type_name,
+                name,
+                arguments,
+                keyword_arguments,
+                block,
+            );
+        }
+        if name == "new" {
+            // A defined `new` replaces the raw constructor (ADR 0031), as it
+            // does on the written name.
+            let qualified_new = format!("{type_name}::new");
+            if self.methods.contains_key(&qualified_new) {
+                self.pending_fields = Some(type_name.to_string());
+                return self.call(&qualified_new, arguments, keyword_arguments);
+            }
+            let fields = Self::resolve(&self.module_path, type_name, &self.structs)
+                .map(|(_, info)| info.fields.clone())
+                .unwrap_or_else(|| panic!("undefined struct {type_name}"));
+            if !arguments.is_empty() {
+                panic!("{type_name}.new takes keyword arguments, not positional ones");
+            }
+            return Some(Self::fill_fields(type_name, &fields, keyword_arguments));
+        }
+        let qualified = format!("{type_name}::{name}");
+        if self.methods.contains_key(&qualified) {
+            return self.call(&qualified, arguments, keyword_arguments);
+        }
+        panic!("{type_name} has no {name}");
+    }
+
     fn defined_new(&self, receiver: &Expression) -> Option<(String, String)> {
         let written = match receiver {
             Expression::Variable(name) => {
@@ -4238,6 +4345,24 @@ impl<W: std::io::Write> Interpreter<W> {
                 low.unwrap_or(Value::Nil),
                 high.unwrap_or(Value::Nil),
             ]));
+        }
+        // `value.class` answers the type (ADR 0074) — the static kind of
+        // reflection: a name with `new`, its type functions, and `name`. A
+        // nil receiver falls through to nil's own refusal.
+        if name == "class"
+            && arguments.is_empty()
+            && block.is_none()
+            && !matches!(receiver, Value::Nil)
+        {
+            return Some(Self::class_of(&receiver));
+        }
+        // The names every value answers — `to_s`, the presence predicates,
+        // `eql?` — stay the general arms' below.
+        if let Value::Type(type_name) = &receiver
+            && !matches!(name, "to_s" | "eql?" | "failure?" | "nil?" | "some?")
+        {
+            let type_name = type_name.clone();
+            return self.type_receiver_call(&type_name, name, arguments, keyword_arguments, block);
         }
         // A symbol answers Ruby's text queries about its name (#112), and
         // `to_sym` answers itself (ADR 0071).

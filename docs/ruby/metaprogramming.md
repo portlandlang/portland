@@ -18,7 +18,7 @@ This cut is not incidental — the cut-list and the "what blocks static safety a
 
 A builtin type is not a class object either — nothing to `allocate` from, no ancestors to ask about, no `instance_method` to compare — but its name carries Ruby's type functions ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)): `Array.new(3) { |index| index * 2 }` and `Integer.sqrt(24)` answer as Ruby's do, and the name on its own still refuses.
 
-The one piece of reflection that stays is the static kind ([ADR 0074](../adr/0074-2026-11-03-class-answers-the-type.md), decided, not built — [#187](https://github.com/portlandlang/portland/issues/187)): `value.class` answers the type, which has a `name`, a `new`, its type functions, and identity `==`, and nothing else. `ancestors`, `instance_methods`, `superclass`, `allocate`, `method_defined?`, `instance_variable_get`, and `const_get` refuse by name, since each asks about a runtime that could have changed and this one cannot.
+The one piece of reflection that stays is the static kind ([ADR 0074](../adr/0074-2026-11-03-class-answers-the-type.md), built 2026-11-03): `value.class` answers the type, which has a `name`, a `new`, its type functions, and identity `==`, and nothing else. `ancestors`, `instance_methods`, `superclass`, `allocate`, `method_defined?`, `instance_variable_get`, and `const_get` refuse by name, since each asks about a runtime that could have changed and this one cannot.
 
 ## Migration
 

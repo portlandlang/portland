@@ -893,6 +893,10 @@ def evaluate_expression(node, bindings)
     mutable slot = lookup(bindings, name)
     slot = resolve(bindings, name) if slot.empty?
     slot = own_type_constant(bindings, name) if slot.empty?
+    # A type's name on its own is the type as a value (ADR 0074), what
+    # `value.class` answers — a struct's, or a builtin's.
+    return outcome([["__type__", slot.first[0]]], bindings) if !slot.empty? && slot.first[1] == "struct"
+    return outcome([["__type__", name]], bindings) if slot.empty? && builtin_type_value_name?(name)
     if slot.empty? || slot.first[1] == "method"
       evaluate_call(call_node(name, []), bindings)
     else
@@ -909,6 +913,8 @@ def evaluate_expression(node, bindings)
     if slot.empty?
       # The seed's wording for a missing `::` name, and a failure (#98).
       panic("undefined name #{joined}")
+    elsif slot.first[1] == "struct"
+      outcome([["__type__", joined]], bindings)
     else
       outcome([value_at(slot.first, 2)], bindings)
     end
@@ -1078,7 +1084,7 @@ def evaluate_json(node, mutable bindings)
   argument = value_at(arguments, 0)
   case node.name
   when "parse"
-    panic("no implicit conversion of #{json_type_label(argument)} into String") unless argument in String
+    panic("no implicit conversion of #{value_type_label(argument)} into String") unless argument in String
     outcome([json_guest_value(json_parse(argument, symbolize_names))], bindings)
   when "generate"         then outcome([json_generate(json_host_value(argument))], bindings)
   when "pretty_generate"  then outcome([json_pretty_generate(json_host_value(argument))], bindings)
@@ -1086,12 +1092,47 @@ def evaluate_json(node, mutable bindings)
   end
 end
 
-# A guest value's type as Ruby's conversion refusal names it.
-def json_type_label(value)
+# Is the name a local or mutable binding in scope — a value wearing a
+# name, rather than a type or method the name reaches?
+def local_name?(bindings, name)
+  slot = lookup(bindings, name)
+  !slot.empty? && (slot.first[1] == "local" || slot.first[1] == "mutable")
+end
+
+# The builtin types whose bare name is a type value (ADR 0074): the value
+# types, not the function namespaces `System` and `JSON`.
+def builtin_type_value_name?(name) = %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(name)
+
+# What `value.class` answers (ADR 0074): a struct's qualified name, a
+# builtin's type name, tagged. An enum case, a wrapper, a type itself, and
+# nil have no class to answer and say so — the seed's sentences.
+def class_of(value)
+  panic("nil has no method 'class' — handle the nil case first") if value.nil?
+  panic("#{render_inspect(value)} has no class — unwrap it first") if value.failure?
+  return ["__type__", value_at(value, 1)] if value in ["__struct__", *]
+  return ["__type__", "Symbol"] if value in ["__symbol__", *]
+  panic(":#{value_at(value, 1)} is an enum case, which has no class — match it with case/in") if value in ["__enum_case__", *]
+  panic("#{value_at(value, 1)} is a type, which has no class") if value in ["__type__", *]
+  ["__type__", value_type_label(value)]
+end
+
+# A method on a type value — `name`, `new`, the type's own functions — is
+# what the written name answers, so it is asked through the written name:
+# a synthetic call on an identifier or path node, dispatched as any is.
+def evaluate_type_receiver_call(type_name, node, bindings)
+  return outcome([type_name], bindings) if node.name == "name" && node.arguments.empty?
+  written = if type_name.include?("::") then path_node(type_name.split("::")) else identifier_node(type_name, line: node.line) end
+  evaluate_method_call(method_call_node(written, node.name, node.arguments, node.block, line: node.line), bindings)
+end
+
+# A guest value's type as Ruby names it: in a conversion refusal, and as
+# what `value.class` answers for a builtin.
+def value_type_label(value)
   return "nil" if value.nil?
   return "Symbol" if value in ["__symbol__", *]
   return value_at(value, 1) if value in ["__struct__", *]
   return ":#{value_at(value, 1)}" if value in ["__enum_case__", *]
+  return "Type" if value in ["__type__", *]
   return "Array" if plain_array?(value)
   case value
   in Integer then "Integer"
@@ -1123,6 +1164,7 @@ def json_host_value(value)
   return value_at(value, 1).to_sym if value in ["__symbol__", *]
   panic("a #{value_at(value, 1)} is not JSON — generate its 'to_h'") if value in ["__struct__", *]
   panic(":#{value_at(value, 1)} carries a payload, which is not JSON — generate its 'to_h'") if value in ["__enum_case__", *]
+  panic("#{value_at(value, 1)} is a type, which is not JSON") if value in ["__type__", *]
   return value.map { json_host_value(it) } if plain_array?(value)
   return value unless value in Hash
   mutable pairs = []
@@ -1162,7 +1204,7 @@ end
 
 # A guest array proper — not a symbol, enum case, or struct wearing the
 # host's array shape.
-def guest_array?(value) = (value in Array) && !(value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *])
+def guest_array?(value) = (value in Array) && !(value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *])
 
 # Ruby's array ordering: the first differing pair decides, and a shorter
 # array sorts first when every pair agrees.
@@ -1420,7 +1462,7 @@ end
 # in for values the compiler cannot spell.
 def plain_array?(value)
   return false unless value in Array
-  return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *]
+  return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *]
   true
 end
 
@@ -1490,7 +1532,7 @@ end
 def render(value)
   return "nil" if value.nil?
   return render_inspect(value) if value.failure?
-  return value_at(value, 1) if value in ["__symbol__", *]
+  return value_at(value, 1) if value in ["__symbol__", *] | ["__type__", *]
   return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *]
   # A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's.
   return render_inspect(value) if plain_array?(value) || (value in Hash)
@@ -1504,6 +1546,8 @@ def render_inspect(value)
   return "nil" if value.nil?
   return "failure(#{render_inspect(failure_payload(value))})" if value.failure?
   return symbol_source(value_at(value, 1)) if value in ["__symbol__", *]
+  # A type inspects as its name (ADR 0074).
+  return value_at(value, 1) if value in ["__type__", *]
   if value in ["__enum_case__", *]
     labels = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
     return "#{symbol_source(value_at(value, 1))}(#{labels.join(", ")})"
@@ -1704,6 +1748,8 @@ end
 # the host and hands each index to the guest block.
 def evaluate_builtin_type_function(node, mutable bindings)
   return evaluate_json(node, bindings) if node.receiver.name == "JSON"
+  # A type's `name` is its spelling (ADR 0074); `System` is not a type.
+  return outcome([node.receiver.name], bindings) if node.name == "name" && node.arguments.empty? && node.receiver.name != "System"
   mutable arguments = []
   node.arguments.each do |argument|
     step = evaluate_expression(argument, bindings)
@@ -1965,7 +2011,7 @@ def binary_search(values, count, ranged, block, entry, mutable scope)
         true
       elsif verdict == false || verdict.nil?
         false
-      elsif (verdict in Integer) || (builtin_type_of(verdict).nil? && !(verdict in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *]))
+      elsif (verdict in Integer) || (builtin_type_of(verdict).nil? && !(verdict in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *]))
         # The host's patterns cannot name a float, so a value the table
         # cannot name and no tag claims is one.
         found = middle if verdict == 0
@@ -2379,7 +2425,9 @@ def evaluate_method_call(node, mutable bindings)
   if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
-  if node.name == "new" && ((node.receiver in IdentifierNode) || (node.receiver in PathNode))
+  # `Name.new(...)` constructs through the written name; a local holding a
+  # type (ADR 0074) is a value, dispatched below.
+  if node.name == "new" && (((node.receiver in IdentifierNode) && !local_name?(bindings, node.receiver.name)) || (node.receiver in PathNode))
     return evaluate_new(node, bindings)
   end
   # `Token.of(...)` — a type function (ADR 0031): the receiver names a
@@ -2437,6 +2485,16 @@ def evaluate_method_call(node, mutable bindings)
   # `&.`: an absent receiver short-circuits; arguments never run.
   if (node in SafeMethodCallNode) && receiver.nil?
     return outcome([nil], bindings)
+  end
+  # `value.class` answers the type (ADR 0074): a tagged name with `new`, its
+  # type functions, and `name` — the static kind of reflection.
+  if node.name == "class" && node.arguments.empty? && node.block.nil?
+    return outcome([class_of(receiver)], bindings)
+  end
+  # The names every value answers — `to_s`, the presence predicates, `eql?`
+  # — stay the general arms' below.
+  if (receiver in ["__type__", *]) && !%w[eql? failure? nil? some? to_s].include?(node.name)
+    return evaluate_type_receiver_call(value_at(receiver, 1), node, bindings)
   end
   mutable arguments = []
   mutable keyword_values = []
