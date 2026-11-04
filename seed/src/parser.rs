@@ -1580,6 +1580,16 @@ impl<'source> Parser<'source> {
     fn while_statement(&mut self, negated: bool) -> Statement {
         self.position += 1; // the `while` or `until`
         let mut condition = self.expression();
+        // Ruby's optional `do` after the condition is declined (ADR 0079):
+        // `do` means a block follows everywhere else, and the style guide
+        // already deletes this one.
+        if self.peek_is_keyword("do") {
+            panic!(
+                "'do' after {} {} condition is a newline here",
+                if negated { "an" } else { "a" },
+                if negated { "until" } else { "while" }
+            );
+        }
         if negated {
             condition = Expression::Unary {
                 operand: Box::new(condition),

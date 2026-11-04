@@ -2659,6 +2659,26 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// Ruby's optional `do` after a `while` or `until` condition is declined
+/// (ADR 0079) on both oracles, with the rewrite named.
+#[test]
+fn while_do_refuses_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "while_do.pdx",
+        None,
+        &[
+            (
+                "mutable i = 0\nwhile i < 3 do\n  i += 1\nend\np i\n",
+                "'do' after a while condition is a newline here",
+            ),
+            (
+                "mutable i = 0\nuntil i == 3 do\n  i += 1\nend\np i\n",
+                "'do' after an until condition is a newline here",
+            ),
+        ],
+    );
+}
+
 /// JSON on both oracles (ADR 0072): the seed's hand-written `json.rs` and the
 /// compiler's Portland twin `json.pdx` answer what Ruby's json gem 3.1.0
 /// answers — verified against Ruby 4.0.7 on 2026-11-03 and recorded in

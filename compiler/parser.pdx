@@ -3378,6 +3378,13 @@ end
 # same loop node, condition wrapped in `not`.
 def parse_while(tokens, position, negated)
   condition = parse_expression(tokens, position)
+  # Ruby's optional `do` after the condition is declined (ADR 0079): `do`
+  # means a block follows everywhere else, and the style guide already
+  # deletes this one.
+  if keyword_at?(tokens, condition.position, %w[do])
+    loop_word = negated ? "an until" : "a while"
+    return Step.new(node: error_node("'do' after #{loop_word} condition is a newline here"), position: skip_line_at(tokens, condition.position))
+  end
   mutable test = condition.node
   test = unary_node("!", test, line: line_at(tokens, position)) if negated
   body = parse_body(tokens, condition.position, %w[end])

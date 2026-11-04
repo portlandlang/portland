@@ -1,12 +1,12 @@
 # 0073 — A struct with no fields is a value with one instance
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#140](https://github.com/portlandlang/portland/issues/140); not built — the build is [#186](https://github.com/portlandlang/portland/issues/186))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#140](https://github.com/portlandlang/portland/issues/140)). Already built: the seed stopped refusing a fieldless struct on 2026-09-27, when the compiler was found to accept one, and `a_struct_may_have_no_fields` in `seed/tests/run_pdx_files.rs` pins both implementations; #140's census had run against the seed before that fix. This ADR records the ruling the fix anticipated; [#186](https://github.com/portlandlang/portland/issues/186) closed as already done.
 - **Date:** 2026-11-03
 - **Issue:** [#140](https://github.com/portlandlang/portland/issues/140)
 
 ## Context
 
-`class Formatter` with only methods and no fields refuses today: `struct Formatter needs at least one field`. ruby_research's level-0 census ([ruby_research#9](https://github.com/portlandlang/ruby_research/issues/9)) finds that refusal in **14,086 gems**, and as the *only* refusal in 1,281 of them. These are Ruby's classes used as a bundle of behavior (`class Formatter; def format(x) …`), as a namespace with `def self.` functions, or as an error type (`class NotFound < StandardError; end`, which also inherits). The one-field minimum came in with structs as a guard against writing a module as a struct; it was never a principle.
+`class Formatter` with only methods and no fields refused on the seed until 2026-09-27: `struct Formatter needs at least one field`. ruby_research's level-0 census ([ruby_research#9](https://github.com/portlandlang/ruby_research/issues/9)) finds that refusal in **14,086 gems**, and as the *only* refusal in 1,281 of them. These are Ruby's classes used as a bundle of behavior (`class Formatter; def format(x) …`), as a namespace with `def self.` functions, or as an error type (`class NotFound < StandardError; end`, which also inherits). The one-field minimum came in with structs as a guard against writing a module as a struct; it was never a principle.
 
 ## Decision
 
@@ -17,6 +17,6 @@
 
 ## Consequences
 
-- The `needs at least one field` refusal is retired on both implementations; the seed's `Struct` representation and the compiler's tagged `["__struct__", name, []]` already allow an empty field list.
+- The `needs at least one field` refusal is gone from both implementations; the seed's `Struct` representation and the compiler's tagged `["__struct__", name, []]` carry an empty field list.
 - The error-type half of the census (`class NotFound < StandardError`) still refuses on the inheritance, which is [ADR 0028](0028-2026-07-27-object-model-structs-and-traits.md)'s and [errors.md](../ruby/errors.md)'s; this ADR takes the field count out of the way so that refusal is the only one left to name.
 - Ledger: [classes.md](../ruby/classes.md).

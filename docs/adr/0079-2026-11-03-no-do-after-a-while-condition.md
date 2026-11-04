@@ -1,6 +1,6 @@
 # 0079 — No `do` after a `while` or `until` condition
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#165](https://github.com/portlandlang/portland/issues/165); the refusal sentence is not yet built — [#192](https://github.com/portlandlang/portland/issues/192))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#165](https://github.com/portlandlang/portland/issues/165); the refusal sentence built on both implementations the same day under [#192](https://github.com/portlandlang/portland/issues/192))
 - **Date:** 2026-11-03
 - **Issue:** [#165](https://github.com/portlandlang/portland/issues/165)
 
