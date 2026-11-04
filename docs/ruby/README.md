@@ -41,11 +41,13 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Integers: 64-bit, refusing past the edge](integers.md) — An integer is a signed 64-bit value; an answer that would leave −2⁶³ … 2⁶³ − 1 refuses with `… overflows the 64-bit integers` where Ruby quietly reaches for a Bignum — and a bignum stays possible, since every refusal could later become an answer.
 - [JSON](json.md) — `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` answer what Ruby's json gem answers, byte for byte — `null` is `nil`, keys are strings or (with `symbolize_names: true`) symbols, duplicate keys and bad documents are failures in Ruby's sentences — with two loud differences: a struct does not silently stringify, and a number past 64 bits is a failure rather than a bignum.
 - [Lookups and `fetch`](lookups.md) — Partial operations return maybes; the only crash is one you typed; `fetch` retires.
+- [`Math`](math.md) — `Math.sqrt`, `Math.log`, `Math::PI`, and the rest of Ruby's module functions are builtins spelled as Ruby spells them; a domain error is a failure in Ruby's own sentence, and `include Math` refuses.
 - [Metaprogramming](metaprogramming.md) — The runtime kind is gone; compile-time macros replace it.
 - [Sharing behavior: traits, not modules or superclasses](mixins-and-inheritance.md) — `include` survives — but it takes a `trait`, a stateless method bundle, never a module or a superclass; collisions are refused by name, and `extend`/`prepend`/subclassing are gone.
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 - [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
+- [Numbers: the tower](numbers.md) — A number is an Integer, a Float, a Rational, or a Complex — four builtin values with Ruby's spellings and Ruby's mixing rules — and BigDecimal is a default tile; there is no `Numeric` superclass to inherit from and no coercion protocol yet.
 - [Ordering](ordering.md) — `<=>` and `include Comparable` migrate unchanged; strings order by canonical text, and `Comparable` is a builtin trait that needs your `<=>` to exist.
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
@@ -54,6 +56,8 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Redefinition](redefinition.md) — A top-level name is defined once — a second `def`, `struct`, `enum`, `trait`, `alias`, or constant of the same name refuses, and a builtin's name is never taken.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
+- [`require` and `require_relative`](requires.md) — `require "name"` searches a load path for `name.pdx` or `name.rb`, and `require_relative` resolves against the requiring file; both take a string literal at a file's top level, since a program is its require closure, known at build.
+- [Sets](sets.md) — `Set` is a builtin immutable value, as it is core in Ruby 4 — `Set.new`, `Set[...]`, and `to_set` build one, `add` and `delete` answer a new one, and the query and algebra surface is Ruby's.
 - [The standard library](standard-library.md) — Ruby's current shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 - [`String#count` and character sets](string-count.md) — `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.
@@ -63,6 +67,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [`System`](system.md) — Ruby has no module for the host boundary — its syscall-touching functions are scattered across `Kernel`, `File`, `Process`, `ENV`, `IO`, and `Time`; Portland gathers every host-touching primitive under `System`, public but not published, and keeps Ruby's spellings on the wrappers written over it.
 - [Truthiness](truthiness.md) — Conditions take booleans, and nothing else.
 - [Types](types.md) — Static and inferred, written only at public boundaries; duck typing becomes structural.
+- [Visibility](visibility.md) — `private`, `protected`, and `public` mean what Ruby's mean, and a call that breaks them refuses at build time instead of raising at the call; `module_function` refuses naming `def self.`.
 - [Word operators: `or`, `and`, `not`](word-operators.md) — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical, and `or` is typed.
 
 <!-- /generated -->

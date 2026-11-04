@@ -84,6 +84,19 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0070](0070-2026-11-03-integers-are-64-bit-for-now.md) — Integers are 64-bit for now; past the edge refuses, and bignums stay possible
 - [0071](0071-2026-11-03-a-symbol-may-be-made-from-text.md) — A symbol may be made from text; a declared vocabulary still refuses it
 - [0072](0072-2026-11-03-json-is-core-written-twice.md) — JSON is core, written twice: `null` is `nil`, keys may be symbols, Ruby's answers byte for byte
+- [0073](0073-2026-11-03-a-struct-with-no-fields.md) — A struct with no fields is a value with one instance
+- [0074](0074-2026-11-03-class-answers-the-type.md) — `value.class` answers the type
+- [0075](0075-2026-11-03-attr-reader-is-a-spelling-of-the-field-list.md) — `attr_reader` is a spelling of the field list
+- [0076](0076-2026-11-03-visibility-checked-at-build-time.md) — Visibility: `private`, `protected`, and `public` are Ruby's, checked at build time
+- [0077](0077-2026-11-03-require-by-name-on-a-load-path.md) — `require "name"`: a load path, `.pdx` or `.rb`, literal and top-level
+- [0078](0078-2026-11-03-omitted-hash-values.md) — `{name:, port:}` reads as Ruby 3.1 reads it
+- [0079](0079-2026-11-03-no-do-after-a-while-condition.md) — No `do` after a `while` or `until` condition
+- [0080](0080-2026-11-03-the-pattern-matching-gaps.md) — Hash patterns, `unless` guards, `=> name`, `_` wildcards, and left-to-right pins
+- [0081](0081-2026-11-03-ranges-over-any-orderable.md) — Ranges over any orderable value
+- [0082](0082-2026-11-03-set-is-a-builtin-value.md) — `Set` is a builtin value, as in Ruby 4
+- [0083](0083-2026-11-03-math-is-rubys.md) — `Math` is Ruby's, with domain errors as failures
+- [0084](0084-2026-11-03-data-define-is-a-spelling-of-struct.md) — `Point = Data.define(:x, :y)` is a spelling of `struct Point`
+- [0085](0085-2026-11-03-rational-complex-and-bigdecimal.md) — Rational and Complex are core; BigDecimal is a default tile
 
 <!-- /generated -->
 

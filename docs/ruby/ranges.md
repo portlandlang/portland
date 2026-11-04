@@ -2,7 +2,7 @@
 
 **Summary:** Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 
-**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6.
+**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6. Ranges over any orderable value are decided ([ADR 0081](../adr/0081-2026-11-03-ranges-over-any-orderable.md), 2026-11-03) and not built — [#194](https://github.com/portlandlang/portland/issues/194).
 
 ## Ruby
 
@@ -38,6 +38,20 @@ end                      # proven total — no else needed
 ```
 
 The checker sorts the integer ranges and requires no gaps, a beginless first, an endless last. Gaps are compile errors. Overlap stays legal — first-match-wins is real semantics, and the cascading `..10 / ..100 / ..1000` idiom depends on it — while an arm _entirely_ covered by earlier arms is already an unreachable-arm error ([pattern matching](pattern-matching.md)). Arm order carries no meaning when arms are disjoint, so it is a lint someday, never a compile error.
+
+### A range's ends may be anything `<=>` orders
+
+ADR 0019 held ranges to integers; [ADR 0081](../adr/0081-2026-11-03-ranges-over-any-orderable.md) widens them to the set [ordering](ordering.md) made precise — numbers, strings, arrays, and `Comparable` structs:
+
+```ruby
+("a".."f").include?("c")        # true
+2.0.clamp(1.5..2.5)              # 2.0 — membership, bounds, and clamp work
+(low..high).cover?(version)      # a range of Comparable structs
+(1.5..2.5).each { }             # refuses: can't iterate from Float
+1.."a"                           # refuses to build: the ends cannot be ordered
+```
+
+Membership and bounds — `include?`, `member?`, `cover?`, `===` and so `case/when`, `clamp`, `min`, `max`, `minmax`, `first`, `last`, `begin`, `end` — work over any such range. Iteration (`each`, `to_a`, `map`, `step`, `size`, `count`) stays with integer ranges and refuses otherwise in Ruby's words; Ruby's `succ` walk over a string range, `("a".."e").to_a`, waits for a pull. Ends `<=>` cannot order refuse where the range is written, since both types are known at build, where Ruby raises `bad value for range` at runtime. Exhaustiveness over range patterns stays an integer proof; a `case/in` over float or string ranges needs an `else`.
 
 ### A range spans a newline only where one reading exists
 

@@ -507,8 +507,8 @@ core/comparable/between_spec.rb:
 core/comparable/clamp_spec.rb:
   pdx: [spec/comparable/clamp_spec.pdx]
   status: partial_planned
-  reason: "A number clamps by an integer range, endless and beginless included (#101); upstream's range examples clamp structs by a range of structs, which waits on ranges over any orderable (ADR 0019 holds integers). Nil bounds and backwards bounds refuse by design."
-  link: https://github.com/portlandlang/portland/issues/149
+  reason: "A number clamps by an integer range, endless and beginless included (#101); upstream's range examples clamp structs by a range of structs, which waits on the build of ranges over any orderable (ADR 0081). Nil bounds and backwards bounds refuse by design."
+  link: https://github.com/portlandlang/portland/issues/194
 core/comparable/equal_value_spec.rb:
   status: skipped
   reason: "Comparable does not derive ==: struct equality is already field by field, and a second definition of equal would disagree with it."
@@ -704,7 +704,7 @@ core/enumerable/sort_by_spec.rb:
 core/enumerable/sum_spec.rb:
   pdx: [spec/enumerable/extremes_spec.pdx]
   status: partial_intentional
-  reason: "Rationals wait on #124, so the rows sum integers; symbol-to-block waits on #77."
+  reason: "Rationals wait on #198, so the rows sum integers; symbol-to-block waits on #77."
   link: docs/ruby/types.md
 core/enumerable/each_with_index_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
@@ -819,8 +819,8 @@ core/enumerable/grep_v_spec.rb:
   link: docs/ruby/pattern-matching.md
 core/enumerable/to_set_spec.rb:
   status: skipped
-  reason: "There is no Set to answer yet (#123)."
-  link: https://github.com/portlandlang/portland/issues/123
+  reason: "Set is decided (ADR 0082) and waits on its build."
+  link: https://github.com/portlandlang/portland/issues/195
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
   status: partial_intentional
@@ -962,8 +962,8 @@ core/float/fdiv_spec.rb:
 core/float/exponent_spec.rb:
   pdx: [spec/number/float/division_spec.pdx]
   status: partial_planned
-  reason: "A negative float to a fractional power is a Complex in Ruby; whether Portland has Complex is #124."
-  link: https://github.com/portlandlang/portland/issues/124
+  reason: "A negative float to a fractional power is a Complex in Ruby; whether Portland has Complex is #198."
+  link: https://github.com/portlandlang/portland/issues/198
 core/float/next_float_spec.rb:
   pdx: [spec/number/float/steps_spec.pdx]
 core/float/prev_float_spec.rb:
@@ -1588,7 +1588,7 @@ core/integer/element_reference_spec.rb:
 core/integer/eql_spec.rb:
   pdx: [spec/eql_spec.pdx]
   status: partial_intentional
-  reason: "Integers are 64-bit, so the bignum rows are written with fixnums; rationals wait on #124."
+  reason: "Integers are 64-bit, so the bignum rows are written with fixnums; rationals wait on #198."
   link: docs/ruby/equality.md
 core/integer/equal_value_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
@@ -1699,7 +1699,7 @@ core/nil/xor_spec.rb:
 # inheritance and no Numeric here (ADR 0028): a number is an Integer or a
 # Float, each specced in spec/number/. The Rational and Complex files
 # (abs2, arg, conjugate, denominator, i, imaginary, numerator, polar, real,
-# rectangular, to_c) wait on #124; step waits on its own rows.
+# rectangular, to_c) wait on #198; step waits on its own rows.
 
 core/numeric/step_spec.rb:
   pdx: [spec/number/integer/step_spec.pdx]
@@ -1712,7 +1712,7 @@ core/numeric/abs_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/angle_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
   link: docs/ruby/metaprogramming.md
 core/numeric/ceil_spec.rb:
   status: skipped
@@ -1732,7 +1732,7 @@ core/numeric/comparison_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/conj_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
   link: docs/ruby/metaprogramming.md
 core/numeric/div_spec.rb:
   status: skipped
@@ -1765,7 +1765,7 @@ core/numeric/floor_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/imag_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
   link: docs/ruby/metaprogramming.md
 core/numeric/infinite_spec.rb:
   status: skipped
@@ -1798,7 +1798,7 @@ core/numeric/numeric_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/phase_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
   link: docs/ruby/metaprogramming.md
 core/numeric/positive_spec.rb:
   pdx: [spec/number/integer/sign_spec.pdx, spec/number/float/sign_spec.pdx]
@@ -1809,10 +1809,10 @@ core/numeric/quo_spec.rb:
   pdx: [spec/number/float/division_spec.pdx]
   status: partial_planned
   reason: "quo answers a Rational for two integers, which waits on the Rational decision; the Float rows are specced, the bignum rows wait on #156, and the to_r row drives a mock subclass."
-  link: https://github.com/portlandlang/portland/issues/124
+  link: https://github.com/portlandlang/portland/issues/198
 core/numeric/rect_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #124."
+  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
   link: docs/ruby/metaprogramming.md
 core/numeric/remainder_spec.rb:
   status: skipped
@@ -1855,12 +1855,12 @@ core/numeric/zero_spec.rb:
 core/random/new_spec.rb:
   pdx: [spec/random/random_spec.pdx]
   status: partial_intentional
-  reason: "Rationals and Complex wait on #124, so their seed rows stay upstream."
+  reason: "Rationals and Complex wait on #198, so their seed rows stay upstream."
   link: docs/ruby/randomness.md
 core/random/rand_spec.rb:
   pdx: [spec/random/random_spec.pdx]
   status: partial_intentional
-  reason: "Random.rand and Random.srand as class methods are the bare rand and srand here; bignum bounds (#156), float ranges (#149), the to_int mocks, and the custom range types stay upstream."
+  reason: "Random.rand and Random.srand as class methods are the bare rand and srand here; bignum bounds (#156), float ranges (#194), the to_int mocks, and the custom range types stay upstream."
   link: docs/ruby/randomness.md
 core/random/seed_spec.rb:
   pdx: [spec/random/random_spec.pdx]
@@ -2002,13 +2002,13 @@ core/range/minmax_spec.rb:
 core/range/bsearch_spec.rb:
   pdx: [spec/range/bsearch_spec.pdx]
   status: partial_planned
-  reason: "A range holds integers, so the Float and endless rows wait on ranges over other orderables; without a block there are no enumerators, and the String-range and Object rows refuse at the literal."
-  link: https://github.com/portlandlang/portland/issues/149
+  reason: "A range holds integers until ADR 0081's build, so the Float and endless rows wait on it; without a block there are no enumerators, and the String-range and Object rows refuse at the literal."
+  link: https://github.com/portlandlang/portland/issues/194
 core/range/new_spec.rb:
   pdx: [spec/range/construction_spec.pdx]
   status: partial_planned
-  reason: "The ends are integers or nil until ranges over other orderables are decided; the third argument is a Boolean, so the 1 and symbol rows refuse; the to_str, mock, frozen, and subclass rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/149
+  reason: "The ends are integers or nil until ADR 0081's build; the third argument is a Boolean, so the 1 and symbol rows refuse; the to_str, mock, frozen, and subclass rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/194
 core/range/overlap_spec.rb:
   pdx: [spec/range/overlap_spec.pdx]
   status: partial_intentional
@@ -3107,8 +3107,8 @@ language/predefined/:
   link: docs/ruby/removed-syntax.md
 language/private_spec.rb:
   status: skipped
-  reason: "Visibility is undecided (#133); private refuses naming that until it is."
-  link: https://github.com/portlandlang/portland/issues/133
+  reason: "Visibility is decided (ADR 0076) and waits on its build; private is misread as a field until then."
+  link: https://github.com/portlandlang/portland/issues/189
 language/proc_spec.rb:
   status: skipped
   reason: "proc refuses with its rewrite: a block is handed to a method and called with yield; the proc question (#77) holds the rest."
@@ -3188,8 +3188,8 @@ language/line_spec.rb:
 language/hash_spec.rb:
   pdx: [spec/hash/literal_spec.pdx]
   status: partial_planned
-  reason: "The omitted-value form {a:} waits on #167; the shorthand is the only symbol-key spelling, so :a => 1 refuses, ** is a splat (ADR 0014), and the empty-expression, frozen-key, duplicate-key-warning, and a= key rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/167
+  reason: "The omitted-value form {a:} is decided (ADR 0078) and waits on its build; the shorthand is the only symbol-key spelling, so :a => 1 refuses, ** is a splat (ADR 0014), and the empty-expression, frozen-key, duplicate-key-warning, and a= key rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/191
 language/heredoc_spec.rb:
   pdx: [spec/string/heredoc_spec.pdx]
   status: partial_intentional
@@ -3242,8 +3242,8 @@ language/or_spec.rb:
 language/pattern_matching_spec.rb:
   pdx: [spec/pattern_matching/language_spec.pdx]
   status: partial_planned
-  reason: "Hash patterns, unless guards, the => capture, reused _ names, and pinning a name bound earlier in the pattern wait on #168; the find pattern, positional and Constant[...] forms, the deconstruct protocols, refinements, and the eval, lambda, regexp, and side-effect rows stay upstream, and an arm that did not match binds nothing."
-  link: https://github.com/portlandlang/portland/issues/168
+  reason: "Hash patterns, unless guards, the => capture, reused _ names, and pinning a name bound earlier in the pattern are decided (ADR 0080) and wait on their build; the find pattern, positional and Constant[...] forms, the deconstruct protocols, refinements, and the eval, lambda, regexp, and side-effect rows stay upstream, and an arm that did not match binds nothing."
+  link: https://github.com/portlandlang/portland/issues/193
 language/precedence_spec.rb:
   pdx: [spec/number/precedence_spec.pdx]
   status: partial_intentional
@@ -3306,9 +3306,9 @@ language/unless_spec.rb:
   pdx: [spec/control_flow/unless_spec.pdx]
 language/until_spec.rb:
   pdx: [spec/control_flow/until_spec.pdx]
-  status: partial_planned
-  reason: "The optional do after the condition waits on #165; a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
-  link: https://github.com/portlandlang/portland/issues/165
+  status: partial_intentional
+  reason: "The optional do after the condition is declined (ADR 0079); a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
+  link: docs/ruby/removed-syntax.md
 language/yield_spec.rb:
   pdx: [spec/method/yield_spec.pdx]
   status: partial_planned
@@ -3316,9 +3316,9 @@ language/yield_spec.rb:
   link: https://github.com/portlandlang/portland/issues/77
 language/while_spec.rb:
   pdx: [spec/control_flow/while_spec.pdx]
-  status: partial_planned
-  reason: "The optional do after the condition waits on #165; a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
-  link: https://github.com/portlandlang/portland/issues/165
+  status: partial_intentional
+  reason: "The optional do after the condition is declined (ADR 0079); a loop is a statement (ADR 0037), so the value and break-value rows, the begin...end do-while rows, and the redo rows stay upstream, and a name first bound in the body dies each iteration (ADR 0001)."
+  link: docs/ruby/removed-syntax.md
 language/END_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
