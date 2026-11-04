@@ -2699,6 +2699,294 @@ core/kernel/format_spec.rb:
   status: partial_intentional
   reason: "format and sprintf are twins here too (ADR 0067), pinned by an example that compares their answers; the instance_method and method reflection rows stay upstream, since the runtime is closed."
   link: docs/ruby/conversions.md
+core/exception/:
+  status: skipped
+  reason: "Failures are values, not exceptions (ADR 0027): there is no raise, rescue, backtrace, cause, or exception class hierarchy to port (#120)."
+  link: docs/ruby/errors.md
+core/module/:
+  status: skipped
+  reason: "A module is a namespace, not an object (ADR 0021): the Module class's reflection — define_method, const_get, instance_methods, ancestors, module_eval — has nothing to answer in a closed runtime; the namespace behavior that does exist is pinned by language/ (#122)."
+  link: docs/ruby/metaprogramming.md
+core/io/buffer/:
+  status: skipped
+  reason: "IO::Buffer is a region of memory written in place, with a memory map — values never mutate (ADR 0015; #175)."
+  link: docs/ruby/mutability.md
+core/signal/:
+  status: skipped
+  reason: "A signal handler is installed in a process-global mutable table and runs reentrantly over whatever the program was doing — globals are out, and together has no reentrancy story (#175)."
+  link: docs/ruby/concurrency.md
+core/argf/:
+  status: skipped
+  reason: "ARGF is a stateful cursor over the input files — the external iteration ADR 0055 declined (#175)."
+  link: docs/ruby/enumerators.md
+core/kernel/trap_spec.rb:
+  status: skipped
+  reason: "Signal.trap by another name (#175): a process-global mutable handler table."
+  link: docs/ruby/concurrency.md
+core/kernel/eval_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no eval."
+  link: docs/ruby/metaprogramming.md
+core/kernel/binding_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no reified scopes."
+  link: docs/ruby/metaprogramming.md
+core/kernel/local_variables_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a scope is not a value to ask about."
+  link: docs/ruby/metaprogramming.md
+core/kernel/global_variables_spec.rb:
+  status: skipped
+  reason: "No globals (#121)."
+  link: docs/ruby/removed-syntax.md
+core/kernel/instance_variable_get_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a field is read by its bare name, never by a runtime name."
+  link: docs/ruby/metaprogramming.md
+core/kernel/instance_variable_set_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121), and values never mutate (ADR 0015)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/instance_variable_defined_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a struct's fields are declared, never probed."
+  link: docs/ruby/metaprogramming.md
+core/kernel/instance_variables_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a struct's fields are declared, never listed at runtime."
+  link: docs/ruby/metaprogramming.md
+core/kernel/remove_instance_variable_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121), and values never mutate (ADR 0015)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/method_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no Method objects."
+  link: docs/ruby/metaprogramming.md
+core/kernel/methods_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a type's methods are declared, never listed at runtime."
+  link: docs/ruby/metaprogramming.md
+core/kernel/public_method_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no Method objects."
+  link: docs/ruby/metaprogramming.md
+core/kernel/public_methods_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a type's methods are declared, never listed at runtime."
+  link: docs/ruby/metaprogramming.md
+core/kernel/private_methods_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a type's methods are declared, never listed at runtime."
+  link: docs/ruby/metaprogramming.md
+core/kernel/protected_methods_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a type's methods are declared, never listed at runtime."
+  link: docs/ruby/metaprogramming.md
+core/kernel/singleton_class_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no singleton classes."
+  link: docs/ruby/metaprogramming.md
+core/kernel/singleton_method_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no singleton methods."
+  link: docs/ruby/metaprogramming.md
+core/kernel/singleton_methods_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no singleton methods."
+  link: docs/ruby/metaprogramming.md
+core/kernel/define_singleton_method_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no runtime method definition."
+  link: docs/ruby/metaprogramming.md
+core/kernel/respond_to_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): what a value answers is known at build time; respond_to? refuses by name."
+  link: docs/ruby/metaprogramming.md
+core/kernel/respond_to_missing_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): no method_missing to pair with."
+  link: docs/ruby/metaprogramming.md
+core/kernel/send_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a method is called by name, never by a runtime name; send refuses naming the rewrite."
+  link: docs/ruby/metaprogramming.md
+core/kernel/public_send_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): public_send refuses naming the rewrite."
+  link: docs/ruby/metaprogramming.md
+core/kernel/extend_spec.rb:
+  status: skipped
+  reason: "The runtime is closed (#121): a module's def is already callable as Module.name (ADR 0021); extend refuses naming it."
+  link: docs/ruby/metaprogramming.md
+core/kernel/object_id_spec.rb:
+  status: skipped
+  reason: "Values have no identity to number (#121): equality is by value (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/kernel/caller_spec.rb:
+  status: skipped
+  reason: "No call-stack reflection (#121)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/caller_locations_spec.rb:
+  status: skipped
+  reason: "No call-stack reflection (#121)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/__method___spec.rb:
+  status: skipped
+  reason: "No call-stack reflection (#121): __method__ has no Portland meaning."
+  link: docs/ruby/removed-syntax.md
+core/kernel/__callee___spec.rb:
+  status: skipped
+  reason: "No call-stack reflection (#121)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/__dir___spec.rb:
+  status: skipped
+  reason: "A file's directory is the build's business (ADR 0049), not a runtime value (#121)."
+  link: docs/ruby/static-checks.md
+core/kernel/set_trace_func_spec.rb:
+  status: skipped
+  reason: "No runtime hooks (#121)."
+  link: docs/ruby/metaprogramming.md
+core/kernel/trace_var_spec.rb:
+  status: skipped
+  reason: "No globals and no runtime hooks (#121)."
+  link: docs/ruby/removed-syntax.md
+core/kernel/untrace_var_spec.rb:
+  status: skipped
+  reason: "No globals and no runtime hooks (#121)."
+  link: docs/ruby/removed-syntax.md
+core/kernel/taint_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/tainted_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/trust_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/untaint_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/untrust_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/untrusted_spec.rb:
+  status: skipped
+  reason: "Tainting was removed from Ruby itself in 3.2 (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/is_a_spec.rb:
+  status: skipped
+  reason: "No class hierarchy to ask about (#121): a type test is a pattern, `value in Token`; is_a? has no Portland meaning."
+  link: docs/ruby/metaprogramming.md
+core/kernel/kind_of_spec.rb:
+  status: skipped
+  reason: "No class hierarchy to ask about (#121): a type test is a pattern, `value in Token`."
+  link: docs/ruby/metaprogramming.md
+core/kernel/instance_of_spec.rb:
+  status: skipped
+  reason: "No class hierarchy to ask about (#121): a type test is a pattern, `value in Token`."
+  link: docs/ruby/metaprogramming.md
+core/kernel/freeze_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): freeze has nothing to do and refuses by name (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/frozen_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): every value is frozen, so frozen? has nothing to ask (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): dup has nothing to copy and refuses by name (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): clone has nothing to copy and refuses by name (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/initialize_clone_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): no clone, so no hook on it (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/initialize_copy_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): no copy, so no hook on it (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/initialize_dup_spec.rb:
+  status: skipped
+  reason: "Values never mutate (ADR 0015): no dup, so no hook on it (#121)."
+  link: docs/ruby/mutability.md
+core/kernel/raise_spec.rb:
+  status: skipped
+  reason: "Failures are values, not exceptions (ADR 0027): raise has no Portland meaning (#121)."
+  link: docs/ruby/errors.md
+core/kernel/fail_spec.rb:
+  status: skipped
+  reason: "Failures are values, not exceptions (ADR 0027): fail is raise by another name (#121)."
+  link: docs/ruby/errors.md
+core/kernel/catch_spec.rb:
+  status: skipped
+  reason: "No non-local exit: catch/throw is a goto across frames, and a failure that crosses a frame is written at each one (ADR 0044; #121)."
+  link: docs/ruby/errors.md
+core/kernel/throw_spec.rb:
+  status: skipped
+  reason: "No non-local exit: catch/throw is a goto across frames, and a failure that crosses a frame is written at each one (ADR 0044; #121)."
+  link: docs/ruby/errors.md
+core/kernel/enum_for_spec.rb:
+  status: skipped
+  reason: "No enumerators (ADR 0055; #121)."
+  link: docs/ruby/enumerators.md
+core/kernel/to_enum_spec.rb:
+  status: skipped
+  reason: "No enumerators (ADR 0055; #121)."
+  link: docs/ruby/enumerators.md
+core/kernel/chomp_spec.rb:
+  status: skipped
+  reason: "Kernel#chomp reads and rewrites $_, the perlish line global of ruby -n (#121); String#chomp is the method."
+  link: docs/ruby/removed-syntax.md
+core/kernel/chop_spec.rb:
+  status: skipped
+  reason: "Kernel#chop reads and rewrites $_, the perlish line global of ruby -n (#121); String#chop is the method."
+  link: docs/ruby/removed-syntax.md
+core/kernel/gsub_spec.rb:
+  status: skipped
+  reason: "Kernel#gsub reads and rewrites $_, the perlish line global of ruby -n (#121); String#gsub is the method."
+  link: docs/ruby/removed-syntax.md
+core/kernel/sub_spec.rb:
+  status: skipped
+  reason: "Kernel#sub reads and rewrites $_, the perlish line global of ruby -n (#121); String#sub is the method."
+  link: docs/ruby/removed-syntax.md
+core/kernel/comparison_spec.rb:
+  status: skipped
+  reason: "Object#<=> answers 0 for identical objects and nil otherwise; here <=> is defined by the types that order (ADR 0054), and a struct writes its own (#121)."
+  link: docs/ruby/ordering.md
+core/kernel/autoload_spec.rb:
+  status: skipped
+  reason: "Loading at the first reference to a constant is a runtime hook; a program is its require closure, known at build (ADR 0049; #121)."
+  link: docs/ruby/static-checks.md
+core/kernel/autoload_relative_spec.rb:
+  status: skipped
+  reason: "Loading at the first reference to a constant is a runtime hook; a program is its require closure, known at build (ADR 0049; #121)."
+  link: docs/ruby/static-checks.md
+core/kernel/load_spec.rb:
+  status: skipped
+  reason: "load re-reads a file every time, with a wrap option; a program is its require closure, each file once (ADR 0049; #121)."
+  link: docs/ruby/static-checks.md
+core/kernel/syscall_spec.rb:
+  status: skipped
+  reason: "A raw syscall by number is the floor's business, not a program's (ADR 0068; #121)."
+  link: docs/ruby/system.md
+core/kernel/test_spec.rb:
+  status: skipped
+  reason: "Kernel#test is the shell's test(1) as single-letter commands; the File predicates it abbreviates are #178's (#121)."
+  link: docs/ruby/system.md
+core/kernel/display_spec.rb:
+  status: skipped
+  reason: "Object#display is print by another name on every object (#121); puts and print are the spellings."
+  link: docs/ruby/aliases.md
 core/encoding/:
   status: skipped
   reason: "A string is UTF-8, always (ADR 0069): there is no encoding tag, so no Encoding objects, lists, converters, defaults, or errors to port."
