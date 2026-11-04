@@ -2403,6 +2403,11 @@ def evaluate_method_call(node, mutable bindings)
   if (receiver in ["__struct__", *]) && %w[between? clamp].include?(node.name) && arguments.length == 2
     return outcome([ordered_answer(node.name, receiver, arguments, bindings)], bindings)
   end
+  # A symbol's `to_sym` is itself (ADR 0071).
+  if (receiver in ["__symbol__", *]) && %w[intern to_sym].include?(node.name)
+    check_builtin_count(receiver, node.name, arguments.length)
+    return outcome([receiver], bindings)
+  end
   # A symbol answers Ruby's text queries about its name (#112), the seed's
   # arm: a guest symbol is a tagged host array, so its name answers instead.
   if (receiver in ["__symbol__", *]) && %w[empty? end_with? id2name length name size slice start_with?].include?(node.name)
@@ -2502,6 +2507,8 @@ def evaluate_method_call(node, mutable bindings)
   when "valid_encoding?" then receiver.valid_encoding?
   when "hex" then receiver.hex
   when "oct" then receiver.oct
+  # A symbol may be made from text (ADR 0071): the guest's tagged shape.
+  when "to_sym", "intern" then ["__symbol__", receiver]
   when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))
   when "gsub" then receiver.gsub(value_at(arguments, 0), value_at(arguments, 1))
   when "upcase" then receiver.upcase

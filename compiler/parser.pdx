@@ -1025,11 +1025,29 @@ def enum_case_decl_node(name, labels)
 end
 
 # The name inside a symbol token: `:paid` -> `paid`, `:"odd key"` -> `odd key`.
+# The quoted part is a string literal (ADR 0071), escapes decoded; where a
+# name is wanted — an enum case, a pattern — an interpolation has no name
+# to give until the program runs, so it refuses here.
 def symbol_name(text)
   inner = text.slice(1, text.length - 1)
-  return inner.slice(1, inner.length - 2) if inner.start_with?("\"")
+  return inner unless inner.start_with?("\"")
 
-  inner
+  decoded = string_expression(inner)
+  return decoded.value if decoded in StringNode
+
+  panic "#{text} is a symbol made from text, which has no name until it runs — bind it to a local and pin that: ^name"
+end
+
+# A symbol token as a value: `:paid` and `:"odd key"` are the literal;
+# `:"prefix_#{name}"` is `"prefix_#{name}".to_sym` (ADR 0071).
+def symbol_expression(text, line: nil)
+  inner = text.slice(1, text.length - 1)
+  return symbol_node(inner) unless inner.start_with?("\"")
+
+  decoded = string_expression(inner, line: line)
+  return symbol_node(decoded.value) if decoded in StringNode
+
+  method_call_node(decoded, "to_sym", [], nil, line: line)
 end
 
 def self_node
@@ -1905,7 +1923,7 @@ def parse_primary(tokens, position)
     if operator_at?(tokens, after, %w[(]) && !tokens[after].leading_space
       parse_enum_case(tokens, symbol_name(token.text), after + 1)
     else
-      Step.new(node: symbol_node(symbol_name(token.text)), position: after)
+      Step.new(node: symbol_expression(token.text, line: token.line), position: after)
     end
   when "identifier"
     # A `!` in the name is just the name (ADR 0044).

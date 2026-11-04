@@ -1,6 +1,6 @@
 # 0071 — A symbol may be made from text; a declared vocabulary still refuses it
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03 in discussion; supersedes [ADR 0023](0023-2026-07-25-symbols.md) §3 and the interpolated-symbol sentence of §2; recorded, not built — the build is [#184](https://github.com/portlandlang/portland/issues/184))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03 in discussion; supersedes [ADR 0023](0023-2026-07-25-symbols.md) §3 and the interpolated-symbol sentence of §2; built on both implementations 2026-11-03 under [#184](https://github.com/portlandlang/portland/issues/184) — `to_sym`, `intern`, and interpolated symbols; the checked-position refusal of ruling 2 waits on a position that checks a vocabulary, which no struct field or argument does yet, and is [#200](https://github.com/portlandlang/portland/issues/200))
 - **Date:** 2026-11-03
 - **Supersedes in part:** [ADR 0023](0023-2026-07-25-symbols.md) §2 (interpolated symbols) and §3 (`to_sym`)
 

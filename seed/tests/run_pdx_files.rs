@@ -1992,10 +1992,6 @@ fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
             "'attr_reader' has no Portland meaning — a field is read by its bare name",
         ),
         (
-            "p(\"a\".to_sym)\n",
-            "'to_sym' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)",
-        ),
-        (
             "Object.new\n",
             "'Object' has no Portland meaning — there is no root class; a struct stands alone",
         ),
@@ -2663,6 +2659,43 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// A symbol made from text (ADR 0071) on both oracles: `to_sym`, `intern`,
+/// a symbol's own `to_sym`, an interpolated symbol with the string's
+/// escapes, and the one refusal — an interpolated symbol where a pattern
+/// wants a name.
+#[test]
+fn symbols_from_text_on_both_oracles() {
+    assert_both_print(
+        "symbols_from_text.pdx",
+        "name = \"pending\"\n\
+         p name.to_sym\n\
+         p \"odd key\".intern\n\
+         p :paid.to_sym\n\
+         p :\"prefix_#{name}_#{1 + 1}\"\n\
+         p :\"a\\\"b\\tc\"\n\
+         p({pending: 1}[(\"pend\" + \"ing\").to_sym])\n\
+         case name.to_sym\n\
+         in :pending then puts \"matched\"\n\
+         else puts \"missed\"\n\
+         end\n",
+        ":pending\n\
+         :\"odd key\"\n\
+         :paid\n\
+         :prefix_pending_2\n\
+         :\"a\\\"b\\tc\"\n\
+         1\n\
+         matched\n",
+    );
+    assert_both_oracles_refuse(
+        "symbol_pattern_from_text.pdx",
+        None,
+        &[(
+            "name = \"a\"\ncase :a\nin :\"#{name}\" then puts 1\nelse puts 2\nend\n",
+            ":\"#{name}\" is a symbol made from text, which has no name until it runs — bind it to a local and pin that: ^name",
+        )],
+    );
+}
+
 /// Ruby's directives whole, on both oracles — the seed's engine and the
 /// hosted walk that hands it one directive at a time agree byte for byte,
 /// and the answers are Ruby 4.0.7's, near-tie rounding included. Every

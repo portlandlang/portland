@@ -1,9 +1,9 @@
 # A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
 # start_with?, end_with?, name, id2name, to_s, ==, and ===. A symbol answers
-# questions about its name here, as in Ruby, and never builds a new symbol
-# from text (ADR 0023) — so upcase and its kin stay behind. Upstream's
-# alias checks compare method objects, which a closed runtime has none of;
-# they ask the same question of the two answers instead.
+# questions about its name here, as in Ruby; making one from text is
+# from_text_spec's (ADR 0071). Upstream's alias checks compare method
+# objects, which a closed runtime has none of; they ask the same question
+# of the two answers instead.
 
 require_relative "../spec_helper"
 

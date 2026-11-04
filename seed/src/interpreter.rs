@@ -4185,13 +4185,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 high.unwrap_or(Value::Nil),
             ]));
         }
-        // A symbol answers Ruby's text queries about its name (#112) — none
-        // of them builds a symbol, which ADR 0023 keeps literal.
+        // A symbol answers Ruby's text queries about its name (#112), and
+        // `to_sym` answers itself (ADR 0071).
         if let Value::Symbol(text) = &receiver
             && block.is_none()
         {
             if matches!(name, "name" | "id2name") && arguments.is_empty() {
                 return Some(Value::String(text.clone()));
+            }
+            if matches!(name, "to_sym" | "intern") && arguments.is_empty() {
+                return Some(receiver.clone());
             }
             if matches!(
                 name,
@@ -6336,6 +6339,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::Integer(ruby_to_i(text, *base))
             }
             (Value::String(text), "to_f", []) => Value::Float(ruby_to_f(text)),
+            // A symbol may be made from text (ADR 0071): a Symbol of no
+            // declared vocabulary, `intern` its twin (ADR 0036).
+            (Value::String(text), "to_sym" | "intern", []) => Value::Symbol(text.clone()),
             (Value::Integer(number), "to_f", []) => Value::Float(*number as f64),
             (Value::Integer(number), "to_i", []) => Value::Integer(*number),
             // An Integer's `ord` is itself, and its `size` the bytes of a
@@ -7889,14 +7895,47 @@ mod tests {
     }
 
     #[test]
+    fn a_symbol_may_be_made_from_text() {
+        // ADR 0071 superseded ADR 0023 §3's cut: `to_sym` and `intern`
+        // answer a Symbol, a symbol's own `to_sym` is itself, and an
+        // interpolated symbol is the string's `to_sym`.
+        assert_eq!(
+            evaluate(r#""paid".to_sym"#),
+            Some(Value::Symbol("paid".to_string()))
+        );
+        assert_eq!(
+            evaluate(r#""odd key".intern"#),
+            Some(Value::Symbol("odd key".to_string()))
+        );
+        assert_eq!(
+            evaluate(":paid.to_sym"),
+            Some(Value::Symbol("paid".to_string()))
+        );
+        assert_eq!(
+            evaluate(
+                r##"name = "x"
+:"prefix_#{name}_#{1 + 1}""##
+            ),
+            Some(Value::Symbol("prefix_x_2".to_string()))
+        );
+        assert_eq!(
+            evaluate(r#":"a\"b\n""#),
+            Some(Value::Symbol("a\"b\n".to_string()))
+        );
+    }
+
+    #[test]
     #[should_panic(
-        expected = "'to_sym' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
+        expected = "is a symbol made from text, which has no name until it runs — bind it to a local and pin that: ^name"
     )]
-    fn there_is_no_to_sym() {
-        // The load-bearing omission (ADR 0023 §3): a symbol built from a
-        // string at runtime could never be checked against a vocabulary —
-        // and the refusal says so (#135).
-        evaluate(r#""paid".to_sym"#);
+    fn an_interpolated_symbol_is_not_a_pattern() {
+        evaluate(
+            r##"name = "a"
+case :a
+in :"#{name}" then 1
+else 2
+end"##,
+        );
     }
 
     #[test]

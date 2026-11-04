@@ -112,9 +112,37 @@ fn float_literal(text: &str) -> f64 {
 
 fn symbol_name(text: &str) -> String {
     let after_colon = &text[1..];
-    match after_colon.strip_prefix('"') {
-        Some(quoted) => quoted.trim_end_matches('"').to_string(),
-        None => after_colon.to_string(),
+    if !after_colon.starts_with('"') {
+        return after_colon.to_string();
+    }
+    // The quoted part is a string literal (ADR 0071), escapes decoded. Where
+    // a *name* is wanted — an enum case, a pattern — an interpolation has
+    // no name to give until the program runs, so it refuses here.
+    match string_expression(after_colon, &mut Vec::new()) {
+        Expression::String(name) => name,
+        _ => panic!(
+            "{text} is a symbol made from text, which has no name until it runs — bind it to a local and pin that: ^name"
+        ),
+    }
+}
+
+/// A symbol token as a value: `:paid` and `:"odd key"` are the literal;
+/// `:"prefix_#{name}"` is `"prefix_#{name}".to_sym` (ADR 0071).
+fn symbol_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
+    let after_colon = &text[1..];
+    if !after_colon.starts_with('"') {
+        return Expression::Symbol(after_colon.to_string());
+    }
+    match string_expression(after_colon, it_frames) {
+        Expression::String(name) => Expression::Symbol(name),
+        interpolated => Expression::MethodCall {
+            arguments: Vec::new(),
+            block: None,
+            keyword_arguments: Vec::new(),
+            name: "to_sym".to_string(),
+            receiver: Box::new(interpolated),
+            safe: false,
+        },
     }
 }
 
@@ -2959,7 +2987,7 @@ impl<'source> Parser<'source> {
                     payload,
                 }
             }
-            TokenKind::Symbol => Expression::Symbol(symbol_name(token.text)),
+            TokenKind::Symbol => symbol_expression(token.text, &mut self.it_frames),
             TokenKind::WordArray | TokenKind::SymbolArray => {
                 let opener = token.text.as_bytes()[2] as char;
                 let closer = token.text.as_bytes()[token.text.len() - 1] as char;

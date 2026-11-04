@@ -759,7 +759,7 @@ core/enumerable/zip_spec.rb:
 core/enumerable/group_by_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
   status: partial_intentional
-  reason: "No blockless Enumerator (ADR 0055); hash defaults wait on #170; a symbol is never made from text (ADR 0023), so the keys are strings."
+  reason: "No blockless Enumerator (ADR 0055); hash defaults wait on #170."
   link: docs/ruby/enumerators.md
 core/enumerable/filter_map_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
@@ -2246,9 +2246,10 @@ core/string/inspect_spec.rb:
   reason: "The escape set is closed: \\a \\b \\v \\f \\e and the \\x and \\u notation for non-printing characters have no spelling, so those rows stay upstream."
   link: docs/ruby/string-escapes.md
 core/string/intern_spec.rb:
-  status: skipped
-  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/from_text_spec.pdx]
+  status: partial_intentional
+  reason: "The one row compares method objects, which a closed runtime has none of; intern is to_sym's twin (ADR 0036), asked of the two answers."
+  link: docs/ruby/metaprogramming.md
 core/string/length_spec.rb:
   pdx: [spec/string/length_spec.pdx]
 core/string/lines_spec.rb:
@@ -2358,8 +2359,9 @@ core/string/to_str_spec.rb:
   reason: "to_str is the implicit-conversion protocol, which Portland refuses (ADR 0036); to_s is the spelling."
   link: docs/ruby/aliases.md
 core/string/to_sym_spec.rb:
-  status: skipped
-  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  pdx: [spec/symbol/from_text_spec.pdx]
+  status: partial_intentional
+  reason: "to_sym answers a Symbol of no declared vocabulary (ADR 0071); the encoding rows describe tags a string has none of (ADR 0069), so the US-ASCII, UTF-16, binary, and invalid-byte rows stay upstream, and @cat has no spelling since instance variables are not names here."
   link: docs/ruby/symbols.md
 core/string/try_convert_spec.rb:
   status: skipped
@@ -2513,9 +2515,8 @@ core/struct/values_spec.rb:
   pdx: [spec/struct/enumerable_spec.pdx]
 
 # — core/symbol —
-# A symbol answers questions about its name, and never builds a new symbol
-# from text (ADR 0023): the case changers and succ stay behind, and symbols
-# are not ordered.
+# A symbol answers questions about its name, and a symbol may be made from
+# text (ADR 0071): to_sym and intern answer, and symbols are not ordered.
 
 core/symbol/inspect_spec.rb:
   pdx: [spec/symbol/spellings_spec.pdx]
@@ -2564,9 +2565,10 @@ core/symbol/id2name_spec.rb:
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
 core/symbol/intern_spec.rb:
-  status: skipped
-  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
-  link: docs/ruby/symbols.md
+  pdx: [spec/symbol/from_text_spec.pdx]
+  status: partial_intentional
+  reason: "The one row compares method objects, which a closed runtime has none of; intern is to_sym's twin (ADR 0036), asked of the two answers."
+  link: docs/ruby/metaprogramming.md
 core/symbol/length_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
   status: partial_intentional
@@ -2620,8 +2622,9 @@ core/symbol/element_reference_spec.rb:
 core/symbol/slice_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
 core/symbol/to_sym_spec.rb:
-  status: skipped
-  reason: "to_sym and intern are cut: a symbol is written literally, never made from text (ADR 0023)."
+  pdx: [spec/symbol/from_text_spec.pdx]
+  status: partial_intentional
+  reason: "A symbol's to_sym is itself (ADR 0071); the operator, instance-variable, and class-variable symbols in upstream's list have no spelling here (ADR 0023 §2)."
   link: docs/ruby/symbols.md
 core/symbol/upcase_spec.rb:
   status: skipped
@@ -3294,9 +3297,9 @@ language/super_spec.rb:
   reason: "There is no inheritance — declined, not deferred — so super has nothing to reach; traits carry shared behavior (ADR 0028)."
   link: docs/ruby/mixins-and-inheritance.md
 language/symbol_spec.rb:
-  pdx: [spec/symbol/spellings_spec.pdx]
+  pdx: [spec/symbol/spellings_spec.pdx, spec/symbol/from_text_spec.pdx]
   status: partial_intentional
-  reason: "No operator symbols, no globals or instance variables to name, no %s or %I, no symbol from text (so no interpolation in a quoted symbol), and no encodings (ADR 0023)."
+  reason: "No operator symbols, no globals or instance variables to name, no %s or %I, and no encodings (ADR 0023); the interpolation rows are in from_text_spec (ADR 0071), and the invalid-byte row describes an encoding a string has none of (ADR 0069)."
   link: docs/ruby/symbols.md
 language/undef_spec.rb:
   status: skipped

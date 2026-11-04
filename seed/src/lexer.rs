@@ -136,9 +136,6 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         "freeze" | "frozen?" | "dup" | "clone" => format!(
             "'{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
         ),
-        "to_sym" | "intern" => format!(
-            "'{name}' has no Portland meaning — a symbol is written literally, never made from text (ADR 0023)"
-        ),
         // Portland's own placeholders, retired when the floor module arrived.
         "argv" => "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)".to_string(),
         "read_file" => "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)".to_string(),
@@ -722,7 +719,8 @@ fn attached_to_a_name_on_the_left(source: &str, colon: usize) -> bool {
 
 /// `:name` and `:"quoted"` only. Operator symbols (`:+`, `:[]`) are out —
 /// `send`, `define_method` and `&:` were their whole job, and all three are
-/// gone (ADR 0023 §2).
+/// gone (ADR 0023 §2). The quoted form is a string literal after the colon
+/// (ADR 0071): escapes and `#{...}` are the string's.
 fn starts_a_symbol(after_colon: &str) -> bool {
     matches!(
         after_colon.as_bytes().first(),
@@ -732,13 +730,28 @@ fn starts_a_symbol(after_colon: &str) -> bool {
 
 /// The characters after the colon, including a closing quote when quoted.
 fn symbol_length(after_colon: &str) -> usize {
-    if let Some(quoted) = after_colon.strip_prefix('"') {
-        // No interpolation inside a symbol (ADR 0023 §2), so the first
-        // closing quote ends it.
-        return match quoted.find('"') {
-            Some(end) => end + 2,
-            None => panic!("unterminated quoted symbol"),
-        };
+    if after_colon.starts_with('"') {
+        // The quoted part is a string literal (ADR 0071), so the token ends
+        // where the string's would: an escaped quote and a quote inside an
+        // interpolation do not close it.
+        let mut chars = after_colon.char_indices().peekable();
+        chars.next(); // the opening quote
+        loop {
+            match chars.next() {
+                None => panic!("unterminated quoted symbol"),
+                Some((_, '\\')) => {
+                    if chars.next().is_none() {
+                        panic!("unterminated quoted symbol");
+                    }
+                }
+                Some((_, '#')) if matches!(chars.peek(), Some(&(_, '{'))) => {
+                    chars.next(); // the `{`
+                    skip_interpolation(&mut chars, 0);
+                }
+                Some((closing, '"')) => return closing + 1,
+                Some(_) => {}
+            }
+        }
     }
 
     let name = after_colon

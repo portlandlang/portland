@@ -16,9 +16,9 @@ context "Symbol" do
 end
 
 # From ruby/spec language/symbol_spec.rb. No operator symbols, no globals
-# or instance variables to name, no %s or %I, no symbol from text — so no
-# interpolation inside a quoted symbol — and no encodings (ADR 0023); the
-# is_a? checks become equality with themselves.
+# or instance variables to name, no %s or %I, and no encodings (ADR 0023);
+# the interpolation rows are in from_text_spec (ADR 0071), and the is_a?
+# checks become equality with themselves.
 context "A Symbol literal" do
   specify "is a ':' followed by any number of valid characters" do
     name = :foo

@@ -3,9 +3,9 @@
 #
 # Note what this file avoids printing: a bare symbol or enum case. The compiler
 # represents those as tagged arrays, exactly as it already does for guest
-# structs, because it cannot manufacture a host symbol — ADR 0023 removed
-# `to_sym`, so nothing can build one from a name at runtime. The decision
-# working as intended, felt by its own compiler.
+# structs — written when it could not manufacture a host symbol, since ADR
+# 0023 had removed `to_sym`. ADR 0071 brought `to_sym` back, so the tag is
+# retirable now; the rendering walkers (#39) print it right either way.
 
 enum Ordering
   :less

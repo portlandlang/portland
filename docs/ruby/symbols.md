@@ -2,7 +2,7 @@
 
 **Summary:** `:foo` survives with its spelling intact, but the set can be declared and checked; `to_sym` exists, and a symbol made from text is refused only where a declared vocabulary is expected; hash shorthand is the only symbol-key form.
 
-**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md); its `to_sym` cut superseded by [ADR 0071](../adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md), 2026-11-03). The 0023 half is built in the seed and the compiler, differentially pinned — see [the language](../language.md#symbols-and-enums); `to_sym`, `intern`, and interpolated symbols are decided and not yet built ([#184](https://github.com/portlandlang/portland/issues/184)).
+**Status:** decided ([ADR 0023](../adr/0023-2026-07-25-symbols.md); its `to_sym` cut superseded by [ADR 0071](../adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md), 2026-11-03). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#symbols-and-enums); `to_sym`, `intern`, and interpolated symbols built 2026-11-03 ([#184](https://github.com/portlandlang/portland/issues/184)). The refusal at a checked position waits on there being one: a struct's fields declare no vocabulary ([ADR 0062](../adr/0062-2026-10-25-struct-fields-are-names-only.md)), so no call site yet expects a particular enum, and the check lands with the first that does ([#200](https://github.com/portlandlang/portland/issues/200)).
 
 ## Ruby
 
@@ -51,7 +51,7 @@ Comparison is equality only. `:paid == "paid"` is a compile error rather than Ru
 - **`:symbol` literals** — compile verbatim, same meaning. Free tier.
 - **`{name: "x"}`** — compiles verbatim, and it is currently a *parse error*, so this is a gain rather than a divergence.
 - **`{:name => "x"}`** — a compile error naming the shorthand. Free-tier autocorrect: RuboCop's `Style/HashSyntax` already defaults to enforcing the shorthand, so conforming Ruby already complies.
-- **`.to_sym`, `.intern`, `:"#{...}"`** — port verbatim once built ([#184](https://github.com/portlandlang/portland/issues/184)), same answers — _free_. The one new refusal is a runtime symbol handed to a checked position; the rewrite is a `case/in` over the vocabulary, which a linter can scaffold.
+- **`.to_sym`, `.intern`, `:"#{...}"`** — port verbatim, same answers — _free_. A quoted symbol takes the string's escapes, so `:"a\nb"` is a name with a newline, as in Ruby. The one new refusal is a runtime symbol handed to a checked position, when there is one; the rewrite is a `case/in` over the vocabulary, which a linter can scaffold. An interpolated symbol in a *pattern*, `in :"#{name}"`, refuses — bind the value to a local and pin it, `in ^name`.
 - **`&:upcase`** — becomes `{ it.upcase }` (ADR 0017). Free tier once the polyfill teaches it.
 - **`send(:name)`, `define_method(:name)`, `respond_to?(:name)`** — gone with runtime metaprogramming, not with symbols; see [metaprogramming](metaprogramming.md).
 - **Symbol/String key mixing** — Rails' indifferent access does not port; each site becomes a compile error. Mechanically fixable, but real work for Rails-shaped codebases, and the size of that work is a corpus question still to be run.

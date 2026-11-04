@@ -253,7 +253,7 @@ end
 context "Enumerable#group_by" do
   specify "returns a hash with values grouped according to the block" do
     words = numerous(["foo", "bar", "baz"])
-    expect(words.group_by { |word| word[0] }).to eq({"f" => ["foo"], "b" => ["bar", "baz"]})
+    expect(words.group_by { |word| word[0].to_sym }).to eq({f: ["foo"], b: ["bar", "baz"]})
   end
 
   specify "returns an empty hash for empty enumerables" do

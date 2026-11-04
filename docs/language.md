@@ -314,7 +314,7 @@ config[:name]                        # => "pdx"
 mixed = {"string" => 1, sym: 2}      # the rocket stays for other keys
 ```
 
-`{:name => "pdx"}` is refused with the rewrite named. **There is no `String#to_sym` yet** — it was cut so a symbol could never be built from text, and [ADR 0071](adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md) brings it back (not yet built): a symbol made from text is a `Symbol` of no declared vocabulary, welcome anywhere a symbol is a value and refused where a vocabulary is checked, with `case/in` as the gate. Operator symbols (`:+`, `:[]`) went with the `send` and `&:` family that needed them.
+`{:name => "pdx"}` is refused with the rewrite named. **A symbol may be made from text** ([ADR 0071](adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md), reversing ADR 0023 §3's cut): `"pending".to_sym` and `text.intern` answer a `Symbol`, a symbol's own `to_sym` is itself, and `:"prefix_#{name}"` is the string's `to_sym` — the quoted form is a string literal after the colon, escapes included. A symbol made from text is of no declared vocabulary: welcome anywhere a symbol is a value, to be refused where a vocabulary is checked once a position checks one, with `case/in` as the gate. In a pattern it refuses — `in :"#{name}"` has no name until it runs; pin a local instead. Operator symbols (`:+`, `:[]`) went with the `send` and `&:` family that needed them.
 
 An **enum** declares a closed vocabulary of symbol cases, and a case may carry a keyword-only payload (ADR 0022):
 
@@ -364,7 +364,7 @@ Read-only, and small on purpose.
 | String     | `length upcase downcase capitalize swapcase reverse empty? chars split strip lstrip rstrip chomp lines include? index count start_with? end_with? to_i to_f slice` and `[index]`               |
 | Integer    | `abs zero? positive? negative? even? odd? gcd pow succ pred next to_f` and `to_s(base)`; `Integer.sqrt(n)` ([ADR 0058](adr/0058-2026-10-16-builtin-types-carry-type-functions.md))                |
 | Float      | `abs zero? positive? negative? nan? finite? infinite? floor ceil round truncate to_i`, and the constants `Float::MAX MIN EPSILON INFINITY NAN DIG` and kin ([#152](https://github.com/portlandlang/portland/issues/152)) |
-| Symbol     | `to_s name id2name length empty? start_with? end_with?` and `[index]` — questions about its name; a symbol is never built from text (ADR 0023)                                                   |
+| Symbol     | `to_s name id2name length empty? start_with? end_with? to_sym intern` and `[index]` — questions about its name; `String#to_sym` and `intern` build one from text (ADR 0071)                       |
 | Array      | `length first last empty? join include? index count sum min max sort reverse uniq flatten compact to_a tally zip each_slice slice` and `[index]`, negative indices included — `sum`/`min`/`max`/`sort` take numbers or strings; `Array.new(count, fill)` and `Array.new(count) { |index| … }` build one ([ADR 0058](adr/0058-2026-10-16-builtin-types-carry-type-functions.md)) |
 | Hash       | `length empty? key? keys values merge dig to_a` and `[key]`                                                                                                                                    |
 | Range      | `include? to_a step min max`, and everything an array answers, by walking                                                                                                                      |
