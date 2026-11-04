@@ -1,6 +1,6 @@
 # 0075 — `attr_reader` is a spelling of the field list
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#134](https://github.com/portlandlang/portland/issues/134); not built — the build is [#188](https://github.com/portlandlang/portland/issues/188))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#134](https://github.com/portlandlang/portland/issues/134); built on both implementations the same day under [#188](https://github.com/portlandlang/portland/issues/188))
 - **Date:** 2026-11-03
 - **Issue:** [#134](https://github.com/portlandlang/portland/issues/134)
 

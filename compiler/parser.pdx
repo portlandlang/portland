@@ -2998,6 +2998,15 @@ def parse_struct(tokens, mutable position)
       position = skip_newlines_at(tokens, constant.position)
       next
     end
+    # `attr_reader :size, :label` declares the fields `size` and `label`,
+    # exactly as the bare lines do (ADR 0075) — the seed's reading.
+    if tokens[position].text == "attr_reader"
+      declared = parse_attr_reader(tokens, position + 1, name)
+      return declared if declared.node in ErrorNode
+      fields += declared.node
+      position = skip_newlines_at(tokens, declared.position)
+      next
+    end
     # Ruby's class macros — `validates :email`, `format :json` — are calls
     # in a type body, where Portland only declares (#135): nothing runs at
     # definition time. The seed's sentence.
@@ -3105,6 +3114,23 @@ def parse_type_constant(tokens, position)
 end
 
 def visibility_word?(word) = %w[module_function private private_constant protected public].include?(word)
+
+# The field names after `attr_reader` (ADR 0075): symbols, comma-separated,
+# at least one — a step whose node is the list of names, or an ErrorNode in
+# the seed's words.
+def parse_attr_reader(tokens, mutable position, struct_name)
+  mutable names = []
+  while true
+    unless position < tokens.length && tokens[position].symbol?
+      return Step.new(node: error_node("attr_reader takes field names as symbols — write attr_reader :size, :label"), position: skip_line_at(tokens, position))
+    end
+    names << symbol_name(tokens[position].text)
+    position += 1
+    break unless operator_at?(tokens, position, %w[,])
+    position += 1
+  end
+  Step.new(node: names, position: position)
+end
 
 # A token that, right after a name in a type body, makes the line a call
 # with a paren-less argument rather than a field (#135).

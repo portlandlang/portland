@@ -1988,8 +1988,8 @@ fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
             "'proc' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'",
         ),
         (
-            "struct Foo\n  attr_reader :x\nend\n",
-            "'attr_reader' has no Portland meaning — a field is read by its bare name",
+            "struct Foo\n  attr_writer :x\nend\n",
+            "'attr_writer' makes a setter, and values never mutate here (ADR 0015) — declare the field with 'attr_reader' or its bare name, and build changed values with 'with'",
         ),
         (
             "Object.new\n",
@@ -2659,6 +2659,33 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// `attr_reader :size, :label` is a spelling of the field list (ADR 0075)
+/// on both oracles, mixing with bare lines; outside a type body, and with
+/// anything but symbols after it, it refuses in one sentence.
+#[test]
+fn attr_reader_on_both_oracles() {
+    assert_both_print(
+        "attr_reader.pdx",
+        "class Token\n  attr_reader :kind, :text\n  line\n\n  def shout = text.upcase\nend\n\
+         token = Token.new(kind: \"word\", text: \"hi\", line: 3)\np token\nputs token.shout\np token.line\np token.to_h\np Token.new(kind: \"a\", text: \"b\", line: 1) == Token.new(kind: \"a\", text: \"b\", line: 1)\n",
+        "Token(kind: \"word\", text: \"hi\", line: 3)\nHI\n3\n{kind: \"word\", text: \"hi\", line: 3}\ntrue\n",
+    );
+    assert_both_oracles_refuse(
+        "attr_reader_refusal.pdx",
+        None,
+        &[
+            (
+                "attr_reader :x\n",
+                "'attr_reader' declares fields, so it belongs in a struct or class body — a field is read by its bare name",
+            ),
+            (
+                "struct Foo\n  attr_reader x\nend\n",
+                "attr_reader takes field names as symbols — write attr_reader :size, :label",
+            ),
+        ],
+    );
+}
+
 /// `{name:, port:}` and `build(name:, port:)` read as Ruby 3.1 reads them
 /// (ADR 0078) on both oracles — a key or label with no value takes the
 /// name's own — and the one line-ending Ruby reads two ways refuses.

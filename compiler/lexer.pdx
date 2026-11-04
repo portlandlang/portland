@@ -149,7 +149,11 @@ def retired_sentence(name)
   when "require" then "'require' has no Portland meaning — 'require_relative' loads a file by its path"
   when "proc", "lambda", "Proc" then "'#{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
   when "alias_method" then "'alias_method' is spelled 'alias' here — 'alias new old', two bare names"
-  when "attr_reader", "attr_writer", "attr_accessor" then "'#{name}' has no Portland meaning — a field is read by its bare name"
+  # `attr_reader` is a spelling of the field list inside a type body (ADR
+  # 0075); this is its sentence everywhere else. The setters mutate, and
+  # what mutable state is waits on #103.
+  when "attr_reader" then "'attr_reader' declares fields, so it belongs in a struct or class body — a field is read by its bare name"
+  when "attr_writer", "attr_accessor" then "'#{name}' makes a setter, and values never mutate here (ADR 0015) — declare the field with 'attr_reader' or its bare name, and build changed values with 'with'"
   when "Thread", "Mutex", "Queue", "Fiber", "Ractor", "ConditionVariable" then "'#{name}' has no Portland meaning — run independent work in a 'together' block"
   when "Object", "BasicObject", "Kernel", "Class", "Module" then "'#{name}' has no Portland meaning — there is no root class; a struct stands alone"
   when "fetch" then "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'"
@@ -171,7 +175,7 @@ end
 
 # The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
 # the word follows a dot — `range.begin` is a method, as Ruby's is.
-def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_reader attr_writer begin defined? ensure extend for redo rescue retry undef].include?(word)
+def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_writer begin defined? ensure extend for redo rescue retry undef].include?(word)
 
 def two_character_operator?(pair)
   %w[== != <= >= && || += -= *= /= %= => &. << .. :: **].include?(pair)

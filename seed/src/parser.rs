@@ -1325,6 +1325,33 @@ impl<'source> Parser<'source> {
             if token.kind != TokenKind::Identifier {
                 panic!("expected a field name in struct {name}, got {token:?}");
             }
+            // `attr_reader :size, :label` declares the fields `size` and
+            // `label`, exactly as the bare lines do (ADR 0075).
+            if token.text == "attr_reader" {
+                loop {
+                    let field = self.advance();
+                    if field.kind != TokenKind::Symbol {
+                        panic!(
+                            "attr_reader takes field names as symbols — write attr_reader :size, :label"
+                        );
+                    }
+                    let field = symbol_name(field.text);
+                    if !methods.is_empty() || !type_functions.is_empty() {
+                        panic!("fields come before methods in struct {name}");
+                    }
+                    if fields.contains(&field) {
+                        panic!("duplicate field {field} in struct {name}");
+                    }
+                    fields.push(field);
+                    if self.peek_kind() != Some(TokenKind::Comma) {
+                        break;
+                    }
+                    self.position += 1; // the `,`
+                }
+                self.expect_statement_boundary();
+                self.skip_newlines();
+                continue;
+            }
             // Ruby's class macros — `validates :email`, `format :json` — are
             // calls in a type body, where Portland only declares (#135):
             // nothing runs at definition time.

@@ -105,8 +105,14 @@ pub fn retired_sentence(name: &str) -> Option<String> {
             "'{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
         ),
         "alias_method" => "'alias_method' is spelled 'alias' here — 'alias new old', two bare names".to_string(),
-        "attr_reader" | "attr_writer" | "attr_accessor" => {
-            format!("'{name}' has no Portland meaning — a field is read by its bare name")
+        // `attr_reader` is a spelling of the field list inside a type body
+        // (ADR 0075); this is its sentence everywhere else. The setters
+        // mutate, and what mutable state is waits on #103.
+        "attr_reader" => {
+            "'attr_reader' declares fields, so it belongs in a struct or class body — a field is read by its bare name".to_string()
+        }
+        "attr_writer" | "attr_accessor" => {
+            format!("'{name}' makes a setter, and values never mutate here (ADR 0015) — declare the field with 'attr_reader' or its bare name, and build changed values with 'with'")
         }
         "Thread" | "Mutex" | "Queue" | "Fiber" | "Ractor" | "ConditionVariable" => format!(
             "'{name}' has no Portland meaning — run independent work in a 'together' block"
@@ -147,12 +153,11 @@ pub fn retired_sentence(name: &str) -> Option<String> {
 
 /// The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
 /// the word follows a dot — `range.begin` is a method, as Ruby's is.
-const RESERVED_WORDS: [&str; 15] = [
+const RESERVED_WORDS: [&str; 14] = [
     "BEGIN",
     "END",
     "__method__",
     "attr_accessor",
-    "attr_reader",
     "attr_writer",
     "begin",
     "defined?",
