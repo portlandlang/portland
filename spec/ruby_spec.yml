@@ -246,12 +246,12 @@ core/array/slice_spec.rb:
 core/array/bsearch_spec.rb:
   pdx: [spec/array/bsearch_spec.pdx]
   status: partial_intentional
-  reason: "Without a block there are no enumerators; break carries no value (ADR 0012); the bignum rows wait on #156."
+  reason: "Without a block there are no enumerators; break carries no value (ADR 0012); the bignum rows stay upstream, integers being 64-bit (docs/ruby/integers.md)."
   link: docs/ruby/enumerators.md
 core/array/bsearch_index_spec.rb:
   pdx: [spec/array/bsearch_spec.pdx]
   status: partial_intentional
-  reason: "Without a block there are no enumerators; the bignum and coerce rows wait on #156 and #155."
+  reason: "Without a block there are no enumerators; the bignum rows stay upstream, integers being 64-bit (docs/ruby/integers.md), and the coerce rows wait on #155."
   link: docs/ruby/enumerators.md
 core/array/combination_spec.rb:
   pdx: [spec/array/combinatorics_spec.pdx]
@@ -1343,6 +1343,7 @@ core/integer/abs_spec.rb:
   pdx: [spec/number/integer/abs_spec.pdx]
   status: partial_intentional
   reason: "No bignums (integers are i64)."
+  link: docs/ruby/integers.md
 core/integer/comparison_spec.rb:
   pdx: [spec/number/integer/spaceship_spec.pdx]
   status: partial_intentional
@@ -1356,6 +1357,7 @@ core/integer/even_spec.rb:
   pdx: [spec/number/integer/parity_spec.pdx]
   status: partial_intentional
   reason: "No bignums: integers are i64."
+  link: docs/ruby/integers.md
 core/integer/exponent_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
   status: partial_intentional
@@ -1384,6 +1386,7 @@ core/integer/odd_spec.rb:
   pdx: [spec/number/integer/parity_spec.pdx]
   status: partial_intentional
   reason: "No bignums: integers are i64."
+  link: docs/ruby/integers.md
 core/integer/plus_spec.rb:
   pdx: [spec/number/integer/operators_spec.pdx]
   status: partial_intentional
@@ -1441,6 +1444,7 @@ core/integer/size_spec.rb:
   pdx: [spec/number/integer/digits_spec.pdx]
   status: partial_intentional
   reason: "No bignums, so the byte counts past 64 bits stay upstream."
+  link: docs/ruby/integers.md
 core/integer/lcm_spec.rb:
   pdx: [spec/number/integer/gcd_spec.pdx]
   status: partial_intentional
@@ -1470,6 +1474,7 @@ core/integer/ceildiv_spec.rb:
   pdx: [spec/number/integer/division_spec.pdx]
   status: partial_intentional
   reason: "No bignums or Rational, so the 6/5r and 10**100 rows stay upstream."
+  link: docs/ruby/integers.md
 core/integer/fdiv_spec.rb:
   pdx: [spec/number/integer/division_spec.pdx]
   status: partial_intentional
@@ -1479,14 +1484,17 @@ core/integer/floor_spec.rb:
   pdx: [spec/number/integer/rounding_spec.pdx]
   status: partial_intentional
   reason: "No bignums (integers are i64), so the 10**70 rows and the precisions past 64 bits stay upstream."
+  link: docs/ruby/integers.md
 core/integer/ceil_spec.rb:
   pdx: [spec/number/integer/rounding_spec.pdx]
   status: partial_intentional
   reason: "No bignums (integers are i64), so the 10**70 rows and the precisions past 64 bits stay upstream."
+  link: docs/ruby/integers.md
 core/integer/truncate_spec.rb:
   pdx: [spec/number/integer/rounding_spec.pdx]
   status: partial_intentional
   reason: "No bignums (integers are i64), so the 10**70 rows stay upstream."
+  link: docs/ruby/integers.md
 core/integer/round_spec.rb:
   pdx: [spec/number/integer/rounding_spec.pdx]
   status: partial_planned
@@ -1511,6 +1519,7 @@ core/integer/to_i_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
   status: partial_intentional
   reason: "No bignums (integers are i64)."
+  link: docs/ruby/integers.md
 core/integer/zero_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
   status: partial_intentional

@@ -27,7 +27,7 @@ value.bit_count
 value[3]                  # the bit at position 3, two's complement
 ```
 
-A left shift past 64 bits refuses — integers are 64-bit here ([#156](https://github.com/portlandlang/portland/issues/156)) — and `bit_count` on a negative refuses, as Ruby's does.
+A left shift past 64 bits refuses — integers are 64-bit here ([integers.md](integers.md)) — and `bit_count` on a negative refuses, as Ruby's does.
 
 What the freed characters buy: `~` marks `together` tasks, `|` stays purely block parameters, `<<` is reserved for heredocs (and possibly append).
 

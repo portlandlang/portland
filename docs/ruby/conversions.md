@@ -10,7 +10,7 @@
 
 ## Portland
 
-- **`to_i` is Ruby's, with `to_i(base)`**: whitespace, one sign, the base's prefix, digits with single underscores between them, and 0 when nothing parses. A base outside 2 to 36 refuses as `invalid radix 37`; base 0 reads the prefix. A number past 64 bits refuses — integers are 64-bit here ([#156](https://github.com/portlandlang/portland/issues/156)).
+- **`to_i` is Ruby's, with `to_i(base)`**: whitespace, one sign, the base's prefix, digits with single underscores between them, and 0 when nothing parses. A base outside 2 to 36 refuses as `invalid radix 37`; base 0 reads the prefix. A number past 64 bits refuses — integers are 64-bit here ([integers.md](integers.md)).
 - **`to_f` is Ruby's**: the longest leading decimal, 0.0 for none, `"-0"` keeping its sign; no base prefixes, no `Infinity`.
 - **`hex` and `oct`** read the same way at their bases.
 - **`to_s` is universal** except on nil, which has no methods ([nil and optionals](nil-and-optionals.md)); a collection's `to_s` is its `inspect` ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)).

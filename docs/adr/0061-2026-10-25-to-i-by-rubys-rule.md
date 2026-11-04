@@ -12,7 +12,7 @@ Ruby's `String#to_i` never fails: it skips leading whitespace, reads a sign, an 
 
 1. **`to_i` reads by Ruby's rule, with `to_i(base)`.** Leading whitespace, one sign, the prefix of the base asked for (`0b`, `0o`, `0d`, `0x`; with base 0, any of them, or a bare `0` for octal), then digits of the base with single underscores between digits; the first thing that is none of these ends the number. Nothing parsed is 0. Tie goes to Ruby (principle 2): migrating code leans on `"8080".to_i` and `"3 apples".to_i` both, and 0 for garbage is the one Ruby behavior everyone already guards.
 1. **A base outside 2 to 36 refuses in Ruby's words**, `invalid radix 1`; base 0 asks the prefix.
-1. **Past 64 bits refuses.** Ruby reaches for a bignum; integers are 64-bit here ([#156](https://github.com/portlandlang/portland/issues/156)), so a number that will not fit refuses rather than answering a wrong one.
+1. **Past 64 bits refuses.** Ruby reaches for a bignum; integers are 64-bit here ([ADR 0070](0070-2026-11-03-integers-are-64-bit-for-now.md)), so a number that will not fit refuses rather than answering a wrong one.
 1. **The strict forms wait.** `Integer(text)` and `Float(text)`, the type functions that refuse garbage, arrive in [ADR 0058](0058-2026-10-16-builtin-types-carry-type-functions.md)'s shape when a real port pulls for them.
 
 ## Consequences
