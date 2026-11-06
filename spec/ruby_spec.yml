@@ -2274,6 +2274,11 @@ core/range/step_spec.rb:
   status: partial_intentional
   reason: "step answers an array outright; there is no enumerator to hand back."
   link: docs/ruby/enumerators.md
+core/range/to_set_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "A beginless or endless range refuses to be walked in Portland's words (ADR 0055) where Ruby raises TypeError or RangeError, and there is no Set subclass to hand to_set."
+  link: docs/ruby/ranges.md
 
 # — core/string —
 

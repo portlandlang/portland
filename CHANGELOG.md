@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`core/range/` fully ported** ([#111](https://github.com/portlandlang/portland/issues/111)) — `core/range/to_set_spec.rb`'s rows join `spec/set/construction_spec.pdx`; the beginless and endless ranges refuse to be walked in Portland's words, and the Set-subclass row has no subclass to drive. No stubs remain under `spec/ruby/core/range/`.
+
 - **`Symbol#encoding` answers UTF-8** ([#112](https://github.com/portlandlang/portland/issues/112)) — on both implementations, as every string's does (ADR 0069). `core/symbol/encoding_spec.rb` ports into `spec/symbol/text_spec.pdx`, UTF-8 where upstream reads US-ASCII off an ASCII name; `core/symbol/match_spec.rb` waits on the regex decision ([#74](https://github.com/portlandlang/portland/issues/74)), and no stubs remain under `spec/ruby/core/symbol/`.
 
 - **A quoted string inside a heredoc's interpolation lexes** ([#164](https://github.com/portlandlang/portland/issues/164)) — on both implementations, folding a `<<~HERE` body into a literal escapes only the body's own quotes; the code inside `#{...}`, string literals and nested interpolations included, is kept as written, so `unquoted #{"interpolated"}` reads as Ruby reads it. The interpolated rows of `language/heredoc_spec.rb` port with the fixture's string literal; pinned by the two-oracle heredoc test.
