@@ -1294,9 +1294,9 @@ mod tests {
     #[should_panic(expected = "a Range is not JSON — generate its 'to_a'")]
     fn a_range_refuses() {
         generate(&Value::Range {
-            end: Some(3),
+            end: Some(Box::new(Value::Integer(3))),
             exclusive: false,
-            start: Some(1),
+            start: Some(Box::new(Value::Integer(1))),
         });
     }
 }

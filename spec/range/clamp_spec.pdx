@@ -6,9 +6,10 @@
 # range.
 #
 # From ruby/spec core/range/clamp_spec.rb. What stays behind: the duck
-# range and the subclass rows, the String bounds (ranges hold integers,
-# ADR 0019), and the refusals — bounds given backwards refuse as clamp's do
-# everywhere, and a single non-range argument refuses on arity.
+# range and the subclass rows, the String bounds (Range#clamp keeps to
+# integer ends and bounds), and the refusals — bounds given backwards refuse
+# as clamp's do everywhere, and a single non-range argument refuses on
+# arity.
 
 require_relative "../spec_helper"
 

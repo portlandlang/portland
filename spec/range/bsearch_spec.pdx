@@ -1,9 +1,9 @@
-# Binary search over a range's integers (#111), from ruby/spec
-# core/range/bsearch_spec.rb, its Integer rows: Ruby's two modes by what
-# the block answers. A range holds integers here, so the Float and endless
-# rows wait on ranges over other orderables (#149); without a block there
-# are no enumerators (ADR 0055); the String-range and Object rows refuse
-# at the literal.
+# Binary search over a range (#111, ADR 0081), from ruby/spec
+# core/range/bsearch_spec.rb: Ruby's two modes by what the block answers,
+# over the integers of a bounded range, the doubles of a float range, and
+# an open range probed outward until the answer is bracketed. Without a
+# block there are no enumerators (ADR 0055); a String range refuses before
+# any search, and the Object rows have no object to build.
 
 require_relative "../spec_helper"
 
@@ -72,6 +72,85 @@ context "Range#bsearch" do
       expect((4..2).bsearch { 1 }).to be_nil
       expect((4..2).bsearch { 0 }).to be_nil
       expect((4..2).bsearch { -1 }).to be_nil
+    end
+  end
+
+  describe "with Float values" do
+    specify "returns nil when the block refuses every element" do
+      expect((0.1...2.3).bsearch { |x| x > 3 }).to be_nil
+      expect((-0.0..2.3).bsearch { |x| nil }).to be_nil
+    end
+
+    specify "returns the minimum when the block accepts every element" do
+      expect((-0.2..4.8).bsearch { |x| x < 5 }).to eq(-0.2)
+    end
+
+    specify "returns the smallest element the block accepts" do
+      expect((0..4.2).bsearch { |x| x >= 2 }).to eq(2)
+      expect((-1.2..4.3).bsearch { |x| x >= 1 }).to eq(1)
+    end
+
+    specify "returns a boundary element where that is the answer" do
+      expect((1.0..3.0).bsearch { |x| x >= 3.0 }).to eq(3.0)
+      expect((1.0...3.0).bsearch { |x| x >= 3.0.prev_float }).to eq(3.0.prev_float)
+      expect((1.0..3.0).bsearch { |x| x >= 1.0 }).to eq(1.0)
+      expect((1.0...3.0).bsearch { |x| x >= 1.0 }).to eq(1.0)
+    end
+
+    specify "works with infinity bounds" do
+      inf = Float::INFINITY
+      expect((0..inf).bsearch { |x| x >= 3 }).to eq(3.0)
+      expect((-inf..0).bsearch { |x| x >= -3 }).to eq(-3.0)
+      expect((inf..inf).bsearch { true }).to eq(inf)
+      expect((inf...inf).bsearch { true }).to be_nil
+      expect((inf..0).bsearch { true }).to be_nil
+    end
+
+    specify "finds an element the block calls zero" do
+      expect((0.0..4.0).bsearch { |x| x < 2 ? 1 : (x > 2 ? -1 : 0) }).to eq(2.0)
+      expect((0.1..2.3).bsearch { |x| -1 }).to be_nil
+      expect((0.1..2.3).bsearch { |x| 1 }).to be_nil
+    end
+  end
+
+  describe "with endless ranges" do
+    specify "returns the smallest element the block accepts" do
+      expect((-2..).bsearch { |x| true }).to eq(-2)
+      expect((0..).bsearch { |x| x >= 2 }).to eq(2)
+      expect((-1..).bsearch { |x| x >= 1 }).to eq(1)
+      expect((-1.2..).bsearch { |x| x >= 1 }).to eq(1)
+      expect((-0.2...).bsearch { |x| true }).to eq(-0.2)
+    end
+
+    specify "returns nil when the block never settles" do
+      expect((0..).bsearch { |x| -1 }).to be_nil
+      expect((0..).bsearch { |x| x > 5 ? -1 : 1 }).to be_nil
+      expect((0.1..).bsearch { |x| x < 0.0 }).to be_nil
+    end
+
+    specify "finds an element the block calls zero" do
+      expect((0..).bsearch { |x| x < 2 ? 1.0 : (x > 2 ? -1.0 : 0.0) }).to eq(2)
+      found = (0..).bsearch { |x| x < 1 ? 1 : (x > 3 ? -1 : 0) }
+      expect([1, 2, 3].include?(found)).to be_true
+    end
+  end
+
+  describe "with beginless ranges" do
+    specify "returns the smallest element the block accepts" do
+      expect((..10).bsearch { |x| x >= 2 }).to eq(2)
+      expect((...-1).bsearch { |x| x >= -10 }).to eq(-10)
+      expect((..10.0).bsearch { |x| x >= 1 }).to eq(1)
+    end
+
+    specify "returns nil when the block never settles" do
+      expect((..0).bsearch { |x| 1 }).to be_nil
+      expect((..0).bsearch { |x| x > 5 ? -1 : 1 }).to be_nil
+      expect((..-0.1).bsearch { |x| x > 0.0 }).to be_nil
+      expect((..5.0).bsearch { |x| -1 }).to be_nil
+    end
+
+    specify "finds an element the block calls zero" do
+      expect((..10).bsearch { |x| x < 2 ? 1.0 : (x > 2 ? -1.0 : 0.0) }).to eq(2)
     end
   end
 end

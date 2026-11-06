@@ -284,7 +284,63 @@ def guest_case_matches(pattern_node, subject, bindings)
   end
   # A set's `===` is membership (ADR 0082), as Ruby's.
   return outcome([set_member?(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__set__", *]
+  # A range of structs covers by the structs' own `<=>` (ADR 0081).
+  return outcome([guest_range_covers?(pattern, subject, step.bindings)], step.bindings) if (pattern in Range) && struct_range?(pattern)
   outcome([pattern === subject], step.bindings)
+end
+
+# — ranges over structs (ADR 0081) —
+#
+# A guest range is a host range, so numbers, strings, symbols, and arrays
+# order on the host's own `<=>`; a struct's `<=>` is a guest method the
+# host cannot call, so a range with a struct at either end is ordered here.
+
+def struct_range?(range) = (range.begin in ["__struct__", *]) || (range.end in ["__struct__", *])
+
+# Ruby's `cover?`: each present end against the probe by `<=>`, a probe of
+# another type simply outside.
+def guest_range_covers?(range, probe, bindings)
+  return false unless probe in ["__struct__", *]
+  low = range.begin
+  high = range.end
+  return false if !low.nil? && (value_at(low, 1) != value_at(probe, 1) || guest_ordering(low, probe, bindings) > 0)
+  return true if high.nil?
+  return false if value_at(high, 1) != value_at(probe, 1)
+  ordering = guest_ordering(probe, high, bindings)
+  range.exclude_end? ? ordering < 0 : ordering <= 0
+end
+
+# `min` and `max` on a range of structs: the ends, nil for an empty range,
+# the seed's refusals for an open one and for an excluded end.
+def guest_range_extreme(range, name, bindings)
+  low = range.begin
+  high = range.end
+  if name == "min"
+    panic("cannot get the minimum of beginless range") if low.nil?
+    return low if high.nil?
+    ordering = guest_ordering(low, high, bindings)
+    return nil if ordering > 0 || (range.exclude_end? && ordering == 0)
+    return low
+  end
+  panic("cannot get the maximum of endless range") if high.nil?
+  panic("cannot exclude non Integer end value") if range.exclude_end?
+  return high if low.nil?
+  return nil if guest_ordering(low, high, bindings) > 0
+  high
+end
+
+# `clamp(range)` on a struct (ADR 0081): the seed's rules — no excluded
+# end, bounds in order — and the struct's own `<=>` for the clamping.
+def clamped_by_guest_range(receiver, range, bindings)
+  low = range.begin
+  high = range.end
+  panic("'clamp' cannot take an exclusive range — write 'low..high'") if range.exclude_end? && !high.nil?
+  if !low.nil? && !high.nil? && guest_ordering(low, high, bindings) > 0
+    panic("'clamp' takes the low bound first, got #{shorten(render_inspect(low))} then #{shorten(render_inspect(high))}")
+  end
+  return low if !low.nil? && guest_ordering(receiver, low, bindings) < 0
+  return high if !high.nil? && guest_ordering(receiver, high, bindings) > 0
+  receiver
 end
 
 # Whether `subject` is of the type `name` names, or nil when `name` names no
@@ -523,8 +579,10 @@ end
 # A range pattern tests membership, not equality (ADR 0019 §1). Integer
 # subjects only — anything else misses, the seed's rule (#40). Guest ranges
 # are host ranges, so `include?` answers without walking.
+# A range pattern is membership (ADR 0019 §1) over any ends `<=>` orders
+# (ADR 0081): the host's own `include?`, which answers false for a subject
+# it cannot order against the ends.
 def match_range(pattern, subject, bindings)
-  return nil unless subject in Integer
   range_step = evaluate_expression(pattern, bindings)
   return [] if slot_value(range_step.value).include?(subject)
   nil
@@ -1913,6 +1971,12 @@ def render_inspect(value)
     return "{" + pairs.join(", ") + "}"
   end
   return encode_string(value) if value in String
+  # A range inspects each end (ADR 0081), so `"a".."f"` keeps its quotes.
+  if value in Range
+    low = value.begin.nil? ? "" : render_inspect(value.begin)
+    high = value.end.nil? ? "" : render_inspect(value.end)
+    return low + (value.exclude_end? ? "..." : "..") + high
+  end
   "#{value}"
 end
 
@@ -2198,16 +2262,13 @@ def evaluate_builtin_type_function(node, mutable bindings)
 end
 
 # `Range.new(first, last)` and `Range.new(first, last, true)` (#111, ADR
-# 0058): the literal's two spellings as a function; either end may be nil.
-# Ends of any other kind wait on ranges over other orderables (#149).
+# 0058): the literal's two spellings as a function; either end may be nil,
+# and the ends are any two values `<=>` orders (ADR 0081) — the host's own
+# range refuses the rest, in the seed's words.
 def range_new(arguments)
   panic("Range.new takes 2 or 3 arguments, got #{arguments.length}") unless arguments.length == 2 || arguments.length == 3
   exclusive = arguments.length == 3 ? value_at(arguments, 2) : false
   panic("Range.new takes true or false for exclusive, got #{render_inspect(exclusive)}") unless exclusive in Boolean
-  arguments.slice(0, 2).each do |end_value|
-    next if end_value.nil? || (end_value in Integer)
-    panic("Range.new takes integer ends here, got #{render_inspect(end_value)} — ranges over other orderables are undecided (#149)")
-  end
   build_range(value_at(arguments, 0), value_at(arguments, 1), exclusive)
 end
 
@@ -2386,6 +2447,125 @@ def binary_search(values, count, ranged, block, entry, mutable scope)
   end
   found = low if found.nil? && satisfied && interrupt.nil?
   [found, scope, interrupt]
+end
+
+# `bsearch` over a range (#111, ADR 0081): the integers of a bounded
+# integer range through binary_search; a float range halved between its
+# ends down to two adjacent doubles, which lands on the boundary the seed's
+# bit-pattern search lands on; an open range probed outward in doubling
+# strides until the block's answer brackets the search, as the seed does.
+def range_bsearch(range, block, entry, mutable scope)
+  floats = (range.begin in Float) || (range.end in Float)
+  integers = (range.begin.nil? || (range.begin in Integer)) && (range.end.nil? || (range.end in Integer))
+  unless floats || integers
+    panic("can't do binary search for #{value_type_label(range.begin.nil? ? range.end : range.begin)}")
+  end
+  panic("a range without both ends cannot be searched — give it a start and an end") if range.begin.nil? && range.end.nil?
+  mutable low = range.begin
+  mutable high = range.end
+  mutable interrupt = nil
+  if high.nil?
+    mutable stride = 1
+    high = low
+    while interrupt.nil?
+      probed = bsearch_direction(block, high, entry, scope)
+      scope = value_at(probed, 1)
+      interrupt = value_at(probed, 2)
+      break unless interrupt.nil?
+      break if value_at(probed, 0)
+      # The seed's probe stops at the edge of its 64-bit keys; this one at
+      # a stride the host's integers still double.
+      break if stride >= 4611686018427387904
+      high = low + stride
+      stride = stride * 2
+    end
+  elsif low.nil?
+    mutable stride = 1
+    low = high
+    while interrupt.nil?
+      probed = bsearch_direction(block, low, entry, scope)
+      scope = value_at(probed, 1)
+      interrupt = value_at(probed, 2)
+      break unless interrupt.nil?
+      break unless value_at(probed, 0)
+      break if stride >= 4611686018427387904
+      low = high - stride
+      stride = stride * 2
+    end
+  end
+  return block_interrupted(interrupt, scope) unless interrupt.nil?
+  if range.exclude_end? && !range.end.nil?
+    high = floats ? high.to_f.prev_float : high - 1
+  end
+  return outcome([nil], scope) if low > high
+  if floats
+    searched = float_bsearch(low.to_f, high.to_f, block, entry, scope)
+    return block_interrupted(value_at(searched, 2), value_at(searched, 1)) unless value_at(searched, 2).nil?
+    return outcome([value_at(searched, 0)], value_at(searched, 1))
+  end
+  searched = binary_search(low..high, high - low + 1, true, block, entry, scope)
+  scope = value_at(searched, 1)
+  interrupt = value_at(searched, 2)
+  return block_interrupted(interrupt, scope) unless interrupt.nil?
+  position = value_at(searched, 0)
+  return outcome([nil], scope) if position.nil?
+  outcome([low + position], scope)
+end
+
+# The halving over doubles: the smallest the block accepts, or the one it
+# calls zero. Answers [value or nil, scope, interrupt].
+def float_bsearch(low, high, block, entry, mutable scope)
+  mutable bottom = low
+  mutable top = high
+  mutable satisfied = nil
+  mutable found = nil
+  mutable interrupt = nil
+  while bottom <= top && found.nil? && interrupt.nil?
+    middle = bottom / 2.0 + top / 2.0
+    probed = bsearch_verdict(block, middle, entry, scope)
+    scope = value_at(probed, 1)
+    interrupt = value_at(probed, 2)
+    break unless interrupt.nil?
+    kind = value_at(probed, 0)
+    if kind == "found"
+      found = middle
+    elsif kind == "true" || kind == "before"
+      satisfied = middle if kind == "true"
+      break if middle == bottom
+      top = middle.prev_float
+    else
+      break if middle == top
+      bottom = middle.next_float
+    end
+  end
+  [found.nil? ? satisfied : found, scope, interrupt]
+end
+
+# One probe of a `bsearch` block: "true" for a true, "found" for a zero,
+# "before" for a negative number (the answer lies at or before), "after"
+# for a false, a nil, or a positive number. Answers [kind, scope, interrupt].
+def bsearch_verdict(block, element, entry, scope)
+  step = run_guest_block(block, [element], scope)
+  after = compacted_since(entry, step.bindings)
+  return [nil, after, step] if step.signal != "none"
+  verdict = step.value.empty? ? nil : slot_value(step.value)
+  kind = if verdict == true
+    "true"
+  elsif verdict == false || verdict.nil?
+    "after"
+  elsif (verdict in Integer) || (verdict in Float)
+    if verdict == 0 then "found" elsif verdict < 0 then "before" else "after" end
+  else
+    panic("wrong argument type #{value_type_label(verdict)} (must be numeric, true, false or nil)")
+  end
+  [kind, after, nil]
+end
+
+# Whether the answer lies at or before the probed element.
+def bsearch_direction(block, element, entry, scope)
+  probed = bsearch_verdict(block, element, entry, scope)
+  kind = value_at(probed, 0)
+  [kind == "true" || kind == "before" || kind == "found", value_at(probed, 1), value_at(probed, 2)]
 end
 
 # A struct's own method called with a block (#110): the method's scope as
@@ -2937,6 +3117,18 @@ def evaluate_method_call(node, mutable bindings)
   # values reach the host's own arms below.
   if (receiver in ["__struct__", *]) && %w[between? clamp].include?(node.name) && arguments.length == 2
     return outcome([ordered_answer(node.name, receiver, arguments, bindings)], bindings)
+  end
+  # A struct clamps by a range of structs too (ADR 0081), by its own `<=>`.
+  if (receiver in ["__struct__", *]) && node.name == "clamp" && arguments.length == 1 && (value_at(arguments, 0) in Range)
+    return outcome([clamped_by_guest_range(receiver, value_at(arguments, 0), bindings)], bindings)
+  end
+  # A range whose ends are structs answers membership and its extremes by
+  # the structs' own `<=>` (ADR 0081); the host would order the tagged
+  # arrays underneath instead.
+  if (receiver in Range) && struct_range?(receiver) && %w[cover? include? max member? min].include?(node.name) && node.block.nil?
+    check_builtin_count(receiver, node.name, arguments.length)
+    return outcome([guest_range_covers?(receiver, value_at(arguments, 0), bindings)], bindings) unless %w[max min].include?(node.name)
+    return outcome([guest_range_extreme(receiver, node.name, bindings)], bindings)
   end
   # A symbol's `to_sym` is itself (ADR 0071).
   if (receiver in ["__symbol__", *]) && %w[intern to_sym].include?(node.name)
@@ -3503,23 +3695,16 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # range's integers.
   # The host's patterns cannot name a range, so what is not an array is
   # one: the seed answers these two names on arrays and ranges only.
+  return range_bsearch(receiver, block, entry, scope) if (receiver in Range) && node.name == "bsearch"
   if %w[bsearch bsearch_index].include?(node.name) && !(receiver in String) && !(receiver in Hash)
-    ranged = !(receiver in Array)
-    count = if ranged
-      panic("a range without both ends cannot be searched — give it a start and an end") if receiver.begin.nil? || receiver.end.nil?
-      last = receiver.exclude_end? ? receiver.end - 1 : receiver.end
-      [last - receiver.begin + 1, 0].max
-    else
-      receiver.length
-    end
-    searched = binary_search(receiver, count, ranged, block, entry, scope)
+    searched = binary_search(receiver, receiver.length, false, block, entry, scope)
     scope = value_at(searched, 1)
     interrupted = value_at(searched, 2)
     return block_interrupted(interrupted, scope) unless interrupted.nil?
     position = value_at(searched, 0)
     return outcome([nil], scope) if position.nil?
     return outcome([position], scope) if node.name == "bsearch_index"
-    return outcome([ranged ? receiver.begin + position : receiver[position]], scope)
+    return outcome([receiver[position]], scope)
   end
   case node.name
   # `to_set { }` (ADR 0082) maps each element first, as Ruby's.

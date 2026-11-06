@@ -14,7 +14,7 @@
 # uses for values:
 #
 #   ["integer"] ["float"] ["string"] ["boolean"] ["symbol"] ["nil"]
-#   ["range"]
+#   ["range", element]         — element is the ends' type (ADR 0081), or ["unknown"]
 #   ["array", element]         — element is a type, or ["unknown"]
 #   ["hash", key, value]
 #   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
@@ -98,7 +98,7 @@ def synthesize(node, types)
   in BooleanNode then ["boolean"]
   in SymbolNode then ["symbol"]
   in NilNode then ["nil"]
-  in RangeNode then ["range"]
+  in RangeNode then synthesize_range(node, types)
   in WordArrayNode then ["array", ["string"]]
   in SymbolArrayNode then ["array", ["symbol"]]
   in ArrayNode then synthesize_array(node, types)
@@ -310,6 +310,14 @@ def synthesize_identifier(node, types)
   synthesize_name(node.name, types)
 end
 
+# A range carries its ends' type (ADR 0081) — the start's, or the end's for
+# a beginless range — which is what its extremes and its walk answer.
+def synthesize_range(node, types)
+  side = node.start.nil? ? node.finish : node.start
+  return ["range", ["unknown"]] if side.nil?
+  ["range", synthesize(side, types)]
+end
+
 def synthesize_name(name, types)
   found = types.find { it[0] == name }
   # A builtin type's bare name is the type as a value (ADR 0074).
@@ -442,7 +450,7 @@ def type_function_answer_for(type_name, name)
     case type_name
     when "Hash"   then ["hash", ["unknown"], ["unknown"]]
     when "Random" then ["random"]
-    when "Range"  then ["range"]
+    when "Range"  then ["range", ["unknown"]]
     when "Set"    then ["set"]
     else ["array", ["unknown"]]
     end
@@ -519,7 +527,7 @@ def call_answer(receiver, node, types)
     ["array", ["unknown"]]
   # A range's ends (#111), each a maybe where the range is open.
   when "begin", "end"
-    return ["maybe", ["integer"]] if receiver == ["range"]
+    return ["maybe", type_at(receiver, 1)] if receiver in ["range", *]
     ["unknown"]
   # A hash's own answers (#105).
   when "invert"
@@ -537,7 +545,7 @@ def call_answer(receiver, node, types)
     # ADR 0047 shape 3 found this arm calling one an Integer?.
     return ["unknown"] unless node.arguments.empty?
     return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
-    return ["maybe", ["integer"]] if receiver == ["range"]
+    return ["maybe", type_at(receiver, 1)] if receiver in ["range", *]
     return ["maybe", ["unknown"]] if receiver == ["set"]
     ["unknown"]
   # The arrangements of an array are arrays of its elements (#104).
@@ -566,7 +574,7 @@ def class_answer(receiver)
   in ["symbol"]    then ["type", "Symbol"]
   in ["array", *]  then ["type", "Array"]
   in ["hash", *]   then ["type", "Hash"]
-  in ["range"]     then ["type", "Range"]
+  in ["range", *]  then ["type", "Range"]
   in ["random"]    then ["type", "Random"]
   in ["set"]       then ["type", "Set"]
   else ["unknown"]
@@ -629,7 +637,8 @@ def synthesize_shape_answer(receiver, name)
   when "step" then ["array", ["integer"]]
   when "to_a", "entries"
     return receiver if receiver in ["array", *]
-    return ["array", ["integer"]] if receiver == ["range"]
+    # A range walks its integers (ADR 0081), so only one over them lists.
+    return ["array", ["integer"]] if receiver == ["range", ["integer"]]
     return ["array", ["unknown"]] if receiver == ["set"]
     ["unknown"]
   else
@@ -663,7 +672,7 @@ def synthesize_block_call(node, receiver, types)
   when "count", "index", "find_index", "rindex" then synthesize_numeric_answer(receiver, node.name)
   # Binary search answers a maybe of the element, or of its position (#104).
   when "bsearch"
-    return ["maybe", element_type(receiver)] if (receiver in ["array", *]) || receiver == ["range"]
+    return ["maybe", element_type(receiver)] if (receiver in ["array", *]) || (receiver in ["range", *])
     ["unknown"]
   when "bsearch_index" then ["maybe", ["integer"]]
   # The arrangements handed to a block answer the array; cycle answers nil.
@@ -770,7 +779,7 @@ end
 
 def element_type(receiver)
   return type_at(receiver, 1) if receiver in ["array", *]
-  return ["integer"] if receiver == ["range"]
+  return type_at(receiver, 1) if receiver in ["range", *]
   ["unknown"]
 end
 
@@ -814,7 +823,7 @@ end
 # sentence handling it.
 def builtin_table(type)
   case type
-  in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/2 class/0 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0& empty?/0 encoding/0 end_with?/1+ eql?/1 failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1 intern/0 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1+ strip/0 sub/1-2& succ/0 swapcase/0 to_f/0 to_i/0-1 to_s/0 to_sym/0 upcase/0 upto/1-2& valid_encoding?/0]
+  in ["string"] then %w[between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0 chop/0 chr/0 clamp/1-2 class/0 codepoints/0 count/1 delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0& empty?/0 encoding/0 end_with?/1+ eql?/1 failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1 intern/0 length/0 lines/0 ljust/1-2 lstrip/0 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 size/0 slice/2 some?/0 split/0-2 start_with?/1+ strip/0 sub/1-2& succ/0 swapcase/0 to_f/0 to_i/0-1 to_s/0 to_sym/0 upcase/0 upto/1-2& valid_encoding?/0]
   in ["integer"] then %w[abs/0 allbits?/1 anybits?/1 between?/2 bit_and/1 bit_count/0 bit_length/0 bit_not/0 bit_or/1 bit_xor/1 ceil/0-1 ceildiv/1 chr/0-1 clamp/1-2 class/0 digits/0-1 div/1 divmod/1 downto/1& eql?/1 even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 nobits?/1 odd?/0 ord/0 positive?/0 pow/1 pred/0 remainder/1 round/0-1 shift_left/1 shift_right/1 size/0 some?/0 step/1-2& succ/0 times/0& to_f/0 to_i/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 class/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
@@ -822,7 +831,7 @@ def builtin_table(type)
   in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
   in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
-  in ["range"] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
+  in ["range", *] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
   in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
   else
     nil

@@ -1884,35 +1884,49 @@ impl<'source> Parser<'source> {
         if let Some(exclusive) = self.range_operator_here() {
             self.position += 1;
             return Pattern::Range {
-                end: Some(self.pattern_range_bound()),
+                end: Some(Box::new(self.pattern_range_bound())),
                 exclusive,
                 start: None,
             };
         }
         let token = self.advance();
         match token.kind {
+            // A literal before a range operator starts a range pattern:
+            // an integer, a float, or a string (ADR 0081).
             TokenKind::Integer => {
                 let value: i64 = integer_literal(token.text);
-                if let Some(exclusive) = self.range_operator_here() {
-                    self.position += 1;
-                    return Pattern::Range {
-                        end: self.pattern_range_end(),
-                        exclusive,
-                        start: Some(value),
-                    };
+                if self.range_operator_here().is_some() {
+                    return self.range_pattern_from(Expression::Integer(value));
                 }
                 Pattern::Literal(Box::new(Expression::Integer(value)))
             }
             TokenKind::Float => {
                 let value = float_literal(token.text);
+                if self.range_operator_here().is_some() {
+                    return self.range_pattern_from(Expression::Float(value));
+                }
                 Pattern::Literal(Box::new(Expression::Float(value)))
             }
             TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
                 let value: i64 = integer_literal(self.advance().text);
+                if self.range_operator_here().is_some() {
+                    return self.range_pattern_from(Expression::Integer(-value));
+                }
                 Pattern::Literal(Box::new(Expression::Integer(-value)))
             }
+            TokenKind::Minus if self.peek_kind() == Some(TokenKind::Float) => {
+                let value = float_literal(self.advance().text);
+                if self.range_operator_here().is_some() {
+                    return self.range_pattern_from(Expression::Float(-value));
+                }
+                Pattern::Literal(Box::new(Expression::Float(-value)))
+            }
             TokenKind::String => {
-                Pattern::Literal(Box::new(string_expression(token.text, &mut self.it_frames)))
+                let literal = string_expression(token.text, &mut self.it_frames);
+                if self.range_operator_here().is_some() {
+                    return self.range_pattern_from(literal);
+                }
+                Pattern::Literal(Box::new(literal))
             }
             // `in :paid(on:)` destructures a payload; `in :paid` matches a
             // payload-free case (ADR 0022 §1).
@@ -2650,27 +2664,55 @@ impl<'source> Parser<'source> {
     }
 
     /// One integer bound of a range pattern, negative allowed.
-    fn pattern_range_bound(&mut self) -> i64 {
+    /// A range pattern whose start was just read, the range operator at
+    /// the cursor: `in 1..5`, `in 1.5..`, `in "a".."f"` (ADR 0081).
+    fn range_pattern_from(&mut self, start: Expression) -> Pattern {
+        let exclusive = self
+            .range_operator_here()
+            .expect("the range operator is at the cursor");
+        self.position += 1;
+        Pattern::Range {
+            end: self.pattern_range_end(),
+            exclusive,
+            start: Some(Box::new(start)),
+        }
+    }
+
+    /// A range pattern's bound: an integer or a float, negative allowed,
+    /// or a string (ADR 0081).
+    fn pattern_range_bound(&mut self) -> Expression {
         let negative = self.peek_kind() == Some(TokenKind::Minus);
         if negative {
             self.position += 1;
         }
         let token = self.advance();
-        if token.kind != TokenKind::Integer {
-            panic!("range patterns take integer bounds, got {token:?}");
+        match token.kind {
+            TokenKind::Integer => {
+                let value: i64 = integer_literal(token.text);
+                Expression::Integer(if negative { -value } else { value })
+            }
+            TokenKind::Float => {
+                let value = float_literal(token.text);
+                Expression::Float(if negative { -value } else { value })
+            }
+            TokenKind::String if !negative => string_expression(token.text, &mut self.it_frames),
+            _ => panic!("range patterns take integer, float, or string bounds, got {token:?}"),
         }
-        let value: i64 = integer_literal(token.text);
-        if negative { -value } else { value }
     }
 
     /// The end of a range pattern, absent for `in 10..`. Patterns always
     /// sit before a token that can't continue them (`then`, a newline, a
     /// `|`), so there is no ambiguity to resolve here.
-    fn pattern_range_end(&mut self) -> Option<i64> {
-        let has_end = self.peek_kind() == Some(TokenKind::Integer)
-            || (self.peek_kind() == Some(TokenKind::Minus)
-                && self.peek_kind_at(1) == Some(TokenKind::Integer));
-        has_end.then(|| self.pattern_range_bound())
+    fn pattern_range_end(&mut self) -> Option<Box<Expression>> {
+        let has_end = matches!(
+            self.peek_kind(),
+            Some(TokenKind::Integer | TokenKind::Float | TokenKind::String)
+        ) || (self.peek_kind() == Some(TokenKind::Minus)
+            && matches!(
+                self.peek_kind_at(1),
+                Some(TokenKind::Integer | TokenKind::Float)
+            ));
+        has_end.then(|| Box::new(self.pattern_range_bound()))
     }
 
     /// `Some(exclusive)` when a range operator sits at the cursor.

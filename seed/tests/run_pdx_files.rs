@@ -1888,9 +1888,10 @@ fn combinatorics_and_binary_search_match_ruby() {
             "p([1].bsearch { \"1\" })\n",
             "wrong argument type String (must be numeric, true, false or nil)",
         ),
+        // Two ends `<=>` cannot order (ADR 0081), Ruby's words.
         (
-            "p(Range.new(\"a\", \"c\"))\n",
-            "ranges over other orderables are undecided (#149)",
+            "p(Range.new(1, \"c\"))\n",
+            "bad value for range — <=> cannot order 1 and \"c\"",
         ),
     ];
     assert_both_oracles_refuse("combinatorics_refusal.pdx", None, &cases);
@@ -2691,6 +2692,51 @@ fn pattern_gaps_on_both_oracles() {
             (
                 "case {a: 1}\nin {\"a\" => 1} then 1\nend\n",
                 "hash patterns take symbol keys",
+            ),
+        ],
+    );
+}
+
+/// A range's ends are any two values `<=>` orders on both oracles (ADR
+/// 0081, #194): membership, the extremes, equality, inspect, clamp, `when`,
+/// and `in` by `<=>`; a float range's `rand` draw is CRuby's; `bsearch`
+/// searches floats and open ranges; iteration stays integer, `1..2.5`
+/// walking to the floor and a float start refusing in Ruby's words.
+#[test]
+fn orderable_ranges_on_both_oracles() {
+    assert_both_print(
+        "orderable_ranges.pdx",
+        "p((\"a\"..\"f\").cover?(\"aa\"))\np((0.5..2.4).include?(2))\np((1..10).cover?(\"a\"))\n\
+         p((\"f\"..\"l\").max)\np((\"z\"..\"l\").min)\np((1...10).max)\np((1.5..2.5).minmax)\n\
+         p((0..1) == (0..1.0))\np((0..1).eql?(0..1.0))\np((\"A\"..\"Z\"))\nputs((\"a\"..\"b\"))\n\
+         p(2.0.clamp(1.5..2.5))\np(\"b\".clamp(\"c\"..\"f\"))\np((1..2.5).to_a)\np([1, 2, 3][1.0..2])\n\
+         p((0.0..100.0).bsearch { it >= 33.3 })\np((0..).bsearch { it >= 1000 })\np((..10).bsearch { it >= 2 })\n\
+         p(Random.new(42).rand(0.0..1.0))\np(Random.new(42).rand(0.0...1.0))\n\
+         case \"m\"\nwhen \"a\"..\"f\" then puts \"early\"\nwhen \"g\"..\"z\" then puts \"late\"\nend\n\
+         answer = case 2.5\nin 1.5..3.0 then \"in\"\nelse \"out\"\nend\np answer\n\
+         p(Range.new(\"a\", \"c\"))\n",
+        "true\ntrue\nfalse\n\"l\"\nnil\n9\n[1.5, 2.5]\ntrue\nfalse\n\"A\"..\"Z\"\na..b\n2.0\n\"c\"\n[1, 2]\n[2, 3]\n33.3\n1000\n2\n0.3745401144950984\n0.3745401188473625\nlate\n\"in\"\n\"a\"..\"c\"\n",
+    );
+    assert_both_oracles_refuse(
+        "orderable_ranges_refusal.pdx",
+        None,
+        &[
+            ("x = (1.5..2.5).each { it }\n", "can't iterate from Float"),
+            (
+                "x = (\"a\"..\"e\").to_a\n",
+                "a string range is not walked here — Ruby's succ walk (\"a\"..\"e\") waits for a pull; write the strings out",
+            ),
+            (
+                "x = (1.5...2.5).max\n",
+                "cannot exclude non Integer end value",
+            ),
+            (
+                "x = (..1).min\n",
+                "cannot get the minimum of beginless range",
+            ),
+            (
+                "x = Range.new(1, \"a\")\n",
+                "bad value for range — <=> cannot order 1 and \"a\"",
             ),
         ],
     );

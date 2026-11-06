@@ -11,9 +11,8 @@ use crate::parser;
 use crate::value::Value;
 use unicode_segmentation::UnicodeSegmentation;
 
-/// The integers a range covers. Endless and beginless ranges have no
-/// element list, so asking for one is an error rather than a hang.
-fn range_elements(range: &Value) -> Vec<Value> {
+/// A range's ends, borrowed, and whether the end is excluded.
+fn range_ends(range: &Value) -> (Option<&Value>, Option<&Value>, bool) {
     let Value::Range {
         end,
         exclusive,
@@ -22,11 +21,117 @@ fn range_elements(range: &Value) -> Vec<Value> {
     else {
         unreachable!("called with a range")
     };
-    let (Some(start), Some(end)) = (start, end) else {
+    (start.as_deref(), end.as_deref(), *exclusive)
+}
+
+/// The ends as integers, where every present end is one — the shape the
+/// integer paths (slicing, `Range#clamp`, `values_at`) keep.
+fn integer_ends(range: &Value) -> Option<(Option<i64>, Option<i64>, bool)> {
+    let (start, end, exclusive) = range_ends(range);
+    let as_integer = |end: Option<&Value>| match end {
+        None => Some(None),
+        Some(Value::Integer(number)) => Some(Some(*number)),
+        Some(_) => None,
+    };
+    Some((as_integer(start)?, as_integer(end)?, exclusive))
+}
+
+/// A range of integers, either end open.
+fn integer_range(start: Option<i64>, end: Option<i64>, exclusive: bool) -> Value {
+    Value::Range {
+        end: end.map(|end| Box::new(Value::Integer(end))),
+        exclusive,
+        start: start.map(|start| Box::new(Value::Integer(start))),
+    }
+}
+
+/// Whether `<=>` orders the two (ADR 0054): numbers with numbers, two
+/// strings, two symbols, two arrays, two structs of one type — the pairs a
+/// range may hold as its ends (ADR 0081), and probe for membership.
+fn comparable_pair(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Integer(_) | Value::Float(_), Value::Integer(_) | Value::Float(_)) => true,
+        (Value::String(_), Value::String(_))
+        | (Value::Symbol(_), Value::Symbol(_))
+        | (Value::Array(_), Value::Array(_)) => true,
+        (Value::Struct { name: left, .. }, Value::Struct { name: right, .. }) => left == right,
+        _ => false,
+    }
+}
+
+/// A range from its ends (ADR 0081): two values `<=>` orders, or one with
+/// an open side. Ruby raises `bad value for range` when it runs; here the
+/// sentence is said where the range is written — by the checker where the
+/// types are known, by this build otherwise.
+fn build_range(start: Option<Value>, end: Option<Value>, exclusive: bool) -> Value {
+    if let (Some(start), Some(end)) = (&start, &end)
+        && !comparable_pair(start, end)
+    {
+        panic!(
+            "bad value for range — <=> cannot order {} and {}",
+            start.shown(),
+            end.shown()
+        );
+    }
+    for end in [&start, &end].into_iter().flatten() {
+        if !comparable_pair(end, end) {
+            panic!(
+                "bad value for range — {} is not a value <=> orders",
+                end.shown()
+            );
+        }
+    }
+    Value::Range {
+        end: end.map(Box::new),
+        exclusive,
+        start: start.map(Box::new),
+    }
+}
+
+/// What a walk needs (ADR 0081 §3): an integer start, and an end that is
+/// an integer, a float — walked to its floor, as Ruby walks `1..2.5` —
+/// or absent. Any other start refuses in Ruby's words; a string range
+/// names the `succ` walk not taken.
+fn walkable_ends(range: &Value) -> (Option<i64>, Option<i64>) {
+    let (start, end, exclusive) = range_ends(range);
+    let refuse = |end: &Value| -> ! {
+        match end {
+            Value::String(_) => panic!(
+                "a string range is not walked here — Ruby's succ walk (\"a\"..\"e\") waits for a pull; write the strings out"
+            ),
+            other => panic!("can't iterate from {}", other.type_name()),
+        }
+    };
+    let start = match start {
+        None => None,
+        Some(Value::Integer(number)) => Some(*number),
+        Some(other) => refuse(other),
+    };
+    let last = match end {
+        None => None,
+        Some(Value::Integer(number)) => Some(if exclusive { number - 1 } else { *number }),
+        Some(Value::Float(number)) => {
+            let floor = number.floor();
+            let whole = floor == *number;
+            Some(if exclusive && whole {
+                floor as i64 - 1
+            } else {
+                floor as i64
+            })
+        }
+        Some(other) => refuse(other),
+    };
+    (start, last)
+}
+
+/// The integers a range covers. Endless and beginless ranges have no
+/// element list, so asking for one is an error rather than a hang.
+fn range_elements(range: &Value) -> Vec<Value> {
+    let (start, last) = walkable_ends(range);
+    let (Some(start), Some(last)) = (start, last) else {
         panic!("a range without both ends has no elements to walk — give it a start and an end");
     };
-    let last = if *exclusive { end - 1 } else { *end };
-    (*start..=last).map(Value::Integer).collect()
+    (start..=last).map(Value::Integer).collect()
 }
 
 /// Ruby's Numeric#step over integers (#109): from `start` toward `limit`
@@ -64,11 +169,7 @@ fn range_clamped(
     {
         panic!("'clamp' takes the low bound first, got {low} then {high}");
     }
-    let empty_at = |point: i64| Value::Range {
-        end: Some(point),
-        exclusive: true,
-        start: Some(point),
-    };
+    let empty_at = |point: i64| integer_range(Some(point), Some(point), true);
     if let (Some(end), Some(low)) = (end, low)
         && end < low
     {
@@ -90,11 +191,7 @@ fn range_clamped(
         (None, high) => high,
     };
     let kept_exclusive = (end == kept_end && exclusive) || (high == kept_end && high_exclusive);
-    Value::Range {
-        end: kept_end,
-        exclusive: kept_exclusive,
-        start: kept_start,
-    }
+    integer_range(kept_start, kept_end, kept_exclusive)
 }
 
 /// The names Ruby's Enumerable gives a struct that defines `each` (#110),
@@ -303,26 +400,6 @@ fn set_binary(members: &[Value], operator: BinaryOperator, right: &Value) -> Opt
     })
 }
 
-/// A bounded range's first element and how many it holds — none for an
-/// empty one — for a search that reads elements by position (#111). An
-/// open end has no span to search.
-fn range_span(range: &Value) -> (i64, usize) {
-    let Value::Range {
-        end,
-        exclusive,
-        start,
-    } = range
-    else {
-        unreachable!("called with a range")
-    };
-    let (Some(start), Some(end)) = (start, end) else {
-        panic!("a range without both ends cannot be searched — give it a start and an end");
-    };
-    let last = if *exclusive { end - 1 } else { *end };
-    let count = (last - start + 1).max(0) as usize;
-    (*start, count)
-}
-
 /// Every way to choose `size` elements from `elements` in order (#104):
 /// Ruby's `combination`, or with `repeating` its `repeated_combination`.
 /// A size below zero or, without repeats, above the length chooses
@@ -457,22 +534,28 @@ fn cycled(elements: &[Value], count: i64) -> Vec<Value> {
 /// offsets (ADR 0019 §2). Negative bounds count from the end; everything
 /// out of range clamps, so a slice is always a collection.
 fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
-    let Value::Range {
-        end,
-        exclusive,
-        start,
-    } = range
-    else {
-        unreachable!("called with a range")
+    let (start, end, exclusive) = range_ends(range);
+    // A position is an integer; a float truncates to one, as Ruby's does.
+    let position = |end: &Value| match end {
+        Value::Integer(number) => *number,
+        Value::Float(number) => number.trunc() as i64,
+        other => panic!(
+            "no implicit conversion of {} into Integer",
+            other.type_name()
+        ),
     };
     let length = length as i64;
     let resolve = |bound: i64| if bound < 0 { length + bound } else { bound };
-    let from = start.map(resolve).unwrap_or(0).clamp(0, length);
+    let from = start
+        .map(position)
+        .map(resolve)
+        .unwrap_or(0)
+        .clamp(0, length);
     let to = match end {
         None => length,
         Some(bound) => {
-            let bound = resolve(*bound);
-            let bound = if *exclusive { bound } else { bound + 1 };
+            let bound = resolve(position(bound));
+            let bound = if exclusive { bound } else { bound + 1 };
             bound.clamp(0, length)
         }
     };
@@ -548,44 +631,17 @@ fn builtin_constants() -> HashMap<String, Value> {
     constants
 }
 
-/// Whether a number sits inside an integer range, either end open (ADR
-/// 0019): Ruby's `cover?`, which is what `===` asks of a range.
-fn range_covers(start: Option<i64>, end: Option<i64>, exclusive: bool, probe: f64) -> bool {
-    let above = start.is_none_or(|start| probe >= start as f64);
-    let below = end.is_none_or(|end| {
-        if exclusive {
-            probe < end as f64
-        } else {
-            probe <= end as f64
-        }
-    });
-    above && below
-}
-
-/// A pattern argument's match (ADR 0065): the `when` rule applied to a
-/// value — a range covers a number, anything else asks `==`.
-fn pattern_matches(pattern: &Value, element: &Value) -> bool {
-    match (pattern, element) {
-        (
-            Value::Range {
-                end,
-                exclusive,
-                start,
-            },
-            Value::Integer(_) | Value::Float(_),
-        ) => range_covers(*start, *end, *exclusive, as_float(element)),
-        (Value::Range { .. }, _) => false,
-        _ => pattern.ruby_equals(element),
-    }
-}
-
 /// Ruby's slice_before and slice_after by a pattern (ADR 0065): runs cut
 /// before, or after, each element the pattern matches.
-fn sliced_runs(elements: &[Value], before: bool, pattern: &Value) -> Vec<Value> {
+fn sliced_runs(
+    elements: &[Value],
+    before: bool,
+    mut matches: impl FnMut(&Value) -> bool,
+) -> Vec<Value> {
     let mut runs: Vec<Vec<Value>> = Vec::new();
     let mut open = false;
     for element in elements.iter().cloned() {
-        let matched = pattern_matches(pattern, &element);
+        let matched = matches(&element);
         if before {
             if matched || runs.is_empty() {
                 runs.push(vec![element]);
@@ -1317,54 +1373,6 @@ fn case_folded(text: &str) -> String {
     text.to_uppercase().to_lowercase()
 }
 
-/// Ruby's `Range#overlap?` on integer ranges (#111).
-fn ranges_overlap(left: &Value, right: &Value) -> bool {
-    let (
-        Value::Range {
-            start: left_start,
-            end: left_end,
-            exclusive: left_exclusive,
-        },
-        Value::Range {
-            start: right_start,
-            end: right_end,
-            exclusive: right_exclusive,
-        },
-    ) = (left, right)
-    else {
-        unreachable!("overlap? is asked of two ranges")
-    };
-    let empty = |start: &Option<i64>, end: &Option<i64>, exclusive: bool| match (start, end) {
-        (Some(start), Some(end)) => {
-            if exclusive {
-                start >= end
-            } else {
-                start > end
-            }
-        }
-        _ => false,
-    };
-    if empty(left_start, left_end, *left_exclusive)
-        || empty(right_start, right_end, *right_exclusive)
-    {
-        return false;
-    }
-    // A start reaches an end when nothing bounds it, or when it sits at or
-    // before the end — before only, where the end is excluded.
-    let reaches = |start: &Option<i64>, end: &Option<i64>, exclusive: bool| match (start, end) {
-        (Some(start), Some(end)) => {
-            if exclusive {
-                start < end
-            } else {
-                start <= end
-            }
-        }
-        _ => true,
-    };
-    reaches(left_start, right_end, *right_exclusive)
-        && reaches(right_start, left_end, *left_exclusive)
-}
-
 /// `flatten` to a depth, Ruby's: each level opens the arrays one deep; a
 /// negative depth opens them all.
 fn flattened_to_depth(elements: &[Value], depth: i64) -> Vec<Value> {
@@ -1449,8 +1457,8 @@ fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
 /// `Range.new(first, last)` and `Range.new(first, last, true)` (#111, ADR
 /// 0058): the literal's two spellings as a function. Either end may be
 /// nil, as the literal's may; the third argument is a Boolean, true
-/// leaving the end out. Ends of any other kind wait on ranges over other
-/// orderables (#149).
+/// leaving the end out. The ends are any two values `<=>` orders (ADR
+/// 0081), checked as the literal's are.
 fn range_new(arguments: &[Value]) -> Value {
     let (first, last, exclusive) = match arguments {
         [first, last] => (first, last, false),
@@ -1465,18 +1473,10 @@ fn range_new(arguments: &[Value]) -> Value {
         }
     };
     let end_of = |value: &Value| match value {
-        Value::Integer(number) => Some(*number),
         Value::Nil => None,
-        other => panic!(
-            "Range.new takes integer ends here, got {} — ranges over other orderables are undecided (#149)",
-            other.shown()
-        ),
+        other => Some(other.clone()),
     };
-    Value::Range {
-        start: end_of(first),
-        end: end_of(last),
-        exclusive,
-    }
+    build_range(end_of(first), end_of(last), exclusive)
 }
 
 /// Ruby's shift (ADR 0003): left by a positive count, right by a negative
@@ -1558,20 +1558,42 @@ fn random_new(arguments: &[Value]) -> Value {
 /// magnitude. A range draws an integer within it.
 fn random_rand(generator: &mut crate::random::Mt, bound: &Value, restrictive: bool) -> Value {
     match bound {
-        Value::Range {
-            end,
-            exclusive,
-            start,
-        } => {
+        Value::Range { .. } => {
+            let (start, end, exclusive) = range_ends(bound);
             let (Some(start), Some(end)) = (start, end) else {
                 panic!("invalid argument - {}", bound.shown());
             };
-            let last = if *exclusive { end - 1 } else { *end };
-            if last < *start {
-                panic!("invalid argument - {}", bound.shown());
+            match (start, end) {
+                (Value::Integer(start), Value::Integer(end)) => {
+                    let last = if exclusive { end - 1 } else { *end };
+                    if last < *start {
+                        panic!("invalid argument - {}", bound.shown());
+                    }
+                    let span = (last - start) as u64;
+                    Value::Integer(start + generator.limited(span) as i64)
+                }
+                // A float at either end draws a float (ADR 0081), CRuby's
+                // way: `start + r * (end - start)`, `r` the inclusive
+                // 53-bit draw for `..` and the exclusive one for `...`; a
+                // span of nothing draws nothing.
+                (Value::Integer(_) | Value::Float(_), Value::Integer(_) | Value::Float(_)) => {
+                    let low = as_float(start);
+                    let span = as_float(end) - low;
+                    if span < 0.0 || (span == 0.0 && exclusive) {
+                        panic!("invalid argument - {}", bound.shown());
+                    }
+                    if span == 0.0 {
+                        return Value::Float(low);
+                    }
+                    let drawn = if exclusive {
+                        generator.real()
+                    } else {
+                        generator.real_inclusive()
+                    };
+                    Value::Float(low + drawn * span)
+                }
+                _ => panic!("invalid argument - {}", bound.shown()),
             }
-            let span = (last - start) as u64;
-            Value::Integer(start + generator.limited(span) as i64)
         }
         Value::Float(limit) if restrictive => {
             if *limit < 0.0 {
@@ -1946,11 +1968,13 @@ fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Val
             let index = if *index < 0 { index + length } else { *index };
             picked.push(element_at(index));
         }
-        Value::Range {
-            end,
-            exclusive,
-            start,
-        } => {
+        Value::Range { .. } => {
+            let Some((start, end, exclusive)) = integer_ends(position) else {
+                panic!(
+                    "values_at takes positions or ranges of integers, got {}",
+                    position.shown()
+                );
+            };
             let mut from = start.unwrap_or(0);
             if from < 0 {
                 from += length;
@@ -2150,6 +2174,22 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
 /// The application half of a binary operator — shared by Binary and
 /// SlotCompound so `h[k] += v` cannot drift from `h[k] + v`.
 /// Ruby's shape for `<=>` (ADR 0054): -1, 0, or 1.
+/// A double as a key that orders like the double (Ruby's bsearch trick):
+/// the bit pattern for a non-negative double, its negation for a negative
+/// one, so the keys run from the most negative to the most positive.
+fn ordered_float_key(number: f64) -> i64 {
+    let bits = number.to_bits() as i64;
+    if bits < 0 { -(bits & i64::MAX) } else { bits }
+}
+
+fn float_from_ordered_key(key: i64) -> f64 {
+    if key < 0 {
+        f64::from_bits(((-key) as u64) | (1u64 << 63))
+    } else {
+        f64::from_bits(key as u64)
+    }
+}
+
 fn ordering_value(ordering: std::cmp::Ordering) -> i64 {
     match ordering {
         std::cmp::Ordering::Less => -1,
@@ -3282,20 +3322,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 exclusive,
                 start,
             } => {
-                let mut bound = |side: &Option<Box<Expression>>| {
-                    side.as_ref().map(|side| match self.value_of(side) {
-                        Value::Integer(number) => number,
-                        other => panic!("range bounds must be integers so far, got {other:?}"),
-                    })
-                };
-                // Evaluated left to right, like every other binary form.
-                let start = bound(start);
-                let end = bound(end);
-                Some(Value::Range {
-                    end,
-                    exclusive: *exclusive,
-                    start,
-                })
+                // Evaluated left to right, like every other binary form;
+                // the ends are any two values `<=>` orders (ADR 0081).
+                let start = start.as_ref().map(|side| self.value_of(side));
+                let end = end.as_ref().map(|side| self.value_of(side));
+                Some(build_range(start, end, *exclusive))
             }
             Expression::Nil => Some(Value::Nil),
             Expression::SelfValue => {
@@ -4480,6 +4511,238 @@ impl<W: std::io::Write> Interpreter<W> {
         Some(Some(answer))
     }
 
+    /// Whether a range holds a value (ADR 0081): Ruby's `cover?`, which is
+    /// what `include?`, `member?`, and `===` ask too — by `<=>`, each open
+    /// end reaching everything on its side. A value `<=>` cannot order
+    /// against the ends is simply not inside.
+    fn range_covers(&mut self, range: &Value, probe: &Value) -> bool {
+        let (start, end, exclusive) = range_ends(range);
+        let above = match start {
+            None => true,
+            Some(start) => comparable_pair(start, probe) && self.ordering_of(start, probe) <= 0,
+        };
+        if !above {
+            return false;
+        }
+        match end {
+            None => true,
+            Some(end) => {
+                comparable_pair(end, probe) && {
+                    let ordering = self.ordering_of(probe, end);
+                    if exclusive {
+                        ordering < 0
+                    } else {
+                        ordering <= 0
+                    }
+                }
+            }
+        }
+    }
+
+    /// A pattern argument's match (ADR 0065): the `when` rule applied to a
+    /// value — a range covers, anything else asks `==`.
+    fn pattern_matches(&mut self, pattern: &Value, element: &Value) -> bool {
+        match pattern {
+            Value::Range { .. } => self.range_covers(pattern, element),
+            _ => pattern.ruby_equals(element),
+        }
+    }
+
+    /// `min` on a range (ADR 0081): its start, unless the range is empty —
+    /// a start past its end, or at an excluded end — or beginless, which
+    /// refuses in Ruby's words.
+    fn range_minimum(&mut self, range: &Value) -> Value {
+        let (start, end, exclusive) = range_ends(range);
+        let Some(start) = start else {
+            panic!("cannot get the minimum of beginless range");
+        };
+        if let Some(end) = end {
+            let ordering = self.ordering_of(start, end);
+            if ordering > 0 || (exclusive && ordering == 0) {
+                return Value::Nil;
+            }
+        }
+        Value::present(start.clone())
+    }
+
+    /// `max` on a range: its end, unless the range is empty or endless; an
+    /// excluded integer end steps back one, and an excluded end of any
+    /// other kind has no maximum to name — Ruby's words for both.
+    fn range_maximum(&mut self, range: &Value) -> Value {
+        let (start, end, exclusive) = range_ends(range);
+        let Some(end) = end else {
+            panic!("cannot get the maximum of endless range");
+        };
+        let top = if exclusive {
+            let Value::Integer(end) = end else {
+                panic!("cannot exclude non Integer end value");
+            };
+            Value::Integer(end - 1)
+        } else {
+            end.clone()
+        };
+        if let Some(start) = start
+            && self.ordering_of(start, &top) > 0
+        {
+            return Value::Nil;
+        }
+        Value::present(top)
+    }
+
+    /// Ruby's `Range#overlap?` (#111) over any ends `<=>` orders: an empty
+    /// range overlaps nothing, an excluded end does not reach, an open end
+    /// reaches everything on its side.
+    fn ranges_overlap(&mut self, left: &Value, right: &Value) -> bool {
+        let (left_start, left_end, left_exclusive) = range_ends(left);
+        let (right_start, right_end, right_exclusive) = range_ends(right);
+        let empty = |this: &mut Self,
+                     start: Option<&Value>,
+                     end: Option<&Value>,
+                     exclusive: bool| match (start, end) {
+            (Some(start), Some(end)) => {
+                let ordering = this.ordering_of(start, end);
+                if exclusive {
+                    ordering >= 0
+                } else {
+                    ordering > 0
+                }
+            }
+            _ => false,
+        };
+        if empty(self, left_start, left_end, left_exclusive)
+            || empty(self, right_start, right_end, right_exclusive)
+        {
+            return false;
+        }
+        // A start reaches an end when nothing bounds it, or when it sits at
+        // or before the end — before only, where the end is excluded.
+        let reaches = |this: &mut Self,
+                       start: Option<&Value>,
+                       end: Option<&Value>,
+                       exclusive: bool| match (start, end) {
+            (Some(start), Some(end)) => {
+                let ordering = this.ordering_of(start, end);
+                if exclusive {
+                    ordering < 0
+                } else {
+                    ordering <= 0
+                }
+            }
+            _ => true,
+        };
+        reaches(self, left_start, right_end, right_exclusive)
+            && reaches(self, right_start, left_end, left_exclusive)
+    }
+
+    /// `bsearch` over a range (#111, ADR 0081): the integers of a bounded
+    /// integer range; the doubles of a float range, searched over their
+    /// ordered bit patterns as Ruby's is; and an open range probed outward
+    /// in doubling strides until the answer is bracketed, then searched.
+    fn range_bsearch(&mut self, range: &Value, block: &Block) -> Option<Value> {
+        let (start, end, exclusive) = range_ends(range);
+        let floats = matches!(start, Some(Value::Float(_))) || matches!(end, Some(Value::Float(_)));
+        let key_of = |end: &Value| -> i64 {
+            match end {
+                Value::Integer(number) if floats => ordered_float_key(*number as f64),
+                Value::Integer(number) => *number,
+                Value::Float(number) => ordered_float_key(*number),
+                other => panic!("can't do binary search for {}", other.type_name()),
+            }
+        };
+        let value_of_key = move |key: i64| -> Value {
+            if floats {
+                Value::Float(float_from_ordered_key(key))
+            } else {
+                Value::Integer(key)
+            }
+        };
+        let low = start.map(key_of);
+        let high = end.map(|end| {
+            if exclusive {
+                key_of(end) - 1
+            } else {
+                key_of(end)
+            }
+        });
+        let (low, high) = match (low, high) {
+            (Some(low), Some(high)) => (low, high),
+            (Some(low), None) => {
+                // Probe upward until the block is satisfied at or past
+                // some key, which bounds the search.
+                let mut stride: i64 = 1;
+                let mut high = low;
+                loop {
+                    match self.bsearch_direction(block, &value_of_key(high)) {
+                        Err(interrupted) => return interrupted,
+                        Ok(true) => break,
+                        Ok(false) => {}
+                    }
+                    high = low.saturating_add(stride);
+                    // A saturated stride has reached the key line's edge.
+                    if stride == i64::MAX {
+                        break;
+                    }
+                    stride = stride.saturating_mul(2);
+                }
+                (low, high)
+            }
+            (None, Some(high)) => {
+                // Probe downward until the block is unsatisfied before
+                // some key.
+                let mut stride: i64 = 1;
+                let mut low = high;
+                loop {
+                    match self.bsearch_direction(block, &value_of_key(low)) {
+                        Err(interrupted) => return interrupted,
+                        Ok(false) => break,
+                        Ok(true) => {}
+                    }
+                    low = high.saturating_sub(stride);
+                    if stride == i64::MAX {
+                        break;
+                    }
+                    stride = stride.saturating_mul(2);
+                }
+                (low, high)
+            }
+            (None, None) => {
+                panic!("a range without both ends cannot be searched — give it a start and an end")
+            }
+        };
+        if high < low {
+            return Some(Value::Nil);
+        }
+        // The span may run most of the key line, so it is counted wide.
+        let count = (i128::from(high) - i128::from(low) + 1) as usize;
+        let key_at = |position: usize| (i128::from(low) + position as i128) as i64;
+        let found = self.binary_search(count, |position| value_of_key(key_at(position)), block);
+        match found {
+            Err(interrupted) => interrupted,
+            Ok(None) => Some(Value::Nil),
+            Ok(Some(position)) => Some(Value::present(value_of_key(key_at(position)))),
+        }
+    }
+
+    /// One probe of a `bsearch` block: true when the answer lies at or
+    /// before this element (a true, a zero, or a negative number), false
+    /// when it lies after (a false, a nil, or a positive number).
+    fn bsearch_direction(&mut self, block: &Block, element: &Value) -> Result<bool, Option<Value>> {
+        let verdict = self.run_block(block, vec![element.clone()]);
+        if let Some(interrupted) = self.block_interrupt() {
+            return Err(interrupted);
+        }
+        Ok(match verdict {
+            Some(Value::Boolean(true)) => true,
+            Some(Value::Boolean(false)) | Some(Value::Nil) | None => false,
+            Some(Value::Integer(number)) => number <= 0,
+            Some(Value::Float(number)) => number <= 0.0,
+            Some(other) => panic!(
+                "wrong argument type {} (must be numeric, true, false or nil)",
+                other.type_name()
+            ),
+        })
+    }
+
     fn array_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
         match arguments.as_slice() {
             [] => Some(Value::array(Vec::new())),
@@ -4946,30 +5209,32 @@ impl<W: std::io::Write> Interpreter<W> {
         // A range behaves as its elements do: `(1..n).each` is the counted
         // loop (ADR 0019). `include?` answers without walking, so endless
         // and beginless ranges can answer it too.
-        if let Value::Range {
-            end,
-            exclusive,
-            start,
-        } = &receiver
-        {
+        if let Value::Range { .. } = &receiver {
+            let (start, end, exclusive) = range_ends(&receiver);
             // A range's own answers (#111): its ends, each a maybe where
             // the range is open; whether the end is excluded; and bare
             // `first`/`last`, which are its ends, so `(0...0).first` is 0
             // as in Ruby, an open end refusing in Ruby's words.
             if arguments.is_empty() && block.is_none() {
                 match name {
-                    "exclude_end?" => return Some(Value::Boolean(*exclusive)),
-                    "begin" => return Some(start.map_or(Value::Nil, Value::Integer)),
-                    "end" => return Some(end.map_or(Value::Nil, Value::Integer)),
+                    "exclude_end?" => return Some(Value::Boolean(exclusive)),
+                    "begin" => {
+                        return Some(
+                            start.map_or(Value::Nil, |start| Value::present(start.clone())),
+                        );
+                    }
+                    "end" => {
+                        return Some(end.map_or(Value::Nil, |end| Value::present(end.clone())));
+                    }
                     "first" => {
-                        return Some(Value::Integer(start.unwrap_or_else(|| {
+                        return Some(start.cloned().unwrap_or_else(|| {
                             panic!("cannot get the first element of beginless range")
-                        })));
+                        }));
                     }
                     "last" => {
-                        return Some(Value::Integer(end.unwrap_or_else(|| {
+                        return Some(end.cloned().unwrap_or_else(|| {
                             panic!("cannot get the last element of endless range")
-                        })));
+                        }));
                     }
                     _ => {}
                 }
@@ -4980,7 +5245,8 @@ impl<W: std::io::Write> Interpreter<W> {
             if name == "overlap?" && block.is_none() {
                 return Some(match arguments.as_slice() {
                     [other @ Value::Range { .. }] => {
-                        Value::Boolean(ranges_overlap(&receiver, other))
+                        let other = other.clone();
+                        Value::Boolean(self.ranges_overlap(&receiver, &other))
                     }
                     [other] => panic!("wrong argument type {} (expected Range)", other.type_name()),
                     _ => {
@@ -4992,17 +5258,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // `cover?` and `member?` ask what `include?` asks: a range of
             // integers has no gap between the two.
             if matches!(name, "include?" | "cover?" | "member?")
-                && let [Value::Integer(probe)] = arguments.as_slice()
+                && let [probe] = arguments.as_slice()
             {
-                let above = start.is_none_or(|start| *probe >= start);
-                let below = end.is_none_or(|end| {
-                    if *exclusive {
-                        *probe < end
-                    } else {
-                        *probe <= end
-                    }
-                });
-                return Some(Value::Boolean(above && below));
+                let probe = probe.clone();
+                return Some(Value::Boolean(self.range_covers(&receiver, &probe)));
             }
             if matches!(name, "to_a" | "entries") && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
@@ -5041,6 +5300,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "rindex"
                         | "each_index"
                         | "rfind"
+                        | "bsearch"
                         | "bsearch_index"
                         | "combination"
                         | "permutation"
@@ -5451,21 +5711,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         Ok(Some(position)) => Some(Value::present(elements[position].clone())),
                     }
                 }
-                (Value::Range { .. }, "bsearch", []) => {
-                    let (start, count) = range_span(&receiver);
-                    let found = self.binary_search(
-                        count,
-                        |position| Value::Integer(start + position as i64),
-                        block,
-                    );
-                    match found {
-                        Err(interrupted) => interrupted,
-                        Ok(None) => Some(Value::Nil),
-                        Ok(Some(position)) => {
-                            Some(Value::present(Value::Integer(start + position as i64)))
-                        }
-                    }
-                }
+                (Value::Range { .. }, "bsearch", []) => self.range_bsearch(&receiver, block),
                 (Value::Array(elements), "take_while" | "drop_while", []) => {
                     let mut split = elements.len();
                     for (position, element) in elements.iter().enumerate() {
@@ -5793,7 +6039,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     let wanted = name == "grep";
                     let mut results = Vec::new();
                     for element in elements.iter().cloned() {
-                        if pattern_matches(pattern, &element) != wanted {
+                        if self.pattern_matches(pattern, &element) != wanted {
                             continue;
                         }
                         let result = self.run_block(block, vec![element]);
@@ -6290,41 +6536,43 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::Array(elements), "all?", [pattern]) => Value::Boolean(
                 elements
                     .iter()
-                    .all(|element| pattern_matches(pattern, element)),
+                    .all(|element| self.pattern_matches(pattern, element)),
             ),
             (Value::Array(elements), "any?", [pattern]) => Value::Boolean(
                 elements
                     .iter()
-                    .any(|element| pattern_matches(pattern, element)),
+                    .any(|element| self.pattern_matches(pattern, element)),
             ),
             (Value::Array(elements), "none?", [pattern]) => Value::Boolean(
                 !elements
                     .iter()
-                    .any(|element| pattern_matches(pattern, element)),
+                    .any(|element| self.pattern_matches(pattern, element)),
             ),
             (Value::Array(elements), "one?", [pattern]) => Value::Boolean(
                 elements
                     .iter()
-                    .filter(|element| pattern_matches(pattern, element))
+                    .filter(|element| self.pattern_matches(pattern, element))
                     .count()
                     == 1,
             ),
             (Value::Array(elements), "grep", [pattern]) => Value::array(
                 elements
                     .iter()
-                    .filter(|element| pattern_matches(pattern, element))
+                    .filter(|element| self.pattern_matches(pattern, element))
                     .cloned()
                     .collect(),
             ),
             (Value::Array(elements), "grep_v", [pattern]) => Value::array(
                 elements
                     .iter()
-                    .filter(|element| !pattern_matches(pattern, element))
+                    .filter(|element| !self.pattern_matches(pattern, element))
                     .cloned()
                     .collect(),
             ),
             (Value::Array(elements), "slice_before" | "slice_after", [pattern]) => {
-                Value::array(sliced_runs(elements, name == "slice_before", pattern))
+                Value::array(sliced_runs(elements, name == "slice_before", |element| {
+                    self.pattern_matches(pattern, element)
+                }))
             }
             // A hash walks its pairs for the pattern forms, as for the rest
             // of Ruby's Enumerable (#105).
@@ -6444,45 +6692,39 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // Ruby 4.1's Range#clamp (#111): the range with its ends held
             // inside two bounds, or inside a range of them.
-            (
-                Value::Range {
-                    end,
-                    exclusive,
-                    start,
-                },
-                "clamp",
-                [Value::Integer(low), Value::Integer(high)],
-            ) => range_clamped(*start, *end, *exclusive, Some(*low), Some(*high), false),
-            (
-                Value::Range {
-                    end,
-                    exclusive,
-                    start,
-                },
-                "clamp",
-                [
-                    Value::Range {
-                        end: bound_end,
-                        exclusive: bound_exclusive,
-                        start: bound_start,
-                    },
-                ],
-            ) => range_clamped(
-                *start,
-                *end,
-                *exclusive,
-                *bound_start,
-                *bound_end,
-                *bound_exclusive,
-            ),
-            (range @ Value::Range { .. }, "min", []) => range_elements(range)
-                .into_iter()
-                .next()
-                .map_or(Value::Nil, Value::present),
-            (range @ Value::Range { .. }, "max", []) => range_elements(range)
-                .into_iter()
-                .last()
-                .map_or(Value::Nil, Value::present),
+            (range @ Value::Range { .. }, "clamp", [Value::Integer(low), Value::Integer(high)]) => {
+                let (start, end, exclusive) = integer_ends(range).unwrap_or_else(|| {
+                    panic!(
+                        "'clamp' on a range takes integer ends here, got {}",
+                        range.shown()
+                    )
+                });
+                range_clamped(start, end, exclusive, Some(*low), Some(*high), false)
+            }
+            (range @ Value::Range { .. }, "clamp", [bounds @ Value::Range { .. }]) => {
+                let (start, end, exclusive) = integer_ends(range).unwrap_or_else(|| {
+                    panic!(
+                        "'clamp' on a range takes integer ends here, got {}",
+                        range.shown()
+                    )
+                });
+                let (low, high, high_exclusive) = integer_ends(bounds).unwrap_or_else(|| {
+                    panic!(
+                        "'clamp' on a range takes integer bounds here, got {}",
+                        bounds.shown()
+                    )
+                });
+                range_clamped(start, end, exclusive, low, high, high_exclusive)
+            }
+            // The extremes by `<=>` (ADR 0081), walking nothing.
+            (range @ Value::Range { .. }, "min", []) => {
+                let range = range.clone();
+                self.range_minimum(&range)
+            }
+            (range @ Value::Range { .. }, "max", []) => {
+                let range = range.clone();
+                self.range_maximum(&range)
+            }
             // A negative start counts from the end, as Ruby's does; a start
             // past either end answers the empty array, never nil (ADR 0019).
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
@@ -7213,36 +7455,34 @@ impl<W: std::io::Write> Interpreter<W> {
                 let below_high = self.ordering_of(receiver, high) <= 0;
                 Value::Boolean(above_low && below_high)
             }
-            // One range for both bounds (#101), endless and beginless too.
-            // Ranges hold integers (ADR 0019), so a number clamps by one;
-            // an exclusive range with an end has no top to clamp to.
-            (
-                receiver,
-                "clamp",
-                [
-                    Value::Range {
-                        end,
-                        exclusive,
-                        start,
-                    },
-                ],
-            ) if matches!(receiver, Value::Integer(_) | Value::Float(_)) => {
-                if *exclusive && end.is_some() {
+            // One range for both bounds (#101), endless and beginless too,
+            // over anything `<=>` orders (ADR 0081); an exclusive range
+            // with an end has no top to clamp to.
+            (receiver, "clamp", [bounds @ Value::Range { .. }]) if orderable(receiver) => {
+                let bounds = bounds.clone();
+                let (low, high, exclusive) = range_ends(&bounds);
+                if exclusive && high.is_some() {
                     panic!("'clamp' cannot take an exclusive range — write 'low..high'");
                 }
-                if let (Some(low), Some(high)) = (start, end)
-                    && low > high
+                if let (Some(low), Some(high)) = (low, high)
+                    && self.ordering_of(low, high) > 0
                 {
-                    panic!("'clamp' takes the low bound first, got {low} then {high}");
+                    panic!(
+                        "'clamp' takes the low bound first, got {} then {}",
+                        low.shown(),
+                        high.shown()
+                    );
                 }
-                match (start, end) {
-                    (Some(low), _) if self.ordering_of(receiver, &Value::Integer(*low)) < 0 => {
-                        Value::Integer(*low)
-                    }
-                    (_, Some(high)) if self.ordering_of(receiver, &Value::Integer(*high)) > 0 => {
-                        Value::Integer(*high)
-                    }
-                    _ => receiver.clone(),
+                if let Some(low) = low
+                    && self.ordering_of(receiver, low) < 0
+                {
+                    low.clone()
+                } else if let Some(high) = high
+                    && self.ordering_of(receiver, high) > 0
+                {
+                    high.clone()
+                } else {
+                    receiver.clone()
                 }
             }
             (receiver, "clamp", [low, high]) if orderable(receiver) => {
@@ -7842,24 +8082,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 Some(captures)
             }
-            // A range pattern tests membership, not equality (ADR 0019 §1).
+            // A range pattern tests membership, not equality (ADR 0019 §1),
+            // over any ends `<=>` orders (ADR 0081).
             Pattern::Range {
                 end,
                 exclusive,
                 start,
             } => {
-                let Value::Integer(probe) = subject else {
-                    return None;
-                };
-                let above = start.is_none_or(|start| *probe >= start);
-                let below = end.is_none_or(|end| {
-                    if *exclusive {
-                        *probe < end
-                    } else {
-                        *probe <= end
-                    }
-                });
-                (above && below).then(Vec::new)
+                let start = start.as_ref().map(|side| self.value_of(side));
+                let end = end.as_ref().map(|side| self.value_of(side));
+                let range = build_range(start, end, *exclusive);
+                self.range_covers(&range, subject).then(Vec::new)
             }
             Pattern::Array { elements, rest } => {
                 let Value::Array(values) = subject else {
@@ -7999,14 +8232,8 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         let pattern = self.value_of(pattern);
         match (&pattern, subject) {
-            (
-                Value::Range {
-                    end,
-                    exclusive,
-                    start,
-                },
-                Value::Integer(_) | Value::Float(_),
-            ) => range_covers(*start, *end, *exclusive, as_float(subject)),
+            // A range's `===` is `cover?` (ADR 0081), over any ends.
+            (Value::Range { .. }, _) => self.range_covers(&pattern, subject),
             (Value::Struct { name, .. }, _) if self.struct_defines(name, "===") => {
                 let method = Self::resolve(&self.module_path, name, &self.structs)
                     .and_then(|(_, info)| info.methods.get("===").cloned())

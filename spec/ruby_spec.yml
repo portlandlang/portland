@@ -506,9 +506,9 @@ core/comparable/between_spec.rb:
   pdx: [spec/comparable/between_spec.pdx]
 core/comparable/clamp_spec.rb:
   pdx: [spec/comparable/clamp_spec.pdx]
-  status: partial_planned
-  reason: "A number clamps by an integer range, endless and beginless included (#101); upstream's range examples clamp structs by a range of structs, which waits on the build of ranges over any orderable (ADR 0081). Nil bounds and backwards bounds refuse by design."
-  link: https://github.com/portlandlang/portland/issues/194
+  status: partial_intentional
+  reason: "Nil bounds and backwards bounds refuse by design, and an exclusive range with an end refuses as Ruby raises; a nil <=> answer has no mock to come from."
+  link: docs/ruby/ranges.md
 core/comparable/equal_value_spec.rb:
   status: skipped
   reason: "Comparable does not derive ==: struct equality is already field by field, and a second definition of equal would disagree with it."
@@ -1858,7 +1858,7 @@ core/random/new_spec.rb:
 core/random/rand_spec.rb:
   pdx: [spec/random/random_spec.pdx]
   status: partial_intentional
-  reason: "Random.rand and Random.srand as class methods are the bare rand and srand here; bignum bounds (#156), float ranges (#194), the to_int mocks, and the custom range types stay upstream."
+  reason: "Random.rand and Random.srand as class methods are the bare rand and srand here; bignum bounds (#156), the to_int mocks, and the custom range types stay upstream."
   link: docs/ruby/randomness.md
 core/random/seed_spec.rb:
   pdx: [spec/random/random_spec.pdx]
@@ -2121,61 +2121,61 @@ core/math/tanh_spec.rb:
 core/range/clamp_spec.rb:
   pdx: [spec/range/clamp_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers (ADR 0019), so the String bounds and the duck range stay behind; no subclasses; backwards bounds and a single non-range argument refuse where Ruby raises."
+  reason: "Range#clamp keeps to integer ends and bounds, so the String bounds and the duck range stay behind; no subclasses; backwards bounds and a single non-range argument refuse where Ruby raises."
   link: docs/ruby/ranges.md
 core/range/begin_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  reason: "The rows beyond numbers and strings — symbols, Time, mocks — stay upstream."
   link: docs/ruby/ranges.md
 core/range/end_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  reason: "The rows beyond numbers and strings — symbols, Time, mocks — stay upstream."
   link: docs/ruby/ranges.md
 core/range/first_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here; no to_int, Float, nil, or String count (ADR 0036); a negative count or a beginless range refuses where Ruby raises."
+  reason: "No to_int, Float, nil, or String count (ADR 0036); a negative count or a beginless range refuses where Ruby raises; a counted first on a float or string range walks, which refuses here."
   link: docs/ruby/ranges.md
 core/range/last_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here; no to_int, Float, nil, or String count (ADR 0036); a negative count or an endless range refuses where Ruby raises."
+  reason: "No to_int, Float, nil, or String count (ADR 0036); a negative count or an endless range refuses where Ruby raises; a counted last on a float or string range walks, which refuses here."
   link: docs/ruby/ranges.md
 core/range/exclude_end_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, and Range.new waits on builtin type functions beyond ADR 0058's two."
+  reason: "The rows handing Range.new a 1 or a symbol as the flag refuse, since the flag is a Boolean."
   link: docs/ruby/ranges.md
 core/range/to_s_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string and float rows stay upstream."
+  reason: "The mock rows stay upstream."
   link: docs/ruby/ranges.md
 core/range/inspect_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "inspect is a function, inspect(range), not a method (ADR 0026); ranges hold integers here, and a nil..nil range has no spelling."
+  reason: "inspect is a function, inspect(range), not a method (ADR 0026); a nil..nil range has no spelling."
   link: docs/ruby/inspect.md
 core/range/eql_spec.rb:
-  pdx: [spec/eql_spec.pdx]
+  pdx: [spec/eql_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, float, struct-endpoint, subclass, and mock rows stay upstream."
+  reason: "The subclass and mock rows stay upstream."
   link: docs/ruby/equality.md
 core/range/hash_spec.rb:
   status: skipped
   reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?, and its digest is never a number to persist."
   link: docs/ruby/equality.md
 core/range/equal_value_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, float, struct-endpoint, Range.new, subclass, and mock rows stay upstream."
+  reason: "The subclass and mock rows stay upstream."
   link: docs/ruby/ranges.md
 core/range/to_a_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, symbol, and non-ASCII rows stay upstream; a float, endless, or beginless range refuses where Ruby raises."
+  reason: "A string range's succ walk is not taken, so the string, symbol, and non-ASCII rows stay upstream; a float, endless, or beginless range refuses where Ruby raises, and 1..2.5 walks to the floor as Ruby's does."
   link: docs/ruby/ranges.md
 core/range/entries_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
@@ -2188,54 +2188,54 @@ core/range/member_spec.rb:
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
 core/range/include_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, float, endless-float, nil, and mock rows stay upstream; a missing or extra argument refuses where Ruby raises."
+  reason: "include? is cover? here (ADR 0081), so the string rows Ruby answers by walking with succ, and the TypeError rows for open string ranges, stay upstream with the mocks; a missing or extra argument refuses where Ruby raises."
   link: docs/ruby/ranges.md
 core/range/cover_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, float, subrange, and mock rows stay upstream."
+  reason: "The subrange and mock rows stay upstream."
   link: docs/ruby/ranges.md
 core/range/size_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here: no Float::INFINITY, float, string, or symbol ends, and no beginless or endless size."
+  reason: "A float, string, or symbol range refuses to be walked, where Ruby answers nil or raises; no Float::INFINITY ends, and no beginless or endless size."
   link: docs/ruby/ranges.md
 core/range/each_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, and an endless range refuses to be walked (ADR 0055); mocks, Time, and blockless Enumerators stay upstream."
+  reason: "A float or endless range refuses to be walked (ADR 0055, ADR 0081), and a string range's succ walk is not taken; mocks, Time, and blockless Enumerators stay upstream."
   link: docs/ruby/enumerators.md
 core/range/reverse_each_spec.rb:
   pdx: [spec/range/ends_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, and an open range refuses to be walked (ADR 0055); mocks and blockless Enumerators stay upstream."
+  reason: "A float or open range refuses to be walked (ADR 0055, ADR 0081), and a string range's succ walk is not taken; mocks and blockless Enumerators stay upstream."
   link: docs/ruby/enumerators.md
 core/range/minmax_spec.rb:
-  pdx: [spec/range/ends_spec.pdx]
+  pdx: [spec/range/ends_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here; the mock, infinite, open-range, and comparator rows stay upstream."
+  reason: "The mock, infinite, and comparator rows stay upstream; an open range refuses where Ruby raises."
   link: docs/ruby/ranges.md
 core/range/bsearch_spec.rb:
   pdx: [spec/range/bsearch_spec.pdx]
-  status: partial_planned
-  reason: "A range holds integers until ADR 0081's build, so the Float and endless rows wait on it; without a block there are no enumerators, and the String-range and Object rows refuse at the literal."
-  link: https://github.com/portlandlang/portland/issues/194
-core/range/new_spec.rb:
-  pdx: [spec/range/construction_spec.pdx]
-  status: partial_planned
-  reason: "The ends are integers or nil until ADR 0081's build; the third argument is a Boolean, so the 1 and symbol rows refuse; the to_str, mock, frozen, and subclass rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/194
-core/range/overlap_spec.rb:
-  pdx: [spec/range/overlap_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string rows stay upstream; nil..nil has no spelling; a non-range argument refuses where Ruby raises TypeError."
+  reason: "Without a block there are no enumerators (ADR 0055); a String range refuses before any search and the Object rows have no object to build; the infinity-bound rows beyond the few ported stay upstream."
+  link: docs/ruby/ranges.md
+core/range/new_spec.rb:
+  pdx: [spec/range/construction_spec.pdx, spec/range/orderable_spec.pdx]
+  status: partial_intentional
+  reason: "The third argument is a Boolean, so the 1 and symbol rows refuse; two ends <=> cannot order refuse where the range is written; the to_str, mock, frozen, and subclass rows stay upstream."
+  link: docs/ruby/ranges.md
+core/range/overlap_spec.rb:
+  pdx: [spec/range/overlap_spec.pdx, spec/range/orderable_spec.pdx]
+  status: partial_intentional
+  reason: "nil..nil has no spelling; a non-range argument refuses where Ruby raises TypeError."
   link: docs/ruby/ranges.md
 core/range/case_compare_spec.rb:
-  pdx: [spec/range/overlap_spec.pdx]
+  pdx: [spec/range/overlap_spec.pdx, spec/range/orderable_spec.pdx]
   status: partial_intentional
-  reason: "Ranges hold integers here, so the string, float, mock, and nil..nil rows stay upstream."
+  reason: "The mock and nil..nil rows stay upstream."
   link: docs/ruby/ranges.md
 core/range/frozen_spec.rb:
   status: skipped

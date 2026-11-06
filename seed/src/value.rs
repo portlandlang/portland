@@ -34,12 +34,13 @@ pub enum Value {
     /// compiler will refuse to build.
     Nil,
     /// `1..5` inclusive, `1...5` exclusive; either end may be absent for
-    /// the endless and beginless forms (ADR 0019). Integer-only in the
-    /// seed — a documented crudeness.
+    /// the endless and beginless forms (ADR 0019). The ends are any two
+    /// values `<=>` orders (ADR 0081): numbers, strings, symbols, arrays,
+    /// Comparable structs — checked where the range is built.
     Range {
-        end: Option<i64>,
+        end: Option<Box<Value>>,
         exclusive: bool,
-        start: Option<i64>,
+        start: Option<Box<Value>>,
     },
     /// `Set[1, 2, 3]` (ADR 0082): distinct members in insertion order,
     /// distinct by `eql?` as Ruby's are, so `1` and `1.0` are two members.
@@ -205,6 +206,29 @@ impl Value {
                             .find(|(other_key, _)| other_key == key)
                             .is_some_and(|(_, other_value)| value.ruby_equals(other_value))
                     })
+            }
+            // A range asks `==` of its ends, so `(0..1) == (0..1.0)`.
+            (
+                Value::Range {
+                    end: left_end,
+                    exclusive: left_exclusive,
+                    start: left_start,
+                },
+                Value::Range {
+                    end: right_end,
+                    exclusive: right_exclusive,
+                    start: right_start,
+                },
+            ) => {
+                let ends_equal =
+                    |left: &Option<Box<Value>>, right: &Option<Box<Value>>| match (left, right) {
+                        (Some(left), Some(right)) => left.ruby_equals(right),
+                        (None, None) => true,
+                        _ => false,
+                    };
+                left_exclusive == right_exclusive
+                    && ends_equal(left_start, right_start)
+                    && ends_equal(left_end, right_end)
             }
             (
                 Value::Struct {
@@ -419,7 +443,18 @@ impl Value {
             }
             Value::Integer(value) => value.to_string(),
             Value::Nil => "nil".to_string(),
-            Value::Range { .. } => self.to_string(),
+            // Ruby's: each end inspected, so `"a".."f"` keeps its quotes.
+            Value::Range {
+                end,
+                exclusive,
+                start,
+            } => {
+                let start = start
+                    .as_ref()
+                    .map_or(String::new(), |start| start.inspect());
+                let end = end.as_ref().map_or(String::new(), |end| end.inspect());
+                format!("{start}{}{end}", if *exclusive { "..." } else { ".." })
+            }
             Value::Some(inner) => format!("some({})", inner.inspect()),
             Value::Failure(inner) => format!("failure({})", inner.inspect()),
             Value::String(value) => quoted(value),

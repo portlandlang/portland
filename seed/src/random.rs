@@ -125,6 +125,17 @@ impl Mt {
         (a * 67_108_864.0 + b) * (1.0 / 9_007_199_254_740_992.0)
     }
 
+    /// `int_pair_to_real_inclusive`: a float in [0, 1] from two words, as
+    /// CRuby draws one for an inclusive float range — the 64-bit pair
+    /// scaled by 2^53 + 1 in 128-bit arithmetic, then by 2^-53.
+    pub fn real_inclusive(&mut self) -> f64 {
+        let high = u128::from(self.int32());
+        let low = u128::from(self.int32());
+        let pair = (high << 32) | low;
+        let scaled = (pair * ((1u128 << 53) | 1)) >> 64;
+        (scaled as f64) * 2f64.powi(-53)
+    }
+
     /// `limited_rand`: an integer in 0..=limit, by masking a draw to the
     /// limit's width and drawing again while it lands above — one word for
     /// a limit under 2^32, two for a wider one.

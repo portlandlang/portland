@@ -617,6 +617,7 @@ def check_node(node, scope, mutable found)
   # saying it here, before any other check and before anything runs, is
   # what keeps the seed's "nothing ran" and this build's refusal the same.
   in ErrorNode(message:) then noted(found, ["sentence", message], locate(node, scope))
+  in RangeNode then check_range(node, scope, found)
   in EnumCaseNode then check_construction(node, scope, found)
   in EnumCasePatternNode then check_case_pattern(node, scope, found)
   in IdentifierNode(name:) then check_defined(name, node, scope, found)
@@ -1387,9 +1388,32 @@ def operator_takes?(operator, left, right)
   end
 end
 
+# A range's ends are checked like any expression, then as a pair (ADR
+# 0081): two known values `<=>` cannot order refuse where the range is
+# written — the seed's sentence, with the types in place of the values.
+def check_range(node, scope, mutable found)
+  found = check_node(node.start, scope, found) unless node.start.nil?
+  found = check_node(node.finish, scope, found) unless node.finish.nil?
+  return found if node.start.nil? || node.finish.nil?
+  types = known_types(scope)
+  start = synthesize(node.start, types)
+  finish = synthesize(node.finish, types)
+  return found unless plain_value?(start) && plain_value?(finish)
+  return found if orderable_pair_types?(start, finish)
+  noted(found, ["sentence", "bad value for range — <=> cannot order #{render_type(start)} and #{render_type(finish)}"], locate(node, scope))
+end
+
+# The pairs `<=>` orders (ADR 0054): numbers with numbers, two strings, two
+# symbols, two arrays.
+def orderable_pair_types?(left, right)
+  return true if numeric?(left) && numeric?(right)
+  return true if left == right && (left == ["string"] || left == ["symbol"])
+  (left in ["array", *]) && (right in ["array", *])
+end
+
 # The types a set's algebra takes on the right (ADR 0082): a set, an array,
 # a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || type == ["range"] || (type in ["array", *]) || (type in ["hash", *])
+def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ["array", *]) || (type in ["hash", *])
 
 # `!` takes a boolean, and `-` and `+` a number; the seed refuses the rest.
 def check_unary(node, scope, found)
@@ -1421,6 +1445,7 @@ def known?(type)
   in ["array", element] then known?(element)
   in ["hash", key, entry] then known?(key) && known?(entry)
   in ["maybe", inner] then known?(inner)
+  in ["range", element] then known?(element)
   else
     true
   end

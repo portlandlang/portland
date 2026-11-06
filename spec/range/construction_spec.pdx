@@ -1,8 +1,8 @@
 # `Range.new` (#111, ADR 0058): the literal's two spellings as a function,
-# from ruby/spec core/range/new_spec.rb. A range holds integers or an open
-# end here, so the String rows wait on ranges over other orderables (#149);
-# the third argument is a Boolean, so the rows handing it a 1 or a symbol
-# refuse; the to_str and mock rows stay upstream.
+# from ruby/spec core/range/new_spec.rb. The String rows are in
+# spec/range/orderable_spec.pdx (ADR 0081); the third argument is a
+# Boolean, so the rows handing it a 1 or a symbol refuse; the to_str and
+# mock rows stay upstream.
 
 require_relative "../spec_helper"
 

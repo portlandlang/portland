@@ -207,10 +207,12 @@ pub enum Pattern {
     Pin(String),
     /// `in 1..5` — membership, not equality (ADR 0019 §1). Either end may
     /// be absent, which is what lets a set of ranges cover the integers.
+    /// `in 1..5`, `in ..0`, `in "a".."f"` — a bound is a literal, an
+    /// integer, float, or string (ADR 0081), or absent for the open forms.
     Range {
-        end: Option<i64>,
+        end: Option<Box<Expression>>,
         exclusive: bool,
-        start: Option<i64>,
+        start: Option<Box<Expression>>,
     },
     /// `in ReturnNode(value: nil)` — match by struct type, refine or bind by
     /// field. Keyword-only (ADR 0013 §5); a field with no sub-pattern binds
