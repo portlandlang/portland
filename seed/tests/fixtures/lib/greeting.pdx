@@ -1,0 +1,5 @@
+# Found by `require "greeting"` on the load path: the fixtures' own lib/.
+
+def greeting
+  "hello by name"
+end

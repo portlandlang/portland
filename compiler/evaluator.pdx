@@ -82,16 +82,12 @@ end
 
 # — evaluation —
 
-def evaluate_program(nodes)
-  # `require_relative` resolves against the file doing the requiring, so that
-  # path has to be in scope from the first statement. The first argument is
-  # it: the compiler was handed the guest program's path, and run.pdx read
-  # the same value. What follows the path is the guest's own: its
-  # `System.arguments` (ADR 0068) answers that, where the host's answers the
-  # whole command line.
-  host_arguments = System.arguments
-  guest_arguments = if host_arguments.empty? then [] else host_arguments.slice(1, host_arguments.length - 1) end
-  run_body(nodes, [["__file__", "file", host_arguments.first or "."], ["__arguments__", "arguments", guest_arguments]] + builtin_constants)
+# `path` is the guest program's file — `require_relative` resolves against
+# it, so it is in scope from the first statement; `arguments` are the
+# guest's own, what its `System.arguments` answers (ADR 0068); `load_path`
+# is where `require "name"` looks (ADR 0077).
+def evaluate_program(nodes, path, arguments, load_path)
+  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + builtin_constants)
 end
 
 # The constants every program starts with (#152): `Float`'s, the seed's
@@ -458,7 +454,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[failure format inspect p panic puts rand require_relative some sprintf srand].include?(name)
+  %w[failure format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
 end
 
 # The top of a file: no frame and no namespace around these bindings.
@@ -4631,8 +4627,57 @@ def loaded_paths(bindings)
   value_at(slot.first, 2)
 end
 
+# The load path (ADR 0077), bound by the driver; a program nobody handed one
+# looks in `lib/`.
+def load_path_of(bindings)
+  slot = lookup(bindings, "__load_path__")
+  return ["lib"] if slot.empty?
+  value_at(slot.first, 2)
+end
+
+# A require sits at a file's top level (ADR 0077 §3): inside a method or a
+# block it refuses — the seed's sentence; the checker said it first.
+def refuse_nested_require(name, bindings)
+  return if frame_of(bindings) == 0 && lookup(bindings, "__block__").empty?
+  panic("'#{name}' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there")
+end
+
 def evaluate_require(name, bindings)
+  refuse_nested_require("require_relative", bindings)
   target = required_path(bindings, name)
+  # `System.read_file` answers a failure (ADR 0027), which lets this refusal
+  # wear the seed's wording: the requested name, and the file it was beside.
+  source = System.read_file(target) or panic "cannot load '#{name}' — not found beside #{file_of(bindings)}"
+  load_required(target, source, bindings)
+end
+
+# `require "name"` (ADR 0077): a core name is a quiet no-op answering false;
+# otherwise the first directory on the load path holding `name.pdx` or
+# `name.rb` — both at once refuses, never picks — and a name found nowhere
+# refuses naming the path searched.
+def evaluate_require_by_name(name, bindings)
+  refuse_nested_require("require", bindings)
+  return outcome([false], bindings) if core_require_name?(name)
+  load_path = load_path_of(bindings)
+  mutable found = nil
+  load_path.each do |directory|
+    next unless found.nil?
+    # `System.read_file` answers a failure (ADR 0027) for a file that is not
+    # there, which is the existence test the host offers.
+    hits = require_candidates(name, directory).reject { System.read_file(it).failure? }
+    if hits.length > 1
+      panic("cannot load '#{name}' — both #{hits.join(" and ")} are on the load path; keep one")
+    end
+    found = hits.first unless hits.empty?
+  end
+  panic("cannot load '#{name}' — not found on the load path (#{load_path.join(", ")})") if found.nil?
+  source = System.read_file(found) or panic "cannot load '#{name}' — cannot read #{found}"
+  load_required(canonical_path(found), source, bindings)
+end
+
+# Load one resolved file once: a second require answers false and runs
+# nothing. Shared by the two spellings.
+def load_required(target, source, bindings)
   return outcome([false], bindings) if loaded_paths(bindings).include?(target)
 
   # Marked loaded before the file runs, not after, so a file that requires
@@ -4643,10 +4688,6 @@ def evaluate_require(name, bindings)
   # declared crosses, bare locals do not — in either direction. A require is
   # not a paste.
   scope = [["__file__", "file", target]] + loaded + bindings.reject { local?(it) }
-  # `System.read_file` answers a failure (ADR 0027), which lets this refusal
-  # wear the seed's wording — one recorded divergence retired. The message
-  # names the *requested* path, as the seed's does.
-  source = System.read_file(target) or panic "require_relative #{inspect(name)}: No such file or directory (os error 2)"
   result = run_body(parse_program(lex(source)), scope)
   # Everything the file declared stays in scope — that is the point of a
   # require. Its locals drop, the requirer's come back, and `__file__` is put
@@ -4661,6 +4702,11 @@ end
 def local?(triple) = triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
 
 def evaluate_call(node, mutable bindings)
+  # A require takes a string literal (ADR 0077 §3), so the build sees every
+  # file it links — the seed's sentence; the checker said it first.
+  if %w[require require_relative].include?(node.name) && !(node.arguments.length == 1 && (node.arguments.first in StringNode))
+    panic("'#{node.name}' takes a string literal — write #{node.name} \"name\" at the top of the file, so the build sees every file it links")
+  end
   mutable arguments = []
   mutable keyword_values = []
   node.arguments.each do |argument|
@@ -4741,6 +4787,8 @@ def evaluate_call(node, mutable bindings)
     outcome([render_inspect(slot_value(arguments))], bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
+  when "require"
+    evaluate_require_by_name(slot_value(arguments), bindings)
   # The ambient generator (ADR 0065): the host's own `rand` and `srand`.
   # Formatting is a function (ADR 0067): formatting.pdx walks the template
   # and the host renders each directive, so the digits are the seed's.

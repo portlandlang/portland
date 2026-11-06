@@ -1,0 +1,13 @@
+# `require "name"` on the load path (ADR 0077): the fixtures' own lib/ is
+# on it, `.pdx` and `.rb` both load, a path under it resolves, a second
+# require answers false, and a core name is a quiet no-op answering false.
+
+require "greeting"
+require "legacy"
+require "nested/part"
+puts greeting
+puts legacy_greeting
+puts nested_part
+puts require("greeting")
+puts require("json")
+puts require("set")

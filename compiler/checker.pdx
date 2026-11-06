@@ -148,7 +148,8 @@ def check_program_with(nodes, source, file, imports, sharpened)
   # in view: a require the walk could not resolve may declare anything.
   judging = nodes.none? { computed_require?(it) }
   scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: [], private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
-  found = check_annotations(nodes, source, scope, [])
+  annotated = check_annotations(nodes, source, scope, [])
+  found = check_requires(nodes, false, scope, annotated)
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
   in_source_order(check_body(nodes, scope, walked.last))
 end
@@ -180,8 +181,8 @@ end
 # checked in this process — the spec harness checks a hundred specs that
 # share one helper — as [key, declarations] pairs, `nil` while a file is
 # in progress; the updated memo comes back.
-def check_closure(path, checked)
-  check_closure_with(path, checked, false)
+def check_closure(path, checked, load_path)
+  check_closure_with(path, checked, false, load_path)
 end
 
 # Run mode (ADR 0049 §4): the closure is a closed world, so the entry
@@ -189,12 +190,12 @@ end
 # agrees on is read at that type inside its body (ADR 0048 ruling 4).
 # Only the entry's defs: a required file is a library by nature, and its
 # defs may have callers outside this closure.
-def check_program_closure(path, checked)
-  check_closure_with(path, checked, true)
+def check_program_closure(path, checked, load_path)
+  check_closure_with(path, checked, true, load_path)
 end
 
-def check_closure_with(path, mutable checked, sharpen)
-  resolution = resolve_closure(path, checked, [], false)
+def check_closure_with(path, mutable checked, sharpen, load_path)
+  resolution = resolve_closure(path, checked, [], false, load_path)
   checked = value_at_checked(resolution, 0)
   files = value_at_checked(resolution, 1)
   entry = files.last
@@ -216,16 +217,16 @@ end
 # requires this one — then the program spans more than one file and a
 # refusal here names its file (ADR 0049 §5); an entry names its file only
 # when it requires something itself.
-def resolve_closure(path, mutable checked, mutable files, required)
+def resolve_closure(path, mutable checked, mutable files, required, load_path)
   key = canonical_path(path)
   return [checked, files] if checked.any? { it[0] == key }
   source = System.read_file(path) or panic "check: cannot read #{path}"
   nodes = parse_program(lex(source))
   checked = [[key, nil]] + checked
-  requires = required_files(nodes, path)
+  requires = required_files(nodes, path, load_path)
   mutable imports = empty_declarations
   requires.each do |name|
-    resolution = resolve_closure(name, checked, files, true)
+    resolution = resolve_closure(name, checked, files, true, load_path)
     checked = value_at_checked(resolution, 0)
     files = value_at_checked(resolution, 1)
     found = checked.find { it[0] == canonical_path(name) }
@@ -238,27 +239,93 @@ def resolve_closure(path, mutable checked, mutable files, required)
   [[[key, exported]] + checked.reject { it[0] == key }, files]
 end
 
-# The files a program's top-level `require_relative "name"` lines name,
-# in order. Only a literal string resolves; anything else is declined.
-def required_files(nodes, path)
+# The files a program's top-level `require_relative "name"` and
+# `require "name"` lines name, in order (ADR 0077). Only a literal string
+# resolves; anything else is declined. A `require` the load path cannot
+# place is left to the runtime's refusal, and a core name is no file.
+def required_files(nodes, path, load_path)
   mutable found = []
   nodes.each do |node|
     next unless node in CallNode
-    next unless node.name == "require_relative"
+    next unless node.name == "require_relative" || node.name == "require"
     next unless node.arguments.length == 1
     argument = node.arguments.first
     next unless argument in StringNode
-    found << required_path_from(path, argument.value)
+    if node.name == "require_relative"
+      found << required_path_from(path, argument.value)
+      next
+    end
+    placed = require_on_load_path(argument.value, load_path)
+    found << placed unless placed.nil?
   end
   found
 end
 
-# A `require_relative` whose path is not a literal string.
+# Where `require name` lands (ADR 0077 §2): the first directory on the path
+# holding exactly one of the name's candidate files; nil for a core name,
+# a name found nowhere, or a name two files answer to.
+def require_on_load_path(name, load_path)
+  return nil if core_require_name?(name)
+  mutable found = nil
+  load_path.each do |directory|
+    next unless found.nil?
+    hits = require_candidates(name, directory).reject { System.read_file(it).failure? }
+    # Two files answering one name refuse here, before anything is checked
+    # or run — the evaluator's sentence, said first.
+    panic("cannot load '#{name}' — both #{hits.join(" and ")} are on the load path; keep one") if hits.length > 1
+    found = hits.first unless hits.empty?
+  end
+  found
+end
+
+# A `require` or `require_relative` whose path is not a literal string.
 def computed_require?(node)
   return false unless node in CallNode
-  return false unless node.name == "require_relative"
+  return false unless node.name == "require_relative" || node.name == "require"
   return true unless node.arguments.length == 1
   !(node.arguments.first in StringNode)
+end
+
+# `require` and `require_relative` take a string literal at a file's top
+# level (ADR 0077 §3) — or a module body's, as static a place — so the build
+# sees every file it links. Inside a def, a block, or a branch, or with a
+# computed name, they refuse naming the rewrite; the seed says the same
+# sentence when the line is reached.
+def check_requires(nodes, inside, scope, mutable found)
+  nodes.each do |node|
+    case node
+    in CallNode(name:, arguments:, block:)
+      if name == "require" || name == "require_relative"
+        if inside
+          found = noted(found, ["sentence", "'#{name}' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there"], locate(node, scope))
+        elsif arguments.length != 1 || !(arguments.first in StringNode)
+          found = noted(found, ["sentence", "'#{name}' takes a string literal — write #{name} \"name\" at the top of the file, so the build sees every file it links"], locate(node, scope))
+        end
+      end
+      found = check_requires(arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in MethodCallNode(receiver:, arguments:, block:)
+      found = check_requires([receiver] + arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in SafeMethodCallNode(receiver:, arguments:, block:)
+      found = check_requires([receiver] + arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in AssignmentNode(value:) then found = check_requires([value], inside, scope, found)
+    in ModuleDefNode(body:) then found = check_requires(body, inside, scope, found)
+    in StructDefNode(methods:, type_functions:, nested:) then found = check_requires(methods + type_functions + nested, true, scope, found)
+    in TraitDefNode(methods:) then found = check_requires(methods, true, scope, found)
+    in DefNode(body:) then found = check_requires(body, true, scope, found)
+    in IfNode(condition:, then_body:, else_body:)
+      found = check_requires([condition], inside, scope, found)
+      found = check_requires((then_body or []) + (else_body or []), true, scope, found)
+    in WhileNode(condition:, body:)
+      found = check_requires([condition], inside, scope, found)
+      found = check_requires(body, true, scope, found)
+    else
+      found = check_requires(children_of(node), true, scope, found)
+    end
+  end
+  found
 end
 
 def declarations_of(nodes)
@@ -1175,7 +1242,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[failure fields format inspect p panic puts rand require_relative some sprintf srand].include?(name)
+def builtin_function?(name) = %w[failure fields format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it

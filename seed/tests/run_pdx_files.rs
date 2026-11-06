@@ -1997,10 +1997,6 @@ fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
             "'Object' has no Portland meaning — there is no root class; a struct stands alone",
         ),
         (
-            "require \"json\"\n",
-            "'require' has no Portland meaning — 'require_relative' loads a file by its path",
-        ),
-        (
             "alias_method :a, :b\n",
             "'alias_method' is spelled 'alias' here — 'alias new old', two bare names",
         ),
@@ -2692,6 +2688,107 @@ fn pattern_gaps_on_both_oracles() {
             (
                 "case {a: 1}\nin {\"a\" => 1} then 1\nend\n",
                 "hash patterns take symbol keys",
+            ),
+        ],
+    );
+}
+
+/// `require "name"` on both oracles (ADR 0077, #190): the fixtures' own
+/// `lib/` is on the load path, `-I` puts a directory at the front on both
+/// drivers, two files answering one name refuse, a name found nowhere
+/// refuses naming the path, and a require inside a def or with a computed
+/// name refuses naming the top of the file.
+#[test]
+fn require_by_name_on_both_oracles() {
+    let library = format!("{}/tests/fixtures/lib", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("requires_with_flag.pdx");
+    std::fs::write(
+        &sample,
+        "require \"greeting\"\nputs greeting\np require(\"nested/part\")\n",
+    )
+    .unwrap();
+    let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("-I")
+        .arg(&library)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg("-I")
+        .arg(&library)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        direct.status.success(),
+        "the seed should run with -I: {}",
+        String::from_utf8_lossy(&direct.stderr)
+    );
+    assert!(
+        hosted.status.success(),
+        "the hosted run should run with -I: {}",
+        String::from_utf8_lossy(&hosted.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&direct.stdout),
+        "hello by name\ntrue\n"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&hosted.stdout),
+        "hello by name\ntrue\n"
+    );
+
+    // Two files answer to `require "twin"` in the fixtures' lib — twin.pdx
+    // and twin.rb — so the require refuses and names both (ADR 0077 §2).
+    let twin = std::env::temp_dir().join("requires_twin.pdx");
+    std::fs::write(&twin, "require \"twin\"\nputs twin\n").unwrap();
+    let twin = twin.display().to_string();
+    for command in [
+        vec!["-I".to_string(), library.clone(), twin.clone()],
+        vec![
+            portland_run(),
+            "-I".to_string(),
+            library.clone(),
+            twin.clone(),
+        ],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .args(&command)
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            !output.status.success(),
+            "two files answering 'twin' should refuse"
+        );
+        let said = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            said.contains("cannot load 'twin' — both")
+                && said.contains("twin.pdx")
+                && said.contains("twin.rb"),
+            "should name both twins, got: {said}"
+        );
+    }
+
+    assert_both_oracles_refuse(
+        "require_refusal.pdx",
+        None,
+        &[
+            (
+                "require \"nope\"\n",
+                "cannot load 'nope' — not found on the load path (",
+            ),
+            (
+                "p require_relative(\"nope\")\n",
+                "cannot load 'nope' — not found beside ",
+            ),
+            (
+                "def load_it = require \"json\"\nload_it\n",
+                "'require' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there",
+            ),
+            (
+                "name = \"json\"\nrequire name\n",
+                "'require' takes a string literal — write require \"name\" at the top of the file, so the build sees every file it links",
             ),
         ],
     );
@@ -4778,6 +4875,7 @@ fn portland_evaluator_runs_the_fixture_suite() {
         "enums",
         "value_methods",
         "requires_library",
+        "requires_by_name",
     ] {
         let path = format!(
             "{}/tests/fixtures/{fixture}.pdx",

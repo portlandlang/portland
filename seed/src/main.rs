@@ -22,7 +22,27 @@ fn main() {
 }
 
 fn run() {
-    let mut arguments = std::env::args().skip(1);
+    let mut arguments = std::env::args().skip(1).peekable();
+    // `pdx -I dir file.pdx` puts a directory at the front of the load path
+    // (ADR 0077), as `ruby -I` does; the flag may repeat.
+    let mut load_path: Vec<String> = Vec::new();
+    while let Some(flag) = arguments.peek() {
+        if flag == "-I" {
+            arguments.next();
+            match arguments.next() {
+                Some(directory) => load_path.push(directory),
+                None => {
+                    eprintln!("pdx: -I needs a directory");
+                    process::exit(64);
+                }
+            }
+        } else if let Some(directory) = flag.strip_prefix("-I") {
+            load_path.push(directory.to_string());
+            arguments.next();
+        } else {
+            break;
+        }
+    }
     let first = arguments.next();
     match first.as_deref() {
         Some("--parse") => {
@@ -35,7 +55,7 @@ fn run() {
                 _ => parse_files(&paths),
             }
         }
-        Some(path) => run_file(path),
+        Some(path) => run_file(path, load_path, arguments.collect()),
         None => repl(),
     }
 }
@@ -91,7 +111,7 @@ fn read_source(path: &str) -> String {
     lexer::normalize_line_endings(source)
 }
 
-fn run_file(path: &str) {
+fn run_file(path: &str, load_path: Vec<String>, program_arguments: Vec<String>) {
     let source = read_source(path);
     // A parse refusal gets its machine line (#88's probe) before it unwinds
     // on as the panic it always was.
@@ -103,7 +123,8 @@ fn run_file(path: &str) {
         }
     };
     let mut interpreter = Interpreter::new();
-    interpreter.set_arguments(std::env::args().skip(2).collect());
+    interpreter.set_arguments(program_arguments);
+    interpreter.set_load_path(load_path);
     interpreter.set_current_file(std::path::PathBuf::from(path));
     interpreter.program(&program);
 }

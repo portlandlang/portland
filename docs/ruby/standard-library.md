@@ -26,7 +26,7 @@ The OS surface is core: `File`, `Dir`, `ENV`, `Time`, `Process`, `Signal`, `IO` 
 
 ## Migration
 
-- `require "logger"` and the rest of the first four migrate verbatim once their tiles exist — _free_. Until then they refuse, pointing here ([#116](https://github.com/portlandlang/portland/issues/116) row 4). `require "json"` is a no-op while `json` is core, as `require "set"` is in Ruby 4 — whether it refuses or is accepted silently is #116's.
+- `require "logger"` and the rest of the first four migrate verbatim once their tiles exist — _free_. Until then each is a missing file on the load path and refuses as one ([requires.md](requires.md)). `require "json"` and `require "set"` are quiet no-ops answering `false` while those are core, as `require "set"` is in Ruby 4 ([ADR 0077](../adr/0077-2026-11-03-require-by-name-on-a-load-path.md) §4).
 - A Gemfile line for a bundled gem (`gem "csv"`, `gem "base64"`) has no Portland twin; a default tile needs none, and an external tile's declaration is [#174](https://github.com/portlandlang/portland/issues/174)'s shape — _gem-supplied_ in the linter's terms, since the manifest is not Ruby.
 - `require "ostruct"` and the other declined names fail loudly at the require, never silently; the rewrite is the one the cited ledger page names.
 - `File.open(path) { |file| file.each_line { } }` has no translation until the fine model lands; `File.read(path).lines.each { }` is the coarse spelling, and it holds the whole file.

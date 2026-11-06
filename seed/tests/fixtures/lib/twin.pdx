@@ -1,0 +1,4 @@
+# One of two files with the same name on the load path; `require "twin"`
+# refuses rather than picking.
+
+def twin = "pdx twin"

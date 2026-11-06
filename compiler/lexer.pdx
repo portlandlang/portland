@@ -146,7 +146,6 @@ def retired_sentence(name)
   when "extend" then "'extend' has no Portland meaning — a module's def is already callable as 'Module.name' (ADR 0021)"
   when "eval", "instance_eval", "class_eval", "define_method", "method_missing", "instance_variable_get", "instance_variable_set", "const_get", "singleton_class"
     "'#{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
-  when "require" then "'require' has no Portland meaning — 'require_relative' loads a file by its path"
   when "proc", "lambda", "Proc" then "'#{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
   when "alias_method" then "'alias_method' is spelled 'alias' here — 'alias new old', two bare names"
   # `attr_reader` is a spelling of the field list inside a type body (ADR

@@ -2437,6 +2437,13 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     home_depth: usize,
     /// The file currently executing; `require_relative` resolves against it.
     current_file: Option<std::path::PathBuf>,
+    /// The program's entry file, whose `lib/` is on the load path (ADR
+    /// 0077), and the `-I` directories as written.
+    entry_file: Option<std::path::PathBuf>,
+    load_path: Vec<String>,
+    /// How many branch, loop, and block bodies deep the run is — zero at a
+    /// file's top level and in a module body, where a require belongs.
+    nesting: usize,
     expression_depth: usize,
     loaded: std::collections::HashSet<std::path::PathBuf>,
     methods: HashMap<String, std::rc::Rc<Method>>,
@@ -2550,6 +2557,9 @@ impl<W: std::io::Write> Interpreter<W> {
             call_depth: 0,
             home_depth: 0,
             current_file: None,
+            entry_file: None,
+            load_path: Vec::new(),
+            nesting: 0,
             loaded: std::collections::HashSet::new(),
             expression_depth: 0,
             methods: HashMap::new(),
@@ -2573,7 +2583,18 @@ impl<W: std::io::Write> Interpreter<W> {
 
     /// Command-line arguments exposed to the program via `System.arguments`.
     /// The path of the file being run, for `require_relative` resolution.
+    /// The `-I` directories (ADR 0077), as written on the command line.
+    pub fn set_load_path(&mut self, directories: Vec<String>) {
+        self.load_path = directories;
+    }
+
     pub fn set_current_file(&mut self, path: std::path::PathBuf) {
+        // The first file set is the program's entry, whose `lib/` is on
+        // the load path (ADR 0077); the requires that follow move the
+        // current file, never the entry.
+        if self.entry_file.is_none() {
+            self.entry_file = Some(path.clone());
+        }
         self.current_file = Some(path);
     }
 
@@ -2858,6 +2879,15 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// Run statements until done or a `return`/`break` starts unwinding.
+    /// A body below the file's top level — a branch's, a loop's, a block's
+    /// — where a require is out of place (ADR 0077 §3).
+    fn run_nested(&mut self, statements: &[Statement]) -> Option<Value> {
+        self.nesting += 1;
+        let result = self.run_body(statements);
+        self.nesting -= 1;
+        result
+    }
+
     fn run_body(&mut self, statements: &[Statement]) -> Option<Value> {
         let mut last = None;
         for statement in statements {
@@ -3264,7 +3294,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     // so plain immutable bindings work per-iteration.
                     let preexisting: std::collections::HashSet<String> =
                         self.variables.keys().cloned().collect();
-                    self.run_body(body);
+                    self.run_nested(body);
                     self.variables.retain(|name, _| preexisting.contains(name));
                     match self.pending {
                         None => {}
@@ -3484,7 +3514,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     if branch.body.is_empty() {
                         return Some(Value::Nil);
                     }
-                    return self.run_body(&branch.body);
+                    return self.run_nested(&branch.body);
                 }
                 if else_body.is_empty() {
                     // The runtime preview of compile-checked exhaustiveness
@@ -3494,7 +3524,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         subject.inspect()
                     );
                 }
-                self.run_body(else_body)
+                self.run_nested(else_body)
             }
             // `pattern === subject` (#150): the test `case/when` runs.
             Expression::CaseEqual { pattern, subject } => {
@@ -3510,11 +3540,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 for branch in branches {
                     for value in &branch.values {
                         if self.case_matches(value, &subject) {
-                            return self.run_body(&branch.body);
+                            return self.run_nested(&branch.body);
                         }
                     }
                 }
-                self.run_body(else_body)
+                self.run_nested(else_body)
             }
             Expression::HashLiteral(entries) => {
                 let mut pairs: Vec<(Value, Value)> = Vec::new();
@@ -3552,7 +3582,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     // A branch that doesn't happen produces nil (ADR 0012).
                     return Some(Value::Nil);
                 }
-                self.run_body(body)
+                self.run_nested(body)
             }
             Expression::Integer(value) => Some(Value::Integer(*value)),
             Expression::String(value) => Some(Value::String(value.clone())),
@@ -3814,6 +3844,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 keyword_arguments,
                 name,
             } => {
+                // A require takes a string literal (ADR 0077 §3), so the
+                // build sees every file it links.
+                if matches!(name.as_str(), "require" | "require_relative")
+                    && !matches!(arguments.as_slice(), [Expression::String(_)])
+                {
+                    panic!(
+                        "'{name}' takes a string literal — write {name} \"name\" at the top of the file, so the build sees every file it links"
+                    );
+                }
                 let arguments: Vec<Value> = arguments
                     .iter()
                     .map(|argument| self.value_of(argument))
@@ -7593,6 +7632,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "panic"
                 | "puts"
                 | "rand"
+                | "require"
                 | "require_relative"
                 | "some"
                 | "sprintf"
@@ -7600,10 +7640,22 @@ impl<W: std::io::Write> Interpreter<W> {
         )
     }
 
+    /// A require sits at a file's top level (ADR 0077 §3): inside a method
+    /// or a block it refuses, naming the rewrite — the checker says this
+    /// first on the compiler side; the seed says it when the line runs.
+    fn refuse_nested_require(&self, name: &str) {
+        if self.call_depth > 0 || self.nesting > 0 {
+            panic!(
+                "'{name}' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there"
+            );
+        }
+    }
+
     /// Load another Portland file, Ruby-style: the path is resolved against
     /// the requiring file's directory, `.pdx` is implied, and a file loads
     /// only once (returns false when already loaded).
     fn require_relative(&mut self, path: &str) -> bool {
+        self.refuse_nested_require("require_relative");
         let base = self
             .current_file
             .as_ref()
@@ -7614,15 +7666,101 @@ impl<W: std::io::Write> Interpreter<W> {
         if resolved.extension().is_none() {
             resolved.set_extension("pdx");
         }
-        let resolved = resolved
-            .canonicalize()
-            .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
+        let Ok(resolved) = resolved.canonicalize() else {
+            let beside = self
+                .current_file
+                .as_ref()
+                .map_or(".".to_string(), |file| file.display().to_string());
+            panic!("cannot load '{path}' — not found beside {beside}");
+        };
+        self.load_file(resolved)
+    }
+
+    /// The load path (ADR 0077 §1): the `-I` directories in order, then the
+    /// program's own `lib/` — beside the entry file, and under the directory
+    /// `pdx` runs from — each once, as written.
+    fn load_path_directories(&self) -> Vec<String> {
+        let mut directories = self.load_path.clone();
+        let beside_entry = self
+            .entry_file
+            .as_ref()
+            .and_then(|file| file.parent())
+            .map(|directory| {
+                let shown = directory.display().to_string();
+                if shown.is_empty() {
+                    "lib".to_string()
+                } else {
+                    format!("{shown}/lib")
+                }
+            })
+            .unwrap_or_else(|| "lib".to_string());
+        for directory in [beside_entry, "lib".to_string()] {
+            if !directories.contains(&directory) {
+                directories.push(directory);
+            }
+        }
+        directories
+    }
+
+    /// `require "name"` (ADR 0077): a core name is a quiet no-op answering
+    /// false; otherwise the first directory on the load path holding
+    /// `name.pdx` or `name.rb` — both at once refuses, never picks — and a
+    /// name found nowhere refuses naming the path searched.
+    fn require(&mut self, name: &str) -> bool {
+        self.refuse_nested_require("require");
+        if matches!(name, "json" | "set") {
+            return false;
+        }
+        let directories = self.load_path_directories();
+        let has_extension = name
+            .rsplit('/')
+            .next()
+            .is_some_and(|last| last.contains('.'));
+        for directory in &directories {
+            let joined = std::path::Path::new(directory).join(name);
+            let candidates: Vec<std::path::PathBuf> = if has_extension {
+                vec![joined]
+            } else {
+                vec![joined.with_extension("pdx"), joined.with_extension("rb")]
+            };
+            let hits: Vec<std::path::PathBuf> = candidates
+                .into_iter()
+                .filter(|candidate| candidate.is_file())
+                .collect();
+            match hits.as_slice() {
+                [] => continue,
+                [found] => {
+                    let resolved = found
+                        .canonicalize()
+                        .unwrap_or_else(|error| panic!("cannot load '{name}' — {error}"));
+                    return self.load_file(resolved);
+                }
+                _ => {
+                    let shown: Vec<String> =
+                        hits.iter().map(|hit| hit.display().to_string()).collect();
+                    panic!(
+                        "cannot load '{name}' — both {} are on the load path; keep one",
+                        shown.join(" and ")
+                    );
+                }
+            }
+        }
+        panic!(
+            "cannot load '{name}' — not found on the load path ({})",
+            directories.join(", ")
+        );
+    }
+
+    /// Run one resolved file once, in a scope of its own (#95): its
+    /// declarations cross, its locals do not. Answers false for a file
+    /// already loaded. Shared by `require` and `require_relative`.
+    fn load_file(&mut self, resolved: std::path::PathBuf) -> bool {
         if self.loaded.contains(&resolved) {
             return false;
         }
         self.loaded.insert(resolved.clone());
         let source = std::fs::read_to_string(&resolved)
-            .unwrap_or_else(|error| panic!("require_relative {path:?}: {error}"));
+            .unwrap_or_else(|error| panic!("cannot load '{}' — {error}", resolved.display()));
         let source = crate::lexer::normalize_line_endings(source);
         let program = parser::parse(&source);
         let previous_file = self.current_file.replace(resolved);
@@ -7772,7 +7910,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 },
             );
         }
-        let result = self.run_body(&block.body);
+        let result = self.run_nested(&block.body);
         // `next` ends just this invocation of the block; `break` and `return`
         // stay pending for the iterating caller to handle.
         if matches!(self.pending, Some(Pending::Next)) {
@@ -8617,6 +8755,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 ("require_relative", [Value::String(path)]) => {
                     return Some(Value::Boolean(self.require_relative(path)));
+                }
+                ("require", [Value::String(name)]) => {
+                    return Some(Value::Boolean(self.require(name)));
                 }
                 _ => {}
             }

@@ -1,6 +1,6 @@
 # 0077 — `require "name"`: a load path, `.pdx` or `.rb`, literal and top-level
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#116](https://github.com/portlandlang/portland/issues/116); not built — the build is [#190](https://github.com/portlandlang/portland/issues/190))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#116](https://github.com/portlandlang/portland/issues/116); built on both implementations 2026-11-06 under [#190](https://github.com/portlandlang/portland/issues/190) — the load path is `-I` and the program's `lib/` until the tile manifest ([#174](https://github.com/portlandlang/portland/issues/174)) adds the dependencies')
 - **Date:** 2026-11-03
 - **Issue:** [#116](https://github.com/portlandlang/portland/issues/116)
 

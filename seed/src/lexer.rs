@@ -100,7 +100,6 @@ pub fn retired_sentence(name: &str) -> Option<String> {
         | "instance_variable_get" | "instance_variable_set" | "const_get" | "singleton_class" => format!(
             "'{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
         ),
-        "require" => "'require' has no Portland meaning — 'require_relative' loads a file by its path".to_string(),
         "proc" | "lambda" | "Proc" => format!(
             "'{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
         ),

@@ -36,7 +36,7 @@ harness_source = System.read_file(harness_path) or panic "run_specs.pdx: cannot 
 harness_program = parse_program(lex(harness_source))
 # The checker's memo of files already checked rides across the specs, so
 # the helper every spec requires is checked once here, not a hundred times.
-mutable checked = check_closure(harness_path, [])
+mutable checked = check_closure(harness_path, [], default_load_path(harness_path, []))
 # A spec run direct is `pdx the_spec.pdx` with nothing after it, so hosted
 # `System.arguments` answers the same empty list (ADR 0068).
 harness = run_body(harness_program, [["__file__", "file", harness_path], ["__arguments__", "arguments", []]] + builtin_constants)
@@ -49,7 +49,7 @@ spec_paths.each do |path|
   program = parse_program(lex(source))
   # Each spec is a program about to run — run mode, so its own defs are
   # read with what every caller passes (ADR 0049 §4).
-  checked = check_program_closure(path, checked)
+  checked = check_program_closure(path, checked, default_load_path(path, []))
   scope = [["__file__", "file", path]] + already_loaded + harness.bindings
   run_body(program, scope)
 end

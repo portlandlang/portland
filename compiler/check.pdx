@@ -1,9 +1,10 @@
 # Check a Portland file without running it (#9, ADR 0034).
 #
-# Usage: pdx compiler/check.pdx <file.pdx> [more.pdx ...]
+# Usage: pdx compiler/check.pdx [-I dir ...] <file.pdx> [more.pdx ...]
 #
 # Silence is a pass; a refusal panics with its wording. The seed has no
 # counterpart on purpose — this is the first door only the compiler has.
+# `-I dir` puts a directory at the front of the load path (ADR 0077).
 
 require_relative "checker"
 
@@ -11,8 +12,10 @@ require_relative "checker"
 # declarations of its requires in view; the file's own locals are its own.
 # Several files share one memo, so a corpus that requires the same library
 # from many entries checks it once: `pdx compiler/check.pdx a.pdx b.pdx`.
+flags = load_path_flags(System.arguments)
+directories = flags[0]
 mutable checked = []
-System.arguments.each do |path|
-  checked = check_closure(path, checked)
+flags[1].each do |path|
+  checked = check_closure(path, checked, default_load_path(path, directories))
 end
 puts "ok"

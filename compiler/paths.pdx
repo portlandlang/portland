@@ -34,6 +34,53 @@ def canonical_path(path)
   joined
 end
 
+# `-I dir` flags at the front of a command line (ADR 0077), as `ruby -I`
+# takes them, the flag repeatable and the directory attached or not.
+# Answers [directories, the arguments that follow].
+def load_path_flags(arguments)
+  mutable directories = []
+  mutable rest = arguments
+  while !rest.empty? && (rest.first == "-I" || (rest.first.start_with?("-I") && rest.first.length > 2))
+    flag = rest.first or ""
+    if flag == "-I"
+      directory = rest[1]
+      panic("pdx: -I needs a directory") if directory.nil?
+      directories << directory
+      rest = rest.slice(2, rest.length - 2)
+    else
+      directories << flag.slice(2, flag.length - 2)
+      rest = rest.slice(1, rest.length - 1)
+    end
+  end
+  [directories, rest]
+end
+
+# The load path (ADR 0077 §1): the `-I` directories in order, then the
+# program's own `lib/` — beside the entry file, and under the directory
+# `pdx` runs from — each once.
+def default_load_path(entry, directories)
+  mutable path = []
+  (directories + ["#{directory_of(entry)}/lib", "lib"]).each do |directory|
+    cleaned = canonical_path(directory)
+    path << cleaned unless path.include?(cleaned)
+  end
+  path
+end
+
+# The files `require name` may mean under one directory (ADR 0077 §2): the
+# name as written when it brought its extension, else `name.pdx` and
+# `name.rb` — both present refuses, never picks.
+def require_candidates(name, directory)
+  joined = "#{directory}/#{name}"
+  last_part = name.split("/").last or name
+  return [joined] if last_part.include?(".")
+  ["#{joined}.pdx", "#{joined}.rb"]
+end
+
+# The names `require` reads as core (ADR 0077 §4): a quiet no-op answering
+# false, as Ruby 4's `require "set"` is for a library already loaded.
+def core_require_name?(name) = %w[json set].include?(name)
+
 # Where `require_relative name` from `from` points: relative to the
 # requiring file's directory, `.pdx` assumed unless the last segment brought
 # its own extension — a dot in an earlier segment does not count, so

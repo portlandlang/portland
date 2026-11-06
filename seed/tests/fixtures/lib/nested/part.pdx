@@ -1,0 +1,5 @@
+# Found by `require "nested/part"` — a path under the load path.
+
+def nested_part
+  "a nested part"
+end
