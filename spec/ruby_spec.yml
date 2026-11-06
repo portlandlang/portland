@@ -3534,9 +3534,10 @@ language/predefined/:
   reason: "DATA, __END__, and TOPLEVEL_BINDING are the predefined globals and bindings, removed with the runtime dynamism."
   link: docs/ruby/removed-syntax.md
 language/private_spec.rb:
-  status: skipped
-  reason: "Visibility is decided (ADR 0076) and waits on its build; private is misread as a field until then."
-  link: https://github.com/portlandlang/portland/issues/189
+  pdx: [spec/visibility/sections_spec.pdx]
+  status: partial_intentional
+  reason: "The NoMethodError rows are build-time refusals here (ADR 0076), pinned by the two-oracle test; the methods reflection, class_eval, class-reopening, subclass, and class << self rows stay upstream."
+  link: docs/ruby/visibility.md
 language/proc_spec.rb:
   status: skipped
   reason: "proc refuses with its rewrite: a block is handed to a method and called with yield; the proc question (#77) holds the rest."

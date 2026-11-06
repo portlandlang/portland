@@ -162,6 +162,8 @@ def evaluate_statement(node, bindings)
   # a runtime can make needs them (ADR 0022, #45).
   in EnumDefNode then outcome([], register_enum(node, declare(qualify(home_of(bindings), node.name), bindings)))
   in ModuleDefNode then evaluate_module(node, bindings)
+  # Visibility is the checker's (ADR 0076 §7): nothing to do at runtime.
+  in PrivateConstantNode then outcome([], bindings)
   else
     evaluate_expression(node, bindings)
   end

@@ -414,7 +414,7 @@ Tier three — cancellation, timeouts, racing — is future work, rare by design
 
 ## Not yet designed
 
-Compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), error handling stopped being on this list on 2026-07-27 (ADR 0027), and visibility on 2026-11-03 (ADR 0076, decided and not built).
+Compile-time macros (#14), regex, the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), error handling stopped being on this list on 2026-07-27 (ADR 0027), and visibility on 2026-11-03 (ADR 0076, built 2026-11-06).
 
 ## Gone, on purpose, forever
 

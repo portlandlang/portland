@@ -1,6 +1,6 @@
 # 0076 — Visibility: `private`, `protected`, and `public` are Ruby's, checked at build time
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#133](https://github.com/portlandlang/portland/issues/133); not built — the build is [#189](https://github.com/portlandlang/portland/issues/189); the edges named below are expected to sharpen in the build)
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#133](https://github.com/portlandlang/portland/issues/133); built on both implementations 2026-11-06 under [#189](https://github.com/portlandlang/portland/issues/189) — the checker refuses where the receiver's type is known, and `private :name` after a def refuses naming the section form)
 - **Date:** 2026-11-03
 - **Issue:** [#133](https://github.com/portlandlang/portland/issues/133)
 

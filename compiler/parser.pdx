@@ -661,6 +661,11 @@ struct StructDefNode
   # `NAME = value` lines in the body (#145): the type's constants, each an
   # AssignmentNode, in the order written.
   constants
+  # The methods a visibility section or `private def` marked (ADR 0076),
+  # as [name, "private" | "protected"] pairs, and the constants
+  # `private_constant` hid — build-time facts the checker reads.
+  visibilities
+  private_constants
   line
 
   include Sexp
@@ -672,7 +677,31 @@ struct StructDefNode
     result << " #{sexp_list(methods)}" unless methods.empty?
     result << " #{sexp_list(type_functions)}" unless type_functions.empty?
     result << " #{sexp_list(nested)}" unless nested.empty?
+    result << " #{visibility_sexp(visibilities)}" unless visibilities.empty?
+    result << " (private_constant #{private_constants.join(" ")})" unless private_constants.empty?
     result + ")"
+  end
+end
+
+# `(private a b) (protected c)` — the marked methods by kind, each kind once.
+def visibility_sexp(visibilities)
+  mutable parts = []
+  %w[private protected].each do |kind|
+    names = visibilities.select { it[1] == kind }.map { it[0] }
+    parts << "(#{kind} #{names.join(" ")})" unless names.empty?
+  end
+  parts.join(" ")
+end
+
+# `private_constant :NAME` in a module body (ADR 0076): the names hidden
+# from outside the namespace — a build-time fact for the checker.
+struct PrivateConstantNode
+  kind
+  names
+  line
+
+  def sexp
+    "(private_constant #{names.join(" ")})"
   end
 end
 
@@ -705,12 +734,17 @@ struct TraitDefNode
   kind
   name
   methods
+  # The methods a visibility section marked (ADR 0076), carried into the
+  # struct that includes the trait.
+  visibilities
   line
 
   include Sexp
 
   def sexp
-    "(trait #{name} #{sexp_list(methods)})"
+    mutable result = "(trait #{name} #{sexp_list(methods)}"
+    result << " #{visibility_sexp(visibilities)}" unless visibilities.empty?
+    result + ")"
   end
 end
 
@@ -1101,12 +1135,16 @@ def self_node
   SelfNode.new(kind: "self")
 end
 
-def struct_def_node(name, fields, includes, methods, nested, type_functions, constants: [], line: nil)
-  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions, constants: constants, line: line)
+def struct_def_node(name, fields, includes, methods, nested, type_functions, constants: [], visibilities: [], private_constants: [], line: nil)
+  StructDefNode.new(kind: "struct_def", name: name, fields: fields, includes: includes, methods: methods, nested: nested, type_functions: type_functions, constants: constants, visibilities: visibilities, private_constants: private_constants, line: line)
 end
 
-def trait_def_node(name, methods, line: nil)
-  TraitDefNode.new(kind: "trait_def", name: name, methods: methods, line: line)
+def trait_def_node(name, methods, visibilities: [], line: nil)
+  TraitDefNode.new(kind: "trait_def", name: name, methods: methods, visibilities: visibilities, line: line)
+end
+
+def private_constant_node(names, line: nil)
+  PrivateConstantNode.new(kind: "private_constant", names: names, line: line)
 end
 
 def together_node(lines)
@@ -2221,6 +2259,10 @@ end
 
 def parse_statement(tokens, position)
   token = tokens[position]
+  # Ruby's visibility words outside a type body (ADR 0076) — the seed's
+  # reading: `private_constant` hides a module's constant for the checker;
+  # `module_function` and a bare section word have nothing to do here.
+  return parse_visibility_statement(tokens, position) if token.identifier? && visibility_word?(token.text)
   if token.keyword?
     case token.text
     when "return" then return parse_return(tokens, position + 1)
@@ -3217,6 +3259,12 @@ def parse_struct(tokens, mutable position)
   position = skip_newlines_at(tokens, position + 1)
   mutable fields = []
   mutable constants = []
+  # The visibility in force (ADR 0076): the open section, a one-method
+  # marker waiting for its def, each marked method, and the hidden constants.
+  mutable section = "public"
+  mutable pending = nil
+  mutable visibilities = []
+  mutable private_constants = []
   while position < tokens.length && tokens[position].identifier?
     # `KINDS = value` — the type's constant (#145), anywhere in the body.
     if type_constant_at?(tokens, position)
@@ -3242,13 +3290,24 @@ def parse_struct(tokens, mutable position)
       position = skip_newlines_at(tokens, skip_line_at(tokens, position))
       next
     end
-    # Ruby's visibility words would otherwise read as fields named
-    # `private` — a spelling quietly meaning something else (#132).
+    # Ruby's visibility (ADR 0076): a section word, `private def`, or
+    # `private_constant :NAME` — recorded for the checker, which refuses
+    # the calls that break them.
     if visibility_word?(tokens[position].text)
-      refusal = visibility_refusal(tokens[position].text) if refusal.nil?
-    else
-      fields << tokens[position].text
+      marker = parse_visibility_marker(tokens, position)
+      return marker if marker.node in ErrorNode
+      marker_kind = marker.node[0]
+      if marker_kind == "section"
+        section = marker.node[1]
+      elsif marker_kind == "one"
+        pending = marker.node[1]
+      else
+        private_constants += marker.node[1]
+      end
+      position = skip_newlines_at(tokens, marker.position)
+      next
     end
+    fields << tokens[position].text
     position = skip_newlines_at(tokens, position + 1)
   end
   # Methods after the fields (#27), includes (ADR 0028), and nested types —
@@ -3266,8 +3325,17 @@ def parse_struct(tokens, mutable position)
       constants << constant.node
       position = skip_newlines_at(tokens, constant.position)
     elsif tokens[position].identifier?
-      refusal = visibility_refusal(tokens[position].text) if refusal.nil?
-      position = skip_newlines_at(tokens, position + 1)
+      marker = parse_visibility_marker(tokens, position)
+      return marker if marker.node in ErrorNode
+      marker_kind = marker.node[0]
+      if marker_kind == "section"
+        section = marker.node[1]
+      elsif marker_kind == "one"
+        pending = marker.node[1]
+      else
+        private_constants += marker.node[1]
+      end
+      position = skip_newlines_at(tokens, marker.position)
     elsif keyword_at?(tokens, position, %w[alias])
       # `alias footprint area` (ADR 0039) — desugared right here: the body
       # is self-contained, so the alias clones the def it points at, and
@@ -3304,7 +3372,12 @@ def parse_struct(tokens, mutable position)
           return Step.new(node: error_node("#{method.node.name} is defined on #{name} instances and on the type — rename one"), position: method.position)
         end
         methods << method.node
+        # The def's visibility (ADR 0076): a one-method marker's, else its
+        # section's; type functions are public.
+        marked = pending.nil? ? section : pending
+        visibilities << [method.node.name, marked] if (method.node in DefNode) && marked != "public"
       end
+      pending = nil
       position = skip_newlines_at(tokens, method.position)
     else
       inner = if keyword_at?(tokens, position, %w[enum])
@@ -3321,7 +3394,7 @@ def parse_struct(tokens, mutable position)
   end
   if keyword_at?(tokens, position, %w[end])
     return Step.new(node: error_node(refusal), position: position + 1) unless refusal.nil?
-    definition = struct_def_node(name, fields, includes, methods, nested, type_functions, constants: constants, line: line)
+    definition = struct_def_node(name, fields, includes, methods, nested, type_functions, constants: constants, visibilities: visibilities, private_constants: private_constants, line: line)
     return Step.new(node: definition, position: position + 1) if prefix.empty?
     return Step.new(node: module_def_node(prefix, [definition]), position: position + 1)
   end
@@ -3341,6 +3414,53 @@ def parse_type_constant(tokens, position)
 end
 
 def visibility_word?(word) = %w[module_function private private_constant protected public].include?(word)
+
+# A visibility marker in a type body (ADR 0076): `private`, `protected`, or
+# `public` alone opens a section (["section", word]); before `def` it marks
+# that one method (["one", word]); `private_constant :A, :B` names hidden
+# constants (["constants", names]). The forms Portland does not take refuse
+# naming their rewrite — the seed's sentences: `module_function`, since a
+# module's def is already a module function, and `private :name`, which
+# marks a method after its def.
+def parse_visibility_marker(tokens, position)
+  word = tokens[position].text
+  after = position + 1
+  if word == "module_function"
+    return Step.new(node: error_node("'module_function' has no Portland meaning — a module's def is already a module function (ADR 0021); write def self.name for a type function"), position: skip_line_at(tokens, position))
+  end
+  if word == "private_constant"
+    mutable names = []
+    mutable cursor = after
+    while true
+      unless cursor < tokens.length && tokens[cursor].symbol?
+        return Step.new(node: error_node("private_constant takes constant names as symbols — private_constant :NAME"), position: skip_line_at(tokens, position))
+      end
+      names << symbol_name(tokens[cursor].text)
+      cursor += 1
+      break unless operator_at?(tokens, cursor, %w[,])
+      cursor += 1
+    end
+    return Step.new(node: ["constants", names], position: cursor)
+  end
+  if after < tokens.length && tokens[after].symbol?
+    name = symbol_name(tokens[after].text)
+    return Step.new(node: error_node("'#{word} :#{name}' marks a method after its def — write #{word} above the def, or #{word} def #{name}"), position: skip_line_at(tokens, position))
+  end
+  return Step.new(node: ["one", word], position: after) if keyword_at?(tokens, after, %w[def])
+  Step.new(node: ["section", word], position: after)
+end
+
+# A visibility word where a statement starts (ADR 0076).
+def parse_visibility_statement(tokens, position)
+  word = tokens[position].text
+  if word == "private_constant"
+    marker = parse_visibility_marker(tokens, position)
+    return marker if marker.node in ErrorNode
+    return Step.new(node: private_constant_node(marker.node[1], line: line_at(tokens, position)), position: marker.position)
+  end
+  return parse_visibility_marker(tokens, position) if word == "module_function"
+  Step.new(node: error_node("'#{word}' outside a type body has nothing to mark — a module's defs are module functions (ADR 0021), and a mixin is a trait, where #{word} marks its methods"), position: skip_line_at(tokens, position))
+end
 
 # The field names after `attr_reader` (ADR 0075): symbols, comma-separated,
 # at least one — a step whose node is the list of names, or an ErrorNode in
@@ -3362,8 +3482,6 @@ end
 # A token that, right after a name in a type body, makes the line a call
 # with a paren-less argument rather than a field (#135).
 def type_body_call_argument?(token) = token.symbol? || token.string? || token.identifier? || %w[integer float symbol_array word_array].include?(token.kind)
-
-def visibility_refusal(word) = "'#{word}' has no Portland meaning yet — visibility is undecided (#133); remove it to run"
 
 # One trait-body alias: same desugar, the trait's own wordings.
 def parse_trait_alias(tokens, position, trait_name, methods)
@@ -3463,7 +3581,26 @@ def parse_trait(tokens, mutable position)
   end
   position = skip_newlines_at(tokens, position + 1)
   mutable methods = []
-  while keyword_at?(tokens, position, %w[alias def])
+  # A trait's methods take visibility sections too (ADR 0076), carried
+  # into the struct that includes it.
+  mutable section = "public"
+  mutable pending = nil
+  mutable visibilities = []
+  while keyword_at?(tokens, position, %w[alias def]) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
+    if tokens[position].identifier?
+      if tokens[position].text == "private_constant"
+        return Step.new(node: error_node("a trait has methods only — private_constant belongs in the module or struct that owns the constant"), position: position + 1)
+      end
+      marker = parse_visibility_marker(tokens, position)
+      return marker if marker.node in ErrorNode
+      if marker.node[0] == "section"
+        section = marker.node[1]
+      else
+        pending = marker.node[1]
+      end
+      position = skip_newlines_at(tokens, marker.position)
+      next
+    end
     if keyword_at?(tokens, position, %w[alias])
       aliased = parse_trait_alias(tokens, position + 1, name, methods)
       return Step.new(node: aliased.node, position: aliased.position) if aliased.node in ErrorNode
@@ -3478,6 +3615,9 @@ def parse_trait(tokens, mutable position)
       return Step.new(node: error_node("a trait cannot define def self.#{method.node.name} — a type function lives on the struct that includes it"), position: method.position)
     end
     methods << method.node
+    marked = pending.nil? ? section : pending
+    visibilities << [method.node.name, marked] if (method.node in DefNode) && marked != "public"
+    pending = nil
     position = skip_newlines_at(tokens, method.position)
   end
   if position < tokens.length && tokens[position].identifier?
@@ -3487,7 +3627,7 @@ def parse_trait(tokens, mutable position)
     return Step.new(node: error_node("expected end to close trait #{name}"), position: position)
   end
   return Step.new(node: error_node("trait #{name} has no methods — a bundle needs behavior"), position: position + 1) if methods.empty?
-  Step.new(node: trait_def_node(name, methods, line: line), position: position + 1)
+  Step.new(node: trait_def_node(name, methods, visibilities: visibilities, line: line), position: position + 1)
 end
 
 # `Foo::Bar` in expression position (ADR 0021). `::` names, `.` invokes —

@@ -369,6 +369,23 @@ impl<'source> Parser<'source> {
     }
 
     fn statement(&mut self) -> Statement {
+        // Ruby's visibility words outside a type body (ADR 0076): a
+        // module's defs are already module functions, so `private` has
+        // nothing to mark and `module_function` nothing to do;
+        // `private_constant` hides a module's constant, a build-time fact
+        // the checker reads and the seed reads past.
+        if let Some(word) = self.visibility_marker_ahead() {
+            match word.as_str() {
+                "private_constant" => {
+                    self.visibility_marker(&word);
+                    return Statement::Expression(Expression::Nil);
+                }
+                "module_function" => self.visibility_marker(&word),
+                _ => panic!(
+                    "'{word}' outside a type body has nothing to mark — a module's defs are module functions (ADR 0021), and a mixin is a trait, where {word} marks its methods"
+                ),
+            }
+        }
         if let Some(names) = self.multiple_assignment_ahead() {
             panic!(
                 "'{names} = …' is a multiple assignment, which Portland does not have — match the value instead: 'value => [{names}]'"
@@ -1253,6 +1270,18 @@ impl<'source> Parser<'source> {
         let mut nested: Vec<Statement> = Vec::new();
         let mut type_functions: Vec<Statement> = Vec::new();
         while !self.peek_is_keyword("end") {
+            // Ruby's visibility (ADR 0076): `private`, `protected`, and
+            // `public` open sections, `private def` marks one method, and
+            // `private_constant :NAME` hides a constant — build-time facts
+            // the checker reads; the seed, with no checker, reads past them.
+            if let Some(word) = self.visibility_marker_ahead() {
+                self.visibility_marker(&word);
+                if !self.peek_is_keyword("def") {
+                    self.expect_statement_boundary();
+                    self.skip_newlines();
+                }
+                continue;
+            }
             // `KINDS = value` — the type's constant (#145), anywhere in the
             // body, as a module's is (ADR 0021, ADR 0053).
             if let Some(token) = self.tokens.get(self.position)
@@ -1463,17 +1492,6 @@ impl<'source> Parser<'source> {
                     token.text, following.text
                 );
             }
-            // Ruby's visibility words would otherwise read as fields named
-            // `private` — a spelling quietly meaning something else (#132).
-            if matches!(
-                token.text,
-                "module_function" | "private" | "private_constant" | "protected" | "public"
-            ) {
-                panic!(
-                    "'{}' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
-                    token.text
-                );
-            }
             if !methods.is_empty() || !type_functions.is_empty() {
                 panic!("fields come before methods in struct {name}");
             }
@@ -1555,6 +1573,51 @@ impl<'source> Parser<'source> {
 
     /// `trait Name ... end` — methods only (ADR 0028): no fields, no state,
     /// no nesting; a bundle of behavior for structs to include.
+    /// The visibility word at the cursor (ADR 0076), if one starts a line.
+    fn visibility_marker_ahead(&self) -> Option<String> {
+        let token = self.tokens.get(self.position)?;
+        (token.kind == TokenKind::Identifier
+            && matches!(
+                token.text,
+                "module_function" | "private" | "private_constant" | "protected" | "public"
+            ))
+        .then(|| token.text.to_string())
+    }
+
+    /// Read past a visibility marker (ADR 0076): a bare section word, or
+    /// one before `def`; `private_constant`'s symbols. The forms Portland
+    /// does not take refuse naming their rewrite: `module_function`, since
+    /// a module's def is already a module function, and `private :name`,
+    /// which marks a method after its def.
+    fn visibility_marker(&mut self, word: &str) {
+        self.position += 1; // the word
+        match word {
+            "module_function" => panic!(
+                "'module_function' has no Portland meaning — a module's def is already a module function (ADR 0021); write def self.name for a type function"
+            ),
+            "private_constant" => loop {
+                let token = self.advance();
+                if token.kind != TokenKind::Symbol {
+                    panic!(
+                        "private_constant takes constant names as symbols — private_constant :NAME"
+                    );
+                }
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
+            },
+            _ => {
+                if self.peek_kind() == Some(TokenKind::Symbol) {
+                    let name = self.advance().text.trim_start_matches(':').to_string();
+                    panic!(
+                        "'{word} :{name}' marks a method after its def — write {word} above the def, or {word} def {name}"
+                    );
+                }
+            }
+        }
+    }
+
     fn trait_definition(&mut self) -> Statement {
         self.position += 1; // the `trait`
         let token = self.advance();
@@ -1574,6 +1637,21 @@ impl<'source> Parser<'source> {
         while !self.peek_is_keyword("end") {
             if self.position >= self.tokens.len() {
                 panic!("expected end to close trait {name}");
+            }
+            // A trait's methods take visibility sections too (ADR 0076),
+            // carried into the struct that includes it.
+            if let Some(word) = self.visibility_marker_ahead() {
+                if word == "private_constant" {
+                    panic!(
+                        "a trait has methods only — private_constant belongs in the module or struct that owns the constant"
+                    );
+                }
+                self.visibility_marker(&word);
+                if !self.peek_is_keyword("def") {
+                    self.expect_statement_boundary();
+                    self.skip_newlines();
+                }
+                continue;
             }
             if self.peek_is_keyword("def") {
                 let (method, type_function) = self.method_definition();

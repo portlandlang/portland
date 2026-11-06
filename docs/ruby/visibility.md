@@ -2,7 +2,7 @@
 
 **Summary:** `private`, `protected`, and `public` mean what Ruby's mean, and a call that breaks them refuses at build time instead of raising at the call; `module_function` refuses naming `def self.`.
 
-**Status:** decided ([ADR 0076](../adr/0076-2026-11-03-visibility-checked-at-build-time.md), 2026-11-03, out of [#133](https://github.com/portlandlang/portland/issues/133)); not built — the build is [#189](https://github.com/portlandlang/portland/issues/189). Until it lands, `private` in a type body is misread as a field named `private`.
+**Status:** decided ([ADR 0076](../adr/0076-2026-11-03-visibility-checked-at-build-time.md), 2026-11-03, out of [#133](https://github.com/portlandlang/portland/issues/133)); **built** on both implementations 2026-11-06 under [#189](https://github.com/portlandlang/portland/issues/189). The checker refuses where the receiver's type is known — a local bound to a `Box`, a `Box.new(...)` — which is where a static check can reach; a receiver whose type it cannot see passes, as any other method check does.
 
 ## Ruby
 
@@ -11,8 +11,6 @@
 ## Portland
 
 The same words, the same sections, the same rule about receivers:
-
-<!-- not-portland: decided, not built (ADR 0076); private still refuses as undecided -->
 
 ```ruby
 struct Box
@@ -34,7 +32,7 @@ Box.new(contents: 1).reveal    # refuses to build: 'reveal' is private to Box
 - **`public`** — ends a section; everything before any visibility word is public.
 - **`private_constant :NAME`** — a module's or struct's constant unreadable from outside its namespace.
 - **Type functions (`def self.`) are public.** `private_class_method` waits for a pull.
-- **`module_function` refuses**, naming `def self.`: a module's `def` is already a module function ([namespaces.md](namespaces.md)).
+- **`module_function` refuses**, naming `def self.`: a module's `def` is already a module function ([namespaces.md](namespaces.md)). So does a bare `private` in a module body, which has no instance methods to mark — a mixin is a trait, where `private` marks its methods — and `private :name`, which marks a method after its def: write `private` above the def, or `private def name`.
 
 The difference is *when*. Which methods a section marks and who the receiver is are static facts, so the refusal is the build's, in [the error voice](../adr/0047-2026-09-22-the-error-voice.md), and no program ever reaches a `NoMethodError` for visibility. The seed, which has no checker, accepts every call; the compiler refuses ([static-checks.md](static-checks.md)).
 

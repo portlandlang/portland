@@ -2697,6 +2697,98 @@ fn pattern_gaps_on_both_oracles() {
     );
 }
 
+/// A refusal that is the checker's alone (ADR 0076 §7): the seed, with no
+/// checker, runs the program; `check.pdx` refuses it with the sentence.
+fn assert_checker_refuses(name: &str, source: &str, expected: &str) {
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    let direct = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        direct.status.success(),
+        "{name}: the seed should run {source:?}, got: {}",
+        String::from_utf8_lossy(&direct.stderr)
+    );
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !checked.status.success(),
+        "{name}: the checker should refuse {source:?}"
+    );
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&checked.stdout),
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    assert!(
+        said.contains(expected),
+        "{name}: the checker should say {expected:?}, got: {said}"
+    );
+}
+
+/// Visibility on both oracles (ADR 0076, #189): `private`, `protected`,
+/// and `public` sections, `private def`, a trait's sections carried into
+/// its struct, and `private_constant` all run the same; the calls that
+/// break them are the checker's refusals — the seed accepts every call.
+#[test]
+fn visibility_on_both_oracles() {
+    assert_both_print(
+        "visibility.pdx",
+        "struct Box\n  contents\n\n  def open = reveal\n  def peek = self.reveal\n  def same?(other) = secret_code == other.secret_code\n\n  private\n\n  def reveal = contents\n\n  protected\n\n  def secret_code = contents * 7\n\n  public\n\n  def label = \"box\"\n\n  private def quiet = \"shh\"\n\n  def loud = quiet.upcase\nend\n\
+         trait Greeting\n  def greet = \"hi #{salute}\"\n\n  private\n\n  def salute = \"friend\"\nend\n\
+         struct Host\n  include Greeting\nend\n\
+         module Config\n  LIMIT = 3\n  private_constant :LIMIT\n\n  def limit = LIMIT\nend\n\
+         box = Box.new(contents: 1)\np box.open\np box.peek\np box.same?(Box.new(contents: 1))\np box.label\np box.loud\np Host.new.greet\np Config.limit\n",
+        "1\n1\ntrue\n\"box\"\n\"SHH\"\n\"hi friend\"\n3\n",
+    );
+    assert_checker_refuses(
+        "visibility_private.pdx",
+        "struct Box\n  contents\n\n  private\n\n  def reveal = contents\nend\nbox = Box.new(contents: 1)\np box.reveal\n",
+        "'reveal' is private to Box",
+    );
+    assert_checker_refuses(
+        "visibility_private_def.pdx",
+        "struct Box\n  contents\n\n  private def quiet = 1\nend\np Box.new(contents: 1).quiet\n",
+        "'quiet' is private to Box",
+    );
+    assert_checker_refuses(
+        "visibility_protected.pdx",
+        "struct Box\n  contents\n\n  protected\n\n  def code = contents\nend\np Box.new(contents: 1).code\n",
+        "'code' is protected — only Box's own methods may call it on another Box",
+    );
+    assert_checker_refuses(
+        "visibility_constant.pdx",
+        "module Config\n  LIMIT = 3\n  private_constant :LIMIT\nend\np Config::LIMIT\n",
+        "'LIMIT' is private to Config",
+    );
+    assert_both_oracles_refuse(
+        "visibility_refusal.pdx",
+        None,
+        &[
+            (
+                "module M\n  module_function\n  def go = 1\nend\n",
+                "'module_function' has no Portland meaning — a module's def is already a module function (ADR 0021); write def self.name for a type function",
+            ),
+            (
+                "struct Box\n  contents\n  def foo = 1\n  private :foo\nend\n",
+                "'private :foo' marks a method after its def — write private above the def, or private def foo",
+            ),
+            (
+                "module M\n  private\n  def go = 1\nend\n",
+                "'private' outside a type body has nothing to mark — a module's defs are module functions (ADR 0021), and a mixin is a trait, where private marks its methods",
+            ),
+        ],
+    );
+}
+
 /// A range's ends are any two values `<=>` orders on both oracles (ADR
 /// 0081, #194): membership, the extremes, equality, inspect, clamp, `when`,
 /// and `in` by `<=>`; a float range's `rand` draw is CRuby's; `bsearch`
@@ -3916,28 +4008,6 @@ fn non_ascii_outside_a_string_refuses_on_both_oracles() {
         "'é' is outside a string or comment, where Portland reads only ASCII",
     )];
     assert_both_oracles_refuse("non_ascii_refusal.pdx", None, &cases);
-}
-
-/// Ruby's visibility words in a type body refuse until #133 decides them,
-/// rather than reading as fields named `private` (#132) — before the
-/// methods, after them, and on a `def`'s own line.
-#[test]
-fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
-    let cases = [
-        (
-            "class Box\n  size\n  private\n  def secret = 1\nend\n",
-            "'private' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
-        ),
-        (
-            "struct Box\n  size\n  def open = 1\n  protected\n  def secret = 1\nend\n",
-            "'protected' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
-        ),
-        (
-            "class Box\n  size\n  def open = 1\n  private def secret = 1\nend\n",
-            "'private' has no Portland meaning yet — visibility is undecided (#133); remove it to run",
-        ),
-    ];
-    assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
 /// A symbol answers Ruby's text queries about its name (#112), as Ruby 4.0.9

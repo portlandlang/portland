@@ -64,12 +64,19 @@ struct Scope
   enums
   file
   globals
+  # The namespace being checked, qualified (`Shop::Config`), and the struct
+  # whose methods are being checked, or nil — what a private constant and
+  # a protected method are read against (ADR 0076).
+  home
+  inside
   judging
   locals
+  private_constants
   shapes
   sharpened
   source
   traits
+  visibilities
 end
 
 # One file of a resolved closure (#94): what to check it with.
@@ -90,8 +97,12 @@ struct Declarations
   contracts
   enums
   globals
+  # The constants `private_constant` hid, qualified, and each struct's
+  # private and protected methods (ADR 0076).
+  private_constants
   shapes
   traits
+  visibilities
 end
 
 # Every enum declaration in the program, as [name, labels] pairs — all of
@@ -136,7 +147,7 @@ def check_program_with(nodes, source, file, imports, sharpened)
   # A bare name is judged (#98) only where every name the file can see is
   # in view: a require the walk could not resolve may declare anything.
   judging = nodes.none? { computed_require?(it) }
-  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, judging: judging, locals: [], shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits)
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: [], private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
   found = check_annotations(nodes, source, scope, [])
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
   in_source_order(check_body(nodes, scope, walked.last))
@@ -251,13 +262,13 @@ def computed_require?(node)
 end
 
 def declarations_of(nodes)
-  Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes))
+  Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
 end
 
-def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], shapes: [], traits: [])
+def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
 
 def merge_declarations(first, second)
-  Declarations.new(arities: first.arities + second.arities, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, shapes: first.shapes + second.shapes, traits: first.traits + second.traits)
+  Declarations.new(arities: first.arities + second.arities, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
 end
 
 # Where a refusal points (#89): the node's line and that line of the
@@ -629,15 +640,21 @@ def check_node(node, scope, mutable found)
   in StructDefNode(methods:, nested:, type_functions:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs", scope, found)
     found = check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs", scope, found)
-    found = check_methods(methods, scope, found)
-    found = check_methods(type_functions, scope, found)
-    check_body(nested, scope, found)
+    # Inside the type's own methods (ADR 0076): protected calls on another
+    # value of the type pass, and its private constants are in reach.
+    within = scope.with(home: qualified_under(scope.home, node.name), inside: node.name)
+    found = check_methods(methods, within, found)
+    found = check_methods(type_functions, within, found)
+    check_body(nested, within, found)
   in TraitDefNode(methods:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it", scope, found)
     check_methods(methods, scope, found)
   # A module's bare names may reach its own defs by lexical scope (ADR
   # 0021), which the globals do not hold — so names are not judged inside.
-  in ModuleDefNode(body:) then check_body(body, scope.with(judging: false), found)
+  in ModuleDefNode(body:) then check_body(body, scope.with(home: qualified_under(scope.home, node.path.join("::")), judging: false), found)
+  # A private constant (ADR 0076) is readable only inside its namespace.
+  in PathNode then check_path(node, scope, found)
+  in PrivateConstantNode then found
   in WhileNode(condition:, body:)
     found = check_node(condition, scope, found)
     found = check_condition("while", node, scope, found)
@@ -855,6 +872,7 @@ def check_method_call(node, scope, mutable found)
   receiver = synthesize(node.receiver, known_types(scope))
   found = check_maybe_method(node, receiver, scope, found) if node in MethodCallNode
   found = check_struct_method(node, receiver, scope, found) if node in MethodCallNode
+  found = check_visibility(node, receiver, scope, found) if node in MethodCallNode
   found = check_builtin_method(node, receiver, scope, found) if node in MethodCallNode
   check_block(node, receiver, scope, found)
 end
@@ -1328,6 +1346,79 @@ def check_struct_method(node, receiver, scope, found)
   spelling = spell_node(node.receiver)
   return found if spelling.nil?
   noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
+end
+
+# Visibility (ADR 0076): a private method is callable only without a
+# receiver or through `self.`; a protected one also on another value of
+# the type from inside the type's own methods. Which methods a section
+# marked and what type the receiver is are static facts, so the refusal is
+# the build's — where Ruby raises NoMethodError at the call.
+def check_visibility(node, receiver, scope, found)
+  return found unless receiver in ["struct", *]
+  return found if node.receiver in SelfNode
+  type_name = type_at(receiver, 1)
+  marked = scope.visibilities.find { it[0] == type_name }
+  return found if marked.nil?
+  entry = value_at_checked(marked, 1).find { it[0] == node.name }
+  return found if entry.nil?
+  kind = value_at_checked(entry, 1)
+  return found if kind == "protected" && scope.inside == type_name
+  return noted(found, ["sentence", "'#{node.name}' is private to #{type_name}"], locate(node, scope)) if kind == "private"
+  noted(found, ["sentence", "'#{node.name}' is protected — only #{type_name}'s own methods may call it on another #{type_name}"], locate(node, scope))
+end
+
+# A constant `private_constant` hid (ADR 0076) is readable by its bare name
+# inside its namespace, and by its path from inside too; a path from
+# outside refuses at build time, where Ruby raises NameError.
+def check_path(node, scope, found)
+  written = node.parts.join("::")
+  # A path is read from where it stands: as written, or under any
+  # enclosing namespace (ADR 0021), outermost last.
+  mutable candidates = [written]
+  mutable home = scope.home
+  until home.empty?
+    candidates << "#{home}::#{written}"
+    home = home.include?("::") ? home.slice(0, home.rindex("::")) : ""
+  end
+  hidden = candidates.find { scope.private_constants.include?(it) }
+  return found if hidden.nil?
+  owner = hidden.slice(0, hidden.rindex("::"))
+  return found if scope.home == owner || scope.home.start_with?(owner + "::")
+  noted(found, ["sentence", "'#{node.parts.last}' is private to #{owner}"], locate(node, scope))
+end
+
+# Each struct's private and protected methods (ADR 0076), its own and its
+# traits', as [name, [[method, kind], ...]] — read by check_visibility.
+def declared_visibilities(nodes)
+  traits = trait_declarations_in(nodes)
+  mutable table = []
+  struct_declarations_in(nodes).each do |declaration|
+    mutable marked = declaration.visibilities
+    declaration.includes.each do |trait_name|
+      matching = traits.select { it.name == trait_name }
+      marked += matching.first.visibilities if matching.length == 1
+    end
+    table << [declaration.name, marked] unless marked.empty?
+  end
+  table
+end
+
+# The constants `private_constant` hid, qualified under their namespace: a
+# module's, a struct's, and those of the types nested in either.
+def declared_private_constants(nodes, home)
+  mutable names = []
+  nodes.each do |node|
+    if node in ModuleDefNode
+      names += declared_private_constants(node.body, qualified_under(home, node.path.join("::")))
+    elsif node in StructDefNode
+      inner = qualified_under(home, node.name)
+      names += node.private_constants.map { qualified_under(inner, it) }
+      names += declared_private_constants(node.nested, inner)
+    elsif node in PrivateConstantNode
+      names += node.names.map { qualified_under(home, it) }
+    end
+  end
+  names
 end
 
 # Shape 4 — an operator on operands it cannot take. The legal pairs are
