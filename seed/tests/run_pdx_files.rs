@@ -5473,3 +5473,38 @@ p(assigns { 4 })
         )],
     );
 }
+
+/// `<<` runs its right side first on both oracles, so a call there whose
+/// block rebinds the very name being appended to — the accumulator pattern
+/// (ADR 0001) — appends to what the block left, not to a stale read.
+#[test]
+fn append_reads_its_name_after_the_right_side_on_both_oracles() {
+    assert_both_print(
+        "append_after_a_rebinding_block",
+        r#"
+def yielding(given)
+  yield
+  :after
+end
+
+def with_argument
+  mutable notes = [:a]
+  notes << yielding(notes) { notes << :b }
+  notes
+end
+
+def broken
+  mutable notes = [:a]
+  notes << yielding(notes) {
+    notes << :b
+    break
+  }
+  notes
+end
+
+p(with_argument)
+p(broken)
+"#,
+        "[:a, :b, :after]\n[:a, :b, nil]\n",
+    );
+}
