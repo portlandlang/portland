@@ -18,13 +18,13 @@ require_relative "helpers"    # ./helpers.pdx beside this file
 - **The load path** is the program's own `lib/`, then each dependency's `lib/`, then the default tiles' ([standard-library.md](standard-library.md)); `pdx -I dir` adds a directory at the front. How a dependency's `lib/` joins the path is the tile manifest's ([#174](https://github.com/portlandlang/portland/issues/174)); until it exists the path is `lib/` and `-I`.
 - **`.pdx` or `.rb`.** A name without an extension finds either; both present refuses and names both, never picks. A `.rb` file is parsed as Portland — the extension is Ruby's, the grammar is this one's — which is what lets a gem's `lib/` load without renaming.
 - **A string literal, at the top level.** The build walks every `require` to see the whole program ([ADR 0049](../adr/0049-2026-09-24-the-whole-program-door.md)), so a computed name or a `require` inside a method, block, or conditional refuses with the rewrite named: move it to the top of the file. This is the one divergence, and it is the closed runtime's, not taste.
-- **A core name refuses by name.** `require "json"`, `require "set"`: these are core here and need no line; the refusal says which line to delete. A default tile's name resolves on the path like any other.
+- **A core name is a quiet no-op.** `require "json"`, `require "set"`: these are core here and need no line, so the line does nothing and answers `false`, as Ruby 4's `require "set"` does for a library already loaded — a file that runs under both Ruby and Portland keeps running. The linter may flag the line as removable. A default tile's name resolves on the path like any other once the tiles ship; until then it is a missing file and refuses, so `require "base64"` stays loud.
 - **A missing file refuses** in [the error voice](../adr/0047-2026-09-22-the-error-voice.md): `cannot load 'foo/bar' — not found on the load path (lib/, …)`.
 - **Each file loads once**; `require` answers true the first time and false after, as Ruby's does. Declarations cross; locals do not.
 
 ## Migration
 
 - A gem's `require "gem_name/part"` lines at the top of each file port verbatim once the gem's `lib/` is on the path. _Free._
-- `require "json"` and other core names: delete the line. _Mechanical._
+- `require "json"` and other core names: port verbatim, a no-op answering `false`; the linter can offer to delete the line. _Free._
 - `require` inside a method or a `rescue LoadError` probe: move to the top of the file, or drop the probe — a build either has the file or refuses. _Rewrite, loud._
 - `$LOAD_PATH.unshift` and `$:` are globals, gone ([removed-syntax.md](removed-syntax.md)); `-I` is the spelling.
