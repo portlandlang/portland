@@ -1367,6 +1367,8 @@ end
 def symbol_text_answer(text, name, arguments)
   case name
   when "name", "id2name" then text
+  # A symbol's text is UTF-8 like every string's (ADR 0069).
+  when "encoding" then "UTF-8"
   when "length", "size" then text.length
   when "empty?" then text.empty?
   when "slice" then text.slice(value_at(arguments, 0), value_at(arguments, 1))
@@ -3180,7 +3182,7 @@ def evaluate_method_call(node, mutable bindings)
   end
   # A symbol answers Ruby's text queries about its name (#112), the seed's
   # arm: a guest symbol is a tagged host array, so its name answers instead.
-  if (receiver in ["__symbol__", *]) && %w[empty? end_with? id2name length name size slice start_with?].include?(node.name)
+  if (receiver in ["__symbol__", *]) && %w[empty? encoding end_with? id2name length name size slice start_with?].include?(node.name)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([symbol_text_answer(value_at(receiver, 1), node.name, arguments)], bindings)
   end

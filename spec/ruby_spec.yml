@@ -3192,6 +3192,11 @@ core/struct/values_spec.rb:
 # A symbol answers questions about its name, and a symbol may be made from
 # text (ADR 0071): to_sym and intern answer, and symbols are not ordered.
 
+core/symbol/encoding_spec.rb:
+  pdx: [spec/symbol/text_spec.pdx]
+  status: partial_intentional
+  reason: "A symbol's text is UTF-8 like every string's (ADR 0069): encoding answers UTF-8 where upstream expects US-ASCII of an ASCII name, and a non-ASCII name does not lex (#139)."
+  link: docs/ruby/encodings.md
 core/symbol/inspect_spec.rb:
   pdx: [spec/symbol/spellings_spec.pdx]
   status: partial_intentional
@@ -3244,6 +3249,10 @@ core/symbol/length_spec.rb:
   status: partial_intentional
   reason: "Byte-escaped names (a NUL, raw UTF-8 bytes) don't lex: a double-quoted string takes only its six escapes."
   link: docs/ruby/string-escapes.md
+core/symbol/match_spec.rb:
+  status: skipped
+  reason: "=~, match, and match? take a regex, which waits on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
 core/symbol/name_spec.rb:
   pdx: [spec/symbol/text_spec.pdx]
   status: partial_intentional

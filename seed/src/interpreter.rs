@@ -5128,6 +5128,10 @@ impl<W: std::io::Write> Interpreter<W> {
             if matches!(name, "to_sym" | "intern") && arguments.is_empty() {
                 return Some(receiver.clone());
             }
+            // A symbol's text is UTF-8 like every string's (ADR 0069).
+            if name == "encoding" && arguments.is_empty() {
+                return Some(Value::String("UTF-8".to_string()));
+            }
             // The case changers and `succ` answer a symbol of the changed
             // name, as Ruby's do — the string's answer, made a symbol again.
             if matches!(

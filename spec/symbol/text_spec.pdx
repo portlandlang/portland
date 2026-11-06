@@ -1,9 +1,11 @@
 # A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
-# start_with?, end_with?, name, id2name, to_s, ==, and ===. A symbol answers
-# questions about its name here, as in Ruby; making one from text is
-# from_text_spec's (ADR 0071). Upstream's alias checks compare method
-# objects, which a closed runtime has none of; they ask the same question
-# of the two answers instead.
+# start_with?, end_with?, name, id2name, to_s, encoding, ==, and ===. A
+# symbol answers questions about its name here, as in Ruby; making one from
+# text is from_text_spec's (ADR 0071). Upstream's alias checks compare
+# method objects, which a closed runtime has none of; they ask the same
+# question of the two answers instead. A symbol's text is UTF-8 like every
+# string's (ADR 0069), so the US-ASCII answers upstream expects of an ASCII
+# name are UTF-8 here, and a non-ASCII name does not lex (#139).
 
 require_relative "../spec_helper"
 
@@ -157,5 +159,15 @@ context "Symbol#slice" do
   specify "is an alias of Symbol#[]" do
     expect(:symbol.slice(1, 3)).to eq("ymb")
     expect(:symbol.slice(1, 1)).to eq(:symbol[1])
+  end
+end
+
+context "Symbol#encoding for ASCII symbols" do
+  specify "is UTF-8" do
+    expect(:foo.encoding).to eq("UTF-8")
+  end
+
+  specify "is UTF-8 after converting to string" do
+    expect(:foo.to_s.encoding).to eq("UTF-8")
   end
 end

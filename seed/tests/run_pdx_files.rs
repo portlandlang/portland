@@ -5508,3 +5508,13 @@ p(broken)
         "[:a, :b, :after]\n[:a, :b, nil]\n",
     );
 }
+
+/// A symbol's text is UTF-8 like every string's (ADR 0069, #112).
+#[test]
+fn symbol_encoding_on_both_oracles() {
+    assert_both_print(
+        "symbol_encoding",
+        "p(:foo.encoding)\np(:foo.to_s.encoding)\np(:\"\".encoding)\n",
+        "\"UTF-8\"\n\"UTF-8\"\n\"UTF-8\"\n",
+    );
+}
