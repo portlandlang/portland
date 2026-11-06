@@ -6,7 +6,8 @@
 # From ruby/spec core/rational/{rational,abs,magnitude,ceil,floor,round,
 # truncate,comparison,denominator,numerator,div,divide,divmod,modulo,
 # remainder,quo,fdiv,minus,multiply,plus,exponent,equal_value,inspect,to_s,
-# to_f,to_i,to_r,rationalize,integer,zero}_spec.rb. Upstream: the bignum
+# to_f,to_i,to_r,rationalize,integer,zero}_spec.rb and core/kernel/
+# Rational_spec.rb. Upstream: the bignum
 # rows (ADR 0070), the coercion and mock rows (#155), the string and nil
 # constructor rows, the digits and half-mode rows of the rounders, hash,
 # and Marshal.
@@ -158,6 +159,55 @@ context "Rational" do
       else "other"
       end
       expect(answer).to eq("rational")
+    end
+  end
+end
+
+context "Kernel#Rational" do
+  describe "passed Integer" do
+    specify "returns a new Rational number with 1 as the denominator" do
+      expect(Rational(1).eql?(Rational(1, 1))).to be_true
+      expect(Rational(-3).eql?(Rational(-3, 1))).to be_true
+    end
+  end
+
+  describe "passed two integers" do
+    specify "returns a new Rational number" do
+      half = Rational(1, 2)
+      expect(half.numerator).to eq(1)
+      expect(half.denominator).to eq(2)
+      expect(half.class).to eq(Rational)
+      three_fifths = Rational(-3, -5)
+      expect(three_fifths.numerator).to eq(3)
+      expect(three_fifths.denominator).to eq(5)
+      expect(three_fifths.class).to eq(Rational)
+    end
+
+    specify "reduces the Rational" do
+      half = Rational(2, 4)
+      expect(half.numerator).to eq(1)
+      expect(half.denominator).to eq(2)
+      third = Rational(3, 9)
+      expect(third.numerator).to eq(1)
+      expect(third.denominator).to eq(3)
+    end
+  end
+
+  describe "when passed a Complex" do
+    describe "[Complex]" do
+      specify "returns a Rational from the real part if the imaginary part is 0" do
+        expect(Rational(Complex(1, 0))).to eq(Rational(1))
+      end
+    end
+
+    describe "[Numeric, Complex]" do
+      specify "uses the real part if the imaginary part is 0" do
+        expect(Rational(1, Complex(2, 0))).to eq(Rational(1, 2))
+      end
+
+      specify "divides a numerator by the Complex denominator if the imaginary part is not 0" do
+        expect(Rational(1, Complex(2, 1))).to eq(Complex(2 / 5r, -1 / 5r))
+      end
     end
   end
 end

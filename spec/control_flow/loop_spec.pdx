@@ -56,3 +56,17 @@ context "The loop expression" do
     expect(seen).to eq([1, 2, 4])
   end
 end
+
+# From ruby/spec core/kernel/loop_spec.rb: the one row a keyword form can
+# carry. Upstream: break's value (ADR 0012), the enumerator and
+# StopIteration rows, and the privacy rows.
+context "Kernel#loop" do
+  specify "calls block until it is terminated by a break" do
+    mutable index = 0
+    loop do
+      index += 1
+      break if index == 10
+    end
+    expect(index).to eq(10)
+  end
+end

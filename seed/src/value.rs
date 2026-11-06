@@ -189,6 +189,28 @@ impl PartialEq for Value {
             (Value::Set(left), Value::Set(right)) => {
                 left.len() == right.len() && left.iter().all(|member| right.contains(member))
             }
+            // A rational is its two integers; a complex its two parts, each
+            // matched by `eql?` — `Complex(1, 2)` is not `Complex(1.0, 2)`.
+            (
+                Value::Rational {
+                    denominator: left_denominator,
+                    numerator: left_numerator,
+                },
+                Value::Rational {
+                    denominator: right_denominator,
+                    numerator: right_numerator,
+                },
+            ) => left_denominator == right_denominator && left_numerator == right_numerator,
+            (
+                Value::Complex {
+                    imaginary: left_imaginary,
+                    real: left_real,
+                },
+                Value::Complex {
+                    imaginary: right_imaginary,
+                    real: right_real,
+                },
+            ) => left_imaginary == right_imaginary && left_real == right_real,
             _ => false,
         }
     }

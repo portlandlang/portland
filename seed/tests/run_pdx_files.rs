@@ -5569,3 +5569,33 @@ fn output_wrappers_on_both_oracles() {
         ],
     );
 }
+
+/// `Rational` and `Complex` read a complex argument as Ruby's do (#185): an
+/// exact-zero imaginary part is the real part, two complexes are
+/// `a + b * i`, and `Rational(1, 2+1i)` is the quotient itself; `eql?` on a
+/// rational or a complex matches their parts; a non-number refuses with its
+/// guest rendering on both oracles.
+#[test]
+fn tower_constructors_with_complex_arguments_on_both_oracles() {
+    assert_both_print(
+        "tower_constructors_complex",
+        "p(Rational(Complex(1, 0)))\np(Rational(1, Complex(2, 0)))\np(Rational(1, Complex(2, 1)))\np(Complex(Complex(3, 4), Complex(5, 6)))\np(Complex(Complex(1.5, 2), Complex(-5, 6.3)))\np(Complex(Complex(1, 2)))\np(Complex(1, Complex(2, 3)))\np(Rational(1).eql?(Rational(1, 1)))\np(Complex(1, 2).eql?(Complex(1, 2)))\np(Complex(1, 2).eql?(Complex(1.0, 2)))\n",
+        "(1/1)\n(1/2)\n((2/5)-(1/5)*i)\n(-3+9i)\n(-4.8-3.0i)\n(1+2i)\n(-2+2i)\ntrue\ntrue\nfalse\n",
+    );
+    assert_both_oracles_refuse(
+        "tower_constructor_refusals",
+        None,
+        &[
+            (
+                "p(Rational(Complex(1, 2)))\n",
+                "can't convert 1+2i into Rational",
+            ),
+            ("p(Rational(:sym))\n", "Rational takes numbers, got :sym"),
+            ("p(Complex(0, :sym))\n", "Complex takes numbers, got :sym"),
+            (
+                "p(Complex(\"79+4i\"))\n",
+                "Complex takes numbers, got \"79+4i\"",
+            ),
+        ],
+    );
+}

@@ -999,29 +999,69 @@ pub fn negate(value: &Value) -> Option<Value> {
 /// `Rational(a)` and `Rational(a, b)`: each part any real, the quotient
 /// reduced; `Rational(1, 0)` refuses as `1 / 0` does.
 pub fn rational_function(arguments: &[Value]) -> Value {
+    // A complex argument stands for its real part when its imaginary part is
+    // an exact zero, as Ruby reads it; `Rational(1, 2+1i)` is Ruby's one
+    // odd corner, the quotient itself, a complex.
+    let real_or_complex = |value: &Value| -> Value {
+        match value {
+            Value::Complex { imaginary, .. } if exact_zero(imaginary) => {
+                real_of_complex(value, "Rational")
+            }
+            other => other.clone(),
+        }
+    };
     match arguments {
-        [value] => to_rational(value, "Rational"),
+        [value] => to_rational(&real_of_complex_or_self(value), "Rational"),
         [numerator, denominator] => {
-            let numerator = to_rational(numerator, "Rational");
-            let denominator = to_rational(denominator, "Rational");
+            let numerator = to_rational(&real_of_complex_or_self(numerator), "Rational");
+            let denominator = real_or_complex(denominator);
+            if matches!(denominator, Value::Complex { .. }) {
+                return binary(&numerator, BinaryOperator::Divide, &denominator)
+                    .unwrap_or_else(|| panic!("Rational takes numbers, got {denominator:?}"));
+            }
+            let denominator = to_rational(&denominator, "Rational");
             real_quo(&numerator, &denominator)
         }
         _ => panic!("Rational takes 1 or 2 arguments, got {}", arguments.len()),
     }
 }
 
+/// A complex with an exact-zero imaginary part is its real part to
+/// `Rational`; any other complex refuses in Ruby's words; a real is itself.
+fn real_of_complex_or_self(value: &Value) -> Value {
+    match value {
+        Value::Complex { .. } => real_of_complex(value, "Rational"),
+        other => other.clone(),
+    }
+}
+
 /// `Complex(a)` and `Complex(a, b)`: two real parts.
 pub fn complex_function(arguments: &[Value]) -> Value {
-    let real_part = |value: &Value| -> Value {
-        if is_real(value) {
+    let part = |value: &Value| -> Value {
+        if is_real(value) || matches!(value, Value::Complex { .. }) {
             value.clone()
         } else {
             panic!("Complex takes numbers, got {}", value.inspect())
         }
     };
     match arguments {
-        [value] => complex(real_part(value), Value::Integer(0)),
-        [real, imaginary] => complex(real_part(real), real_part(imaginary)),
+        // A complex argument is itself; two of them are `a + b * i`, as
+        // Ruby reads them.
+        [value] => match part(value) {
+            whole @ Value::Complex { .. } => whole,
+            real => complex(real, Value::Integer(0)),
+        },
+        [real, imaginary] => {
+            let (real, imaginary) = (part(real), part(imaginary));
+            if is_real(&real) && is_real(&imaginary) {
+                return complex(real, imaginary);
+            }
+            let unit = complex(Value::Integer(0), Value::Integer(1));
+            let scaled = binary(&imaginary, BinaryOperator::Multiply, &unit)
+                .unwrap_or_else(|| panic!("Complex takes numbers, got {imaginary:?}"));
+            binary(&real, BinaryOperator::Add, &scaled)
+                .unwrap_or_else(|| panic!("Complex takes numbers, got {real:?}"))
+        }
         _ => panic!("Complex takes 1 or 2 arguments, got {}", arguments.len()),
     }
 }

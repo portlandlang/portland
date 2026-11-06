@@ -3,8 +3,8 @@
 # Ruby's generator step for step, so every seeded number here is the one
 # CRuby draws.
 #
-# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb and
-# core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
 # measurement, mocks of `rand` and `to_int`, `random: Random` the class
 # (a type is not a value), bignum bounds (#156), the
 # Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
@@ -164,6 +164,10 @@ context "Kernel#rand" do
     expect([0, 1, 2, 3].include?(rand(-4))).to be_true
   end
 
+  specify "never returns a value greater or equal to 1.0 with no arguments" do
+    expect((1..100).map { rand }.all? { |drawn| (0...1.0).include?(drawn) }).to be_true
+  end
+
   specify "never returns a value greater or equal to any passed in max argument" do
     expect((1..100).map { rand(10) }.all? { |drawn| drawn < 10 }).to be_true
   end
@@ -173,6 +177,84 @@ context "Kernel#rand" do
       drawn = rand(1..5)
       expect(drawn >= 1 && drawn <= 5).to be_true
     end
+  end
+
+  describe "given an exclusive range" do
+    specify "returns an Integer between the two Integers" do
+      expect((1..100).map { rand(4...6) }.all? { |drawn| (drawn in Integer) && (4...6).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the given Integer and Float" do
+      expect((1..100).map { rand(4...6.5) }.all? { |drawn| (drawn in Float) && (4...6.5).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the given Float and Integer" do
+      expect((1..100).map { rand(3.5...6) }.all? { |drawn| (drawn in Float) && (3.5...6).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the two given Floats" do
+      expect((1..100).map { rand(3.5...6.5) }.all? { |drawn| (drawn in Float) && (3.5...6.5).include?(drawn) }).to be_true
+    end
+  end
+
+  describe "given an inclusive range" do
+    specify "returns an Integer between the two Integers" do
+      expect((1..100).map { rand(4..6) }.all? { |drawn| (drawn in Integer) && (4..6).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the given Integer and Float" do
+      expect((1..100).map { rand(4..6.5) }.all? { |drawn| (drawn in Float) && (4..6.5).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the given Float and Integer" do
+      expect((1..100).map { rand(3.5..6) }.all? { |drawn| (drawn in Float) && (3.5..6).include?(drawn) }).to be_true
+    end
+
+    specify "returns a Float between the two given Floats" do
+      expect((1..100).map { rand(3.5..6.5) }.all? { |drawn| (drawn in Float) && (3.5..6.5).include?(drawn) }).to be_true
+    end
+  end
+
+  describe "given an inclusive range between 0 and 1" do
+    specify "returns an Integer between the two Integers" do
+      drawn = rand(0..1)
+      expect(drawn in Integer).to be_true
+      expect((0..1).include?(drawn)).to be_true
+    end
+
+    specify "returns a Float if at least one side is Float" do
+      first = Random.new(42).rand(0..1.0)
+      second = Random.new(42).rand(0.0..1.0)
+      third = Random.new(42).rand(0.0..1)
+      expect(third in Float).to be_true
+      expect(first.eql?(third)).to be_true
+      expect(second.eql?(third)).to be_true
+      expect((0.0..1.0).include?(third)).to be_true
+    end
+  end
+
+  describe "given an exclusive range between 0 and 1" do
+    specify "returns zero as an Integer" do
+      expect(rand(0...1).eql?(0)).to be_true
+    end
+
+    specify "returns a Float if at least one side is Float" do
+      first = Random.new(42).rand(0...1.0)
+      second = Random.new(42).rand(0.0...1.0)
+      third = Random.new(42).rand(0.0...1)
+      expect(third in Float).to be_true
+      expect(first.eql?(third)).to be_true
+      expect(second.eql?(third)).to be_true
+      expect((0.0...1.0).include?(third)).to be_true
+    end
+  end
+
+  specify "returns the range start/end when Float range is 0" do
+    expect(rand(1.0..1.0).eql?(1.0)).to be_true
+  end
+
+  specify "returns the range start/end when Integer range is 0" do
+    expect(rand(42..42).eql?(42)).to be_true
   end
 end
 
@@ -193,6 +275,28 @@ context "Kernel#srand" do
     srand(176542)
     second = (1..20).map { rand }
     expect(first).to eq(second)
+  end
+
+  specify "returns the previous seed value" do
+    srand(10)
+    expect(srand(20)).to eq(10)
+  end
+
+  specify "seeds the RNG correctly and repeatably" do
+    srand(10)
+    first = rand
+    srand(10)
+    expect(rand).to eq(first)
+  end
+
+  specify "defaults number to a random value" do
+    srand
+    expect(srand == 0).to be_false
+  end
+
+  specify "accepts a negative seed" do
+    srand(-17)
+    expect(srand).to eq(-17)
   end
 end
 

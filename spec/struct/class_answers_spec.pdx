@@ -79,3 +79,17 @@ context "value.class" do
     end
   end
 end
+
+# From ruby/spec core/kernel/class_spec.rb: the builtins' row. Upstream:
+# Object.new, a class's own class, and the singleton row — nil has no
+# methods, and a type has no class.
+context "Kernel#class" do
+  specify "returns the class of the object" do
+    expect(1.class).to eq(Integer)
+    expect(3.14.class).to eq(Float)
+    expect(:hello.class).to eq(Symbol)
+    expect("hello".class).to eq(String)
+    expect([1, 2].class).to eq(Array)
+    expect({1 => 2}.class).to eq(Hash)
+  end
+end

@@ -3554,6 +3554,16 @@ end
 
 # A real builtin called with a count outside its arity: the sentence
 # ratified 2026-09-23, the seed's (#88).
+# The tower's constructors take numbers (ADR 0085); a guest value that is
+# not one — a symbol, a string, nil — refuses here with its guest rendering,
+# before the host's constructor could show its tagged shape.
+def refuse_non_number(name, arguments)
+  arguments.each do |argument|
+    next if (argument in Integer) || (argument in Float) || (argument in Rational) || (argument in Complex)
+    panic("#{name} takes numbers, got #{render_inspect(argument)}")
+  end
+end
+
 def check_builtin_count(receiver, name, given)
   type = builtin_type_of(receiver)
   return if type.nil?
@@ -4933,10 +4943,12 @@ def evaluate_call(node, mutable bindings)
   # rational or complex is a host value, as a float is.
   when "Rational"
     panic("Rational takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    refuse_non_number("Rational", arguments)
     built = arguments.length == 1 ? Rational(value_at(arguments, 0)) : Rational(value_at(arguments, 0), value_at(arguments, 1))
     outcome([built], bindings)
   when "Complex"
     panic("Complex takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    refuse_non_number("Complex", arguments)
     built = arguments.length == 1 ? Complex(value_at(arguments, 0)) : Complex(value_at(arguments, 0), value_at(arguments, 1))
     outcome([built], bindings)
   when "require_relative"

@@ -3451,6 +3451,80 @@ core/enumerator/:
   status: skipped
   reason: "There are no enumerators; methods that would answer one answer the finished collection."
   link: docs/ruby/enumerators.md
+core/kernel/Complex_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "A string argument waits on the conversion functions' page (conversions.md); the bignums, the mocks, the to_c and real? protocols, and exception: false stay upstream; nil and a symbol refuse where Ruby raises."
+  link: docs/ruby/numbers.md
+core/kernel/Rational_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "A string argument waits on the conversion functions' page (conversions.md); the bignums, the mocks, the to_r and to_int protocols, and exception: false stay upstream; nil, a symbol, and a zero denominator refuse where Ruby raises."
+  link: docs/ruby/numbers.md
+core/kernel/backtick_spec.rb:
+  status: skipped
+  reason: "Shell execution and process spawning wait on #179, the decision ADR 0051 deferred."
+  link: https://github.com/portlandlang/portland/issues/179
+core/kernel/case_compare_spec.rb:
+  status: skipped
+  reason: "Every row drives dup, object_id, and equal? — object identity, which values never have (ADR 0015); a struct's === is its == (#151)."
+  link: docs/ruby/equality.md
+core/kernel/class_spec.rb:
+  pdx: [spec/struct/class_answers_spec.pdx]
+  status: partial_intentional
+  reason: "Object.new has no Portland form, a type has no class (ADR 0074), and there are no singleton methods."
+  link: docs/ruby/types.md
+core/kernel/eql_spec.rb:
+  pdx: [spec/eql_spec.pdx]
+  status: partial_intentional
+  reason: "Object.new and the mocks have no identity to compare here; the bignum stays upstream, integers being 64-bit."
+  link: docs/ruby/equality.md
+core/kernel/equal_value_spec.rb:
+  status: skipped
+  reason: "Every row compares mocks by identity; values compare by value here (ADR 0015), and nil == nil is spec/optionals/nil_spec.pdx's."
+  link: docs/ruby/equality.md
+core/kernel/exec_spec.rb:
+  status: skipped
+  reason: "Shell execution and process spawning wait on #179, the decision ADR 0051 deferred."
+  link: https://github.com/portlandlang/portland/issues/179
+core/kernel/fork_spec.rb:
+  status: skipped
+  reason: "Shell execution and process spawning wait on #179, the decision ADR 0051 deferred."
+  link: https://github.com/portlandlang/portland/issues/179
+core/kernel/gets_spec.rb:
+  status: skipped
+  reason: "gets reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  link: https://github.com/portlandlang/portland/issues/177
+core/kernel/inspect_spec.rb:
+  status: skipped
+  reason: "Every row inspects Object.new or stubs its instance variables; inspect is a function here (ADR 0026) and there is no Object."
+  link: docs/ruby/inspect.md
+core/kernel/lambda_spec.rb:
+  status: skipped
+  reason: "-> refuses with its rewrite; the proc question (#77) holds the rest."
+  link: https://github.com/portlandlang/portland/issues/77
+core/kernel/loop_spec.rb:
+  pdx: [spec/control_flow/loop_spec.pdx]
+  status: partial_intentional
+  reason: "loop is a keyword form, not a method (ADR 0037): break carries no value, there is no enumerator without a block, and nothing raises StopIteration."
+  link: docs/adr/0037-2026-08-18-the-loop-spellings.md
+core/kernel/match_spec.rb:
+  status: skipped
+  reason: "=~ waits on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
+core/kernel/nil_spec.rb:
+  pdx: [spec/optionals/nil_spec.pdx]
+  status: partial_intentional
+  reason: "Object and Object.new have no Portland form; the builtin values answer."
+  link: docs/ruby/mixins-and-inheritance.md
+core/kernel/not_match_spec.rb:
+  status: skipped
+  reason: "!~ waits on the regex decision (#74)."
+  link: https://github.com/portlandlang/portland/issues/74
+core/kernel/open_spec.rb:
+  status: skipped
+  reason: "open reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  link: https://github.com/portlandlang/portland/issues/177
 core/kernel/p_spec.rb:
   pdx: [spec/system/output_spec.pdx]
   status: partial_intentional
@@ -3471,6 +3545,10 @@ core/kernel/printf_spec.rb:
   status: partial_intentional
   reason: "printf is format then print (ADR 0067); the formatting rows are format's in spec/string/format_spec.pdx, and the IO-first-argument, to_str mock, and privacy rows stay upstream."
   link: docs/ruby/system.md
+core/kernel/proc_spec.rb:
+  status: skipped
+  reason: "proc refuses with its rewrite; the proc question (#77) holds the rest."
+  link: https://github.com/portlandlang/portland/issues/77
 core/kernel/putc_spec.rb:
   pdx: [spec/system/output_spec.pdx]
   status: partial_intentional
@@ -3481,6 +3559,37 @@ core/kernel/puts_spec.rb:
   status: partial_intentional
   reason: "puts answers no value (ADR 0012), so its rows are the two-oracle test's; the privacy and reflection rows and the $stdout reassignment stay upstream."
   link: docs/ruby/system.md
+core/kernel/rand_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "The range rows draw 100 times, not 1000; a backwards range refuses as Random#rand's does where Kernel#rand answers nil; the to_int mock, the custom range types, Time, and the ruby_exe row stay upstream."
+  link: docs/ruby/randomness.md
+core/kernel/readline_spec.rb:
+  status: skipped
+  reason: "readline reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  link: https://github.com/portlandlang/portland/issues/177
+core/kernel/readlines_spec.rb:
+  status: skipped
+  reason: "readlines reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  link: https://github.com/portlandlang/portland/issues/177
+core/kernel/require_relative_spec.rb:
+  pdx: [spec/require/relative_spec.pdx]
+  status: partial_intentional
+  reason: "$LOADED_FEATURES, symlinks, instance_eval, the to_str and to_path mocks, C extensions, and the LoadError rows stay upstream, a missing file refusing at build."
+  link: docs/ruby/requires.md
+core/kernel/require_spec.rb:
+  pdx: [spec/require/relative_spec.pdx]
+  status: partial_intentional
+  reason: "require by name is pinned by the seed's load-path fixtures; $LOADED_FEATURES, $LOAD_PATH, .so and C extensions, the mocks, and the LoadError rows stay upstream, a missing file refusing at build."
+  link: docs/ruby/requires.md
+core/kernel/select_spec.rb:
+  status: skipped
+  reason: "select reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  link: https://github.com/portlandlang/portland/issues/177
+core/kernel/spawn_spec.rb:
+  status: skipped
+  reason: "Shell execution and process spawning wait on #179, the decision ADR 0051 deferred."
+  link: https://github.com/portlandlang/portland/issues/179
 core/kernel/sprintf_spec.rb:
   pdx: [spec/string/format_spec.pdx]
   status: partial_intentional
@@ -3511,6 +3620,19 @@ core/argf/:
   status: skipped
   reason: "ARGF is a stateful cursor over the input files — the external iteration ADR 0055 declined (#175)."
   link: docs/ruby/enumerators.md
+core/kernel/srand_spec.rb:
+  pdx: [spec/random/random_spec.pdx]
+  status: partial_intentional
+  reason: "srand(0) draws a fresh seed, as no argument does; a float, nil, or string seed refuses where Ruby coerces or raises; the bignum seed and the ruby_exe row stay upstream."
+  link: docs/ruby/randomness.md
+core/kernel/system_spec.rb:
+  status: skipped
+  reason: "Shell execution and process spawning wait on #179, the decision ADR 0051 deferred."
+  link: https://github.com/portlandlang/portland/issues/179
+core/kernel/to_s_spec.rb:
+  status: skipped
+  reason: "The one row matches Object.new's to_s against a regex; there is no Object and no regex."
+  link: docs/ruby/inspect.md
 core/kernel/trap_spec.rb:
   status: skipped
   reason: "Signal.trap by another name (#175): a process-global mutable handler table."

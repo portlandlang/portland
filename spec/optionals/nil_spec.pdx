@@ -17,3 +17,13 @@ context "NilClass#inspect" do
     expect(inspect(nil)).to eq("nil")
   end
 end
+
+# From ruby/spec core/kernel/nil_spec.rb: the builtin values. Upstream:
+# Object and Object.new.
+context "Kernel#nil?" do
+  specify "returns false" do
+    expect("".nil?).to be_false
+    expect([].nil?).to be_false
+    expect({}.nil?).to be_false
+  end
+end
