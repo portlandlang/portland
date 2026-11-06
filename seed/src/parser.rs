@@ -1,6 +1,7 @@
 //! Hand-written recursive descent, like every language that cares about
 //! error messages and speed. Crude in the seed: parse failures just panic.
 
+use crate::ast::HashRest;
 use crate::ast::{
     BinaryOperator, Block, CaseBranch, Expression, GuardAction, InBranch, LogicalOperator,
     Parameter, Pattern, Program, Statement, TogetherLine, UnaryOperator,
@@ -1809,9 +1810,16 @@ impl<'source> Parser<'source> {
         while self.peek_is_keyword("in") {
             self.position += 1; // the `in`
             let pattern = self.pattern();
+            // `in 0 unless done?` is `if not done?` (ADR 0080).
             let guard = if self.peek_is_keyword("if") {
                 self.position += 1; // the `if`
                 Some(self.expression())
+            } else if self.peek_is_keyword("unless") {
+                self.position += 1; // the `unless`
+                Some(Expression::Unary {
+                    operand: Box::new(self.expression()),
+                    operator: UnaryOperator::Not,
+                })
             } else {
                 None
             };
@@ -1842,15 +1850,33 @@ impl<'source> Parser<'source> {
     /// One pattern, with `|` alternatives binding loosest.
     fn pattern(&mut self) -> Pattern {
         let first = self.pattern_primary();
-        if self.peek_kind() != Some(TokenKind::Pipe) {
-            return first;
+        let pattern = if self.peek_kind() != Some(TokenKind::Pipe) {
+            first
+        } else {
+            let mut alternatives = vec![first];
+            while self.peek_kind() == Some(TokenKind::Pipe) {
+                self.position += 1; // the `|`
+                alternatives.push(self.pattern_primary());
+            }
+            Pattern::Alternative(alternatives)
+        };
+        // `pattern => name` — the AS pattern (ADR 0080), at any depth.
+        if self.peek_kind() == Some(TokenKind::FatArrow) {
+            self.position += 1; // the `=>`
+            let name = self.advance();
+            if name.kind != TokenKind::Identifier
+                || name
+                    .text
+                    .starts_with(|character: char| character.is_ascii_uppercase())
+            {
+                panic!("expected a name to bind after => in a pattern, got {name:?}");
+            }
+            return Pattern::Binding {
+                name: name.text.to_string(),
+                pattern: Box::new(pattern),
+            };
         }
-        let mut alternatives = vec![first];
-        while self.peek_kind() == Some(TokenKind::Pipe) {
-            self.position += 1; // the `|`
-            alternatives.push(self.pattern_primary());
-        }
-        Pattern::Alternative(alternatives)
+        pattern
     }
 
     fn pattern_primary(&mut self) -> Pattern {
@@ -1949,8 +1975,73 @@ impl<'source> Parser<'source> {
                 Pattern::Pin(name.text.to_string())
             }
             TokenKind::LeftBracket => self.array_pattern(),
+            TokenKind::LeftBrace => self.hash_pattern(),
             other => panic!("unsupported pattern starting with {other:?}"),
         }
+    }
+
+    /// `{a: 0, b:}`, `{a: 0, **rest}`, `{**nil}`, `{}` — a hash pattern
+    /// (ADR 0080). Keys are the shorthand's labels, the one symbol-key
+    /// spelling; a label with no pattern binds under its own name.
+    fn hash_pattern(&mut self) -> Pattern {
+        let mut pairs: Vec<(String, Option<Pattern>)> = Vec::new();
+        // The bare `{}` matches only the empty hash, as `{**nil}` does.
+        let mut rest = HashRest::Closed;
+        if self.peek_kind() != Some(TokenKind::RightBrace) {
+            rest = HashRest::Open;
+            loop {
+                if self.peek_kind() == Some(TokenKind::StarStar) {
+                    self.position += 1; // the `**`
+                    rest = if self.peek_is_keyword("nil") {
+                        self.position += 1;
+                        HashRest::Closed
+                    } else {
+                        let name = self.advance();
+                        if name.kind != TokenKind::Identifier {
+                            panic!(
+                                "expected a name or nil after ** in a hash pattern, got {name:?}"
+                            );
+                        }
+                        HashRest::Bind(name.text.to_string())
+                    };
+                    if self.peek_kind() == Some(TokenKind::Comma) {
+                        panic!("a ** rest must end a hash pattern");
+                    }
+                    break;
+                }
+                let label_token = self.advance();
+                if label_token.kind != TokenKind::Identifier
+                    || self.peek_kind() != Some(TokenKind::Colon)
+                {
+                    panic!(
+                        "hash patterns take symbol keys — write {{name: pattern}} or {{name:}}, got {}",
+                        label_token.text
+                    );
+                }
+                let label = label_token.text.to_string();
+                self.position += 1; // the `:`
+                if pairs.iter().any(|(existing, _)| *existing == label) {
+                    panic!("duplicate key {label} in a hash pattern");
+                }
+                let sub_pattern = match self.peek_kind() {
+                    Some(TokenKind::Comma | TokenKind::RightBrace) => None,
+                    _ => Some(self.pattern()),
+                };
+                pairs.push((label, sub_pattern));
+                if self.peek_kind() != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.position += 1; // the `,`
+            }
+        }
+        if self.peek_kind() != Some(TokenKind::RightBrace) {
+            panic!(
+                "expected closing brace in hash pattern, got {:?}",
+                self.tokens.get(self.position)
+            );
+        }
+        self.position += 1; // the `}`
+        Pattern::Hash { pairs, rest }
     }
 
     /// `[p, p]` exact, or `[p, *rest]` — a splat may only end the pattern

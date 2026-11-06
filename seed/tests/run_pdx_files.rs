@@ -2659,6 +2659,43 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// The five pattern-matching gaps (ADR 0080) on both oracles: hash patterns
+/// in every shape, `unless` guards, the AS pattern at any depth,
+/// `_`-prefixed names that never bind, and a pin reading a name bound to
+/// its left; a duplicate key and a non-symbol key refuse.
+#[test]
+fn pattern_gaps_on_both_oracles() {
+    assert_both_print(
+        "pattern_gaps.pdx",
+        "config = {name: \"pdx\", port: 8080, tls: true}\n\
+         case config\nin {name:, port: Integer => port_number, **rest} then p([name, port_number, rest])\nend\n\
+         case config\nin {name: \"other\"} then puts \"no\"\nin {tls: true, **nil} then puts \"closed\"\nin {tls: true} then puts \"open\"\nend\n\
+         case {}\nin {} then puts \"empty\"\nend\n\
+         case {a: 1}\nin {} then puts \"no\"\nelse puts \"not empty\"\nend\n\
+         case [1, 1]\nin [n, ^n] then p n\nend\n\
+         case [1, 2]\nin [m, ^m] then puts \"same\"\nelse puts \"differ\"\nend\n\
+         case [0, 1, 2]\nin [0, _x, _x] then puts \"wild\"\nend\n\
+         case 5\nin Integer => five unless five > 9 then p five\nend\n\
+         case [1, [2, 3]]\nin [1, Array => inner] then p inner\nend\n\
+         p({k: 1} in {k:})\np k\n",
+        "[\"pdx\", 8080, {tls: true}]\nopen\nempty\nnot empty\n1\ndiffer\nwild\n5\n[2, 3]\ntrue\n1\n",
+    );
+    assert_both_oracles_refuse(
+        "pattern_gaps_refusal.pdx",
+        None,
+        &[
+            (
+                "case {a: 1}\nin {a: 1, b: 2, a: 3} then 1\nend\n",
+                "duplicate key a in a hash pattern",
+            ),
+            (
+                "case {a: 1}\nin {\"a\" => 1} then 1\nend\n",
+                "hash patterns take symbol keys",
+            ),
+        ],
+    );
+}
+
 /// Four places the hosted compiler had drifted from the seed (#201, #202,
 /// #203, #205), each now the seed's refusal: a rocket with a symbol key,
 /// a parse refusal inside a paren-less call's arguments reported before the

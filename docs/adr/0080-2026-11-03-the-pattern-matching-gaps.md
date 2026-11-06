@@ -1,6 +1,6 @@
 # 0080 — Hash patterns, `unless` guards, `=> name`, `_` wildcards, and left-to-right pins
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#168](https://github.com/portlandlang/portland/issues/168); not built — the build is [#193](https://github.com/portlandlang/portland/issues/193))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#168](https://github.com/portlandlang/portland/issues/168); built on both implementations 2026-11-05 under [#193](https://github.com/portlandlang/portland/issues/193))
 - **Date:** 2026-11-03
 - **Issue:** [#168](https://github.com/portlandlang/portland/issues/168)
 

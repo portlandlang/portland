@@ -3455,9 +3455,9 @@ language/or_spec.rb:
   link: docs/ruby/word-operators.md
 language/pattern_matching_spec.rb:
   pdx: [spec/pattern_matching/language_spec.pdx]
-  status: partial_planned
-  reason: "Hash patterns, unless guards, the => capture, reused _ names, and pinning a name bound earlier in the pattern are decided (ADR 0080) and wait on their build; the find pattern, positional and Constant[...] forms, the deconstruct protocols, refinements, and the eval, lambda, regexp, and side-effect rows stay upstream, and an arm that did not match binds nothing."
-  link: https://github.com/portlandlang/portland/issues/193
+  status: partial_intentional
+  reason: "The find pattern, positional and Constant[...] forms, the deconstruct protocols, refinements, string-label keys, and the eval, lambda, regexp, and side-effect rows stay upstream; an arm that did not match binds nothing, and a miss on a key is a miss rather than NoMatchingPatternKeyError."
+  link: docs/ruby/pattern-matching.md
 language/precedence_spec.rb:
   pdx: [spec/number/precedence_spec.pdx]
   status: partial_intentional

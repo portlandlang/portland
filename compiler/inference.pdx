@@ -1306,7 +1306,16 @@ end
 # pin reads rather than binds, and the shapes hold sub-patterns.
 def pattern_names(pattern)
   case pattern
-  in IdentifierNode(name:) then [name]
+  # A `_`-prefixed name binds nothing (ADR 0080).
+  in IdentifierNode(name:) then if name.start_with?("_") then [] else [name] end
+  in BindingPatternNode(pattern: inner, name:) then pattern_names(inner) + [name]
+  in HashPatternNode(pairs:, rest_kind:, rest_name:)
+    mutable found = []
+    pairs.each do |pair|
+      found += pattern_names(pair[1])
+    end
+    found << rest_name if rest_kind == "bind"
+    found
   in AlternativePatternNode(options:)
     mutable found = []
     options.each do |option|

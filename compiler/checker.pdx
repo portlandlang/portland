@@ -878,7 +878,16 @@ end
 # Patterns hold sub-patterns and, in two places, expressions.
 def check_pattern(pattern, scope, mutable found)
   case pattern
+  # A refusal the pattern parser carried as a node (ADR 0080) is said here,
+  # the way check_node says one carried in an expression.
+  in ErrorNode(message:) then noted(found, ["sentence", message], locate(pattern, scope))
   in EnumCasePatternNode then check_case_pattern(pattern, scope, found)
+  in BindingPatternNode(pattern: inner) then check_pattern(inner, scope, found)
+  in HashPatternNode(pairs:)
+    pairs.each do |pair|
+      found = check_pattern(pair[1], scope, found)
+    end
+    found
   in AlternativePatternNode(options:)
     options.each do |option|
       found = check_pattern(option, scope, found)

@@ -535,6 +535,37 @@ struct PinNode
   end
 end
 
+# `in {a: 0, b:}` (ADR 0080): pairs are [label, pattern]; rest_kind is
+# "open", "bind", or "closed", rest_name the `**rest` name when bound.
+struct HashPatternNode
+  kind
+  pairs
+  rest_kind
+  rest_name
+
+  def sexp
+    mutable parts = pairs.map do |pair|
+      "(: #{pair[0]} #{pair[1].sexp})"
+    end
+    parts << "**#{rest_name}" if rest_kind == "bind"
+    parts << "**nil" if rest_kind == "closed"
+    return "(hash_pattern)" if parts.empty?
+    "(hash_pattern #{parts.join(" ")})"
+  end
+end
+
+# `in Integer => number` (ADR 0080): the pattern that must match, and the
+# name the whole value binds under.
+struct BindingPatternNode
+  kind
+  pattern
+  name
+
+  def sexp
+    "(=> #{pattern.sexp} #{name})"
+  end
+end
+
 struct ReturnNode
   kind
   value
@@ -807,6 +838,16 @@ end
 
 def array_pattern_node(elements, splat, rest_name)
   ArrayPatternNode.new(kind: "array_pattern", elements: elements, splat: splat, rest_name: rest_name)
+end
+
+# `rest_kind` is "open" (a partial match, Ruby's default), "bind" with the
+# name `**rest` carries, or "closed" for `**nil` and the bare `{}`.
+def hash_pattern_node(pairs, rest_kind, rest_name)
+  HashPatternNode.new(kind: "hash_pattern", pairs: pairs, rest_kind: rest_kind, rest_name: rest_name)
+end
+
+def binding_pattern_node(pattern, name)
+  BindingPatternNode.new(kind: "binding_pattern", pattern: pattern, name: name)
 end
 
 def assignment_node(name, value, line: nil)
@@ -2730,6 +2771,12 @@ def parse_in_branch(tokens, mutable position)
     guard = guard_step.node
     position = guard_step.position
   end
+  # `in 0 unless done?` is `if not done?` (ADR 0080).
+  if keyword_at?(tokens, position, %w[unless])
+    guard_step = parse_expression(tokens, position + 1)
+    guard = unary_node("!", guard_step.node, line: line_at(tokens, position))
+    position = guard_step.position
+  end
   body = parse_branch_body(tokens, position, %w[in else end])
   Step.new(node: in_branch_node(pattern.node, guard, body.node), position: body.position)
 end
@@ -2737,14 +2784,85 @@ end
 def parse_pattern(tokens, mutable position)
   first = parse_pattern_primary(tokens, position)
   position = first.position
-  return first unless operator_at?(tokens, position, %w[|])
-  mutable options = [first.node]
-  while operator_at?(tokens, position, %w[|])
-    option = parse_pattern_primary(tokens, position + 1)
-    options << option.node
-    position = option.position
+  mutable pattern = first.node
+  if operator_at?(tokens, position, %w[|])
+    mutable options = [first.node]
+    while operator_at?(tokens, position, %w[|])
+      option = parse_pattern_primary(tokens, position + 1)
+      options << option.node
+      position = option.position
+    end
+    pattern = alternative_pattern_node(options)
   end
-  Step.new(node: alternative_pattern_node(options), position: position)
+  # `pattern => name` — the AS pattern (ADR 0080), at any depth.
+  if operator_at?(tokens, position, %w[=>])
+    name = tokens[position + 1]
+    unless position + 1 < tokens.length && name.identifier? && !"ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(name.text.slice(0, 1))
+      return Step.new(node: error_node("expected a name to bind after => in a pattern"), position: position + 1)
+    end
+    return Step.new(node: binding_pattern_node(pattern, name.text), position: position + 2)
+  end
+  Step.new(node: pattern, position: position)
+end
+
+# `{a: 0, b:}`, `{a: 0, **rest}`, `{**nil}`, `{}` — a hash pattern (ADR
+# 0080), the seed's reading: keys are the shorthand's labels, a label with
+# no pattern binds under its own name, and the bare `{}` is closed like
+# `{**nil}`.
+# A refusal inside a hash pattern resumes after the pattern's closing brace,
+# so the branch body still parses and the checker says this refusal first.
+def hash_pattern_refusal(tokens, mutable position, message)
+  while position < tokens.length && !operator_at?(tokens, position, ["}"]) && !tokens[position].newline?
+    position += 1
+  end
+  position += 1 if operator_at?(tokens, position, ["}"])
+  Step.new(node: error_node(message), position: position)
+end
+
+def parse_hash_pattern(tokens, mutable position)
+  mutable pairs = []
+  mutable rest_kind = "closed"
+  mutable rest_name = nil
+  unless operator_at?(tokens, position, ["}"])
+    rest_kind = "open"
+    while true
+      if operator_at?(tokens, position, %w[**])
+        position += 1
+        if keyword_at?(tokens, position, %w[nil])
+          rest_kind = "closed"
+          position += 1
+        elsif position < tokens.length && tokens[position].identifier?
+          rest_kind = "bind"
+          rest_name = tokens[position].text
+          position += 1
+        else
+          return Step.new(node: error_node("expected a name or nil after ** in a hash pattern"), position: position)
+        end
+        return Step.new(node: error_node("a ** rest must end a hash pattern"), position: position) if operator_at?(tokens, position, %w[,])
+        break
+      end
+      token = tokens[position]
+      unless token.identifier? && operator_at?(tokens, position + 1, %w[:])
+        return hash_pattern_refusal(tokens, position, "hash patterns take symbol keys — write {name: pattern} or {name:}, got #{token.text}")
+      end
+      label = token.text
+      return hash_pattern_refusal(tokens, position, "duplicate key #{label} in a hash pattern") if pairs.any? { it[0] == label }
+      position += 2
+      if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, ["}"])
+        pairs << [label, identifier_node(label)]
+      else
+        sub_pattern = parse_pattern(tokens, position)
+        pairs << [label, sub_pattern.node]
+        position = sub_pattern.position
+      end
+      break unless operator_at?(tokens, position, %w[,])
+      position += 1
+    end
+  end
+  unless operator_at?(tokens, position, ["}"])
+    return Step.new(node: error_node("expected closing brace in hash pattern"), position: position)
+  end
+  Step.new(node: hash_pattern_node(pairs, rest_kind, rest_name), position: position + 1)
 end
 
 # Literal patterns reuse the literal expression nodes; a bare lowercase
@@ -2804,6 +2922,9 @@ def parse_pattern_primary(tokens, position)
   end
   if token.operator? && token.text == "["
     return parse_array_pattern(tokens, position + 1)
+  end
+  if token.operator? && token.text == "{"
+    return parse_hash_pattern(tokens, position + 1)
   end
   if token.identifier?
     name = token.text

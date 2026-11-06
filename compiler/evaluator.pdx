@@ -422,28 +422,65 @@ end
 
 # Try a pattern against a value: an array of [name, value] captures on a
 # match (empty for literals), nil on a miss.
-def match_pattern(pattern, mutable subject, bindings)
+def match_pattern(pattern, subject, bindings) = match_pattern_with(pattern, subject, bindings, [])
+
+# `earlier` is what the pattern has bound so far, to the left — what a pin
+# reads first (ADR 0080): `in [n, ^n]`.
+def match_pattern_with(pattern, mutable subject, bindings, earlier)
   # A failure is transparent to patterns (ADR 0027): its whole use is
   # carrying the reason to a handler whose tool is the pattern.
   while subject.failure?
     subject = failure_payload(subject)
   end
   case pattern
-  in AlternativePatternNode then match_alternative(pattern, subject, bindings)
-  in ArrayPatternNode then match_array(pattern, subject, bindings)
-  in IdentifierNode(name:) then [[name, subject]]
-  in PinNode then match_pin(pattern, subject, bindings)
+  in AlternativePatternNode then match_alternative(pattern, subject, bindings, earlier)
+  in ArrayPatternNode then match_array(pattern, subject, bindings, earlier)
+  in HashPatternNode then match_hash(pattern, subject, bindings, earlier)
+  in BindingPatternNode then match_binding(pattern, subject, bindings, earlier)
+  # A `_`-prefixed name matches anything and binds nothing (ADR 0080).
+  in IdentifierNode(name:) then if name.start_with?("_") then [] else [[name, subject]] end
+  in PinNode then match_pin(pattern, subject, bindings, earlier)
   in RangeNode then match_range(pattern, subject, bindings)
-  in StructPatternNode then match_struct(pattern, subject, bindings)
-  in EnumCasePatternNode then match_enum_case(pattern, subject, bindings)
+  in StructPatternNode then match_struct(pattern, subject, bindings, earlier)
+  in EnumCasePatternNode then match_enum_case(pattern, subject, bindings, earlier)
   else
     match_literal(pattern, subject, bindings)
   end
 end
 
+# `pattern => name` (ADR 0080): the inner pattern must match, and the whole
+# value binds under the name.
+def match_binding(pattern, subject, bindings, earlier)
+  captures = match_pattern_with(pattern.pattern, subject, bindings, earlier)
+  return nil if captures.nil?
+  captures + [[pattern.name, subject]]
+end
+
+# `{a: 0, b:}` (ADR 0080): a hash with symbol keys — tagged, as a guest's
+# are — each named key present and matching; partial unless `**nil` or the
+# bare `{}` closes it; `**rest` binds the pairs not named.
+def match_hash(pattern, subject, bindings, earlier)
+  return nil unless subject in Hash
+  mutable captures = []
+  mutable named = []
+  pattern.pairs.each do |pair|
+    key = ["__symbol__", pair[0]]
+    return nil unless subject.key?(key)
+    named << key
+    value = subject[key] or nil
+    sub_captures = match_pattern_with(value_at(pair, 1), value, bindings, earlier + captures)
+    return nil if sub_captures.nil?
+    captures += sub_captures
+  end
+  remaining = subject.reject { |key, _value| named.include?(key) }
+  return nil if pattern.rest_kind == "closed" && !remaining.empty?
+  captures << [pattern.rest_name, remaining] if pattern.rest_kind == "bind"
+  captures
+end
+
 # `in :paid(on:)` — the case name must match, then each label binds or
 # matches deeper (ADR 0022 §1).
-def match_enum_case(pattern, subject, bindings)
+def match_enum_case(pattern, subject, bindings, earlier)
   return nil unless subject in ["__enum_case__", *]
   return nil unless value_at(subject, 1) == pattern.name
 
@@ -455,7 +492,7 @@ def match_enum_case(pattern, subject, bindings)
     value = enum_payload_value(payload, entry[0])
     return nil if value.nil?
 
-    sub_captures = match_pattern(entry[1], value, bindings)
+    sub_captures = match_pattern_with(entry[1], value, bindings, earlier + captures)
     return nil if sub_captures.nil?
 
     sub_captures.each do |capture|
@@ -490,24 +527,31 @@ def match_range(pattern, subject, bindings)
   nil
 end
 
-def match_pin(pattern, subject, bindings)
+# A pin reads a name bound to its left in the same pattern first (ADR
+# 0080), then the variables.
+def match_pin(pattern, subject, bindings, earlier)
+  bound = earlier.reverse.find { it[0] == pattern.name }
+  unless bound.nil?
+    return [] if value_at(bound, 1) == subject
+    return nil
+  end
   slot = lookup(bindings, pattern.name)
   panic("undefined variable #{pattern.name} in a ^ pin") if slot.empty?
   return [] if value_at(slot.first, 2) == subject
   nil
 end
 
-def match_alternative(pattern, subject, bindings)
+def match_alternative(pattern, subject, bindings, earlier)
   mutable index = 0
   while index < pattern.options.length
-    captures = match_pattern(pattern.options[index], subject, bindings)
+    captures = match_pattern_with(pattern.options[index], subject, bindings, earlier)
     return captures unless captures.nil?
     index += 1
   end
   nil
 end
 
-def match_array(pattern, subject, bindings)
+def match_array(pattern, subject, bindings, earlier)
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
   # This used to be a recorded crude gap, from before the tagged-shape
   # predicates existed.
@@ -517,7 +561,7 @@ def match_array(pattern, subject, bindings)
   mutable captures = []
   mutable index = 0
   while index < pattern.elements.length
-    element_captures = match_pattern(pattern.elements[index], value_at(subject, index), bindings)
+    element_captures = match_pattern_with(pattern.elements[index], value_at(subject, index), bindings, earlier + captures)
     return nil if element_captures.nil?
     captures += element_captures
     index += 1
@@ -549,7 +593,7 @@ def match_builtin_type(pattern, subject)
   nil
 end
 
-def match_struct(pattern, subject, bindings)
+def match_struct(pattern, subject, bindings, earlier)
   if %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
@@ -561,7 +605,7 @@ def match_struct(pattern, subject, bindings)
   while index < pattern.fields.length
     field = pattern.fields[index]
     value = struct_field(subject, field[0])
-    sub_captures = match_pattern(field[1], value, bindings)
+    sub_captures = match_pattern_with(field[1], value, bindings, earlier + captures)
     return nil if sub_captures.nil?
     captures += sub_captures
     index += 1

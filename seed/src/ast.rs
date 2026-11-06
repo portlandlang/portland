@@ -226,6 +226,28 @@ pub enum Pattern {
         name: String,
         payload: Vec<(String, Option<Pattern>)>,
     },
+    /// `in {a: 0, b:}` — a hash pattern (ADR 0080): symbol keys, each
+    /// matching deeper or binding under its own name, partial by default.
+    /// `**rest` binds the pairs not named; `**nil` and the bare `{}` demand
+    /// that none are left.
+    Hash {
+        pairs: Vec<(String, Option<Pattern>)>,
+        rest: HashRest,
+    },
+    /// `in Integer => number` — the AS pattern (ADR 0080): the inner
+    /// pattern must match, and the whole value binds under the name.
+    Binding { name: String, pattern: Box<Pattern> },
+}
+
+/// What a hash pattern says about the keys it does not name.
+#[derive(Clone, Debug, PartialEq)]
+pub enum HashRest {
+    /// Anything may follow — Ruby's default, a partial match.
+    Open,
+    /// `**rest` — the pairs not named, as a hash.
+    Bind(String),
+    /// `**nil`, or the bare `{}` — nothing may follow.
+    Closed,
 }
 
 #[derive(Clone, Debug, PartialEq)]

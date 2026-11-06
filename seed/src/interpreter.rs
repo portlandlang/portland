@@ -7383,6 +7383,26 @@ impl<W: std::io::Write> Interpreter<W> {
         pattern: &Pattern,
         subject: &Value,
     ) -> Option<Vec<(String, Value)>> {
+        self.match_pattern_with(pattern, subject, &[])
+    }
+
+    /// The names a pattern has bound so far plus these — what a pin to the
+    /// right reads (ADR 0080): `in [n, ^n]`.
+    fn bound_so_far(
+        earlier: &[(String, Value)],
+        captures: &[(String, Value)],
+    ) -> Vec<(String, Value)> {
+        let mut all = earlier.to_vec();
+        all.extend(captures.iter().cloned());
+        all
+    }
+
+    fn match_pattern_with(
+        &mut self,
+        pattern: &Pattern,
+        subject: &Value,
+        earlier: &[(String, Value)],
+    ) -> Option<Vec<(String, Value)>> {
         // A failure is transparent to patterns (ADR 0027): its whole use is
         // carrying the reason to a handler whose tool is the pattern, so
         // `in ReadFailed(reason:)` matches the payload and a capture binds
@@ -7394,7 +7414,54 @@ impl<W: std::io::Write> Interpreter<W> {
         match pattern {
             Pattern::Alternative(options) => options
                 .iter()
-                .find_map(|option| self.match_pattern(option, subject)),
+                .find_map(|option| self.match_pattern_with(option, subject, earlier)),
+            // `pattern => name` (ADR 0080): the inner pattern must match, and
+            // the whole value binds under the name.
+            Pattern::Binding { name, pattern } => {
+                let mut captures = self.match_pattern_with(pattern, subject, earlier)?;
+                captures.push((name.clone(), subject.clone()));
+                Some(captures)
+            }
+            // `{a: 0, b:}` (ADR 0080): a hash with symbol keys, each named
+            // key present and matching; partial unless `**nil` or the bare
+            // `{}` closes it; `**rest` binds the pairs not named.
+            Pattern::Hash { pairs, rest } => {
+                let Value::Hash(entries) = subject else {
+                    return None;
+                };
+                let mut captures = Vec::new();
+                for (label, sub_pattern) in pairs {
+                    let value = entries
+                        .iter()
+                        .find(|(key, _)| matches!(key, Value::Symbol(name) if name == label))
+                        .map(|(_, value)| value)?;
+                    match sub_pattern {
+                        None => captures.push((label.clone(), value.clone())),
+                        Some(sub_pattern) => {
+                            let so_far = Self::bound_so_far(earlier, &captures);
+                            captures.extend(self.match_pattern_with(sub_pattern, value, &so_far)?)
+                        }
+                    }
+                }
+                let named = |key: &Value| matches!(key, Value::Symbol(name) if pairs.iter().any(|(label, _)| label == name));
+                match rest {
+                    crate::ast::HashRest::Open => {}
+                    crate::ast::HashRest::Closed => {
+                        if entries.iter().any(|(key, _)| !named(key)) {
+                            return None;
+                        }
+                    }
+                    crate::ast::HashRest::Bind(name) => {
+                        let remaining: Vec<(Value, Value)> = entries
+                            .iter()
+                            .filter(|(key, _)| !named(key))
+                            .cloned()
+                            .collect();
+                        captures.push((name.clone(), Value::hash(remaining)));
+                    }
+                }
+                Some(captures)
+            }
             // `in :paid(on:)` — the case name must match, then each named
             // label binds or matches deeper (ADR 0022 §1).
             Pattern::EnumCase { name, payload } => {
@@ -7417,7 +7484,10 @@ impl<W: std::io::Write> Interpreter<W> {
                     match inner {
                         // `on:` alone binds a name of the same name.
                         None => captures.push((label.clone(), value.clone())),
-                        Some(pattern) => captures.extend(self.match_pattern(pattern, value)?),
+                        Some(pattern) => {
+                            let so_far = Self::bound_so_far(earlier, &captures);
+                            captures.extend(self.match_pattern_with(pattern, value, &so_far)?)
+                        }
                     }
                 }
                 Some(captures)
@@ -7452,7 +7522,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 let mut captures = Vec::new();
                 for (element, value) in elements.iter().zip(values.iter()) {
-                    captures.extend(self.match_pattern(element, value)?);
+                    let so_far = Self::bound_so_far(earlier, &captures);
+                    captures.extend(self.match_pattern_with(element, value, &so_far)?);
                 }
                 if let Some(Some(name)) = rest {
                     let remainder = values[elements.len()..].to_vec();
@@ -7460,14 +7531,25 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 Some(captures)
             }
+            // A `_`-prefixed name matches anything and binds nothing (ADR
+            // 0080), so it may appear any number of times.
+            Pattern::Capture(name) if name.starts_with('_') => Some(Vec::new()),
             Pattern::Capture(name) => Some(vec![(name.clone(), subject.clone())]),
+            // A pin reads a name bound to its left in the same pattern
+            // first (ADR 0080), then the variables.
             Pattern::Pin(name) => {
-                let value = self
-                    .variables
-                    .get(name)
-                    .unwrap_or_else(|| panic!("undefined variable {name} in a ^ pin"))
-                    .value
-                    .clone();
+                let value = earlier
+                    .iter()
+                    .rev()
+                    .find(|(bound, _)| bound == name)
+                    .map(|(_, value)| value.clone())
+                    .unwrap_or_else(|| {
+                        self.variables
+                            .get(name)
+                            .unwrap_or_else(|| panic!("undefined variable {name} in a ^ pin"))
+                            .value
+                            .clone()
+                    });
                 if value == *subject {
                     Some(Vec::new())
                 } else {
@@ -7539,7 +7621,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         // `field:` shorthand binds under the field's name.
                         None => captures.push((label.clone(), value)),
                         Some(sub_pattern) => {
-                            captures.extend(self.match_pattern(sub_pattern, &value)?)
+                            let so_far = Self::bound_so_far(earlier, &captures);
+                            captures.extend(self.match_pattern_with(
+                                sub_pattern,
+                                &value,
+                                &so_far,
+                            )?)
                         }
                     }
                 }

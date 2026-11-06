@@ -4,9 +4,10 @@
 # pattern, positional and Constant[...] forms, the deconstruct protocols,
 # refinements, and the rows that reach eval, lambdas, regexps, or a side
 # effect in the subject; captures are fenced, so an arm that did not match
-# binds nothing. Hash patterns, unless guards, the => capture, reused _
-# names, and pinning a name bound earlier in the pattern wait on #168. A
-# match with no arm and no else refuses rather than raising.
+# binds nothing. Hash patterns, unless guards, the => capture, `_`-prefixed
+# names, and pinning a name bound earlier in the pattern are ADR 0080's,
+# each as Ruby reads it. A match with no arm and no else refuses rather
+# than raising.
 
 require_relative "../spec_helper"
 
@@ -248,6 +249,180 @@ context "Pattern matching" do
       in [[1], [2 | "2"]] then true
       end
       expect(answer).to be_true
+    end
+  end
+
+  describe "guards" do
+    specify "supports unless guard" do
+      refused = case 0
+      in 0 unless true then true
+      else false
+      end
+      expect(refused).to be_false
+      taken = case 0
+      in 0 unless false then true
+      else false
+      end
+      expect(taken).to be_true
+    end
+  end
+
+  describe "names beginning with _" do
+    specify "supports using _ in a pattern several times" do
+      answer = case [0, 1, 2]
+      in [0, _, _] then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "supports using any name with _ at the beginning in a pattern several times" do
+      in_array = case [0, 1, 2]
+      in [0, _x, _x] then true
+      end
+      expect(in_array).to be_true
+      in_hash = case {a: 0, b: 1, c: 2}
+      in {a: 0, b: _x, c: _x} then true
+      end
+      expect(in_hash).to be_true
+    end
+  end
+
+  describe "pins" do
+    specify "supports existing variables in a pattern specified with ^ operator" do
+      a = 0
+      answer = case 0
+      in ^a then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "allows applying ^ operator to bound variables" do
+      same = case [1, 1]
+      in [n, ^n] then n
+      end
+      expect(same).to eq(1)
+      differ = case [1, 2]
+      in [m, ^m] then true
+      else false
+      end
+      expect(differ).to be_false
+    end
+  end
+
+  describe "AS pattern" do
+    specify "binds a variable to a value if pattern matches" do
+      answer = case 0
+      in Integer => n then n
+      end
+      expect(answer).to eq(0)
+    end
+
+    specify "can be used as a nested pattern" do
+      answer = case [1, [2, 3]]
+      in [1, Array => ary] then ary
+      end
+      expect(answer).to eq([2, 3])
+    end
+  end
+
+  describe "Hash pattern" do
+    specify "supports form {id: pat, id: pat, ...}" do
+      answer = case {a: 0, b: 1}
+      in {a: 0, b: 1} then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "supports form {id:, id:}" do
+      answer = case {a: 0, b: 1}
+      in {a:, b:} then [a, b]
+      end
+      expect(answer).to eq([0, 1])
+    end
+
+    specify "binds variables" do
+      answer = case {a: 0, b: 1, c: 2}
+      in {a: x, b: y, c: z} then [x, y, z]
+      end
+      expect(answer).to eq([0, 1, 2])
+    end
+
+    specify "supports double splat operator **rest" do
+      remaining = case {a: 0, b: 1, c: 2}
+      in {a: 0, **rest} then rest
+      end
+      expect(remaining).to eq({b: 1, c: 2})
+      bound = case {a: 0, b: 1, c: 2}
+      in {a:, **others} then [a, others]
+      end
+      expect(bound).to eq([0, {b: 1, c: 2}])
+    end
+
+    specify "treats **nil like there should not be any other keys in a matched Hash" do
+      exact = case {a: 1, b: 2}
+      in {a: 1, b: 2, **nil} then true
+      end
+      expect(exact).to be_true
+      extra = case {a: 1, b: 2}
+      in {a: 1, **nil} then true
+      else false
+      end
+      expect(extra).to be_false
+    end
+
+    specify "can match partially" do
+      answer = case {a: 1, b: 2}
+      in {a: 1} then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "matches {} with {}, and {} only matches empty hashes" do
+      empty = case {}
+      in {} then true
+      end
+      expect(empty).to be_true
+      filled = case {a: 1}
+      in {} then true
+      else false
+      end
+      expect(filled).to be_false
+    end
+
+    specify "in {**nil} only matches empty hashes" do
+      empty = case {}
+      in {**nil} then true
+      else false
+      end
+      expect(empty).to be_true
+      filled = case {a: 1}
+      in {**nil} then true
+      else false
+      end
+      expect(filled).to be_false
+    end
+
+    specify "misses when a key is absent" do
+      answer = case {a: 1}
+      in {b: 2} then true
+      else false
+      end
+      expect(answer).to be_false
+    end
+
+    specify "can be used as a nested pattern" do
+      answer = case {a: {a: 1, b: 1}, b: {a: 1, b: 2}}
+      in {a: {a: 0}} then false
+      in {a: {a: 1}, b: {b: 1}} then false
+      in {a: {a: 1}, b: {b: 2}} then true
+      end
+      expect(answer).to be_true
+    end
+
+    specify "works in a one-line match, binding on a hit" do
+      expect(({k: 1} in {k:})).to be_true
+      expect(k).to eq(1)
+      expect(({k: 1} in {k: 2})).to be_false
     end
   end
 end
