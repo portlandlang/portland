@@ -353,6 +353,29 @@ struct IntegerNode
   end
 end
 
+# `3r`, `1.5r` (ADR 0085): the literal's exact fraction, reduced at parse,
+# so `1.5r` is `3/2`.
+struct RationalNode
+  kind
+  numerator
+  denominator
+
+  def sexp
+    "(rational #{numerator} #{denominator})"
+  end
+end
+
+# `2i`, `1.5i` (ADR 0085): a complex with a zero real part and the number
+# as its imaginary part.
+struct ImaginaryNode
+  kind
+  value
+
+  def sexp
+    "(imaginary #{value.sexp})"
+  end
+end
+
 # `1..5` / `1...5`; start or end is nil for the beginless and endless
 # forms (ADR 0019).
 struct RangeNode
@@ -994,6 +1017,26 @@ end
 
 def integer_node(value)
   IntegerNode.new(kind: "integer", value: integer_digits(value))
+end
+
+# The digits of `3r` or `1.5r` as a reduced fraction: the point's position
+# is the power of ten.
+def rational_node(text)
+  digits = text.slice(0, text.length - 1).split("_").join("")
+  parts = digits.split(".")
+  whole = parts.first or "0"
+  fraction = parts.length > 1 ? (parts.last or "") : ""
+  scale = 10 ** fraction.length
+  numerator = (whole + fraction).to_i
+  divisor = numerator.gcd(scale)
+  RationalNode.new(kind: "rational", numerator: numerator / divisor, denominator: scale / divisor)
+end
+
+# The number before `i`, as its own literal.
+def imaginary_node(text)
+  number = text.slice(0, text.length - 1)
+  inner = number.include?(".") ? float_node(number) : integer_node(number)
+  ImaginaryNode.new(kind: "imaginary", value: inner)
 end
 
 # An integer literal's value in decimal digits: underscores shed, and a base
@@ -2076,6 +2119,8 @@ def parse_primary(tokens, position)
   case token.kind
   when "integer" then Step.new(node: integer_node(token.text), position: after)
   when "float" then Step.new(node: float_node(token.text), position: after)
+  when "rational" then Step.new(node: rational_node(token.text), position: after)
+  when "imaginary" then Step.new(node: imaginary_node(token.text), position: after)
   when "symbol"
     # `:paid` alone is a symbol; `:paid(on: expr)` carries a payload
     # (ADR 0022). The paren must be attached, or it is a separate thing.
@@ -2960,6 +3005,7 @@ def parse_pattern_primary(tokens, position)
     return parse_pattern_range_from(tokens, float_node(token.text), position + 1) if operator_at?(tokens, position + 1, %w[.. ...])
     return Step.new(node: float_node(token.text), position: position + 1)
   end
+  return pattern_tower_literal(tokens, position) if token.rational? || token.imaginary?
   if token.operator? && token.text == "-" && position + 1 < tokens.length && tokens[position + 1].integer?
     negated = integer_node("-" + tokens[position + 1].text)
     return parse_pattern_range_from(tokens, negated, position + 2) if operator_at?(tokens, position + 2, %w[.. ...])
@@ -3037,6 +3083,13 @@ def parse_pattern_range_bound(tokens, mutable position)
   text = negative ? "-" + token.text : token.text
   return Step.new(node: float_node(text), position: position + 1) if token.float?
   Step.new(node: integer_node(text), position: position + 1)
+end
+
+# A rational or imaginary literal where a pattern stands (ADR 0085).
+def pattern_tower_literal(tokens, position)
+  token = tokens[position]
+  return Step.new(node: rational_node(token.text), position: position + 1) if token.rational?
+  Step.new(node: imaginary_node(token.text), position: position + 1)
 end
 
 # The end of a range pattern, absent for `in 10..` — an end exists only when

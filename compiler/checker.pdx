@@ -831,7 +831,7 @@ end
 # A builtin type's name, as a `when` value or a `===` pattern tests for it
 # (#151): a type, not a value, so not a name to find defined.
 def builtin_type_name?(node)
-  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(node.name)
+  (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(node.name)
 end
 
 def check_case_in(node, scope, mutable found)
@@ -1233,7 +1233,7 @@ def check_defined(name, node, scope, found)
   return found if scope.globals.any? { it[0] == name }
   return found if builtin_function?(name)
   # A builtin type's bare name is the type as a value (ADR 0074).
-  return found if %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(name)
+  return found if %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
   # A removed Ruby spelling names its rewrite instead (#135).
   return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
   noted(found, ["undefined", name], locate(node, scope))
@@ -1242,7 +1242,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[failure fields format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
+def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it
@@ -1514,7 +1514,10 @@ def operator_takes?(operator, left, right)
   # Numbers and strings order (ADR 0054); a struct declines here, since its
   # `<=>` is a call the shape table answers for.
   when "<", "<=", ">", ">=", "<=>"
-    return true if numeric?(left) && numeric?(right)
+    # A complex has no order (ADR 0085) but answers `<=>` — nil unless
+    # both sides are real; the other three floors order.
+    return true if real_numeric?(left) && real_numeric?(right)
+    return true if operator == "<=>" && numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["string"]
     # Symbols order by their names (#105).
     return true if left == ["symbol"] && right == ["symbol"]

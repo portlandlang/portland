@@ -356,7 +356,16 @@ pub enum Expression {
     },
     /// IEEE 754 double (ADR 0018).
     Float(f64),
+    /// `2i`, `1.5i` (ADR 0085): a complex with a zero real part and the
+    /// literal's number as its imaginary part.
+    Imaginary(Box<Expression>),
     Integer(i64),
+    /// `3r`, `1.5r` (ADR 0085): the literal's exact fraction, reduced at
+    /// parse — `1.5r` is `(3/2)`.
+    Rational {
+        denominator: i64,
+        numerator: i64,
+    },
     /// `1..5` / `1...5`, with either end optional for the endless and
     /// beginless forms (ADR 0019).
     Range {

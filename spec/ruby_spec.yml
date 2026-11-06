@@ -704,7 +704,7 @@ core/enumerable/sort_by_spec.rb:
 core/enumerable/sum_spec.rb:
   pdx: [spec/enumerable/extremes_spec.pdx]
   status: partial_intentional
-  reason: "Rationals wait on #198, so the rows sum integers; symbol-to-block waits on #77."
+  reason: "The rational rows sum exactly (spec/number/tower_spec.pdx); symbol-to-block waits on #77."
   link: docs/ruby/types.md
 core/enumerable/each_with_index_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
@@ -960,7 +960,7 @@ core/float/fdiv_spec.rb:
 core/float/exponent_spec.rb:
   pdx: [spec/number/float/division_spec.pdx]
   status: partial_planned
-  reason: "A negative float to a fractional power is a Complex in Ruby; whether Portland has Complex is #198."
+  reason: "A negative float to a fractional power is a Complex, as Ruby's is (spec/number/complex_spec.pdx); the bignum and coercion rows stay upstream."
   link: https://github.com/portlandlang/portland/issues/198
 core/float/next_float_spec.rb:
   pdx: [spec/number/float/steps_spec.pdx]
@@ -1586,7 +1586,7 @@ core/integer/element_reference_spec.rb:
 core/integer/eql_spec.rb:
   pdx: [spec/eql_spec.pdx]
   status: partial_intentional
-  reason: "Integers are 64-bit, so the bignum rows are written with fixnums; rationals wait on #198."
+  reason: "Integers are 64-bit, so the bignum rows are written with fixnums; a rational is never eql? to an integer, as in Ruby."
   link: docs/ruby/equality.md
 core/integer/equal_value_spec.rb:
   pdx: [spec/number/integer/identity_spec.pdx]
@@ -1710,7 +1710,7 @@ core/numeric/abs_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/angle_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/ceil_spec.rb:
   status: skipped
@@ -1730,7 +1730,7 @@ core/numeric/comparison_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/conj_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/div_spec.rb:
   status: skipped
@@ -1763,7 +1763,7 @@ core/numeric/floor_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/imag_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/infinite_spec.rb:
   status: skipped
@@ -1796,7 +1796,7 @@ core/numeric/numeric_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/phase_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/positive_spec.rb:
   pdx: [spec/number/integer/sign_spec.pdx, spec/number/float/sign_spec.pdx]
@@ -1806,11 +1806,11 @@ core/numeric/positive_spec.rb:
 core/numeric/quo_spec.rb:
   pdx: [spec/number/float/division_spec.pdx]
   status: partial_planned
-  reason: "quo answers a Rational for two integers, which waits on the Rational decision; the Float rows are specced, the bignum rows wait on #156, and the to_r row drives a mock subclass."
+  reason: "quo answers a Rational for two integers, as Ruby's does (spec/number/rational_spec.pdx); the Float rows are specced, the bignum rows wait on #156, and the to_r row drives a mock subclass."
   link: https://github.com/portlandlang/portland/issues/198
 core/numeric/rect_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the Complex family waits on #198."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/remainder_spec.rb:
   status: skipped
@@ -1853,7 +1853,7 @@ core/numeric/zero_spec.rb:
 core/random/new_spec.rb:
   pdx: [spec/random/random_spec.pdx]
   status: partial_intentional
-  reason: "Rationals and Complex wait on #198, so their seed rows stay upstream."
+  reason: "A seed is an integer here; the rational and complex seed rows stay upstream."
   link: docs/ruby/randomness.md
 core/random/rand_spec.rb:
   pdx: [spec/random/random_spec.pdx]
@@ -2493,6 +2493,246 @@ core/set/union_spec.rb:
   pdx: [spec/set/algebra_spec.pdx]
   status: partial_intentional
   reason: "| is out of the grammar (ADR 0003, #207), so union and + carry the rows; the compare_by_identity row stays upstream."
+core/rational/abs_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum row stays upstream (ADR 0070)."
+core/rational/ceil_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The precision rows (ceil(2)) stay upstream; the bare form is Ruby's."
+core/rational/comparison_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/rational/denominator_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum row stays upstream (ADR 0070)."
+core/rational/div_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "A zero divisor refuses as 1 / 0 does, pinned by the two-oracle test."
+core/rational/divide_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155); a zero divisor refuses, pinned by the two-oracle test."
+core/rational/divmod_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion rows stay upstream (#155); a zero divisor refuses."
+core/rational/equal_value_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155)."
+core/rational/exponent_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum, coercion, and mock rows stay upstream (ADR 0070, #155); a negative power of zero refuses as 1 / 0 does."
+core/rational/fdiv_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/floor_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The precision rows (floor(2)) stay upstream; the bare form is Ruby's."
+core/rational/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?."
+  link: docs/ruby/equality.md
+core/rational/inspect_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(rational), not a method (ADR 0026); the bignum row stays upstream."
+core/rational/integer_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/magnitude_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/marshal_dump_spec.rb:
+  status: skipped
+  reason: "There is no Marshal; a value crosses a boundary as JSON (ADR 0072)."
+  link: docs/ruby/json.md
+core/rational/minus_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/rational/modulo_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "A zero divisor refuses as 1 / 0 does."
+core/rational/multiply_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/rational/numerator_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum row stays upstream (ADR 0070)."
+core/rational/plus_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/rational/quo_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/rational_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "Rational builds from numbers; the string and nil rows stay upstream, and a bad argument refuses where Ruby raises."
+core/rational/rationalize_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/remainder_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/round_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The precision and half-mode rows stay upstream; the bare form rounds half away from zero, as Ruby's does."
+core/rational/to_f_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/to_i_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/to_r_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The mock row stays upstream."
+core/rational/to_s_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/rational/truncate_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+  status: partial_intentional
+  reason: "The precision rows (truncate(2)) stay upstream; the bare form is Ruby's."
+core/rational/zero_spec.rb:
+  pdx: [spec/number/rational_spec.pdx]
+core/complex/abs_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/abs2_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/angle_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/arg_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/coerce_spec.rb:
+  status: skipped
+  reason: "There is no coercion protocol yet (#155): a struct does not join the arithmetic by defining coerce."
+  link: docs/ruby/numbers.md
+core/complex/comparison_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/conj_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/conjugate_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/constants_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/denominator_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum row stays upstream (ADR 0070)."
+core/complex/divide_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155); a zero divisor refuses, pinned by the two-oracle test."
+core/complex/eql_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock rows stay upstream."
+core/complex/equal_value_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155)."
+core/complex/exponent_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155)."
+core/complex/fdiv_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion and mock rows stay upstream (#155); the Infinity and NaN rows are the floats' own."
+core/complex/finite_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/hash_spec.rb:
+  status: skipped
+  reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?."
+  link: docs/ruby/equality.md
+core/complex/imag_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/imaginary_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/infinite_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/inspect_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is a function, inspect(complex), not a method (ADR 0026); the bignum rows stay upstream."
+core/complex/integer_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/magnitude_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/marshal_dump_spec.rb:
+  status: skipped
+  reason: "There is no Marshal; a value crosses a boundary as JSON (ADR 0072)."
+  link: docs/ruby/json.md
+core/complex/minus_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/complex/multiply_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/complex/negative_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The row asserts negative? is missing, which the method table says before anything runs."
+core/complex/numerator_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/phase_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/plus_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The coercion, mock, and bignum rows stay upstream (#155, ADR 0070)."
+core/complex/polar_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/positive_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The row asserts positive? is missing, which the method table says before anything runs."
+core/complex/quo_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/rationalize_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock rows stay upstream; a nonzero imaginary part refuses in Ruby's words."
+core/complex/real_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock row stays upstream."
+core/complex/rect_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/rectangular_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock and non-numeric rows stay upstream; Complex.rectangular takes numbers."
+core/complex/to_c_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+core/complex/to_f_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock rows stay upstream; a nonzero imaginary part refuses in Ruby's words."
+core/complex/to_i_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock rows stay upstream; a nonzero imaginary part refuses in Ruby's words."
+core/complex/to_r_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The mock rows stay upstream; a nonzero imaginary part refuses in Ruby's words, pinned by the two-oracle test."
+core/complex/to_s_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum rows stay upstream (ADR 0070)."
+core/complex/uminus_spec.rb:
+  pdx: [spec/number/complex_spec.pdx]
+  status: partial_intentional
+  reason: "The bignum rows stay upstream (ADR 0070)."
 core/string/allocate_spec.rb:
   status: skipped
   reason: "There is no String class object to allocate from; a string is a value."

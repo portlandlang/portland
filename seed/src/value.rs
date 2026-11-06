@@ -42,6 +42,19 @@ pub enum Value {
         exclusive: bool,
         start: Option<Box<Value>>,
     },
+    /// `Rational(1, 3)`, `3r` (ADR 0085): a reduced fraction of two 64-bit
+    /// integers, the denominator positive. The arithmetic lives in
+    /// `tower.rs`.
+    Rational {
+        denominator: i64,
+        numerator: i64,
+    },
+    /// `Complex(1, 2)`, `2i` (ADR 0085): two real parts — integers,
+    /// floats, or rationals — as Ruby's hold them.
+    Complex {
+        imaginary: Box<Value>,
+        real: Box<Value>,
+    },
     /// `Set[1, 2, 3]` (ADR 0082): distinct members in insertion order,
     /// distinct by `eql?` as Ruby's are, so `1` and `1.0` are two members.
     /// Equality is membership, never order. Built by `Value::set`, which
@@ -188,6 +201,11 @@ impl Value {
     /// hash's order is not its identity, and its keys still match by
     /// `eql?`, so `{1 => :x}` is not `{1.0 => :x}`.
     pub fn ruby_equals(&self, other: &Value) -> bool {
+        // A rational or complex compares by value across the reals (ADR
+        // 0085): `Rational(2, 1) == 2`, `Complex(1, 0) == 1`.
+        if let Some(answer) = crate::tower::equals(self, other) {
+            return answer;
+        }
         match (self, other) {
             (Value::Integer(left), Value::Float(right))
             | (Value::Float(right), Value::Integer(left)) => *left as f64 == *right,
@@ -350,8 +368,10 @@ impl Value {
             Value::Float(_) => Some("float"),
             Value::Hash(_) => Some("hash"),
             Value::Integer(_) => Some("integer"),
+            Value::Complex { .. } => Some("complex"),
             Value::Random(_) => Some("random"),
             Value::Range { .. } => Some("range"),
+            Value::Rational { .. } => Some("rational"),
             Value::Set(_) => Some("set"),
             Value::String(_) => Some("string"),
             Value::Symbol(_) => Some("symbol"),
@@ -370,8 +390,10 @@ impl Value {
             Value::Hash(_) => "Hash".to_string(),
             Value::Integer(_) => "Integer".to_string(),
             Value::Nil => "nil".to_string(),
+            Value::Complex { .. } => "Complex".to_string(),
             Value::Random(_) => "Random".to_string(),
             Value::Range { .. } => "Range".to_string(),
+            Value::Rational { .. } => "Rational".to_string(),
             Value::Set(_) => "Set".to_string(),
             Value::String(_) => "String".to_string(),
             Value::Struct { name, .. } => name.clone(),
@@ -420,6 +442,8 @@ impl Value {
             // The spelling that builds one from the same seed; where it has
             // been drawn from is not written, as Ruby's is not.
             Value::Random(generator) => format!("Random.new({})", generator.borrow().seed),
+            // Ruby's `(1/3)` and `(1+2i)` (ADR 0085).
+            Value::Rational { .. } | Value::Complex { .. } => crate::tower::inspect(self),
             // Ruby 4's spelling, which is also the constructor's.
             Value::Set(members) => {
                 let inner: Vec<String> = members.iter().map(Value::inspect).collect();
@@ -562,6 +586,10 @@ impl fmt::Display for Value {
             }
             Value::Nil => write!(formatter, "nil"),
             Value::Random(_) | Value::Set(_) => write!(formatter, "{}", self.inspect()),
+            // `1/3` and `1+2i`: the inspect forms without their parentheses.
+            Value::Rational { .. } | Value::Complex { .. } => {
+                write!(formatter, "{}", crate::tower::to_s(self))
+            }
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::Failure(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),

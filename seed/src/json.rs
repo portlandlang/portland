@@ -651,6 +651,8 @@ fn key_text(key: &Value) -> String {
 fn not_json(value: &Value) -> ! {
     match value {
         Value::Range { .. } => panic!("a Range is not JSON — generate its 'to_a'"),
+        Value::Rational { .. } => panic!("a Rational is not JSON — generate its 'to_f'"),
+        Value::Complex { .. } => panic!("a Complex is not JSON — generate its 'rectangular'"),
         Value::Struct { name, .. } => panic!("a {name} is not JSON — generate its 'to_h'"),
         Value::EnumCase { name, .. } => {
             panic!(":{name} carries a payload, which is not JSON — generate its 'to_h'")

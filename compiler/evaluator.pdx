@@ -110,6 +110,7 @@ def builtin_constants
     ["Encoding::UTF_8", "constant", "UTF-8"],
     # `Math`'s two constants (ADR 0083), Ruby's values.
     ["Math::PI", "constant", 3.141592653589793],
+    ["Complex::I", "constant", Complex(0, 1)],
     ["Math::E", "constant", 2.718281828459045]
   ]
 end
@@ -356,6 +357,8 @@ def guest_type_matches(name, subject, bindings)
   when "Random" then return Random === subject
   when "Set" then return subject in ["__set__", *]
   when "String" then return String === subject
+  when "Rational" then return Rational === subject
+  when "Complex" then return Complex === subject
   end
   slot = resolve(bindings, name)
   return nil if slot.empty? || slot.first[1] != "struct"
@@ -454,7 +457,7 @@ end
 
 # The seed's builtin_name: names a local may never take.
 def builtin_method?(name)
-  %w[failure format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
+  %w[Complex Rational failure format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
 end
 
 # The top of a file: no frame and no namespace around these bindings.
@@ -644,6 +647,8 @@ def match_builtin_type(pattern, subject)
   when "Range"   then subject in Range
   when "Set"     then subject in ["__set__", *]
   when "String"  then subject in String
+  when "Rational" then subject in Rational
+  when "Complex" then subject in Complex
   when "Symbol"  then subject in ["__symbol__", *]
   # Guest structs, symbols, and enum cases are tagged host arrays — not arrays.
   when "Array"   then plain_array?(subject)
@@ -654,7 +659,7 @@ def match_builtin_type(pattern, subject)
 end
 
 def match_struct(pattern, subject, bindings, earlier)
-  if %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(pattern.name)
+  if %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
@@ -979,6 +984,11 @@ def evaluate_expression(node, bindings)
   in SlotCompoundNode then evaluate_slot_compound(node, bindings)
   in IntegerNode(value:) then outcome([value.to_i], bindings)
   in FloatNode(value:) then outcome([value.to_f], bindings)
+  # The tower's literals (ADR 0085), as host values.
+  in RationalNode(numerator:, denominator:) then outcome([Rational(numerator, denominator)], bindings)
+  in ImaginaryNode(value: inner)
+    step = evaluate_expression(inner, bindings)
+    outcome([Complex(0, slot_value(step.value))], step.bindings)
   in RangeNode then evaluate_range(node, bindings)
   in LogicalNode then evaluate_logical(node, bindings)
   in MatchAssertNode then evaluate_match_assert(node, bindings)
@@ -1258,7 +1268,7 @@ end
 
 # The builtin types whose bare name is a type value (ADR 0074): the value
 # types, not the function namespaces `System` and `JSON`.
-def builtin_type_value_name?(name) = %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(name)
+def builtin_type_value_name?(name) = %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
 
 # What `value.class` answers (ADR 0074): a struct's qualified name, a
 # builtin's type name, tagged. An enum case, a wrapper, a type itself, and
@@ -1293,12 +1303,14 @@ def value_type_label(value)
   return "Set" if value in ["__set__", *]
   return "Array" if plain_array?(value)
   case value
-  in Integer then "Integer"
-  in Float   then "Float"
-  in Boolean then "Boolean"
-  in Hash    then "Hash"
-  in Range   then "Range"
-  in Random  then "Random"
+  in Integer  then "Integer"
+  in Float    then "Float"
+  in Rational then "Rational"
+  in Complex  then "Complex"
+  in Boolean  then "Boolean"
+  in Hash     then "Hash"
+  in Range    then "Range"
+  in Random   then "Random"
   else "String"
   end
 end
@@ -1969,6 +1981,9 @@ def render_inspect(value)
     return "{" + pairs.join(", ") + "}"
   end
   return encode_string(value) if value in String
+  # A rational or complex is a host value (ADR 0085): Ruby's `(1/3)` and
+  # `(1+2i)` are the host's inspect.
+  return inspect(value) if (value in Rational) || (value in Complex)
   # A range inspects each end (ADR 0081), so `"a".."f"` keeps its quotes.
   if value in Range
     low = value.begin.nil? ? "" : render_inspect(value.begin)
@@ -2256,6 +2271,17 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return mapped_guest_set(node, candidates, bindings)
   end
   return outcome([guest_set(arguments)], bindings) if type_name == "Set" && node.name == "[]"
+  # `Complex.polar` and `Complex.rectangular` (ADR 0085), the host's own.
+  if type_name == "Complex" && %w[polar rect rectangular].include?(node.name)
+    panic("Complex.#{node.name} takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    first = value_at(arguments, 0)
+    built = if node.name == "polar"
+      arguments.length == 1 ? Complex.polar(first) : Complex.polar(first, value_at(arguments, 1))
+    else
+      arguments.length == 1 ? Complex.rectangular(first) : Complex.rectangular(first, value_at(arguments, 1))
+    end
+    return outcome([built], bindings)
+  end
   panic("#{type_name} has no #{node.name}")
 end
 
@@ -2958,7 +2984,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Math Random Range Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Complex Hash Integer JSON Math Random Range Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   # `Name.new(...)` constructs through the written name; a local holding a
@@ -3294,6 +3320,22 @@ def evaluate_method_call(node, mutable bindings)
   when "truncate" then arguments.empty? ? receiver.truncate : receiver.truncate(value_at(arguments, 0))
   when "positive?" then receiver.positive?
   when "negative?" then receiver.negative?
+  # The tower's names (ADR 0085), the host's own answers.
+  when "numerator" then receiver.numerator
+  when "denominator" then receiver.denominator
+  when "rationalize" then arguments.empty? ? receiver.rationalize : receiver.rationalize(value_at(arguments, 0))
+  when "to_r" then receiver.to_r
+  when "to_c" then receiver.to_c
+  when "real" then receiver.real
+  when "imaginary", "imag" then receiver.imaginary
+  when "real?" then receiver.real?
+  when "conjugate", "conj" then receiver.conjugate
+  when "arg", "angle", "phase" then receiver.arg
+  when "polar" then receiver.polar
+  when "rectangular", "rect" then receiver.rectangular
+  when "abs2" then receiver.abs2
+  when "i" then receiver.i
+  when "integer?" then receiver.integer?
   when "keys" then receiver.keys
   when "merge" then receiver.merge(value_at(arguments, 0))
   when "dig" then dig_into(receiver, arguments)
@@ -3483,6 +3525,8 @@ def builtin_type_of(value)
   return ["array", ["unknown"]] if plain_array?(value)
   return ["random"] if value in Random
   return ["set"] if value in ["__set__", *]
+  return ["rational"] if value in Rational
+  return ["complex"] if value in Complex
   nil
 end
 
@@ -4785,6 +4829,16 @@ def evaluate_call(node, mutable bindings)
     # `p` without the printing (ADR 0026); the host builtin answers the
     # untagged shapes, and render_inspect already speaks for the tagged ones.
     outcome([render_inspect(slot_value(arguments))], bindings)
+  # The tower's constructors (ADR 0085): the host's own, since a guest
+  # rational or complex is a host value, as a float is.
+  when "Rational"
+    panic("Rational takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    built = arguments.length == 1 ? Rational(value_at(arguments, 0)) : Rational(value_at(arguments, 0), value_at(arguments, 1))
+    outcome([built], bindings)
+  when "Complex"
+    panic("Complex takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    built = arguments.length == 1 ? Complex(value_at(arguments, 0)) : Complex(value_at(arguments, 0), value_at(arguments, 1))
+    outcome([built], bindings)
   when "require_relative"
     evaluate_require(slot_value(arguments), bindings)
   when "require"

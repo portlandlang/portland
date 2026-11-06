@@ -26,8 +26,12 @@ pub enum TokenKind {
     Greater,
     GreaterEqual,
     Identifier,
+    /// `2i`, `1.5i` (ADR 0085): a number with the imaginary suffix.
+    Imaginary,
     Integer,
     Keyword,
+    /// `3r`, `1.5r` (ADR 0085): a number with the rational suffix.
+    Rational,
     LeftBrace,
     LeftBracket,
     LeftParen,
@@ -329,6 +333,29 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         let written = &source[start..end + 1 + usize::from(signed)];
                         panic!("'{written}' has no digits in its exponent");
                     }
+                }
+                // Ruby's `r` and `i` suffixes (ADR 0085): `3r`, `1.5r`,
+                // `2i`, `1.5i` — a letter that ends the number, not one
+                // that starts a name (`2if` is still a refusal elsewhere).
+                if let Some(suffix) = source[end..].chars().next()
+                    && (suffix == 'r' || suffix == 'i')
+                    && !source[end + 1..].starts_with(|character: char| {
+                        character.is_ascii_alphanumeric() || character == '_'
+                    })
+                {
+                    let number = &source[start..end];
+                    if number.contains(['e', 'E']) {
+                        panic!(
+                            "'{number}{suffix}' has an exponent — a rational or imaginary literal takes digits and a point"
+                        );
+                    }
+                    chars.next(); // the suffix
+                    end += 1;
+                    kind = if suffix == 'r' {
+                        TokenKind::Rational
+                    } else {
+                        TokenKind::Imaginary
+                    };
                 }
                 let text = &source[start..end];
                 if text.contains("__")

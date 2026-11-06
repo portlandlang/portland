@@ -1,0 +1,58 @@
+# The tower's names every real answers (ADR 0085), and the contagion
+# across its floors: `numerator`, `denominator`, `to_r`, `to_c`, `real`,
+# `imaginary`, `arg`, `polar`, `rectangular`, `conjugate`, `abs2`, `i` on
+# integers and floats; sums that stay exact.
+#
+# From ruby/spec core/numeric/{angle,arg,phase,conj,imag,real,rect,polar,
+# abs2,i,quo}_spec.rb where a row runs on a builtin, and
+# core/enumerable/sum_spec.rb's rational rows. Upstream: the rows that drive
+# a mock Numeric subclass — there is no Numeric to subclass.
+
+require_relative "../spec_helper"
+
+context "The numeric tower" do
+  describe "the real-valued names on an integer and a float" do
+    specify "real, imaginary, real?, conjugate" do
+      expect(3.real).to eq(3)
+      expect(3.imag).to eq(0)
+      expect(3.imaginary).to eq(0)
+      expect(3.real?).to be_true
+      expect(3.conj).to eq(3)
+      expect(1.5.conjugate).to eq(1.5)
+    end
+
+    specify "arg is 0 or pi by the sign" do
+      expect(3.arg).to eq(0)
+      expect(-3.arg).to eq(3.141592653589793)
+      expect(3.0.angle).to eq(0)
+      expect(-3.0.phase).to eq(3.141592653589793)
+    end
+
+    specify "rectangular and polar" do
+      expect(3.rect).to eq([3, 0])
+      expect(3.rectangular).to eq([3, 0])
+      expect(3.polar).to eq([3, 0])
+      expect(-3.polar).to eq([3, 3.141592653589793])
+    end
+
+    specify "abs2 and i" do
+      expect(3.abs2).to eq(9)
+      expect(1.5.abs2).to eq(2.25)
+      expect(3.i).to eq(Complex(0, 3))
+    end
+  end
+
+  describe "contagion" do
+    specify "an integer with a rational is a rational, with a complex a complex" do
+      expect((1 + Rational(1, 2)).class).to eq(Rational)
+      expect((Rational(1, 2) + 0.5).class).to eq(Float)
+      expect((1 + Complex(0, 1)).class).to eq(Complex)
+      expect((Rational(1, 3) + Complex(1, 2)).class).to eq(Complex)
+    end
+
+    specify "sums stay exact" do
+      expect([Rational(1, 2), Rational(1, 3)].sum).to eq(Rational(5, 6))
+      expect([Complex(1, 2), 3].sum).to eq(Complex(4, 2))
+    end
+  end
+end

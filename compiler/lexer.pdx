@@ -24,6 +24,14 @@ struct Token
     kind == "integer"
   end
 
+  def rational?
+    kind == "rational"
+  end
+
+  def imaginary?
+    kind == "imaginary"
+  end
+
   def keyword?
     kind == "keyword"
   end
@@ -726,6 +734,16 @@ def lex(raw_source, first_line: 1)
             panic "'#{written}' has no digits in its exponent"
           end
         end
+      end
+      # Ruby's `r` and `i` suffixes (ADR 0085): a letter that ends the
+      # number, not one that starts a name — the seed's reading.
+      if index < characters.length && (characters[index] == "r" || characters[index] == "i") && !(index + 1 < characters.length && name_character?(characters[index + 1]))
+        if text.include?("e") || text.include?("E")
+          panic "'#{text}#{characters[index]}' has an exponent — a rational or imaginary literal takes digits and a point"
+        end
+        kind = characters[index] == "r" ? "rational" : "imaginary"
+        text << characters[index]
+        index += 1
       end
       if text.include?("__") || text.end_with?("_") || text.include?("_.") || %w[_e _E e_ E_ +_ -_].any? { text.include?(it) }
         panic "an underscore in a number sits between digits — #{text} has one loose"

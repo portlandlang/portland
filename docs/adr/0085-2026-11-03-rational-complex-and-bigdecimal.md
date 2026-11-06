@@ -1,6 +1,6 @@
 # 0085 — Rational and Complex are core; BigDecimal is a default tile
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, reversing the recommendation in [#124](https://github.com/portlandlang/portland/issues/124) to defer — "build now"; not built — the builds are [#198](https://github.com/portlandlang/portland/issues/198) for Rational and Complex and [#199](https://github.com/portlandlang/portland/issues/199) for BigDecimal). The shape below is the author's reading of "build now" and is open to amendment.
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, reversing the recommendation in [#124](https://github.com/portlandlang/portland/issues/124) to defer — "build now"; Rational and Complex built on both implementations 2026-11-06 under [#198](https://github.com/portlandlang/portland/issues/198); BigDecimal's build is [#199](https://github.com/portlandlang/portland/issues/199)). The shape below is the author's reading of "build now" and is open to amendment.
 - **Date:** 2026-11-03
 - **Issue:** [#124](https://github.com/portlandlang/portland/issues/124)
 

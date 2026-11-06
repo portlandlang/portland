@@ -50,7 +50,10 @@ fn integer_range(start: Option<i64>, end: Option<i64>, exclusive: bool) -> Value
 /// range may hold as its ends (ADR 0081), and probe for membership.
 fn comparable_pair(left: &Value, right: &Value) -> bool {
     match (left, right) {
-        (Value::Integer(_) | Value::Float(_), Value::Integer(_) | Value::Float(_)) => true,
+        (
+            Value::Integer(_) | Value::Float(_) | Value::Rational { .. },
+            Value::Integer(_) | Value::Float(_) | Value::Rational { .. },
+        ) => true,
         (Value::String(_), Value::String(_))
         | (Value::Symbol(_), Value::Symbol(_))
         | (Value::Array(_), Value::Array(_)) => true,
@@ -568,6 +571,7 @@ fn as_float(value: &Value) -> f64 {
     match value {
         Value::Float(number) => *number,
         Value::Integer(number) => *number as f64,
+        Value::Rational { .. } => crate::tower::to_f64(value),
         other => panic!("expected a number, got {other:?}"),
     }
 }
@@ -627,6 +631,11 @@ fn builtin_constants() -> HashMap<String, Value> {
     );
     // `Math`'s two constants (ADR 0083), Ruby's values.
     constants.insert("Math::PI".to_string(), Value::Float(std::f64::consts::PI));
+    // The imaginary unit (ADR 0085).
+    constants.insert(
+        "Complex::I".to_string(),
+        crate::tower::complex(Value::Integer(0), Value::Integer(1)),
+    );
     constants.insert("Math::E".to_string(), Value::Float(std::f64::consts::E));
     constants
 }
@@ -771,14 +780,17 @@ fn integer_in_base(number: i64, base: i64) -> String {
 /// Integer division, floored — Ruby's rule, not Rust's truncation
 /// (ADR 0018): `-7 / 2` is `-4`, because the quotient rounds toward
 /// negative infinity rather than toward zero.
-/// Integer `**` and `pow` (ADR 0033). Two edges Ruby has answers for that
-/// Portland cannot follow: a negative exponent is a Rational there and a
-/// refusal here, and past-i64 results refuse the way past-i64 literals do.
+/// Integer `**` and `pow` (ADR 0033) for a non-negative exponent — a
+/// negative one is the tower's rational (ADR 0085), taken before this.
+/// Past-i64 results refuse the way past-i64 literals do.
 fn integer_power(left: i64, right: i64) -> Value {
     if right < 0 {
-        panic!(
-            "{left} ** {right} is a fraction, and integers have none — write {left}.0 ** {right} for the float"
-        );
+        return crate::tower::binary(
+            &Value::Integer(left),
+            BinaryOperator::Power,
+            &Value::Integer(right),
+        )
+        .expect("a negative power is the tower's");
     }
     // A magnitude of one never grows, however tall the tower — Ruby's
     // answers, reached before the width check could refuse them.
@@ -1808,6 +1820,12 @@ fn ruby_sum(addends: &[Value], initial: Value) -> Value {
     if addends.is_empty() {
         return initial;
     }
+    // A rational or complex anywhere sums exactly through `+` (ADR 0085),
+    // as Ruby's does — the float compensation below is for floats alone.
+    let tower = |value: &Value| matches!(value, Value::Rational { .. } | Value::Complex { .. });
+    if tower(&initial) || addends.iter().any(tower) {
+        return added_through_plus(initial, addends);
+    }
     let float_initial = match initial {
         Value::Float(number) => Some(number),
         _ => None,
@@ -2214,7 +2232,11 @@ fn ordering_operator(operator: BinaryOperator) -> bool {
 fn orderable(value: &Value) -> bool {
     matches!(
         value,
-        Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Struct { .. }
+        Value::Integer(_)
+            | Value::Float(_)
+            | Value::Rational { .. }
+            | Value::String(_)
+            | Value::Struct { .. }
     )
 }
 
@@ -2230,6 +2252,11 @@ fn checked_integer(answer: Option<i64>, written: impl FnOnce() -> String) -> Val
 }
 
 fn apply_binary(left: Value, operator: &BinaryOperator, right: Value) -> Value {
+    // The tower (ADR 0085): a rational or complex on either side, an
+    // integer to a negative power, a negative base to a fractional power.
+    if let Some(answer) = crate::tower::binary(&left, *operator, &right) {
+        return answer;
+    }
     match (left, operator, right) {
         (Value::Integer(left), BinaryOperator::Add, Value::Integer(right)) => {
             checked_integer(left.checked_add(right), || format!("{left} + {right}"))
@@ -3585,6 +3612,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.run_nested(body)
             }
             Expression::Integer(value) => Some(Value::Integer(*value)),
+            // The tower's literals (ADR 0085).
+            Expression::Rational {
+                denominator,
+                numerator,
+            } => Some(crate::tower::rational(*numerator, *denominator)),
+            Expression::Imaginary(inner) => {
+                let imaginary = self.value_of(inner);
+                Some(crate::tower::complex(Value::Integer(0), imaginary))
+            }
             Expression::String(value) => Some(Value::String(value.clone())),
             Expression::Symbol(name) => Some(Value::Symbol(name.clone())),
             Expression::EnumCase { name, payload } => {
@@ -3655,6 +3691,8 @@ impl<W: std::io::Write> Interpreter<W> {
                             | "Range"
                             | "Set"
                             | "System"
+                            | "Complex"
+                            | "Rational"
                     )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
@@ -3776,6 +3814,14 @@ impl<W: std::io::Write> Interpreter<W> {
                         }))
                     }
                     (UnaryOperator::Negate, Value::Float(value)) => Some(Value::Float(-value)),
+                    (
+                        UnaryOperator::Negate,
+                        value @ (Value::Rational { .. } | Value::Complex { .. }),
+                    ) => crate::tower::negate(&value),
+                    (
+                        UnaryOperator::Plus,
+                        number @ (Value::Rational { .. } | Value::Complex { .. }),
+                    ) => Some(number),
                     (UnaryOperator::Not, Value::Boolean(value)) => Some(Value::Boolean(!value)),
                     (UnaryOperator::Plus, number @ (Value::Integer(_) | Value::Float(_))) => {
                         Some(number)
@@ -3806,6 +3852,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     // Bare own-method calls inside a struct method (#27).
                     let (struct_name, receiver) = self.self_receiver.clone().unwrap();
                     self.call_struct_method(struct_name, receiver, method, Vec::new(), Vec::new())
+                } else if matches!(name.as_str(), "Complex" | "Rational")
+                    && self.lookup_method(name).is_none()
+                {
+                    // The two constructors double as type names (ADR 0085):
+                    // bare, each is the type as a value, as `Integer` is.
+                    Some(Value::Type(name.clone()))
                 } else if self.lookup_method(name).is_some() || Self::builtin_name(name) {
                     self.call(name, Vec::new(), Vec::new())
                 } else if let Some((qualified, _)) =
@@ -3826,6 +3878,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Set"
                         | "String"
                         | "Symbol"
+                        | "Complex"
+                        | "Rational"
                 ) {
                     Some(Value::Type(name.clone()))
                 } else {
@@ -4020,6 +4074,11 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
             ("Random", "new") => Some(random_new(&arguments)),
+            // `Complex.polar` and `Complex.rectangular` (ADR 0085).
+            ("Complex", _) => Some(
+                crate::tower::complex_type_function(name, &arguments)
+                    .unwrap_or_else(|| panic!("Complex has no {name}")),
+            ),
             // `Set.new(enumerable)` and `Set[a, b]` (ADR 0082): the members
             // in order, repeats dropped; a block maps each member first, as
             // Ruby's does.
@@ -4922,6 +4981,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "String"
                 | "Symbol"
                 | "System"
+                | "Complex"
+                | "Rational"
         ) {
             return self.builtin_type_function(
                 type_name,
@@ -5011,6 +5072,14 @@ impl<W: std::io::Write> Interpreter<W> {
             && !matches!(receiver, Value::Nil)
         {
             return Some(Self::class_of(&receiver));
+        }
+        // The tower's methods (ADR 0085): a rational's and a complex's own,
+        // and the names every real answers — before the integer and float
+        // arms, so `1.quo(2)` is a rational and `3.to_r` exists.
+        if block.is_none()
+            && let Some(answer) = crate::tower::method(&receiver, name, &arguments)
+        {
+            return Some(answer);
         }
         // A set's own names (ADR 0082), then Ruby's Enumerable through its
         // members; any other name falls through to the general arms and the
@@ -7625,7 +7694,9 @@ impl<W: std::io::Write> Interpreter<W> {
     fn builtin_name(name: &str) -> bool {
         matches!(
             name,
-            "failure"
+            "Complex"
+                | "Rational"
+                | "failure"
                 | "format"
                 | "inspect"
                 | "p"
@@ -7785,6 +7856,7 @@ impl<W: std::io::Write> Interpreter<W> {
             .map(|element| match element {
                 Value::Integer(value) => *value as f64,
                 Value::Float(value) => *value,
+                Value::Rational { .. } => crate::tower::to_f64(element),
                 other => panic!("{method} needs an array of numbers, found {other:?}"),
             })
             .collect()
@@ -8303,6 +8375,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Set"
                         | "String"
                         | "Symbol"
+                        | "Complex"
+                        | "Rational"
                 ) {
                     if !pattern_fields.is_empty() {
                         panic!("the builtin type pattern {name} takes no fields");
@@ -8319,6 +8393,8 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Set", Value::Set(_))
                             | ("String", Value::String(_))
                             | ("Symbol", Value::Symbol(_))
+                            | ("Complex", Value::Complex { .. })
+                            | ("Rational", Value::Rational { .. })
                     );
                     return if matched { Some(Vec::new()) } else { None };
                 }
@@ -8416,6 +8492,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "Set"
                 | "String"
                 | "Symbol"
+                | "Complex"
+                | "Rational"
         ) {
             return Some(subject.type_name() == name);
         }
@@ -8759,6 +8837,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 ("require", [Value::String(name)]) => {
                     return Some(Value::Boolean(self.require(name)));
                 }
+                // The tower's constructors (ADR 0085), Ruby's spellings.
+                ("Rational", _) => return Some(crate::tower::rational_function(&arguments)),
+                ("Complex", _) => return Some(crate::tower::complex_function(&arguments)),
                 _ => {}
             }
         }

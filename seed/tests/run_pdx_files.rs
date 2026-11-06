@@ -841,10 +841,6 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "x = -2.abs ** 2\n",
             "a chained negative literal under ** is ambiguous — write ((-2).abs) ** 2 or -(2.abs ** 2)",
         ),
-        (
-            "x = 2 ** -1\n",
-            "2 ** -1 is a fraction, and integers have none — write 2.0 ** -1 for the float",
-        ),
         ("x = 2 ** 100\n", "2 ** 100 overflows the 64-bit integers"),
         // ADR 0031: type functions, definable `new`, and `fields`.
         (
@@ -2688,6 +2684,41 @@ fn pattern_gaps_on_both_oracles() {
             (
                 "case {a: 1}\nin {\"a\" => 1} then 1\nend\n",
                 "hash patterns take symbol keys",
+            ),
+        ],
+    );
+}
+
+/// Rational and Complex on both oracles (ADR 0085, #198): the constructors
+/// and the `r` and `i` suffixes, Ruby's contagion, the reduced and
+/// canonical answers, `inspect` as Ruby spells it, and the refusals — a
+/// zero denominator in Ruby's words, a conversion a complex cannot make.
+#[test]
+fn rational_and_complex_on_both_oracles() {
+    assert_both_print(
+        "tower.pdx",
+        "p(Rational(6, 4))\np(1.5r)\np(2i)\np(Rational(1, 3) + 1)\np(Rational(1, 3) + 1.0)\np(2 ** -1)\np(1.quo(2))\n\
+         p(0.75.to_r)\np(0.333.rationalize(Rational(1, 100)))\np(Rational(5, 2).round)\n\
+         p(Complex(1, 2) * Complex(3, 4))\np(Complex(1, 2) / Complex(3, 4))\np(Complex(1, 2) ** -1)\np(Complex(1, 2) ** 0.5)\n\
+         p((-8.0) ** (1.0 / 3))\np(Complex(3, 4).abs)\np(Complex(3, 4).polar)\np(Complex(1, Rational(-1, 2)))\n\
+         p(Complex(1, 0) == 1)\np(Rational(1, 2) == 0.5)\np([Rational(1, 2), Rational(1, 3)].sum)\np(Complex::I)\n",
+        "(3/2)\n(3/2)\n(0+2i)\n(4/3)\n1.3333333333333333\n(1/2)\n(1/2)\n(3/4)\n(1/3)\n3\n(-5+10i)\n((11/25)+(2/25)*i)\n((1/5)-(2/5)*i)\n(1.272019649514069+0.7861513777574233i)\n(1.0+1.7320508075688772i)\n5.0\n[5.0, 0.9272952180016122]\n(1-(1/2)*i)\ntrue\ntrue\n(5/6)\n(0+1i)\n",
+    );
+    assert_both_oracles_refuse(
+        "tower_refusal.pdx",
+        None,
+        &[
+            ("x = Rational(1, 0)\n", "divided by 0"),
+            ("x = Rational(1, 3) / 0\n", "divided by 0"),
+            (
+                "x = Complex(1, 2).to_r\n",
+                "can't convert 1+2i into Rational",
+            ),
+            ("x = Rational()\n", "Rational takes 1 or 2 arguments, got 0"),
+            ("x = Complex(\"a\")\n", "Complex takes numbers, got \"a\""),
+            (
+                "x = 1e3r\n",
+                "'1e3r' has an exponent — a rational or imaginary literal takes digits and a point",
             ),
         ],
     );

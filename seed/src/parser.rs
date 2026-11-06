@@ -111,6 +111,40 @@ fn float_literal(text: &str) -> f64 {
         .expect("float literal out of range")
 }
 
+/// `3r` and `1.5r` (ADR 0085): the digits as an exact fraction — the
+/// point's position is the power of ten — reduced here, so `1.5r` is `3/2`.
+fn rational_literal(text: &str) -> (i64, i64) {
+    let digits = text.trim_end_matches('r').replace('_', "");
+    let (whole, fraction) = digits.split_once('.').unwrap_or((&digits, ""));
+    let scale = 10i128.pow(fraction.len() as u32);
+    let numerator: i128 = format!("{whole}{fraction}")
+        .parse()
+        .expect("rational literal out of range");
+    let divisor = {
+        let (mut left, mut right) = (numerator.abs(), scale);
+        while right != 0 {
+            let rest = left % right;
+            left = right;
+            right = rest;
+        }
+        left.max(1)
+    };
+    let narrow = |value: i128| {
+        i64::try_from(value).unwrap_or_else(|_| panic!("{text} overflows the 64-bit integers"))
+    };
+    (narrow(numerator / divisor), narrow(scale / divisor))
+}
+
+/// `2i` and `1.5i`: the number before the suffix, as its own literal.
+fn imaginary_literal(text: &str) -> Expression {
+    let number = text.trim_end_matches('i');
+    if number.contains('.') {
+        Expression::Float(float_literal(number))
+    } else {
+        Expression::Integer(integer_literal(number))
+    }
+}
+
 fn symbol_name(text: &str) -> String {
     let after_colon = &text[1..];
     if !after_colon.starts_with('"') {
@@ -1985,6 +2019,16 @@ impl<'source> Parser<'source> {
                 }
                 Pattern::Literal(Box::new(Expression::Float(value)))
             }
+            TokenKind::Rational => {
+                let (numerator, denominator) = rational_literal(token.text);
+                Pattern::Literal(Box::new(Expression::Rational {
+                    denominator,
+                    numerator,
+                }))
+            }
+            TokenKind::Imaginary => Pattern::Literal(Box::new(Expression::Imaginary(Box::new(
+                imaginary_literal(token.text),
+            )))),
             TokenKind::Minus if self.peek_kind() == Some(TokenKind::Integer) => {
                 let value: i64 = integer_literal(self.advance().text);
                 if self.range_operator_here().is_some() {
@@ -3247,6 +3291,14 @@ impl<'source> Parser<'source> {
                 let value = float_literal(token.text);
                 Expression::Float(value)
             }
+            TokenKind::Rational => {
+                let (numerator, denominator) = rational_literal(token.text);
+                Expression::Rational {
+                    denominator,
+                    numerator,
+                }
+            }
+            TokenKind::Imaginary => Expression::Imaginary(Box::new(imaginary_literal(token.text))),
             // `::Rails` — the top-level name (#147). No-shadow already makes
             // it the only reading of `Rails`, so it is a second spelling.
             TokenKind::ColonColon => {
