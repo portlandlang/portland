@@ -1242,7 +1242,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic puts rand require require_relative some sprintf srand].include?(name)
+def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf putc puts rand require require_relative some sprintf srand warn].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it

@@ -7724,6 +7724,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "inspect"
                 | "p"
                 | "panic"
+                | "pp"
+                | "print"
+                | "printf"
+                | "putc"
                 | "puts"
                 | "rand"
                 | "require"
@@ -7731,6 +7735,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "some"
                 | "sprintf"
                 | "srand"
+                | "warn"
         )
     }
 
@@ -8793,9 +8798,92 @@ impl<W: std::io::Write> Interpreter<W> {
                         "puts got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                writeln!(self.output, "{argument}").expect("failed to write output");
+                // Ruby's rule: a line already ending in a newline gets no
+                // second one.
+                let text = argument.to_string();
+                let newline = if text.ends_with('\n') { "" } else { "\n" };
+                write!(self.output, "{text}{newline}").expect("failed to write output");
             }
             return None;
+        }
+        // `print` is `puts` without the newline, answering nil (#185); the
+        // nil and failure refusals are the same ones.
+        if self.lookup_method(name).is_none() && name == "print" {
+            for argument in &arguments {
+                if matches!(argument, Value::Nil) {
+                    panic!(
+                        "print got nil — handle the nil case first (p renders nil for debugging)"
+                    );
+                }
+                if matches!(argument, Value::Failure(_)) {
+                    panic!(
+                        "print got a failure — handle the failure case first (p renders it for debugging)"
+                    );
+                }
+                write!(self.output, "{argument}").expect("failed to write output");
+            }
+            return Some(Value::Nil);
+        }
+        // `putc` writes one character — an integer's low byte, or a string's
+        // first character — and answers its argument, as Ruby's does (#185).
+        if self.lookup_method(name).is_none() && name == "putc" {
+            match arguments.as_slice() {
+                [Value::Integer(code)] => {
+                    let character = char::from((code & 0xff) as u8);
+                    write!(self.output, "{character}").expect("failed to write output");
+                }
+                [Value::String(text)] => {
+                    if let Some(character) = text.chars().next() {
+                        write!(self.output, "{character}").expect("failed to write output");
+                    }
+                }
+                [other] => panic!("putc takes an integer or a string, got {}", other.inspect()),
+                other => panic!("putc takes 1 argument, got {}", other.len()),
+            }
+            let mut arguments = arguments;
+            return Some(arguments.remove(0));
+        }
+        // `printf` is `format` then `print` (#185).
+        if self.lookup_method(name).is_none() && name == "printf" {
+            let template = match arguments.first() {
+                Some(Value::String(template)) => template,
+                Some(other) => panic!(
+                    "no implicit conversion of {} into String",
+                    other.type_name()
+                ),
+                None => panic!("too few arguments"),
+            };
+            let formatted =
+                crate::format::format_values(template, &arguments[1..], &keyword_arguments);
+            write!(self.output, "{formatted}").expect("failed to write output");
+            return Some(Value::Nil);
+        }
+        // `warn` is `puts` to standard error, answering nil (#185): each
+        // argument on its own line, an array's elements each on theirs.
+        if self.lookup_method(name).is_none() && name == "warn" {
+            let mut lines: Vec<Value> = Vec::new();
+            for argument in arguments {
+                match argument {
+                    Value::Array(elements) => lines.extend(elements.iter().cloned()),
+                    other => lines.push(other),
+                }
+            }
+            for line in &lines {
+                if matches!(line, Value::Nil) {
+                    panic!(
+                        "warn got nil — handle the nil case first (p renders nil for debugging)"
+                    );
+                }
+                if matches!(line, Value::Failure(_)) {
+                    panic!(
+                        "warn got a failure — handle the failure case first (p renders it for debugging)"
+                    );
+                }
+                let text = line.to_string();
+                let newline = if text.ends_with('\n') { "" } else { "\n" };
+                write_standard_error(&format!("{text}{newline}"));
+            }
+            return Some(Value::Nil);
         }
         if self.lookup_method(name).is_none() && name == "some" {
             let mut arguments = arguments;
@@ -8820,15 +8908,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 _ => panic!("panic needs one string message"),
             }
         }
-        if self.lookup_method(name).is_none() && name == "p" {
+        // `pp` is `p` here: there is no pretty-printer to defer to (#185).
+        if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
                 let inspected = argument.inspect();
                 writeln!(self.output, "{inspected}").expect("failed to write output");
             }
-            // Like Ruby: p returns its argument, so it drops into any expression.
+            // Like Ruby: p returns its argument, so it drops into any
+            // expression — and nil with nothing to show (ADR 0012).
             let mut arguments = arguments;
             return match arguments.len() {
-                0 => None,
+                0 => Some(Value::Nil),
                 1 => Some(arguments.remove(0)),
                 _ => Some(Value::array(arguments)),
             };

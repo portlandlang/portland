@@ -5545,3 +5545,27 @@ fn float_tower_edges_on_both_oracles() {
         ],
     );
 }
+
+/// Ruby's output wrappers over the floor's two streams (ADR 0068, #185):
+/// `print`, `putc`, `pp`, `printf`, and `warn` join `puts` and `p`; a line
+/// already ending in a newline gets no second one from `puts`; `p` answers
+/// nil with nothing to show and an array of several arguments.
+#[test]
+fn output_wrappers_on_both_oracles() {
+    assert_both_print(
+        "output_wrappers",
+        "puts \"a\\n\"\nputs \"b\"\np(p)\np(p(1, 2))\np(pp([1, [2]]))\np(print(\"x\", 1, :y, \"\\n\"))\np(putc(65))\nputc(\"\\n\")\np(putc(0x2441))\np(putc(\"Ruby\"))\nputc(\"\\n\")\np(printf(\"%d-%s\\n\", 3, \"x\"))\np(warn(\"to standard error\", [\"each\", \"line\"]))\np(warn)\n",
+        "a\nb\nnil\n1\n2\n[1, 2]\n[1, [2]]\n[1, [2]]\nx1y\nnil\nA65\n\nA9281\nR\"Ruby\"\n\n3-x\nnil\nnil\nnil\n",
+    );
+    assert_both_oracles_refuse(
+        "output_wrapper_refusals",
+        None,
+        &[
+            ("putc(nil)\n", "putc takes an integer or a string, got nil"),
+            ("putc(1, 2)\n", "putc takes 1 argument, got 2"),
+            ("print(nil)\n", "print got nil — handle the nil case first"),
+            ("warn(nil)\n", "warn got nil — handle the nil case first"),
+            ("x = puts(\"a\")\n", "assignment to x produced no value"),
+        ],
+    );
+}

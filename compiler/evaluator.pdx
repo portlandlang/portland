@@ -144,6 +144,9 @@ def evaluate_statement(node, bindings)
     step = evaluate_expression(value, bindings)
     # An or-guard diverted (`x = f() or return`): skip the binding, unwind.
     return step unless step.signal == "none"
+    # A right side with no value at all — `puts`, a definition — binds
+    # nothing (ADR 0012); the seed's sentence.
+    panic("assignment to #{name} produced no value") if step.value.empty?
     bound = slot_value(step.value)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
   in DefNode(name:, parameters:, body:)
@@ -246,8 +249,9 @@ def evaluate_if(node, bindings)
   else
     node.else_body
   end
-  # A branch that doesn't happen produces nil (ADR 0012).
-  return outcome([nil], condition.bindings) if body.nil?
+  # A branch that doesn't happen produces nil (ADR 0012), and so does an
+  # `else` that exists but is empty.
+  return outcome([nil], condition.bindings) if body.nil? || body.empty?
   run_body(body, condition.bindings)
 end
 
@@ -1951,6 +1955,10 @@ def joined_guest(values, separator)
   end
   rendered.join(separator)
 end
+
+# A line for `puts` and `warn`: Ruby's rule, a text already ending in a
+# newline gets no second one.
+def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
 
 def render(value)
   return "nil" if value.nil?
@@ -4848,14 +4856,70 @@ def evaluate_call(node, mutable bindings)
       # The refusals come before the rendering, with the seed's wording.
       panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("puts got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      System.write_standard_output("#{render(argument)}\n")
+      System.write_standard_output(lined(render(argument)))
     end
     outcome([], bindings)
-  when "p"
+  # `pp` is `p` here: there is no pretty-printer to defer to (#185). `p`
+  # answers its one argument, several as an array, and nil with none.
+  when "p", "pp"
     arguments.each do |argument|
       System.write_standard_output("#{render_inspect(argument)}\n")
     end
+    return outcome([nil], bindings) if arguments.empty?
+    return outcome(arguments, bindings) if arguments.length == 1
+    outcome([arguments], bindings)
+  # `print` is `puts` without the newline, answering nil (#185).
+  when "print"
+    arguments.each do |argument|
+      panic("print got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
+      panic("print got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
+      System.write_standard_output(render(argument))
+    end
+    outcome([nil], bindings)
+  # `putc` writes one character — an integer's low byte, or a string's first
+  # character — and answers its argument (#185).
+  when "putc"
+    panic("putc takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    written = value_at(arguments, 0)
+    if written in Integer
+      System.write_standard_output((written % 256).chr)
+    elsif written in String
+      System.write_standard_output(written.slice(0, 1))
+    else
+      panic("putc takes an integer or a string, got #{render_inspect(written)}")
+    end
     outcome(arguments, bindings)
+  # `printf` is `format` then `print` (#185).
+  when "printf"
+    panic("too few arguments") if arguments.empty?
+    template = value_at(arguments, 0)
+    unless template in String
+      shown = template.nil? ? "nil" : type_at(builtin_type_of(template), 0).capitalize
+      panic("no implicit conversion of #{shown} into String")
+    end
+    mutable rest = []
+    arguments.each_with_index do |argument, index|
+      rest << argument if index > 0
+    end
+    System.write_standard_output(format_template(template, rest, keyword_values))
+    outcome([nil], bindings)
+  # `warn` is `puts` to standard error, answering nil (#185): each argument
+  # on its own line, an array's elements each on theirs.
+  when "warn"
+    mutable lines = []
+    arguments.each do |argument|
+      if plain_array?(argument)
+        lines += argument
+      else
+        lines << argument
+      end
+    end
+    lines.each do |line|
+      panic("warn got nil — handle the nil case first (p renders nil for debugging)") if line.nil?
+      panic("warn got a failure — handle the failure case first (p renders it for debugging)") if line.failure?
+      System.write_standard_error(lined(render(line)))
+    end
+    outcome([nil], bindings)
   when "some"
     outcome([some(slot_value(arguments))], bindings)
   when "failure"

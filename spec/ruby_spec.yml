@@ -3451,6 +3451,36 @@ core/enumerator/:
   status: skipped
   reason: "There are no enumerators; methods that would answer one answer the finished collection."
   link: docs/ruby/enumerators.md
+core/kernel/p_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "What p writes is pinned by the two-oracle test; the privacy and reflection rows, the File receiver, the mocks, and the output-separator globals stay upstream."
+  link: docs/ruby/system.md
+core/kernel/pp_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "pp is p here — there is no pretty-printer to load; the row shells out to ruby."
+  link: docs/ruby/system.md
+core/kernel/print_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "What print writes is pinned by the two-oracle test; the privacy and reflection rows and $_ stay upstream."
+  link: docs/ruby/system.md
+core/kernel/printf_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "printf is format then print (ADR 0067); the formatting rows are format's in spec/string/format_spec.pdx, and the IO-first-argument, to_str mock, and privacy rows stay upstream."
+  link: docs/ruby/system.md
+core/kernel/putc_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "What putc writes is pinned by the two-oracle test; nil, true, and false refuse where Ruby raises TypeError, and the to_int mock, the closed stream, and the privacy rows stay upstream."
+  link: docs/ruby/system.md
+core/kernel/puts_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "puts answers no value (ADR 0012), so its rows are the two-oracle test's; the privacy and reflection rows and the $stdout reassignment stay upstream."
+  link: docs/ruby/system.md
 core/kernel/sprintf_spec.rb:
   pdx: [spec/string/format_spec.pdx]
   status: partial_intentional
@@ -3749,6 +3779,11 @@ core/kernel/display_spec.rb:
   status: skipped
   reason: "Object#display is print by another name on every object (#121); puts and print are the spellings."
   link: docs/ruby/aliases.md
+core/kernel/warn_spec.rb:
+  pdx: [spec/system/output_spec.pdx]
+  status: partial_intentional
+  reason: "What warn writes is pinned by the two-oracle test; $VERBOSE, the uplevel and category keywords, the mocks, Warning.warn, and the privacy rows stay upstream."
+  link: docs/ruby/system.md
 core/encoding/:
   status: skipped
   reason: "A string is UTF-8, always (ADR 0069): there is no encoding tag, so no Encoding objects, lists, converters, defaults, or errors to port."
