@@ -3825,8 +3825,8 @@ language/block_spec.rb:
 language/break_spec.rb:
   pdx: [spec/control_flow/unwinding_spec.pdx]
   status: partial_planned
-  reason: "break out of a method's own yield waits on #166 and the lambda rows on the proc question (#77); break carries no value (ADR 0012), the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there are no threads."
-  link: https://github.com/portlandlang/portland/issues/166
+  reason: "the block rows run (#166); the captured-block and lambda rows wait on the proc question (#77); break carries no value (ADR 0012), the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there are no threads."
+  link: https://github.com/portlandlang/portland/issues/77
 language/case_spec.rb:
   pdx: [spec/control_flow/case_when_spec.pdx, spec/control_flow/then_spec.pdx]
   status: partial_intentional

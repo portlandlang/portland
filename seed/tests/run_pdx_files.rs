@@ -5376,3 +5376,100 @@ fn every_builtin_appears_in_a_hosted_fixture() {
         untested.join(", ")
     );
 }
+
+/// A `break` written in a block belongs to the call that was handed the
+/// block (#166): a yielding method of the program's own answers nil, as a
+/// builtin walk does (ADR 0012), through any loop, walk, or delegating
+/// `yield` on the way; a bare `break` in a method body still refuses.
+#[test]
+fn break_through_a_yield_on_both_oracles() {
+    assert_both_print(
+        "break_through_a_yield",
+        r#"
+def yielder
+  yield
+  :after
+end
+
+def breaks_out
+  yielder { break }
+end
+
+def twice
+  yield 1
+  yield 2
+  :done
+end
+
+def yielding_in_while
+  mutable index = 0
+  while index < 5
+    yield index
+    index += 1
+  end
+  :loop_finished
+end
+
+def break_through_while
+  yielding_in_while { |index| break if index == 1 }
+end
+
+def inner
+  yield
+  :inner_finished
+end
+
+def outer
+  inner { yield }
+  :outer_finished
+end
+
+def break_through_delegation
+  outer { break }
+end
+
+def walks
+  [1, 2].each { break }
+  yield
+  :walked
+end
+
+def yielding_in_each
+  [1, 2, 3].each { |number| yield number }
+  :each_finished
+end
+
+def break_through_each
+  yielding_in_each { |number| break if number == 2 }
+end
+
+def assigns
+  result = yield
+  [:assigned, result]
+end
+
+def break_before_assignment
+  assigns { break }
+end
+
+p(breaks_out)
+p(twice { |number| break if number == 2 })
+p(break_through_while)
+p(break_through_delegation)
+p(walks { :block })
+p([1, 2].each { yielder { break } })
+p(break_through_each)
+p(break_before_assignment)
+p(assigns { 4 })
+"#,
+        "nil\nnil\nnil\nnil\n:walked\n[1, 2]\nnil\nnil\n[:assigned, 4]\n",
+    );
+    assert_both_oracles_refuse(
+        "bare_break_in_a_yielding_method",
+        None,
+        &[(
+            "def yielder\n  yield\n  break\nend\nyielder { 1 }\n",
+            "break outside of a loop",
+        )],
+    );
+}

@@ -2438,7 +2438,13 @@ struct Method {
 
 /// A `return`, `break`, or `next` in flight, unwinding to whatever handles it.
 enum Pending {
-    Break,
+    /// A `break` leaves the loop or the block it is written in. Written in
+    /// a block, it belongs to the call that was handed the block (#166):
+    /// the yield that ran the block aims it at the yielding method's frame,
+    /// and that call answers nil (ADR 0012). Unaimed, it is a loop's.
+    Break {
+        target: Option<usize>,
+    },
     Next,
     /// A `return` belongs to the method its block was written in (ADR 0025),
     /// so it carries the call depth of that frame and unwinds until it gets
@@ -2899,7 +2905,7 @@ impl<W: std::io::Write> Interpreter<W> {
         let last = self.run_body(&program.statements);
         match self.pending.take() {
             None => last,
-            Some(Pending::Break) => panic!("break outside of a loop"),
+            Some(Pending::Break { .. }) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
             Some(Pending::Return { .. }) => panic!("return outside of a method"),
         }
@@ -3012,7 +3018,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 None
             }
             Statement::Break => {
-                self.pending = Some(Pending::Break);
+                self.pending = Some(Pending::Break { target: None });
                 None
             }
             Statement::Next => {
@@ -3325,13 +3331,17 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.variables.retain(|name, _| preexisting.contains(name));
                     match self.pending {
                         None => {}
-                        Some(Pending::Break) => {
+                        Some(Pending::Break { target: None }) => {
                             self.pending = None;
                             break;
                         }
                         Some(Pending::Next) => self.pending = None,
-                        // A return keeps unwinding to the enclosing method.
-                        Some(Pending::Return { .. }) => return None,
+                        // A return keeps unwinding to the enclosing method,
+                        // and so does a break aimed at a yielding call's
+                        // frame (#166): it left a block, not this loop.
+                        Some(Pending::Return { .. }) | Some(Pending::Break { target: Some(_) }) => {
+                            return None;
+                        }
                     }
                 }
                 // A finished while is nil, always (ADR 0012, Ruby's rule).
@@ -3474,7 +3484,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // control and produce no value; the unwinding machinery takes over.
             Expression::Guard(action) => {
                 match action {
-                    GuardAction::Break => self.pending = Some(Pending::Break),
+                    GuardAction::Break => self.pending = Some(Pending::Break { target: None }),
                     GuardAction::Next => self.pending = Some(Pending::Next),
                     GuardAction::Return(value) => {
                         let value = value.as_ref().map(|expression| self.value_of(expression));
@@ -3987,6 +3997,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 let result = self.run_block(&block, arguments);
                 self.current_block = yielding_block;
                 self.home_depth = yielding_home;
+                // A `break` leaving the block belongs to the call that was
+                // handed it — the yielding method's own frame, which is the
+                // frame this yield is written in (#166). Aimed, it unwinds
+                // through any loop or walk on the way to that frame.
+                if let Some(Pending::Break { target: None }) = self.pending {
+                    self.pending = Some(Pending::Break {
+                        target: Some(yielding_home),
+                    });
+                }
                 // Whatever the block rebound stays rebound: blocks rebind
                 // outer mutables, which is the accumulator pattern (ADR
                 // 0001). The write-back lands in the shared cell, where the
@@ -7932,11 +7951,12 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// A `break` is consumed here and the call produces nil (ADR 0012);
-    /// a `return` stays pending and unwinds to the enclosing method.
+    /// a `return` stays pending and unwinds to the enclosing method, as
+    /// does a `break` already aimed at a yielding call's frame (#166).
     fn block_interrupt(&mut self) -> Option<Option<Value>> {
         match self.pending {
             None => None,
-            Some(Pending::Break) => {
+            Some(Pending::Break { target: None }) => {
                 self.pending = None;
                 Some(Some(Value::Nil))
             }
@@ -8671,7 +8691,21 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.pending = Some(Pending::Return { target, value });
                 }
             }
-            Some(Pending::Break) => panic!("break outside of a loop"),
+            // A `break` that left a block handed to this call ends the
+            // call with nil (#166, ADR 0012); aimed further out, it keeps
+            // unwinding. Unaimed, it never left a loop and refuses.
+            Some(Pending::Break {
+                target: Some(target),
+            }) => {
+                if target > self.call_depth {
+                    result = Some(Value::Nil);
+                } else {
+                    self.pending = Some(Pending::Break {
+                        target: Some(target),
+                    });
+                }
+            }
+            Some(Pending::Break { target: None }) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
         }
         result
@@ -8964,7 +8998,21 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.pending = Some(Pending::Return { target, value });
                 }
             }
-            Some(Pending::Break) => panic!("break outside of a loop"),
+            // A `break` that left a block handed to this call ends the
+            // call with nil (#166, ADR 0012); aimed further out, it keeps
+            // unwinding. Unaimed, it never left a loop and refuses.
+            Some(Pending::Break {
+                target: Some(target),
+            }) => {
+                if target > self.call_depth {
+                    result = Some(Value::Nil);
+                } else {
+                    self.pending = Some(Pending::Break {
+                        target: Some(target),
+                    });
+                }
+            }
+            Some(Pending::Break { target: None }) => panic!("break outside of a loop"),
             Some(Pending::Next) => panic!("next outside of a loop"),
         }
         result
