@@ -1024,6 +1024,12 @@ def enum_case_decl_node(name, labels)
   EnumCaseDeclNode.new(kind: "enum_case_decl", labels: labels, name: name)
 end
 
+# A symbol name the shorthand can spell: letters, digits, and underscores,
+# at least one — the seed's test. (The evaluator has its own
+# `identifier_shaped?` for rendering; the parser cannot lean on it, since
+# the parse driver loads no evaluator.)
+def shorthand_key_name?(name) = !name.empty? && name.chars.all? { name_character?(it) }
+
 # The name inside a symbol token: `:paid` -> `paid`, `:"odd key"` -> `odd key`.
 # The quoted part is a string literal (ADR 0071), escapes decoded; where a
 # name is wanted — an enum case, a pattern — an interpolation has no name
@@ -1808,9 +1814,15 @@ def parse_hash(tokens, mutable position)
       end
       return Step.new(node: error_node("expected closing brace in hash"), position: position)
     end
+    rocketed = tokens[position]
     key = parse_expression(tokens, position)
     unless operator_at?(tokens, key.position, %w[=>])
       return Step.new(node: error_node("expected => in hash literal"), position: key.position)
+    end
+    # One spelling per symbol key (ADR 0023 §1), the seed's refusal: the
+    # rocket stays only for keys the shorthand cannot say (#201).
+    if rocketed.symbol? && (key.node in SymbolNode) && shorthand_key_name?(key.node.value)
+      return Step.new(node: error_node("write #{key.node.value}: instead of #{rocketed.text} => — the shorthand is the only symbol-key spelling"), position: skip_line_at(tokens, position))
     end
     value = parse_expression(tokens, key.position + 1)
     pairs << pair_node(key.node, value.node)

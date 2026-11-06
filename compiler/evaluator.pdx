@@ -1976,6 +1976,9 @@ def evaluate_new(node, mutable bindings)
   fields = value_at(slot.first[2], 0)
   mutable provided = []
   node.arguments.each do |argument|
+    # A struct is built by keyword (ADR 0062) — the seed's sentence for a
+    # positional argument, where the host used to read it as a label (#203).
+    panic("#{slot.first[0]}.new takes keyword arguments, not positional ones") unless argument in KeywordArgumentNode
     step = evaluate_expression(argument.value, bindings)
     bindings = step.bindings
     provided << [argument.label, slot_value(step.value)]
@@ -2578,6 +2581,7 @@ def evaluate_method_call(node, mutable bindings)
   end
   # `with` copies-and-updates before any dispatch, like the seed (#27).
   if node.name == "with" && (receiver in ["__struct__", *])
+    panic("#{value_at(receiver, 1)}.with takes keyword arguments, not positional ones") unless arguments.empty?
     return outcome([struct_with(receiver, keyword_values)], bindings)
   end
   # Struct methods dispatch before builtins and field access (#27).

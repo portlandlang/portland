@@ -23,7 +23,7 @@ JSON_FRAGMENT_LENGTH = 32
 
 # What a parse step hands back: the value read, and where the next one
 # starts. A failure takes this struct's place when the document is bad.
-struct JsonStep
+struct JSONStep
   value
   position
 end
@@ -99,7 +99,7 @@ def json_keyword(codes, index, word, value)
     return json_fail(codes, "unexpected token #{json_fragment(codes, index)}", index) unless matches
     offset += 1
   end
-  JsonStep.new(value: value, position: index + expected.length)
+  JSONStep.new(value: value, position: index + expected.length)
 end
 
 def json_digits_end(codes, start)
@@ -139,9 +139,9 @@ def json_number(codes, start)
     index = exponent_end
   end
   token = json_text(codes, start, index)
-  return JsonStep.new(value: token.to_f, position: index) unless integer
+  return JSONStep.new(value: token.to_f, position: index) unless integer
   return json_fail(codes, "#{token} overflows the 64-bit integers", start) if json_overflows?(token)
-  JsonStep.new(value: token.to_i, position: index)
+  JSONStep.new(value: token.to_i, position: index)
 end
 
 def json_invalid_number(codes, start) = json_fail(codes, "invalid number: #{json_fragment(codes, start)}", start)
@@ -190,7 +190,7 @@ def json_string(codes, quote)
   return json_fail(codes, "unexpected end of input, expected closing \"", index) unless closed
   text = json_unescape(codes, content, index)
   return text if text.failure?
-  JsonStep.new(value: text, position: index + 1)
+  JSONStep.new(value: text, position: index + 1)
 end
 
 def json_unescape(codes, from, to)
@@ -250,7 +250,7 @@ def json_unicode_escape(codes, backslash, to)
   elsif code >= 0xDC00 && code <= 0xDFFF
     return json_fail(codes, "unpaired trailing surrogate at #{json_fragment(codes, backslash)}", backslash)
   end
-  JsonStep.new(value: scalar.chr(Encoding::UTF_8), position: after)
+  JSONStep.new(value: scalar.chr(Encoding::UTF_8), position: after)
 end
 
 # Four hex digits at `at`, inside a string ending at `to`; `backslash` is
@@ -280,7 +280,7 @@ def json_incomplete_unicode(codes, backslash) = json_fail(codes, "incomplete uni
 def json_array(codes, open, nesting, symbolize)
   index = json_skip_whitespace(codes, open + 1)
   return index if index.failure?
-  return JsonStep.new(value: [], position: index + 1) if index < codes.length && json_code_at(codes, index) == "]".ord
+  return JSONStep.new(value: [], position: index + 1) if index < codes.length && json_code_at(codes, index) == "]".ord
   depth = nesting + 1
   return failure("nesting of #{depth} is too deep") if depth > JSON_MAX_NESTING
   mutable elements = []
@@ -302,13 +302,13 @@ def json_array(codes, open, nesting, symbolize)
       return json_fail(codes, "expected ',' or ']' after array value", after)
     end
   end
-  JsonStep.new(value: elements, position: position)
+  JSONStep.new(value: elements, position: position)
 end
 
 def json_object(codes, open, nesting, symbolize)
   index = json_skip_whitespace(codes, open + 1)
   return index if index.failure?
-  return JsonStep.new(value: {}, position: index + 1) if index < codes.length && json_code_at(codes, index) == "}".ord
+  return JSONStep.new(value: {}, position: index + 1) if index < codes.length && json_code_at(codes, index) == "}".ord
   depth = nesting + 1
   return failure("nesting of #{depth} is too deep") if depth > JSON_MAX_NESTING
   mutable pairs = []
@@ -352,7 +352,7 @@ def json_object(codes, open, nesting, symbolize)
     return json_fail(codes, "duplicate key #{inspect(pair_key.to_s)}", open) if seen.include?(pair_key)
     seen << pair_key
   end
-  JsonStep.new(value: pairs.to_h, position: position)
+  JSONStep.new(value: pairs.to_h, position: position)
 end
 
 # The sentence with the gem's position: the line, and the column in

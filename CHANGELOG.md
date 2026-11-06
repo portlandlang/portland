@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A parse refusal is the first refusal, hosted too** ([#202](https://github.com/portlandlang/portland/issues/202), [#205](https://github.com/portlandlang/portland/issues/205)) — the hosted compiler carried a parse error as a node and surfaced it only when the evaluator reached it, so `p 'it'` followed by `p 'it' 's'` printed `"it"` before refusing, and a refused argument in a paren-less call was counted toward the call's arity and reported as the wrong count. The checker now says an ErrorNode's sentence before any other check, and the arity check skips a call holding one; nothing runs on either oracle, pinned by a test that reads an empty standard output.
+
+- **Positional struct construction refuses hosted as it does on the seed** ([#203](https://github.com/portlandlang/portland/issues/203)) — `Point.new(1, 2)` read each argument as a keyword node and died on `"1" is a String, which has no method 'kind'`; it now says `Point.new takes keyword arguments, not positional ones`, and `with(2)` says the same for `with`.
+
+- **The hosted parser refuses `{:s => 3}`** ([#201](https://github.com/portlandlang/portland/issues/201)) — it had read the rocket with a symbol key as a pair; it now says `write s: instead of :s => — the shorthand is the only symbol-key spelling`, the seed's sentence, and keeps the rocket for `:"odd key" => 2`, which the shorthand cannot spell.
+
+- **`JSONStep`** — the JSON reader's step struct takes Ruby core's spelling of an acronym in a type name (`JSON::ParserError`, `IO::Buffer`), not the Rails inflector's `JsonStep`.
+
 - **`%I`'s refusal names the array that interpolates** — on both implementations the sentence read `write %i[]; a symbol does not interpolate`, a rule ADR 0071 retired when it made `:"#{a}"` legal; it now reads `write %i[] when no name interpolates, or [:"#{a}", :b] when one does`, the shape of `%W`'s. The ruling in ADR 0051 is unchanged: `%I` stays out.
 
 - **GitHub highlights `.pdx` as Ruby** — a `.gitattributes` with `*.pdx linguist-language=Ruby`, so the file view, diffs, and the language bar read Portland with Ruby's grammar; the superset forms go uncolored rather than breaking the view.

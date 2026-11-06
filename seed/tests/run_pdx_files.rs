@@ -2659,6 +2659,55 @@ fn system_first_wave_on_both_oracles() {
 }
 
 /// Formatting is a function (ADR 0067, #172): `format` and `sprintf` with
+/// Four places the hosted compiler had drifted from the seed (#201, #202,
+/// #203, #205), each now the seed's refusal: a rocket with a symbol key,
+/// a parse refusal inside a paren-less call's arguments reported before the
+/// call's arity, positional struct construction and `with`, and two
+/// adjacent string literals — which must also refuse before anything runs.
+#[test]
+fn hosted_drifts_refuse_as_the_seed_does() {
+    assert_both_oracles_refuse(
+        "hosted_drifts.pdx",
+        None,
+        &[
+            (
+                "p({:s => 3})\n",
+                "write s: instead of :s => — the shorthand is the only symbol-key spelling",
+            ),
+            (
+                "def build(name:) = name\nbuild :name => 1\n",
+                "':name => …' is a bare hash argument, which Portland does not have — write the keyword argument, 'name: …'",
+            ),
+            (
+                "struct Point\n  x\n  y\nend\np Point.new(1, 2)\n",
+                "Point.new takes keyword arguments, not positional ones",
+            ),
+            (
+                "struct Point\n  x\nend\np Point.new(x: 1).with(2)\n",
+                "Point.with takes keyword arguments, not positional ones",
+            ),
+            ("p 'it' 's'\n", "newline after statement, got"),
+        ],
+    );
+    // The adjacent literals refuse before the first statement runs: nothing
+    // reaches standard output on either oracle.
+    let sample = std::env::temp_dir().join("adjacent_literals.pdx");
+    std::fs::write(&sample, "p 'it'\np 'it' 's'\n").unwrap();
+    for driver in [None, Some(portland_run())] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_pdx"));
+        if let Some(driver) = driver {
+            command.arg(driver);
+        }
+        let output = command.arg(&sample).output().expect("failed to run pdx");
+        assert!(!output.status.success());
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "",
+            "a parse refusal must stop the program before its first statement runs"
+        );
+    }
+}
+
 /// `Math` on both oracles (ADR 0083): Ruby's module functions, Ruby's
 /// answers — the hosted evaluator hands each call to the host's own — with
 /// domain errors as failures in Ruby's sentence and the wrong argument

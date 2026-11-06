@@ -613,6 +613,10 @@ end
 # bodies that would never run included — and checks only what it knows.
 def check_node(node, scope, mutable found)
   case node
+  # A parse refusal carried as a node is the first refusal (#202, #205):
+  # saying it here, before any other check and before anything runs, is
+  # what keeps the seed's "nothing ran" and this build's refusal the same.
+  in ErrorNode(message:) then noted(found, ["sentence", message], locate(node, scope))
   in EnumCaseNode then check_construction(node, scope, found)
   in EnumCasePatternNode then check_case_pattern(node, scope, found)
   in IdentifierNode(name:) then check_defined(name, node, scope, found)
@@ -831,6 +835,8 @@ end
 def check_arity(node, scope, found)
   arity = scope.arities.find { it[0] == node.name }
   return found if arity.nil?
+  # A refused argument is not an argument to count (#202).
+  return found if node.arguments.any? { it in ErrorNode }
   required = value_at_checked(arity, 1)
   total = value_at_checked(arity, 2)
   given = node.arguments.reject { it in KeywordArgumentNode }.length
