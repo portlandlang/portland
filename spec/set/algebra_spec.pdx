@@ -1,0 +1,103 @@
+# A set's algebra (ADR 0082) under Ruby's word names — `union`,
+# `intersection`, `difference` — and the two operators the grammar has, `+`
+# for union and `-` for difference; each takes any enumerable and answers a
+# new set. `|`, `&`, and `^` are out of the grammar (ADR 0003); #207 holds
+# that question. Ruby 4's `flatten`, `classify`, `join`, and `to_a` beside.
+#
+# From ruby/spec core/set/{union,plus,intersection,minus,difference,flatten,
+# classify,join,to_a}_spec.rb. Upstream: the alias checks, the
+# compare_by_identity rows, the recursive set, the Enumerator rows, the
+# Set-like objects, and flatten!, which mutates (ADR 0015).
+
+require_relative "../spec_helper"
+
+context "Set" do
+  describe "#union" do
+    specify "holds every member of self and the passed enumerable" do
+      members = Set[:a, :b, :c]
+      expect(members.union(Set[:b, :d, :e])).to eq(Set[:a, :b, :c, :d, :e])
+      expect(members.union([:b, :e])).to eq(Set[:a, :b, :c, :e])
+      expect(members.union(1..2)).to eq(Set[:a, :b, :c, 1, 2])
+    end
+
+    specify "is also +" do
+      expect(Set[:a, :b] + Set[:b, :c]).to eq(Set[:a, :b, :c])
+      expect(Set[1, 2] + [3, 4]).to eq(Set[1, 2, 3, 4])
+    end
+
+    specify "keeps insertion order" do
+      expect((Set[3, 1] + [2, 1]).to_a).to eq([3, 1, 2])
+    end
+  end
+
+  describe "#intersection" do
+    specify "holds only the members shared with the passed enumerable" do
+      members = Set[:a, :b, :c]
+      expect(members.intersection(Set[:b, :c, :d, :e])).to eq(Set[:b, :c])
+      expect(members.intersection([:b, :c, :d])).to eq(Set[:b, :c])
+    end
+  end
+
+  describe "#difference" do
+    specify "holds the members the passed enumerable lacks" do
+      members = Set[:a, :b, :c]
+      expect(members.difference(Set[:a, :b])).to eq(Set[:c])
+      expect(members.difference([:b, :c])).to eq(Set[:a])
+    end
+
+    specify "is also -" do
+      expect(Set[:a, :b, :c] - Set[:a, :b]).to eq(Set[:c])
+      expect(Set[:a, :b, :c] - [:b, :c]).to eq(Set[:a])
+    end
+  end
+
+  describe "the symmetric difference" do
+    specify "is spelled from union and intersection" do
+      left = Set[1, 2, 3, 4]
+      right = Set[3, 4, 5]
+      expect((left + right) - left.intersection(right)).to eq(Set[1, 2, 5])
+    end
+  end
+
+  describe "#flatten" do
+    specify "opens every nested set" do
+      nested = Set[1, 2, Set[3, 4, Set[5, 6, Set[7, 8]]], 9, 10]
+      expect(nested.flatten).to eq(Set[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    end
+
+    specify "leaves arrays inside as they are" do
+      expect(Set[[1, 2], Set[3]].flatten).to eq(Set[[1, 2], 3])
+    end
+  end
+
+  describe "#classify" do
+    specify "groups the members by the block's answer, each group a set" do
+      words = Set["one", "two", "three", "four"]
+      expect(words.classify { it.length }).to eq({3 => Set["one", "two"], 5 => Set["three"], 4 => Set["four"]})
+    end
+
+    specify "yields every member" do
+      mutable seen = []
+      Set["one", "two", "three", "four"].classify { seen << it }
+      expect(seen.sort).to eq(["four", "one", "three", "two"])
+    end
+  end
+
+  describe "#join" do
+    specify "is the empty string for the empty set" do
+      expect(Set[].join).to eq("")
+    end
+
+    specify "joins the members' text, with a separator when given" do
+      members = Set[:a, :b, :c]
+      expect(members.join).to eq("abc")
+      expect(members.join(" | ")).to eq("a | b | c")
+    end
+  end
+
+  describe "#to_a" do
+    specify "answers the members in insertion order" do
+      expect(Set[3, 1, 2].to_a).to eq([3, 1, 2])
+    end
+  end
+end

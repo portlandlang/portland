@@ -427,3 +427,13 @@ puts "m".clamp("a", "f")
 puts "é".encoding
 puts "é".encoding == Encoding::UTF_8
 puts "腥ȡ".valid_encoding?
+
+# A set (ADR 0082): built from any enumerable, distinct by `eql?` in
+# insertion order; `add` answers a new set, the algebra rides its word
+# names and `+`/`-`, and the walks answer as on an array of the members.
+seen = ["x", "x", "y"].to_set
+p seen
+p seen.add("z").union(Set["w"]) - ["x"]
+p Set[1, 2] <= Set[1, 2, 3]
+p Set[1, 2, 3].select { it.odd? }
+p Set.new(1..3) { it * it }.include?(4)

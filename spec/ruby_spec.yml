@@ -818,9 +818,7 @@ core/enumerable/grep_v_spec.rb:
   reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; the regex and $~ rows wait on #74."
   link: docs/ruby/pattern-matching.md
 core/enumerable/to_set_spec.rb:
-  status: skipped
-  reason: "Set is decided (ADR 0082) and waits on its build."
-  link: https://github.com/portlandlang/portland/issues/195
+  pdx: [spec/set/construction_spec.pdx]
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/block/queries_spec.pdx]
   status: partial_intentional
@@ -2279,6 +2277,222 @@ core/range/step_spec.rb:
 
 # — core/string —
 
+core/set/add_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "add answers a new set rather than the receiver, and add? mutates (ADR 0015); the mid-iteration RuntimeError has no mutation to guard."
+core/set/append_spec.rb:
+  status: skipped
+  reason: "<< on a set mutates in place; it refuses toward #103, and add answers the new set (ADR 0082 §3)."
+  link: docs/ruby/sets.md
+core/set/case_compare_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects, which a closed runtime has none of; === is membership under when."
+core/set/classify_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "The Enumerator and compare_by_identity rows stay upstream."
+core/set/clear_spec.rb:
+  status: skipped
+  reason: "clear mutates its receiver (ADR 0015); Set[] is the empty set."
+  link: docs/ruby/sets.md
+core/set/collect_spec.rb:
+  status: skipped
+  reason: "collect! mutates its receiver (ADR 0015); map answers an array."
+  link: docs/ruby/sets.md
+core/set/compare_by_identity_spec.rb:
+  status: skipped
+  reason: "Identity is unobservable where values never mutate (ADR 0015): two equal members are the same member."
+  link: docs/ruby/mutability.md
+core/set/comparison_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+core/set/constructor_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "instance_of? is a closed runtime's question; the members are checked."
+core/set/delete_if_spec.rb:
+  status: skipped
+  reason: "delete_if mutates its receiver (ADR 0015); reject answers the new set."
+  link: docs/ruby/sets.md
+core/set/delete_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "delete answers a new set rather than the receiver, and delete? mutates (ADR 0015)."
+core/set/difference_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; difference and - are both specified."
+core/set/disjoint_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The Set-like objects stay upstream; any enumerable is taken."
+core/set/divide_spec.rb:
+  status: skipped
+  reason: "divide's two-arity form walks a graph of member pairs and its one-arity form is classify's groups as a set of sets; classify is the surface here."
+  link: docs/ruby/sets.md
+core/set/each_spec.rb:
+  pdx: [spec/set/enumerable_spec.pdx]
+  status: partial_intentional
+  reason: "The Enumerator row stays upstream (ADR 0055)."
+core/set/empty_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+core/set/enumerable/to_set_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+core/set/eql_spec.rb:
+  pdx: [spec/set/equality_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; eql? agrees with == by example."
+core/set/equal_value_spec.rb:
+  pdx: [spec/set/equality_spec.pdx]
+  status: partial_intentional
+  reason: "The Set-like object stays upstream."
+core/set/exclusion_spec.rb:
+  status: skipped
+  reason: "^ is out of the grammar (ADR 0003); #207 holds the question, and the symmetric difference is spelled from union and intersection meanwhile."
+  link: docs/ruby/sets.md
+core/set/filter_spec.rb:
+  status: skipped
+  reason: "filter! mutates its receiver (ADR 0015); filter answers the new set."
+  link: docs/ruby/sets.md
+core/set/flatten_merge_spec.rb:
+  status: skipped
+  reason: "A protected internal of Ruby's Set before 4.0, gone since."
+  link: docs/ruby/sets.md
+core/set/flatten_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "No value can hold itself, so the recursive set cannot be built; flatten! mutates (ADR 0015); the compare_by_identity rows stay upstream."
+core/set/gt_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; > is specified beside proper_superset?."
+core/set/gte_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; >= is specified beside superset?."
+core/set/hash_spec.rb:
+  status: skipped
+  reason: "There is no hash method (ADR 0059); a set is a hash key by eql?."
+  link: docs/ruby/equality.md
+core/set/include_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "The objects defining hash and eql? by hand stay upstream; membership is by eql?."
+core/set/initialize_clone_spec.rb:
+  status: skipped
+  reason: "There is no clone or freeze; a set is a value (ADR 0015)."
+  link: docs/ruby/mutability.md
+core/set/initialize_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "The private-method check and the mock enumerables answering each_entry or each stay upstream; Set.new takes a Set, an Array, a Range, or a Hash."
+core/set/inspect_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; inspect and to_s both read Set[1, 2]."
+core/set/intersect_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The Set-like objects stay upstream; any enumerable is taken."
+core/set/intersection_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "& is out of the grammar (ADR 0003, #207), so intersection carries the rows; the alias and compare_by_identity rows stay upstream."
+core/set/join_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+core/set/keep_if_spec.rb:
+  status: skipped
+  reason: "keep_if mutates its receiver (ADR 0015); select answers the new set."
+  link: docs/ruby/sets.md
+core/set/length_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; length is specified beside size."
+core/set/lt_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; < is specified beside proper_subset?."
+core/set/lte_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; <= is specified beside subset?."
+core/set/map_spec.rb:
+  status: skipped
+  reason: "map! mutates its receiver (ADR 0015); map answers an array."
+  link: docs/ruby/sets.md
+core/set/member_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; member? is specified beside include?."
+core/set/merge_spec.rb:
+  status: skipped
+  reason: "merge mutates its receiver (ADR 0015); union answers the new set."
+  link: docs/ruby/sets.md
+core/set/minus_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "The compare_by_identity row stays upstream."
+core/set/plus_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "The alias check compares method objects; + is specified beside union."
+core/set/pretty_print_cycle_spec.rb:
+  status: skipped
+  reason: "No value can hold itself, and there is no pretty printer."
+  link: docs/ruby/sets.md
+core/set/proper_subset_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The rows that raise on a non-set are the refusal, pinned by the two-oracle test."
+core/set/proper_superset_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The rows that raise on a non-set are the refusal, pinned by the two-oracle test; the Set-like object stays upstream."
+core/set/reject_spec.rb:
+  status: skipped
+  reason: "reject! mutates its receiver (ADR 0015); reject answers the new set."
+  link: docs/ruby/sets.md
+core/set/replace_spec.rb:
+  status: skipped
+  reason: "replace mutates its receiver (ADR 0015); bind the other set to the name."
+  link: docs/ruby/sets.md
+core/set/select_spec.rb:
+  status: skipped
+  reason: "select! mutates its receiver (ADR 0015); select answers the new set."
+  link: docs/ruby/sets.md
+core/set/set_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "The row shells out to ruby to show Set needs no require; it needs none here either."
+core/set/size_spec.rb:
+  pdx: [spec/set/membership_spec.pdx]
+core/set/sortedset/:
+  status: skipped
+  reason: "SortedSet left Ruby in 3.0 and stays gone (ADR 0082 §6)."
+  link: docs/ruby/sets.md
+core/set/subset_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The rows that raise on a non-set are the refusal, pinned by the two-oracle test."
+core/set/subtract_spec.rb:
+  status: skipped
+  reason: "subtract mutates its receiver (ADR 0015); difference answers the new set."
+  link: docs/ruby/sets.md
+core/set/superset_spec.rb:
+  pdx: [spec/set/comparison_spec.pdx]
+  status: partial_intentional
+  reason: "The rows that raise on a non-set are the refusal, pinned by the two-oracle test; the Set-like object stays upstream."
+core/set/to_a_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+core/set/to_s_spec.rb:
+  pdx: [spec/set/construction_spec.pdx]
+  status: partial_intentional
+  reason: "No value can hold itself, so the cyclic row cannot be built; is_a? is a closed runtime's question."
+core/set/union_spec.rb:
+  pdx: [spec/set/algebra_spec.pdx]
+  status: partial_intentional
+  reason: "| is out of the grammar (ADR 0003, #207), so union and + carry the rows; the compare_by_identity row stays upstream."
 core/string/allocate_spec.rb:
   status: skipped
   reason: "There is no String class object to allocate from; a string is a value."

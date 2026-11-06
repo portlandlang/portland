@@ -2696,6 +2696,56 @@ fn pattern_gaps_on_both_oracles() {
     );
 }
 
+/// `Set` is a builtin immutable value on both oracles (ADR 0082, #195):
+/// `Set.new`, `Set[...]`, and `to_set` build one; `add` and `delete`
+/// answer a new one; the algebra rides the word names and `+`/`-`; the
+/// walks that answer their receiver answer the set; `when` is membership.
+/// The mutators refuse naming the spelling that answers a new set.
+#[test]
+fn sets_on_both_oracles() {
+    assert_both_print(
+        "sets.pdx",
+        "seen = Set.new([\"a\", \"b\"])\n\
+         p seen.add(\"c\")\np seen\n\
+         p seen.union(Set[\"b\", \"d\"])\np seen + [\"z\"]\np seen - Set[\"a\"]\n\
+         p([\"x\", \"x\", \"y\"].to_set)\n\
+         p Set[1, 2, 3] == Set[3, 2, 1]\np Set[1, 2] <= Set[1, 2, 3]\np Set[1, 2] <=> Set[1, 2, 3]\n\
+         p Set[1, 2, 3].select { it.odd? }\np Set[1, 2, 3].map { it * 2 }\n\
+         p Set[1, Set[2, Set[3]]].flatten\n\
+         p Set[\"one\", \"two\", \"three\"].classify { it.length }\n\
+         p Set.new([1, 2, 3]) { it * it }\n\
+         case 2\nwhen Set[1, 2] then puts \"member\"\nend\n\
+         p Set[1].class\n",
+        "Set[\"a\", \"b\", \"c\"]\nSet[\"a\", \"b\"]\nSet[\"a\", \"b\", \"d\"]\nSet[\"a\", \"b\", \"z\"]\nSet[\"b\"]\nSet[\"x\", \"y\"]\ntrue\ntrue\n-1\nSet[1, 3]\n[2, 4, 6]\nSet[1, 2, 3]\n{3 => Set[\"one\", \"two\"], 5 => Set[\"three\"]}\nSet[1, 4, 9]\nmember\nSet\n",
+    );
+    assert_both_oracles_refuse(
+        "sets_refusal.pdx",
+        None,
+        &[
+            (
+                "x = Set[1].add?(2)\n",
+                "'add?' mutates its receiver, and values never mutate here (ADR 0015) — 'add' answers the new set; bind it",
+            ),
+            (
+                "mutable held = Set[1]\nheld << 2\n",
+                "'<<' adds to a set in place, and values never mutate here (ADR 0015) — write held = held.add(value)",
+            ),
+            (
+                "x = Set[1].merge([2])\n",
+                "'merge' mutates its receiver, and values never mutate here (ADR 0015) — 'union' answers the new set; bind it",
+            ),
+            (
+                "x = Set[1].subset?([1])\n",
+                "'subset?' takes a Set, got [1]",
+            ),
+            (
+                "x = Set.new(1, 2)\n",
+                "Set.new takes 0 or 1 argument, got 2",
+            ),
+        ],
+    );
+}
+
 /// Four places the hosted compiler had drifted from the seed (#201, #202,
 /// #203, #205), each now the seed's refusal: a rocket with a symbol key,
 /// a parse refusal inside a paren-less call's arguments reported before the

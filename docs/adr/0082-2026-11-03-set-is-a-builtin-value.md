@@ -1,6 +1,6 @@
 # 0082 — `Set` is a builtin value, as in Ruby 4
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#123](https://github.com/portlandlang/portland/issues/123); not built — the build is [#195](https://github.com/portlandlang/portland/issues/195))
+- **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#123](https://github.com/portlandlang/portland/issues/123); built on both implementations 2026-11-05 under [#195](https://github.com/portlandlang/portland/issues/195) — the algebra under its word names, `+`, and `-`, since [ADR 0003](0003-2026-07-20-bitwise-operators-out.md) took `|`, `&`, and `^` out of the grammar; [#207](https://github.com/portlandlang/portland/issues/207) holds that edge)
 - **Date:** 2026-11-03
 - **Issue:** [#123](https://github.com/portlandlang/portland/issues/123)
 

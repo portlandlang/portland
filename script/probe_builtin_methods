@@ -14,6 +14,7 @@
 # output rather than to a reading of the Rust.
 #
 # Usage: script/probe_builtin_methods            (needs target/debug/pdx)
+#        script/probe_builtin_methods set        (one type, while writing its arms)
 #
 # Each line is `type: name/arity name/arity …`, sorted: `include?/1`,
 # `slice/1-2`, `each/0&` (block-taking), `first/0-1`, `values_at/0+` (any
@@ -38,7 +39,11 @@ receivers = {
   "hash" => '{"a" => 1}',
   "range" => "(1..3)",
   "random" => "Random.new(42)",
+  "set" => "Set[1, 2, 3]",
 }
+# `script/probe_builtin_methods set` probes one type while its arms are
+# being written; the check script runs the lot.
+receivers = receivers.select { |type, _receiver| ARGV.include?(type) } unless ARGV.empty?
 
 candidates = %w[
   abs magnitude downto even? gcd gcdlcm lcm negative? next odd? positive? pow pred succ times to_f to_s upto zero?
@@ -63,6 +68,7 @@ candidates = %w[
   step clamp digits between? divmod modulo remainder fdiv quo div ceildiv begin end exclude_end? cover? overlap?
   inspect class hash is_a? respond_to? send tap then itself instance_of?
   append prepend concat replace to_ary to_int to_str to_sym intern
+  add delete subset? superset? proper_subset? proper_superset? disjoint? to_set classify add? delete? merge subtract clear keep_if delete_if
 ].uniq.sort
 
 # [call text, positional count, block?]

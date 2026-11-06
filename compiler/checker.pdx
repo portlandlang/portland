@@ -746,7 +746,7 @@ end
 # A builtin type's name, as a `when` value or a `===` pattern tests for it
 # (#151): a type, not a value, so not a name to find defined.
 def builtin_type_name?(node)
-  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(node.name)
+  (node in IdentifierNode) && %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(node.name)
 end
 
 def check_case_in(node, scope, mutable found)
@@ -1147,7 +1147,7 @@ def check_defined(name, node, scope, found)
   return found if scope.globals.any? { it[0] == name }
   return found if builtin_function?(name)
   # A builtin type's bare name is the type as a value (ADR 0074).
-  return found if %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(name)
+  return found if %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(name)
   # A removed Ruby spelling names its rewrite instead (#135).
   return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
   noted(found, ["undefined", name], locate(node, scope))
@@ -1361,11 +1361,15 @@ def operator_takes?(operator, left, right)
     return true if left == ["symbol"] && right == ["symbol"]
     # Hashes compare as sets of pairs (#105), under everything but `<=>`.
     return true if operator != "<=>" && (left in ["hash", *]) && (right in ["hash", *])
+    # Sets order by the subset relations (ADR 0082).
+    return true if left == ["set"] && right == ["set"]
     # Arrays order element by element, under `<=>` alone.
     operator == "<=>" && (left in ["array", *]) && (right in ["array", *])
   when "+"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["string"]
+    # A set's union and difference take any enumerable (ADR 0082).
+    return true if left == ["set"] && set_operand_type?(right)
     (left in ["array", *]) && (right in ["array", *])
   when "*"
     return true if numeric?(left) && numeric?(right)
@@ -1374,6 +1378,7 @@ def operator_takes?(operator, left, right)
   # An array less another is the elements the other lacks (#104).
   when "-"
     return true if numeric?(left) && numeric?(right)
+    return true if left == ["set"] && set_operand_type?(right)
     (left in ["array", *]) && (right in ["array", *])
   when "/", "%", "**" then numeric?(left) && numeric?(right)
   else
@@ -1381,6 +1386,10 @@ def operator_takes?(operator, left, right)
     true
   end
 end
+
+# The types a set's algebra takes on the right (ADR 0082): a set, an array,
+# a range, or a hash.
+def set_operand_type?(type) = type == ["set"] || type == ["range"] || (type in ["array", *]) || (type in ["hash", *])
 
 # `!` takes a boolean, and `-` and `+` a number; the seed refuses the rest.
 def check_unary(node, scope, found)

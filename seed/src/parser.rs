@@ -3067,6 +3067,26 @@ impl<'source> Parser<'source> {
                     };
                 }
                 Some(TokenKind::LeftBracket) => {
+                    // `Set[1, 2, 3]` (ADR 0082): the type function `[]` with
+                    // the members between the brackets — not an index.
+                    if matches!(&expression, Expression::Variable(name) if name == "Set")
+                        && self
+                            .tokens
+                            .get(self.position)
+                            .is_some_and(|bracket| !bracket.leading_space)
+                    {
+                        self.position += 1; // the `[`
+                        let arguments = self.bracket_arguments();
+                        expression = Expression::MethodCall {
+                            arguments,
+                            block: None,
+                            keyword_arguments: Vec::new(),
+                            name: "[]".to_string(),
+                            receiver: Box::new(expression),
+                            safe: false,
+                        };
+                        continue;
+                    }
                     self.position += 1; // the `[`
                     let index = Box::new(self.expression());
                     if self.peek_kind() != Some(TokenKind::RightBracket) {
@@ -3436,6 +3456,31 @@ impl<'source> Parser<'source> {
 
     /// Parse a comma-separated argument list, consuming the closing paren.
     /// Keyword arguments (`label: value`) may only follow positional ones.
+    /// The members of `Set[...]`, up to the closing bracket: positional
+    /// expressions, newlines and a trailing comma ending nothing, as inside
+    /// a call's parens.
+    fn bracket_arguments(&mut self) -> Vec<Expression> {
+        let mut members = Vec::new();
+        self.skip_newlines();
+        while self.peek_kind() != Some(TokenKind::RightBracket) {
+            members.push(self.expression());
+            self.skip_newlines();
+            match self.peek_kind() {
+                Some(TokenKind::Comma) => {
+                    self.position += 1; // the `,`
+                    self.skip_newlines();
+                }
+                Some(TokenKind::RightBracket) => {}
+                _ => panic!(
+                    "expected closing bracket after Set's members, got {:?}",
+                    self.tokens.get(self.position)
+                ),
+            }
+        }
+        self.position += 1; // the `]`
+        members
+    }
+
     fn call_arguments(&mut self) -> (Vec<Expression>, Vec<(String, Expression)>) {
         // Parentheses open a context of their own: inside them a `do` is
         // claimable again, so `outer(inner do ... end)` says what it looks like.

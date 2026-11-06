@@ -282,6 +282,8 @@ def guest_case_matches(pattern_node, subject, bindings)
       return outcome([answer], result.bindings)
     end
   end
+  # A set's `===` is membership (ADR 0082), as Ruby's.
+  return outcome([set_member?(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__set__", *]
   outcome([pattern === subject], step.bindings)
 end
 
@@ -298,6 +300,7 @@ def guest_type_matches(name, subject, bindings)
   when "Integer" then return Integer === subject
   when "Range" then return Range === subject
   when "Random" then return Random === subject
+  when "Set" then return subject in ["__set__", *]
   when "String" then return String === subject
   end
   slot = resolve(bindings, name)
@@ -583,6 +586,7 @@ def match_builtin_type(pattern, subject)
   when "Integer" then subject in Integer
   when "Random"  then subject in Random
   when "Range"   then subject in Range
+  when "Set"     then subject in ["__set__", *]
   when "String"  then subject in String
   when "Symbol"  then subject in ["__symbol__", *]
   # Guest structs, symbols, and enum cases are tagged host arrays — not arrays.
@@ -594,7 +598,7 @@ def match_builtin_type(pattern, subject)
 end
 
 def match_struct(pattern, subject, bindings, earlier)
-  if %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(pattern.name)
+  if %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
@@ -1003,6 +1007,12 @@ def evaluate_binary(node, bindings)
   if node.operator == "<=>" && guest_array?(left) && guest_array?(right)
     return outcome([compare_guest_arrays(left, right, right_step.bindings)], right_step.bindings)
   end
+  # A set's algebra and its subset orderings (ADR 0082), the seed's arms;
+  # equality and the refusals stay the host's below.
+  if left in ["__set__", *]
+    answered = set_binary(node.operator, value_at(left, 1), right)
+    return outcome([slot_value(answered)], right_step.bindings) unless answered.empty?
+  end
   result = case node.operator
   when "<=>" then left <=> right
   when "+" then left + right
@@ -1013,8 +1023,8 @@ def evaluate_binary(node, bindings)
   # `**` rides the host whole (ADR 0033): the rational and overflow
   # refusals below are the seed's own, wording included.
   when "**" then left ** right
-  when "==" then left == right
-  when "!=" then left != right
+  when "==" then guest_equal?(left, right)
+  when "!=" then !guest_equal?(left, right)
   when "<" then left < right
   when "<=" then left <= right
   when ">" then left > right
@@ -1192,7 +1202,7 @@ end
 
 # The builtin types whose bare name is a type value (ADR 0074): the value
 # types, not the function namespaces `System` and `JSON`.
-def builtin_type_value_name?(name) = %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(name)
+def builtin_type_value_name?(name) = %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(name)
 
 # What `value.class` answers (ADR 0074): a struct's qualified name, a
 # builtin's type name, tagged. An enum case, a wrapper, a type itself, and
@@ -1224,6 +1234,7 @@ def value_type_label(value)
   return value_at(value, 1) if value in ["__struct__", *]
   return ":#{value_at(value, 1)}" if value in ["__enum_case__", *]
   return "Type" if value in ["__type__", *]
+  return "Set" if value in ["__set__", *]
   return "Array" if plain_array?(value)
   case value
   in Integer then "Integer"
@@ -1295,7 +1306,7 @@ end
 
 # A guest array proper — not a symbol, enum case, or struct wearing the
 # host's array shape.
-def guest_array?(value) = (value in Array) && !(value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *])
+def guest_array?(value) = (value in Array) && !(value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *] | ["__set__", *])
 
 # Ruby's array ordering: the first differing pair decides, and a shorter
 # array sorts first when every pair agrees.
@@ -1440,6 +1451,11 @@ def evaluate_append(node, mutable bindings)
   value_step = evaluate_expression(node.value, bindings)
   bindings = value_step.bindings
   value = slot_value(value_step.value)
+  # A set's `<<` waits on #103 with the other mutators (ADR 0082 §3); `add`
+  # answers the new set meanwhile — the seed's sentence.
+  if current in ["__set__", *]
+    panic("'<<' adds to a set in place, and values never mutate here (ADR 0015) — write #{node.name} = #{node.name}.add(value)")
+  end
   # Crude string-vs-array probe (no type predicates yet): an empty slice
   # of a string is "", of an array is [].
   appended = if current.slice(0, 0) == ""
@@ -1553,8 +1569,241 @@ end
 # in for values the compiler cannot spell.
 def plain_array?(value)
   return false unless value in Array
-  return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *]
+  return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *] | ["__set__", *]
   true
+end
+
+# — sets (ADR 0082) —
+
+# A guest set: the tag, then its members in insertion order, distinct by
+# `eql?` as Ruby's are — the first of two equal candidates stays.
+def guest_set(candidates)
+  mutable members = []
+  candidates.each do |candidate|
+    members << candidate unless set_member?(members, candidate)
+  end
+  ["__set__", members]
+end
+
+def set_member?(members, value) = members.any? { guest_eql?(it, value) }
+
+def set_subset?(members, other) = members.all? { set_member?(other, it) }
+
+def set_proper_subset?(members, other) = members.length < other.length && set_subset?(members, other)
+
+def set_intersects?(members, other) = members.any? { set_member?(other, it) }
+
+# `eql?` across the guest's shapes: a set holds the other's members in any
+# order, an array matches element by element, and everything else is the
+# host's own — so `1` and `1.0` stay two members, as the seed keeps them.
+def guest_eql?(left, right)
+  # Absence has no methods (ADR 0006), so nil is told apart here.
+  return right.nil? if left.nil?
+  return false if right.nil?
+  if (left in ["__set__", *]) && (right in ["__set__", *])
+    left_members = value_at(left, 1)
+    right_members = value_at(right, 1)
+    return left_members.length == right_members.length && set_subset?(left_members, right_members)
+  end
+  return elementwise?(left, right, true) if plain_array?(left) && plain_array?(right)
+  left.eql?(right)
+end
+
+# Ruby's `==` across the guest's shapes: a set by membership, an array
+# element by element, and everything else the host's own — which asks `==`
+# of what a hash holds, so `1 == 1.0` there as everywhere.
+def guest_equal?(left, right)
+  return guest_eql?(left, right) if (left in ["__set__", *]) || (right in ["__set__", *])
+  return elementwise?(left, right, false) if plain_array?(left) && plain_array?(right)
+  left == right
+end
+
+# Two arrays compared element by element, by `eql?` when `strict`, by `==`
+# otherwise.
+def elementwise?(left, right, strict)
+  return false unless left.length == right.length
+  mutable index = 0
+  mutable same = true
+  left.each do |element|
+    counterpart = value_at(right, index)
+    matched = strict ? guest_eql?(element, counterpart) : guest_equal?(element, counterpart)
+    same = false unless matched
+    index += 1
+  end
+  same
+end
+
+# The members an enumerable lends a set (ADR 0082): an array's elements, a
+# set's members, a range's integers, a hash's pairs — Ruby's reading of
+# each. Anything else refuses, `context` leading the sentence — the seed's.
+def set_operand(value, context)
+  return value if plain_array?(value)
+  return value_at(value, 1) if value in ["__set__", *]
+  return value.to_a if (value in Range) || (value in Hash)
+  panic("#{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got #{shorten(render_inspect(value))}")
+end
+
+# The subset family compares sets only, as Ruby's does.
+def set_argument(value, name)
+  return value_at(value, 1) if value in ["__set__", *]
+  panic("'#{name}' takes a Set, got #{shorten(render_inspect(value))}")
+end
+
+# Every nested set opened into its members, all the way down — Ruby's
+# `Set#flatten`; arrays inside stay arrays.
+def set_flattened(members)
+  mutable flattened = []
+  members.each do |member|
+    if member in ["__set__", *]
+      flattened += set_flattened(value_at(member, 1))
+    else
+      flattened << member
+    end
+  end
+  flattened
+end
+
+# The spelling that answers a new set, for each mutator Ruby's Set has
+# (ADR 0082 §3) — the bang names say theirs through `retired_sentence`.
+def set_mutator_spelling(name)
+  case name
+  when "add?"      then "'add' answers the new set; bind it"
+  when "delete?"   then "'delete' answers the new set; bind it"
+  when "merge"     then "'union' answers the new set; bind it"
+  when "subtract"  then "'difference' answers the new set; bind it"
+  when "clear"     then "write Set[] for the empty set"
+  when "replace"   then "bind the other set to the name instead"
+  when "keep_if"   then "'select' answers the new set; bind it"
+  when "delete_if" then "'reject' answers the new set; bind it"
+  else nil
+  end
+end
+
+def refuse_set_mutator(name)
+  spelling = set_mutator_spelling(name)
+  return if spelling.nil?
+  panic("'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — #{spelling}")
+end
+
+# The names a set answers the way an array does (ADR 0082): Ruby's
+# Enumerable, `each` itself, and the three counting names a set shares.
+def set_shares_with_array?(name) = enumerable_name?(name) || %w[each empty? join length size].include?(name)
+
+# A set's own blockless surface: membership by `eql?`, `add` and `delete`
+# answering a new set, Ruby's algebra under its word names, and the subset
+# family.
+def set_own_name?(name) = %w[add delete difference disjoint? flatten include? intersect? intersection member? proper_subset? proper_superset? subset? superset? to_set union].include?(name)
+
+def set_own_answer(name, members, arguments)
+  other = value_at(arguments, 0)
+  case name
+  when "add"              then set_member?(members, other) ? ["__set__", members] : ["__set__", members + [other]]
+  when "delete"           then ["__set__", members.reject { guest_eql?(it, other) }]
+  when "include?", "member?" then set_member?(members, other)
+  when "to_set"           then ["__set__", members]
+  when "flatten"          then guest_set(set_flattened(members))
+  when "union"            then guest_set(members + set_operand(other, "'union' on a set"))
+  when "subset?"          then set_subset?(members, set_argument(other, name))
+  when "superset?"        then set_subset?(set_argument(other, name), members)
+  when "proper_subset?"   then set_proper_subset?(members, set_argument(other, name))
+  when "proper_superset?" then set_proper_subset?(set_argument(other, name), members)
+  when "intersect?"       then set_intersects?(members, set_operand(other, "'intersect?' on a set"))
+  when "disjoint?"        then !set_intersects?(members, set_operand(other, "'disjoint?' on a set"))
+  when "intersection"
+    lent = set_operand(other, "'intersection' on a set")
+    guest_set(members.select { set_member?(lent, it) })
+  else
+    lent = set_operand(other, "'difference' on a set")
+    guest_set(members.reject { set_member?(lent, it) })
+  end
+end
+
+# A set on an operator's left (ADR 0082): `+` and `-` are union and
+# difference over any enumerable; the four orderings are the subset family
+# over a set; `<=>` is 0, -1, 1, or nil by the same relations, nil too for
+# anything not a set. An empty answer leaves the operator to the host —
+# equality, and the refusals.
+def set_binary(operator, members, right)
+  case operator
+  when "+"   then [guest_set(members + set_operand(right, "'+' on a set"))]
+  when "<="  then [set_subset?(members, set_argument(right, operator))]
+  when ">="  then [set_subset?(set_argument(right, operator), members)]
+  when "<"   then [set_proper_subset?(members, set_argument(right, operator))]
+  when ">"   then [set_proper_subset?(set_argument(right, operator), members)]
+  when "<=>" then [set_compared(members, right)]
+  when "-"
+    lent = set_operand(right, "'-' on a set")
+    [guest_set(members.reject { set_member?(lent, it) })]
+  else []
+  end
+end
+
+def set_compared(members, right)
+  return nil unless right in ["__set__", *]
+  other = value_at(right, 1)
+  forward = set_subset?(members, other)
+  backward = set_subset?(other, members)
+  return 0 if forward && backward
+  return -1 if forward
+  return 1 if backward
+  nil
+end
+
+# The walks that answer their receiver answer the set, not its members
+# (ADR 0082): `each` and its two siblings; `select`, `filter`, `find_all`,
+# and `reject` answer a set of what they kept. Anything else — a mapped
+# array, a count, a maybe — stands, as does any receiver that is not a set.
+def set_rewrapped(original, name, walked)
+  return walked unless original in ["__set__", *]
+  return walked unless walked.signal == "none"
+  answer = slot_value(walked.value)
+  return walked unless plain_array?(answer)
+  return outcome([original], walked.bindings) if %w[each each_with_index reverse_each].include?(name)
+  return outcome([guest_set(answer)], walked.bindings) if %w[filter find_all reject select].include?(name)
+  walked
+end
+
+# The set of `candidates`, each mapped through the node's block when it has
+# one — `map`'s own walk, so a `break` inside answers as it does there.
+def mapped_guest_set(node, candidates, bindings)
+  return outcome([guest_set(candidates)], bindings) if node.block.nil?
+  mapping = method_call_node(node.receiver, "map", [], node.block, line: node.line)
+  walked = evaluate_block_call(mapping, candidates, [], bindings)
+  return walked unless walked.signal == "none"
+  mapped = slot_value(walked.value)
+  return walked unless plain_array?(mapped)
+  outcome([guest_set(mapped)], walked.bindings)
+end
+
+# `classify` groups the members by the block's answer, each group a set, in
+# the order the answers were first seen; `to_set` with a block maps first.
+def evaluate_set_block_call(node, receiver, arguments, mutable scope)
+  members = value_at(receiver, 1)
+  return mapped_guest_set(node, members, scope) if node.name == "to_set"
+  entry = scope
+  mutable groups = []
+  mutable interrupt = nil
+  members.each do |member|
+    step = run_guest_block(node.block, [member], scope)
+    scope = compacted_since(entry, step.bindings)
+    if step.signal != "none"
+      interrupt = step
+      break
+    end
+    panic("classify block produced no value") if step.value.empty?
+    key = slot_value(step.value)
+    if groups.any? { guest_eql?(it[0], key) }
+      groups = groups.map { guest_eql?(it[0], key) ? [key, value_at(it, 1) + [member]] : it }
+    else
+      groups << [key, [member]]
+    end
+  end
+  return block_interrupted(interrupt, scope) if interrupt.some?
+  mutable classified = {}
+  groups.each do |group|
+    classified[group[0]] = guest_set(value_at(group, 1))
+  end
+  outcome([classified], scope)
 end
 
 # — rendering (#39) —
@@ -1624,7 +1873,7 @@ def render(value)
   return "nil" if value.nil?
   return render_inspect(value) if value.failure?
   return value_at(value, 1) if value in ["__symbol__", *] | ["__type__", *]
-  return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *]
+  return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *] | ["__set__", *]
   # A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's.
   return render_inspect(value) if plain_array?(value) || (value in Hash)
   "#{value}"
@@ -1646,6 +1895,11 @@ def render_inspect(value)
   if value in ["__struct__", *]
     fields = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
     return "#{value_at(value, 1)}(#{fields.join(", ")})"
+  end
+  # Ruby 4's spelling, which is also the constructor's (ADR 0082).
+  if value in ["__set__", *]
+    members = value_at(value, 1).map { render_inspect(it) }
+    return "Set[" + members.join(", ") + "]"
   end
   if plain_array?(value)
     rendered = value.map { render_inspect(it) }
@@ -1932,6 +2186,14 @@ def evaluate_builtin_type_function(node, mutable bindings)
   if type_name == "Random" && node.name == "new"
     return outcome([arguments.empty? ? Random.new : Random.new(value_at(arguments, 0))], bindings)
   end
+  # `Set.new(enumerable)` and `Set[a, b]` (ADR 0082): the members in order,
+  # repeats dropped; a block maps each member first, as Ruby's does.
+  if type_name == "Set" && node.name == "new"
+    panic("Set.new takes 0 or 1 argument, got #{arguments.length}") if arguments.length > 1
+    candidates = arguments.empty? ? [] : set_operand(value_at(arguments, 0), "Set.new")
+    return mapped_guest_set(node, candidates, bindings)
+  end
+  return outcome([guest_set(arguments)], bindings) if type_name == "Set" && node.name == "[]"
   panic("#{type_name} has no #{node.name}")
 end
 
@@ -2518,7 +2780,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Math Random Range System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Hash Integer JSON Math Random Range Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   # `Name.new(...)` constructs through the written name; a local holding a
@@ -2605,7 +2867,29 @@ def evaluate_method_call(node, mutable bindings)
       arguments += argument_step.value
     end
   end
-  return evaluate_block_call(node, receiver, arguments, bindings) if node.block.some?
+  # A set (ADR 0082): its own names answer here, a mutator names the
+  # spelling that answers a new set, and Ruby's Enumerable walks the members
+  # as an array's — the walks that answer their receiver answering the set
+  # again (set_rewrapped). Any other name is the table's refusal.
+  original = receiver
+  if (receiver in ["__set__", *]) && !%w[eql? failure? nil? some? to_s].include?(node.name)
+    refuse_set_mutator(node.name)
+    if node.block.nil? && set_own_name?(node.name)
+      check_builtin_count(receiver, node.name, arguments.length)
+      return outcome([set_own_answer(node.name, value_at(receiver, 1), arguments)], bindings)
+    end
+    return evaluate_set_block_call(node, receiver, arguments, bindings) if node.block.some? && %w[classify to_set].include?(node.name)
+    if node.name == "classify"
+      shown = arguments.map { shorten(render_inspect(it)) }
+      panic("undefined method classify for #{shorten(render_inspect(receiver))} with [#{shown.join(", ")}]")
+    end
+    unless set_shares_with_array?(node.name)
+      refuse_missing_builtin(receiver, node.name)
+      panic("no method #{node.name} on this value — the compiler may be missing a builtin the seed has")
+    end
+    receiver = value_at(receiver, 1)
+  end
+  return set_rewrapped(original, node.name, evaluate_block_call(node, receiver, arguments, bindings)) if node.block.some?
   # `sample(random:)` and `shuffle(random:)` (ADR 0065): the one keyword a
   # builtin takes, handed to the host's own.
   if plain_array?(receiver) && %w[sample shuffle].include?(node.name) && !keyword_values.empty?
@@ -2679,7 +2963,7 @@ def evaluate_method_call(node, mutable bindings)
   when "some?" then receiver.some?
   # `eql?` is universal (ADR 0059): the host's own, which on a guest's
   # tagged shapes is element by element, as the seed's is.
-  when "eql?" then receiver.eql?(value_at(arguments, 0))
+  when "eql?" then guest_eql?(receiver, value_at(arguments, 0))
   # The failure predicate rides the host like its presence siblings —
   # before ADR 0044 it was reachable only through `!`, so this arm was a
   # green-but-never-covered hosted gap.
@@ -2824,6 +3108,9 @@ def evaluate_method_call(node, mutable bindings)
   when "merge" then receiver.merge(value_at(arguments, 0))
   when "dig" then dig_into(receiver, arguments)
   when "to_a", "entries" then receiver.to_a
+  # `to_set` on the collections (ADR 0082): an array's elements, a hash's
+  # pairs, a range's integers, repeats dropped.
+  when "to_set" then guest_set(set_operand(receiver, "'to_set'"))
   when "values" then receiver.values
   when "key?", "has_key?" then receiver.key?(value_at(arguments, 0))
   when "member?" then receiver.member?(value_at(arguments, 0))
@@ -2921,7 +3208,7 @@ def evaluate_method_call(node, mutable bindings)
     end
     struct_field(receiver, node.name)
   end
-  outcome([result], bindings)
+  set_rewrapped(original, node.name, outcome([result], bindings))
 end
 
 # What a block rebound flows back to the caller; what it named itself does
@@ -3005,6 +3292,7 @@ def builtin_type_of(value)
   return ["hash", ["unknown"], ["unknown"]] if value in Hash
   return ["array", ["unknown"]] if plain_array?(value)
   return ["random"] if value in Random
+  return ["set"] if value in ["__set__", *]
   nil
 end
 
@@ -3234,6 +3522,8 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return outcome([ranged ? receiver.begin + position : receiver[position]], scope)
   end
   case node.name
+  # `to_set { }` (ADR 0082) maps each element first, as Ruby's.
+  when "to_set" then mapped_guest_set(node, set_operand(receiver, "'to_set'"), scope)
   when "each", "each_pair"
     # A hash yields its key and value as two arguments. An array yields
     # one, and a two-parameter guest block over it spreads in

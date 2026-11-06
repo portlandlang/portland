@@ -1426,6 +1426,13 @@ def postfix_from(tokens, mutable step)
       next
     end
     if operator_at?(tokens, position, ["["])
+      # `Set[1, 2, 3]` (ADR 0082): the type function `[]` with the members
+      # between the brackets — not an index.
+      if (step.node in IdentifierNode) && step.node.name == "Set" && !tokens[position].leading_space
+        members = parse_bracket_arguments(tokens, position + 1)
+        step = Step.new(node: method_call_node(step.node, "[]", members.node, nil, line: line_at(tokens, position)), position: members.position)
+        next
+      end
       step = parse_index(tokens, step.node, position + 1)
       next
     end
@@ -1704,6 +1711,27 @@ def parse_braced_body(tokens, mutable position)
       end
     end
     position = skip_newlines_at(tokens, position)
+  end
+end
+
+# The members of `Set[...]`, up to the closing bracket: expressions, with
+# newlines and a trailing comma ending nothing, as inside a call's parens.
+def parse_bracket_arguments(tokens, mutable position)
+  mutable members = []
+  position = skip_newlines_at(tokens, position)
+  while true
+    return Step.new(node: members, position: position + 1) if operator_at?(tokens, position, ["]"])
+    if position >= tokens.length
+      return Step.new(node: [error_node("expected closing bracket after Set's members")], position: position)
+    end
+    step = parse_expression(tokens, position)
+    members << step.node
+    position = skip_newlines_at(tokens, step.position)
+    if operator_at?(tokens, position, %w[,])
+      position = skip_newlines_at(tokens, position + 1)
+    elsif !operator_at?(tokens, position, ["]"])
+      return Step.new(node: [error_node("expected closing bracket after Set's members")], position: position)
+    end
   end
 end
 

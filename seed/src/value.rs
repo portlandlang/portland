@@ -41,6 +41,11 @@ pub enum Value {
         exclusive: bool,
         start: Option<i64>,
     },
+    /// `Set[1, 2, 3]` (ADR 0082): distinct members in insertion order,
+    /// distinct by `eql?` as Ruby's are, so `1` and `1.0` are two members.
+    /// Equality is membership, never order. Built by `Value::set`, which
+    /// drops the repeats.
+    Set(std::rc::Rc<Vec<Value>>),
     /// The nested case of the wrapper (ADR 0005): only ever wraps Nil or
     /// another Some — a plain present value is never boxed (`some(5)` is
     /// `5`). Built by `Value::present`; keeps `[nil].first` ≠ `[].first`.
@@ -165,6 +170,11 @@ impl PartialEq for Value {
             // Two generators are equal when seeded alike and drawn alike,
             // as Ruby's are.
             (Value::Random(left), Value::Random(right)) => *left.borrow() == *right.borrow(),
+            // Two sets are equal when each holds the other's members —
+            // order is not a set's identity, and a member matches by `eql?`.
+            (Value::Set(left), Value::Set(right)) => {
+                left.len() == right.len() && left.iter().all(|member| right.contains(member))
+            }
             _ => false,
         }
     }
@@ -228,6 +238,18 @@ impl Value {
 
     pub fn hash(pairs: Vec<(Value, Value)>) -> Value {
         Value::Hash(std::rc::Rc::new(pairs))
+    }
+
+    /// A set from candidates in order, the repeats dropped: the first of
+    /// two `eql?` members stays, as Ruby's `Set.new` keeps it.
+    pub fn set(candidates: Vec<Value>) -> Value {
+        let mut members: Vec<Value> = Vec::with_capacity(candidates.len());
+        for candidate in candidates {
+            if !members.contains(&candidate) {
+                members.push(candidate);
+            }
+        }
+        Value::Set(std::rc::Rc::new(members))
     }
 
     /// One hash pair, written the way it would be typed.
@@ -306,6 +328,7 @@ impl Value {
             Value::Integer(_) => Some("integer"),
             Value::Random(_) => Some("random"),
             Value::Range { .. } => Some("range"),
+            Value::Set(_) => Some("set"),
             Value::String(_) => Some("string"),
             Value::Symbol(_) => Some("symbol"),
             _ => None,
@@ -325,6 +348,7 @@ impl Value {
             Value::Nil => "nil".to_string(),
             Value::Random(_) => "Random".to_string(),
             Value::Range { .. } => "Range".to_string(),
+            Value::Set(_) => "Set".to_string(),
             Value::String(_) => "String".to_string(),
             Value::Struct { name, .. } => name.clone(),
             Value::Symbol(_) => "Symbol".to_string(),
@@ -372,6 +396,11 @@ impl Value {
             // The spelling that builds one from the same seed; where it has
             // been drawn from is not written, as Ruby's is not.
             Value::Random(generator) => format!("Random.new({})", generator.borrow().seed),
+            // Ruby 4's spelling, which is also the constructor's.
+            Value::Set(members) => {
+                let inner: Vec<String> = members.iter().map(Value::inspect).collect();
+                format!("Set[{}]", inner.join(", "))
+            }
             Value::Boolean(value) => value.to_string(),
             Value::EnumCase { name, payload } => {
                 let inner: Vec<String> = payload
@@ -497,7 +526,7 @@ impl fmt::Display for Value {
                 Ok(())
             }
             Value::Nil => write!(formatter, "nil"),
-            Value::Random(_) => write!(formatter, "{}", self.inspect()),
+            Value::Random(_) | Value::Set(_) => write!(formatter, "{}", self.inspect()),
             Value::Some(_) => write!(formatter, "{}", self.inspect()),
             Value::Failure(_) => write!(formatter, "{}", self.inspect()),
             Value::String(value) => write!(formatter, "{value}"),

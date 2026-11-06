@@ -162,6 +162,147 @@ fn enumerable_name(name: &str) -> bool {
     )
 }
 
+/// The names a set answers the way an array does (ADR 0082): Ruby's
+/// Enumerable, `each` itself, and the three counting names a set shares.
+fn set_shares_with_array(name: &str) -> bool {
+    enumerable_name(name) || matches!(name, "each" | "empty?" | "join" | "length" | "size")
+}
+
+/// The spelling that answers a new set, for each mutator Ruby's Set has
+/// (ADR 0082 §3) — the bang names say theirs through `retired_sentence`.
+fn set_mutator_spelling(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "add?" => "'add' answers the new set; bind it",
+        "delete?" => "'delete' answers the new set; bind it",
+        "merge" => "'union' answers the new set; bind it",
+        "subtract" => "'difference' answers the new set; bind it",
+        "clear" => "write Set[] for the empty set",
+        "replace" => "bind the other set to the name instead",
+        "keep_if" => "'select' answers the new set; bind it",
+        "delete_if" => "'reject' answers the new set; bind it",
+        _ => return None,
+    })
+}
+
+/// The members an enumerable lends a set (ADR 0082): an array's elements,
+/// a set's members, a range's integers, a hash's pairs — Ruby's reading of
+/// each. Anything else refuses, `context` leading the sentence.
+fn set_operand(value: &Value, context: &str) -> Vec<Value> {
+    match value {
+        Value::Array(elements) => elements.as_ref().clone(),
+        Value::Set(members) => members.as_ref().clone(),
+        Value::Range { .. } => range_elements(value),
+        Value::Hash(pairs) => pairs
+            .iter()
+            .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
+            .collect(),
+        other => panic!(
+            "{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got {}",
+            other.shown()
+        ),
+    }
+}
+
+/// The subset family compares sets only, as Ruby's does.
+fn set_argument<'a>(value: &'a Value, name: &str) -> &'a Vec<Value> {
+    match value {
+        Value::Set(members) => members,
+        other => panic!("'{name}' takes a Set, got {}", other.shown()),
+    }
+}
+
+fn set_union(members: &[Value], other: Vec<Value>) -> Value {
+    let mut grown = members.to_vec();
+    grown.extend(other);
+    Value::set(grown)
+}
+
+fn set_intersection(members: &[Value], other: &[Value]) -> Value {
+    Value::set(
+        members
+            .iter()
+            .filter(|member| other.contains(member))
+            .cloned()
+            .collect(),
+    )
+}
+
+fn set_difference(members: &[Value], other: &[Value]) -> Value {
+    Value::set(
+        members
+            .iter()
+            .filter(|member| !other.contains(member))
+            .cloned()
+            .collect(),
+    )
+}
+
+fn set_subset(members: &[Value], other: &[Value]) -> bool {
+    members.iter().all(|member| other.contains(member))
+}
+
+fn set_intersects(members: &[Value], other: &[Value]) -> bool {
+    members.iter().any(|member| other.contains(member))
+}
+
+/// Every nested set opened into its members, all the way down — Ruby's
+/// `Set#flatten`; arrays inside stay arrays.
+fn set_flattened(members: &[Value]) -> Vec<Value> {
+    let mut flattened = Vec::new();
+    for member in members {
+        match member {
+            Value::Set(inner) => flattened.extend(set_flattened(inner)),
+            other => flattened.push(other.clone()),
+        }
+    }
+    flattened
+}
+
+/// A set on an operator's left (ADR 0082): `+` and `-` are union and
+/// difference over any enumerable; the four orderings are the subset
+/// family over a set; `<=>` is 0, -1, 1, or nil by the same relations, nil
+/// too for anything not a set. `None` leaves the operator to `apply_binary`
+/// — equality, and the refusals.
+fn set_binary(members: &[Value], operator: BinaryOperator, right: &Value) -> Option<Value> {
+    let glyph = operator.glyph();
+    Some(match operator {
+        BinaryOperator::Add => {
+            set_union(members, set_operand(right, &format!("'{glyph}' on a set")))
+        }
+        BinaryOperator::Subtract => {
+            set_difference(members, &set_operand(right, &format!("'{glyph}' on a set")))
+        }
+        BinaryOperator::LessOrEqual => {
+            Value::Boolean(set_subset(members, set_argument(right, glyph)))
+        }
+        BinaryOperator::GreaterOrEqual => {
+            Value::Boolean(set_subset(set_argument(right, glyph), members))
+        }
+        BinaryOperator::Less => {
+            let other = set_argument(right, glyph);
+            Value::Boolean(members.len() < other.len() && set_subset(members, other))
+        }
+        BinaryOperator::Greater => {
+            let other = set_argument(right, glyph);
+            Value::Boolean(other.len() < members.len() && set_subset(other, members))
+        }
+        BinaryOperator::Spaceship => match right {
+            Value::Set(other) => {
+                let forward = set_subset(members, other);
+                let backward = set_subset(other, members);
+                match (forward, backward) {
+                    (true, true) => Value::Integer(0),
+                    (true, false) => Value::Integer(-1),
+                    (false, true) => Value::Integer(1),
+                    (false, false) => Value::Nil,
+                }
+            }
+            _ => Value::Nil,
+        },
+        _ => return None,
+    })
+}
+
 /// A bounded range's first element and how many it holds — none for an
 /// empty one — for a search that reads elements by position (#111). An
 /// open end has no span to search.
@@ -3179,6 +3320,14 @@ impl<W: std::io::Write> Interpreter<W> {
                         std::rc::Rc::make_mut(&mut elements).push(element);
                         Some(Value::Array(elements))
                     }
+                    // A set's `<<` waits on #103 with the other mutators
+                    // (ADR 0082 §3); `add` answers the new set meanwhile.
+                    (current @ Value::Set(_), _) => {
+                        self.restore(name, current);
+                        panic!(
+                            "'<<' adds to a set in place, and values never mutate here (ADR 0015) — write {name} = {name}.add(value)"
+                        )
+                    }
                     (current, value) => {
                         let message = format!(
                             "cannot append {value:?} to {current:?} — << takes a string or an array on the left"
@@ -3412,6 +3561,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     let ordering = self.compare_arrays(&left_elements[..], &right_elements[..]);
                     return Some(Value::Integer(ordering));
                 }
+                // A set's algebra and its subset orderings (ADR 0082).
+                if let Value::Set(members) = &left
+                    && let Some(answer) = set_binary(members, *operator, &right)
+                {
+                    return Some(answer);
+                }
                 Some(apply_binary(left, operator, right))
             }
             Expression::MethodCall {
@@ -3437,6 +3592,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             | "Math"
                             | "Random"
                             | "Range"
+                            | "Set"
                             | "System"
                     )
                     && !self.variables.contains_key(type_name)
@@ -3606,6 +3762,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Integer"
                         | "Random"
                         | "Range"
+                        | "Set"
                         | "String"
                         | "Symbol"
                 ) {
@@ -3793,6 +3950,11 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
             ("Random", "new") => Some(random_new(&arguments)),
+            // `Set.new(enumerable)` and `Set[a, b]` (ADR 0082): the members
+            // in order, repeats dropped; a block maps each member first, as
+            // Ruby's does.
+            ("Set", "new") => self.set_new(arguments, block),
+            ("Set", "[]") => Some(Value::set(arguments)),
             ("Range", "new") => Some(range_new(&arguments)),
             ("System", "arguments") => {
                 if !arguments.is_empty() {
@@ -4150,6 +4312,174 @@ impl<W: std::io::Write> Interpreter<W> {
     /// `Array.new` in Ruby's arities: bare, by count (nil-filled, as
     /// Ruby's), by count and fill, by count and a block handed each index,
     /// or copied from an array.
+    /// `Set.new`, `Set.new(enumerable)`, and either with a block (ADR 0082).
+    fn set_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
+        let candidates = match arguments.as_slice() {
+            [] => Vec::new(),
+            [source] => set_operand(source, "Set.new"),
+            _ => panic!("Set.new takes 0 or 1 argument, got {}", arguments.len()),
+        };
+        self.mapped_set(candidates, block)
+    }
+
+    /// The set of `candidates`, each mapped through the block when there is
+    /// one — `map`'s own walk, so a `break` inside it answers as it does
+    /// there.
+    fn mapped_set(&mut self, candidates: Vec<Value>, block: Option<&Block>) -> Option<Value> {
+        let Some(block) = block else {
+            return Some(Value::set(candidates));
+        };
+        let mapped = self.method_call(
+            Value::array(candidates),
+            "map",
+            Vec::new(),
+            Vec::new(),
+            Some(block),
+        )?;
+        Some(match mapped {
+            Value::Array(elements) => Value::set(elements.as_ref().clone()),
+            interrupted => interrupted,
+        })
+    }
+
+    /// A set's own surface (ADR 0082): membership by `eql?`, `add` and
+    /// `delete` answering a new set, Ruby's algebra under its word names,
+    /// the subset family, and Ruby 4's `join`, `flatten`, and `classify`.
+    /// Enumerable's names walk the members as an array's do, and the walks
+    /// that answer their receiver answer the set, as Ruby's do. A mutator
+    /// names the spelling that answers a new set. `None` leaves the name to
+    /// the general arms and the table's refusal.
+    fn set_method(
+        &mut self,
+        members: &std::rc::Rc<Vec<Value>>,
+        name: &str,
+        arguments: &[Value],
+        block: Option<&Block>,
+    ) -> Option<Option<Value>> {
+        if let Some(spelling) = set_mutator_spelling(name) {
+            refusal("missing");
+            panic!(
+                "'{name}' mutates its receiver, and values never mutate here (ADR 0015) — {spelling}"
+            );
+        }
+        // A block beside a name that takes none is the block arms' refusal,
+        // as it is on an array.
+        let own = matches!(
+            name,
+            "add"
+                | "delete"
+                | "difference"
+                | "disjoint?"
+                | "flatten"
+                | "include?"
+                | "intersect?"
+                | "intersection"
+                | "member?"
+                | "proper_subset?"
+                | "proper_superset?"
+                | "subset?"
+                | "superset?"
+                | "union"
+        );
+        if own && block.is_some() {
+            return None;
+        }
+        let answer = match (name, arguments) {
+            ("add", [member]) => {
+                let mut grown = members.as_ref().clone();
+                if !grown.contains(member) {
+                    grown.push(member.clone());
+                }
+                Value::Set(std::rc::Rc::new(grown))
+            }
+            ("delete", [member]) => Value::Set(std::rc::Rc::new(
+                members
+                    .iter()
+                    .filter(|held| *held != member)
+                    .cloned()
+                    .collect(),
+            )),
+            ("include?" | "member?", [needle]) => Value::Boolean(members.contains(needle)),
+            ("to_set", []) => Value::Set(members.clone()),
+            ("union", [other]) => set_union(members, set_operand(other, "'union' on a set")),
+            ("intersection", [other]) => {
+                set_intersection(members, &set_operand(other, "'intersection' on a set"))
+            }
+            ("difference", [other]) => {
+                set_difference(members, &set_operand(other, "'difference' on a set"))
+            }
+            ("subset?", [other]) => Value::Boolean(set_subset(members, set_argument(other, name))),
+            ("superset?", [other]) => {
+                Value::Boolean(set_subset(set_argument(other, name), members))
+            }
+            ("proper_subset?", [other]) => {
+                let other = set_argument(other, name);
+                Value::Boolean(members.len() < other.len() && set_subset(members, other))
+            }
+            ("proper_superset?", [other]) => {
+                let other = set_argument(other, name);
+                Value::Boolean(other.len() < members.len() && set_subset(other, members))
+            }
+            ("intersect?", [other]) => Value::Boolean(set_intersects(
+                members,
+                &set_operand(other, "'intersect?' on a set"),
+            )),
+            ("disjoint?", [other]) => Value::Boolean(!set_intersects(
+                members,
+                &set_operand(other, "'disjoint?' on a set"),
+            )),
+            ("flatten", []) => Value::set(set_flattened(members)),
+            // The members grouped by the block's answer, each group a set,
+            // in the order the answers were first seen.
+            ("classify", []) if block.is_some() => {
+                let block = block.expect("checked above");
+                let mut groups: Vec<(Value, Vec<Value>)> = Vec::new();
+                for member in members.iter().cloned() {
+                    let key = self.run_block(block, vec![member.clone()]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return Some(interrupted);
+                    }
+                    let key = key.unwrap_or_else(|| panic!("classify block produced no value"));
+                    match groups.iter_mut().find(|(held, _)| *held == key) {
+                        Some((_, group)) => group.push(member),
+                        None => groups.push((key, vec![member])),
+                    }
+                }
+                Value::hash(
+                    groups
+                        .into_iter()
+                        .map(|(key, group)| (key, Value::set(group)))
+                        .collect(),
+                )
+            }
+            (name, _) if set_shares_with_array(name) => {
+                let walked = self.method_call(
+                    Value::Array(members.clone()),
+                    name,
+                    arguments.to_vec(),
+                    Vec::new(),
+                    block,
+                );
+                let Some(walked) = walked else {
+                    return Some(None);
+                };
+                match (name, walked) {
+                    ("each" | "each_with_index" | "reverse_each", Value::Array(_)) => {
+                        Value::Set(members.clone())
+                    }
+                    ("select" | "filter" | "find_all" | "reject", Value::Array(kept))
+                        if block.is_some() =>
+                    {
+                        Value::set(kept.as_ref().clone())
+                    }
+                    (_, answer) => answer,
+                }
+            }
+            _ => return None,
+        };
+        Some(Some(answer))
+    }
+
     fn array_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
         match arguments.as_slice() {
             [] => Some(Value::array(Vec::new())),
@@ -4286,6 +4616,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "JSON"
                 | "Random"
                 | "Range"
+                | "Set"
                 | "String"
                 | "Symbol"
                 | "System"
@@ -4378,6 +4709,15 @@ impl<W: std::io::Write> Interpreter<W> {
             && !matches!(receiver, Value::Nil)
         {
             return Some(Self::class_of(&receiver));
+        }
+        // A set's own names (ADR 0082), then Ruby's Enumerable through its
+        // members; any other name falls through to the general arms and the
+        // table's refusal.
+        if let Value::Set(members) = &receiver {
+            let members = members.clone();
+            if let Some(answered) = self.set_method(&members, name, &arguments, block) {
+                return answered;
+            }
         }
         // The names every value answers — `to_s`, the presence predicates,
         // `eql?` — stay the general arms' below.
@@ -4935,6 +5275,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         results.push(result);
                     }
                     Some(Value::array(results))
+                }
+                // `to_set { }` (ADR 0082) maps each element first, as Ruby's.
+                (Value::Array(_) | Value::Hash(_) | Value::Range { .. }, "to_set", []) => {
+                    let elements = set_operand(&receiver, "'to_set'");
+                    self.mapped_set(elements, Some(block))
                 }
                 (Value::Array(elements), "each_with_index", []) => {
                     for (index, element) in elements.iter().cloned().enumerate() {
@@ -5918,6 +6263,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 Value::array(pairs.iter().map(|(_, value)| value.clone()).collect())
             }
             // Membership asks Ruby's `==`, so `[1].include?(1.0)` holds.
+            // `to_set` on the collections (ADR 0082): an array's elements, a
+            // hash's pairs, a range's integers, repeats dropped.
+            (Value::Array(_) | Value::Hash(_) | Value::Range { .. }, "to_set", []) => {
+                Value::set(set_operand(&receiver, "'to_set'"))
+            }
             (Value::Array(elements), "include?" | "member?", [needle]) => {
                 Value::Boolean(elements.iter().any(|element| element.ruby_equals(needle)))
             }
@@ -7579,6 +7929,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Integer"
                         | "Random"
                         | "Range"
+                        | "Set"
                         | "String"
                         | "Symbol"
                 ) {
@@ -7594,6 +7945,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Integer", Value::Integer(_))
                             | ("Random", Value::Random(_))
                             | ("Range", Value::Range { .. })
+                            | ("Set", Value::Set(_))
                             | ("String", Value::String(_))
                             | ("Symbol", Value::Symbol(_))
                     );
@@ -7674,6 +8026,8 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                 }
             }
+            // A set's `===` is membership (ADR 0082), as Ruby's.
+            (Value::Set(members), _) => members.contains(subject),
             // Portland's own `==`, so `1 === 1.0` as `1 == 1.0` does.
             _ => {
                 apply_binary(pattern.clone(), &BinaryOperator::Equals, subject.clone())
@@ -7694,6 +8048,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "Integer"
                 | "Random"
                 | "Range"
+                | "Set"
                 | "String"
                 | "Symbol"
         ) {

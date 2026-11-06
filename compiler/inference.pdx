@@ -313,7 +313,7 @@ end
 def synthesize_name(name, types)
   found = types.find { it[0] == name }
   # A builtin type's bare name is the type as a value (ADR 0074).
-  return ["type", name] if found.nil? && %w[Array Boolean Float Hash Integer Random Range String Symbol].include?(name)
+  return ["type", name] if found.nil? && %w[Array Boolean Float Hash Integer Random Range Set String Symbol].include?(name)
   return ["unknown"] if found.nil?
   type_at(found, 1)
 end
@@ -343,6 +343,8 @@ def synthesize_binary(node, types)
     return ["float"] if numeric?(left) && numeric?(right)
     return ["string"] if left == ["string"] && right == ["string"]
     return left if (left in ["array", *]) && (right in ["array", *])
+    # A set's union and difference answer a set (ADR 0082).
+    return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
     ["unknown"]
   when "/"
     return ["integer"] if left == ["integer"] && right == ["integer"]
@@ -434,11 +436,14 @@ def type_function_answer_for(type_name, name)
   # `JSON.parse` answers the document's shape, which is unknown; the two
   # writers answer text (ADR 0072).
   when "generate", "pretty_generate"       then ["string"]
+  # `Set[a, b]` is the one bracketed type function (ADR 0082).
+  when "[]"                                then if type_name == "Set" then ["set"] else ["unknown"] end
   when "new"
     case type_name
     when "Hash"   then ["hash", ["unknown"], ["unknown"]]
     when "Random" then ["random"]
     when "Range"  then ["range"]
+    when "Set"    then ["set"]
     else ["array", ["unknown"]]
     end
   else ["unknown"]
@@ -452,7 +457,7 @@ end
 # unbound name is the type's.
 def builtin_type_function?(node, types)
   return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Hash Integer JSON Math Random Range System].include?(node.receiver.name)
+  return false unless %w[Array Hash Integer JSON Math Random Range Set System].include?(node.receiver.name)
   # Unbound, or bound to nothing but itself as a type value (ADR 0074).
   answered = synthesize_name(node.receiver.name, types)
   answered == ["unknown"] || answered == ["type", node.receiver.name]
@@ -470,7 +475,7 @@ def call_answer(receiver, node, types)
   # own answers.
   if receiver in ["type", *]
     type_name = type_at(receiver, 1)
-    return type_function_answer_for(type_name, name) if %w[Array Hash Integer JSON Math Random Range System].include?(type_name)
+    return type_function_answer_for(type_name, name) if %w[Array Hash Integer JSON Math Random Range Set System].include?(type_name)
     return ["struct", type_name] if name == "new"
     return synthesize_name(type_name + "." + name, types)
   end
@@ -497,8 +502,14 @@ def call_answer(receiver, node, types)
   when "partition", "rpartition" then ["array", ["string"]]
   when "codepoints", "bytes" then ["array", ["integer"]]
   when "casecmp?" then ["boolean"]
-  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "allbits?", "anybits?", "nobits?", "all?", "none?", "one?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?", "valid_encoding?"
+  when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "allbits?", "anybits?", "nobits?", "all?", "none?", "one?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?", "valid_encoding?", "subset?", "superset?", "proper_subset?", "proper_superset?", "disjoint?"
     ["boolean"]
+  # A set's own answers (ADR 0082): `to_set` on any collection, and the
+  # names that answer a new set on one.
+  when "to_set" then ["set"]
+  when "add", "delete", "union"
+    return ["set"] if receiver == ["set"]
+    ["unknown"]
   when "chars", "grapheme_clusters", "split", "lines" then ["array", ["string"]]
   when "keys"
     return ["array", type_at(receiver, 1)] if receiver in ["hash", *]
@@ -527,6 +538,7 @@ def call_answer(receiver, node, types)
     return ["unknown"] unless node.arguments.empty?
     return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
     return ["maybe", ["integer"]] if receiver == ["range"]
+    return ["maybe", ["unknown"]] if receiver == ["set"]
     ["unknown"]
   # The arrangements of an array are arrays of its elements (#104).
   when "combination", "repeated_combination", "permutation", "repeated_permutation"
@@ -556,6 +568,7 @@ def class_answer(receiver)
   in ["hash", *]   then ["type", "Hash"]
   in ["range"]     then ["type", "Range"]
   in ["random"]    then ["type", "Random"]
+  in ["set"]       then ["type", "Set"]
   else ["unknown"]
   end
 end
@@ -602,6 +615,10 @@ def synthesize_shape_answer(receiver, name)
   case name
   when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection"
     return receiver if receiver in ["array", *]
+    # A set's algebra answers a set; its Enumerable walks answer arrays
+    # (ADR 0082), as Ruby's do.
+    return receiver if receiver == ["set"] && %w[difference flatten intersection].include?(name)
+    return ["array", ["unknown"]] if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
     # A hash's compact and slice answer a hash (#105).
     return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
     return ["string"] if receiver == ["string"] && name == "slice"
@@ -613,6 +630,7 @@ def synthesize_shape_answer(receiver, name)
   when "to_a", "entries"
     return receiver if receiver in ["array", *]
     return ["array", ["integer"]] if receiver == ["range"]
+    return ["array", ["unknown"]] if receiver == ["set"]
     ["unknown"]
   else
     ["unknown"]
@@ -655,8 +673,13 @@ def synthesize_block_call(node, receiver, types)
   when "cycle" then ["nil"]
   when "all?", "any?", "none?", "one?" then ["boolean"]
   when "select", "filter", "reject", "each", "each_with_index", "reverse_each"
-    return receiver if (receiver in ["array", *]) || (receiver in ["hash", *])
+    return receiver if (receiver in ["array", *]) || (receiver in ["hash", *]) || receiver == ["set"]
     ["unknown"]
+  # A set's groups (ADR 0082): the block's answers to sets of its members.
+  when "classify"
+    return ["hash", body, ["set"]] if receiver == ["set"]
+    ["unknown"]
+  when "to_set" then ["set"]
   # A hash's own walks (#105): the key side or the value side rewritten
   # by the block, or walked and the hash answered.
   when "transform_values"
@@ -796,10 +819,11 @@ def builtin_table(type)
   in ["float"] then %w[abs/0 between?/2 ceil/0 clamp/1-2 class/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 positive?/0 pow/1 prev_float/0 quo/1 remainder/1 round/0 some?/0 to_f/0 to_i/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[capitalize/0 class/0 downcase/0 empty?/0 end_with?/1+ eql?/1 failure?/0 id2name/0 intern/0 length/0 name/0 next/0 nil?/0 size/0 slice/2 some?/0 start_with?/1+ succ/0 swapcase/0 to_s/0 to_sym/0 upcase/0]
-  in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
-  in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
+  in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
+  in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
-  in ["range"] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0]
+  in ["range"] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/1 sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
+  in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
   else
     nil
   end
