@@ -2469,9 +2469,7 @@ def binary_search(values, count, ranged, block, entry, mutable scope)
         true
       elsif verdict == false || verdict.nil?
         false
-      elsif (verdict in Integer) || (builtin_type_of(verdict).nil? && !(verdict in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *]))
-        # The host's patterns cannot name a float, so a value the table
-        # cannot name and no tag claims is one.
+      elsif (verdict in Integer) || (verdict in Float)
         found = middle if verdict == 0
         verdict < 0
       else
@@ -3535,6 +3533,7 @@ def arguments_word(expected) = if expected == "1" then "argument" else "argument
 def builtin_type_of(value)
   return ["string"] if value in String
   return ["integer"] if value in Integer
+  return ["float"] if value in Float
   return ["boolean"] if value in Boolean
   return ["hash", ["unknown"], ["unknown"]] if value in Hash
   return ["array", ["unknown"]] if plain_array?(value)

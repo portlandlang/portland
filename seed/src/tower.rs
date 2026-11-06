@@ -1153,8 +1153,11 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
     }
     // The reals: integers, floats, rationals.
     let answer = match (name, arguments) {
+        // NaN and the infinities have no rational: Ruby answers the float
+        // itself as the numerator and 1 as the denominator, and so does this.
         ("numerator", []) => match receiver {
             Value::Integer(_) => receiver.clone(),
+            Value::Float(number) if !number.is_finite() => receiver.clone(),
             Value::Float(number) => match float_to_rational(*number) {
                 Value::Rational { numerator, .. } => Value::Integer(numerator),
                 other => other,
@@ -1164,6 +1167,7 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         },
         ("denominator", []) => match receiver {
             Value::Integer(_) => Value::Integer(1),
+            Value::Float(number) if !number.is_finite() => Value::Integer(1),
             Value::Float(number) => match float_to_rational(*number) {
                 Value::Rational { denominator, .. } => Value::Integer(denominator),
                 other => other,

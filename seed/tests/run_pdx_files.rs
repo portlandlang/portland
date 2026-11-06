@@ -5518,3 +5518,30 @@ fn symbol_encoding_on_both_oracles() {
         "\"UTF-8\"\n\"UTF-8\"\n\"UTF-8\"\n",
     );
 }
+
+/// The tower's edges on a float (#108): NaN and the infinities have no
+/// rational, so `numerator` answers the float itself and `denominator` 1,
+/// as Ruby's do; `to_r` and `rationalize` refuse in Ruby's one word; and
+/// the hosted compiler checks a float builtin's arity as the seed does, and
+/// its checker types a flattened array by its innermost elements.
+#[test]
+fn float_tower_edges_on_both_oracles() {
+    assert_both_print(
+        "float_tower_edges",
+        "p([[1.5, [2.5]], [3.5]].flatten.map { it.floor })\np((1.0 / 0).denominator)\np((0.0 / 0.0).denominator)\np((0.0 / 0.0).numerator.nan?)\np((1.0 / 0).numerator)\np((-1.0 / 0).numerator)\np(1.4592.denominator)\np(29871.2722891.numerator)\np(3382729202.92822.rationalize)\np(0.3.rationalize(0.05))\np(0.3.rationalize(0.001))\n",
+        "[1, 2, 3]\n1\n1\ntrue\nInfinity\n-Infinity\n1125899906842624\n2052738201145529\n(4806858197361/1421)\n(1/3)\n(3/10)\n",
+    );
+    assert_both_oracles_refuse(
+        "float_tower_refusals",
+        None,
+        &[
+            ("p((1.0 / 0).to_r)\n", "Infinity"),
+            ("p((0.0 / 0.0).rationalize)\n", "NaN"),
+            (
+                "p(0.3.rationalize(0.1, 0.1))\n",
+                "'rationalize' takes 0 to 1 arguments, got 2",
+            ),
+            ("p(1.5.floor(1, 2))\n", "'floor' takes 0 arguments, got 2"),
+        ],
+    );
+}

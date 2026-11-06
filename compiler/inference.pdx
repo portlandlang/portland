@@ -578,11 +578,25 @@ def call_answer(receiver, node, types)
     return ["array", receiver] if receiver in ["array", *]
     ["unknown"]
   when "product" then ["array", ["array", ["unknown"]]]
-  when "sort", "uniq", "compact", "flatten", "slice", "merge", "step", "to_a", "entries", "clamp", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection", "cycle"
+  # `flatten` without a depth reaches the innermost elements (#108); with a
+  # depth, how deep the array stays nested is the argument's to say.
+  when "flatten"
+    return flattened_type(receiver) if (receiver in ["array", *]) && node.arguments.empty?
+    return ["array", ["unknown"]] if receiver in ["array", *]
+    synthesize_shape_answer(receiver, name)
+  when "sort", "uniq", "compact", "slice", "merge", "step", "to_a", "entries", "clamp", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection", "cycle"
     synthesize_shape_answer(receiver, name)
   else
     ["unknown"]
   end
+end
+
+# An array of arrays flattened all the way: an array of the innermost
+# element type.
+def flattened_type(receiver)
+  element = type_at(receiver, 1)
+  return flattened_type(element) if element in ["array", *]
+  ["array", element]
 end
 
 # The four names every value answers, and nothing else, on a receiver
