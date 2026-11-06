@@ -4,8 +4,8 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#!~" do
+context "Kernel#!~" do
   pending "calls =~ internally and negates the result"
-  pending "raises NoMethodError if self does not respond to \#=~"
+  pending "raises NoMethodError if self does not respond to #=~"
   pending "can be overridden in subclasses"
 end

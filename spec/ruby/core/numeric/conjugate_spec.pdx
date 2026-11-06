@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#conjugate" do
+context "Numeric#conjugate" do
   pending "returns self"
 end

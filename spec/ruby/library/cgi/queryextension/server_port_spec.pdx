@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#server_port" do
+context "CGI::QueryExtension#server_port" do
   pending "returns ENV['SERVER_PORT'] as Integer"
 end

@@ -86,7 +86,7 @@ context "File.open" do
   pending "defaults external_encoding to BINARY for binary modes"
   pending "accepts options as a keyword argument"
   pending "uses the second argument as an options Hash"
-  pending "calls \#to_hash to convert the second argument to a Hash"
+  pending "calls #to_hash to convert the second argument to a Hash"
   pending "accepts extra flags as a keyword argument and combine with a string mode"
   pending "accepts extra flags as a keyword argument and combine with an integer mode"
   context "on a FIFO" do

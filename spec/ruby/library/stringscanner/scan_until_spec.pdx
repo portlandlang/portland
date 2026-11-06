@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#scan_until" do
+context "StringScanner#scan_until" do
   pending "returns the substring up to and including the end of the match"
   pending "sets the last match result"
   pending "returns nil if there's no match"
@@ -13,12 +13,12 @@ context "StringScanner\#scan_until" do
   pending "searches a substring in the rest part of a string if given a String"
   pending "sets the last match result if given a String"
   pending "sets the last match result if given a String"
-  context "\#[] successive call with a capture group name" do
-    context "when \#scan_until was called with a Regexp pattern" do
+  context "#[] successive call with a capture group name" do
+    context "when #scan_until was called with a Regexp pattern" do
       pending "returns matched substring when matching succeeded"
       pending "returns nil when matching failed"
     end
-    context "when \#scan_until was called with a String pattern" do
+    context "when #scan_until was called with a String pattern" do
       pending "returns nil when matching succeeded"
       pending "raises IndexError when matching succeeded"
       pending "returns nil when matching failed"

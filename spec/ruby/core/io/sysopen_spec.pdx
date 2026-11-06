@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "IO.sysopen" do
   pending "returns the file descriptor for a given path"
   pending "works on directories"
-  pending "calls \#to_path to convert an object to a path"
+  pending "calls #to_path to convert an object to a path"
   pending "accepts a mode as second argument"
   pending "accepts permissions as third argument"
   pending "accepts mode & permission that are nil"

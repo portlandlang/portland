@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#finish" do
+context "Net::HTTP#finish" do
   context "when self has been started" do
     pending "closes the tcp connection"
   end

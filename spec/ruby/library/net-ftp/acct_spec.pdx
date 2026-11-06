@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#acct" do
+context "Net::FTP#acct" do
   pending "writes the ACCT command to the server"
   pending "returns nil"
   pending "does not raise any error when the response code is 230"

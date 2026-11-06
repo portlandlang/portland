@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "WeakRef\#new" do
+context "WeakRef#new" do
   pending "creates a subclass correctly"
 end

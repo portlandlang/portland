@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#close" do
+context "Logger#close" do
   pending "closes the logging device"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#options" do
+context "Regexp#options" do
   pending "returns an Integer bitvector of regexp options for the Regexp object"
   pending "allows checking for presence of a certain option with bitwise &"
   pending "returns 0 for a Regexp literal without options"

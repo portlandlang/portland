@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#square?" do
+context "Matrix#square?" do
   pending "returns true when the Matrix is square"
   pending "returns true when the Matrix has only one element"
   pending "returns false when the Matrix is rectangular"

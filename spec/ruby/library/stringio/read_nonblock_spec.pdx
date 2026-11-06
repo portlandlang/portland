@@ -4,21 +4,21 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#read_nonblock when passed length, buffer" do
+context "StringIO#read_nonblock when passed length, buffer" do
   pending "behaves like :stringio_read :read_nonblock"
   pending "accepts :exception option"
 end
-context "StringIO\#read_nonblock when passed length" do
+context "StringIO#read_nonblock when passed length" do
   pending "behaves like :stringio_read_length :read_nonblock"
   pending "accepts :exception option"
 end
-context "StringIO\#read_nonblock when passed nil" do
+context "StringIO#read_nonblock when passed nil" do
   pending "behaves like :stringio_read_nil :read_nonblock"
 end
-context "StringIO\#read_nonblock when passed length" do
+context "StringIO#read_nonblock when passed length" do
   pending "behaves like :stringio_sysread_length :read_nonblock"
 end
-context "StringIO\#read_nonblock" do
+context "StringIO#read_nonblock" do
   pending "accepts an exception option"
   context "when exception option is set to false" do
     context "when the end is reached" do

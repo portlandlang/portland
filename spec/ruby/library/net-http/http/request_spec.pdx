@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#request" do
+context "Net::HTTP#request" do
   context "when passed request_object" do
     pending "makes a HTTP Request based on the passed request_object"
   end

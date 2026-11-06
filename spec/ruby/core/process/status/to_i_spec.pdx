@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#to_i" do
+context "Process::Status#to_i" do
   pending "returns an integer when the child exits"
   pending "returns an integer when the child is signaled"
 end

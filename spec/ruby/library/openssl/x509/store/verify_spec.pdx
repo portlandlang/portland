@@ -4,7 +4,7 @@
 
 require_relative "../../../../../spec_helper"
 
-context "OpenSSL::X509::Store\#verify" do
+context "OpenSSL::X509::Store#verify" do
   pending "returns true for valid certificate"
   pending "returns false for an expired certificate"
   pending "returns false for an expired root certificate"

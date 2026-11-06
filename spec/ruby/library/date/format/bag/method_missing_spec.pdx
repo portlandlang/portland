@@ -4,6 +4,6 @@
 
 require_relative "../../../../../spec_helper"
 
-context "Date::Format::Bag\#method_missing" do
+context "Date::Format::Bag#method_missing" do
   pending "needs to be reviewed for spec completeness"
 end

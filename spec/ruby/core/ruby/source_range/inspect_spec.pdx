@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Ruby::SourceRange\#inspect" do
+context "Ruby::SourceRange#inspect" do
   pending "includes the absolute path and coordinates"
   pending "uses path when absolute_path is nil"
 end

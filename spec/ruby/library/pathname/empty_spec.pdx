@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#empty?" do
+context "Pathname#empty?" do
   pending "returns true when file is not empty"
   pending "returns false when the directory is not empty"
   pending "return true when file is empty"

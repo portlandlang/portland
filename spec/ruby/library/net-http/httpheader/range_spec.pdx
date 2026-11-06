@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#range" do
+context "Net::HTTPHeader#range" do
   pending "returns a Range object that represents the 'Range' header entry"
   pending "returns nil when there is no 'Range' header entry"
   pending "raises a Net::HTTPHeaderSyntaxError when the 'Range' has an invalid format"
   pending "raises a Net::HTTPHeaderSyntaxError when the 'Range' was not specified"
 end
-context "Net::HTTPHeader\#range=" do
-  pending "is an alias of Net::HTTPHeader\#set_range"
+context "Net::HTTPHeader#range=" do
+  pending "is an alias of Net::HTTPHeader#set_range"
 end

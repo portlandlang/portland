@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "TCPServer\#initialize" do
+context "TCPServer#initialize" do
   context "with a single Integer argument" do
     pending "sets the port to the given argument"
     pending "sets the hostname to 0.0.0.0 or ::"

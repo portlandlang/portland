@@ -22,9 +22,9 @@ context "File.join" do
   pending "handles middle parts edge cases"
   pending "raises an ArgumentError if passed a recursive array"
   pending "raises a TypeError exception when args are nil"
-  pending "calls \#to_str"
-  pending "doesn't mutate the object when calling \#to_str"
-  pending "calls \#to_path"
+  pending "calls #to_str"
+  pending "doesn't mutate the object when calling #to_str"
+  pending "calls #to_path"
   pending "raises errors for null bytes"
   pending "preserves the encoding of the path"
 end

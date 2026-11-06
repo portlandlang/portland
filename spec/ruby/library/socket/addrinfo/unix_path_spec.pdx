@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#unix_path" do
+context "Addrinfo#unix_path" do
   context "for an ipv4 socket" do
     pending "raises an exception"
   end

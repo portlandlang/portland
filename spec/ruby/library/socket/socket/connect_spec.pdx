@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#connect" do
+context "Socket#connect" do
   pending "returns 0 when connected successfully using a String"
   pending "returns 0 when connected successfully using an Addrinfo"
   pending "raises Errno::EISCONN when already connected"

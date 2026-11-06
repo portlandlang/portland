@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#getc" do
+context "StringIO#getc" do
   pending "behaves like :stringio_getc :getc"
   pending "returns the character at the current position"
 end
-context "StringIO\#getc when self is not readable" do
+context "StringIO#getc when self is not readable" do
   pending "behaves like :stringio_getc_not_readable :getc"
 end

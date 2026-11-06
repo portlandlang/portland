@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#mtime" do
+context "Zlib::GzipReader#mtime" do
   pending "returns the timestamp from the Gzip header"
 end

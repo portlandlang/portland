@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::Cookie\#path" do
+context "CGI::Cookie#path" do
   pending "returns self's path"
 end
-context "CGI::Cookie\#path=" do
+context "CGI::Cookie#path=" do
   pending "sets self's path"
 end

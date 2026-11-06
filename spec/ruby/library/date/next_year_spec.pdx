@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#next_year" do
+context "Date#next_year" do
   pending "returns the day of the reform if date falls within calendar reform"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "ENV\#dup" do
+context "ENV#dup" do
   pending "raises TypeError"
 end

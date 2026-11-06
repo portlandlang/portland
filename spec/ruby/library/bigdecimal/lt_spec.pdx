@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#<" do
+context "BigDecimal#<" do
   pending "returns true if a < b"
   pending "properly handles infinity values"
   pending "properly handles Float infinity values"

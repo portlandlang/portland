@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#binary" do
+context "Net::FTP#binary" do
   pending "returns true when self is in binary mode"
 end
-context "Net::FTP\#binary=" do
+context "Net::FTP#binary=" do
   pending "sets self to binary mode when passed true"
 end

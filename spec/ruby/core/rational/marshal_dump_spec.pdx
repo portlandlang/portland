@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#marshal_dump" do
+context "Rational#marshal_dump" do
   pending "is a private method"
   pending "dumps numerator and denominator"
 end

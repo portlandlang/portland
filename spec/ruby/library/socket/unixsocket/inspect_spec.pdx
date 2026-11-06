@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXSocket\#inspect" do
+context "UNIXSocket#inspect" do
   pending "returns sockets fd for unnamed sockets"
 end

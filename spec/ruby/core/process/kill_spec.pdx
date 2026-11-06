@@ -21,7 +21,7 @@ context "Process.kill" do
   pending "accepts a signal name without the 'SIG' prefix"
   pending "accepts a signal name with the 'SIG' prefix"
   pending "accepts an Integer as a signal value"
-  pending "calls \#to_int to coerce the pid to an Integer"
+  pending "calls #to_int to coerce the pid to an Integer"
 end
 context "Process.kill" do
   pending "signals multiple processes"

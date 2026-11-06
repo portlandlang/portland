@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#getservbyname" do
+context "Socket#getservbyname" do
   pending "returns the port for service 'discard'"
   pending "returns the port for service 'discard' with protocol 'tcp'"
   pending "returns the port for service \"ftp\""

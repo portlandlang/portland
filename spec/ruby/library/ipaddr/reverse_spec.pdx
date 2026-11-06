@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "IPAddr\#reverse" do
+context "IPAddr#reverse" do
   pending "generates the reverse DNS lookup entry"
 end
-context "IPAddr\#ip6_arpa" do
+context "IPAddr#ip6_arpa" do
   pending "converts an IPv6 address into the reverse DNS lookup representation according to RFC3172"
 end
-context "IPAddr\#ip6_int" do
+context "IPAddr#ip6_int" do
   pending "converts an IPv6 address into the reverse DNS lookup representation according to RFC1886"
 end

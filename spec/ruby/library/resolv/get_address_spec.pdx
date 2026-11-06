@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Resolv\#getaddress" do
+context "Resolv#getaddress" do
   pending "resolves localhost"
   pending "raises ResolvError if the name can not be looked up"
 end

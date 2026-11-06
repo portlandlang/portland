@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Float\#coerce" do
+context "Float#coerce" do
   pending "returns [other, self] both as Floats"
 end

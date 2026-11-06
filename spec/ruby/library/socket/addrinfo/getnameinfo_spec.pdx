@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#getnameinfo" do
+context "Addrinfo#getnameinfo" do
   context "using an IP Addrinfo" do
     pending "returns the node and service names"
     pending "accepts flags as an Integer as the first argument"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#i" do
+context "Numeric#i" do
   pending "returns a Complex object"
   pending "sets the real part to 0"
   pending "sets the imaginary part to self"

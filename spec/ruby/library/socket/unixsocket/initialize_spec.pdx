@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXSocket\#initialize" do
+context "UNIXSocket#initialize" do
   context "using a non existing path" do
     pending "raises Errno::ENOENT"
     pending "raises Errno::ECONNREFUSED"

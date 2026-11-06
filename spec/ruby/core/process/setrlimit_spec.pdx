@@ -6,12 +6,12 @@ require_relative "../../../spec_helper"
 
 context "Process.setrlimit" do
   context "when passed an Object" do
-    pending "calls \#to_int to convert resource to an Integer"
-    pending "raises a TypeError if \#to_int for resource does not return an Integer"
-    pending "calls \#to_int to convert the soft limit to an Integer"
-    pending "raises a TypeError if \#to_int for resource does not return an Integer"
-    pending "calls \#to_int to convert the hard limit to an Integer"
-    pending "raises a TypeError if \#to_int for resource does not return an Integer"
+    pending "calls #to_int to convert resource to an Integer"
+    pending "raises a TypeError if #to_int for resource does not return an Integer"
+    pending "calls #to_int to convert the soft limit to an Integer"
+    pending "raises a TypeError if #to_int for resource does not return an Integer"
+    pending "calls #to_int to convert the hard limit to an Integer"
+    pending "raises a TypeError if #to_int for resource does not return an Integer"
   end
   context "when passed a Symbol" do
     pending "coerces :AS into RLIMIT_AS"
@@ -52,8 +52,8 @@ context "Process.setrlimit" do
     pending "raises ArgumentError when passed an unknown resource"
   end
   context "when passed on Object" do
-    pending "calls \#to_str to convert to a String"
-    pending "calls \#to_int if \#to_str does not return a String"
+    pending "calls #to_str to convert to a String"
+    pending "calls #to_int if #to_str does not return a String"
   end
   pending "is not implemented"
 end

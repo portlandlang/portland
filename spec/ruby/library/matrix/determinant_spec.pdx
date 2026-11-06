@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#determinant" do
+context "Matrix#determinant" do
   pending "returns the determinant of a square Matrix"
   pending "returns the determinant of a single-element Matrix"
   pending "returns 1 for an empty Matrix"

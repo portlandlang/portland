@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#[]" do
+context "Matrix#[]" do
   pending "returns element at (i, j)"
   pending "returns nil for an invalid index pair"
 end

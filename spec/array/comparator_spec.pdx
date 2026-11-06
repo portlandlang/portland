@@ -1,7 +1,7 @@
 # Ordering by a block (#99): `sort`, `min`, and `max` take a comparator
 # block answering an integer that orders two elements, and `min_by` and
 # `max_by` take a key under `<=>` (ADR 0054). Every expected value is Ruby
-# 4.0.7's answer for the same call.
+# 4.0.9's answer for the same call.
 
 require_relative "../spec_helper"
 

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#length" do
-  pending "is an alias of Net::HTTPHeader\#size"
+context "Net::HTTPHeader#length" do
+  pending "is an alias of Net::HTTPHeader#size"
 end

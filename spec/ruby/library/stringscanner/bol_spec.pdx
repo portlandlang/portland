@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#bol?" do
-  pending "is an alias of StringScanner\#beginning_of_line?"
+context "StringScanner#bol?" do
+  pending "is an alias of StringScanner#beginning_of_line?"
 end

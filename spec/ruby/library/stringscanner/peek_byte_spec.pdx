@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#peek_byte" do
+context "StringScanner#peek_byte" do
   pending "returns a byte at the current position as an Integer"
   pending "returns nil at the end of the string"
   pending "is not multi-byte character sensitive"

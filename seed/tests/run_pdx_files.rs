@@ -1713,7 +1713,7 @@ fn unary_plus_answers_the_number_itself() {
 /// `times`, `upto`, and `downto` without a block answer the finished
 /// walk, ADR 0055's rule for whatever Ruby answers with an enumerator; a
 /// Float endpoint walks to its floor going up and its ceiling going down,
-/// as Ruby's does (4.0.6), and an endpoint with no integer — NaN, an
+/// as Ruby's does (4.0.9), and an endpoint with no integer — NaN, an
 /// infinity — refuses, since an infinite walk waits on a real pull (#107).
 #[test]
 fn integer_walks_match_ruby() {
@@ -1744,7 +1744,7 @@ fn integer_to_i_is_itself() {
 }
 
 /// `next_float` and `prev_float` (#108): Ruby's `nextafter` toward the
-/// infinities, one IEEE step, a zero's sign included (Ruby 4.0.6).
+/// infinities, one IEEE step, a zero's sign included (Ruby 4.0.9).
 #[test]
 fn float_steps_match_ruby() {
     assert_evaluator_matches_seed(
@@ -1756,7 +1756,7 @@ fn float_steps_match_ruby() {
 /// `==` between collections asks `==` of what they hold, as Ruby's does:
 /// numbers cross (`[1] == [1.0]`), a hash's order is not its identity, and
 /// its keys still match by `eql?`, so `{1 => :x}` is not `{1.0 => :x}`
-/// (Ruby 4.0.6, the expected lines).
+/// (Ruby 4.0.9, the expected lines).
 #[test]
 fn collection_equality_asks_rubys_equality_of_members() {
     assert_both_print(
@@ -1769,7 +1769,7 @@ fn collection_equality_asks_rubys_equality_of_members() {
 /// An Integer's rounding family (#107): with no precision, or one at or
 /// above zero, the integer itself; below zero, to that many trailing
 /// zeros — `floor` down, `ceil` up, `truncate` toward zero, `round` to the
-/// nearest with a half going away from zero (Ruby 4.0.6, the expected
+/// nearest with a half going away from zero (Ruby 4.0.9, the expected
 /// lines). An answer past the 64-bit integers refuses.
 #[test]
 fn integer_rounding_matches_ruby() {
@@ -1804,7 +1804,7 @@ fn integer_rounding_matches_ruby() {
 }
 
 /// A first run of Ruby's string methods (#106), the ones with no regex,
-/// character set, or mutation in them, answering as Ruby 4.0.6's do (the
+/// character set, or mutation in them, answering as Ruby 4.0.9's do (the
 /// expected lines): padding, `chop`, `chr`, the prefix and suffix drops,
 /// `succ`, `ord`, `partition`s, `rindex`, `casecmp`s, `each_char`,
 /// `each_line`, `codepoints`, `bytes`, `bytesize`, `hex`, `oct`, `sub` and
@@ -1837,7 +1837,7 @@ fn string_methods_first_run_match_ruby() {
 }
 
 /// Ruby's Struct views and walks (#114) on a struct's fields in order, the
-/// expected lines Ruby 4.0.7's for an equivalent `Struct.new` (the struct
+/// expected lines Ruby 4.0.9's for an equivalent `Struct.new` (the struct
 /// itself renders as its constructor reads, ADR 0026): `to_h` bare and
 /// through a block, `to_a` and `values`, `members`, `size` and `length`,
 /// `each`, `each_pair`, `select`, and `filter`. A field named for a view
@@ -1864,7 +1864,7 @@ fn a_structs_views_and_walks_match_ruby() {
 }
 
 /// Ruby's combinatorics, `cycle`, and binary search on arrays and ranges
-/// (#104, #111), the expected lines Ruby 4.0.7's: `combination`,
+/// (#104, #111), the expected lines Ruby 4.0.9's: `combination`,
 /// `repeated_combination`, `permutation`, `repeated_permutation`, and
 /// `product` answer their arrangements without a block and hand them over
 /// with one; `cycle` takes a count; `bsearch` and `bsearch_index` run
@@ -2036,7 +2036,7 @@ fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
 }
 
 /// Ruby's Enumerable over runs and groups (#110), on both oracles, the
-/// expected lines Ruby 4.0.6's: `chunk` with its nil, `:_separator`, and
+/// expected lines Ruby 4.0.9's: `chunk` with its nil, `:_separator`, and
 /// `:_alone` answers; `chunk_while` and `slice_when` asked of each
 /// neighbouring pair; `slice_before` and `slice_after`; `each_cons`
 /// answering the finished array (ADR 0055); `group_by` in first-seen order;
@@ -2067,7 +2067,7 @@ fn enumerable_runs_and_groups_match_ruby() {
 }
 
 /// Pattern arguments take the `when` rule (ADR 0066), on both oracles, the
-/// expected lines Ruby 4.0.7's: a range covers, anything else asks `==`,
+/// expected lines Ruby 4.0.9's: a range covers, anything else asks `==`,
 /// through the predicates, grep, grep_v, and the slices; a pattern beside
 /// a block refuses.
 #[test]
@@ -2182,7 +2182,7 @@ fn struct_fields_are_names_only_on_both_oracles() {
 }
 
 /// `to_i` by Ruby's rule (ADR 0061) on both oracles, the expected lines
-/// Ruby 4.0.7's; an illegal base refuses in Ruby's words and a number past
+/// Ruby 4.0.9's; an illegal base refuses in Ruby's words and a number past
 /// 64 bits in the seed's.
 #[test]
 fn to_i_matches_ruby_and_refuses_on_both_oracles() {
@@ -2203,7 +2203,7 @@ fn to_i_matches_ruby_and_refuses_on_both_oracles() {
 }
 
 /// A collection's `to_s` is its `inspect` (ADR 0060), on both oracles, the
-/// expected lines Ruby 4.0.7's; `join` still renders elements by their
+/// expected lines Ruby 4.0.9's; `join` still renders elements by their
 /// own `to_s`.
 #[test]
 fn collection_to_s_is_inspect_on_both_oracles() {
@@ -2215,7 +2215,7 @@ fn collection_to_s_is_inspect_on_both_oracles() {
 }
 
 /// Ruby's bit math as named methods (ADR 0003, locked by #157), the
-/// expected lines Ruby 4.0.7's answers to the operator forms; a shift past
+/// expected lines Ruby 4.0.9's answers to the operator forms; a shift past
 /// 64 bits, a negative bit_count, and the `^` and `>>` glyphs refuse on
 /// both oracles.
 #[test]
@@ -2246,7 +2246,7 @@ fn bit_methods_match_ruby_and_the_glyphs_refuse_on_both_oracles() {
     assert_both_oracles_refuse("bits_refusal.pdx", None, &cases);
 }
 
-/// `eql?` on every value (ADR 0059), the expected lines Ruby 4.0.7's: same
+/// `eql?` on every value (ADR 0059), the expected lines Ruby 4.0.9's: same
 /// kind and same value, no promotion, element by element; and `hash`
 /// refusing with its sentence on both oracles.
 #[test]
@@ -2264,7 +2264,7 @@ fn eql_matches_ruby_and_hash_refuses_on_both_oracles() {
 }
 
 /// `Integer#step` (#109) and Ruby 4.1's `Range#clamp` (#111) on both
-/// oracles — the step rows Ruby 4.0.7's, the clamp rows upstream's spec —
+/// oracles — the step rows Ruby 4.0.9's, the clamp rows upstream's spec —
 /// and a symbol's inspect keeping its quotes beyond ASCII (#139).
 #[test]
 fn integer_step_and_range_clamp_match_ruby() {
@@ -2284,7 +2284,7 @@ fn integer_step_and_range_clamp_match_ruby() {
 }
 
 /// `overlap?` (#111): whether two ranges share an element, Ruby's rule
-/// (4.0.6, the expected lines) — an empty range overlaps nothing, an
+/// (4.0.9, the expected lines) — an empty range overlaps nothing, an
 /// excluded end does not reach, and an open end reaches everything on its
 /// side. A non-range argument refuses in Ruby's words.
 #[test]
@@ -2301,7 +2301,7 @@ fn range_overlap_matches_ruby() {
     assert_both_oracles_refuse("range_overlap_refusal.pdx", None, &cases);
 }
 
-/// A range's own answers (#111), Ruby's (4.0.6, the expected lines):
+/// A range's own answers (#111), Ruby's (4.0.9, the expected lines):
 /// `begin` and `end` — `end` legal after a dot, as `next` is — a maybe
 /// where the range is open; `exclude_end?`; `cover?` and `member?` as
 /// `include?`; `entries` as `to_a`; bare `first` and `last` the ends
@@ -2331,7 +2331,7 @@ fn a_ranges_own_answers_match_ruby() {
 /// A hash's pairs by lookup and as a list, and the subset comparisons
 /// (#105): `assoc` and `rassoc` ask Ruby's `==` and answer a maybe pair,
 /// `flatten` lays the pairs out to a depth, and `<=`, `<`, `>=`, `>` ask
-/// whether one hash's pairs all sit in the other (Ruby 4.0.6, the expected
+/// whether one hash's pairs all sit in the other (Ruby 4.0.9, the expected
 /// lines). A comparison against a non-hash refuses as any mismatched
 /// operator does.
 #[test]
@@ -2345,7 +2345,7 @@ fn hash_pairs_and_subsets_match_ruby() {
     assert_both_oracles_refuse("hash_subset_refusal.pdx", None, &cases);
 }
 
-/// Symbols order by their names, as Ruby's do (4.0.6, the expected lines),
+/// Symbols order by their names, as Ruby's do (4.0.9, the expected lines),
 /// on both implementations — the seed had refused `:a <=> :b` while the
 /// hosted evaluator ordered its tagged-array shape, so an array of
 /// symbol-keyed pairs sorted on one and not the other (#105).
@@ -2358,7 +2358,7 @@ fn symbols_order_by_name() {
     );
 }
 
-/// A hash's own methods (#105), answering as Ruby's do (4.0.6, the
+/// A hash's own methods (#105), answering as Ruby's do (4.0.9, the
 /// expected lines): `select`, `filter`, and `reject` answer a hash and hand
 /// a one-parameter block the key; `transform_keys` and `transform_values`
 /// rewrite one side; `to_h` with a block rebuilds from pairs; `invert`,
@@ -2376,7 +2376,7 @@ fn a_hashs_own_methods_match_ruby() {
 /// A hash walks as its pairs (#105): Ruby's Enumerable over a hash yields
 /// `[key, value]`, spread by a two-parameter block (ADR 0057), and
 /// `each_with_index` and `reverse_each` answer the hash itself, as Ruby's
-/// do (4.0.6, the expected lines). Arrays take `count` with a block too.
+/// do (4.0.9, the expected lines). Arrays take `count` with a block too.
 #[test]
 fn a_hash_walks_as_its_pairs() {
     assert_both_print(
@@ -2389,7 +2389,7 @@ fn a_hash_walks_as_its_pairs() {
 /// The builtin types carry Ruby's type functions (ADR 0058, #159):
 /// `Array.new` bare, by count, by count and fill, by count and block, or
 /// from an array; `Integer.sqrt` exactly, past where a float would round
-/// (Ruby 4.0.6, the expected lines). A negative count or a negative
+/// (Ruby 4.0.9, the expected lines). A negative count or a negative
 /// radicand refuses in Ruby's words; a fill beside a block, or an argument
 /// of the wrong kind, refuses naming it.
 #[test]
@@ -2513,7 +2513,7 @@ fn system_read_file_on_both_oracles() {
 }
 
 /// `System.write_file` (ADR 0068, #176): the whole file replaced, answering
-/// the bytes written as Ruby's `File.write` does (4.0.7: 11 for "teal
+/// the bytes written as Ruby's `File.write` does (4.0.9: 11 for "teal
 /// carpet"), or a failure naming the path and the OS's reason — so `or`
 /// reads the same on a write as on a read, where the bare placeholder
 /// produced no value on success and broke the or-guard. Both oracles.
@@ -2838,7 +2838,7 @@ fn while_do_refuses_on_both_oracles() {
 
 /// JSON on both oracles (ADR 0072): the seed's hand-written `json.rs` and the
 /// compiler's Portland twin `json.pdx` answer what Ruby's json gem 3.1.0
-/// answers — verified against Ruby 4.0.7 on 2026-11-03 and recorded in
+/// answers — verified against Ruby 4.0.9 on 2026-11-03 and recorded in
 /// #182 — byte for byte: `null` as nil told apart from a missing key, the
 /// gem's float spellings, its escapes, its pretty form, and every failure in
 /// its sentence with its position.
@@ -3030,7 +3030,7 @@ fn symbols_from_text_on_both_oracles() {
 
 /// Ruby's directives whole, on both oracles — the seed's engine and the
 /// hosted walk that hands it one directive at a time agree byte for byte,
-/// and the answers are Ruby 4.0.7's, near-tie rounding included. Every
+/// and the answers are Ruby 4.0.9's, near-tie rounding included. Every
 /// refusal is Ruby's sentence; `"%d" % x` names the function.
 #[test]
 fn format_on_both_oracles() {
@@ -3136,7 +3136,7 @@ fn format_on_both_oracles() {
 
 /// Block parameters spread a yielded array (ADR 0057, #158): a block taking
 /// two or more parameters that is handed exactly one array binds them from
-/// its elements, extra elements dropped, as Ruby's does (4.0.6, the
+/// its elements, extra elements dropped, as Ruby's does (4.0.9, the
 /// expected lines). Where Ruby would fill a missing parameter with nil —
 /// an array too short, or no array at all — Portland refuses.
 #[test]
@@ -3181,7 +3181,7 @@ fn join_flattens_nested_arrays_and_refuses_nil() {
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
-/// arrays element by element (#104; Ruby 4.0.6, the expected lines).
+/// arrays element by element (#104; Ruby 4.0.9, the expected lines).
 #[test]
 fn comparators_carry_their_rebindings_and_arrays_order() {
     assert_both_print(
@@ -3195,7 +3195,7 @@ fn comparators_carry_their_rebindings_and_arrays_order() {
 /// first float Kahan–Babuska compensated summation, so `[0.1, 0.2,
 /// 0.3].sum` is 0.6 — the naive running total's 0.6000000000000001 was a
 /// silent divergence — and anything else through `+`, with an init and a
-/// block as Ruby's take them (Ruby 4.0.6, the expected lines).
+/// block as Ruby's take them (Ruby 4.0.9, the expected lines).
 #[test]
 fn array_sum_matches_ruby() {
     assert_both_print(
@@ -3219,7 +3219,7 @@ fn a_builtin_handed_nil_sees_nil() {
 }
 
 /// `at`, `dig`, `assoc`, `rassoc`, `transpose`, `to_h`, `rfind`, and
-/// `reverse_each` (#104), Ruby's answers (4.0.6, the expected lines).
+/// `reverse_each` (#104), Ruby's answers (4.0.9, the expected lines).
 /// `at` and `dig` answer maybes as `[]` does; `dig` walks arrays and
 /// hashes alike; a ragged `transpose` and a `to_h` element that is not a
 /// pair refuse in Ruby's words.
@@ -3253,7 +3253,7 @@ fn array_lookups_and_reshapes_match_ruby() {
 
 /// Array's set arithmetic (#104): `-` and its named twin `difference`,
 /// `union`, `intersection`, and `intersect?`, matching elements by `eql?`
-/// as Ruby's do — so `[1, 1.0] - [1]` keeps the float (Ruby 4.0.6, the
+/// as Ruby's do — so `[1, 1.0] - [1]` keeps the float (Ruby 4.0.9, the
 /// expected lines). `|` and `&` stay out of the grammar (ADR 0003); the
 /// named methods are the spelling.
 #[test]
@@ -3265,7 +3265,7 @@ fn array_set_arithmetic_matches_ruby() {
     );
 }
 
-/// `partition`, `one?`, and `minmax` (#104), Ruby's answers (4.0.6, the
+/// `partition`, `one?`, and `minmax` (#104), Ruby's answers (4.0.9, the
 /// expected lines): `minmax` is `min` and `max` together — maybes, a
 /// comparator block included — and the other two take a true-or-false
 /// block, as `select` does.
@@ -3289,7 +3289,7 @@ fn array_partition_one_minmax_match_ruby() {
     assert_both_oracles_refuse("array_partition_refusal.pdx", None, &cases);
 }
 
-/// `rotate`, `values_at`, and `each_index` (#104), Ruby's answers (4.0.6,
+/// `rotate`, `values_at`, and `each_index` (#104), Ruby's answers (4.0.9,
 /// the expected lines): `values_at` pads what lies past the end with nil,
 /// a range's too, and a range starting before the array refuses in Ruby's
 /// words.
@@ -3306,7 +3306,7 @@ fn array_rotate_values_at_each_index_match_ruby() {
 
 /// The index family (#104): `index` and its twin `find_index` by value or
 /// by a true-or-false block, and `rindex` from the far end, each a maybe
-/// (ADR 0010) that asks Ruby's `==` of a value (Ruby 4.0.6, the expected
+/// (ADR 0010) that asks Ruby's `==` of a value (Ruby 4.0.9, the expected
 /// lines).
 #[test]
 fn array_index_family_matches_ruby() {
@@ -3324,7 +3324,7 @@ fn array_index_family_matches_ruby() {
 
 /// `take`, `drop`, `take_while`, and `drop_while` (#104): the ends of an
 /// array by count or by a true-or-false block, answering new arrays (Ruby
-/// 4.0.6, the expected lines). A negative count refuses in Ruby's words,
+/// 4.0.9, the expected lines). A negative count refuses in Ruby's words,
 /// and a block answering anything but true or false refuses as `select`'s
 /// does.
 #[test]
@@ -3364,7 +3364,7 @@ fn a_struct_may_have_no_fields() {
 /// `digits`, `ord`, and `size` (#107): place values least significant
 /// first in any radix from 2 up, an Integer's `ord` is itself, and its
 /// `size` is the 8 bytes Ruby reports for a 64-bit machine integer (Ruby
-/// 4.0.6, the expected lines). A bad radix or a negative self refuses in
+/// 4.0.9, the expected lines). A bad radix or a negative self refuses in
 /// Ruby's words.
 #[test]
 fn integer_digits_ord_size_match_ruby() {
@@ -3385,7 +3385,7 @@ fn integer_digits_ord_size_match_ruby() {
 
 /// `gcd`, `lcm`, and `gcdlcm` (#107): magnitudes, never a sign, a zero
 /// giving the other side's magnitude to `gcd` and zero to `lcm` (Ruby
-/// 4.0.6, the expected lines). An answer past the 64-bit integers refuses.
+/// 4.0.9, the expected lines). An answer past the 64-bit integers refuses.
 #[test]
 fn integer_divisors_match_ruby() {
     assert_both_print(
@@ -3408,7 +3408,7 @@ fn integer_divisors_match_ruby() {
 
 /// An array's membership questions ask Ruby's `==` of each element, as
 /// Ruby's do — `include?`, `member?`, `index`, and `count` of a value — so
-/// `[1, 2].include?(1.0)` is true (Ruby 4.0.6, the expected lines).
+/// `[1, 2].include?(1.0)` is true (Ruby 4.0.9, the expected lines).
 #[test]
 fn array_membership_asks_rubys_equality() {
     assert_both_print(
@@ -3421,7 +3421,7 @@ fn array_membership_asks_rubys_equality() {
 /// `div`, `remainder`, and `ceildiv` (ADR 0018, #107): `div` is Ruby's
 /// `(x / y).floor`, `remainder` keeps the dividend's sign, and `ceildiv`
 /// rounds the quotient up; any zero divisor refuses, a float one too
-/// (Ruby 4.0.6).
+/// (Ruby 4.0.9).
 #[test]
 fn integer_quotients_match_ruby() {
     assert_evaluator_matches_seed(
@@ -3444,7 +3444,7 @@ fn integer_quotients_match_ruby() {
 
 /// A float `%` is Ruby's `flomod`: a zero keeps its sign, an infinite
 /// modulus answers the dividend or its own infinity, and NaN spreads
-/// (Ruby 4.0.6).
+/// (Ruby 4.0.9).
 #[test]
 fn float_modulo_matches_ruby() {
     assert_evaluator_matches_seed(
@@ -3456,7 +3456,7 @@ fn float_modulo_matches_ruby() {
 /// Ruby's named division (ADR 0018, #108): `fdiv` and Float's `quo` divide
 /// as floats, `modulo` is `%`, and `divmod` answers the floored quotient and
 /// the remainder together — Ruby's `flodivmod` once a float is involved, so
-/// a zero's sign and an infinite divisor answer as Ruby's do (4.0.6).
+/// a zero's sign and an infinite divisor answer as Ruby's do (4.0.9).
 #[test]
 fn named_division_matches_ruby() {
     assert_evaluator_matches_seed(
@@ -3618,7 +3618,7 @@ fn crlf_line_endings_read_as_newlines_on_both_oracles() {
     let source = "x = \"a\r\nb\"\r\np x\r\ny = <<~EOS\r\n  hi\r\nEOS\r\np y\r\ntotal = 1 + \\\r\n  2\r\np total\r\n";
     assert_evaluator_matches_seed("evaluator_crlf.pdx", source);
     // Both agreeing is not enough — both keeping the `\r` would agree too.
-    // Ruby 4.0.7 prints this for the same bytes.
+    // Ruby 4.0.9 prints this for the same bytes.
     let sample = std::env::temp_dir().join("crlf_against_ruby.pdx");
     std::fs::write(&sample, source).unwrap();
     let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
@@ -3644,7 +3644,7 @@ fn newlines_inside_brackets_and_after_operators_on_both_oracles() {
 
 /// The first published gem to load unmodified: htmldog 1.0.0's
 /// `lib/htmldog.rb`, byte for byte as rubygems.org serves it, on both
-/// implementations, answering what Ruby 4.0.7 answers for the same driver
+/// implementations, answering what Ruby 4.0.9 answers for the same driver
 /// (found by ruby_research's first-gem-candidates report). A differential
 /// check alone would pass if both agreed on something Ruby doesn't say.
 #[test]
@@ -3758,7 +3758,7 @@ fn visibility_words_refuse_in_a_type_body_on_both_oracles() {
     assert_both_oracles_refuse("visibility_refusal.pdx", None, &cases);
 }
 
-/// A symbol answers Ruby's text queries about its name (#112), as Ruby 4.0.7
+/// A symbol answers Ruby's text queries about its name (#112), as Ruby 4.0.9
 /// answers them, and indexes its name as text.
 #[test]
 fn symbol_text_queries_on_both_oracles() {

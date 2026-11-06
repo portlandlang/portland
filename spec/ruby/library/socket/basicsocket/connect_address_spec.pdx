@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#connect_address" do
+context "Socket#connect_address" do
   context "using an unbound socket" do
     pending "raises SocketError"
   end

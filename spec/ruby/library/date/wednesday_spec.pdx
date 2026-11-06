@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#wednesday?" do
+context "Date#wednesday?" do
   pending "should be wednesday"
 end

@@ -15,7 +15,7 @@ context "File.basename" do
   pending "takes into consideration the platform path separator(s)"
   pending "takes into consideration the platform path separator(s)"
   pending "raises a TypeError if the arguments are not String types"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "raises an ArgumentError if passed more than two arguments"
   pending "returns the basename for windows"
   pending "returns basename windows unc"

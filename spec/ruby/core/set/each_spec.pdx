@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#each" do
+context "Set#each" do
   pending "yields each Object in self"
   pending "returns self"
   pending "returns an Enumerator when not passed a block"

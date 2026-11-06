@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#member?" do
-  pending "is an alias of Set\#include?"
+context "Set#member?" do
+  pending "is an alias of Set#include?"
 end

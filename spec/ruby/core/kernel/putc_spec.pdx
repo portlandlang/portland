@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#putc" do
+context "Kernel#putc" do
   pending "is a private method"
   pending "behaves like :io_putc :putc Object.new"
 end

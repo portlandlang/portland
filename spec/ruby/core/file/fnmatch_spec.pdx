@@ -42,7 +42,7 @@ context "File.fnmatch" do
   pending "has special handling for ./ when using * and FNM_PATHNAME"
   pending "matches **/* with FNM_PATHNAME to recurse directories"
   pending "matches ** with FNM_PATHNAME only in current directory"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "raises a TypeError if the first and second arguments are not string-like"
   pending "raises a TypeError if the third argument is not an Integer"
   pending "does not raise a TypeError if the third argument can be coerced to an Integer"

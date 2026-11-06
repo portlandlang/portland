@@ -7,7 +7,7 @@ require_relative "../../../../spec_helper"
 context "Socket::Option.bool" do
   pending "creates a new Socket::Option"
 end
-context "Socket::Option\#bool" do
+context "Socket::Option#bool" do
   pending "returns boolean value"
   pending "raises TypeError when called on a non boolean option"
 end

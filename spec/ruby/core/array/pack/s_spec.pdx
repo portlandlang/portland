@@ -4,21 +4,21 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'S'" do
+context "Array#pack with format 'S'" do
   pending "behaves like :array_pack_basic S"
   pending "behaves like :array_pack_basic_non_float S"
   pending "behaves like :array_pack_arguments S"
   pending "behaves like :array_pack_numeric_basic S"
   pending "behaves like :array_pack_integer S"
 end
-context "Array\#pack with format 's'" do
+context "Array#pack with format 's'" do
   pending "behaves like :array_pack_basic s"
   pending "behaves like :array_pack_basic_non_float s"
   pending "behaves like :array_pack_arguments s"
   pending "behaves like :array_pack_numeric_basic s"
   pending "behaves like :array_pack_integer s"
 end
-context "Array\#pack with format 'S'" do
+context "Array#pack with format 'S'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_16bit_le S<"
   end
@@ -42,7 +42,7 @@ context "Array\#pack with format 'S'" do
     pending "behaves like :array_pack_16bit_be S!>"
   end
 end
-context "Array\#pack with format 's'" do
+context "Array#pack with format 's'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_16bit_le s<"
   end
@@ -66,39 +66,39 @@ context "Array\#pack with format 's'" do
     pending "behaves like :array_pack_16bit_be s!>"
   end
 end
-context "Array\#pack with format 'S'" do
+context "Array#pack with format 'S'" do
   pending "behaves like :array_pack_16bit_le S"
 end
-context "Array\#pack with format 'S' with modifier '_'" do
+context "Array#pack with format 'S' with modifier '_'" do
   pending "behaves like :array_pack_16bit_le S_"
 end
-context "Array\#pack with format 'S' with modifier '!'" do
+context "Array#pack with format 'S' with modifier '!'" do
   pending "behaves like :array_pack_16bit_le S!"
 end
-context "Array\#pack with format 's'" do
+context "Array#pack with format 's'" do
   pending "behaves like :array_pack_16bit_le s"
 end
-context "Array\#pack with format 's' with modifier '_'" do
+context "Array#pack with format 's' with modifier '_'" do
   pending "behaves like :array_pack_16bit_le s_"
 end
-context "Array\#pack with format 's' with modifier '!'" do
+context "Array#pack with format 's' with modifier '!'" do
   pending "behaves like :array_pack_16bit_le s!"
 end
-context "Array\#pack with format 'S'" do
+context "Array#pack with format 'S'" do
   pending "behaves like :array_pack_16bit_be S"
 end
-context "Array\#pack with format 'S' with modifier '_'" do
+context "Array#pack with format 'S' with modifier '_'" do
   pending "behaves like :array_pack_16bit_be S_"
 end
-context "Array\#pack with format 'S' with modifier '!'" do
+context "Array#pack with format 'S' with modifier '!'" do
   pending "behaves like :array_pack_16bit_be S!"
 end
-context "Array\#pack with format 's'" do
+context "Array#pack with format 's'" do
   pending "behaves like :array_pack_16bit_be s"
 end
-context "Array\#pack with format 's' with modifier '_'" do
+context "Array#pack with format 's' with modifier '_'" do
   pending "behaves like :array_pack_16bit_be s_"
 end
-context "Array\#pack with format 's' with modifier '!'" do
+context "Array#pack with format 's' with modifier '!'" do
   pending "behaves like :array_pack_16bit_be s!"
 end

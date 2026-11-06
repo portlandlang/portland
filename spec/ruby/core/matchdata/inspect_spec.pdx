@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#inspect" do
+context "MatchData#inspect" do
   pending "returns a String"
   pending "returns a human readable representation that contains entire matched string and the captures"
   pending "returns a human readable representation of named captures"

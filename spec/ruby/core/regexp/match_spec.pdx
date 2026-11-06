@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#=~" do
+context "Regexp#=~" do
   pending "behaves like :regexp_match :=~"
   pending "returns the index of the first character of the matching region"
   pending "returns the index too, when argument is a Symbol"
 end
-context "Regexp\#match" do
+context "Regexp#match" do
   pending "behaves like :regexp_match :match"
   pending "returns a MatchData object"
   pending "returns a MatchData object, when argument is a Symbol"
@@ -36,7 +36,7 @@ context "Regexp\#match" do
   pending "raises TypeError when the given argument cannot be coerced to String"
   pending "raises TypeError when the given argument is an Exception"
 end
-context "Regexp\#match?" do
+context "Regexp#match?" do
   context "when matches the given value" do
     pending "returns true but does not set Regexp.last_match"
   end
@@ -44,6 +44,6 @@ context "Regexp\#match?" do
   pending "takes matching position as the 2nd argument"
   pending "returns false when given nil"
 end
-context "Regexp\#~" do
+context "Regexp#~" do
   pending "matches against the contents of $_"
 end

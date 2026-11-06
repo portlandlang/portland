@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA256\#digest" do
+context "Digest::SHA256#digest" do
   pending "returns a digest"
 end
 context "Digest::SHA256.digest" do

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#`" do
+context "Kernel#`" do
   pending "is a private method"
   pending "returns the standard output of the executed sub-process"
   pending "lets the standard error stream pass through to the inherited stderr"
@@ -15,5 +15,5 @@ context "Kernel\#`" do
   pending "sets $? to the exit status of the executed sub-process"
 end
 context "Kernel.`" do
-  pending "tries to convert the given argument to String using \#to_str"
+  pending "tries to convert the given argument to String using #to_str"
 end

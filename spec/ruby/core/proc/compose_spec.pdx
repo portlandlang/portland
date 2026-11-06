@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#<<" do
+context "Proc#<<" do
   pending "returns a Proc that is the composition of self and the passed Proc"
   pending "calls passed Proc with arguments and then calls self with result"
   pending "accepts any callable object"
@@ -16,7 +16,7 @@ context "Proc\#<<" do
     pending "passes blocks to the second proc"
   end
 end
-context "Proc\#>>" do
+context "Proc#>>" do
   pending "returns a Proc that is the composition of self and the passed Proc"
   pending "calls passed Proc with arguments and then calls self with result"
   pending "accepts any callable object"

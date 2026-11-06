@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#include?" do
+context "CGI::QueryExtension#include?" do
   pending "behaves like :cgi_query_extension_has_key_p :include?"
 end

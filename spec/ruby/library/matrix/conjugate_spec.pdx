@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#conjugate" do
+context "Matrix#conjugate" do
   pending "returns a matrix with all entries 'conjugated'"
   pending "returns empty matrices on the same size if empty"
   context "for a subclass of Matrix" do

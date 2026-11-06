@@ -4,17 +4,17 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#byteslice" do
+context "String#byteslice" do
   pending "needs to reviewed for spec completeness"
   pending "behaves like :string_slice :byteslice"
 end
-context "String\#byteslice with index, length" do
+context "String#byteslice with index, length" do
   pending "behaves like :string_slice_index_length :byteslice"
 end
-context "String\#byteslice with Range" do
+context "String#byteslice with Range" do
   pending "behaves like :string_slice_range :byteslice"
 end
-context "String\#byteslice on non ASCII strings" do
+context "String#byteslice on non ASCII strings" do
   pending "returns byteslice of unicode strings"
   pending "returns a String in the same encoding as self"
 end

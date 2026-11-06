@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#cookies" do
+context "CGI::QueryExtension#cookies" do
   pending "needs to be reviewed for spec completeness"
 end
-context "CGI::QueryExtension\#cookies=" do
+context "CGI::QueryExtension#cookies=" do
   pending "needs to be reviewed for spec completeness"
 end

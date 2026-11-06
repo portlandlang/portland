@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#set_form_data" do
+context "Net::HTTPHeader#set_form_data" do
   context "when passed params" do
     pending "automatically set the 'Content-Type' to 'application/x-www-form-urlencoded'"
     pending "sets self's body based on the passed form parameters"

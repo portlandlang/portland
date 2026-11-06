@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#get" do
+context "GetoptLong#get" do
   pending "returns the next option name and its argument as an Array"
   pending "shifts ARGV on each call"
   pending "terminates processing when encountering '--'"

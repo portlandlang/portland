@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#method" do
+context "Net::HTTPGenericRequest#method" do
   pending "returns self's request method"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#fileno" do
+context "IO#fileno" do
   pending "returns the numeric file descriptor of the given IO object"
   pending "raises IOError on closed stream"
 end

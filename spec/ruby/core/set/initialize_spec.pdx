@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#initialize" do
+context "Set#initialize" do
   pending "is private"
   pending "adds all elements of the passed Enumerable to self"
-  pending "uses \#each_entry on the provided Enumerable"
-  pending "uses \#each on the provided Enumerable if it does not respond to \#each_entry"
-  pending "raises if the provided Enumerable does not respond to \#each_entry or \#each"
+  pending "uses #each_entry on the provided Enumerable"
+  pending "uses #each on the provided Enumerable if it does not respond to #each_entry"
+  pending "raises if the provided Enumerable does not respond to #each_entry or #each"
   pending "should initialize with empty array and set"
   pending "preprocesses all elements by a passed block before adding to self"
   pending "should initialize with empty array and block"

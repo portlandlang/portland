@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#pos" do
+context "StringScanner#pos" do
   pending "returns the position of the scan pointer"
   pending "returns 0 in the reset position"
   pending "returns the length of the string in the terminate position"
   pending "is not multi-byte character sensitive"
 end
-context "StringScanner\#pos=" do
+context "StringScanner#pos=" do
   pending "modify the scan pointer"
   pending "positions from the end if the argument is negative"
   pending "raises a RangeError if position too far backward"

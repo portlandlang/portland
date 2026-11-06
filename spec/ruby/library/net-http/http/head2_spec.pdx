@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#head2" do
-  pending "is an alias of Net::HTTP\#request_head"
+context "Net::HTTP#head2" do
+  pending "is an alias of Net::HTTP#request_head"
 end

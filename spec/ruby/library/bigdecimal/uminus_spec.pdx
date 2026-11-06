@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#-@" do
+context "BigDecimal#-@" do
   pending "negates self"
   pending "properly handles special values"
 end

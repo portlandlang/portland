@@ -4,16 +4,16 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#write_nonblock on a file" do
+context "IO#write_nonblock on a file" do
   pending "writes all of the string's bytes but does not buffer them"
   pending "does not modify the passed argument"
   pending "checks if the file is writable if writing zero bytes"
 end
-context "IO\#write_nonblock" do
+context "IO#write_nonblock" do
   pending "behaves like :io_write :write_nonblock"
   pending "behaves like :io_write_no_transcode :write_nonblock"
 end
-context "IO\#write_nonblock" do
+context "IO#write_nonblock" do
   pending "raises an exception extending IO::WaitWritable when the write would block"
   pending "raises an ArgumentError if exception: is not true or false"
   context "when exception option is set to false" do

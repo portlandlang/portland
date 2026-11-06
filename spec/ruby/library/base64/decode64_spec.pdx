@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Base64\#decode64" do
+context "Base64#decode64" do
   pending "returns the Base64-decoded version of the given string"
   pending "returns the Base64-decoded version of the given shared string"
   pending "returns the Base64-decoded version of the given string with wrong padding"

@@ -4,15 +4,15 @@
 
 require_relative "../../../spec_helper"
 
-context "Tempfile\#close when passed no argument or [false]" do
+context "Tempfile#close when passed no argument or [false]" do
   pending "closes self"
   pending "does not unlink self"
 end
-context "Tempfile\#close when passed [true]" do
+context "Tempfile#close when passed [true]" do
   pending "closes self"
   pending "unlinks self"
 end
-context "Tempfile\#close!" do
+context "Tempfile#close!" do
   pending "closes self"
   pending "unlinks self"
 end

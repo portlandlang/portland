@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "IPSocket\#inspect" do
+context "IPSocket#inspect" do
   pending "returns a String with the fd, family, address and port for TCPSocket"
   pending "returns a String with the fd, family, address and port for UDPSocket"
   pending "returns a String marking the socket as closed for a closed TCPSocket"

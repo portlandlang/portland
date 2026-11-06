@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#passive" do
+context "Net::FTP#passive" do
   pending "returns true when self is in passive mode"
   pending "is the value of Net::FTP.default_value by default"
 end
-context "Net::FTP\#passive=" do
+context "Net::FTP#passive=" do
   pending "sets self to passive mode when passed true"
 end

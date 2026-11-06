@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#<=>" do
+context "Date#<=>" do
   pending "returns 0 when two dates are equal"
   pending "returns -1 when self is less than another date"
   pending "returns -1 when self is less than a Numeric"

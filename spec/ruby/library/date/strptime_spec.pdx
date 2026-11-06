@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#strptime" do
+context "Date#strptime" do
   pending "returns January 1, 4713 BCE when given no arguments"
   pending "uses the default format when not given a date format"
   pending "parses a full day name"

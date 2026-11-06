@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#determinant" do
+context "Matrix::LUPDecomposition#determinant" do
   pending "returns the determinant when the matrix is square"
   pending "raises an error for rectangular matrices"
 end

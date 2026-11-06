@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#inspect" do
+context "Dir#inspect" do
   pending "returns a String"
   pending "includes the class name"
   pending "includes the directory name"

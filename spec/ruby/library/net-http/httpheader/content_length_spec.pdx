@@ -4,14 +4,14 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#content_length" do
+context "Net::HTTPHeader#content_length" do
   pending "returns nil if no 'Content-Length' header entry is set"
   pending "raises a Net::HTTPHeaderSyntaxError when the 'Content-Length' header entry has an invalid format"
   pending "returns the value of the 'Content-Length' header entry as an Integer"
   pending "ignores the parts of the 'Content-Length' header entry around the digits"
   pending "raises a Net::HTTPHeaderSyntaxError if the 'Content-Length' header entry is not entirely digits"
 end
-context "Net::HTTPHeader\#content_length=" do
+context "Net::HTTPHeader#content_length=" do
   pending "removes the 'Content-Length' entry if passed false or nil"
   pending "sets the 'Content-Length' entry to the passed value"
   pending "sets the 'Content-Length' entry to 0 if the passed value is not valid"

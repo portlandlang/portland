@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "main\#include" do
+context "main#include" do
   pending "includes the given Module in Object"
   context "in a file loaded with wrapping" do
     pending "includes the given Module in the load wrapper"

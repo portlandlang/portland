@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Monitor\#new_cond" do
+context "Monitor#new_cond" do
   pending "creates a MonitorMixin::ConditionVariable"
   pending "returns a condition variable which can be waited on by a thread holding the monitor"
   pending "returns a condition variable which can be waited on by a thread holding the monitor inside multiple synchronize blocks"

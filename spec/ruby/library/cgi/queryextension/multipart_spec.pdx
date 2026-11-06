@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#multipart?" do
+context "CGI::QueryExtension#multipart?" do
   pending "returns true if the current Request is a multipart request"
 end

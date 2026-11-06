@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#accept_nonblock" do
+context "Socket#accept_nonblock" do
   pending "raises IO::WaitReadable if the connection is not accepted yet"
   pending "returns :wait_readable in exceptionless mode"
 end
-context "Socket\#accept_nonblock" do
+context "Socket#accept_nonblock" do
   context "using an unbound socket" do
     pending "raises Errno::EINVAL"
   end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#conj" do
-  pending "is an alias of Matrix\#conjugate"
+context "Matrix#conj" do
+  pending "is an alias of Matrix#conjugate"
 end

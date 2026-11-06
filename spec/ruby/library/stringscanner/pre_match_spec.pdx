@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#pre_match" do
+context "StringScanner#pre_match" do
   pending "returns the pre-match (in the regular expression sense) of the last scan"
   pending "returns nil if there's no match"
   pending "is more than just the data from the last match"

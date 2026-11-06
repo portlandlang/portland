@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::IPSocket\#addr" do
+context "Socket::IPSocket#addr" do
   pending "returns an array with the socket's information"
   pending "returns an address in the array if do_not_reverse_lookup is true"
   pending "returns an address in the array if passed false"
 end
-context "Socket::IPSocket\#addr" do
+context "Socket::IPSocket#addr" do
   context "without reverse lookups" do
     pending "returns an Array containing address information"
   end

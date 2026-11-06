@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#-" do
+context "DateTime#-" do
   pending "is able to subtract sub-millisecond precision values"
   pending "correctly calculates sub-millisecond time differences"
 end

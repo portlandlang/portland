@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#eof?" do
+context "Zlib::GzipReader#eof?" do
   pending "returns true when at EOF"
   pending "returns true when at EOF with the exact length of uncompressed data"
   pending "returns true when at EOF with a length greater than the size of uncompressed data"
   pending "returns false when at EOF when there's data left in the buffer to read"
   pending "does not affect the reading data"
 end
-context "Zlib::GzipReader\#eof" do
-  pending "is an alias of Zlib::GzipReader\#eof?"
+context "Zlib::GzipReader#eof" do
+  pending "is an alias of Zlib::GzipReader#eof?"
 end

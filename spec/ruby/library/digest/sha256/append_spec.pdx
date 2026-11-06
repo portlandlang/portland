@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA256\#<<" do
+context "Digest::SHA256#<<" do
   pending "can update"
 end

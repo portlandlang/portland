@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#readline" do
+context "StringIO#readline" do
   context "when passed [separator]" do
     pending "behaves like :stringio_gets_separator :readline"
     pending "raises an IOError if self is at the end"

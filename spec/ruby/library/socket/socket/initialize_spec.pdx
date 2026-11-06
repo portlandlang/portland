@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#initialize" do
+context "Socket#initialize" do
   context "using an Integer as the 1st and 2nd arguments" do
     pending "returns a Socket"
   end
@@ -14,9 +14,9 @@ context "Socket\#initialize" do
   context "using Strings as the 1st and 2nd arguments" do
     pending "returns a Socket"
   end
-  context "using objects that respond to \#to_str" do
+  context "using objects that respond to #to_str" do
     pending "returns a Socket"
-    pending "raises TypeError when the \#to_str method does not return a String"
+    pending "raises TypeError when the #to_str method does not return a String"
   end
   context "using a custom protocol" do
     pending "returns a Socket when using an Integer"

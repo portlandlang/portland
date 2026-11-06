@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#p" do
+context "Kernel#p" do
   pending "is a private method"
   pending "flushes output if receiver is a File"
   pending "prints obj.inspect followed by system record separator for each argument given"

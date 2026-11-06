@@ -4,21 +4,21 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   pending "behaves like :array_pack_basic J"
   pending "behaves like :array_pack_basic_non_float J"
   pending "behaves like :array_pack_arguments J"
   pending "behaves like :array_pack_numeric_basic J"
   pending "behaves like :array_pack_integer J"
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   pending "behaves like :array_pack_basic j"
   pending "behaves like :array_pack_basic_non_float j"
   pending "behaves like :array_pack_arguments j"
   pending "behaves like :array_pack_numeric_basic j"
   pending "behaves like :array_pack_integer j"
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_64bit_le J_"
   end
@@ -26,7 +26,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_64bit_le J!"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_64bit_le j_"
   end
@@ -34,7 +34,7 @@ context "Array\#pack with format 'j'" do
     pending "behaves like :array_pack_64bit_le j!"
   end
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_64bit_be J_"
   end
@@ -42,7 +42,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_64bit_be J!"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_64bit_be j_"
   end
@@ -50,7 +50,7 @@ context "Array\#pack with format 'j'" do
     pending "behaves like :array_pack_64bit_be j!"
   end
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '<' and '_'" do
     pending "behaves like :array_pack_64bit_le J<_"
     pending "behaves like :array_pack_64bit_le J_<"
@@ -68,7 +68,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_64bit_be J!>"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '<' and '_'" do
     pending "behaves like :array_pack_64bit_le j<_"
     pending "behaves like :array_pack_64bit_le j_<"
@@ -86,21 +86,21 @@ context "Array\#pack with format 'j'" do
     pending "behaves like :array_pack_64bit_be j!>"
   end
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   pending "behaves like :array_pack_basic J"
   pending "behaves like :array_pack_basic_non_float J"
   pending "behaves like :array_pack_arguments J"
   pending "behaves like :array_pack_numeric_basic J"
   pending "behaves like :array_pack_integer J"
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   pending "behaves like :array_pack_basic j"
   pending "behaves like :array_pack_basic_non_float j"
   pending "behaves like :array_pack_arguments j"
   pending "behaves like :array_pack_numeric_basic j"
   pending "behaves like :array_pack_integer j"
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_32bit_be J_"
   end
@@ -108,7 +108,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_32bit_be J!"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_32bit_be j_"
   end
@@ -116,7 +116,7 @@ context "Array\#pack with format 'j'" do
     pending "behaves like :array_pack_32bit_be j!"
   end
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_32bit_le J_"
   end
@@ -124,7 +124,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_32bit_le J!"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :array_pack_32bit_le j_"
   end
@@ -132,7 +132,7 @@ context "Array\#pack with format 'j'" do
     pending "behaves like :array_pack_32bit_le j!"
   end
 end
-context "Array\#pack with format 'J'" do
+context "Array#pack with format 'J'" do
   context "with modifier '<' and '_'" do
     pending "behaves like :array_pack_32bit_le J<_"
     pending "behaves like :array_pack_32bit_le J_<"
@@ -150,7 +150,7 @@ context "Array\#pack with format 'J'" do
     pending "behaves like :array_pack_32bit_be J!>"
   end
 end
-context "Array\#pack with format 'j'" do
+context "Array#pack with format 'j'" do
   context "with modifier '<' and '_'" do
     pending "behaves like :array_pack_32bit_le j<_"
     pending "behaves like :array_pack_32bit_le j_<"

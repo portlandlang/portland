@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#readlines" do
+context "IO#readlines" do
   pending "raises an IOError if the stream is closed"
   context "when passed no arguments" do
     pending "returns an Array containing lines based on $/"
@@ -27,7 +27,7 @@ context "IO\#readlines" do
     pending "updates self's lineno based on the number of lines read"
     pending "updates self's position based on the number of characters read"
     pending "does not change $_"
-    pending "tries to convert the passed separator to a String using \#to_str"
+    pending "tries to convert the passed separator to a String using #to_str"
   end
   context "when passed limit" do
     pending "raises ArgumentError when passed 0 as a limit"
@@ -41,7 +41,7 @@ context "IO\#readlines" do
     pending "tolerates it"
   end
 end
-context "IO\#readlines" do
+context "IO#readlines" do
   pending "raises an IOError if the stream is opened for append only"
   pending "raises an IOError if the stream is opened for write only"
 end

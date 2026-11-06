@@ -4,14 +4,14 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#send" do
+context "BasicSocket#send" do
   pending "sends a message to another socket and returns the number of bytes sent"
   pending "accepts flags to specify unusual sending behaviour"
   pending "accepts a sockaddr as recipient address"
 end
-context "BasicSocket\#send" do
+context "BasicSocket#send" do
   context "using a disconnected socket" do
-    context "with an object implementing \#to_str" do
+    context "with an object implementing #to_str" do
       pending "returns the amount of sent bytes"
     end
     context "without a destination address" do

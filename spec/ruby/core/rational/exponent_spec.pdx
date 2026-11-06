@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#**" do
+context "Rational#**" do
   context "when passed Rational" do
     pending "returns Rational(1) if the exponent is Rational(0)"
     pending "returns self raised to the argument as a Rational if the exponent's denominator is 1"
@@ -35,8 +35,8 @@ context "Rational\#**" do
     pending "returns a complex number if self is negative and the passed argument is not 0"
     pending "returns Complex(1.0) when the passed argument is 0.0"
   end
-  pending "calls \#coerce on the passed argument with self"
-  pending "calls \#** on the coerced Rational with the coerced Object"
+  pending "calls #coerce on the passed argument with self"
+  pending "calls #** on the coerced Rational with the coerced Object"
   pending "raises ZeroDivisionError for Rational(0, 1) passed a negative Integer"
   pending "raises ZeroDivisionError for Rational(0, 1) passed a negative Rational with denominator 1"
   pending "raises ZeroDivisionError for Rational(0, 1) passed a negative Rational"

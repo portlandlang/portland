@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'R'" do
+context "String#unpack with format 'R'" do
   pending "behaves like :string_unpack_basic R"
   pending "behaves like :string_unpack_no_platform R"
   pending "decodes a ULEB128 integer"
@@ -13,7 +13,7 @@ context "String\#unpack with format 'R'" do
   pending "returns nil for remaining incomplete values after a valid one"
   pending "skips incomplete values with '*' modifier"
 end
-context "String\#unpack with format 'r'" do
+context "String#unpack with format 'r'" do
   pending "behaves like :string_unpack_basic r"
   pending "behaves like :string_unpack_no_platform r"
   pending "decodes a SLEB128 integer"

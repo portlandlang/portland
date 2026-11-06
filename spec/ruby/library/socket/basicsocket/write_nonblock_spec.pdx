@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#write_nonblock" do
+context "BasicSocket#write_nonblock" do
   pending "sends data"
   pending "does not set the IO in nonblock mode"
   pending "sets the IO in nonblock mode"

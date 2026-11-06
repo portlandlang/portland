@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#debug_mode" do
+context "Net::FTP#debug_mode" do
   pending "returns true when self is in debug mode"
 end
-context "Net::FTP\#debug_mode=" do
+context "Net::FTP#debug_mode=" do
   pending "sets self into debug mode when passed true"
 end

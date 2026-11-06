@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#minor" do
+context "Matrix#minor" do
   context "with start_row, nrows, start_col, ncols" do
     pending "returns the given portion of the Matrix"
     pending "returns an empty Matrix if nrows or ncols is 0"

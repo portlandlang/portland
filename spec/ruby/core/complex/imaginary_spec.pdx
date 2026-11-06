@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#imaginary" do
+context "Complex#imaginary" do
   pending "returns the imaginary part of self"
 end

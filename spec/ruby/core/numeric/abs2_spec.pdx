@@ -4,8 +4,8 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#abs2" do
+context "Numeric#abs2" do
   pending "returns the square of the absolute value of self"
-  pending "calls \#* on self"
+  pending "calls #* on self"
   pending "returns NaN when self is NaN"
 end

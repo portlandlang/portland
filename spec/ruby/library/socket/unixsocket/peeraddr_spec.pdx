@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXSocket\#peeraddr" do
+context "UNIXSocket#peeraddr" do
   pending "returns the address family and path of the server end of the connection"
   pending "raises an error in server sockets"
 end

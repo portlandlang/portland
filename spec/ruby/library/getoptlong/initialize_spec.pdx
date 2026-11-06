@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#initialize" do
+context "GetoptLong#initialize" do
   pending "sets ordering to REQUIRE_ORDER if ENV['POSIXLY_CORRECT'] is set"
   pending "sets ordering to PERMUTE if ENV['POSIXLY_CORRECT'] is not set"
 end

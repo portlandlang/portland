@@ -4,18 +4,18 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#new_start" do
+context "Date#new_start" do
   pending "converts a date object into another with a new calendar reform"
 end
-context "Date\#italy" do
+context "Date#italy" do
   pending "converts a date object into another with the Italian calendar reform"
 end
-context "Date\#england" do
+context "Date#england" do
   pending "converts a date object into another with the English calendar reform"
 end
-context "Date\#julian" do
+context "Date#julian" do
   pending "converts a date object into another with the Julian calendar"
 end
-context "Date\#gregorian" do
+context "Date#gregorian" do
   pending "converts a date object into another with the Gregorian calendar"
 end

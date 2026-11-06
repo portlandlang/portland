@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#retrlines" do
+context "Net::FTP#retrlines" do
   pending "sends the passed command over the socket"
   pending "yields each received line to the passed block"
 end

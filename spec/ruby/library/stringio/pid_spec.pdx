@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#pid" do
+context "StringIO#pid" do
   pending "returns nil"
 end

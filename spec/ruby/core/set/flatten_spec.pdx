@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#flatten" do
+context "Set#flatten" do
   pending "returns a copy of self with each included Set flattened"
   pending "raises an ArgumentError when self is recursive"
   context "when Set contains a Set-like object" do
@@ -12,7 +12,7 @@ context "Set\#flatten" do
   end
   pending "does not retain compare_by_identity flag"
 end
-context "Set\#flatten!" do
+context "Set#flatten!" do
   pending "flattens self"
   pending "returns self when self was modified"
   pending "returns nil when self was not modified"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#finite?" do
+context "BigDecimal#finite?" do
   pending "is false if Infinity or NaN"
   pending "returns true for finite values"
 end

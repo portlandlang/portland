@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#ipv6_loopback?" do
+context "Addrinfo#ipv6_loopback?" do
   context "for an ipv4 socket" do
     pending "returns false for the loopback address"
     pending "returns false for another address"

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#keys" do
+context "CGI::QueryExtension#keys" do
   pending "returns all parameter keys as an Array"
 end

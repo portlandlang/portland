@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#open" do
+context "Kernel#open" do
   pending "is a private method"
   pending "opens a file when given a valid filename"
   pending "opens a file when called with a block"
@@ -19,15 +19,15 @@ context "Kernel\#open" do
   pending "raises an ArgumentError if not passed one argument"
   pending "accepts options as keyword arguments"
   context "when given an object that responds to to_open" do
-    pending "calls \#to_path to convert the argument to a String before calling \#to_str"
-    pending "calls \#to_str to convert the argument to a String"
-    pending "calls \#to_open on argument"
-    pending "returns the value from \#to_open"
-    pending "passes its arguments onto \#to_open"
-    pending "passes keyword arguments onto \#to_open as keyword arguments if to_open accepts them"
-    pending "passes the return value from \#to_open to a block"
+    pending "calls #to_path to convert the argument to a String before calling #to_str"
+    pending "calls #to_str to convert the argument to a String"
+    pending "calls #to_open on argument"
+    pending "returns the value from #to_open"
+    pending "passes its arguments onto #to_open"
+    pending "passes keyword arguments onto #to_open as keyword arguments if to_open accepts them"
+    pending "passes the return value from #to_open to a block"
   end
-  pending "raises a TypeError if passed a non-String that does not respond to \#to_open"
+  pending "raises a TypeError if passed a non-String that does not respond to #to_open"
   pending "accepts nil for mode and permission"
   pending "is not redefined by open-uri"
 end

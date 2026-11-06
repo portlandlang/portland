@@ -9,7 +9,7 @@ context "Digest::SHA256.file" do
     pending "returns a Digest::SHA256 object"
     pending "returns a Digest::SHA256 object with the correct digest"
     pending "can be used with frozen-string-literal"
-    pending "calls \#to_str on an object and returns the Digest::SHA256 with the result"
+    pending "calls #to_str on an object and returns the Digest::SHA256 with the result"
   end
   pending "behaves like :file_read_directory :file Digest::SHA256"
   pending "raises a Errno::ENOENT when passed a path that does not exist"

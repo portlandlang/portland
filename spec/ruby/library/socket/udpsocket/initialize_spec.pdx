@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "UDPSocket\#initialize" do
+context "UDPSocket#initialize" do
   pending "initializes a new UDPSocket"
   pending "initializes a new UDPSocket using an Integer"
   pending "initializes a new UDPSocket using a Symbol"

@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#each_with_index" do
+context "Matrix#each_with_index" do
   pending "returns an Enumerator when called without a block"
   pending "returns self"
   pending "yields the elements starting with the those of the first row"
 end
-context "Matrix\#each_with_index with an argument" do
+context "Matrix#each_with_index with an argument" do
   pending "raises an ArgumentError for unrecognized argument"
   pending "yields the rights elements when passed :diagonal"
   pending "yields the rights elements when passed :off_diagonal"

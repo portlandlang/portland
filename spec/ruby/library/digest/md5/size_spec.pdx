@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::MD5\#size" do
-  pending "is an alias of Digest::MD5\#length"
+context "Digest::MD5#size" do
+  pending "is an alias of Digest::MD5#length"
 end

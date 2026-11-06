@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#chdir" do
+context "Net::FTP#chdir" do
   context "when switching to the parent directory" do
     pending "sends the 'CDUP' command to the server"
     pending "returns nil"

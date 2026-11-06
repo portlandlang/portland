@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#flush" do
+context "IO#flush" do
   pending "raises IOError on closed stream"
   context "on a pipe" do
     pending "raises Errno::EPIPE if sync=false and the read end is closed"

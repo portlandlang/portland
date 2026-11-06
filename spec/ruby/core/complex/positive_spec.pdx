@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#positive?" do
+context "Complex#positive?" do
   pending "is undefined"
 end

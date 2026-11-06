@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "Digest.hexencode" do
   pending "returns '' when passed an empty String"
   pending "returns the hex-encoded value of a non-empty String"
-  pending "calls \#to_str on an object and returns the hex-encoded value of the result"
+  pending "calls #to_str on an object and returns the hex-encoded value of the result"
   pending "raises a TypeError when passed nil"
   pending "raises a TypeError when passed an Integer"
 end

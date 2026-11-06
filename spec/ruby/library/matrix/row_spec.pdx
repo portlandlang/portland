@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#row" do
+context "Matrix#row" do
   pending "returns a Vector when called without a block"
   pending "yields the elements of the row when called with a block"
   pending "counts backwards for negative argument"

@@ -2,7 +2,7 @@
 # gem's own sentence. `null` is `nil`, and a lookup tells a present null
 # from a missing key; keys are strings, or symbols with `symbolize_names:`;
 # numbers split on Ruby's rule with a bignum as a failure; every edge is
-# json 3.1.0's, verified against Ruby 4.0.7. ruby/spec has no library/json,
+# json 3.1.0's, verified against Ruby 4.0.9. ruby/spec has no library/json,
 # so these rows are the gem's own answers, recorded in #182.
 
 require_relative "../spec_helper"

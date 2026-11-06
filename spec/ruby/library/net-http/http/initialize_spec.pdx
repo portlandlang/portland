@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#initialize" do
+context "Net::HTTP#initialize" do
   pending "is private"
   context "when passed address" do
     pending "sets the new Net::HTTP instance's address to the passed address"

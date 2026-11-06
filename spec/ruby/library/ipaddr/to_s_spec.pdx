@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "IPAddr\#to_s" do
+context "IPAddr#to_s" do
   pending "displays IPAddr using short notation"
 end
-context "IPAddr\#to_string" do
+context "IPAddr#to_string" do
   pending "displays an IPAddr using full notation"
 end

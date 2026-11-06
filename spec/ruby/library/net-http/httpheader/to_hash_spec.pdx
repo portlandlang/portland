@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#to_hash" do
+context "Net::HTTPHeader#to_hash" do
   pending "returns a Hash representing all Header entries (keys in lower case, values as arrays)"
   pending "does not allow modifying the headers from the returned hash"
 end

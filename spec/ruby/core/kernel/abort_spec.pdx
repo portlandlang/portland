@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#abort" do
+context "Kernel#abort" do
   pending "is a private method"
   pending "behaves like :process_abort :abort KernelSpecs::Method.new"
 end

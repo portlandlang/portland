@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#include?" do
+context "Set#include?" do
   pending "returns true when self contains the passed Object"
   context "member equality" do
-    pending "is checked using both \#hash and \#eql?"
-    pending "is not checked using \#=="
+    pending "is checked using both #hash and #eql?"
+    pending "is not checked using #=="
   end
 end

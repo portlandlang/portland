@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#a" do
+context "CGI::HtmlExtension#a" do
   context "when passed a String" do
     pending "returns an 'a'-element, using the passed String as the 'href'-attribute"
     pending "includes the passed block's return value when passed a block"

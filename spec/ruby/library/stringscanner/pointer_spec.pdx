@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#pointer" do
-  pending "is an alias of StringScanner\#pos"
+context "StringScanner#pointer" do
+  pending "is an alias of StringScanner#pos"
 end
-context "StringScanner\#pointer=" do
-  pending "is an alias of StringScanner\#pos="
+context "StringScanner#pointer=" do
+  pending "is an alias of StringScanner#pos="
 end

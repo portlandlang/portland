@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#content_range" do
+context "Net::HTTPHeader#content_range" do
   pending "returns a Range object that represents the 'Content-Range' header entry"
   pending "returns nil when there is no 'Content-Range' header entry"
   pending "raises a Net::HTTPHeaderSyntaxError when the 'Content-Range' has an invalid format"

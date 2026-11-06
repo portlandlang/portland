@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::ZStream\#adler" do
+context "Zlib::ZStream#adler" do
   pending "generates hash"
 end

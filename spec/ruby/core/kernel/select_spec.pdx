@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#select" do
+context "Kernel#select" do
   pending "is a private method"
   pending "does not block when timeout is 0"
 end

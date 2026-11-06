@@ -70,7 +70,7 @@ Corollary, learned the hard way: **green is not covered.** The differential suit
 
 ### 8. Verify, don't remember
 
-Run the thing. Ruby's edges were checked by executing Ruby 4.0.6, not by recalling them — and the system Ruby, 2.6, would have given confidently wrong answers about beginless ranges and `case/in`. Ruby's slicing is asymmetric in a way nobody remembers correctly (`[3..]` is `[]` but `[4..]` is `nil`).
+Run the thing. Ruby's edges were checked by executing Ruby 4.0.9, not by recalling them — and the system Ruby, 2.6, would have given confidently wrong answers about beginless ranges and `case/in`. Ruby's slicing is asymmetric in a way nobody remembers correctly (`[3..]` is `[]` but `[4..]` is `nil`).
 
 The same applies to our own work: **check our own ADRs before reasoning about interactions between our own features.** A `~task` collision was once invented out of thin air and reasoned about at length; ADR 0002 had already specified `~` as a statement-line marker with a following space, so there was no collision to solve.
 

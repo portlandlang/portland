@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#initialize" do
+context "Regexp#initialize" do
   pending "is a private method"
   pending "raises a FrozenError on a Regexp literal"
   pending "raises a FrozenError on an initialized non-literal Regexp"

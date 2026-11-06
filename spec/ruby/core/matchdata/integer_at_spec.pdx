@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#integer_at" do
+context "MatchData#integer_at" do
   pending "converts the corresponding match to an Integer and returns it when given an Integer"
   pending "returns nil on non-matching index matches"
   pending "returns nil on non-integer matches"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA512\#hexdigest" do
+context "Digest::SHA512#hexdigest" do
   pending "returns a hexdigest"
 end
 context "Digest::SHA512.hexdigest" do

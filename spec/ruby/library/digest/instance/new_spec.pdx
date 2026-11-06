@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::Instance\#new" do
+context "Digest::Instance#new" do
   pending "returns a copy of the digest instance"
   pending "calls reset"
 end

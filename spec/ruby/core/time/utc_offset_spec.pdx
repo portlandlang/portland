@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#utc_offset" do
+context "Time#utc_offset" do
   pending "returns the offset in seconds between the timezone of time and UTC"
   pending "returns 0 when the date is UTC"
   pending "returns the correct offset for US Eastern time zone around daylight savings time change"

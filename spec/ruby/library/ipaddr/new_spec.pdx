@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IPAddr\#new" do
+context "IPAddr#new" do
   pending "initializes IPAddr"
   pending "initializes IPAddr ipv6 address with short notation"
   pending "initializes IPAddr ipv6 address with long notation"

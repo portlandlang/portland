@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#to_s" do
+context "Kernel#to_s" do
   pending "returns a String containing the name of self's class"
 end

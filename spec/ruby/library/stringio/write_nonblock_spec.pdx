@@ -4,16 +4,16 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#write_nonblock when passed [Object]" do
+context "StringIO#write_nonblock when passed [Object]" do
   pending "behaves like :stringio_write :write_nonblock"
 end
-context "StringIO\#write_nonblock when passed [String]" do
+context "StringIO#write_nonblock when passed [String]" do
   pending "behaves like :stringio_write_string :write_nonblock"
   pending "accepts :exception option"
 end
-context "StringIO\#write_nonblock when self is not writable" do
+context "StringIO#write_nonblock when self is not writable" do
   pending "behaves like :stringio_write_not_writable :write_nonblock"
 end
-context "StringIO\#write_nonblock when in append mode" do
+context "StringIO#write_nonblock when in append mode" do
   pending "behaves like :stringio_write_append :write_nonblock"
 end

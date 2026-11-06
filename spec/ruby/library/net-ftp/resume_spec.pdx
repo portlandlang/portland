@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#resume" do
+context "Net::FTP#resume" do
   pending "returns true when self is set to resume uploads/downloads"
 end
-context "Net::FTP\#resume=" do
+context "Net::FTP#resume=" do
   pending "sets self to resume uploads/downloads when set to true"
 end

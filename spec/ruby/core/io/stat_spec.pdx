@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#stat" do
+context "IO#stat" do
   pending "raises IOError on closed stream"
   pending "returns a File::Stat object for the stream"
   pending "can stat pipes"

@@ -4,14 +4,14 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#dump" do
+context "String#dump" do
   pending "does not take into account if a string is frozen"
   pending "returns a String instance"
   pending "wraps string with \""
   pending "returns a string with special characters replaced with \\<char> notation"
   pending "returns a string with \" and \\ escaped with a backslash"
-  pending "returns a string with \\\#<char> when \# is followed by $, @, @@, {"
-  pending "returns a string with \# not escaped when followed by any other character"
+  pending "returns a string with \\#<char> when # is followed by $, @, @@, {"
+  pending "returns a string with # not escaped when followed by any other character"
   pending "returns a string with printable non-alphanumeric characters unescaped"
   pending "returns a string with numeric characters unescaped"
   pending "returns a string with upper-case alpha characters unescaped"

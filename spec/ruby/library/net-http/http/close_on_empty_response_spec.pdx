@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#close_on_empty_response" do
+context "Net::HTTP#close_on_empty_response" do
   pending "needs to be reviewed for spec completeness"
 end
-context "Net::HTTP\#close_on_empty_response=" do
+context "Net::HTTP#close_on_empty_response=" do
   pending "needs to be reviewed for spec completeness"
 end

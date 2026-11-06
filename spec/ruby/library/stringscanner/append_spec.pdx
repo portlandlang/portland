@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#<<" do
+context "StringScanner#<<" do
   pending "concatenates the given argument to self and returns self"
   pending "raises a TypeError if the given argument can't be converted to a String"
 end
-context "StringScanner\#<< when passed an Integer" do
+context "StringScanner#<< when passed an Integer" do
   pending "raises a TypeError"
   pending "doesn't call to_int on the argument"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#+" do
+context "DateTime#+" do
   pending "is able to add sub-millisecond precision values"
 end

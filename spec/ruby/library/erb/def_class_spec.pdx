@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "ERB\#def_class" do
+context "ERB#def_class" do
   pending "return an unnamed class which has instance method to render eRuby script"
 end

@@ -11,7 +11,7 @@ context "File.delete" do
   pending "raises a TypeError if not passed a String type"
   pending "raises an Errno::ENOENT when the given file doesn't exist"
   pending "coerces a given parameter into a string if possible"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "accepts a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
   pending "allows deleting an open file with File::SHARE_DELETE"
 end

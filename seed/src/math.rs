@@ -1,5 +1,5 @@
 //! `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
-//! spells them, answering what Ruby 4.0.7 answers. A domain error is a
+//! spells them, answering what Ruby 4.0.9 answers. A domain error is a
 //! failure in Ruby's own sentence — `Numerical argument is out of domain -
 //! sqrt` — since the caller's number was the problem (ADR 0027); the wrong
 //! count or kind of argument refuses, since the program was.

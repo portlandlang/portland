@@ -10,7 +10,7 @@ context "Socket::AncillaryData.ipv6_pktinfo" do
   pending "sets the level to IPPROTO_IP"
   pending "sets the type to IP_PKTINFO"
 end
-context "Socket::AncillaryData\#ipv6_pktinfo" do
+context "Socket::AncillaryData#ipv6_pktinfo" do
   context "using an Addrinfo without a port number" do
     pending "returns an Array"
     context "the returned Array" do

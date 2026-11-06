@@ -7,8 +7,8 @@ require_relative "../../../spec_helper"
 context "ENV.[]" do
   pending "returns nil if the variable isn't found"
   pending "returns only frozen values"
-  pending "coerces a non-string name with \#to_str"
-  pending "raises TypeError if the argument is not a String and does not respond to \#to_str"
+  pending "coerces a non-string name with #to_str"
+  pending "raises TypeError if the argument is not a String and does not respond to #to_str"
   pending "looks up values case-insensitively"
 end
 context "ENV.[]" do

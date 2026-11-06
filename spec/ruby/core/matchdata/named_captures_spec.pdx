@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#named_captures" do
+context "MatchData#named_captures" do
   pending "returns a Hash that has captured name and the matched string pairs"
   pending "prefers later captures"
   pending "returns the latest matched capture, even if a later one that does not match exists"

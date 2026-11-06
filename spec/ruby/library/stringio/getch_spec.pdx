@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#getch" do
+context "StringIO#getch" do
   pending "behaves like :stringio_getc :getch"
   pending "returns the character at the current position"
-  pending "increments \#pos by the byte size of the character in multibyte strings"
+  pending "increments #pos by the byte size of the character in multibyte strings"
   pending "returns nil at the end of the string"
-  context "StringIO\#getch when self is not readable" do
+  context "StringIO#getch when self is not readable" do
     pending "behaves like :stringio_getc_not_readable :getch"
   end
 end

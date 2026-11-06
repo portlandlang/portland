@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#>" do
-  pending "is an alias of Set\#proper_superset?"
+context "Set#>" do
+  pending "is an alias of Set#proper_superset?"
 end

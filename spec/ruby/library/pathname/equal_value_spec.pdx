@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#==" do
+context "Pathname#==" do
   pending "returns true when identical paths are used"
   pending "returns true when identical paths are used"
 end

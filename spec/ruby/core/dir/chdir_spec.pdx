@@ -8,10 +8,10 @@ context "Dir.chdir" do
   pending "defaults to $HOME with no arguments"
   pending "changes to the specified directory"
   pending "returns 0 when successfully changing directory"
-  pending "calls \#to_str on the argument if it's not a String"
-  pending "calls \#to_str on the argument if it's not a String and a block is given"
-  pending "calls \#to_path on the argument if it's not a String"
-  pending "prefers \#to_path over \#to_str"
+  pending "calls #to_str on the argument if it's not a String"
+  pending "calls #to_str on the argument if it's not a String and a block is given"
+  pending "calls #to_path on the argument if it's not a String"
+  pending "prefers #to_path over #to_str"
   pending "accepts a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
   pending "returns the value of the block when a block is given"
   pending "defaults to the home directory when given a block but no argument"
@@ -21,7 +21,7 @@ context "Dir.chdir" do
   pending "always returns to the original directory when given a block"
   pending "accepts a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters when given a block"
 end
-context "Dir\#chdir" do
+context "Dir#chdir" do
   pending "changes the current working directory to self"
   pending "changes the current working directory to self for duration of the block when a block is given"
   pending "returns 0 when successfully changing directory"

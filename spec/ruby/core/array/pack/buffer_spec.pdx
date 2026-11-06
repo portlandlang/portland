@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with :buffer option" do
+context "Array#pack with :buffer option" do
   pending "returns specified buffer"
   pending "adds result at the end of buffer content"
   pending "raises TypeError exception if buffer is not String"

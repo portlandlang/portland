@@ -10,6 +10,6 @@ context "File.mtime" do
   pending "raises an Errno::ENOENT exception if the file is not found"
   pending "accepts a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
 end
-context "File\#mtime" do
+context "File#mtime" do
   pending "returns the modification Time of the file"
 end

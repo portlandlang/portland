@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "File\#chmod" do
+context "File#chmod" do
   pending "returns 0 if successful"
   pending "raises RangeError with too large values"
   pending "invokes to_int on non-integer argument"
@@ -19,7 +19,7 @@ end
 context "File.chmod" do
   pending "returns the number of files modified"
   pending "raises RangeError with too large values"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "throws a TypeError if the given path is not coercible into a string"
   pending "raises an error for a non existent path"
   pending "invokes to_int on non-integer argument"

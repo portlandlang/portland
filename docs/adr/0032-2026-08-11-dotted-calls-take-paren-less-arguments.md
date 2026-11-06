@@ -11,7 +11,7 @@ The pull is this repo's own language spec — 271 assertions writing `expect(x).
 
 ## Decision
 
-**`receiver.method argument` parses, as the mirror of the bare command call one dot deeper** — the same test for what starts an argument, the same argument loop (multiple arguments, keywords), the same refusals where two readings exist. Every acceptance is in previously-refused space, so no existing program changes meaning. The rules, each verified against Ruby 4.0.6 before adoption:
+**`receiver.method argument` parses, as the mirror of the bare command call one dot deeper** — the same test for what starts an argument, the same argument loop (multiple arguments, keywords), the same refusals where two readings exist. Every acceptance is in previously-refused space, so no existing program changes meaning. The rules, each verified against Ruby 4.0.9 before adoption:
 
 - **Nesting follows Ruby: adjacency nests, commas make siblings.** `a.to b.c d` gives `d` to the innermost call; `a.to x, y` gives both to `to`. One reading each.
 - **A postfix chain binds to the argument**: `expect(x).to eq(1).and(y)` is `to(eq(1).and(y))` — Ruby's parse, one reading. Chaining off the outer call takes parens on the outer call.

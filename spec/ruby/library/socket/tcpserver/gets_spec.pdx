@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "TCPServer\#gets" do
+context "TCPServer#gets" do
   pending "raises Errno::ENOTCONN on gets"
 end

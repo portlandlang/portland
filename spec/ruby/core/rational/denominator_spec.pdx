@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#denominator" do
+context "Rational#denominator" do
   pending "returns the denominator"
   pending "returns 1 if no denominator was given"
 end

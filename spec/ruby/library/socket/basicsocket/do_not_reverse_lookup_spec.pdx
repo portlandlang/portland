@@ -10,11 +10,11 @@ context "BasicSocket.do_not_reverse_lookup" do
   pending "looks for hostnames when set to false"
   pending "looks for numeric addresses when set to true"
 end
-context "BasicSocket\#do_not_reverse_lookup" do
+context "BasicSocket#do_not_reverse_lookup" do
   context "for an TCPSocket.new socket" do
     pending "behaves like :socket_do_not_reverse_lookup -> {\n      TCPSocket.new('127.0.0.1', @port)\n    }"
   end
-  context "for an TCPServer\#accept socket" do
+  context "for an TCPServer#accept socket" do
     pending "behaves like :socket_do_not_reverse_lookup -> {\n      @server.accept\n    }"
   end
 end

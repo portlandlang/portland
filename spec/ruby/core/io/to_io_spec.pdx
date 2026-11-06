@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#to_io" do
+context "IO#to_io" do
   pending "returns self for open stream"
   pending "returns self for closed stream"
 end

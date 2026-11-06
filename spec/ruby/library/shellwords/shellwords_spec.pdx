@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Shellwords\#shellwords" do
+context "Shellwords#shellwords" do
   pending "honors quoted strings"
   pending "honors escaped double quotes"
   pending "honors escaped single quotes"

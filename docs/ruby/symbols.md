@@ -6,7 +6,7 @@
 
 ## Ruby
 
-A symbol is an interned name, and the interning is the interpreter's own identifier table exposed as values. A bare Ruby 4.0.6 has **3,599 symbols interned before any user code runs** — its method, ivar, and constant names — which is why symbols and metaprogramming are inseparable there: `send(:foo)` works because `:foo` *is* the key in the method table.
+A symbol is an interned name, and the interning is the interpreter's own identifier table exposed as values. A bare Ruby 4.0.9 has **3,810 symbols interned before any user code runs** — its method, ivar, and constant names — which is why symbols and metaprogramming are inseparable there: `send(:foo)` works because `:foo` *is* the key in the method table.
 
 <!-- not-portland: Ruby, shown for contrast -->
 

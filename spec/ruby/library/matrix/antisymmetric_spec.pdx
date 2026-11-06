@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#antisymmetric?" do
+context "Matrix#antisymmetric?" do
   pending "returns true for an antisymmetric Matrix"
   pending "returns true for a 0x0 empty matrix"
   pending "returns false for non-antisymmetric matrices"

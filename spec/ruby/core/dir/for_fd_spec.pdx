@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "Dir.for_fd" do
   pending "returns a new Dir object representing the directory specified by the given integer directory file descriptor"
   pending "returns a new Dir object without associated path"
-  pending "calls \#to_int to convert a value to an Integer"
+  pending "calls #to_int to convert a value to an Integer"
   pending "raises TypeError when value cannot be converted to Integer"
   pending "raises a SystemCallError if the file descriptor given is not valid"
   pending "raises a SystemCallError if the file descriptor given is not for a directory"

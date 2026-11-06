@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#inspect" do
+context "BigDecimal#inspect" do
   pending "returns String"
   pending "looks like this"
   pending "does not add an exponent for zero values"

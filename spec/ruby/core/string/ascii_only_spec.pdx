@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#ascii_only?" do
+context "String#ascii_only?" do
   context "with ASCII only characters" do
     pending "returns true if the encoding is UTF-8"
     pending "returns true if the encoding is US-ASCII"

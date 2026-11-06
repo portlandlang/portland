@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#set_options" do
+context "GetoptLong#set_options" do
   pending "allows setting command line options"
   pending "discards previously defined command line options"
   pending "raises an ArgumentError if too many argument flags where given"

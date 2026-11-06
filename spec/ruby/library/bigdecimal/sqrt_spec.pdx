@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#sqrt" do
+context "BigDecimal#sqrt" do
   pending "returns square root of 2 with desired precision"
   pending "returns square root of 3 with desired precision"
   pending "returns square root of 121 with desired precision"

@@ -6,7 +6,7 @@ require_relative "../../../spec_helper"
 
 context "IO.read" do
   pending "reads the contents of a file"
-  pending "calls \#to_path on non-String arguments"
+  pending "calls #to_path on non-String arguments"
   pending "accepts options as keyword arguments"
   pending "accepts an empty options Hash"
   pending "accepts a length, and empty options Hash"
@@ -49,7 +49,7 @@ context "IO.read on an empty file" do
   pending "returns nil when length is passed"
   pending "returns an empty string when no length is passed"
 end
-context "IO\#read" do
+context "IO#read" do
   pending "can be read from consecutively"
   pending "treats first nil argument as no length limit"
   pending "raises an ArgumentError when not passed a valid length"
@@ -80,17 +80,17 @@ context "IO\#read" do
   pending "raises ArgumentError when length is less than 0"
   pending "raises IOError when stream is closed by another thread"
 end
-context "IO\#read on Windows" do
+context "IO#read on Windows" do
   pending "normalizes line endings in text mode"
   pending "does not normalize line endings in binary mode"
 end
-context "IO\#read" do
+context "IO#read" do
   pending "ignores unicode encoding"
 end
-context "IO\#read in binary mode" do
+context "IO#read in binary mode" do
   pending "does not transcode file contents when Encoding.default_internal is set"
 end
-context "IO\#read in text mode" do
+context "IO#read in text mode" do
   pending "reads data according to the internal encoding"
 end
 context "IO.read with BOM" do
@@ -101,8 +101,8 @@ context "IO.read with BOM" do
   pending "reads a file with a utf-32le bom"
   pending "reads a file with a utf-32be bom"
 end
-context "IO\#read" do
-  context "when IO\#external_encoding and IO\#internal_encoding are nil" do
+context "IO#read" do
+  context "when IO#external_encoding and IO#internal_encoding are nil" do
     pending "sets the String encoding to Encoding.default_external"
   end
   context "with internal encoding" do
@@ -130,7 +130,7 @@ context "IO\#read" do
     end
   end
 end
-context "IO\#read with large data" do
+context "IO#read with large data" do
   pending "reads all the data at once"
   pending "reads only the requested number of bytes"
 end

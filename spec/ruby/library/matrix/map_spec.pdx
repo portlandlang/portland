@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#map" do
+context "Matrix#map" do
   pending "returns an instance of Matrix"
   pending "returns a Matrix where each element is the result of the block"
   pending "returns an enumerator if no block is given"

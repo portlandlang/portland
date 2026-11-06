@@ -13,7 +13,7 @@ context "Net::HTTP.proxy_user" do
     pending "returns the username for self's proxy connection"
   end
 end
-context "Net::HTTP\#proxy_user" do
+context "Net::HTTP#proxy_user" do
   context "when self is no proxy class instance" do
     pending "returns nil"
   end

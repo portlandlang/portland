@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#puts" do
+context "Kernel#puts" do
   pending "is a private method"
   pending "delegates to $stdout.puts"
 end

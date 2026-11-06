@@ -17,13 +17,13 @@ context "Time.now" do
     pending "raises ArgumentError if String argument and seconds greater than 59"
   end
   context "Timezone object" do
-    pending "raises TypeError if timezone does not implement \#utc_to_local method"
-    pending "does not raise exception if timezone does not implement \#local_to_utc method"
-    context "returned value by \#utc_to_local and \#local_to_utc methods" do
+    pending "raises TypeError if timezone does not implement #utc_to_local method"
+    pending "does not raise exception if timezone does not implement #local_to_utc method"
+    context "returned value by #utc_to_local and #local_to_utc methods" do
       pending "could be Time instance"
       pending "could be Time subclass instance"
       pending "could be Integer"
-      pending "could have any \#zone and \#utc_offset because they are ignored"
+      pending "could have any #zone and #utc_offset because they are ignored"
       pending "raises ArgumentError if difference between argument and result is too large"
     end
   end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Resolv\#getname" do
+context "Resolv#getname" do
   pending "resolves 127.0.0.1"
   pending "raises ResolvError when there is no result"
 end

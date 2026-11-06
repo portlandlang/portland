@@ -4,14 +4,14 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#crypt" do
+context "String#crypt" do
   pending "returns a cryptographic hash of self by applying the bcrypt algorithm with the specified salt"
   pending "raises Errno::EINVAL when the salt is shorter than 29 characters"
-  pending "calls \#to_str to converts the salt arg to a String"
+  pending "calls #to_str to converts the salt arg to a String"
   pending "doesn't return subclass instances"
   pending "returns a cryptographic hash of self by applying the UNIX crypt algorithm with the specified salt"
   pending "raises an ArgumentError when the string contains NUL character"
-  pending "calls \#to_str to converts the salt arg to a String"
+  pending "calls #to_str to converts the salt arg to a String"
   pending "doesn't return subclass instances"
   pending "raises an ArgumentError when the salt is shorter than two characters"
   pending "raises a type error when the salt arg can't be converted to a string"

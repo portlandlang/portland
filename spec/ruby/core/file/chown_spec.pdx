@@ -13,10 +13,10 @@ context "File.chown" do
   pending "does not modify the group id of the file if passed nil or -1"
   pending "returns the number of files processed"
   pending "raises an error for a non existent path"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "accepts a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
 end
-context "File\#chown" do
+context "File#chown" do
   pending "does not modify the owner id of the file"
   pending "does not modify the group id of the file"
   pending "changes the owner id of the file"

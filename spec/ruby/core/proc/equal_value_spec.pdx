@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#==" do
+context "Proc#==" do
   pending "is a public method"
   pending "returns true if self and other are the same object"
   pending "returns true if other is a dup of the original"

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#[]=" do
+context "OpenStruct#[]=" do
   pending "sets the associated value"
 end

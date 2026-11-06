@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA2\#hexdigest" do
+context "Digest::SHA2#hexdigest" do
   pending "returns a SHA256 hexdigest by default"
 end
 context "Digest::SHA2.hexdigest" do

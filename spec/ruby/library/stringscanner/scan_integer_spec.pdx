@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#scan_integer" do
+context "StringScanner#scan_integer" do
   pending "returns the matched Integer literal starting from the current position"
   pending "returns nil when no Integer literal matched starting from the current position"
   pending "supports a sign +/-"
@@ -20,7 +20,7 @@ context "StringScanner\#scan_integer" do
     pending "matches '0' in a '0x' located in the end of a string"
   end
 end
-context "\#[] successive call with a capture group name" do
+context "#[] successive call with a capture group name" do
   pending "returns nil substring when matching succeeded"
   pending "raises IndexError when matching succeeded"
   pending "returns nil when matching failed"

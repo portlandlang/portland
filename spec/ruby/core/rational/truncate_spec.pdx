@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#truncate" do
+context "Rational#truncate" do
   context "with no arguments (precision = 0)" do
     pending "returns an integer"
     pending "returns the truncated value toward 0"

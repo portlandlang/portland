@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#==" do
+context "Regexp#==" do
   pending "is true if self and other have the same pattern"
   pending "is true if self and other have the same character set code"
-  pending "is true if other has the same \#casefold? values"
+  pending "is true if other has the same #casefold? values"
   pending "is true if self does not specify /n option and other does"
   pending "is true if self specifies /n option and other does not"
 end

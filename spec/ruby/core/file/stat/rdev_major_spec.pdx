@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#rdev_major" do
-  pending "returns the major part of File::Stat\#rdev"
+context "File::Stat#rdev_major" do
+  pending "returns the major part of File::Stat#rdev"
   pending "returns nil"
 end

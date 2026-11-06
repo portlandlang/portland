@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::EigenvalueDecomposition\#initialize" do
+context "Matrix::EigenvalueDecomposition#initialize" do
   pending "raises an error if argument is not a matrix"
   pending "raises an error if matrix is not square"
   pending "never hangs"

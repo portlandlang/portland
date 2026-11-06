@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::FTP\#set_typecode" do
+context "URI::FTP#set_typecode" do
   pending "needs to be reviewed for spec completeness"
 end

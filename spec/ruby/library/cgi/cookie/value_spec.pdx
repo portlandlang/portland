@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::Cookie\#value" do
+context "CGI::Cookie#value" do
   pending "returns self's value"
   pending "is in synch with self"
 end
-context "CGI::Cookie\#value=" do
+context "CGI::Cookie#value=" do
   pending "sets self's value"
-  pending "automatically converts the passed Object to an Array using \#Array"
+  pending "automatically converts the passed Object to an Array using #Array"
   pending "does keep self and the values in sync"
 end

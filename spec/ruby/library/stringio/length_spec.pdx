@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#length" do
+context "StringIO#length" do
   pending "returns the length of the wrapped string"
 end

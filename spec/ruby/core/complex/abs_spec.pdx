@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#abs" do
+context "Complex#abs" do
   pending "returns the modulus: |a + bi| = sqrt((a ^ 2) + (b ^ 2))"
 end

@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#normalize" do
+context "URI::Generic#normalize" do
   pending "needs to be reviewed for spec completeness"
 end
-context "URI::Generic\#normalize!" do
+context "URI::Generic#normalize!" do
   pending "needs to be reviewed for spec completeness"
 end

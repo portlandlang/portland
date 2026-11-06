@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#open_timeout" do
+context "Net::HTTP#open_timeout" do
   pending "returns the seconds to wait till the connection is open"
 end
-context "Net::HTTP\#open_timeout=" do
+context "Net::HTTP#open_timeout=" do
   pending "sets the seconds to wait till the connection is open"
   pending "returns the newly set value"
 end

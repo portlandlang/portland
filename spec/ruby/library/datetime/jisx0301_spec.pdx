@@ -7,6 +7,6 @@ require_relative "../../../spec_helper"
 context "DateTime.jisx0301" do
   pending "needs to be reviewed for spec completeness"
 end
-context "DateTime\#jisx0301" do
+context "DateTime#jisx0301" do
   pending "needs to be reviewed for spec completeness"
 end

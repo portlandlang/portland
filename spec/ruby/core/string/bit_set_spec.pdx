@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#bit_set" do
+context "String#bit_set" do
   pending "sets a bit in LSB-first order by default and returns self"
   pending "sets a bit in MSB-first order"
   pending "preserves byte order when using MSB-first order"

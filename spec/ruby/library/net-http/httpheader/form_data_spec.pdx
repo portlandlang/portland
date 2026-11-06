@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#form_data=" do
-  pending "is an alias of Net::HTTPHeader\#set_form_data"
+context "Net::HTTPHeader#form_data=" do
+  pending "is an alias of Net::HTTPHeader#set_form_data"
 end

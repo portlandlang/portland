@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#to_h" do
+context "OpenStruct#to_h" do
   pending "returns a Hash with members as keys"
   pending "returns a Hash with keys as symbols"
   pending "does not return the hash used as initializer"
@@ -13,7 +13,7 @@ context "OpenStruct\#to_h" do
     pending "converts [key, value] pairs returned by the block to a hash"
     pending "raises ArgumentError if block returns longer or shorter array"
     pending "raises TypeError if block returns something other than Array"
-    pending "coerces returned pair to Array with \#to_ary"
-    pending "does not coerce returned pair to Array with \#to_a"
+    pending "coerces returned pair to Array with #to_ary"
+    pending "does not coerce returned pair to Array with #to_a"
   end
 end

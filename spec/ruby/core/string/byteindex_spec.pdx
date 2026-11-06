@@ -4,14 +4,14 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#byteindex" do
-  pending "calls \#to_str to convert the first argument"
-  pending "calls \#to_int to convert the second argument"
+context "String#byteindex" do
+  pending "calls #to_str to convert the first argument"
+  pending "calls #to_int to convert the second argument"
   pending "does not raise IndexError when byte offset is correct or on string boundary"
   pending "behaves like :byte_index_common :byteindex"
 end
-context "String\#byteindex with String" do
-  pending "behaves the same as String\#byteindex(char) for one-character strings"
+context "String#byteindex with String" do
+  pending "behaves the same as String#byteindex(char) for one-character strings"
   pending "returns the byteindex of the first occurrence of the given substring"
   pending "treats the offset as a byteindex"
   pending "ignores string subclasses"
@@ -25,8 +25,8 @@ context "String\#byteindex with String" do
   pending "handles a substring in a superset encoding"
   pending "handles a substring in a subset encoding"
 end
-context "String\#byteindex with Regexp" do
-  pending "behaves the same as String\#byteindex(string) for escaped string regexps"
+context "String#byteindex with Regexp" do
+  pending "behaves the same as String#byteindex(string) for escaped string regexps"
   pending "returns the byteindex of the first match of regexp"
   pending "starts the search at the given offset"
   pending "starts the search at offset + self.length if offset is negative"

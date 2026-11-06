@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#column_size" do
+context "Matrix#column_size" do
   pending "returns the number of columns"
   pending "returns 0 for empty matrices"
 end

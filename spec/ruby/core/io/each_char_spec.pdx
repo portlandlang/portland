@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#each_char" do
+context "IO#each_char" do
   pending "yields each character"
   context "when no block is given" do
     pending "returns an Enumerator"
@@ -19,6 +19,6 @@ context "IO\#each_char" do
   pending "raises an IOError when an enumerator created on a closed stream is accessed"
   pending "raises IOError on closed stream"
 end
-context "IO\#each_char" do
+context "IO#each_char" do
   pending "does not yield any characters on an empty stream"
 end

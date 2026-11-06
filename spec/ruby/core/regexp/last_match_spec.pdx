@@ -16,7 +16,7 @@ context "Regexp.last_match" do
     pending "returns a named capture"
   end
   context "when given an Object" do
-    pending "coerces argument to an index using \#to_int"
+    pending "coerces argument to an index using #to_int"
     pending "raises a TypeError when unable to coerce"
   end
 end

@@ -9,12 +9,12 @@ context "Zlib::Deflate.deflate" do
   pending "deflates lots of data"
   pending "deflates chunked data"
 end
-context "Zlib::Deflate\#deflate" do
+context "Zlib::Deflate#deflate" do
   pending "deflates some data"
   pending "deflates lots of data"
   pending "has a binary encoding"
 end
-context "Zlib::Deflate\#deflate" do
+context "Zlib::Deflate#deflate" do
   context "without break" do
     pending "deflates chunked data"
     pending "deflates chunked data with final chunk"

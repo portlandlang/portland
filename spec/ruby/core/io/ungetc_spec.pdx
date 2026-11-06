@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#ungetc" do
+context "IO#ungetc" do
   pending "pushes back one character onto stream"
   pending "interprets the codepoint in the external encoding"
   pending "pushes back one character when invoked at the end of the stream"
@@ -15,7 +15,7 @@ context "IO\#ungetc" do
   pending "raises TypeError if passed nil"
   pending "puts one or more characters back in the stream"
   pending "puts correctly back a string longer than the amount of data previously read"
-  pending "calls \#to_str to convert the argument if it is not an Integer"
+  pending "calls #to_str to convert the argument if it is not an Integer"
   pending "returns nil when invoked on stream that was not yet read"
   pending "raises IOError on stream not opened for reading"
   pending "raises IOError on closed stream"

@@ -9,7 +9,7 @@ context "Net::HTTP.Proxy" do
   pending "returns Net::HTTP when the passed address is nil"
   pending "sets the returned subclasses' proxy options based on the passed arguments"
 end
-context "Net::HTTP\#proxy?" do
+context "Net::HTTP#proxy?" do
   context "when self is no proxy class instance" do
     pending "returns false"
   end

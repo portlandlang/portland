@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#text_field" do
+context "CGI::HtmlExtension#text_field" do
   context "when passed no arguments" do
     pending "returns an text-'input'-element without a name"
     pending "ignores a passed block"

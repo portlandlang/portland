@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "UDPSocket\#write" do
+context "UDPSocket#write" do
   pending "raises EMSGSIZE if msg is too long"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#frameset" do
+context "CGI::HtmlExtension#frameset" do
   pending "initializes the HTML Generation methods for the Frameset version of HTML4"
 end

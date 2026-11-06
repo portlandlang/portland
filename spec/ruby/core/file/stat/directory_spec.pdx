@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#directory?" do
+context "File::Stat#directory?" do
   pending "behaves like :file_directory :directory? FileStat"
 end

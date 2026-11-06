@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#byteoffset" do
+context "MatchData#byteoffset" do
   pending "returns beginning and ending byte-based offset of whole matched substring for 0 element"
   pending "returns beginning and ending byte-based offset of n-th match, all the subsequent elements are capturing groups"
   pending "accepts String as a reference to a named capture"

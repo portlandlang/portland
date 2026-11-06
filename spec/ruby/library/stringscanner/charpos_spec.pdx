@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#charpos" do
+context "StringScanner#charpos" do
   pending "returns character index corresponding to the current position"
   pending "is multi-byte character sensitive"
 end

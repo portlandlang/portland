@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#http_version" do
+context "Net::HTTPResponse#http_version" do
   pending "returns self's http version"
 end

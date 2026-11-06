@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Parser\#join" do
+context "URI::Parser#join" do
   pending "returns a URI object of the concatenation of a protocol and domain, and a path"
   pending "accepts URI objects"
   pending "accepts string-like arguments with to_str"

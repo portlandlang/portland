@@ -2,7 +2,7 @@
 
 **Summary:** Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 
-**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.6. Ranges over any orderable value are decided ([ADR 0081](../adr/0081-2026-11-03-ranges-over-any-orderable.md), 2026-11-03) and not built — [#194](https://github.com/portlandlang/portland/issues/194).
+**Status:** decided ([ADR 0019](../adr/0019-2026-07-23-ranges.md)). Built in the seed and the compiler, differentially pinned — see [the language](../language.md#values). Ruby behavior below was verified against Ruby 4.0.9. Ranges over any orderable value are decided ([ADR 0081](../adr/0081-2026-11-03-ranges-over-any-orderable.md), 2026-11-03) and not built — [#194](https://github.com/portlandlang/portland/issues/194).
 
 ## Ruby
 

@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#<<" do
+context "IO#<<" do
   pending "writes an object to the IO stream"
-  pending "calls \#to_s on the object to print it"
+  pending "calls #to_s on the object to print it"
   pending "raises an error if the stream is closed"
   pending "returns self"
 end

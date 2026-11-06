@@ -6,7 +6,7 @@ require_relative "../../../spec_helper"
 
 context "Dir.delete" do
   pending "removes empty directories"
-  pending "calls \#to_path on non-String arguments"
+  pending "calls #to_path on non-String arguments"
   pending "raises an Errno::ENOTEMPTY when trying to remove a nonempty directory"
   pending "raises an Errno::ENOENT when trying to remove a non-existing directory"
   pending "raises an Errno::ENOTDIR when trying to remove a non-directory"

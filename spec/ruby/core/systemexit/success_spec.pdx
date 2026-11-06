@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "SystemExit\#success?" do
+context "SystemExit#success?" do
   pending "returns true when the status is 0"
   pending "returns false when the status is not 0"
 end

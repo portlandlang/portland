@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#canonname" do
+context "Addrinfo#canonname" do
   pending "returns the canonical name for a host"
   context "when the canonical name is not available" do
     pending "returns nil"

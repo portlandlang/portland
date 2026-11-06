@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#storlines" do
+context "Net::FTP#storlines" do
   pending "sends the passed command and the passed File object's content to the server"
   pending "yields each line of the transmitted content"
 end

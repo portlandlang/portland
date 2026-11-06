@@ -1,6 +1,6 @@
 # JSON, core and written twice (ADR 0072). This is the Portland twin of the
 # seed's `json.rs`: `json_parse`, `json_generate`, and `json_pretty_generate`
-# answering what Ruby's json gem (3.1.0 on Ruby 4.0.7) answers, byte for
+# answering what Ruby's json gem (3.1.0 on Ruby 4.0.9) answers, byte for
 # byte — its sentences, its positions, its float spellings — and what the
 # hosted evaluator runs when a program says `JSON.parse`. The seed is the
 # oracle; the differential suite holds the two together. This file is also

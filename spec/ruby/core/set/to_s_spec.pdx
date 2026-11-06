@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#to_s" do
+context "Set#to_s" do
   pending "returns a String representation of self"
   pending "does include the elements of the set"
   pending "does include the elements of the set"

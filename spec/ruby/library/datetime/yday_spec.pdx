@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#yday" do
+context "DateTime#yday" do
   pending "behaves like :time_yday -> year, month, day { DateTime.new(year, month, day).yday }"
 end

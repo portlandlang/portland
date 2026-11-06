@@ -1,6 +1,6 @@
 //! JSON, core and written by hand (ADR 0072): `JSON.parse`, `JSON.generate`,
 //! and `JSON.pretty_generate` answering what Ruby's json gem (3.1.0 on Ruby
-//! 4.0.7) answers, byte for byte — its sentences, its positions, its float
+//! 4.0.9) answers, byte for byte — its sentences, its positions, its float
 //! spellings — read from the gem's `parser.c`, `generator.c`, and vendored
 //! `fpconv.c` rather than recalled, and pinned by the probes recorded in
 //! #182. The compiler carries a Portland twin (`compiler/json.pdx`); the two

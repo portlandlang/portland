@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#expect" do
+context "IO#expect" do
   pending "matches data against a Regexp"
   pending "matches data against a String"
   pending "returns any captures of the Regexp"

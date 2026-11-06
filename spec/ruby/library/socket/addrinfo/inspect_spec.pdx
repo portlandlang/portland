@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#inspect" do
+context "Addrinfo#inspect" do
   context "using an IPv4 Addrinfo" do
     pending "returns a String when using a TCP Addrinfo"
     pending "returns a String when using an UDP Addrinfo"

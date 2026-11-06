@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::IPSocket\#getaddress" do
+context "Socket::IPSocket#getaddress" do
   pending "returns the IP address of hostname"
   pending "returns the IP address when passed an IP"
   pending "returns IPv4 compatible IPv6 addresses"

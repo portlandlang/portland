@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#each_byte" do
+context "StringIO#each_byte" do
   pending "yields each character code in turn"
   pending "updates the position before each yield"
   pending "does not yield if the current position is out of bounds"
   pending "returns self"
   pending "returns an Enumerator when passed no block"
 end
-context "StringIO\#each_byte when self is not readable" do
+context "StringIO#each_byte when self is not readable" do
   pending "raises an IOError"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#each_line" do
+context "IO#each_line" do
   context "with no separator" do
     pending "yields each line to the passed block"
     pending "yields each line starting from the current position"
@@ -31,7 +31,7 @@ context "IO\#each_line" do
   context "when passed a String containing one space as a separator" do
     pending "uses the passed argument as the line separator"
     pending "does not change $_"
-    pending "tries to convert the passed separator to a String using \#to_str"
+    pending "tries to convert the passed separator to a String using #to_str"
   end
   context "when passed nil as a separator" do
     pending "yields self's content starting from the current position when the passed separator is nil"
@@ -80,6 +80,6 @@ context "IO\#each_line" do
     pending "raises ArgumentError"
   end
 end
-context "IO\#each_line" do
+context "IO#each_line" do
   pending "uses $/ as the default line separator"
 end

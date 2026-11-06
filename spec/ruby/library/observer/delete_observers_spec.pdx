@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Observer\#delete_observers" do
+context "Observer#delete_observers" do
   pending "deletes the observers"
 end

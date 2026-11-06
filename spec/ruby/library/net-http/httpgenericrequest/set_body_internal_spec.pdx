@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#set_body_internal when passed string" do
+context "Net::HTTPGenericRequest#set_body_internal when passed string" do
   pending "sets self's body to the passed string"
   pending "raises an ArgumentError when the body or body_stream of self have already been set"
 end

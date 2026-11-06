@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#==" do
+context "Delegator#==" do
   pending "is not delegated when passed self"
   pending "is delegated when passed the delegated object"
   pending "is delegated in general"

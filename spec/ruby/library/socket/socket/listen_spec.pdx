@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#listen" do
+context "Socket#listen" do
   pending "verifies we can listen for incoming connections"
 end
-context "Socket\#listen" do
+context "Socket#listen" do
   context "using a DGRAM socket" do
     pending "raises Errno::EOPNOTSUPP or Errno::EACCES"
   end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#tr" do
+context "String#tr" do
   pending "returns a new string with the characters from from_string replaced by the ones in to_string"
   pending "accepts c1-c2 notation to denote ranges of characters"
   pending "accepts c1-c1 notation to denote range of one character"
@@ -38,7 +38,7 @@ context "String\#tr" do
     pending "raises Encoding::CompatibilityError when either keys or values have an incompatible encoding"
   end
 end
-context "String\#tr!" do
+context "String#tr!" do
   pending "modifies self in place"
   pending "returns nil if no modification was made"
   pending "does not modify self if from_str is empty"

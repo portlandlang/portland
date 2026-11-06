@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#step" do
+context "Date#step" do
   pending "steps forward in time"
   pending "steps backward in time"
 end

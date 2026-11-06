@@ -4,15 +4,15 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#getbyte" do
+context "IO#getbyte" do
   pending "returns the next byte from the stream"
   pending "returns nil when invoked at the end of the stream"
   pending "raises an IOError on closed stream"
   pending "reads after ungetc without character conversion"
 end
-context "IO\#getbyte" do
+context "IO#getbyte" do
   pending "returns nil on empty stream"
 end
-context "IO\#getbyte" do
+context "IO#getbyte" do
   pending "raises an IOError if the stream is not readable"
 end

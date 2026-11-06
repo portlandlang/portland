@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#type_params" do
+context "Net::HTTPHeader#type_params" do
   pending "returns additional 'Content-Type' information as a Hash"
   pending "returns an empty Hash when no additional 'Content-Type' information is set"
 end

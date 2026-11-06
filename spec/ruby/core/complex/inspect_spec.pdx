@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#inspect" do
+context "Complex#inspect" do
   pending "returns (${real}+${image}i) for positive imaginary parts"
   pending "returns (${real}-${image}i) for negative imaginary parts"
-  pending "calls \#inspect on real and imaginary"
+  pending "calls #inspect on real and imaginary"
   pending "adds an `*' before the `i' if the last character of the imaginary part is not numeric"
 end

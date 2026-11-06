@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipFile\#closed?" do
+context "Zlib::GzipFile#closed?" do
   pending "returns the closed status"
 end

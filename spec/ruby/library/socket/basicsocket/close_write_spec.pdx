@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::BasicSocket\#close_write" do
+context "Socket::BasicSocket#close_write" do
   pending "closes the writing end of the socket"
   pending "does not raise when called on a socket already closed for writing"
   pending "does not fully close the socket"

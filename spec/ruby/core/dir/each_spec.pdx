@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#each" do
+context "Dir#each" do
   pending "yields each directory entry in succession"
   pending "returns the directory which remains open"
   pending "returns the same result when called repeatedly"
@@ -17,6 +17,6 @@ context "Dir\#each" do
     end
   end
 end
-context "Dir\#each" do
+context "Dir#each" do
   pending "behaves like :dir_closed :each"
 end

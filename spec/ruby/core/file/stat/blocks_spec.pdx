@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#blocks" do
+context "File::Stat#blocks" do
   pending "returns a non-negative integer"
   pending "returns nil"
 end

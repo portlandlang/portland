@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#to_sockaddr" do
+context "Addrinfo#to_sockaddr" do
   context "for an ipv4 socket" do
     pending "returns a sockaddr packed structure"
   end

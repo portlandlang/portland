@@ -11,5 +11,5 @@ context "SecureRandom.base64" do
   pending "generates a random base64 string out of 32 random bytes"
   pending "treats nil argument as default one and generates a random base64 string"
   pending "raises ArgumentError on negative arguments"
-  pending "tries to convert the passed argument to an Integer using \#to_int"
+  pending "tries to convert the passed argument to an Integer using #to_int"
 end

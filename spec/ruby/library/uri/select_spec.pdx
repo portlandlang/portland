@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#select" do
+context "URI#select" do
   pending "takes any number of component names as symbols, and returns an array of those components"
   pending "returns nil for any valid component that isn't set and doesn't have a default"
   pending "raises an ArgumentError if a component is requested that isn't valid under the given scheme"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#body" do
+context "Net::HTTPResponse#body" do
   pending "returns the read body"
   pending "returns the previously read body if called a second time"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#ipv6_pktinfo_ifindex" do
+context "Socket::AncillaryData#ipv6_pktinfo_ifindex" do
   pending "returns an Addrinfo"
 end

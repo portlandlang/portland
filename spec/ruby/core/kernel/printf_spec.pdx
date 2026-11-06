@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#printf" do
+context "Kernel#printf" do
   pending "is a private method"
   pending "writes to stdout when a string is the first argument"
   pending "calls write on the first argument when it is not a string"
-  pending "calls \#to_str to convert the format object to a String"
+  pending "calls #to_str to convert the format object to a String"
 end
-context "Kernel\#printf" do
+context "Kernel#printf" do
   context "formatting" do
     context "io is specified" do
       pending "behaves like :kernel_sprintf -> format, *args {\n        io = StringIO.new(+\"\")\n        printf(io, format, *args)\n        io.string\n      }"

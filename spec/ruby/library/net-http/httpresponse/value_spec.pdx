@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#value" do
+context "Net::HTTPResponse#value" do
   pending "raises an HTTP error for non 2xx HTTP Responses"
 end

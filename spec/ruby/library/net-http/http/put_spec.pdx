@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#put" do
+context "Net::HTTP#put" do
   pending "sends an put request to the passed path and returns the response"
   pending "returns a Net::HTTPResponse"
 end

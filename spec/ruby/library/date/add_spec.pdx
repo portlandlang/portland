@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#+" do
+context "Date#+" do
   pending "adds the number of days to a Date"
   pending "adds a negative number of days to a Date"
   pending "raises a TypeError when passed a Symbol"

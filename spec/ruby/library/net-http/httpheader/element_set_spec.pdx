@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#[]= when passed key, value" do
+context "Net::HTTPHeader#[]= when passed key, value" do
   pending "sets the header entry with the passed key to the passed value"
   pending "is case-insensitive"
   pending "removes the header entry with the passed key when the value is false or nil"

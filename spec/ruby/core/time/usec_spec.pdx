@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#usec" do
+context "Time#usec" do
   pending "returns 0 for a Time constructed with a whole number of seconds"
   pending "returns the microseconds part of a Time constructed with a Float number of seconds"
   pending "returns the microseconds part of a Time constructed with an Integer number of microseconds"
@@ -13,6 +13,6 @@ context "Time\#usec" do
   pending "returns the microseconds part of a Time constructed with a Rational number of seconds"
   pending "returns the microseconds part of a Time constructed with an Rational number of microseconds > 1"
   pending "returns 0 for a Time constructed with an Rational number of microseconds < 1"
-  pending "returns the microseconds for time created by Time\#local"
+  pending "returns the microseconds for time created by Time#local"
   pending "returns a positive value for dates before the epoch"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#sticky?" do
+context "File::Stat#sticky?" do
   pending "behaves like :file_sticky :sticky? FileStat"
 end

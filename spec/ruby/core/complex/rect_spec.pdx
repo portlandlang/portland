@@ -4,8 +4,8 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#rect" do
-  pending "is an alias of Complex\#rectangular"
+context "Complex#rect" do
+  pending "is an alias of Complex#rectangular"
 end
 context "Complex.rect" do
   pending "is an alias of Complex.rectangular"

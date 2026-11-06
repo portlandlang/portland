@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#to_s" do
+context "BigDecimal#to_s" do
   pending "return type is of class String"
   pending "the default format looks like 0.xxxxenn"
   pending "does not add an exponent for zero values"

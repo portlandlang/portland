@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#marshal_load" do
+context "Addrinfo#marshal_load" do
   context "using an IP address" do
     pending "returns a new Addrinfo"
   end

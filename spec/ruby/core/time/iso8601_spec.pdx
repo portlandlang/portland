@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#iso8601" do
+context "Time#iso8601" do
   pending "generates ISO-8601 strings in Z for UTC times"
   pending "generates ISO-8601 string with timezone offset for non-UTC times"
   pending "year is always at least 4 digits"

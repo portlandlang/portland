@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#marshal_dump" do
+context "OpenStruct#marshal_dump" do
   pending "returns the method/value table"
 end

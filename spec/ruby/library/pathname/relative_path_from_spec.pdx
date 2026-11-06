@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#relative_path_from" do
+context "Pathname#relative_path_from" do
   pending "raises an error when the two paths do not share a common prefix"
   pending "raises an error when the base directory has .."
   pending "returns a path relative from root"

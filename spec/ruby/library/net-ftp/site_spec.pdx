@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#site" do
+context "Net::FTP#site" do
   pending "sends the SITE command with the passed argument to the server"
   pending "returns nil"
   pending "does not raise an error when the response code is 202"

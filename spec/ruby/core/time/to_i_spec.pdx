@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#to_i" do
+context "Time#to_i" do
   pending "returns the value of time as an integer number of seconds since epoch"
   pending "doesn't return an actual number of seconds in time"
   pending "rounds fractional seconds toward zero"

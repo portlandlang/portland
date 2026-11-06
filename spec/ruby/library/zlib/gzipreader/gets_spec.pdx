@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#gets" do
+context "Zlib::GzipReader#gets" do
   context "with \"\" separator" do
     pending "reads paragraphs skipping newlines"
   end

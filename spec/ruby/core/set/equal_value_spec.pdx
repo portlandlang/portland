@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#==" do
+context "Set#==" do
   pending "returns true when the passed Object is a Set and self and the Object contain the same elements"
   pending "does not depend on the order of the elements"
   pending "does not depend on the order of nested Sets"

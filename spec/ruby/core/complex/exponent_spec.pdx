@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#**" do
+context "Complex#**" do
   context "with Integer 0" do
     pending "returns Complex(1)"
   end

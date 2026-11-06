@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#to_time" do
+context "Time#to_time" do
   pending "returns itself in the same timezone"
 end

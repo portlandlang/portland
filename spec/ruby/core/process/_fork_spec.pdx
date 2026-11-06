@@ -5,7 +5,7 @@
 require_relative "../../../spec_helper"
 
 context "Process._fork" do
-  pending "for \#respond_to? returns the same as Process.respond_to?(:fork)"
+  pending "for #respond_to? returns the same as Process.respond_to?(:fork)"
   pending "raises a NotImplementedError when called"
-  pending "is called by Process\#fork"
+  pending "is called by Process#fork"
 end

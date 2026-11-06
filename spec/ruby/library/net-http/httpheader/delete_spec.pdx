@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#delete when passed key" do
+context "Net::HTTPHeader#delete when passed key" do
   pending "removes the header entry with the passed key"
   pending "returns the removed values"
   pending "is case-insensitive"

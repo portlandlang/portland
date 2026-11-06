@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#remainder" do
+context "BigDecimal#remainder" do
   pending "it equals modulo, if both values are of same sign"
   pending "means self-arg*(self/arg).truncate"
   pending "raises ZeroDivisionError used with zero"

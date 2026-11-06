@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#return_code" do
+context "Net::FTP#return_code" do
   pending "outputs a warning and returns a newline"
 end
-context "Net::FTP\#return_code=" do
+context "Net::FTP#return_code=" do
   pending "outputs a warning"
 end

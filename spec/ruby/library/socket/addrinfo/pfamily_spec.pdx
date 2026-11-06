@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#pfamily" do
+context "Addrinfo#pfamily" do
   pending "returns PF_UNSPEC as the default socket family"
   context "for an ipv4 socket" do
     pending "returns Socket::PF_INET"

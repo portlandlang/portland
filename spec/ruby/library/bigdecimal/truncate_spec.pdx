@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#truncate" do
+context "BigDecimal#truncate" do
   pending "returns value of type Integer."
   pending "returns the integer part as a BigDecimal if no precision given"
   pending "returns value of given precision otherwise"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#fetch" do
+context "Net::HTTPHeader#fetch" do
   context "when passed key" do
     pending "returns the header entry for the passed key"
     pending "is case-insensitive"

@@ -30,6 +30,6 @@ context "Process.daemon" do
   end
 end
 context "Process.daemon" do
-  pending "returns false from \#respond_to?"
+  pending "returns false from #respond_to?"
   pending "raises a NotImplementedError"
 end

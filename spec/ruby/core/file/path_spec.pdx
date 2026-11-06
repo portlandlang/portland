@@ -4,18 +4,18 @@
 
 require_relative "../../../spec_helper"
 
-context "File\#path" do
-  pending "is an alias of File\#to_path"
+context "File#path" do
+  pending "is an alias of File#to_path"
 end
 context "File.path" do
   pending "returns the string argument without any change"
   pending "returns path for File argument"
   pending "returns path for Pathname argument"
-  pending "calls \#to_path for non-string argument and returns result"
-  pending "raises TypeError when \#to_path result is not a string"
+  pending "calls #to_path for non-string argument and returns result"
+  pending "raises TypeError when #to_path result is not a string"
   pending "raises ArgumentError for string argument contains NUL character"
-  pending "raises ArgumentError when \#to_path result contains NUL character"
+  pending "raises ArgumentError when #to_path result contains NUL character"
   pending "raises Encoding::CompatibilityError for ASCII-incompatible string argument"
-  pending "raises Encoding::CompatibilityError when \#to_path result is ASCII-incompatible"
+  pending "raises Encoding::CompatibilityError when #to_path result is ASCII-incompatible"
   pending "preserves the encoding of the path"
 end

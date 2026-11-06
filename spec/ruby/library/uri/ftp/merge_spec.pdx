@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::FTP\#merge" do
+context "URI::FTP#merge" do
   pending "needs to be reviewed for spec completeness"
 end

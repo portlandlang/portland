@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#marshal_dump" do
+context "Complex#marshal_dump" do
   pending "is a private method"
   pending "dumps real and imaginary parts"
 end

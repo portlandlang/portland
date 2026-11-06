@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#[]" do
+context "CGI::QueryExtension#[]" do
   pending "it returns the value for the parameter with the given key"
   pending "only returns the first value for parameters with multiple values"
   pending "returns a String"

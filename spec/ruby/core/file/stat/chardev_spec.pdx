@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#chardev?" do
+context "File::Stat#chardev?" do
   pending "behaves like :file_chardev :chardev? FileStat"
 end

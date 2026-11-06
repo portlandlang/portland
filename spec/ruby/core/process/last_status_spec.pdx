@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Process\#last_status" do
+context "Process#last_status" do
   pending "returns the status of the last executed child process in the current thread"
   pending "returns nil if no child process has been ever executed in the current thread"
   pending "raises an ArgumentError if any arguments are provided"

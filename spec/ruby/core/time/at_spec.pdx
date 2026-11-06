@@ -10,7 +10,7 @@ context "Time.at" do
     pending "returns a Time object representing the given number of Float seconds since 1970-01-01 00:00:00 UTC"
     pending "returns a non-UTC Time"
     pending "returns a subclass instance on a Time subclass"
-    pending "roundtrips a Rational produced by \#to_r"
+    pending "roundtrips a Rational produced by #to_r"
     context "passed Rational" do
       pending "returns Time with correct microseconds"
       pending "returns Time with correct nanoseconds"
@@ -26,23 +26,23 @@ context "Time.at" do
   context "passed non-Time, non-Numeric" do
     pending "raises a TypeError with a String argument"
     pending "raises a TypeError with a nil argument"
-    context "with an argument that responds to \#to_int" do
-      pending "coerces using \#to_int"
+    context "with an argument that responds to #to_int" do
+      pending "coerces using #to_int"
     end
-    context "with an argument that responds to \#to_r" do
-      pending "coerces using \#to_r"
-      pending "needs for the argument to respond to \#to_int too"
+    context "with an argument that responds to #to_r" do
+      pending "coerces using #to_r"
+      pending "needs for the argument to respond to #to_int too"
     end
   end
   context "passed [Integer, Numeric]" do
     pending "returns a Time object representing the given number of seconds and Integer microseconds since 1970-01-01 00:00:00 UTC"
     pending "returns a Time object representing the given number of seconds and Float microseconds since 1970-01-01 00:00:00 UTC"
   end
-  context "with a second argument that responds to \#to_int" do
-    pending "coerces using \#to_int"
+  context "with a second argument that responds to #to_int" do
+    pending "coerces using #to_int"
   end
-  context "with a second argument that responds to \#to_r" do
-    pending "coerces using \#to_r"
+  context "with a second argument that responds to #to_r" do
+    pending "coerces using #to_r"
   end
   context "passed [Integer, nil]" do
     pending "raises a TypeError"
@@ -71,7 +71,7 @@ context "Time.at" do
     end
     context "not supported format" do
       pending "raises ArgumentError"
-      pending "does not try to convert format to Symbol with \#to_sym"
+      pending "does not try to convert format to Symbol with #to_sym"
     end
     pending "supports Float second argument"
   end

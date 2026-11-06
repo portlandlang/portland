@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#==" do
+context "MatchData#==" do
   pending "returns true if both operands have equal target strings, patterns, and match positions"
   pending "returns false if the operands have different target strings"
   pending "returns false if the operands have different patterns"

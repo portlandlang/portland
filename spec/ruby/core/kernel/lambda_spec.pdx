@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#lambda" do
+context "Kernel#lambda" do
   pending "behaves like :kernel_lambda :lambda"
   pending "is a private method"
   pending "creates a lambda-style Proc if given a literal block"
-  pending "creates a lambda-style Proc if given a literal block via \#send"
-  pending "creates a lambda-style Proc if given a literal block via \#__send__"
+  pending "creates a lambda-style Proc if given a literal block via #send"
+  pending "creates a lambda-style Proc if given a literal block via #__send__"
   pending "checks the arity of the call when no args are specified"
   pending "checks the arity when 1 arg is specified"
   pending "does not check the arity when passing a Proc with &"

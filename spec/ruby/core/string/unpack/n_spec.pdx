@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'N'" do
+context "String#unpack with format 'N'" do
   pending "behaves like :string_unpack_basic N"
   pending "behaves like :string_unpack_32bit_be N"
   pending "behaves like :string_unpack_32bit_be_unsigned N"
   pending "behaves like :string_unpack_no_platform N"
 end
-context "String\#unpack with format 'n'" do
+context "String#unpack with format 'n'" do
   pending "behaves like :string_unpack_basic n"
   pending "behaves like :string_unpack_16bit_be n"
   pending "behaves like :string_unpack_16bit_be_unsigned n"

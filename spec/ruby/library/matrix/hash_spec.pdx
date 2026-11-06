@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#hash" do
+context "Matrix#hash" do
   pending "returns an Integer"
   pending "returns the same value for the same matrix"
 end

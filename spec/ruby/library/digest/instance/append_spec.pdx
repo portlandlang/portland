@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::Instance\#<<" do
+context "Digest::Instance#<<" do
   pending "raises a RuntimeError if called"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::Scalar\#initialize" do
+context "Matrix::Scalar#initialize" do
   pending "needs to be reviewed for spec completeness"
 end

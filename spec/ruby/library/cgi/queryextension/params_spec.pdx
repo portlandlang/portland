@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#params" do
+context "CGI::QueryExtension#params" do
   pending "returns the parsed HTTP Query Params"
 end
-context "CGI::QueryExtension\#params=" do
+context "CGI::QueryExtension#params=" do
   pending "sets the HTTP Query Params to the passed argument"
 end

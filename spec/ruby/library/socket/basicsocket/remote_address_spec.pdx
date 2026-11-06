@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#remote_address" do
+context "BasicSocket#remote_address" do
   pending "behaves like :socket_local_remote_address :remote_address -> socket {\n    a2 = BasicSocket.for_fd(socket.fileno)\n    a2.autoclose = false\n    a2.remote_address\n  }"
 end

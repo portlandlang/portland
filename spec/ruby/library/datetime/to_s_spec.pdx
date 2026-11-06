@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#to_s" do
+context "DateTime#to_s" do
   pending "returns a new String object"
   pending "maintains timezone regardless of local time"
 end

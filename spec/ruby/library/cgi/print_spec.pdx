@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "CGI\#print" do
+context "CGI#print" do
   pending "passes all arguments to $stdout.print"
   pending "returns the result of calling $stdout.print"
 end

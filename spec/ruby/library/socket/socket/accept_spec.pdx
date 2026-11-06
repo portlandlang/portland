@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#accept" do
+context "Socket#accept" do
   context "using an unbound socket" do
     pending "raises Errno::EINVAL"
   end

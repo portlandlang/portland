@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#hash" do
+context "Regexp#hash" do
   pending "is provided"
   pending "is based on the text and options of Regexp"
   pending "returns the same value for two Regexps differing only in the /n option"

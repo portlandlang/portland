@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "TCPSocket\#recv" do
+context "TCPSocket#recv" do
   pending "returns the message data"
 end

@@ -4,14 +4,14 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'P'" do
+context "String#unpack with format 'P'" do
   pending "behaves like :string_unpack_basic P"
   pending "round-trips a string through pack and unpack"
   pending "cannot unpack a string except from the same object that created it, or a duplicate of it"
   pending "reads as many characters as specified"
   pending "reads only as far as a NUL character"
 end
-context "String\#unpack with format 'p'" do
+context "String#unpack with format 'p'" do
   pending "behaves like :string_unpack_basic p"
   pending "round-trips a string through pack and unpack"
   pending "cannot unpack a string except from the same object that created it, or a duplicate of it"

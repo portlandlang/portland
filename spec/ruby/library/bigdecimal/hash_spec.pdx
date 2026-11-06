@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BidDecimal\#hash" do
+context "BidDecimal#hash" do
   context "two BigDecimal objects with the same value" do
     pending "should have the same hash for ordinary values"
     pending "should have the same hash for infinite values"

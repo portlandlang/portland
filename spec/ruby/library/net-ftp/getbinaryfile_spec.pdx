@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#getbinaryfile" do
+context "Net::FTP#getbinaryfile" do
   pending "behaves like :net_ftp_getbinaryfile :getbinaryfile"
 end

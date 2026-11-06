@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#seek" do
+context "IO#seek" do
   pending "behaves like :io_set_pos :seek"
 end
-context "IO\#seek" do
+context "IO#seek" do
   pending "moves the read position relative to the current position with SEEK_CUR"
   pending "accepts the symbol :CUR for SEEK_CUR"
   pending "moves the read position relative to the start with SEEK_SET"

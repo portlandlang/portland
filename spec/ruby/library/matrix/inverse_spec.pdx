@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#inverse" do
+context "Matrix#inverse" do
   pending "returns a Matrix"
   pending "returns the inverse of the Matrix"
   pending "returns the inverse of the Matrix (other case)"

@@ -4,18 +4,18 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#String" do
+context "Kernel#String" do
   pending "is a private method"
   pending "converts nil to a String"
   pending "converts a Float to a String"
   pending "converts a boolean to a String"
   pending "converts a constant to a String"
-  pending "calls \#to_s to convert an arbitrary object to a String"
-  pending "raises a TypeError if \#to_s does not exist"
-  pending "raises a TypeError if respond_to? returns false for \#to_s"
-  pending "raises a TypeError if \#to_s is not defined, even though \#respond_to?(:to_s) returns true"
-  pending "calls \#to_s if \#respond_to?(:to_s) returns true"
-  pending "raises a TypeError if \#to_s does not return a String"
+  pending "calls #to_s to convert an arbitrary object to a String"
+  pending "raises a TypeError if #to_s does not exist"
+  pending "raises a TypeError if respond_to? returns false for #to_s"
+  pending "raises a TypeError if #to_s is not defined, even though #respond_to?(:to_s) returns true"
+  pending "calls #to_s if #respond_to?(:to_s) returns true"
+  pending "raises a TypeError if #to_s does not return a String"
   pending "returns the same object if it is already a String"
   pending "returns the same object if it is an instance of a String subclass"
 end

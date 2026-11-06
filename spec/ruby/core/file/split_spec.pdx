@@ -15,6 +15,6 @@ context "File.split" do
   pending "raises an ArgumentError when not passed a single argument"
   pending "raises a TypeError if the argument is not a String type"
   pending "coerces the argument with to_str if it is not a String type"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "preserves the encoding of the path"
 end

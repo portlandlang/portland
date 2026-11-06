@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#close_write" do
+context "IO#close_write" do
   pending "closes the write end of a duplex I/O stream"
   pending "does nothing on subsequent invocations"
   pending "allows subsequent invocation of close"

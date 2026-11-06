@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#named_captures" do
+context "StringScanner#named_captures" do
   pending "returns a hash of names and matched substrings for named capturing groups in a regular expression of the most recent matching"
   pending "returns {} if there are no named capturing groups"
   pending "returns {} if there is no any matching done"

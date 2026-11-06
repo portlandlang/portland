@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#component" do
+context "URI::Generic#component" do
   pending "needs to be reviewed for spec completeness"
 end
 context "URI::Generic.component" do

@@ -8,7 +8,7 @@ context "Dir.each_child" do
   pending "accepts an encoding keyword for the encoding of the entries"
   pending "yields all names in an existing directory to the provided block"
   pending "returns nil when successful"
-  pending "calls \#to_path on non-String arguments"
+  pending "calls #to_path on non-String arguments"
   pending "raises a SystemCallError if passed a nonexistent directory"
   context "when no block is given" do
     pending "returns an Enumerator"
@@ -19,7 +19,7 @@ context "Dir.each_child" do
     end
   end
 end
-context "Dir\#each_child" do
+context "Dir#each_child" do
   pending "yields all names in an existing directory to the provided block"
   pending "returns self when successful"
   pending "returns the same result when called repeatedly"

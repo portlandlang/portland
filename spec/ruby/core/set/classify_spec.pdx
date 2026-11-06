@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#classify" do
+context "Set#classify" do
   pending "yields each Object in self"
   pending "returns an Enumerator when passed no block"
   pending "classifies the Objects in self based on the block's return value"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#exitstatus" do
+context "Process::Status#exitstatus" do
   pending "returns the process exit code"
   context "for a child that raised SignalException" do
     pending "returns nil"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#fixed_encoding?" do
+context "Regexp#fixed_encoding?" do
   pending "returns false by default"
   pending "returns false if the 'n' modifier was supplied to the Regexp"
   pending "returns true if the 'u' modifier was supplied to the Regexp"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#block_given?" do
+context "Kernel#block_given?" do
   pending "is a private method"
   pending "returns true if and only if a block is supplied"
   pending "returns false when a method defined by define_method is called with a block"

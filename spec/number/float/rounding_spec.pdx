@@ -1,5 +1,5 @@
 # The rounding family — each answers an Integer. The values are Ruby
-# 4.0.6's, run rather than recalled: `round` goes half away from zero,
+# 4.0.9's, run rather than recalled: `round` goes half away from zero,
 # `truncate` toward it.
 #
 # From ruby/spec core/float/{floor,ceil,round,truncate}_spec.rb.

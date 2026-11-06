@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#level" do
+context "Socket::AncillaryData#level" do
   pending "returns the level as an Integer"
 end

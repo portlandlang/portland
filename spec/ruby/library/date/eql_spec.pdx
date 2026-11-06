@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#eql?" do
+context "Date#eql?" do
   pending "returns true if self is equal to another date"
   pending "returns false if self is not equal to another date"
 end

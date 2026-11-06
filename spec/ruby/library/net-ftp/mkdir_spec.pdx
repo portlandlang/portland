@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#mkdir" do
+context "Net::FTP#mkdir" do
   pending "sends the MKD command with the passed pathname to the server"
   pending "returns the path to the newly created directory"
   pending "raises a Net::FTPPermError when the response code is 500"

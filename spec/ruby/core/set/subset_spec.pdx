@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#subset?" do
+context "Set#subset?" do
   pending "returns true if passed a Set that is equal to self or self is a subset of"
   pending "raises an ArgumentError when passed a non-Set"
 end

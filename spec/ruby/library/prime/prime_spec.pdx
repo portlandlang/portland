@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Prime\#prime?" do
+context "Prime#prime?" do
   pending "returns a true value for prime numbers"
   pending "returns a false value for composite numbers"
 end

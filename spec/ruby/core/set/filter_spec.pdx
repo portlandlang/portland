@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#filter!" do
-  pending "is an alias of Set\#select!"
+context "Set#filter!" do
+  pending "is an alias of Set#select!"
 end

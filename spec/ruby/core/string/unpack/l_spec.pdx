@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'L'" do
+context "String#unpack with format 'L'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le L<"
     pending "behaves like :string_unpack_32bit_le_unsigned L<"
@@ -62,7 +62,7 @@ context "String\#unpack with format 'L'" do
     pending "behaves like :string_unpack_64bit_be_unsigned L!>"
   end
 end
-context "String\#unpack with format 'l'" do
+context "String#unpack with format 'l'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le l<"
     pending "behaves like :string_unpack_32bit_le_signed l<"
@@ -120,87 +120,87 @@ context "String\#unpack with format 'l'" do
     pending "behaves like :string_unpack_64bit_be_signed l!>"
   end
 end
-context "String\#unpack with format 'L'" do
+context "String#unpack with format 'L'" do
   pending "behaves like :string_unpack_basic L"
   pending "behaves like :string_unpack_32bit_le L"
   pending "behaves like :string_unpack_32bit_le_unsigned L"
 end
-context "String\#unpack with format 'l'" do
+context "String#unpack with format 'l'" do
   pending "behaves like :string_unpack_basic l"
   pending "behaves like :string_unpack_32bit_le l"
   pending "behaves like :string_unpack_32bit_le_signed l"
 end
-context "String\#unpack with format 'L' with modifier '_'" do
+context "String#unpack with format 'L' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_le L_"
   pending "behaves like :string_unpack_32bit_le_unsigned L_"
 end
-context "String\#unpack with format 'L' with modifier '!'" do
+context "String#unpack with format 'L' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_le L!"
   pending "behaves like :string_unpack_32bit_le_unsigned L!"
 end
-context "String\#unpack with format 'l' with modifier '_'" do
+context "String#unpack with format 'l' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_le l_"
   pending "behaves like :string_unpack_32bit_le_signed l"
 end
-context "String\#unpack with format 'l' with modifier '!'" do
+context "String#unpack with format 'l' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_le l!"
   pending "behaves like :string_unpack_32bit_le_signed l"
 end
-context "String\#unpack with format 'L' with modifier '_'" do
+context "String#unpack with format 'L' with modifier '_'" do
   pending "behaves like :string_unpack_64bit_le L_"
   pending "behaves like :string_unpack_64bit_le_unsigned L_"
 end
-context "String\#unpack with format 'L' with modifier '!'" do
+context "String#unpack with format 'L' with modifier '!'" do
   pending "behaves like :string_unpack_64bit_le L!"
   pending "behaves like :string_unpack_64bit_le_unsigned L!"
 end
-context "String\#unpack with format 'l' with modifier '_'" do
+context "String#unpack with format 'l' with modifier '_'" do
   pending "behaves like :string_unpack_64bit_le l_"
   pending "behaves like :string_unpack_64bit_le_signed l_"
 end
-context "String\#unpack with format 'l' with modifier '!'" do
+context "String#unpack with format 'l' with modifier '!'" do
   pending "behaves like :string_unpack_64bit_le l!"
   pending "behaves like :string_unpack_64bit_le_signed l!"
 end
-context "String\#unpack with format 'L'" do
+context "String#unpack with format 'L'" do
   pending "behaves like :string_unpack_basic L"
   pending "behaves like :string_unpack_32bit_be L"
   pending "behaves like :string_unpack_32bit_be_unsigned L"
 end
-context "String\#unpack with format 'l'" do
+context "String#unpack with format 'l'" do
   pending "behaves like :string_unpack_basic l"
   pending "behaves like :string_unpack_32bit_be l"
   pending "behaves like :string_unpack_32bit_be_signed l"
 end
-context "String\#unpack with format 'L' with modifier '_'" do
+context "String#unpack with format 'L' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_be L_"
   pending "behaves like :string_unpack_32bit_be_unsigned L_"
 end
-context "String\#unpack with format 'L' with modifier '!'" do
+context "String#unpack with format 'L' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_be L!"
   pending "behaves like :string_unpack_32bit_be_unsigned L!"
 end
-context "String\#unpack with format 'l' with modifier '_'" do
+context "String#unpack with format 'l' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_be l_"
   pending "behaves like :string_unpack_32bit_be_signed l"
 end
-context "String\#unpack with format 'l' with modifier '!'" do
+context "String#unpack with format 'l' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_be l!"
   pending "behaves like :string_unpack_32bit_be_signed l"
 end
-context "String\#unpack with format 'L' with modifier '_'" do
+context "String#unpack with format 'L' with modifier '_'" do
   pending "behaves like :string_unpack_64bit_be L_"
   pending "behaves like :string_unpack_64bit_be_unsigned L_"
 end
-context "String\#unpack with format 'L' with modifier '!'" do
+context "String#unpack with format 'L' with modifier '!'" do
   pending "behaves like :string_unpack_64bit_be L!"
   pending "behaves like :string_unpack_64bit_be_unsigned L!"
 end
-context "String\#unpack with format 'l' with modifier '_'" do
+context "String#unpack with format 'l' with modifier '_'" do
   pending "behaves like :string_unpack_64bit_be l_"
   pending "behaves like :string_unpack_64bit_be_signed l_"
 end
-context "String\#unpack with format 'l' with modifier '!'" do
+context "String#unpack with format 'l' with modifier '!'" do
   pending "behaves like :string_unpack_64bit_be l!"
   pending "behaves like :string_unpack_64bit_be_signed l!"
 end

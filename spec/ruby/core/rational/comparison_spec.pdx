@@ -4,26 +4,26 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#<=> when passed a Rational object" do
+context "Rational#<=> when passed a Rational object" do
   pending "returns 1 when self is greater than the passed argument"
   pending "returns 0 when self is equal to the passed argument"
   pending "returns -1 when self is less than the passed argument"
 end
-context "Rational\#<=> when passed an Integer object" do
+context "Rational#<=> when passed an Integer object" do
   pending "returns 1 when self is greater than the passed argument"
   pending "returns 0 when self is equal to the passed argument"
   pending "returns -1 when self is less than the passed argument"
 end
-context "Rational\#<=> when passed a Float object" do
+context "Rational#<=> when passed a Float object" do
   pending "returns 1 when self is greater than the passed argument"
   pending "returns 0 when self is equal to the passed argument"
   pending "returns -1 when self is less than the passed argument"
 end
-context "Rational\#<=> when passed an Object that responds to \#coerce" do
-  pending "calls \#coerce on the passed argument with self"
-  pending "calls \#<=> on the coerced Rational with the coerced Object"
-  pending "does not rescue exception raised in other\#coerce"
+context "Rational#<=> when passed an Object that responds to #coerce" do
+  pending "calls #coerce on the passed argument with self"
+  pending "calls #<=> on the coerced Rational with the coerced Object"
+  pending "does not rescue exception raised in other#coerce"
 end
-context "Rational\#<=> when passed a non-Numeric Object that doesn't respond to \#coerce" do
+context "Rational#<=> when passed a non-Numeric Object that doesn't respond to #coerce" do
   pending "returns nil"
 end

@@ -7,6 +7,6 @@ require_relative "../../../spec_helper"
 context "ENV.include?" do
   pending "returns true if ENV has the key"
   pending "returns false if ENV doesn't include the key"
-  pending "coerces the key with \#to_str"
-  pending "raises TypeError if the argument is not a String and does not respond to \#to_str"
+  pending "coerces the key with #to_str"
+  pending "raises TypeError if the argument is not a String and does not respond to #to_str"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#socktype" do
+context "Addrinfo#socktype" do
   pending "returns 0 by default"
   pending "returns the socket type when given"
   context "for a unix socket" do

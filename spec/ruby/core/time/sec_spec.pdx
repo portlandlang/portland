@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#sec" do
+context "Time#sec" do
   pending "returns the second of the minute(0..60) for time"
 end

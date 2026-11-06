@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#set_registry" do
+context "URI::Generic#set_registry" do
   pending "needs to be reviewed for spec completeness"
 end

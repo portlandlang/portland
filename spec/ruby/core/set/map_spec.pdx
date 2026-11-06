@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#map!" do
+context "Set#map!" do
   pending "yields each Object in self"
   pending "returns self"
   pending "replaces self with the return values of the block"

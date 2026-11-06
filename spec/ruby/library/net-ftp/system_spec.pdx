@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#system" do
+context "Net::FTP#system" do
   pending "sends the SYST command to the server"
   pending "returns the received information"
   pending "raises a Net::FTPPermError when the response code is 500"

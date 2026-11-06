@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#call" do
+context "Proc#call" do
   pending "invokes self"
   pending "sets self's parameters to the given values"
   pending "can receive block arguments"
@@ -18,9 +18,9 @@ context "Proc\#call" do
     pending "silently ignores extra arguments"
     pending "auto-explodes a single Array argument"
   end
-  context "on a Proc created with Kernel\#lambda or Kernel\#proc" do
+  context "on a Proc created with Kernel#lambda or Kernel#proc" do
     pending "ignores excess arguments when self is a proc"
-    pending "will call \#to_ary on argument and return self if return is nil"
+    pending "will call #to_ary on argument and return self if return is nil"
     pending "substitutes nil for missing arguments when self is a proc"
     pending "raises an ArgumentError on excess arguments when self is a lambda"
     pending "raises an ArgumentError on missing arguments when self is a lambda"

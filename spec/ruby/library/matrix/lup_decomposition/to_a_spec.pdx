@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#to_a" do
+context "Matrix::LUPDecomposition#to_a" do
   pending "returns an array of three matrices"
   pending "returns [l, u, p] such that l*u == a*p"
   pending "returns the right values for rectangular matrices"
-  pending "has other properties implied by the specs of \#l, \#u and \#p"
+  pending "has other properties implied by the specs of #l, #u and #p"
 end

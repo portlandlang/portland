@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#inspect" do
+context "File::Stat#inspect" do
   pending "produces a nicely formatted description of a File::Stat object"
 end

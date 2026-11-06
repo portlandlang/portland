@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Float\#numerator" do
+context "Float#numerator" do
   pending "converts self to a Rational object then returns its numerator"
   pending "returns 0 for 0.0"
   pending "returns NaN for NaN"

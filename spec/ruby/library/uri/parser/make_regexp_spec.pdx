@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Parser\#make_regexp" do
+context "URI::Parser#make_regexp" do
   pending "needs to be reviewed for spec completeness"
 end

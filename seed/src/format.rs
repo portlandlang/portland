@@ -2,7 +2,7 @@
 //! directives whole — `%d %i %u %b %B %o %x %X %e %E %f %g %G %a %A %c %p
 //! %s %%`, the flags `-`, `+`, a space, `0`, and `#`, width and precision,
 //! `*` and `n$` from the arguments, and `%<name>d` and `%{name}` from the
-//! keyword arguments. The refusals are Ruby's words (4.0.7) where Ruby has
+//! keyword arguments. The refusals are Ruby's words (4.0.9) where Ruby has
 //! them; every one is a panic, since a refusal here is a program's mistake,
 //! not a sad path a caller handles.
 //!

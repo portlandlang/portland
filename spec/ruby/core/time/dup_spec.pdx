@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#dup" do
+context "Time#dup" do
   pending "returns a Time object that represents the same time"
   pending "copies the gmt state flag"
   pending "returns an independent Time object"

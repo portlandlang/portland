@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#ipv6_mc_sitelocal?" do
+context "Addrinfo#ipv6_mc_sitelocal?" do
   pending "returns true for a multi-cast site-local address"
   pending "returns false for a regular IPv6 address"
   pending "returns false for an IPv4 address"

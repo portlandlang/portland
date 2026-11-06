@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#*" do
+context "BigDecimal#*" do
   pending "behaves like :bigdecimal_mult :* []"
 end
-context "BigDecimal\#*" do
+context "BigDecimal#*" do
   pending "multiply self with other"
   context "with Object" do
     pending "tries to coerce the other operand to self"

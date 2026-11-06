@@ -11,5 +11,5 @@ context "SecureRandom.hex" do
   pending "generates a random hex string of length 32 if no argument is provided"
   pending "treats nil argument as default one and generates a random hex string of length 32"
   pending "raises ArgumentError on negative arguments"
-  pending "tries to convert the passed argument to an Integer using \#to_int"
+  pending "tries to convert the passed argument to an Integer using #to_int"
 end

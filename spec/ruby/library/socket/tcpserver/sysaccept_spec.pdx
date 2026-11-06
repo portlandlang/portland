@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "TCPServer\#sysaccept" do
+context "TCPServer#sysaccept" do
   pending "blocks if no connections"
   pending "returns file descriptor of an accepted connection"
 end
-context "TCPServer\#sysaccept" do
+context "TCPServer#sysaccept" do
   context "without a connected client" do
     pending "blocks the caller"
   end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#inspect" do
-  pending "is an alias of Proc\#to_s"
+context "Proc#inspect" do
+  pending "is an alias of Proc#to_s"
 end

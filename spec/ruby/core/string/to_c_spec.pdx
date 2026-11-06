@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#to_c" do
+context "String#to_c" do
   pending "behaves like :kernel_complex :to_c_method StringSpecs"
 end
-context "String\#to_c" do
+context "String#to_c" do
   pending "returns a complex number with 0 as the real part, 0 as the imaginary part for unrecognised Strings"
   pending "ignores trailing garbage"
   context "it treats special float value strings as characters" do

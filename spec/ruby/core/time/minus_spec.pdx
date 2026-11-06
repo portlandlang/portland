@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#-" do
+context "Time#-" do
   pending "decrements the time by the specified amount"
   pending "understands negative subtractions"
   pending "accepts arguments that can be coerced into Rational"

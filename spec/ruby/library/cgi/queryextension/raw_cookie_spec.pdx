@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#raw_cookie" do
+context "CGI::QueryExtension#raw_cookie" do
   pending "returns ENV['HTTP_COOKIE']"
 end

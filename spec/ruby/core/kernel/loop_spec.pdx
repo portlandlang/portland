@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#loop" do
+context "Kernel#loop" do
   pending "is a private method"
   pending "calls block until it is terminated by a break"
   pending "returns value passed to break"
@@ -13,7 +13,7 @@ context "Kernel\#loop" do
   pending "rescues StopIteration"
   pending "rescues StopIteration's subclasses"
   pending "does not rescue other errors"
-  pending "returns StopIteration\#result, the result value of a finished iterator"
+  pending "returns StopIteration#result, the result value of a finished iterator"
   context "when no block is given" do
     context "returned Enumerator" do
       context "size" do

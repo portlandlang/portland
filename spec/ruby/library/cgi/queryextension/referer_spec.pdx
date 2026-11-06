@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#referer" do
+context "CGI::QueryExtension#referer" do
   pending "returns ENV['HTTP_REFERER']"
 end

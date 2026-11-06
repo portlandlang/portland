@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'Z'" do
+context "Array#pack with format 'Z'" do
   pending "behaves like :array_pack_basic Z"
   pending "behaves like :array_pack_basic_non_float Z"
   pending "behaves like :array_pack_no_platform Z"
   pending "behaves like :array_pack_string Z"
-  pending "calls \#to_str to convert an Object to a String"
+  pending "calls #to_str to convert an Object to a String"
   pending "will not implicitly convert a number to a string"
   pending "adds all the bytes and appends a NULL byte when passed the '*' modifier"
   pending "pads the output with NULL bytes when the count exceeds the size of the String"

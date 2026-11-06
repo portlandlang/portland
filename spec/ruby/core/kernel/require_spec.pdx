@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#require" do
+context "Kernel#require" do
   pending "is a private method"
   pending "provided features are already required"
   pending "behaves like :kernel_require_basic :require CodeLoadingSpecs::Method.new"

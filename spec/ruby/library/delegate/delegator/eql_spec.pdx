@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#eql?" do
+context "Delegator#eql?" do
   pending "returns true when compared with same delegator"
   pending "returns true when compared with the inner object"
   pending "returns false when compared with the delegator with other object"

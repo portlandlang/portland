@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Vector\#normalize" do
+context "Vector#normalize" do
   pending "returns a normalized copy of the vector"
   pending "raises an error for zero vectors"
 end

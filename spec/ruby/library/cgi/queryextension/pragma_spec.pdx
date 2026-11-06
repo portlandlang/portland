@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#pragma" do
+context "CGI::QueryExtension#pragma" do
   pending "returns ENV['HTTP_PRAGMA']"
 end

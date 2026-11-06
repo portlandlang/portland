@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#/" do
+context "Matrix#/" do
   pending "returns the result of dividing self by another Matrix"
   pending "returns the result of dividing self by a Fixnum"
   pending "returns the result of dividing self by a Bignum"

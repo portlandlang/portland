@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#values_at" do
+context "MatchData#values_at" do
   context "when passed a list of Integers" do
     pending "returns an array containing each value given by one of integers"
     pending "returns nil value for any integer that is out of range"

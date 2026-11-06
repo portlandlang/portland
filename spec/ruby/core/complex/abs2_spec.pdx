@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#abs2" do
+context "Complex#abs2" do
   pending "returns the sum of the squares of the real and imaginary parts"
 end

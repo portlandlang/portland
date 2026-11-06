@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXServer\#listen" do
+context "UNIXServer#listen" do
   pending "returns 0"
 end

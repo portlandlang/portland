@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#round" do
+context "Time#round" do
   pending "defaults to rounding to 0 places"
   pending "rounds to 0 decimal places with an explicit argument"
   pending "rounds to 7 decimal places with an explicit argument"
-  pending "returns an instance of Time, even if \#round is called on a subclass"
+  pending "returns an instance of Time, even if #round is called on a subclass"
   pending "copies own timezone to the returning value"
 end

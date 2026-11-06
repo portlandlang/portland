@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#refined" do
+context "Proc#refined" do
   pending "returns a new Proc with the refinements of the given module activated inside its body"
   pending "does not change the receiver"
   pending "activates the refinements of all the given modules"
@@ -17,7 +17,7 @@ context "Proc\#refined" do
   pending "keeps the refinements active in methods defined inside the body"
   pending "keeps the refinements active in instance methods defined inside the body"
   pending "keeps the refinements active in a class body opened with the class keyword inside the body"
-  pending "applies the refinements to Symbol\#to_proc blocks created inside the body"
+  pending "applies the refinements to Symbol#to_proc blocks created inside the body"
   pending "applies the refinements to operators and element access"
   pending "keeps the refinements active when called via instance_eval, instance_exec and class_eval"
   pending "returns the receiver when called with no modules"

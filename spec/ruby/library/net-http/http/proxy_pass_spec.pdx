@@ -13,7 +13,7 @@ context "Net::HTTP.proxy_pass" do
     pending "returns the password for self's proxy connection"
   end
 end
-context "Net::HTTP\#proxy_pass" do
+context "Net::HTTP#proxy_pass" do
   context "when self is no proxy class instance" do
     pending "returns nil"
   end

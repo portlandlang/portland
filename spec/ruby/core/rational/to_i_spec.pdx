@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#to_i" do
+context "Rational#to_i" do
   pending "converts self to an Integer by truncation"
   pending "converts self to an Integer by truncation"
 end

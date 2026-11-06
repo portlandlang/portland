@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#nsec" do
+context "Time#nsec" do
   pending "returns 0 for a Time constructed with a whole number of seconds"
   pending "returns the nanoseconds part of a Time constructed with a Float number of seconds"
   pending "returns the nanoseconds part of a Time constructed with an Integer number of microseconds"

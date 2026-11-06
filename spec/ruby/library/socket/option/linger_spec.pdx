@@ -8,7 +8,7 @@ context "Socket::Option.linger" do
   pending "creates a new Socket::Option for SO_LINGER"
   pending "accepts boolean as onoff argument"
 end
-context "Socket::Option\#linger" do
+context "Socket::Option#linger" do
   pending "returns linger option"
   pending "raises TypeError if not a SO_LINGER"
   pending "raises TypeError when called on a non SOL_SOCKET/SO_LINGER option"

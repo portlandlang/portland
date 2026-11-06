@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPRequest\#initialize" do
+context "Net::HTTPRequest#initialize" do
   pending "uses the METHOD constants to set the request method"
   pending "uses the REQUEST_HAS_BODY to set whether the Request has a body or not"
   pending "uses the RESPONSE_HAS_BODY to set whether the Response can have a body or not"

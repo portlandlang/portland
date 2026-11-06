@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#difference" do
-  pending "is an alias of Set\#-"
+context "Set#difference" do
+  pending "is an alias of Set#-"
 end

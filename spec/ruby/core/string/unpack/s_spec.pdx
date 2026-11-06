@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'S'" do
+context "String#unpack with format 'S'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_16bit_le S<"
     pending "behaves like :string_unpack_16bit_le_unsigned S<"
@@ -38,7 +38,7 @@ context "String\#unpack with format 'S'" do
     pending "behaves like :string_unpack_16bit_be_unsigned S!>"
   end
 end
-context "String\#unpack with format 's'" do
+context "String#unpack with format 's'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_16bit_le s<"
     pending "behaves like :string_unpack_16bit_le_signed s<"
@@ -72,55 +72,55 @@ context "String\#unpack with format 's'" do
     pending "behaves like :string_unpack_16bit_be_signed s!>"
   end
 end
-context "String\#unpack with format 'S'" do
+context "String#unpack with format 'S'" do
   pending "behaves like :string_unpack_basic S"
   pending "behaves like :string_unpack_16bit_le S"
   pending "behaves like :string_unpack_16bit_le_unsigned S"
 end
-context "String\#unpack with format 'S' with modifier '_'" do
+context "String#unpack with format 'S' with modifier '_'" do
   pending "behaves like :string_unpack_16bit_le S_"
   pending "behaves like :string_unpack_16bit_le_unsigned S_"
 end
-context "String\#unpack with format 'S' with modifier '!'" do
+context "String#unpack with format 'S' with modifier '!'" do
   pending "behaves like :string_unpack_16bit_le S!"
   pending "behaves like :string_unpack_16bit_le_unsigned S!"
 end
-context "String\#unpack with format 's'" do
+context "String#unpack with format 's'" do
   pending "behaves like :string_unpack_basic s"
   pending "behaves like :string_unpack_16bit_le s"
   pending "behaves like :string_unpack_16bit_le_signed s"
 end
-context "String\#unpack with format 's' with modifier '_'" do
+context "String#unpack with format 's' with modifier '_'" do
   pending "behaves like :string_unpack_16bit_le s_"
   pending "behaves like :string_unpack_16bit_le_signed s_"
 end
-context "String\#unpack with format 's' with modifier '!'" do
+context "String#unpack with format 's' with modifier '!'" do
   pending "behaves like :string_unpack_16bit_le s!"
   pending "behaves like :string_unpack_16bit_le_signed s!"
 end
-context "String\#unpack with format 'S'" do
+context "String#unpack with format 'S'" do
   pending "behaves like :string_unpack_basic S"
   pending "behaves like :string_unpack_16bit_be S"
   pending "behaves like :string_unpack_16bit_be_unsigned S"
 end
-context "String\#unpack with format 'S' with modifier '_'" do
+context "String#unpack with format 'S' with modifier '_'" do
   pending "behaves like :string_unpack_16bit_be S_"
   pending "behaves like :string_unpack_16bit_be_unsigned S_"
 end
-context "String\#unpack with format 'S' with modifier '!'" do
+context "String#unpack with format 'S' with modifier '!'" do
   pending "behaves like :string_unpack_16bit_be S!"
   pending "behaves like :string_unpack_16bit_be_unsigned S!"
 end
-context "String\#unpack with format 's'" do
+context "String#unpack with format 's'" do
   pending "behaves like :string_unpack_basic s"
   pending "behaves like :string_unpack_16bit_be s"
   pending "behaves like :string_unpack_16bit_be_signed s"
 end
-context "String\#unpack with format 's' with modifier '_'" do
+context "String#unpack with format 's' with modifier '_'" do
   pending "behaves like :string_unpack_16bit_be s_"
   pending "behaves like :string_unpack_16bit_be_signed s_"
 end
-context "String\#unpack with format 's' with modifier '!'" do
+context "String#unpack with format 's' with modifier '!'" do
   pending "behaves like :string_unpack_16bit_be s!"
   pending "behaves like :string_unpack_16bit_be_signed s!"
 end

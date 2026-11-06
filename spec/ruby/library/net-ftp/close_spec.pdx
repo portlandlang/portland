@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#close" do
+context "Net::FTP#close" do
   pending "closes the socket"
   pending "does not try to close the socket if it has already been closed"
   pending "does not try to close the socket if it is nil"

@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#read_timeout" do
+context "Net::HTTP#read_timeout" do
   pending "returns the seconds to wait until reading one block"
 end
-context "Net::HTTP\#read_timeout=" do
+context "Net::HTTP#read_timeout=" do
   pending "sets the seconds to wait till the connection is open"
   pending "returns the newly set value"
 end

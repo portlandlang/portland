@@ -10,6 +10,6 @@ end
 context "File.lstat" do
   pending "returns a File::Stat object with symlink properties for a symlink"
 end
-context "File\#lstat" do
+context "File#lstat" do
   pending "needs to be reviewed for spec completeness"
 end

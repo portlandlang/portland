@@ -7,13 +7,13 @@ require_relative "../../../spec_helper"
 context "BigDecimal" do
   pending "is not defined unless it is required"
 end
-context "Kernel\#BigDecimal" do
+context "Kernel#BigDecimal" do
   pending "creates a new object of class BigDecimal"
   pending "BigDecimal(Rational) with bigger-than-double numerator"
   pending "accepts significant digits >= given precision"
   pending "determines precision from initial value"
   pending "ignores leading and trailing whitespace"
-  pending "coerces the value argument with \#to_str"
+  pending "coerces the value argument with #to_str"
   pending "does not ignores trailing garbage"
   pending "raises ArgumentError for invalid strings"
   pending "allows omitting the integer part"

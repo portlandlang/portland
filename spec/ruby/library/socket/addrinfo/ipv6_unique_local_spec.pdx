@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#ipv6_unique_local?" do
+context "Addrinfo#ipv6_unique_local?" do
   pending "returns true for an unique local IPv6 address"
   pending "returns false for a regular IPv6 address"
   pending "returns false for an IPv4 address"

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#tv_nsec" do
-  pending "is an alias of Time\#nsec"
+context "Time#tv_nsec" do
+  pending "is an alias of Time#nsec"
 end

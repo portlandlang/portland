@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#initialize" do
+context "Addrinfo#initialize" do
   context "with a sockaddr string" do
     context "without a family" do
       pending "stores the ip address from the sockaddr"

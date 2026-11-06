@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#encode" do
+context "String#encode" do
   pending "behaves like :string_encode :encode"
   context "when passed no options" do
     pending "returns a copy when Encoding.default_internal is nil"
@@ -42,7 +42,7 @@ context "String\#encode" do
     pending "returns a copy in the destination encoding when both encodings are the same"
   end
 end
-context "String\#encode!" do
+context "String#encode!" do
   pending "behaves like :string_encode :encode!"
   pending "raises a FrozenError when called on a frozen String"
   pending "raises a FrozenError when called on a frozen String when it's a no-op"

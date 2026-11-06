@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "OpenSSL.fixed_length_secure_compare" do
   pending "returns true for two strings with the same content"
   pending "returns false for two strings of equal size with different content"
-  pending "converts both arguments to strings using \#to_str"
+  pending "converts both arguments to strings using #to_str"
   pending "does not accept arguments that are not string and cannot be coerced into strings"
   pending "raises an ArgumentError for two strings of different size"
 end

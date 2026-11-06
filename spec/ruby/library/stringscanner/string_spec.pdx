@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#string" do
+context "StringScanner#string" do
   pending "returns the string being scanned"
   pending "returns the identical object passed in"
 end
-context "StringScanner\#string=" do
+context "StringScanner#string=" do
   pending "changes the string being scanned to the argument and resets the scanner"
-  pending "converts the argument into a string using \#to_str"
+  pending "converts the argument into a string using #to_str"
 end

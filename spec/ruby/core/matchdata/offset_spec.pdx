@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#offset" do
+context "MatchData#offset" do
   pending "returns beginning and ending character offset of whole matched substring for 0 element"
   pending "returns beginning and ending character offset of n-th match, all the subsequent elements are capturing groups"
   pending "accepts String as a reference to a named capture"

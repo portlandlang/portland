@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#abort" do
+context "Net::FTP#abort" do
   pending "sends the ABOR command to the server"
   pending "ignores the response"
   pending "returns the full response"

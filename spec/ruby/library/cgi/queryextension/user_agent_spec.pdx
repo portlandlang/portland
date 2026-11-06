@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#user_agent" do
+context "CGI::QueryExtension#user_agent" do
   pending "returns ENV['HTTP_USER_AGENT']"
 end

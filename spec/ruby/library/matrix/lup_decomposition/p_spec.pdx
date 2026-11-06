@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#p" do
+context "Matrix::LUPDecomposition#p" do
   pending "returns the third element of to_a"
   pending "returns a permutation matrix"
 end

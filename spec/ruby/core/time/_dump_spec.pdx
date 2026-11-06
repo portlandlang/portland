@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#_dump" do
+context "Time#_dump" do
   pending "is a private method"
   pending "preserves the GMT flag"
   pending "dumps a Time object to a bytestring"

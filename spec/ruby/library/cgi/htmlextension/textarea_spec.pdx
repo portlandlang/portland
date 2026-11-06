@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#textarea" do
+context "CGI::HtmlExtension#textarea" do
   context "when passed no arguments" do
     pending "returns an 'textarea'-element without a name"
     pending "includes the return value of the passed block when passed a block"

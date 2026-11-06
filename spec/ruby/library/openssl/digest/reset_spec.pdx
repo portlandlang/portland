@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "OpenSSL::Digest\#reset" do
+context "OpenSSL::Digest#reset" do
   pending "works for a SHA1 digest"
   pending "works for a SHA256 digest"
   pending "works for a SHA384 digest"

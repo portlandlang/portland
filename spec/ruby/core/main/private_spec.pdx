@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "main\#private" do
+context "main#private" do
   context "when single argument is passed and it is not an array" do
     pending "sets the visibility of the given methods to private"
   end

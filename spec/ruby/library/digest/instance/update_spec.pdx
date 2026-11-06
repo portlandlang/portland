@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::Instance\#update" do
-  pending "is an alias of Digest::Instance\#<<"
+context "Digest::Instance#update" do
+  pending "is an alias of Digest::Instance#<<"
 end

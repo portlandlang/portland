@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA384\#digest!" do
+context "Digest::SHA384#digest!" do
   pending "returns a digest and can digest!"
 end

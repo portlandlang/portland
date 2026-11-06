@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#closed?" do
+context "IO#closed?" do
   pending "returns true on closed stream"
   pending "returns false on open stream"
 end

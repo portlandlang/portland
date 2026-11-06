@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Vector\#cross_product" do
+context "Vector#cross_product" do
   pending "returns the cross product of a vector"
   pending "raises an error unless both vectors have dimension 3"
 end

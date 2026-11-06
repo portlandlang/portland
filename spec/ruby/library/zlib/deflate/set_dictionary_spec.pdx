@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::Deflate\#set_dictionary" do
+context "Zlib::Deflate#set_dictionary" do
   pending "sets the dictionary"
 end

@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#initialize" do
+context "IO#initialize" do
   pending "reassociates the IO instance with the new descriptor when passed an Integer"
-  pending "calls \#to_int to coerce the object passed as an fd"
+  pending "calls #to_int to coerce the object passed as an fd"
   pending "accepts options as keyword arguments"
   pending "raises a TypeError when passed an IO"
   pending "raises a TypeError when passed nil"

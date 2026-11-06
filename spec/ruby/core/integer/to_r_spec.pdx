@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Integer\#to_r" do
+context "Integer#to_r" do
   pending "returns a Rational object"
   pending "constructs a rational number with self as the numerator"
   pending "constructs a rational number with 1 as the denominator"

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#symlink?" do
+context "File::Stat#symlink?" do
   pending "behaves like :file_symlink :symlink? FileStat"
 end

@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'w'" do
+context "Array#pack with format 'w'" do
   pending "behaves like :array_pack_basic w"
   pending "behaves like :array_pack_basic_non_float w"
   pending "behaves like :array_pack_arguments w"
   pending "behaves like :array_pack_numeric_basic w"
   pending "encodes a BER-compressed integer"
-  pending "calls \#to_int to convert the pack argument to an Integer"
+  pending "calls #to_int to convert the pack argument to an Integer"
   pending "raise ArgumentError for NULL bytes between directives"
   pending "ignores spaces between directives"
   pending "raises an ArgumentError when passed a negative value"

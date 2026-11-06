@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#solve" do
+context "Matrix::LUPDecomposition#solve" do
   context "for rectangular matrices" do
     pending "raises an error for singular matrices"
     context "for non singular matrices" do

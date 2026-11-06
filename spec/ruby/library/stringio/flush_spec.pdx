@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#flush" do
+context "StringIO#flush" do
   pending "returns self"
 end

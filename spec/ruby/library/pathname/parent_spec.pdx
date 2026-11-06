@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#parent" do
+context "Pathname#parent" do
   pending "has parent of root as root"
   pending "has parent of /usr/ as root"
   pending "has parent of /usr/local as root"

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#ipv6only!" do
+context "Socket#ipv6only!" do
   pending "enables IPv6 only mode"
 end

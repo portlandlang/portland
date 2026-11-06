@@ -11,7 +11,7 @@ context "Dir.[]" do
   pending "behaves like :dir_glob_recursive :[]"
 end
 context "Dir.[]" do
-  pending "calls \#to_path to convert multiple patterns"
+  pending "calls #to_path to convert multiple patterns"
   pending "preserves the encoding of the path"
   pending "accepts multiple patterns in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
 end

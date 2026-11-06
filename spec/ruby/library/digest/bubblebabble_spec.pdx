@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "Digest.bubblebabble" do
   pending "returns a String"
   pending "returns a String in the Bubble Babble Binary Data Encoding format"
-  pending "calls \#to_str on an object and returns the bubble babble value of the result"
+  pending "calls #to_str on an object and returns the bubble babble value of the result"
   pending "raises a TypeError when passed nil"
   pending "raises a TypeError when passed an Integer"
 end

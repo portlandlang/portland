@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#getbyte" do
+context "StringIO#getbyte" do
   pending "behaves like :stringio_getc :getbyte"
   pending "returns the 8-bit byte at the current position"
 end
-context "StringIO\#getbyte when self is not readable" do
+context "StringIO#getbyte when self is not readable" do
   pending "behaves like :stringio_getc_not_readable :getbyte"
 end

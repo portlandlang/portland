@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#-" do
+context "Set#-" do
   pending "returns a new Set containing self's elements excluding the elements in the passed Enumerable"
   pending "raises an ArgumentError when passed a non-Enumerable"
   pending "retains compare_by_identity flag"

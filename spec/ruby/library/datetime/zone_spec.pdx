@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#zone" do
+context "DateTime#zone" do
   pending "needs to be reviewed for spec completeness"
 end

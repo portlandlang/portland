@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#inspect" do
+context "Net::HTTPGenericRequest#inspect" do
   pending "returns a String representation of self"
 end

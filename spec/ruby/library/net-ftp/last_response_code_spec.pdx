@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#last_response_code" do
+context "Net::FTP#last_response_code" do
   pending "behaves like :net_ftp_last_response_code :last_response_code"
 end

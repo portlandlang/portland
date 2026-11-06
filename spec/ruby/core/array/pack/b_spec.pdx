@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'B'" do
+context "Array#pack with format 'B'" do
   pending "behaves like :array_pack_basic B"
   pending "behaves like :array_pack_basic_non_float B"
   pending "behaves like :array_pack_arguments B"
   pending "behaves like :array_pack_hex B"
-  pending "calls \#to_str to convert an Object to a String"
+  pending "calls #to_str to convert an Object to a String"
   pending "will not implicitly convert a number to a string"
   pending "encodes one bit for each character starting with the most significant bit"
   pending "implicitly has a count of one when not passed a count modifier"
@@ -18,12 +18,12 @@ context "Array\#pack with format 'B'" do
   pending "returns a binary string"
   pending "encodes the string as a sequence of bytes"
 end
-context "Array\#pack with format 'b'" do
+context "Array#pack with format 'b'" do
   pending "behaves like :array_pack_basic b"
   pending "behaves like :array_pack_basic_non_float b"
   pending "behaves like :array_pack_arguments b"
   pending "behaves like :array_pack_hex b"
-  pending "calls \#to_str to convert an Object to a String"
+  pending "calls #to_str to convert an Object to a String"
   pending "encodes one bit for each character starting with the least significant bit"
   pending "implicitly has a count of one when not passed a count modifier"
   pending "implicitly has count equal to the string length when passed the '*' modifier"

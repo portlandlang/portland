@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#ipv4?" do
+context "Addrinfo#ipv4?" do
   context "for an ipv4 socket" do
     pending "returns true"
   end

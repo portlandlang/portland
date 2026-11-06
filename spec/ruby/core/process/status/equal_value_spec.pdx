@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#==" do
+context "Process::Status#==" do
   pending "returns true when compared to the integer status of an exited child"
   pending "returns true when compared to the integer status of a terminated child"
 end

@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#bitwise_not" do
+context "String#bitwise_not" do
   pending "returns a new string with every bit inverted"
   pending "returns a BINARY string"
 end
-context "String\#bitwise_not!" do
+context "String#bitwise_not!" do
   pending "inverts every bit in self and returns self"
   pending "raises a FrozenError if self is frozen"
 end

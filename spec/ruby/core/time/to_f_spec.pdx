@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#to_f" do
+context "Time#to_f" do
   pending "returns the float number of seconds + usecs since the epoch"
 end

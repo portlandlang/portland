@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Parser\#parse" do
+context "URI::Parser#parse" do
   pending "returns a URI::HTTP object when parsing an HTTP URI"
   pending "populates the components of a parsed URI::HTTP, setting the port to 80 by default"
   pending "parses out the port number of a URI, when given"

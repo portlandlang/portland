@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::MD5\#digest_length" do
+context "Digest::MD5#digest_length" do
   pending "returns the length of computed digests"
 end

@@ -4,16 +4,16 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#sync=" do
+context "IO#sync=" do
   pending "sets the sync mode to true or false"
   pending "accepts non-boolean arguments"
   pending "raises an IOError on closed stream"
 end
-context "IO\#sync" do
+context "IO#sync" do
   pending "returns the current sync mode"
   pending "raises an IOError on closed stream"
 end
-context "IO\#sync" do
+context "IO#sync" do
   pending "is false by default for STDIN"
   pending "is false by default for STDOUT"
   pending "is true by default for STDERR"

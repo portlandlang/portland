@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'G'" do
+context "String#unpack with format 'G'" do
   pending "behaves like :string_unpack_basic G"
   pending "behaves like :string_unpack_double_be G"
 end
-context "String\#unpack with format 'g'" do
+context "String#unpack with format 'g'" do
   pending "behaves like :string_unpack_basic g"
   pending "behaves like :string_unpack_float_be g"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#conjugate" do
+context "Complex#conjugate" do
   pending "returns the complex conjugate: conj a + bi = a - bi"
 end

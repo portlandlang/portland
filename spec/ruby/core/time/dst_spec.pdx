@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#dst?" do
+context "Time#dst?" do
   pending "returns whether time is during daylight saving time"
 end

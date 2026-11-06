@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Float\#rationalize" do
+context "Float#rationalize" do
   pending "returns self as a simplified Rational with no argument"
   pending "simplifies self to the degree specified by a Rational argument"
   pending "simplifies self to the degree specified by a Float argument"

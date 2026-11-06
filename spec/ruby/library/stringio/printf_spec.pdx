@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#printf" do
+context "StringIO#printf" do
   pending "returns nil"
   pending "pads self with \\000 when the current position is after the end"
   pending "performs format conversion"
@@ -13,15 +13,15 @@ context "StringIO\#printf" do
     pending "behaves like :kernel_sprintf -> format, *args {\n      io = StringIO.new(+\"\")\n      io.printf(format, *args)\n      io.string\n    }"
   end
 end
-context "StringIO\#printf when in read-write mode" do
+context "StringIO#printf when in read-write mode" do
   pending "starts from the beginning"
   pending "does not truncate existing string"
   pending "correctly updates self's position"
 end
-context "StringIO\#printf when in append mode" do
+context "StringIO#printf when in append mode" do
   pending "appends the passed argument to the end of self"
   pending "correctly updates self's position"
 end
-context "StringIO\#printf when self is not writable" do
+context "StringIO#printf when self is not writable" do
   pending "raises an IOError"
 end

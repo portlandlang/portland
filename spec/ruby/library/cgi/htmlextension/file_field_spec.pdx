@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#file_field" do
+context "CGI::HtmlExtension#file_field" do
   context "when passed no arguments" do
     pending "returns a file-'input'-element without a name and a size of 20"
     pending "ignores a passed block"

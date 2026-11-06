@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#default_passive" do
+context "Net::FTP#default_passive" do
   pending "is true by default"
 end

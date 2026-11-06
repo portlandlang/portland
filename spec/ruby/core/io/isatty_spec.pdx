@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#isatty" do
-  pending "is an alias of IO\#tty?"
+context "IO#isatty" do
+  pending "is an alias of IO#tty?"
 end

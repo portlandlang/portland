@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "WeakRef\#allocate" do
+context "WeakRef#allocate" do
   pending "assigns nil as the reference"
 end

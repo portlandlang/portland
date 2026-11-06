@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#size" do
+context "Net::HTTPHeader#size" do
   pending "returns the number of header entries in self"
 end

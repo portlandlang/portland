@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#strftime" do
+context "Date#strftime" do
   pending "behaves like :strftime_date :strftime"
   pending "should be able to print the date with no argument"
   pending "should be able to show the timezone with a : separator"

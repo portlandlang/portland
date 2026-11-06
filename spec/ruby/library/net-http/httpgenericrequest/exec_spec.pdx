@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#exec when passed socket, version, path" do
+context "Net::HTTPGenericRequest#exec when passed socket, version, path" do
   pending "executes the request over the socket to the path using the HTTP version"
   context "when a request body is set" do
     pending "sets the 'Content-Type' header to 'application/x-www-form-urlencoded' unless the 'Content-Type' header is supplied"

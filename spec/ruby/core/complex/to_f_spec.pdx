@@ -4,15 +4,15 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#to_f" do
+context "Complex#to_f" do
   context "when the imaginary part is Integer 0" do
-    pending "returns the result of sending \#to_f to the real part"
+    pending "returns the result of sending #to_f to the real part"
   end
   context "when the imaginary part is Rational 0" do
-    pending "returns the result of sending \#to_f to the real part"
+    pending "returns the result of sending #to_f to the real part"
   end
-  context "when the imaginary part responds to \#== 0 with true" do
-    pending "returns the result of sending \#to_f to the real part"
+  context "when the imaginary part responds to #== 0 with true" do
+    pending "returns the result of sending #to_f to the real part"
   end
   context "when the imaginary part is non-zero" do
     pending "raises RangeError"

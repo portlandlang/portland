@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#readline" do
+context "IO#readline" do
   pending "returns the next line on the stream"
   pending "goes back to first position after a rewind"
-  pending "returns characters after the position set by \#seek"
+  pending "returns characters after the position set by #seek"
   pending "raises EOFError on end of stream"
   pending "raises IOError on closed stream"
   pending "assigns the returned line to $_"

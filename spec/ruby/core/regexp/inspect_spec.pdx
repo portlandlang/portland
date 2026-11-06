@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#inspect" do
+context "Regexp#inspect" do
   pending "returns a formatted string that would eval to the same regexp"
   pending "returns options in the order 'mixn'"
   pending "does not include the 'o' option"

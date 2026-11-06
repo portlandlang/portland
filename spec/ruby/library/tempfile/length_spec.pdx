@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Tempfile\#length" do
-  pending "is an alias of Tempfile\#size"
+context "Tempfile#length" do
+  pending "is an alias of Tempfile#size"
 end

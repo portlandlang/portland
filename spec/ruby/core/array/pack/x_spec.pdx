@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'x'" do
+context "Array#pack with format 'x'" do
   pending "behaves like :array_pack_basic x"
   pending "behaves like :array_pack_basic_non_float x"
   pending "behaves like :array_pack_no_platform x"
@@ -18,7 +18,7 @@ context "Array\#pack with format 'x'" do
   pending "aligns from the beginning of the output with '@!'"
   pending "aligns to a directive's alignment with the '!' modifier"
 end
-context "Array\#pack with format 'X'" do
+context "Array#pack with format 'X'" do
   pending "behaves like :array_pack_basic X"
   pending "behaves like :array_pack_basic_non_float X"
   pending "behaves like :array_pack_no_platform X"

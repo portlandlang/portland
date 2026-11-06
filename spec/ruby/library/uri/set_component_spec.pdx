@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#select" do
+context "URI#select" do
   pending "conforms to the MatzRuby tests"
 end

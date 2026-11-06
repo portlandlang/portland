@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#content_type" do
+context "Net::HTTPHeader#content_type" do
   pending "returns the content type string, as per 'Content-Type' header entry"
   pending "returns nil if the 'Content-Type' header entry does not exist"
 end
-context "Net::HTTPHeader\#content_type=" do
-  pending "is an alias of Net::HTTPHeader\#set_content_type"
+context "Net::HTTPHeader#content_type=" do
+  pending "is an alias of Net::HTTPHeader#set_content_type"
 end

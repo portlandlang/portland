@@ -4,21 +4,21 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'Q'" do
+context "Array#pack with format 'Q'" do
   pending "behaves like :array_pack_basic Q"
   pending "behaves like :array_pack_basic_non_float Q"
   pending "behaves like :array_pack_arguments Q"
   pending "behaves like :array_pack_numeric_basic Q"
   pending "behaves like :array_pack_integer Q"
 end
-context "Array\#pack with format 'q'" do
+context "Array#pack with format 'q'" do
   pending "behaves like :array_pack_basic q"
   pending "behaves like :array_pack_basic_non_float q"
   pending "behaves like :array_pack_arguments q"
   pending "behaves like :array_pack_numeric_basic q"
   pending "behaves like :array_pack_integer q"
 end
-context "Array\#pack with format 'Q'" do
+context "Array#pack with format 'Q'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_64bit_le Q<"
   end
@@ -26,7 +26,7 @@ context "Array\#pack with format 'Q'" do
     pending "behaves like :array_pack_64bit_be Q>"
   end
 end
-context "Array\#pack with format 'q'" do
+context "Array#pack with format 'q'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_64bit_le q<"
   end
@@ -34,15 +34,15 @@ context "Array\#pack with format 'q'" do
     pending "behaves like :array_pack_64bit_be q>"
   end
 end
-context "Array\#pack with format 'Q'" do
+context "Array#pack with format 'Q'" do
   pending "behaves like :array_pack_64bit_le Q"
 end
-context "Array\#pack with format 'q'" do
+context "Array#pack with format 'q'" do
   pending "behaves like :array_pack_64bit_le q"
 end
-context "Array\#pack with format 'Q'" do
+context "Array#pack with format 'Q'" do
   pending "behaves like :array_pack_64bit_be Q"
 end
-context "Array\#pack with format 'q'" do
+context "Array#pack with format 'q'" do
   pending "behaves like :array_pack_64bit_be q"
 end

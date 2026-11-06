@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#deconstruct" do
-  pending "is an alias of MatchData\#captures"
+context "MatchData#deconstruct" do
+  pending "is an alias of MatchData#captures"
 end

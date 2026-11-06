@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#collect!" do
-  pending "is an alias of Set\#map!"
+context "Set#collect!" do
+  pending "is an alias of Set#map!"
 end

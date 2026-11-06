@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#close_on_exec=" do
+context "IO#close_on_exec=" do
   pending "sets the close-on-exec flag if true"
   pending "sets the close-on-exec flag if non-false"
   pending "unsets the close-on-exec flag if false"
@@ -12,7 +12,7 @@ context "IO\#close_on_exec=" do
   pending "ensures the IO's file descriptor is closed in exec'ed processes"
   pending "raises IOError if called on a closed IO"
 end
-context "IO\#close_on_exec?" do
+context "IO#close_on_exec?" do
   pending "returns true by default"
   pending "returns true if set"
   pending "raises IOError if called on a closed IO"

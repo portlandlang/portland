@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#to_c" do
+context "Numeric#to_c" do
   pending "returns a Complex object"
   pending "uses self as the real component"
   pending "uses 0 as the imaginary component"

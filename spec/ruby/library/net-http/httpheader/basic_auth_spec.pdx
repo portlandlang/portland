@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#basic_auth when passed account, password" do
+context "Net::HTTPHeader#basic_auth when passed account, password" do
   pending "sets the 'Authorization' Header entry for basic authorization"
 end

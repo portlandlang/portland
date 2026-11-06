@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#opaque" do
+context "URI::Generic#opaque" do
   pending "needs to be reviewed for spec completeness"
 end
-context "URI::Generic\#opaque=" do
+context "URI::Generic#opaque=" do
   pending "needs to be reviewed for spec completeness"
 end

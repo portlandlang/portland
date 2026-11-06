@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#initialize_clone" do
+context "Set#initialize_clone" do
   pending "does not freeze the new Set when called from clone(freeze: false)"
 end

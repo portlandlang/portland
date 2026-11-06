@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#size" do
+context "MatchData#size" do
   pending "should return the number of elements in the match array"
 end

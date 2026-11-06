@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#rdev" do
+context "File::Stat#rdev" do
   pending "returns the number of the device this file represents which the file exists"
 end

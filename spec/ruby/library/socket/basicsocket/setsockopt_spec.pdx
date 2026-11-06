@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#setsockopt" do
+context "BasicSocket#setsockopt" do
   pending "sets the socket linger to 0"
   pending "sets the socket linger to some positive value"
   pending "raises EINVAL if passed wrong linger value"
@@ -22,7 +22,7 @@ context "BasicSocket\#setsockopt" do
     pending "linger"
   end
 end
-context "BasicSocket\#setsockopt" do
+context "BasicSocket#setsockopt" do
   context "using a STREAM socket" do
     context "using separate arguments with Symbols" do
       pending "raises TypeError when the first argument is nil"

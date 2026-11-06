@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#terminate" do
+context "StringScanner#terminate" do
   pending "set the scan pointer to the end of the string and clear matching data."
 end

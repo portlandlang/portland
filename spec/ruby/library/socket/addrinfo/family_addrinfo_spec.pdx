@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#family_addrinfo" do
+context "Addrinfo#family_addrinfo" do
   pending "raises ArgumentError if no arguments are given"
   context "using multiple arguments" do
     context "with an IP Addrinfo" do

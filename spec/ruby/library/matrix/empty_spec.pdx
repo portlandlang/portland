@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#empty?" do
+context "Matrix#empty?" do
   pending "returns true when the Matrix is empty"
   pending "returns false when the Matrix has elements"
   pending "doesn't accept any parameter"

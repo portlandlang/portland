@@ -11,7 +11,7 @@ The bug is separable from #29's zoo ruling — which members survive, which deli
 
 ## Decision
 
-**Inside `%w[...]`, the content rules are Ruby's**, verified against Ruby 4.0.6 rather than remembered (principle 8):
+**Inside `%w[...]`, the content rules are Ruby's**, verified against Ruby 4.0.9 rather than remembered (principle 8):
 
 - A backslash before `]`, `[`, `\`, or whitespace escapes it: the backslash drops, the character joins the current word, and escaped whitespace joins instead of splitting — `%w[a \] b]` is `["a", "]", "b"]`, `%w[rose\ city]` is `["rose city"]`.
 - A backslash before anything else stays literal: `%w[a\nb]` is the five-character `"a\nb"` with its backslash, exactly Ruby's single-quoted-style behavior.

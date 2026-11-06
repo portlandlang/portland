@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#fileno" do
+context "StringIO#fileno" do
   pending "returns nil"
 end

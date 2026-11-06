@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#add" do
+context "Logger#add" do
   pending "writes a new message to the logger"
   pending "receives a severity"
   pending "receives a message"

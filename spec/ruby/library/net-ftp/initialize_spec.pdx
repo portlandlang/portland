@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#initialize" do
+context "Net::FTP#initialize" do
   pending "is private"
   pending "sets self into binary mode"
   pending "sets self into active mode"

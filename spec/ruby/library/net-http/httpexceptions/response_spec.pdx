@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPExceptions\#response" do
+context "Net::HTTPExceptions#response" do
   pending "returns self's response"
 end

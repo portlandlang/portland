@@ -11,5 +11,5 @@ context "SecureRandom.random_bytes" do
   pending "generates a random binary string of specified length"
   pending "generates different binary strings with subsequent invocations"
   pending "raises ArgumentError on negative arguments"
-  pending "tries to convert the passed argument to an Integer using \#to_int"
+  pending "tries to convert the passed argument to an Integer using #to_int"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#to_s" do
+context "Regexp#to_s" do
   pending "displays options if included"
   pending "shows non-included options after a - sign"
   pending "shows all options as excluded if none are selected"

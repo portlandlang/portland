@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#initialize" do
-  pending "calls \#to_path on non-String arguments"
+context "Dir#initialize" do
+  pending "calls #to_path on non-String arguments"
 end

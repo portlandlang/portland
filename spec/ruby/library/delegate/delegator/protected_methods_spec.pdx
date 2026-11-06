@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#protected_methods" do
+context "Delegator#protected_methods" do
   pending "includes protected methods of the delegate object"
   pending "includes protected instance methods of the Delegator class"
 end

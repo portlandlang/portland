@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#protocol" do
+context "Addrinfo#protocol" do
   pending "returns 0 by default"
   pending "returns a custom protocol when given"
   context "for a unix socket" do

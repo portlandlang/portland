@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#data" do
+context "Socket::AncillaryData#data" do
   pending "returns the data as a String"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::Cookie\#to_s" do
+context "CGI::Cookie#to_s" do
   pending "returns a String representation of self"
   pending "escapes the self's values"
   pending "does not escape tilde"

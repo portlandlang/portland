@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#retrbinary" do
+context "Net::FTP#retrbinary" do
   pending "sends the passed command to the server"
   pending "yields the received content as binary blocks of the passed size"
 end

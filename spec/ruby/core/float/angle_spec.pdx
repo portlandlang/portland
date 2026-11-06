@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Float\#angle" do
-  pending "is an alias of Float\#arg"
+context "Float#angle" do
+  pending "is an alias of Float#arg"
 end

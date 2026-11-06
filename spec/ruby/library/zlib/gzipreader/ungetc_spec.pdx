@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#ungetc" do
+context "Zlib::GzipReader#ungetc" do
   context "at the start of the stream" do
     context "with a single-byte character" do
       pending "prepends the character to the stream"

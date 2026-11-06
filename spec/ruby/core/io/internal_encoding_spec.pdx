@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#internal_encoding" do
+context "IO#internal_encoding" do
   pending "can be retrieved from a closed stream"
   context "with 'r' mode" do
     pending "behaves like :io_internal_encoding nil r"

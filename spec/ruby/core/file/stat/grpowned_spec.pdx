@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#grpowned?" do
+context "File::Stat#grpowned?" do
   pending "behaves like :file_grpowned :grpowned? FileStat"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::ZStream\#flush_next_out" do
+context "Zlib::ZStream#flush_next_out" do
   pending "flushes the stream and flushes the output buffer"
 end

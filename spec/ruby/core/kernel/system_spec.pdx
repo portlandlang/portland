@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#system" do
+context "Kernel#system" do
   pending "is a private method"
   pending "executes the specified command in a subprocess"
   pending "returns true when the command exits with a zero exit status"

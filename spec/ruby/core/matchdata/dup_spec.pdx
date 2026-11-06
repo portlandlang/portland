@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#dup" do
+context "MatchData#dup" do
   pending "duplicates the match data"
 end

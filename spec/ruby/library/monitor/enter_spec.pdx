@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Monitor\#enter" do
+context "Monitor#enter" do
   pending "acquires the monitor"
 end

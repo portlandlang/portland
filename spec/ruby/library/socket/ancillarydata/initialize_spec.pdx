@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#initialize" do
+context "Socket::AncillaryData#initialize" do
   context "using Integers for the family, level, and type" do
     pending "sets the address family"
     pending "sets the message level"

@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#floor" do
+context "Time#floor" do
   pending "defaults to flooring to 0 places"
   pending "floors to 0 decimal places with an explicit argument"
   pending "floors to 7 decimal places with an explicit argument"
-  pending "returns an instance of Time, even if \#floor is called on a subclass"
+  pending "returns an instance of Time, even if #floor is called on a subclass"
   pending "copies own timezone to the returning value"
 end

@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXServer\#accept" do
+context "UNIXServer#accept" do
   pending "accepts what is written by the client"
-  pending "can be interrupted by Thread\#kill"
-  pending "can be interrupted by Thread\#raise"
+  pending "can be interrupted by Thread#kill"
+  pending "can be interrupted by Thread#raise"
 end
-context "UNIXServer\#accept" do
+context "UNIXServer#accept" do
   context "without a client" do
     pending "blocks the calling thread"
   end

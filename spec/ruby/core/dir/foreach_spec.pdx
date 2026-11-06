@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "Dir.foreach" do
   pending "yields all names in an existing directory to the provided block"
   pending "returns nil when successful"
-  pending "calls \#to_path on non-String arguments"
+  pending "calls #to_path on non-String arguments"
   pending "raises a SystemCallError if passed a nonexistent directory"
   pending "returns an Enumerator if no block given"
   pending "accepts an encoding keyword for the encoding of the entries"

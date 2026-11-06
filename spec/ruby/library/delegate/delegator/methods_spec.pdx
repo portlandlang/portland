@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#methods" do
+context "Delegator#methods" do
   pending "returns singleton methods when passed false"
   pending "includes all public methods of the delegate object"
   pending "includes all protected methods of the delegate object"

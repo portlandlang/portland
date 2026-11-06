@@ -4,18 +4,18 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#hash" do
+context "Kernel#hash" do
   pending "is provided"
   pending "is stable"
 end
-context "Kernel\#Hash" do
+context "Kernel#Hash" do
   pending "is a private method"
   pending "converts nil to a Hash"
   pending "converts an empty array to a Hash"
-  pending "does not call \#to_hash on an Hash"
-  pending "calls \#to_hash to convert the argument to an Hash"
-  pending "raises a TypeError if it doesn't respond to \#to_hash"
-  pending "raises a TypeError if \#to_hash does not return an Hash"
+  pending "does not call #to_hash on an Hash"
+  pending "calls #to_hash to convert the argument to an Hash"
+  pending "raises a TypeError if it doesn't respond to #to_hash"
+  pending "raises a TypeError if #to_hash does not return an Hash"
 end
 context "Kernel.Hash" do
   pending "is a public method"

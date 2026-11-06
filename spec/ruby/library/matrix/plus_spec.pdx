@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#+" do
+context "Matrix#+" do
   pending "returns the result of adding the corresponding elements of self and other"
   pending "returns an instance of Matrix"
   pending "raises a Matrix::ErrDimensionMismatch if the matrices are different sizes"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipFile\#orig_name" do
+context "Zlib::GzipFile#orig_name" do
   pending "returns the name"
   pending "raises an error on a closed stream"
 end

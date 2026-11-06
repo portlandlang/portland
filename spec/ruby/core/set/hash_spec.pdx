@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#hash" do
+context "Set#hash" do
   pending "is static"
   pending "is equal to nil.hash for an uninitialized Set"
 end

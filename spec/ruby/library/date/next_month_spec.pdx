@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#next_month" do
+context "Date#next_month" do
   pending "returns the next month"
   pending "returns three months later"
   pending "returns three months later across years"

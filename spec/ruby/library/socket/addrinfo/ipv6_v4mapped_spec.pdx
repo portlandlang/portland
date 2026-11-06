@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#ipv6_v4mapped?" do
+context "Addrinfo#ipv6_v4mapped?" do
   pending "returns true for an IPv4 compatible address"
   pending "returns false for an IPv4 compatible address"
   pending "returns false for a regular IPv6 address"

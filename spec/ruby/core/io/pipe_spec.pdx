@@ -32,9 +32,9 @@ context "IO.pipe" do
   pending "sets the external and internal encoding when passed two String arguments"
   pending "accepts an options Hash with one String encoding argument"
   pending "accepts an options Hash with two String encoding arguments"
-  pending "calls \#to_hash to convert an options argument"
-  pending "calls \#to_str to convert the first argument to a String"
-  pending "calls \#to_str to convert the second argument to a String"
+  pending "calls #to_hash to convert an options argument"
+  pending "calls #to_str to convert the first argument to a String"
+  pending "calls #to_str to convert the second argument to a String"
   pending "sets no external encoding for the write end"
   pending "sets no internal encoding for the write end"
 end

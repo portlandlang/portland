@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#welcome" do
+context "Net::FTP#welcome" do
   pending "returns the server's welcome message"
 end

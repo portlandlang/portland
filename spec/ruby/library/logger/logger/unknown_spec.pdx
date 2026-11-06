@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#unknown" do
+context "Logger#unknown" do
   pending "logs a message with unknown severity"
   pending "defaults the priority value to 5 and text value to ANY"
   pending "receives empty messages"

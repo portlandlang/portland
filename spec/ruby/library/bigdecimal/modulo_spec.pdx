@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#%" do
+context "BigDecimal#%" do
   pending "behaves like :bigdecimal_modulo :%"
   pending "raises ZeroDivisionError if other is zero"
 end
-context "BigDecimal\#modulo" do
-  pending "is an alias of BigDecimal\#%"
+context "BigDecimal#modulo" do
+  pending "is an alias of BigDecimal#%"
 end

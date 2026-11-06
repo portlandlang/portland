@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#read" do
+context "BasicSocket#read" do
   pending "receives data after it's ready"
   pending "returned data is binary encoded regardless of the external encoding"
   pending "replaces the content of the provided buffer without changing its encoding"

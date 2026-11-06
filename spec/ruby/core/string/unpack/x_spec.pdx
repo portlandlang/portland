@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'X'" do
+context "String#unpack with format 'X'" do
   pending "behaves like :string_unpack_basic X"
   pending "behaves like :string_unpack_no_platform X"
   pending "moves the read index back by the number of bytes specified by count"
@@ -14,7 +14,7 @@ context "String\#unpack with format 'X'" do
   pending "raises an ArgumentError when passed the '*' modifier if the remaining bytes exceed the bytes from the index to the start of the String"
   pending "raises an ArgumentError if the count exceeds the bytes from current index to the start of the String"
 end
-context "String\#unpack with format 'x'" do
+context "String#unpack with format 'x'" do
   pending "behaves like :string_unpack_basic x"
   pending "behaves like :string_unpack_no_platform x"
   pending "moves the read index forward by the number of bytes specified by count"

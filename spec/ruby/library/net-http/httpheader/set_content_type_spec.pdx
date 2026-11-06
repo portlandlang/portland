@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#set_content_type" do
+context "Net::HTTPHeader#set_content_type" do
   context "when passed type, params" do
     pending "sets the 'Content-Type' header entry based on the passed type and params"
   end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#succ" do
-  pending "is an alias of Date\#next"
+context "Date#succ" do
+  pending "is an alias of Date#next"
 end

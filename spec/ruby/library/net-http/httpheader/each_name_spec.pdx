@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#each_name" do
-  pending "is an alias of Net::HTTPHeader\#each_key"
+context "Net::HTTPHeader#each_name" do
+  pending "is an alias of Net::HTTPHeader#each_key"
 end

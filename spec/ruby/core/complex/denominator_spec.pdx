@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#denominator" do
+context "Complex#denominator" do
   pending "returns the least common multiple denominator of the real and imaginary parts"
 end

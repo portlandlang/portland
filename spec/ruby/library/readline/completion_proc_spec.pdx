@@ -9,5 +9,5 @@ context "Readline.completion_proc" do
 end
 context "Readline.completion_proc=" do
   pending "returns the passed Proc"
-  pending "returns an ArgumentError if not given an Proc or \#call"
+  pending "returns an ArgumentError if not given an Proc or #call"
 end

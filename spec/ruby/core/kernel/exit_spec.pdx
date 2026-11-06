@@ -4,14 +4,14 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#exit" do
+context "Kernel#exit" do
   pending "is a private method"
   pending "behaves like :process_exit :exit KernelSpecs::Method.new"
 end
 context "Kernel.exit" do
   pending "is a public method"
 end
-context "Kernel\#exit!" do
+context "Kernel#exit!" do
   pending "is a private method"
   pending "behaves like :process_exit! :exit! self"
 end

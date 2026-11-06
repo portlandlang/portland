@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#set_range" do
+context "Net::HTTPHeader#set_range" do
   context "when passed nil" do
     pending "returns nil"
     pending "deletes the 'Range' header entry"

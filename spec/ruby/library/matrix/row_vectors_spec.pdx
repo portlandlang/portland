@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#row_vectors" do
+context "Matrix#row_vectors" do
   pending "returns an Array"
   pending "returns an Array of Vectors"
   pending "returns each row as a Vector"

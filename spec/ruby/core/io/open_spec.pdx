@@ -11,10 +11,10 @@ context "IO.open" do
   pending "behaves like :io_new_errors :open"
 end
 context "IO.open" do
-  pending "calls \#close after yielding to the block"
-  pending "propagate an exception in the block after calling \#close"
-  pending "propagates an exception raised by \#close that is not a StandardError"
-  pending "propagates an exception raised by \#close that is a StandardError"
-  pending "does not propagate an IOError with 'closed stream' message raised by \#close"
-  pending "does not set last error when an IOError with 'closed stream' raised by \#close"
+  pending "calls #close after yielding to the block"
+  pending "propagate an exception in the block after calling #close"
+  pending "propagates an exception raised by #close that is not a StandardError"
+  pending "propagates an exception raised by #close that is a StandardError"
+  pending "does not propagate an IOError with 'closed stream' message raised by #close"
+  pending "does not set last error when an IOError with 'closed stream' raised by #close"
 end

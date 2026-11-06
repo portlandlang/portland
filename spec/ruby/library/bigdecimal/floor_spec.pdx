@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#floor" do
+context "BigDecimal#floor" do
   pending "returns the greatest integer smaller or equal to self"
   pending "raise exception, if self is special value"
   pending "returns n digits right of the decimal point if given n > 0"

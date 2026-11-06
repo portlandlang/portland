@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#readpartial" do
+context "IO#readpartial" do
   pending "raises IOError on closed stream"
   pending "reads at most the specified number of bytes"
   pending "reads after ungetc with data in the buffer"

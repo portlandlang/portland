@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#sync" do
+context "StringIO#sync" do
   pending "returns true"
 end
-context "StringIO\#sync=" do
+context "StringIO#sync=" do
   pending "does not change 'sync' status"
 end

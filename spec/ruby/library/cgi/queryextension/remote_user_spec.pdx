@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#remote_user" do
+context "CGI::QueryExtension#remote_user" do
   pending "returns ENV['REMOTE_USER']"
 end

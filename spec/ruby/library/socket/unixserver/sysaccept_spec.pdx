@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXServer\#sysaccept" do
+context "UNIXServer#sysaccept" do
   context "without a client" do
     pending "blocks the calling thread"
   end

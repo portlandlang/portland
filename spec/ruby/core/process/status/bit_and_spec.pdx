@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#&" do
+context "Process::Status#&" do
   pending "returns a bitwise and of the integer status of an exited child"
   pending "raises an ArgumentError if mask is negative"
   pending "shows a deprecation warning"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#getsockopt" do
+context "BasicSocket#getsockopt" do
   pending "gets a socket option Socket::SO_TYPE"
   pending "gets a socket option Socket::SO_OOBINLINE"
   pending "gets a socket option Socket::SO_LINGER"

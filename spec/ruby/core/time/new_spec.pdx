@@ -14,12 +14,12 @@ end
 context "Time.new with a utc_offset argument" do
   pending "returns a non-UTC time"
   pending "returns a Time with a UTC offset of the specified number of Integer seconds"
-  context "with an argument that responds to \#to_int" do
-    pending "coerces using \#to_int"
+  context "with an argument that responds to #to_int" do
+    pending "coerces using #to_int"
   end
   pending "returns a Time with a UTC offset of the specified number of Rational seconds"
-  context "with an argument that responds to \#to_r" do
-    pending "coerces using \#to_r"
+  context "with an argument that responds to #to_r" do
+    pending "coerces using #to_r"
   end
   pending "returns a Time with a UTC offset specified as +HH:MM"
   pending "returns a Time with a UTC offset specified as -HH:MM"
@@ -31,8 +31,8 @@ context "Time.new with a utc_offset argument" do
   pending "returns a Time with a UTC offset specified as -HHMM"
   pending "returns a Time with a UTC offset specified as +HHMMSS"
   pending "returns a Time with a UTC offset specified as -HHMMSS"
-  context "with an argument that responds to \#to_str" do
-    pending "coerces using \#to_str"
+  context "with an argument that responds to #to_str" do
+    pending "coerces using #to_str"
   end
   pending "returns a Time with UTC offset specified as UTC"
   pending "returns a Time with UTC offset specified as a single letter military timezone"
@@ -48,26 +48,26 @@ context "Time.new with a utc_offset argument" do
 end
 context "Time.new with a timezone argument" do
   pending "returns a Time in the timezone"
-  pending "accepts timezone argument that must have \#local_to_utc and \#utc_to_local methods"
-  pending "raises TypeError if timezone does not implement \#local_to_utc method"
-  pending "does not raise exception if timezone does not implement \#utc_to_local method"
-  context "returned value by \#utc_to_local and \#local_to_utc methods" do
+  pending "accepts timezone argument that must have #local_to_utc and #utc_to_local methods"
+  pending "raises TypeError if timezone does not implement #local_to_utc method"
+  pending "does not raise exception if timezone does not implement #utc_to_local method"
+  context "returned value by #utc_to_local and #local_to_utc methods" do
     pending "could be Time instance"
     pending "could be Time subclass instance"
-    pending "could be any object with \#to_i method"
-    pending "could have any \#zone and \#utc_offset because they are ignored if it isn't an instance of Time"
-    pending "cannot have arbitrary \#utc_offset if it is an instance of Time"
+    pending "could be any object with #to_i method"
+    pending "could have any #zone and #utc_offset because they are ignored if it isn't an instance of Time"
+    pending "cannot have arbitrary #utc_offset if it is an instance of Time"
     pending "raises ArgumentError if difference between argument and result is too large"
   end
-  context "Time-like argument of \#utc_to_local and \#local_to_utc methods" do
+  context "Time-like argument of #utc_to_local and #local_to_utc methods" do
     pending "implements subset of Time methods"
     pending "has attribute values the same as a Time object in UTC"
   end
-  context "\#name method" do
-    pending "uses the optional \#name method for marshaling"
-    pending "cannot marshal Time if \#name method isn't implemented"
+  context "#name method" do
+    pending "uses the optional #name method for marshaling"
+    pending "cannot marshal Time if #name method isn't implemented"
   end
-  pending "the \#abbr method is used by '%Z' in \#strftime"
+  pending "the #abbr method is used by '%Z' in #strftime"
   context "subject's class implements .find_timezone method" do
     pending "calls .find_timezone to build a time object at loading marshaled data"
     pending "calls .find_timezone to build a time object if passed zone name as a timezone argument"

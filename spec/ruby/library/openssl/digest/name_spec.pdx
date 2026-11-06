@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "OpenSSL::Digest\#name" do
+context "OpenSSL::Digest#name" do
   pending "returns the name of digest"
   pending "converts the name to the internal representation of OpenSSL"
   pending "works on subclasses too"

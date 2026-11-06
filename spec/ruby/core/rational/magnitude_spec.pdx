@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#magnitude" do
-  pending "is an alias of Rational\#abs"
+context "Rational#magnitude" do
+  pending "is an alias of Rational#abs"
 end

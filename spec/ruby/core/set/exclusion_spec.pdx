@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#^" do
+context "Set#^" do
   pending "returns a new Set containing elements that are not in both self and the passed Enumerable"
   pending "correctly excludes elements that appear multiple times in the passed Enumerable"
   pending "raises an ArgumentError when passed a non-Enumerable"

@@ -15,7 +15,7 @@ context "Socket::AncillaryData.unix_rights" do
     pending "raises TypeError"
   end
 end
-context "Socket::AncillaryData\#unix_rights" do
+context "Socket::AncillaryData#unix_rights" do
   pending "returns the data as an Array of IO objects"
   pending "returns nil when the data is not a list of file descriptors"
   pending "raises TypeError when the level is not SOL_SOCKET"

@@ -2,7 +2,7 @@
 # — the rows core/string/modulo_spec.rb, core/kernel/sprintf_spec.rb, and
 # core/kernel/format_spec.rb all share. Portland spells them `format(...)`
 # and `sprintf(...)`; `"%d" % x` refuses naming `format`. Every answer here
-# is Ruby 4.0.7's byte for byte, the near-tie float rows included (2.675 is
+# is Ruby 4.0.9's byte for byte, the near-tie float rows included (2.675 is
 # "2.68" where correct rounding would say "2.67"), because the seed carries
 # MRI's own digit rounding.
 #

@@ -7,8 +7,8 @@ require_relative "../../../spec_helper"
 context "Process.getrlimit" do
   pending "returns a two-element Array of Integers"
   context "when passed an Object" do
-    pending "calls \#to_int to convert to an Integer"
-    pending "raises a TypeError if \#to_int does not return an Integer"
+    pending "calls #to_int to convert to an Integer"
+    pending "raises a TypeError if #to_int does not return an Integer"
   end
   context "when passed a Symbol" do
     pending "coerces the short name into the full RLIMIT_ prefixed name"
@@ -19,8 +19,8 @@ context "Process.getrlimit" do
     pending "raises ArgumentError when passed an unknown resource"
   end
   context "when passed on Object" do
-    pending "calls \#to_str to convert to a String"
-    pending "calls \#to_int if \#to_str does not return a String"
+    pending "calls #to_str to convert to a String"
+    pending "calls #to_int if #to_str does not return a String"
   end
   pending "is not implemented"
 end

@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "IPAddr\#ipv4_compat" do
+context "IPAddr#ipv4_compat" do
   pending "should ipv4_compat?"
 end
-context "IPAddr\#ipv4_mapped" do
+context "IPAddr#ipv4_mapped" do
   pending "should ipv4_mapped"
 end

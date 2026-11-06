@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'E'" do
+context "Array#pack with format 'E'" do
   pending "behaves like :array_pack_basic E"
   pending "behaves like :array_pack_basic_float E"
   pending "behaves like :array_pack_arguments E"
@@ -13,7 +13,7 @@ context "Array\#pack with format 'E'" do
   pending "behaves like :array_pack_float E"
   pending "behaves like :array_pack_double_le E"
 end
-context "Array\#pack with format 'e'" do
+context "Array#pack with format 'e'" do
   pending "behaves like :array_pack_basic e"
   pending "behaves like :array_pack_basic_float e"
   pending "behaves like :array_pack_arguments e"

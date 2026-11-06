@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#eql?" do
+context "Complex#eql?" do
   pending "returns false if other is not Complex"
   pending "returns true when the respective parts are of the same classes and self == other"
   pending "returns false when the real parts are of different classes"
   pending "returns false when the imaginary parts are of different classes"
   pending "returns false when self == other is false"
-  pending "does NOT send \#eql? to real or imaginary parts"
+  pending "does NOT send #eql? to real or imaginary parts"
 end

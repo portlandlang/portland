@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#readbyte" do
+context "StringIO#readbyte" do
   pending "behaves like :stringio_readchar :readbyte"
   pending "reads the next 8-bit byte from self's current position"
 end
-context "StringIO\#readbyte when self is not readable" do
+context "StringIO#readbyte when self is not readable" do
   pending "behaves like :stringio_readchar_not_readable :readbyte"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#ftype" do
+context "File::Stat#ftype" do
   pending "returns a String"
   pending "returns 'file' when the file is a file"
   pending "returns 'directory' when the file is a dir"

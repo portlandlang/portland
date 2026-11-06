@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#strftime" do
+context "DateTime#strftime" do
   pending "behaves like :strftime_date :strftime"
   pending "behaves like :strftime_time :strftime"
   pending "should be able to print the datetime with no argument"

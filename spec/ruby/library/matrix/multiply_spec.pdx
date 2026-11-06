@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#*" do
+context "Matrix#*" do
   pending "returns the result of multiplying the corresponding elements of self and a Matrix"
   pending "returns the result of multiplying the corresponding elements of self and a Vector"
   pending "returns the result of multiplying the elements of self and a Fixnum"

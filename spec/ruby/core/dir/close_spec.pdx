@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#close" do
+context "Dir#close" do
   pending "does not raise an IOError even if the Dir instance is closed"
   pending "returns nil"
   pending "does not raise an error even if the file descriptor is closed with another Dir instance"

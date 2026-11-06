@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::MailTo\#to_mailtext" do
+context "URI::MailTo#to_mailtext" do
   pending "needs to be reviewed for spec completeness"
 end

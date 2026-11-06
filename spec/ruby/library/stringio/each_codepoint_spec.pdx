@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#each_codepoint" do
+context "StringIO#each_codepoint" do
   pending "returns an Enumerator"
   pending "yields each codepoint code in turn"
   pending "yields each codepoint starting from the current position"

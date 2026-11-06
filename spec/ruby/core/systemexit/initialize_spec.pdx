@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "SystemExit\#initialize" do
+context "SystemExit#initialize" do
   pending "accepts a status"
   pending "accepts a message"
   pending "accepts a status and message"

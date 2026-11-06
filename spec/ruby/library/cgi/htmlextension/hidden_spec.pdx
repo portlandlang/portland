@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#hidden" do
+context "CGI::HtmlExtension#hidden" do
   context "when passed no arguments" do
     pending "returns an hidden-'input'-element without a name"
     pending "ignores a passed block"

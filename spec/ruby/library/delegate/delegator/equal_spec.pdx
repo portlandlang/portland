@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#equal?" do
+context "Delegator#equal?" do
   pending "returns true only when compared with the delegator"
 end

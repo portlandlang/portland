@@ -4,7 +4,7 @@
 
 require_relative "../../spec_helper"
 
-context "String\#to_f" do
+context "String#to_f" do
   pending "resists CVE-2013-4164 by converting very long Strings to a Float"
 end
 context "JSON.parse" do

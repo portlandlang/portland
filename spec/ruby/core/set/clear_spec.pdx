@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#clear" do
+context "Set#clear" do
   pending "removes all elements from self"
   pending "returns self"
 end

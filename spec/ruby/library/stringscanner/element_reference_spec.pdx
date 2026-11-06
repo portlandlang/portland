@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#[]" do
+context "StringScanner#[]" do
   pending "returns nil if there is no current match"
   pending "returns the n-th subgroup in the most recent match"
   pending "returns nil if index is outside of self"

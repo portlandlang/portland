@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Integer\#denominator" do
+context "Integer#denominator" do
   pending "returns 1"
 end

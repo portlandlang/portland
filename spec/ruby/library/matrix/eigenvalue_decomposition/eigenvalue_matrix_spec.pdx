@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::EigenvalueDecomposition\#eigenvalue_matrix" do
+context "Matrix::EigenvalueDecomposition#eigenvalue_matrix" do
   pending "returns a diagonal matrix with the eigenvalues on the diagonal"
 end

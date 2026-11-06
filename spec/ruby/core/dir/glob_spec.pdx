@@ -13,7 +13,7 @@ end
 context "Dir.glob" do
   pending "can take an array of patterns"
   pending "returns matching file paths when supplied :base keyword argument"
-  pending "calls \#to_path to convert multiple patterns"
+  pending "calls #to_path to convert multiple patterns"
   pending "matches both dot and non-dotfiles with '*' and option File::FNM_DOTMATCH"
   pending "matches files with any beginning with '*<non-special characters>' and option File::FNM_DOTMATCH"
   pending "matches any files in the current directory with '**' and option File::FNM_DOTMATCH"

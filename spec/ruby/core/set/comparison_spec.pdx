@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#<=>" do
+context "Set#<=>" do
   pending "returns 0 if the sets are equal"
   pending "returns -1 if the set is a proper subset of the other set"
   pending "returns +1 if the set is a proper superset of other set"

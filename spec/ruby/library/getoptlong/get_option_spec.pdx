@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#get_option" do
-  pending "is an alias of GetoptLong\#get"
+context "GetoptLong#get_option" do
+  pending "is an alias of GetoptLong#get"
 end

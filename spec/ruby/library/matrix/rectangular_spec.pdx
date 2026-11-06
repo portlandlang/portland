@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#rectangular" do
+context "Matrix#rectangular" do
   pending "returns [receiver.real, receiver.imag]"
   context "for a subclass of Matrix" do
     pending "returns instances of that subclass"

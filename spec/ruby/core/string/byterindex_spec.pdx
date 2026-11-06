@@ -4,15 +4,15 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#byterindex with object" do
+context "String#byterindex with object" do
   pending "tries to convert obj to a string via to_str"
-  pending "calls \#to_int to convert the second argument"
+  pending "calls #to_int to convert the second argument"
   pending "does not raise IndexError when byte offset is correct or on string boundary"
   pending "behaves like :byte_index_common :byterindex"
 end
-context "String\#byterindex with String" do
-  pending "behaves the same as String\#byterindex(char) for one-character strings"
-  pending "behaves the same as String\#byterindex(?char) for one-character strings"
+context "String#byterindex with String" do
+  pending "behaves the same as String#byterindex(char) for one-character strings"
+  pending "behaves the same as String#byterindex(?char) for one-character strings"
   pending "returns the index of the last occurrence of the given substring"
   pending "ignores string subclasses"
   pending "starts the search at the given offset"
@@ -23,8 +23,8 @@ context "String\#byterindex with String" do
   pending "handles a substring in a superset encoding"
   pending "handles a substring in a subset encoding"
 end
-context "String\#byterindex with Regexp" do
-  pending "behaves the same as String\#byterindex(string) for escaped string regexps"
+context "String#byterindex with Regexp" do
+  pending "behaves the same as String#byterindex(string) for escaped string regexps"
   pending "returns the index of the first match from the end of string of regexp"
   pending "starts the search at the given offset"
   pending "starts the search at offset + self.length if offset is negative"

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#putc" do
+context "IO#putc" do
   pending "behaves like :io_putc :putc"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#<<" do
+context "Date#<<" do
   pending "subtracts a number of months from a date"
   pending "returns the last day of a month if the day doesn't exist"
   pending "raises an error on non numeric parameters"

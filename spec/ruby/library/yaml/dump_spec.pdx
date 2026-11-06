@@ -7,7 +7,7 @@ require_relative "../../../spec_helper"
 context "YAML.dump" do
   pending "converts an object to YAML and write result to io when io provided"
   pending "returns a string containing dumped YAML when no io provided"
-  pending "returns the same string that \#to_yaml on objects"
+  pending "returns the same string that #to_yaml on objects"
   pending "dumps strings into YAML strings"
   pending "dumps hashes into YAML key-values"
   pending "dumps Arrays into YAML collection"

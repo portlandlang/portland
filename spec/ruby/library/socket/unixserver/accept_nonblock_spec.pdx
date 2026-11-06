@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXServer\#accept_nonblock" do
+context "UNIXServer#accept_nonblock" do
   pending "accepts a connection in a non-blocking way"
   pending "returns a UNIXSocket"
   pending "returns :wait_readable in exceptionless mode"
 end
-context "UNIXServer\#accept_nonblock" do
+context "UNIXServer#accept_nonblock" do
   context "without a client" do
     pending "raises IO::WaitReadable"
   end

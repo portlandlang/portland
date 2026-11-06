@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#help" do
+context "Net::FTP#help" do
   pending "writes the HELP command to the server"
   pending "returns the server's response"
   pending "writes the HELP command with an optional parameter to the socket"

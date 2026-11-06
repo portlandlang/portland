@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#root?" do
+context "Pathname#root?" do
   pending "returns true for root directories"
   pending "returns false for empty string"
   pending "returns false for a top level directory"

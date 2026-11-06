@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#binding" do
+context "Proc#binding" do
   pending "returns a Binding instance"
   pending "returns the binding associated with self"
 end

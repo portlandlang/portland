@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#+" do
+context "Time#+" do
   pending "increments the time by the specified amount"
   pending "is a commutative operator"
   pending "adds a negative Float"

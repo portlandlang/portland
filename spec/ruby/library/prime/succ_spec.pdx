@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Prime\#succ" do
-  pending "is an alias of Prime\#next"
+context "Prime#succ" do
+  pending "is an alias of Prime#next"
 end

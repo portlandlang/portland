@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::BasicSocket\#ioctl" do
+context "Socket::BasicSocket#ioctl" do
   pending "passes data from and to a String correctly"
   pending "passes data from and to a String correctly"
 end

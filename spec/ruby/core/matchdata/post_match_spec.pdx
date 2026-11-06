@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#post_match" do
+context "MatchData#post_match" do
   pending "returns the string after the match equiv. special var $'"
   pending "sets the encoding to the encoding of the source String"
   pending "sets an empty result to the encoding of the source String"

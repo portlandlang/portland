@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#exist?" do
+context "StringScanner#exist?" do
   pending "returns distance in bytes between the current position and the end of the matched substring"
   pending "returns 0 if the pattern is empty"
   pending "returns nil if the pattern isn't found in the string"
@@ -12,12 +12,12 @@ context "StringScanner\#exist?" do
   pending "raises TypeError if given a String"
   pending "searches a substring in the rest part of a string if given a String"
   pending "returns nil if the pattern isn't found in the string"
-  context "\#[] successive call with a capture group name" do
-    context "when \#exist? was called with a Regexp pattern" do
+  context "#[] successive call with a capture group name" do
+    context "when #exist? was called with a Regexp pattern" do
       pending "returns matched substring when matching succeeded"
       pending "returns nil when matching failed"
     end
-    context "when \#exist? was called with a String pattern" do
+    context "when #exist? was called with a String pattern" do
       pending "returns nil when matching succeeded"
       pending "raises IndexError when matching succeeded"
       pending "returns nil when matching failed"

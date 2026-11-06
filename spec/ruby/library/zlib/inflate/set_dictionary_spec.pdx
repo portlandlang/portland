@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::Inflate\#set_dictionary" do
+context "Zlib::Inflate#set_dictionary" do
   pending "sets the inflate dictionary"
 end

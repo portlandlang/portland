@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#flatten_merge" do
+context "Set#flatten_merge" do
   pending "is protected"
   pending "flattens the passed Set and merges it into self"
   pending "raises an ArgumentError when trying to flatten a recursive Set"

@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#warn" do
+context "Kernel#warn" do
   pending "is a private method"
   pending "accepts multiple arguments"
   pending "does not append line-end if last character is line-end"
-  pending "calls \#write on $stderr if $VERBOSE is true"
-  pending "calls \#write on $stderr if $VERBOSE is false"
-  pending "does not call \#write on $stderr if $VERBOSE is nil"
+  pending "calls #write on $stderr if $VERBOSE is true"
+  pending "calls #write on $stderr if $VERBOSE is false"
+  pending "does not call #write on $stderr if $VERBOSE is nil"
   pending "writes each argument on a line when passed multiple arguments"
   pending "writes each array element on a line when passes an array"
   pending "does not write strings when passed no arguments"
@@ -18,8 +18,8 @@ context "Kernel\#warn" do
   pending "writes to_s representation if passed a non-string"
   context ":uplevel keyword argument" do
     pending "prepends a message with specified line from the backtrace"
-    pending "shows the caller of \#require and not \#require itself without RubyGems"
-    pending "shows the caller of \#require and not \#require itself with RubyGems loaded"
+    pending "shows the caller of #require and not #require itself without RubyGems"
+    pending "shows the caller of #require and not #require itself with RubyGems loaded"
     pending "doesn't show the caller when the uplevel is `nil`"
     pending "skips <internal: core library methods defined in Ruby"
     pending "accepts :category keyword with a symbol"
@@ -39,7 +39,7 @@ context "Kernel\#warn" do
   pending "calls Warning.warn with category: nil if Warning.warn accepts keyword arguments"
   pending "calls Warning.warn with given category keyword converted to a symbol"
   pending "does not call Warning.warn if self is the Warning module"
-  pending "avoids recursion if Warning\#warn is redefined and calls super"
+  pending "avoids recursion if Warning#warn is redefined and calls super"
 end
 context "Kernel.warn" do
   pending "is a public method"

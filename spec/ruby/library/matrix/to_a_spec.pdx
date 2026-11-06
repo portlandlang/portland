@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#to_a" do
+context "Matrix#to_a" do
   pending "returns the array of arrays that describe the rows of the matrix"
 end

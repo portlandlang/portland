@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#ruby2_keywords" do
+context "Proc#ruby2_keywords" do
   pending "marks the final hash argument as keyword hash"
   pending "applies to the underlying method and applies across duplication"
   pending "returns self"

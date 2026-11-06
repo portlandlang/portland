@@ -7,6 +7,6 @@ require_relative "../../../spec_helper"
 context "Matrix.unitary?" do
   pending "returns false for non unitary matrices"
   pending "returns true for unitary matrices"
-  pending "returns true for unitary matrices with a Complex and a negative \#imag"
+  pending "returns true for unitary matrices with a Complex and a negative #imag"
   pending "raises an error for rectangular matrices"
 end

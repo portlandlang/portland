@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'B'" do
+context "String#unpack with format 'B'" do
   pending "behaves like :string_unpack_basic B"
   pending "behaves like :string_unpack_no_platform B"
   pending "decodes one bit from each byte for each format character starting with the most significant bit"
@@ -19,7 +19,7 @@ context "String\#unpack with format 'B'" do
   pending "ignores spaces between directives"
   pending "decodes into US-ASCII string values"
 end
-context "String\#unpack with format 'b'" do
+context "String#unpack with format 'b'" do
   pending "behaves like :string_unpack_basic b"
   pending "behaves like :string_unpack_no_platform b"
   pending "decodes one bit from each byte for each format character starting with the least significant bit"

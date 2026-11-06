@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#size" do
+context "Net::FTP#size" do
   pending "sends the SIZE command to the server"
   pending "returns the size of the passed file as Integer"
   pending "raises a Net::FTPPermError when the response code is 500"

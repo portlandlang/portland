@@ -513,7 +513,7 @@ impl fmt::Display for Value {
 mod tests {
     use super::format_float;
 
-    /// #102: Ruby's `Float#to_s`, each expectation taken from Ruby 4.0.7's
+    /// #102: Ruby's `Float#to_s`, each expectation taken from Ruby 4.0.9's
     /// own output. Fixed notation while the decimal point sits within 15
     /// places left of it or 4 right; scientific past that, with a fractional
     /// digit always, a signed exponent, and at least two exponent digits.

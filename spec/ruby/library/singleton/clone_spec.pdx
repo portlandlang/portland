@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Singleton\#clone" do
+context "Singleton#clone" do
   pending "is prevented"
 end

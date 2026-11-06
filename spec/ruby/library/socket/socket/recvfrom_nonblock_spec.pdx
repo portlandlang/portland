@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#recvfrom_nonblock" do
+context "Socket#recvfrom_nonblock" do
   context "using an unbound socket" do
     pending "raises IO::WaitReadable"
   end
@@ -35,7 +35,7 @@ context "Socket\#recvfrom_nonblock" do
     end
   end
 end
-context "Socket\#recvfrom_nonblock" do
+context "Socket#recvfrom_nonblock" do
   context "when recvfrom(2) returns 0 (if no messages are available to be received and the peer has performed an orderly shutdown)" do
     context "stream socket" do
       pending "returns nil on a closed stream socket"

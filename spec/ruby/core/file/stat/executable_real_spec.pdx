@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#executable_real?" do
+context "File::Stat#executable_real?" do
   pending "behaves like :file_executable_real :executable_real? FileStat"
 end

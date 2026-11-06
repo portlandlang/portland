@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#permutation?" do
+context "Matrix#permutation?" do
   pending "returns true for a permutation Matrix"
   pending "returns false for a non permutation square Matrix"
   pending "returns true for an empty 0x0 matrix"

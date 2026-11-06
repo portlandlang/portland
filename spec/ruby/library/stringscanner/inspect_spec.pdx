@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#inspect" do
+context "StringScanner#inspect" do
   pending "returns a String object"
   pending "returns a string that represents the StringScanner object"
 end

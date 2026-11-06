@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#pretty_print_cycle" do
+context "Set#pretty_print_cycle" do
   pending "passes the 'pretty print' representation of a self-referencing Set to the pretty print writer"
 end

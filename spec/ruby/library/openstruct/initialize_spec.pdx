@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#initialize" do
+context "OpenStruct#initialize" do
   pending "is private"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#each_capitalized_name" do
+context "Net::HTTPHeader#each_capitalized_name" do
   context "when passed a block" do
     pending "yields each header key to the passed block (keys capitalized)"
   end

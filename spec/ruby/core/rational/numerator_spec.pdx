@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#numerator" do
+context "Rational#numerator" do
   pending "returns the numerator"
 end

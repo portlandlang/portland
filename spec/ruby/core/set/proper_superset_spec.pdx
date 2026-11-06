@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#proper_superset?" do
+context "Set#proper_superset?" do
   pending "returns true if passed a Set that self is a proper superset of"
   pending "raises an ArgumentError when passed a non-Set"
   context "when comparing to a Set-like object" do

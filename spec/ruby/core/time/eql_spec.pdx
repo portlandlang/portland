@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#eql?" do
+context "Time#eql?" do
   pending "returns true if self and other have the same whole number of seconds"
   pending "returns false if self and other have differing whole numbers of seconds"
   pending "returns true if self and other have the same number of microseconds"

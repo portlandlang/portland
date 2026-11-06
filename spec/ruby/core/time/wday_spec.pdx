@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#wday" do
+context "Time#wday" do
   pending "returns an integer representing the day of the week, 0..6, with Sunday being 0"
 end

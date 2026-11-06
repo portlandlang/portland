@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#to_s" do
+context "Proc#to_s" do
   context "for a proc created with Proc.new" do
     pending "returns a description including file and line number"
     pending "has a binary encoding"
@@ -17,11 +17,11 @@ context "Proc\#to_s" do
     pending "returns a description including file and line number"
     pending "has a binary encoding"
   end
-  context "for a proc created with UnboundMethod\#to_proc" do
+  context "for a proc created with UnboundMethod#to_proc" do
     pending "returns a description including '(lambda)' and optionally including file and line number"
     pending "has a binary encoding"
   end
-  context "for a proc created with Symbol\#to_proc" do
+  context "for a proc created with Symbol#to_proc" do
     pending "returns a description including '(&:symbol)'"
     pending "has a binary encoding"
   end

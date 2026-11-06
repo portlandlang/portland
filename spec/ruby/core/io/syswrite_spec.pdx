@@ -4,17 +4,17 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#syswrite on a file" do
+context "IO#syswrite on a file" do
   pending "writes all of the string's bytes but does not buffer them"
   pending "does not modify the passed argument"
-  pending "warns if called immediately after a buffered IO\#write"
-  pending "does not warn if called after IO\#write with intervening IO\#sysread"
-  pending "writes to the actual file position when called after buffered IO\#read"
+  pending "warns if called immediately after a buffered IO#write"
+  pending "does not warn if called after IO#write with intervening IO#sysread"
+  pending "writes to the actual file position when called after buffered IO#read"
 end
-context "IO\#syswrite on a pipe" do
+context "IO#syswrite on a pipe" do
   pending "returns the written bytes if the fd is in nonblock mode and write would block"
 end
-context "IO\#syswrite" do
+context "IO#syswrite" do
   pending "behaves like :io_write :syswrite"
   pending "behaves like :io_write_no_transcode :syswrite"
 end

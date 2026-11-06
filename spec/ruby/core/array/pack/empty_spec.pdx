@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with empty format" do
+context "Array#pack with empty format" do
   pending "returns an empty String"
   pending "returns a String with US-ASCII encoding"
 end

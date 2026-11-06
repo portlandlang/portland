@@ -16,7 +16,7 @@ context "Net::HTTP.start" do
     pending "closes the tcp connection after yielding"
   end
 end
-context "Net::HTTP\#start" do
+context "Net::HTTP#start" do
   pending "returns self"
   pending "opens the tcp connection"
   context "when self has already been started" do

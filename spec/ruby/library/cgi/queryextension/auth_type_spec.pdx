@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::QueryExtension\#auth_type" do
+context "CGI::QueryExtension#auth_type" do
   pending "returns ENV['AUTH_TYPE']"
 end

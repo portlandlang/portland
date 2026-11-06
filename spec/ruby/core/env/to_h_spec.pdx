@@ -12,7 +12,7 @@ context "ENV.to_h" do
     pending "does not require the array elements to be strings"
     pending "raises ArgumentError if block returns longer or shorter array"
     pending "raises TypeError if block returns something other than Array"
-    pending "coerces returned pair to Array with \#to_ary"
-    pending "does not coerce returned pair to Array with \#to_a"
+    pending "coerces returned pair to Array with #to_ary"
+    pending "does not coerce returned pair to Array with #to_a"
   end
 end

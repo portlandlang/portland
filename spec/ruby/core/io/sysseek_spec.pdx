@@ -4,14 +4,14 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#sysseek" do
+context "IO#sysseek" do
   pending "behaves like :io_set_pos :sysseek"
 end
-context "IO\#sysseek" do
+context "IO#sysseek" do
   pending "moves the read position relative to the current position with SEEK_CUR"
   pending "accepts the symbol :CUR for SEEK_CUR"
   pending "raises an error when called after buffered reads"
-  pending "seeks normally even when called immediately after a buffered IO\#read"
+  pending "seeks normally even when called immediately after a buffered IO#read"
   pending "moves the read position relative to the start with SEEK_SET"
   pending "accepts the symbol :SET for SEEK_SET"
   pending "moves the read position relative to the end with SEEK_END"

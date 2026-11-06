@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#[]" do
+context "MatchData#[]" do
   pending "acts as normal array indexing [index]"
   pending "supports accessors [start, length]"
   pending "supports ranges [start..end]"
@@ -13,7 +13,7 @@ context "MatchData\#[]" do
   pending "supports beginningless endless ranges [nil..nil]"
   pending "returns instances of String when given a String subclass"
 end
-context "MatchData\#[Symbol]" do
+context "MatchData#[Symbol]" do
   pending "returns the corresponding named match when given a Symbol"
   pending "returns the corresponding named match when given a String"
   pending "returns the matching version of multiple corresponding named match"

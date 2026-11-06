@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#-@" do
-  pending "sends \#-@ to the real and imaginary parts and returns a Complex with the resulting respective parts"
+context "Complex#-@" do
+  pending "sends #-@ to the real and imaginary parts and returns a Complex with the resulting respective parts"
 end

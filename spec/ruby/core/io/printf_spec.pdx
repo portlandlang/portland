@@ -4,8 +4,8 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#printf" do
-  pending "calls \#to_str to convert the format object to a String"
-  pending "writes the \#sprintf formatted string"
+context "IO#printf" do
+  pending "calls #to_str to convert the format object to a String"
+  pending "writes the #sprintf formatted string"
   pending "raises IOError on closed stream"
 end

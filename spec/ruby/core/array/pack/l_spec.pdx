@@ -4,21 +4,21 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'L'" do
+context "Array#pack with format 'L'" do
   pending "behaves like :array_pack_basic L"
   pending "behaves like :array_pack_basic_non_float L"
   pending "behaves like :array_pack_arguments L"
   pending "behaves like :array_pack_numeric_basic L"
   pending "behaves like :array_pack_integer L"
 end
-context "Array\#pack with format 'l'" do
+context "Array#pack with format 'l'" do
   pending "behaves like :array_pack_basic l"
   pending "behaves like :array_pack_basic_non_float l"
   pending "behaves like :array_pack_arguments l"
   pending "behaves like :array_pack_numeric_basic l"
   pending "behaves like :array_pack_integer l"
 end
-context "Array\#pack with format 'L'" do
+context "Array#pack with format 'L'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_32bit_le L<"
   end
@@ -58,7 +58,7 @@ context "Array\#pack with format 'L'" do
     pending "behaves like :array_pack_64bit_be L!>"
   end
 end
-context "Array\#pack with format 'l'" do
+context "Array#pack with format 'l'" do
   context "with modifier '<'" do
     pending "behaves like :array_pack_32bit_le l<"
   end
@@ -98,63 +98,63 @@ context "Array\#pack with format 'l'" do
     pending "behaves like :array_pack_64bit_be l!>"
   end
 end
-context "Array\#pack with format 'L'" do
+context "Array#pack with format 'L'" do
   pending "behaves like :array_pack_32bit_le L"
 end
-context "Array\#pack with format 'l'" do
+context "Array#pack with format 'l'" do
   pending "behaves like :array_pack_32bit_le l"
 end
-context "Array\#pack with format 'L' with modifier '_'" do
+context "Array#pack with format 'L' with modifier '_'" do
   pending "behaves like :array_pack_32bit_le L_"
 end
-context "Array\#pack with format 'L' with modifier '!'" do
+context "Array#pack with format 'L' with modifier '!'" do
   pending "behaves like :array_pack_32bit_le L!"
 end
-context "Array\#pack with format 'l' with modifier '_'" do
+context "Array#pack with format 'l' with modifier '_'" do
   pending "behaves like :array_pack_32bit_le l_"
 end
-context "Array\#pack with format 'l' with modifier '!'" do
+context "Array#pack with format 'l' with modifier '!'" do
   pending "behaves like :array_pack_32bit_le l!"
 end
-context "Array\#pack with format 'L' with modifier '_'" do
+context "Array#pack with format 'L' with modifier '_'" do
   pending "behaves like :array_pack_64bit_le L_"
 end
-context "Array\#pack with format 'L' with modifier '!'" do
+context "Array#pack with format 'L' with modifier '!'" do
   pending "behaves like :array_pack_64bit_le L!"
 end
-context "Array\#pack with format 'l' with modifier '_'" do
+context "Array#pack with format 'l' with modifier '_'" do
   pending "behaves like :array_pack_64bit_le l_"
 end
-context "Array\#pack with format 'l' with modifier '!'" do
+context "Array#pack with format 'l' with modifier '!'" do
   pending "behaves like :array_pack_64bit_le l!"
 end
-context "Array\#pack with format 'L'" do
+context "Array#pack with format 'L'" do
   pending "behaves like :array_pack_32bit_be L"
 end
-context "Array\#pack with format 'l'" do
+context "Array#pack with format 'l'" do
   pending "behaves like :array_pack_32bit_be l"
 end
-context "Array\#pack with format 'L' with modifier '_'" do
+context "Array#pack with format 'L' with modifier '_'" do
   pending "behaves like :array_pack_32bit_be L_"
 end
-context "Array\#pack with format 'L' with modifier '!'" do
+context "Array#pack with format 'L' with modifier '!'" do
   pending "behaves like :array_pack_32bit_be L!"
 end
-context "Array\#pack with format 'l' with modifier '_'" do
+context "Array#pack with format 'l' with modifier '_'" do
   pending "behaves like :array_pack_32bit_be l_"
 end
-context "Array\#pack with format 'l' with modifier '!'" do
+context "Array#pack with format 'l' with modifier '!'" do
   pending "behaves like :array_pack_32bit_be l!"
 end
-context "Array\#pack with format 'L' with modifier '_'" do
+context "Array#pack with format 'L' with modifier '_'" do
   pending "behaves like :array_pack_64bit_be L_"
 end
-context "Array\#pack with format 'L' with modifier '!'" do
+context "Array#pack with format 'L' with modifier '!'" do
   pending "behaves like :array_pack_64bit_be L!"
 end
-context "Array\#pack with format 'l' with modifier '_'" do
+context "Array#pack with format 'l' with modifier '_'" do
   pending "behaves like :array_pack_64bit_be l_"
 end
-context "Array\#pack with format 'l' with modifier '!'" do
+context "Array#pack with format 'l' with modifier '!'" do
   pending "behaves like :array_pack_64bit_be l!"
 end

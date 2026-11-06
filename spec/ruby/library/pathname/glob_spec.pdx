@@ -13,7 +13,7 @@ context "Pathname.glob" do
   pending "raises an ArgumentError when supplied a keyword argument other than :base"
   pending "does not raise an ArgumentError when supplied a flag and :base keyword argument"
 end
-context "Pathname\#glob" do
+context "Pathname#glob" do
   pending "returns [] for no match"
   pending "returns [] when the pathname does not exist"
   pending "returns matching file paths"

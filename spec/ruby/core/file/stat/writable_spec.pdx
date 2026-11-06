@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#writable?" do
+context "File::Stat#writable?" do
   pending "behaves like :file_writable :writable? FileStat"
 end

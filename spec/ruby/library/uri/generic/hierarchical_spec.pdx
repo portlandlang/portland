@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#hierarchical?" do
+context "URI::Generic#hierarchical?" do
   pending "needs to be reviewed for spec completeness"
 end

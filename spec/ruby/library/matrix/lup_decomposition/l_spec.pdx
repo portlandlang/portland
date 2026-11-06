@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#l" do
+context "Matrix::LUPDecomposition#l" do
   pending "returns the first element of to_a"
   pending "returns a lower triangular matrix"
 end

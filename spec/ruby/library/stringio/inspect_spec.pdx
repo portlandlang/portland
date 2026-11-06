@@ -4,8 +4,8 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#inspect" do
-  pending "returns the same as \#to_s"
+context "StringIO#inspect" do
+  pending "returns the same as #to_s"
   pending "does not include the contents"
-  pending "uses the regular Object\#inspect without any instance variable"
+  pending "uses the regular Object#inspect without any instance variable"
 end

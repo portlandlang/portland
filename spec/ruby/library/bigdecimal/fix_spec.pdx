@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#fix" do
+context "BigDecimal#fix" do
   pending "returns a BigDecimal"
   pending "returns the integer part of the absolute value"
   pending "correctly handles special values"

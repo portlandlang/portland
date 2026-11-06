@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#scan" do
+context "String#scan" do
   pending "returns an array containing all matches"
   pending "respects unicode when the pattern collapses to nothing"
   pending "stores groups as arrays in the returned arrays"
@@ -16,7 +16,7 @@ context "String\#scan" do
   pending "does not raise any errors when passed a multi-byte string"
   pending "returns Strings in the same encoding as self"
 end
-context "String\#scan with pattern and block" do
+context "String#scan with pattern and block" do
   pending "returns self"
   pending "passes each match to the block as one argument: an array"
   pending "passes groups to the block as one argument: an array"

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#inspect" do
-  pending "is an alias of OpenStruct\#to_s"
+context "OpenStruct#inspect" do
+  pending "is an alias of OpenStruct#to_s"
 end

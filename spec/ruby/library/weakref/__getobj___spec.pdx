@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "WeakRef\#__getobj__" do
+context "WeakRef#__getobj__" do
   pending "returns the object if it is reachable"
   pending "raises WeakRef::RefError if the object is no longer reachable"
 end

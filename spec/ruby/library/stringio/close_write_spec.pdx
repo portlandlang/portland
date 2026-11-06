@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#close_write" do
+context "StringIO#close_write" do
   pending "returns nil"
   pending "prevents further writing"
   pending "allows further reading"

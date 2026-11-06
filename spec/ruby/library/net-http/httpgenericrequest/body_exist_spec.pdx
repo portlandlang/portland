@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#body_exist?" do
+context "Net::HTTPGenericRequest#body_exist?" do
   pending "returns true when the response is expected to have a body"
   context "when $VERBOSE is true" do
     pending "emits a warning"

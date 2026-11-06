@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#real" do
+context "Numeric#real" do
   pending "returns self"
   pending "raises an ArgumentError if given any arguments"
 end
-context "Numeric\#real?" do
+context "Numeric#real?" do
   pending "returns true"
 end

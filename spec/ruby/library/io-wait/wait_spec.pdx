@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#wait" do
+context "IO#wait" do
   context "[events, timeout] passed" do
     pending "returns events mask when the READABLE event is ready during the timeout"
     pending "returns events mask when the WRITABLE event is ready during the timeout"

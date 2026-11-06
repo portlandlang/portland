@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#sleep" do
+context "Kernel#sleep" do
   pending "is a private method"
   pending "returns an Integer"
   pending "accepts a Float"
@@ -16,7 +16,7 @@ context "Kernel\#sleep" do
   pending "pauses execution indefinitely if not given a duration"
   pending "sleeps with nanosecond precision"
   pending "accepts a nil duration"
-  context "Kernel\#sleep with Fiber scheduler" do
+  context "Kernel#sleep with Fiber scheduler" do
     pending "calls the scheduler without arguments when no duration is given"
     pending "calls the scheduler with the given duration"
     pending "does not call the scheduler if the fiber is blocking"

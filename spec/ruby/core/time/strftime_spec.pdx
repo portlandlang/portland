@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#strftime" do
+context "Time#strftime" do
   pending "behaves like :strftime_date :strftime"
   pending "behaves like :strftime_time :strftime"
   pending "requires an argument"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Vector\#eql?" do
+context "Vector#eql?" do
   pending "returns true for self"
-  pending "returns false when there are a pair corresponding elements which are not equal in the sense of Kernel\#eql?"
+  pending "returns false when there are a pair corresponding elements which are not equal in the sense of Kernel#eql?"
 end

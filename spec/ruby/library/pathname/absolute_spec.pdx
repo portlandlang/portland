@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#absolute?" do
+context "Pathname#absolute?" do
   pending "returns true for the root directory"
   pending "returns true for a dir starting with a slash"
   pending "returns false for a dir not starting with a slash"

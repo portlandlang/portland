@@ -17,7 +17,7 @@ Ruby has three openers:
 <<~EOS     # squiggly: strips the common leading indentation
 ```
 
-ADR 0015 made `<<` Portland's append operator, which collides with Ruby's heredoc opener. Ruby resolves that collision by asking whether the receiver is a known **local variable** or a **method** — verified on 4.0.6:
+ADR 0015 made `<<` Portland's append operator, which collides with Ruby's heredoc opener. Ruby resolves that collision by asking whether the receiver is a known **local variable** or a **method** — verified on 4.0.9:
 
 ```ruby
 x = []
@@ -39,7 +39,7 @@ This is the usual one-way-to-do-it call, but it also has a structural payoff: **
 
 `<<~` loses less than it appears: it strips only the _common_ indentation, so relative structure survives. The single thing it cannot express is uniform absolute leading whitespace, which can be written explicitly.
 
-The rest follows Ruby, verified on 4.0.6:
+The rest follows Ruby, verified on 4.0.9:
 
 ```ruby
 foo = <<~EOS        # no space between `<<~` and the terminator
@@ -70,7 +70,7 @@ B
 
 **No space is permitted between `<<~` and the terminator.** `<<~ EOS` is already a syntax error in Ruby, so this codifies existing behavior rather than diverging.
 
-**Terminators are SCREAMING_CAPS.** Ruby permits any identifier — `<<~sql`, `<<~Sql`, `<<~_x`, `<<~q1`, even `<<~puts` all parse (verified on 4.0.6), with the closing line required to match exactly. Portland requires uppercase, optionally with digits and underscores:
+**Terminators are SCREAMING_CAPS.** Ruby permits any identifier — `<<~sql`, `<<~Sql`, `<<~_x`, `<<~q1`, even `<<~puts` all parse (verified on 4.0.9), with the closing line required to match exactly. Portland requires uppercase, optionally with digits and underscores:
 
 ```ruby
 db = <<~SQL

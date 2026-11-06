@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#imaginary" do
+context "Numeric#imaginary" do
   pending "returns 0"
   pending "raises an ArgumentError if given any arguments"
 end

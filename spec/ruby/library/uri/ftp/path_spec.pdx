@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::FTP\#path=" do
+context "URI::FTP#path=" do
   pending "does not require a leading /"
   pending "does not strip the leading /"
 end
-context "URI::FTP\#path" do
+context "URI::FTP#path" do
   pending "unescapes the leading /"
 end

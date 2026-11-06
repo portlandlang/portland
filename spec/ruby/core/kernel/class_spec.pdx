@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#class" do
+context "Kernel#class" do
   pending "returns the class of the object"
   pending "returns Class for a class"
   pending "returns the first non-singleton class"

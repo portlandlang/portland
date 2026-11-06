@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#join" do
+context "Set#join" do
   pending "returns an empty string if the Set is empty"
   pending "returns a new string formed by joining elements after conversion"
   pending "does not separate elements when the passed separator is nil"
   pending "returns a string formed by concatenating each element separated by the separator"
-  pending "calls \#to_a to convert the Set in to an Array"
+  pending "calls #to_a to convert the Set in to an Array"
 end

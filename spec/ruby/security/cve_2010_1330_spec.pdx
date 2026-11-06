@@ -4,6 +4,6 @@
 
 require_relative "../../spec_helper"
 
-context "String\#gsub" do
+context "String#gsub" do
   pending "resists CVE-2010-1330 by raising an exception on invalid UTF-8 bytes"
 end

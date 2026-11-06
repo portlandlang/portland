@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#termsig" do
+context "Process::Status#termsig" do
   context "for a child that exited normally" do
     pending "returns nil"
   end

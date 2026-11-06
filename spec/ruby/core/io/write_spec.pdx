@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#write on a file" do
+context "IO#write on a file" do
   pending "does not check if the file is writable if writing zero bytes"
   pending "returns a length of 0 when writing a blank string"
   pending "returns a length of 0 when writing blank strings"
@@ -39,15 +39,15 @@ context "IO.write" do
   pending "warns about deprecation given a path with a pipe"
   pending "writes to that literal file when path starts with a pipe"
 end
-context "IO\#write" do
+context "IO#write" do
   pending "behaves like :io_write :write"
   pending "behaves like :io_write_transcode :write"
   pending "accepts multiple arguments"
 end
-context "IO\#write on Windows" do
+context "IO#write on Windows" do
   pending "normalizes line endings in text mode"
   pending "does not normalize line endings in binary mode"
 end
-context "IO\#write on STDOUT" do
+context "IO#write on STDOUT" do
   pending "raises SignalException SIGPIPE if the stream is closed instead of Errno::EPIPE like other IOs"
 end

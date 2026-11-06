@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#second" do
+context "DateTime#second" do
   pending "returns 0 seconds if passed no arguments"
   pending "returns the seconds passed in the arguments"
   pending "adds 60 to negative values"

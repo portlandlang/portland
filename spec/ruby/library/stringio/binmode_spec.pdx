@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#binmode" do
+context "StringIO#binmode" do
   pending "returns self"
   pending "changes external encoding to BINARY"
   pending "does not set internal encoding"

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#cmsg_is?" do
+context "Socket::AncillaryData#cmsg_is?" do
   context "using :INET, :IP, :TTL as the family, level, and type" do
     pending "returns true when comparing with IPPROTO_IP and IP_TTL"
     pending "returns true when comparing with :IP and :TTL"

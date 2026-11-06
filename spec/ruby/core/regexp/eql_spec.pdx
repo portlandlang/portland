@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#eql?" do
-  pending "is an alias of Regexp\#=="
+context "Regexp#eql?" do
+  pending "is an alias of Regexp#=="
 end

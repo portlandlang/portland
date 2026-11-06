@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#scan_byte" do
+context "StringScanner#scan_byte" do
   pending "scans one byte and returns it as on Integer"
   pending "is not multi-byte character sensitive"
   pending "returns nil at the end of the string"
   pending "changes current position"
   pending "sets the last match result"
-  context "\#[] successive call with a capture group name" do
+  context "#[] successive call with a capture group name" do
     pending "returns nil"
     pending "raises IndexError"
     pending "returns a matching character when given Integer index"

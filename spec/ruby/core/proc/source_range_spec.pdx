@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#source_range" do
+context "Proc#source_range" do
   pending "sets absolute_path to the real path of the source file"
   pending "sets path to the source location path"
   pending "works for proc {}"
@@ -20,7 +20,7 @@ context "Proc\#source_range" do
   pending "works for define_method & to_proc"
   pending "returns the same range for a proc-ified method as the method reports"
   pending "returns nil for a core method that has been proc-ified"
-  pending "sets \#path when \#absolute_path is nil"
-  pending "sets \#absolute_path to nil even if an absolute path is given to eval"
+  pending "sets #path when #absolute_path is nil"
+  pending "sets #absolute_path to nil even if an absolute path is given to eval"
   pending "considers eval's start line"
 end

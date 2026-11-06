@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#leap?" do
+context "Date#leap?" do
   pending "needs to be reviewed for spec completeness"
 end
 context "Date.leap?" do

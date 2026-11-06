@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Tempfile\#open" do
+context "Tempfile#open" do
   pending "reopens self"
   pending "reopens self in read and write mode and does not truncate"
 end

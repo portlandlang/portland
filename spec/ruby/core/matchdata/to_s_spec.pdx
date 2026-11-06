@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#to_s" do
+context "MatchData#to_s" do
   pending "returns the entire matched string"
   pending "returns an instance of String when given a String subclass"
 end

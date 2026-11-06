@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "File\#reopen" do
+context "File#reopen" do
   pending "resets the stream to a new file path"
-  pending "calls \#to_path to convert an Object"
+  pending "calls #to_path to convert an Object"
 end

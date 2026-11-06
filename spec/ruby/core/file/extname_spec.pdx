@@ -13,7 +13,7 @@ context "File.extname" do
     pending "returns '.'"
   end
   pending "returns only the last extension of a file with several dots"
-  pending "accepts an object that has a \#to_path method"
+  pending "accepts an object that has a #to_path method"
   pending "raises a TypeError if not passed a String type"
   pending "raises an ArgumentError if not passed one argument"
   pending "returns the extension for a multibyte filename"

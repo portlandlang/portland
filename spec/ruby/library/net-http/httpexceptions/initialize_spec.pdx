@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPExceptions\#initialize when passed message, response" do
+context "Net::HTTPExceptions#initialize when passed message, response" do
   pending "calls super with the passed message"
   pending "sets self's response to the passed response"
 end

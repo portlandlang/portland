@@ -6,6 +6,6 @@ require_relative "../../../spec_helper"
 
 context "Performance warnings" do
   context "when redefined optimised methods" do
-    pending "emits performance warning for redefining Integer\#+"
+    pending "emits performance warning for redefining Integer#+"
   end
 end

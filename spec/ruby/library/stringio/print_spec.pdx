@@ -4,20 +4,20 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#print" do
+context "StringIO#print" do
   pending "prints $_ when passed no arguments"
   pending "prints the passed arguments to self"
-  pending "tries to convert the passed Object to a String using \#to_s"
+  pending "tries to convert the passed Object to a String using #to_s"
   pending "returns nil"
   pending "pads self with \\000 when the current position is after the end"
   pending "honors the output record separator global"
   pending "updates the current position"
   pending "correctly updates the current position when honoring the output record separator global"
 end
-context "StringIO\#print when in append mode" do
+context "StringIO#print when in append mode" do
   pending "appends the passed argument to the end of self"
   pending "correctly updates self's position"
 end
-context "StringIO\#print when self is not writable" do
+context "StringIO#print when self is not writable" do
   pending "raises an IOError"
 end

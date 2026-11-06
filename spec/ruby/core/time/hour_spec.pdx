@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#hour" do
+context "Time#hour" do
   pending "returns the hour of the day (0..23) for a local Time"
   pending "returns the hour of the day for a UTC Time"
   pending "returns the hour of the day for a Time with a fixed offset"

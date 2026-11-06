@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#string" do
+context "MatchData#string" do
   pending "returns a copy of the match string"
   pending "returns a frozen copy of the match string"
   pending "returns the same frozen string for every call"

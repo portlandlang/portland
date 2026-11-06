@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#read" do
+context "Dir#read" do
   pending "returns the file name in the current seek position"
   pending "returns nil when there are no more entries"
   pending "returns each entry successively"

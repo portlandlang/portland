@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#read" do
+context "Zlib::GzipReader#read" do
   pending "with no arguments reads the entire content of a gzip file"
   pending "with nil length argument reads the entire content of a gzip file"
   pending "reads the contents up to a certain size"

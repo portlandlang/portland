@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#getch" do
+context "StringScanner#getch" do
   pending "scans one character and returns it"
   pending "scans newlines too"
   pending "is multi-byte character sensitive"
   pending "returns nil at the end of the string"
-  context "\#[] successive call with a capture group name" do
+  context "#[] successive call with a capture group name" do
     pending "returns nil"
     pending "raises IndexError"
     pending "returns a matching character when given Integer index"

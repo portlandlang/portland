@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#public_methods" do
+context "Delegator#public_methods" do
   pending "includes public methods of the delegate object"
   pending "includes public instance methods of the Delegator class"
 end

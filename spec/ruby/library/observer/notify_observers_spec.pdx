@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Observer\#notify_observers" do
+context "Observer#notify_observers" do
   pending "must call changed before notifying observers"
   pending "verifies observer responds to update"
   pending "receives the callback"

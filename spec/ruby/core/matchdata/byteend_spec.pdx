@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "MatchData\#byteend" do
+context "MatchData#byteend" do
   context "when passed an integer argument" do
     pending "returns the byte-based offset of the end of the nth element"
     pending "returns nil when the nth match isn't found"
     pending "returns the byte-based offset for multi-byte strings"
     pending "returns the byte-based offset for multi-byte strings with unicode regexp"
-    pending "tries to convert the passed argument to an Integer using \#to_int"
+    pending "tries to convert the passed argument to an Integer using #to_int"
   end
   context "when passed a String argument" do
     pending "return the byte-based offset of the start of the named capture"

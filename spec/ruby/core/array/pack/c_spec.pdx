@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'C'" do
+context "Array#pack with format 'C'" do
   pending "behaves like :array_pack_basic C"
   pending "behaves like :array_pack_basic_non_float C"
   pending "behaves like :array_pack_8bit C"
@@ -13,7 +13,7 @@ context "Array\#pack with format 'C'" do
   pending "behaves like :array_pack_integer C"
   pending "behaves like :array_pack_no_platform C"
 end
-context "Array\#pack with format 'c'" do
+context "Array#pack with format 'c'" do
   pending "behaves like :array_pack_basic c"
   pending "behaves like :array_pack_basic_non_float c"
   pending "behaves like :array_pack_8bit c"

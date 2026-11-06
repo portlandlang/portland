@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with directive 'w'" do
+context "String#unpack with directive 'w'" do
   pending "behaves like :string_unpack_basic w"
   pending "behaves like :string_unpack_no_platform w"
   pending "decodes a BER-compressed integer"
   pending "raise ArgumentError for NULL bytes between directives"
   pending "ignores spaces between directives"
 end
-context "String\#unpack with directive 'w*'" do
+context "String#unpack with directive 'w*'" do
   pending "decodes BER-compressed integers"
 end

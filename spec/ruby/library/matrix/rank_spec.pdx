@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#rank" do
+context "Matrix#rank" do
   pending "returns the rank of the Matrix"
   pending "doesn't loop forever"
   pending "works for some easy rectangular matrices"

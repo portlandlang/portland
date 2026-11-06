@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::Inflate\#inflate" do
+context "Zlib::Inflate#inflate" do
   pending "inflates some data"
   pending "inflates lots of data"
   pending "works in pass-through mode, once finished"
@@ -18,7 +18,7 @@ context "Zlib::Inflate.inflate" do
   pending "properly handles excessive data, byte-by-byte"
   pending "properly handles excessive data, in one go"
 end
-context "Zlib::Inflate\#inflate" do
+context "Zlib::Inflate#inflate" do
   context "without break" do
     pending "inflates chunked data"
     pending "properly handles chunked data"

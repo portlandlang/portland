@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Prime\#next" do
+context "Prime#next" do
   pending "returns the element at the current position and moves forward"
 end

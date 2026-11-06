@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#head" do
+context "Net::HTTP#head" do
   pending "sends a MOVE request to the passed path and returns the response"
   pending "returns a Net::HTTPResponse"
 end

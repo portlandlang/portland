@@ -50,7 +50,7 @@ context "Comparable" do
 
   # One range for both bounds (#101). Ranges hold integers (ADR 0019), so
   # upstream's struct ranges wait; a number clamps by an integer range, as
-  # Ruby 4.0.7 answers.
+  # Ruby 4.0.9 answers.
   describe "#clamp with a range" do
     specify "clamps a number between the range's ends" do
       expect(5.clamp(1..3)).to eq(3)

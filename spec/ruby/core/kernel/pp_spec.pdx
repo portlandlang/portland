@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#pp" do
+context "Kernel#pp" do
   pending "lazily loads the 'pp' library and delegates the call to that library"
 end

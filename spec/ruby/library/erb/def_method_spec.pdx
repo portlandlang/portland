@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "ERB\#def_method" do
+context "ERB#def_method" do
   pending "define module's instance method to render eRuby file"
 end

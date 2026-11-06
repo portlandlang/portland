@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::Inflate\#finish" do
+context "Zlib::Inflate#finish" do
   pending "inflates chunked data"
   pending "each chunk should have the same prefix"
 end

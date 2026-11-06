@@ -9,9 +9,9 @@ context "Process.detach" do
   pending "produces the exit Process::Status as the thread value"
   pending "reaps the child process's status automatically"
   pending "sets the :pid thread-local to the PID"
-  pending "provides a \#pid method on the returned thread which returns the PID"
+  pending "provides a #pid method on the returned thread which returns the PID"
   pending "tolerates not existing child process pid"
-  pending "calls \#to_int to implicitly convert non-Integer pid to Integer"
-  pending "raises TypeError when pid argument does not have \#to_int method"
-  pending "raises TypeError when \#to_int returns non-Integer value"
+  pending "calls #to_int to implicitly convert non-Integer pid to Integer"
+  pending "raises TypeError when pid argument does not have #to_int method"
+  pending "raises TypeError when #to_int returns non-Integer value"
 end

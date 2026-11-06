@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Object\#to_yaml" do
+context "Object#to_yaml" do
   pending "returns the YAML representation of an Array object"
   pending "returns the YAML representation of a Hash object"
   pending "returns the YAML representation of an object"

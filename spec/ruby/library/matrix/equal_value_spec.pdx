@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#==" do
+context "Matrix#==" do
   pending "behaves like :equal :=="
   pending "returns true if some elements are == but not eql?"
 end

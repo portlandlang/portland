@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#jd" do
+context "Date#jd" do
   pending "determines the Julian day for a Date object"
 end
 context "Date.jd" do

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#realpath" do
+context "Pathname#realpath" do
   pending "returns a Pathname"
 end

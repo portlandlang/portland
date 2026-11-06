@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#checkbox_group" do
+context "CGI::HtmlExtension#checkbox_group" do
   context "when passed name, values ..." do
     pending "returns a sequence of 'checkbox'-elements with the passed name and the passed values"
     pending "allows passing a value inside an Array"

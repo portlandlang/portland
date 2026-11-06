@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#image_button" do
+context "CGI::HtmlExtension#image_button" do
   context "when passed no arguments" do
     pending "returns an image-'input'-element without a source image"
     pending "ignores a passed block"

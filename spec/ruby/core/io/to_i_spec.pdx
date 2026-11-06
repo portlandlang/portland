@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#to_i" do
-  pending "is an alias of IO\#fileno"
+context "IO#to_i" do
+  pending "is an alias of IO#fileno"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#lambda?" do
+context "Proc#lambda?" do
   pending "returns true if the Proc was created from a block with the lambda keyword"
   pending "returns false if the Proc was created from a block with the proc keyword"
   pending "returns false if the Proc was created from a block with Proc.new"

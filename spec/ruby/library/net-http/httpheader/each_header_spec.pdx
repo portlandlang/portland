@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#each_header" do
+context "Net::HTTPHeader#each_header" do
   context "when passed a block" do
     pending "yields each header entry to the passed block (keys in lower case, values joined)"
   end

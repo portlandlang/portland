@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "ERB\#run" do
+context "ERB#run" do
   pending "print the result of compiled ruby code"
   pending "share local variables"
   pending "is not able to h() or u() unless including ERB::Util"

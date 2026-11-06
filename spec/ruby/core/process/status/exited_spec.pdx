@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Status\#exited?" do
+context "Process::Status#exited?" do
   context "for a child that exited normally" do
     pending "returns true"
   end

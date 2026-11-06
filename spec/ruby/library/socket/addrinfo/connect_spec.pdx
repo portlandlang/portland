@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#connect" do
+context "Addrinfo#connect" do
   pending "returns a Socket when no block is given"
   pending "yields a Socket when a block is given"
   pending "accepts a Hash of options"

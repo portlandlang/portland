@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#asctime" do
+context "Date#asctime" do
   pending "returns a canonical string representation of date"
 end

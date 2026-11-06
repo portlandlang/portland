@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#blksize" do
+context "File::Stat#blksize" do
   pending "returns the blksize of a File::Stat object"
   pending "returns nil"
 end

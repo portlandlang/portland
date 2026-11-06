@@ -1,7 +1,7 @@
 # `JSON.generate` and `JSON.pretty_generate` (ADR 0072): the json gem's text
 # — its float writer, its escapes, its two-space pretty form — with NaN and
 # Infinity as failures, and a struct or range refusing where Ruby writes
-# garbage. The gem's answers, verified against Ruby 4.0.7, recorded in #182.
+# garbage. The gem's answers, verified against Ruby 4.0.9, recorded in #182.
 
 require_relative "../spec_helper"
 

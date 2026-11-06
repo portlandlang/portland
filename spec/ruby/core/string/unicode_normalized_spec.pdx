@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#unicode_normalized?" do
+context "String#unicode_normalized?" do
   pending "returns true if string is in the specified normalization form"
   pending "returns false if string is not in the supplied normalization form"
   pending "defaults to the nfc normalization form if no forms are specified"

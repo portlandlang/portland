@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#to_r" do
+context "Rational#to_r" do
   pending "returns self"
   pending "raises TypeError trying to convert BasicObject"
   pending "works when a BasicObject has to_r"

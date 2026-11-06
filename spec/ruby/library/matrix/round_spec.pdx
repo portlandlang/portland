@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#round" do
+context "Matrix#round" do
   pending "returns a matrix with all entries rounded"
   pending "returns empty matrices on the same size if empty"
   context "for a subclass of Matrix" do

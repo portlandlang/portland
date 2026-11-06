@@ -1,5 +1,5 @@
 # `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
-# spells them, answering what Ruby 4.0.7 answers; a domain error is a
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
 # failure in Ruby's own sentence. From ruby/spec core/math, the whole
 # directory: the `Float()` coercion rows and the private-instance-method
 # rows (`include Math`) stay upstream, since a namespace is not a mixin and

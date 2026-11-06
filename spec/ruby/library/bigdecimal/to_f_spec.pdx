@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#to_f" do
+context "BigDecimal#to_f" do
   pending "returns number of type float"
   pending "rounds correctly to Float precision"
   pending "properly handles special values"

@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#getbyte" do
+context "String#getbyte" do
   pending "returns an Integer if given a valid index"
   pending "starts indexing at 0"
   pending "counts from the end of the String if given a negative argument"
   pending "returns an Integer between 0 and 255"
   pending "regards a multi-byte character as having multiple bytes"
-  pending "mirrors the output of \#bytes"
+  pending "mirrors the output of #bytes"
   pending "interprets bytes relative to the String's encoding"
   pending "returns nil for out-of-bound indexes"
   pending "regards the empty String as containing no bytes"

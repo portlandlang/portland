@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#parameters" do
+context "Proc#parameters" do
   pending "returns an empty Array for a proc expecting no parameters"
   pending "returns an Array of Arrays for a proc expecting parameters"
   pending "sets the first element of each sub-Array to :opt for optional arguments"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#terminate" do
+context "GetoptLong#terminate" do
   pending "terminates option processing"
   pending "returns self when option processing is terminated"
   pending "returns nil when option processing was already terminated"

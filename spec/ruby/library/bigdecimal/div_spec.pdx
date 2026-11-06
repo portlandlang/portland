@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#div with precision set to 0" do
+context "BigDecimal#div with precision set to 0" do
   pending "behaves like :bigdecimal_quo :div [0]"
 end
-context "BigDecimal\#div" do
+context "BigDecimal#div" do
   pending "returns a / b with optional precision"
   context "with Object" do
     pending "tries to coerce the other operand to self"

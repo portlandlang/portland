@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#conj" do
-  pending "is an alias of Complex\#conjugate"
+context "Complex#conj" do
+  pending "is an alias of Complex#conjugate"
 end

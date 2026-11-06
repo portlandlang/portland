@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#infinite?" do
+context "Complex#infinite?" do
   pending "returns nil if magnitude is finite"
   pending "returns 1 for positive infinity"
   pending "returns 1 for positive complex with infinite imaginary"

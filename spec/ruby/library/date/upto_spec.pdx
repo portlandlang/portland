@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#upto" do
+context "Date#upto" do
   pending "returns future dates for the default step value"
 end

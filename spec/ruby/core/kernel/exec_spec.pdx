@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#exec" do
+context "Kernel#exec" do
   pending "is a private method"
   pending "runs the specified command, replacing current process"
 end

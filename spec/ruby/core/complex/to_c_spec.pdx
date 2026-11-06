@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#to_c" do
+context "Complex#to_c" do
   pending "returns self"
   pending "returns the same value"
 end

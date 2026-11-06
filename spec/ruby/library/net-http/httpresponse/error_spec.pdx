@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#error!" do
+context "Net::HTTPResponse#error!" do
   pending "raises self's class 'EXCEPTION_TYPE' Exception"
 end

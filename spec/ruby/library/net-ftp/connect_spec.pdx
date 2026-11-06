@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#connect" do
+context "Net::FTP#connect" do
   pending "tries to connect to the FTP Server on the given host and port"
   pending "returns nil"
   pending "does not raise any error when the response code is 220"

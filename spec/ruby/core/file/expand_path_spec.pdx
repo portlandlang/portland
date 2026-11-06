@@ -18,7 +18,7 @@ context "File.expand_path" do
   pending "expands ~ENV['USER']/a to a in the user's home directory"
   pending "does not expand ~ENV['USER'] when it's not at the start"
   pending "expands ../foo with ~/dir as base dir to /path/to/user/home/foo"
-  pending "accepts objects that have a \#to_path method"
+  pending "accepts objects that have a #to_path method"
   pending "raises a TypeError if not passed a String type"
   pending "expands /./dir to /dir"
   pending "expands C:/./dir to C:/dir"

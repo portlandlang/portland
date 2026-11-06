@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#sendcmd" do
+context "Net::FTP#sendcmd" do
   pending "sends the passed command to the server"
   pending "returns the server's response"
   pending "raises no error when the response code is 1xx, 2xx or 3xx"

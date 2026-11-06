@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#==" do
+context "OpenStruct#==" do
   pending "returns false when the passed argument is no OpenStruct"
   pending "returns true when self and other are equal method/value wise"
 end

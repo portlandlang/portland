@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#captures" do
+context "StringScanner#captures" do
   pending "returns the array of captured values of the most recent matching"
   pending "returns nil if the last match fails"
   pending "returns nil if there is no any match done"

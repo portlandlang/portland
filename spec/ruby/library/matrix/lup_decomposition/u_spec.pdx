@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::LUPDecomposition\#u" do
+context "Matrix::LUPDecomposition#u" do
   pending "returns the second element of to_a"
   pending "returns an upper triangular matrix"
 end

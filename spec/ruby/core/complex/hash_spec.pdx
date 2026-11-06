@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#hash" do
+context "Complex#hash" do
   pending "is static"
   pending "is different for different instances"
 end

@@ -4,12 +4,12 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#matched" do
+context "StringScanner#matched" do
   pending "returns the last matched string"
   pending "returns nil if there's no match"
   pending "behaves like :extract_range_matched :matched"
 end
-context "StringScanner\#matched?" do
+context "StringScanner#matched?" do
   pending "returns true if the last match was successful"
   pending "returns false if there's no match"
 end

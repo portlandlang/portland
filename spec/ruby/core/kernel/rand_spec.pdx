@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#rand" do
+context "Kernel#rand" do
   pending "is a private method"
   pending "returns a float if no argument is passed"
   pending "returns an integer for an integer argument"

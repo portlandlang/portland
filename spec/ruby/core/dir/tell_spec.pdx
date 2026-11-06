@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Dir\#tell" do
-  pending "is an alias of Dir\#pos"
+context "Dir#tell" do
+  pending "is an alias of Dir#pos"
 end

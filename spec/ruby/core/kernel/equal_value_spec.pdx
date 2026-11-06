@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#==" do
+context "Kernel#==" do
   pending "returns true only if obj and other are the same object"
 end

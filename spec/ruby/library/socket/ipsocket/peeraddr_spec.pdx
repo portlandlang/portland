@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::IPSocket\#peeraddr" do
+context "Socket::IPSocket#peeraddr" do
   pending "raises error if socket is not connected"
   pending "returns an array of information on the peer"
   pending "returns an IP instead of hostname if do_not_reverse_lookup is true"
   pending "returns an IP instead of hostname if passed false"
 end
-context "Socket::IPSocket\#peeraddr" do
+context "Socket::IPSocket#peeraddr" do
   context "without reverse lookups" do
     pending "returns an Array containing address information"
   end

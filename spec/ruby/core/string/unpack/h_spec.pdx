@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'H'" do
+context "String#unpack with format 'H'" do
   pending "behaves like :string_unpack_basic H"
   pending "behaves like :string_unpack_no_platform H"
   pending "decodes one nibble from each byte for each format character starting with the most significant bit"
@@ -19,7 +19,7 @@ context "String\#unpack with format 'H'" do
   pending "ignores spaces between directives"
   pending "should make strings with US_ASCII encoding"
 end
-context "String\#unpack with format 'h'" do
+context "String#unpack with format 'h'" do
   pending "behaves like :string_unpack_basic h"
   pending "behaves like :string_unpack_no_platform h"
   pending "decodes one nibble from each byte for each format character starting with the least significant bit"

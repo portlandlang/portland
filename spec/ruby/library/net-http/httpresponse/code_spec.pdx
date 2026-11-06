@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#code" do
+context "Net::HTTPResponse#code" do
   pending "returns the result code string"
 end

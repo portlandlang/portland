@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#html" do
+context "CGI::HtmlExtension#html" do
   context "when passed no arguments" do
     pending "returns a self's doctype and an 'html'-element"
     pending "includes the passed block when passed a block"

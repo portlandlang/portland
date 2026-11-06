@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#mtime" do
+context "Net::FTP#mtime" do
   pending "sends the MDTM with the passed filename command to the server"
   context "when passed filename" do
     pending "returns the last modification time of the passed file as a Time object in the local time"

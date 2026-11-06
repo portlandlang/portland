@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#nonzero?" do
+context "BigDecimal#nonzero?" do
   pending "returns self if self doesn't equal zero"
   pending "returns nil otherwise"
 end

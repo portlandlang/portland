@@ -24,7 +24,7 @@ context "File.new" do
   pending "returns a new read-only File when use File::RDONLY|File::CREAT mode"
   pending "returns a new read-only File when use File::CREAT mode"
   pending "coerces filename using to_str"
-  pending "coerces filename using \#to_path"
+  pending "coerces filename using #to_path"
   pending "accepts options as a keyword argument"
   pending "bitwise-ORs mode and flags option"
   pending "does not use the given block and warns to use File::open"

@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#canonical_each" do
-  pending "is an alias of Net::HTTPHeader\#each_capitalized"
+context "Net::HTTPHeader#canonical_each" do
+  pending "is an alias of Net::HTTPHeader#each_capitalized"
 end

@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#puttextfile" do
+context "Net::FTP#puttextfile" do
   pending "behaves like :net_ftp_puttextfile :puttextfile"
 end

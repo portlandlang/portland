@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::Cookie\#initialize when passed String" do
+context "CGI::Cookie#initialize when passed String" do
   pending "sets the self's name to the passed String"
   pending "sets the self's value to an empty Array"
   pending "sets self to a non-secure cookie"
@@ -13,13 +13,13 @@ context "CGI::Cookie\#initialize when passed String" do
   pending "does not set self's expiration date"
   pending "does not set self's domain"
 end
-context "CGI::Cookie\#initialize when passed Hash" do
+context "CGI::Cookie#initialize when passed Hash" do
   pending "sets self's contents based on the passed Hash"
   pending "does set self's path based on ENV[\"SCRIPT_NAME\"] when the Hash has no 'path' entry"
-  pending "tries to convert the Hash's 'value' to an Array using \#Array"
+  pending "tries to convert the Hash's 'value' to an Array using #Array"
   pending "raises a ArgumentError when the passed Hash has no 'name' entry"
 end
-context "CGI::Cookie\#initialize when passed String, values ..." do
+context "CGI::Cookie#initialize when passed String, values ..." do
   pending "sets the self's name to the passed String"
   pending "sets the self's value to an Array containing all passed values"
   pending "sets self to a non-secure cookie"

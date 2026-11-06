@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "Process::Tms\#utime" do
+context "Process::Tms#utime" do
   pending "returns utime attribute"
 end
-context "Process::Tms\#utime=" do
+context "Process::Tms#utime=" do
   pending "assigns a value to the ctime attribute"
 end

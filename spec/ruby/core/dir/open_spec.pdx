@@ -11,9 +11,9 @@ context "Dir.open" do
   pending "returns the value of the block if a block is given"
   pending "closes the Dir instance when the block exits if given a block"
   pending "closes the Dir instance when the block exits the block even due to an exception"
-  pending "calls \#to_path on non-String arguments"
+  pending "calls #to_path on non-String arguments"
   pending "accepts an options Hash"
-  pending "calls \#to_hash to convert the options object"
+  pending "calls #to_hash to convert the options object"
   pending "ignores the :encoding option if it is nil"
   pending "sets the close-on-exec flag for the directory file descriptor"
 end

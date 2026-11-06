@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'A'" do
+context "String#unpack with format 'A'" do
   pending "behaves like :string_unpack_basic A"
   pending "behaves like :string_unpack_no_platform A"
   pending "behaves like :string_unpack_string A"
@@ -13,7 +13,7 @@ context "String\#unpack with format 'A'" do
   pending "does not remove whitespace other than space"
   pending "decodes into raw (ascii) string values"
 end
-context "String\#unpack with format 'a'" do
+context "String#unpack with format 'a'" do
   pending "behaves like :string_unpack_basic a"
   pending "behaves like :string_unpack_no_platform a"
   pending "behaves like :string_unpack_string a"

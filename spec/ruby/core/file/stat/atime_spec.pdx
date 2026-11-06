@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#atime" do
+context "File::Stat#atime" do
   pending "returns the atime of a File::Stat object"
 end

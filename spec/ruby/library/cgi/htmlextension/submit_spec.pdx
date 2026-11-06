@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::HtmlExtension\#submit" do
+context "CGI::HtmlExtension#submit" do
   context "when passed no arguments" do
     pending "returns a submit-'input'-element"
     pending "ignores a passed block"

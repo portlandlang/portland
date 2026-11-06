@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#ctime" do
-  pending "is an alias of Time\#asctime"
+context "Time#ctime" do
+  pending "is an alias of Time#asctime"
 end

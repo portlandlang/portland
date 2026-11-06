@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format '%'" do
+context "Array#pack with format '%'" do
   pending "raises an Argument Error"
 end

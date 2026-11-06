@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'M'" do
+context "String#unpack with format 'M'" do
   pending "behaves like :string_unpack_basic M"
   pending "behaves like :string_unpack_no_platform M"
   pending "decodes an empty string"
@@ -23,7 +23,7 @@ context "String\#unpack with format 'M'" do
   pending "decodes pre-encoded byte values 127..255"
   pending "unpacks incomplete escape sequences as literal characters"
 end
-context "String\#unpack with format 'm'" do
+context "String#unpack with format 'm'" do
   pending "behaves like :string_unpack_basic m"
   pending "behaves like :string_unpack_no_platform m"
   pending "decodes an empty string"

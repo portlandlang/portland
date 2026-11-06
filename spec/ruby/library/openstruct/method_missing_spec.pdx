@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "OpenStruct\#method_missing when called with a method name ending in '='" do
+context "OpenStruct#method_missing when called with a method name ending in '='" do
   pending "raises an ArgumentError when not passed any additional arguments"
 end
-context "OpenStruct\#method_missing when passed additional arguments" do
+context "OpenStruct#method_missing when passed additional arguments" do
   pending "raises a NoMethodError when the key does not exist"
   pending "raises an ArgumentError when the key exists"
 end

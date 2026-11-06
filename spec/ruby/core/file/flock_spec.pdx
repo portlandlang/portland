@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "File\#flock" do
+context "File#flock" do
   pending "exclusively locks a file"
   pending "non-exclusively locks a file"
   pending "returns false if trying to lock an exclusively locked file"

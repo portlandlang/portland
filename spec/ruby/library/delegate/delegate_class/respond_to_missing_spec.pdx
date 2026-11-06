@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "DelegateClass\#respond_to_missing?" do
+context "DelegateClass#respond_to_missing?" do
   pending "is used for respond_to? behavior of late-bound delegated methods"
 end

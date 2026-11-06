@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'V'" do
+context "Array#pack with format 'V'" do
   pending "behaves like :array_pack_basic V"
   pending "behaves like :array_pack_basic_non_float V"
   pending "behaves like :array_pack_arguments V"
@@ -13,7 +13,7 @@ context "Array\#pack with format 'V'" do
   pending "behaves like :array_pack_no_platform V"
   pending "behaves like :array_pack_32bit_le V"
 end
-context "Array\#pack with format 'v'" do
+context "Array#pack with format 'v'" do
   pending "behaves like :array_pack_basic v"
   pending "behaves like :array_pack_basic_non_float v"
   pending "behaves like :array_pack_arguments v"

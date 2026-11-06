@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "CSV::StringReader\#initialize" do
+context "CSV::StringReader#initialize" do
   pending "needs to be reviewed for spec completeness"
 end

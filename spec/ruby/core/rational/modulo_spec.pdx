@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Rational\#%" do
+context "Rational#%" do
   pending "returns the remainder when this value is divided by other"
   pending "returns a Float value when the argument is Float"
   pending "raises ZeroDivisionError on zero denominator"

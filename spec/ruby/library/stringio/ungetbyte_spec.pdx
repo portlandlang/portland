@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#ungetbyte" do
+context "StringIO#ungetbyte" do
   pending "ungets a single byte from a string starting with a single byte character"
   pending "ungets a single byte from a string in the middle of a multibyte character"
   pending "constrains the value of a numeric argument to a single byte"

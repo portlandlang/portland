@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Matrix::EigenvalueDecomposition\#to_a" do
+context "Matrix::EigenvalueDecomposition#to_a" do
   pending "returns an array of with [V, D, V.inv]"
   pending "returns a factorization"
 end

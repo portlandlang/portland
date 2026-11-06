@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'M'" do
+context "Array#pack with format 'M'" do
   pending "behaves like :array_pack_basic M"
   pending "behaves like :array_pack_basic_non_float M"
   pending "behaves like :array_pack_arguments M"
@@ -28,15 +28,15 @@ context "Array\#pack with format 'M'" do
   pending "emits a soft line break when the output exceeds 72 characters when passed '*', 0, 1, or no count modifier"
   pending "emits a soft line break when the output exceeds count characters"
   pending "encodes a recursive array"
-  pending "calls \#to_s to convert an object to a String"
-  pending "converts the object to a String representation if \#to_s does not return a String"
+  pending "calls #to_s to convert an object to a String"
+  pending "converts the object to a String representation if #to_s does not return a String"
   pending "encodes a Symbol as a String"
   pending "encodes an Integer as a String"
   pending "encodes a Float as a String"
   pending "converts Floats to the minimum unique representation"
   pending "sets the output string to US-ASCII encoding"
 end
-context "Array\#pack with format 'm'" do
+context "Array#pack with format 'm'" do
   pending "behaves like :array_pack_basic m"
   pending "behaves like :array_pack_basic_non_float m"
   pending "behaves like :array_pack_arguments m"
@@ -47,8 +47,8 @@ context "Array\#pack with format 'm'" do
   pending "emits a newline after complete groups of count / 3 input characters when passed a count modifier"
   pending "implicitly has a count of 45 when passed '*', 1, 2 or no count modifier"
   pending "encodes all ascii characters"
-  pending "calls \#to_str to convert an object to a String"
-  pending "raises a TypeError if \#to_str does not return a String"
+  pending "calls #to_str to convert an object to a String"
+  pending "raises a TypeError if #to_str does not return a String"
   pending "raises a TypeError if passed nil"
   pending "raises a TypeError if passed an Integer"
   pending "does not emit a newline if passed zero as the count modifier"

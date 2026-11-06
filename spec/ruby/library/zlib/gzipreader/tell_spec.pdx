@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#tell" do
-  pending "is an alias of Zlib::GzipReader\#pos"
+context "Zlib::GzipReader#tell" do
+  pending "is an alias of Zlib::GzipReader#pos"
 end

@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#union" do
-  pending "is an alias of Set\#|"
+context "Set#union" do
+  pending "is an alias of Set#|"
 end
-context "Set\#|" do
+context "Set#|" do
   pending "returns a new Set containing all elements of self and the passed Enumerable"
   pending "raises an ArgumentError when passed a non-Enumerable"
   pending "retains compare_by_identity flag"

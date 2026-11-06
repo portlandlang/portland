@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#msg" do
+context "Net::HTTPResponse#msg" do
   pending "returns self's response message"
 end

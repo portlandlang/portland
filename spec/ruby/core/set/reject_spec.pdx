@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#reject!" do
+context "Set#reject!" do
   pending "yields every element of self"
   pending "deletes every element from self for which the passed block returns true"
   pending "returns self when self was modified"

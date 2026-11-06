@@ -12,7 +12,7 @@ context "Socket::TCPServer.accept_nonblock" do
     pending "returns :wait_readable in exceptionless mode"
   end
 end
-context "TCPServer\#accept_nonblock" do
+context "TCPServer#accept_nonblock" do
   context "without a connected client" do
     pending "raises IO::WaitReadable"
   end

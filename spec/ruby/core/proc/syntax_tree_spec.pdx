@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#syntax_tree" do
+context "Proc#syntax_tree" do
   pending "currently returns a CallNode and not a BlockNode for a block"
   pending "currently returns a CallNode and not a BlockNode for a block with rescue"
   pending "returns a LambdaNode for a stabby lambda"

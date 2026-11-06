@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#curry" do
+context "Proc#curry" do
   pending "returns a Proc when called on a proc"
   pending "returns a Proc when called on a lambda"
   pending "calls the curried proc with the arguments if sufficient arguments have been given"
@@ -13,13 +13,13 @@ context "Proc\#curry" do
   pending "can be passed superfluous arguments if created from a proc"
   pending "raises an ArgumentError if passed superfluous arguments when created from a lambda"
   pending "returns Procs with arities of -1"
-  pending "produces Procs that raise ArgumentError for \#binding"
-  pending "produces Procs that return [[:rest]] for \#parameters"
-  pending "produces Procs that return nil for \#source_location"
+  pending "produces Procs that raise ArgumentError for #binding"
+  pending "produces Procs that return [[:rest]] for #parameters"
+  pending "produces Procs that return nil for #source_location"
   pending "produces Procs that can be passed as the block for instance_exec"
   pending "combines arguments and calculates incoming arity accurately for successively currying"
 end
-context "Proc\#curry with arity argument" do
+context "Proc#curry with arity argument" do
   pending "accepts an optional Integer argument for the arity"
   pending "returns a Proc when called on a proc"
   pending "returns a Proc when called on a lambda"

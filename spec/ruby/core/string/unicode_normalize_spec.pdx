@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#unicode_normalize" do
+context "String#unicode_normalize" do
   pending "normalizes code points in the string according to the form that is specified"
   pending "defaults to the nfc normalization form if no forms are specified"
   context "returns normalized form of string by default" do
@@ -15,7 +15,7 @@ context "String\#unicode_normalize" do
   pending "raises an Encoding::CompatibilityError if string is not in an unicode encoding"
   pending "raises an ArgumentError if the specified form is invalid"
 end
-context "String\#unicode_normalize!" do
+context "String#unicode_normalize!" do
   pending "normalizes code points and modifies the receiving string"
   pending "modifies original string (nfc)"
   pending "modifies self in place (nfd)"

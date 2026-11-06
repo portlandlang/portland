@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::IPSocket\#recvfrom" do
+context "Socket::IPSocket#recvfrom" do
   pending "reads data from the connection"
   pending "reads up to len bytes"
   pending "returns an array with the data and connection info"
 end
-context "Socket::IPSocket\#recvfrom" do
+context "Socket::IPSocket#recvfrom" do
   context "when recvfrom(2) returns 0 (if no messages are available to be received and the peer has performed an orderly shutdown)" do
     context "stream socket" do
       pending "returns nil on a closed stream socket"
@@ -19,7 +19,7 @@ context "Socket::IPSocket\#recvfrom" do
     end
   end
 end
-context "Socket::IPSocket\#recvfrom" do
+context "Socket::IPSocket#recvfrom" do
   pending "returns an Array containing up to N bytes and address information"
   pending "allows specifying of flags when receiving data"
   context "using reverse lookups" do

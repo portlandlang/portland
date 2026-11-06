@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Delegator\#method" do
+context "Delegator#method" do
   pending "returns a method object for public methods of the delegate object"
   pending "raises a NameError for protected methods of the delegate object"
   pending "raises a NameError for a private methods of the delegate object"

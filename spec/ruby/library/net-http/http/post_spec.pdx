@@ -10,7 +10,7 @@ context "Net::HTTP.post" do
   pending "sends Content-Type: application/x-www-form-urlencoded by default"
   pending "does not support HTTP Basic Auth"
 end
-context "Net::HTTP\#post" do
+context "Net::HTTP#post" do
   pending "sends an post request to the passed path and returns the response"
   pending "returns a Net::HTTPResponse"
   context "when passed a block" do

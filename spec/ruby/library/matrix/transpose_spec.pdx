@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#transpose" do
+context "Matrix#transpose" do
   pending "returns a transposed matrix"
   pending "can transpose empty matrices"
   context "for a subclass of Matrix" do

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#normalize" do
+context "URI#normalize" do
   pending "adds a / onto the end of the URI if the path is blank"
   pending "downcases the host of the URI"
   pending "respects RFC 3986"

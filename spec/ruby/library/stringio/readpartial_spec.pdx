@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#readpartial" do
+context "StringIO#readpartial" do
   pending "reads at most the specified number of bytes"
   pending "reads after ungetc with data in the buffer"
   pending "reads after ungetc with multibyte characters in the buffer"

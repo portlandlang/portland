@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#inspect" do
+context "Time#inspect" do
   pending "behaves like :inspect :inspect"
   pending "preserves microseconds"
   pending "omits trailing zeros from microseconds"

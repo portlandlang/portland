@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "UNIXSocket\#recv_io" do
+context "UNIXSocket#recv_io" do
   pending "reads an IO object across the socket"
   pending "takes an optional class to use"
 end
-context "UNIXSocket\#recv_io" do
+context "UNIXSocket#recv_io" do
   context "without a custom class" do
     pending "returns an IO"
   end

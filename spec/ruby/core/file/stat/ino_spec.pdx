@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#ino" do
+context "File::Stat#ino" do
   pending "returns the ino of a File::Stat object"
   pending "returns BY_HANDLE_FILE_INFORMATION.nFileIndexHigh/Low of a File::Stat object"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Parser\#extract" do
+context "URI::Parser#extract" do
   pending "behaves according to its documentation"
   pending "treats contiguous URIs as a single URI"
   pending "treats pretty much anything with a colon as a URI"

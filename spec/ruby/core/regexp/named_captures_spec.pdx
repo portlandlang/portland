@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#named_captures" do
+context "Regexp#named_captures" do
   pending "returns a Hash"
   pending "returns an empty Hash when there are no capture groups"
   pending "sets the keys of the Hash to the names of the capture groups"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#readbyte" do
+context "IO#readbyte" do
   pending "reads one byte from the stream"
   pending "raises EOFError on EOF"
   pending "reads after ungetc without character conversion"

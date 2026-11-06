@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#rename" do
+context "Net::FTP#rename" do
   context "when passed from_name, to_name" do
     pending "sends the RNFR command with the passed from_name and the RNTO command with the passed to_name to the server"
     pending "returns something"

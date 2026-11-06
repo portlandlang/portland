@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#tr_s" do
+context "String#tr_s" do
   pending "returns a string processed according to tr with newly duplicate characters removed"
   pending "accepts c1-c2 notation to denote ranges of characters"
   pending "accepts c1-c1 notation to denote range of one character"
@@ -27,7 +27,7 @@ context "String\#tr_s" do
   pending "raises an Encoding::CompatibilityError when the encodings are incompatible"
   pending "deletes the characters in from_str and does not squeeze the result if to_str is empty"
 end
-context "String\#tr_s!" do
+context "String#tr_s!" do
   pending "modifies self in place"
   pending "returns nil if no modification was made"
   pending "does not modify self if from_str is empty"

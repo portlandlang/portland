@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#to_s" do
+context "Complex#to_s" do
   context "when self's real component is 0" do
     pending "returns both the real and imaginary component even when the real is 0"
   end

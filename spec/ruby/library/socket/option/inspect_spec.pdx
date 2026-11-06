@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::Option\#inspect" do
+context "Socket::Option#inspect" do
   pending "correctly returns SO_LINGER value"
 end

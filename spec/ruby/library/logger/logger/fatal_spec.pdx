@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#fatal?" do
+context "Logger#fatal?" do
   pending "returns true if severity level allows fatal messages"
   pending "returns false if severity level does not allow fatal messages"
 end
-context "Logger\#fatal" do
+context "Logger#fatal" do
   pending "logs a FATAL message"
   pending "accepts an application name with a block"
 end

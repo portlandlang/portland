@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#join" do
+context "Pathname#join" do
   pending "without separators"
   pending "with separators"
   pending "with a string"

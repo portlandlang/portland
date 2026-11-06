@@ -12,7 +12,7 @@ context "Net::HTTP.proxy_address" do
     pending "returns the address for self's proxy connection"
   end
 end
-context "Net::HTTP\#proxy_address" do
+context "Net::HTTP#proxy_address" do
   context "when self is no proxy class instance" do
     pending "returns nil"
   end

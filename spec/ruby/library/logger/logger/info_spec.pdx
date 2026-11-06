@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#info?" do
+context "Logger#info?" do
   pending "returns true if severity level allows info messages"
   pending "returns false if severity level does not allow info messages"
 end
-context "Logger\#info" do
+context "Logger#info" do
   pending "logs a INFO message"
   pending "accepts an application name with a block"
 end

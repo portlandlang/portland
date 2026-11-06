@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#tuesday?" do
+context "Time#tuesday?" do
   pending "returns true if time represents Tuesday"
   pending "returns false if time doesn't represent Tuesday"
 end

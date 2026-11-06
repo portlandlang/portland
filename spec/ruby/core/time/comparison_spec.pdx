@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#<=>" do
+context "Time#<=>" do
   pending "returns 1 if the first argument is a point in time after the second argument"
   pending "returns 1 if the first argument is a point in time after the second argument (down to a millisecond)"
   pending "returns 1 if the first argument is a point in time after the second argument (down to a microsecond)"
@@ -15,7 +15,7 @@ context "Time\#<=>" do
   pending "returns 1 if the first argument is a fraction of a microsecond after the second argument"
   pending "returns 0 if time is the same as other, including fractional microseconds"
   pending "returns -1 if the first argument is a fraction of a microsecond before the second argument"
-  pending "returns nil when compared to an Integer because Time does not respond to \#coerce"
+  pending "returns nil when compared to an Integer because Time does not respond to #coerce"
   context "given different timezones" do
     pending "returns 0 if time is the same as other"
     pending "returns -1 if the first argument is before the second argument"

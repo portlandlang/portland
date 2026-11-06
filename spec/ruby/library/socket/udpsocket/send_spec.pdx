@@ -4,13 +4,13 @@
 
 require_relative "../../../../spec_helper"
 
-context "UDPSocket\#send" do
+context "UDPSocket#send" do
   pending "sends data in ad hoc mode"
   pending "sends data in ad hoc mode (with port given as a String)"
   pending "sends data in connection mode"
   pending "raises EMSGSIZE if data is too big"
 end
-context "UDPSocket\#send" do
+context "UDPSocket#send" do
   context "using a disconnected socket" do
     context "without a destination address" do
       pending "raises \#{SocketSpecs.dest_addr_req_error}"

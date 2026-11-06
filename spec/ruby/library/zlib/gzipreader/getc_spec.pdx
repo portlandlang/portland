@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#getc" do
+context "Zlib::GzipReader#getc" do
   pending "returns the next character from the stream"
   pending "increments position"
   pending "returns nil at the end of the stream"

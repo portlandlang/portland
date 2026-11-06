@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Date\#-" do
+context "Date#-" do
   pending "subtracts a number of days from a Date"
   pending "subtracts a negative number of days from a Date"
   pending "computes the difference between two dates"

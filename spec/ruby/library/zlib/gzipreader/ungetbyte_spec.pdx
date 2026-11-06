@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#ungetbyte" do
+context "Zlib::GzipReader#ungetbyte" do
   context "at the start of the stream" do
     context "with an integer" do
       pending "prepends the byte to the stream"

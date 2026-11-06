@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#itself" do
+context "Kernel#itself" do
   pending "returns the receiver itself"
 end

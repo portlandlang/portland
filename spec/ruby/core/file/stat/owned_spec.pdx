@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "File::Stat\#owned?" do
+context "File::Stat#owned?" do
   pending "behaves like :file_owned :owned? FileStat"
 end
-context "File::Stat\#owned?" do
+context "File::Stat#owned?" do
   pending "returns true if the file is owned by the user"
   pending "returns false if the file is not owned by the user"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_64bit_le J_"
     pending "behaves like :string_unpack_64bit_le_unsigned J_"
@@ -14,7 +14,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_64bit_le_unsigned J!"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_64bit_le j_"
     pending "behaves like :string_unpack_64bit_le_signed j_"
@@ -24,7 +24,7 @@ context "String\#unpack with format 'j'" do
     pending "behaves like :string_unpack_64bit_le_signed j!"
   end
 end
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_64bit_be J_"
     pending "behaves like :string_unpack_64bit_be_unsigned J_"
@@ -34,7 +34,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_64bit_be_unsigned J!"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_64bit_be j_"
     pending "behaves like :string_unpack_64bit_be_signed j_"
@@ -44,7 +44,7 @@ context "String\#unpack with format 'j'" do
     pending "behaves like :string_unpack_64bit_be_signed j!"
   end
 end
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_64bit_le J<"
     pending "behaves like :string_unpack_64bit_le_unsigned J<"
@@ -78,7 +78,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_64bit_be_unsigned J!>"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_64bit_le j<"
     pending "behaves like :string_unpack_64bit_le_signed j<"
@@ -112,7 +112,7 @@ context "String\#unpack with format 'j'" do
     pending "behaves like :string_unpack_64bit_be_signed j!>"
   end
 end
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_32bit_le J_"
     pending "behaves like :string_unpack_32bit_le_unsigned J_"
@@ -122,7 +122,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_32bit_le_unsigned J!"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_32bit_le j_"
     pending "behaves like :string_unpack_32bit_le_signed j_"
@@ -132,7 +132,7 @@ context "String\#unpack with format 'j'" do
     pending "behaves like :string_unpack_32bit_le_signed j!"
   end
 end
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_32bit_be J_"
     pending "behaves like :string_unpack_32bit_be_unsigned J_"
@@ -142,7 +142,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_32bit_be_unsigned J!"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '_'" do
     pending "behaves like :string_unpack_32bit_be j_"
     pending "behaves like :string_unpack_32bit_be_signed j_"
@@ -152,7 +152,7 @@ context "String\#unpack with format 'j'" do
     pending "behaves like :string_unpack_32bit_be_signed j!"
   end
 end
-context "String\#unpack with format 'J'" do
+context "String#unpack with format 'J'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le J<"
     pending "behaves like :string_unpack_32bit_le_unsigned J<"
@@ -186,7 +186,7 @@ context "String\#unpack with format 'J'" do
     pending "behaves like :string_unpack_32bit_be_unsigned J!>"
   end
 end
-context "String\#unpack with format 'j'" do
+context "String#unpack with format 'j'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le j<"
     pending "behaves like :string_unpack_32bit_le_signed j<"

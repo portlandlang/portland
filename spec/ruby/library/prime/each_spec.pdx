@@ -10,13 +10,13 @@ end
 context "Prime.each" do
   pending "behaves like :prime_each_with_arguments :each Prime"
 end
-context "Prime\#each with Prime.instance" do
+context "Prime#each with Prime.instance" do
   pending "behaves like :prime_each :each Prime.instance"
 end
-context "Prime\#each with Prime.instance" do
+context "Prime#each with Prime.instance" do
   pending "behaves like :prime_each_with_arguments :each Prime.instance"
 end
-context "Prime\#each with Prime.instance" do
+context "Prime#each with Prime.instance" do
   pending "behaves like :prime_each :each"
   pending "resets the enumerator with each call"
 end

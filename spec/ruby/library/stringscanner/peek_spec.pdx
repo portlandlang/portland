@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#peek" do
+context "StringScanner#peek" do
   pending "returns at most the specified number of bytes from the current position"
   pending "returns an empty string when the passed argument is zero"
   pending "raises a ArgumentError when the passed argument is negative"

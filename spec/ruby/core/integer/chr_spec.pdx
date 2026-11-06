@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Integer\#chr without argument" do
+context "Integer#chr without argument" do
   pending "returns a String"
   pending "returns a new String for each call"
   pending "raises a RangeError is self is less than 0"
@@ -36,7 +36,7 @@ context "Integer\#chr without argument" do
     end
   end
 end
-context "Integer\#chr with an encoding argument" do
+context "Integer#chr with an encoding argument" do
   pending "returns a String"
   pending "returns a new String for each call"
   pending "accepts a String as an argument"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#read_nonblock" do
+context "IO#read_nonblock" do
   pending "raises an exception extending IO::WaitReadable when there is no data"
   pending "raises an ArgumentError if exception: is not true or false"
   context "when exception option is set to false" do

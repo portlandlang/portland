@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Complex\#arg" do
+context "Complex#arg" do
   pending "returns the argument -- i.e., the angle from (1, 0) in the complex plane"
 end

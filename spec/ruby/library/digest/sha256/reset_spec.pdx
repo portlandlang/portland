@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA256\#reset" do
+context "Digest::SHA256#reset" do
   pending "returns digest state to initial conditions"
 end

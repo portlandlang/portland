@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipWriter\#write" do
+context "Zlib::GzipWriter#write" do
   pending "writes some compressed data"
   pending "returns the number of bytes in the input"
   pending "handles inputs of 2^23 bytes"

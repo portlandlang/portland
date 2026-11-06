@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "CGI\#http_header" do
+context "CGI#http_header" do
   pending "behaves like :cgi_http_header :http_header"
 end

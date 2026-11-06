@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "OptionParser\#order" do
+context "OptionParser#order" do
   pending "accepts `into` keyword argument and stores result in it"
 end
-context "OptionParser\#order!" do
+context "OptionParser#order!" do
   pending "accepts `into` keyword argument and stores result in it"
 end

@@ -4,10 +4,10 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPGenericRequest\#body" do
+context "Net::HTTPGenericRequest#body" do
   pending "returns self's request body"
 end
-context "Net::HTTPGenericRequest\#body=" do
+context "Net::HTTPGenericRequest#body=" do
   pending "sets self's body content to the passed String"
   pending "sets self's body stream to nil"
 end

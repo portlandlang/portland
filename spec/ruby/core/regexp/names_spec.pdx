@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#names" do
+context "Regexp#names" do
   pending "returns an Array"
   pending "returns an empty Array if there are no named captures"
   pending "returns each named capture as a String"

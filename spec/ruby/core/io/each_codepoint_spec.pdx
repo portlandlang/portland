@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#each_codepoint" do
+context "IO#each_codepoint" do
   context "when no block is given" do
     pending "returns an Enumerator"
     context "returned Enumerator" do
@@ -19,10 +19,10 @@ context "IO\#each_codepoint" do
   pending "does not change $_"
   pending "raises an IOError when self is not readable"
 end
-context "IO\#each_codepoint" do
+context "IO#each_codepoint" do
   pending "calls the given block"
   pending "returns self"
 end
-context "IO\#each_codepoint" do
+context "IO#each_codepoint" do
   pending "raises an exception at incomplete character before EOF when conversion takes place"
 end

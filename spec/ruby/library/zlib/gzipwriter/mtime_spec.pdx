@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipWriter\#mtime=" do
+context "Zlib::GzipWriter#mtime=" do
   pending "sets mtime using Integer"
   pending "sets mtime using Time"
   pending "raises if the header was written"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Monitor\#try_enter" do
+context "Monitor#try_enter" do
   pending "will acquire a monitor not held by another thread"
   pending "will not acquire a monitor already held by another thread"
 end

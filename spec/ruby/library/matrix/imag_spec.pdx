@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#imag" do
-  pending "is an alias of Matrix\#imaginary"
+context "Matrix#imag" do
+  pending "is an alias of Matrix#imaginary"
 end

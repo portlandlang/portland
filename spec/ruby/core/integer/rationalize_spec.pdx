@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Integer\#rationalize" do
+context "Integer#rationalize" do
   pending "returns a Rational object"
   pending "uses self as the numerator"
   pending "uses 1 as the denominator"

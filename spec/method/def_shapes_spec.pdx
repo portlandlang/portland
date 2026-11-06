@@ -3,7 +3,7 @@
 # newline, the boundary ends the list), and endless defs — one guarded
 # statement, no `end`, parens required around any parameters (which falls
 # out of Ruby's own carve-out: after a bare list, `=` was already a
-# default). All Ruby-parity, probed on 4.0.6.
+# default). All Ruby-parity, probed on 4.0.9.
 
 require_relative "../spec_helper"
 

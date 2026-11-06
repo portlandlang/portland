@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#eof?" do
+context "StringIO#eof?" do
   pending "returns true when self's position is greater than or equal to self's size"
   pending "returns false when self's position is less than self's size"
 end
-context "StringIO\#eof" do
-  pending "is an alias of StringIO\#eof?"
+context "StringIO#eof" do
+  pending "is an alias of StringIO#eof?"
 end

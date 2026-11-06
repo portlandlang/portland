@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#dup" do
+context "BigDecimal#dup" do
   pending "returns self"
 end

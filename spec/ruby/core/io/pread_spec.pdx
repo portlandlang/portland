@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#pread" do
+context "IO#pread" do
   pending "accepts a length, and an offset"
   pending "accepts a length, an offset, and an output buffer"
   pending "shrinks the buffer in case of less bytes read"
@@ -16,8 +16,8 @@ context "IO\#pread" do
   pending "returns a buffer for maxlen = 0 when buffer specified"
   pending "ignores the offset for maxlen = 0, even if it is out of file bounds"
   pending "does not reset the buffer when reading with maxlen = 0"
-  pending "converts maxlen to Integer using \#to_int"
-  pending "converts offset to Integer using \#to_int"
+  pending "converts maxlen to Integer using #to_int"
+  pending "converts offset to Integer using #to_int"
   pending "converts a buffer to String using to_str"
   pending "raises TypeError if maxlen is not an Integer and cannot be coerced into Integer"
   pending "raises TypeError if offset is not an Integer and cannot be coerced into Integer"

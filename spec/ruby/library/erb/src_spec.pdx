@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "ERB\#src" do
+context "ERB#src" do
   pending "returns the compiled ruby code evaluated to a String"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#to_time" do
+context "DateTime#to_time" do
   pending "yields a new Time object"
   pending "returns a Time representing the same instant"
   pending "returns a Time representing the same instant before Gregorian"

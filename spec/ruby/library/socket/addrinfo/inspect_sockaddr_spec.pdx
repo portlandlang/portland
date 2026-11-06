@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Addrinfo\#inspect_sockaddr" do
+context "Addrinfo#inspect_sockaddr" do
   context "using an IPv4 address" do
     pending "returns a String containing the IP address and port number"
     pending "returns a String containing just the IP address when no port is given"

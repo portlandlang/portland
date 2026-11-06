@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTP\#address" do
+context "Net::HTTP#address" do
   pending "returns the current host name"
 end

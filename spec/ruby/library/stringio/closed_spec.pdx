@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#closed?" do
+context "StringIO#closed?" do
   pending "returns true if self is completely closed"
 end

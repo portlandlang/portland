@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#Integer" do
+context "Kernel#Integer" do
   pending "is a private method"
   pending "returns a Bignum for a Bignum"
   pending "returns a Fixnum for a Fixnum"
@@ -149,7 +149,7 @@ context "Kernel\#Integer" do
   pending "raises an ArgumentError if the number begins with 0\#{d} and the base is \#{base}"
   pending "raises an ArgumentError if a base is given for a non-String value"
   pending "tries to convert the base to an integer using to_int"
-  pending "raises a TypeError if it is not an integer and does not respond to \#to_i"
+  pending "raises a TypeError if it is not an integer and does not respond to #to_i"
   context "when passed exception: false" do
     context "and valid argument" do
       pending "returns an Integer number"

@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#initialize" do
+context "StringScanner#initialize" do
   pending "is a private method"
   pending "returns an instance of StringScanner"
-  pending "converts the argument into a string using \#to_str"
+  pending "converts the argument into a string using #to_str"
   pending "accepts a fixed_anchor keyword argument"
 end

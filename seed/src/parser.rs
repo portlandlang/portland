@@ -147,7 +147,7 @@ fn symbol_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
 }
 
 /// The words of a `%w[...]` or `%i[...]` body — Ruby's rules (ADR 0030),
-/// run against Ruby 4.0.6 rather than remembered. A backslash before the
+/// run against Ruby 4.0.9 rather than remembered. A backslash before the
 /// literal's own delimiter, a backslash, or whitespace drops away (escaped
 /// whitespace joins a word instead of splitting); before anything else it
 /// stays, `\n` meaning the two characters. Whitespace runs split once and

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'I'" do
+context "String#unpack with format 'I'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le I<"
     pending "behaves like :string_unpack_32bit_le_unsigned I<"
@@ -38,7 +38,7 @@ context "String\#unpack with format 'I'" do
     pending "behaves like :string_unpack_32bit_be_unsigned I!>"
   end
 end
-context "String\#unpack with format 'i'" do
+context "String#unpack with format 'i'" do
   context "with modifier '<'" do
     pending "behaves like :string_unpack_32bit_le i<"
     pending "behaves like :string_unpack_32bit_le_signed i<"
@@ -72,55 +72,55 @@ context "String\#unpack with format 'i'" do
     pending "behaves like :string_unpack_32bit_be_signed i!>"
   end
 end
-context "String\#unpack with format 'I'" do
+context "String#unpack with format 'I'" do
   pending "behaves like :string_unpack_basic I"
   pending "behaves like :string_unpack_32bit_le I"
   pending "behaves like :string_unpack_32bit_le_unsigned I"
 end
-context "String\#unpack with format 'I' with modifier '_'" do
+context "String#unpack with format 'I' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_le I_"
   pending "behaves like :string_unpack_32bit_le_unsigned I_"
 end
-context "String\#unpack with format 'I' with modifier '!'" do
+context "String#unpack with format 'I' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_le I!"
   pending "behaves like :string_unpack_32bit_le_unsigned I!"
 end
-context "String\#unpack with format 'i'" do
+context "String#unpack with format 'i'" do
   pending "behaves like :string_unpack_basic i"
   pending "behaves like :string_unpack_32bit_le i"
   pending "behaves like :string_unpack_32bit_le_signed i"
 end
-context "String\#unpack with format 'i' with modifier '_'" do
+context "String#unpack with format 'i' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_le i_"
   pending "behaves like :string_unpack_32bit_le_signed i_"
 end
-context "String\#unpack with format 'i' with modifier '!'" do
+context "String#unpack with format 'i' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_le i!"
   pending "behaves like :string_unpack_32bit_le_signed i!"
 end
-context "String\#unpack with format 'I'" do
+context "String#unpack with format 'I'" do
   pending "behaves like :string_unpack_basic I"
   pending "behaves like :string_unpack_32bit_be I"
   pending "behaves like :string_unpack_32bit_be_unsigned I"
 end
-context "String\#unpack with format 'I' with modifier '_'" do
+context "String#unpack with format 'I' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_be I_"
   pending "behaves like :string_unpack_32bit_be_unsigned I_"
 end
-context "String\#unpack with format 'I' with modifier '!'" do
+context "String#unpack with format 'I' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_be I!"
   pending "behaves like :string_unpack_32bit_be_unsigned I!"
 end
-context "String\#unpack with format 'i'" do
+context "String#unpack with format 'i'" do
   pending "behaves like :string_unpack_basic i"
   pending "behaves like :string_unpack_32bit_be i"
   pending "behaves like :string_unpack_32bit_be_signed i"
 end
-context "String\#unpack with format 'i' with modifier '_'" do
+context "String#unpack with format 'i' with modifier '_'" do
   pending "behaves like :string_unpack_32bit_be i_"
   pending "behaves like :string_unpack_32bit_be_signed i_"
 end
-context "String\#unpack with format 'i' with modifier '!'" do
+context "String#unpack with format 'i' with modifier '!'" do
   pending "behaves like :string_unpack_32bit_be i!"
   pending "behaves like :string_unpack_32bit_be_signed i!"
 end

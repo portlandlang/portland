@@ -10,7 +10,7 @@ context "File.absolute_path?" do
   pending "returns false if it's a tricky relative path"
   pending "does not expand '~' to a home directory."
   pending "does not expand '~user' to a home directory."
-  pending "calls \#to_path on its argument"
+  pending "calls #to_path on its argument"
   pending "takes into consideration the platform's root"
   pending "takes into consideration the platform path separator(s)"
 end
@@ -21,6 +21,6 @@ context "File.absolute_path" do
   pending "does not expand '~' when given dir argument"
   pending "does not expand '~user' to a home directory."
   pending "accepts a second argument of a directory from which to resolve the path"
-  pending "calls \#to_path on its argument"
+  pending "calls #to_path on its argument"
   pending "preserves the encoding of the path"
 end

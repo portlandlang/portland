@@ -8,6 +8,6 @@ context "URI::HTTP.request_uri" do
   pending "returns a string of the path + query"
   pending "returns '/' if the path of the URI is blank"
 end
-context "URI::HTTP\#request_uri" do
+context "URI::HTTP#request_uri" do
   pending "needs to be reviewed for spec completeness"
 end

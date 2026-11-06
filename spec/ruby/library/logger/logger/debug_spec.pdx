@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#debug?" do
+context "Logger#debug?" do
   pending "returns true if severity level allows debug messages"
   pending "returns false if severity level does not allow debug messages"
 end
-context "Logger\#debug" do
+context "Logger#debug" do
   pending "logs a DEBUG message"
   pending "accepts an application name with a block"
 end

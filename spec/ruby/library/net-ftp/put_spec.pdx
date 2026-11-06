@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#put (binary mode)" do
+context "Net::FTP#put (binary mode)" do
   pending "behaves like :net_ftp_putbinaryfile :put"
 end
-context "Net::FTP\#put (text mode)" do
+context "Net::FTP#put (text mode)" do
   pending "behaves like :net_ftp_puttextfile :put"
 end

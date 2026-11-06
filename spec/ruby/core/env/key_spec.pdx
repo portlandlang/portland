@@ -10,6 +10,6 @@ end
 context "ENV.key" do
   pending "returns the index associated with the passed value"
   pending "returns nil if the passed value is not found"
-  pending "coerces the key element with \#to_str"
-  pending "raises TypeError if the argument is not a String and does not respond to \#to_str"
+  pending "coerces the key element with #to_str"
+  pending "raises TypeError if the argument is not a String and does not respond to #to_str"
 end

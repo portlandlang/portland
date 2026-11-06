@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::LDAP\#set_filter" do
+context "URI::LDAP#set_filter" do
   pending "needs to be reviewed for spec completeness"
 end

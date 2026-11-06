@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#merge" do
+context "URI#merge" do
   pending "returns the receiver and the argument, joined as per URI.join"
   pending "accepts URI objects as argument"
   pending "accepts a string-like argument"

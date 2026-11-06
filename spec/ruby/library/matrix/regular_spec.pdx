@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Matrix\#regular?" do
+context "Matrix#regular?" do
   pending "returns false for singular matrices"
   pending "returns true if the Matrix is regular"
   pending "returns true for an empty 0x0 matrix"

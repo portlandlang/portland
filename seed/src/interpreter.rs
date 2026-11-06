@@ -472,7 +472,7 @@ fn split_value(text: &str, separator: Option<&str>, limit: i64) -> Value {
     )
 }
 
-/// `String#split` by Ruby's rules (#142), each checked against Ruby 4.0.7:
+/// `String#split` by Ruby's rules (#142), each checked against Ruby 4.0.9:
 /// no separator or a single space splits on runs of whitespace, leading
 /// whitespace ignored; an empty separator splits into characters; a
 /// positive limit caps the pieces, the last holding the rest; and trailing
@@ -552,7 +552,7 @@ fn flatten_into(elements: &[Value], flat: &mut Vec<Value>) {
 }
 
 /// A whole number written in another base, 2 through 36 — lowercase digits,
-/// the sign out front, Ruby's shapes (probed on 4.0.6).
+/// the sign out front, Ruby's shapes (probed on 4.0.9).
 fn integer_in_base(number: i64, base: i64) -> String {
     if number == 0 {
         return "0".to_string();
@@ -1867,7 +1867,7 @@ fn magnitude_gcd(left: i64, right: i64) -> u64 {
 }
 
 /// `gcd`: never a sign, and a zero yields the other side's magnitude (Ruby
-/// 4.0.6, probed). The smallest integer's magnitude is past the edge.
+/// 4.0.9, probed). The smallest integer's magnitude is past the edge.
 fn integer_gcd(number: i64, other: i64) -> Value {
     match i64::try_from(magnitude_gcd(number, other)) {
         Ok(divisor) => Value::Integer(divisor),
@@ -6430,7 +6430,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 [argument @ (Value::Integer(_) | Value::Float(_))],
             ) => float_divmod(&receiver, argument),
             // Euclid on magnitudes — the answer never carries a sign, and a
-            // zero yields the other side's magnitude (Ruby 4.0.6, probed).
+            // zero yields the other side's magnitude (Ruby 4.0.9, probed).
             // Ruby's bit math as named methods (ADR 0003, locked by #157):
             // the operators stay out of the grammar, the capability stays.
             (Value::Integer(number), "bit_and", [Value::Integer(other)]) => {
@@ -6508,7 +6508,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // Portland's `%` is floored (ADR 0018) while Rust's truncates, so
             // `-7 % 2` is 1 there and -1 here. The two differ only in *sign*,
             // never in zero-ness, and these arms only ever compare against
-            // zero. Verified against Ruby 4.0.6 on negatives. Anywhere the
+            // zero. Verified against Ruby 4.0.9 on negatives. Anywhere the
             // sign is observable, use `floored_modulo`.
             (Value::Integer(number), "even?", []) => Value::Boolean(number % 2 == 0),
             (Value::Integer(number), "negative?", []) => Value::Boolean(*number < 0),
@@ -6641,7 +6641,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // the ledger; nil is not falsy here, so Ruby's shape is unusable).
             (Value::Float(number), "infinite?", []) => Value::Boolean(number.is_infinite()),
             // The rounding family answers Integers, Ruby's shapes verified on
-            // 4.0.6: `round` goes half away from zero (Rust's f64::round
+            // 4.0.9: `round` goes half away from zero (Rust's f64::round
             // agrees), `truncate` toward it, `floor`/`ceil` by their names.
             (Value::Float(number), "floor", []) => {
                 float_to_integer(*number, number.floor(), "floor")
@@ -8638,7 +8638,7 @@ end
 
     /// And a nested hash is unambiguously a block whose body is that hash —
     /// the first element inside the outer braces is a `{`, which cannot start
-    /// a pair. Ruby 4.0.6 reads it the same way.
+    /// a pair. Ruby 4.0.9 reads it the same way.
     #[test]
     fn a_nested_hash_after_a_call_name_is_a_block_holding_it() {
         let source = "def twice\n  puts(\"got #{yield}\")\nend\ntwice {{name: 1}}\n";
@@ -9132,7 +9132,7 @@ end
         assert_eq!(evaluate("4.odd?"), Some(Value::Boolean(false)));
         // Negatives pin the claim above the implementation: these use Rust's
         // truncating `%` rather than ADR 0018's floored one, which is safe
-        // only because they compare against zero. Matches Ruby 4.0.6.
+        // only because they compare against zero. Matches Ruby 4.0.9.
         assert_eq!(evaluate("(0 - 7).odd?"), Some(Value::Boolean(true)));
         assert_eq!(evaluate("(0 - 7).even?"), Some(Value::Boolean(false)));
         assert_eq!(evaluate("(0 - 8).even?"), Some(Value::Boolean(true)));
@@ -9418,7 +9418,7 @@ end
             evaluate("%w[a b c].length + 1 % 2"),
             Some(Value::Integer(4))
         );
-        // ADR 0030: Ruby's content rules, run against Ruby 4.0.6 rather than
+        // ADR 0030: Ruby's content rules, run against Ruby 4.0.9 rather than
         // remembered. Escaped brackets, backslashes, and whitespace drop the
         // backslash; balanced brackets pass through whole; any other escape
         // keeps its backslash; whitespace runs split once.
@@ -9978,7 +9978,7 @@ end
     }
 
     /// ADR 0018: IEEE doubles, Ruby's printing, mixed arithmetic promotes.
-    /// Every expectation below was checked against Ruby 4.0.6.
+    /// Every expectation below was checked against Ruby 4.0.9.
     #[test]
     fn evaluates_floats() {
         assert_eq!(evaluate("2.75"), Some(Value::Float(2.75)));

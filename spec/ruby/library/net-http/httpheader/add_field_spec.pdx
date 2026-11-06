@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#add_field when passed key, value" do
+context "Net::HTTPHeader#add_field when passed key, value" do
   pending "adds the passed value to the header entry with the passed key"
   pending "is case-insensitive"
 end

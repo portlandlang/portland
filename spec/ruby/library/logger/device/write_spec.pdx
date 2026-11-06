@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger::LogDevice\#write" do
+context "Logger::LogDevice#write" do
   pending "writes a message to the device"
   pending "can create a file and writes empty message"
   pending "fails if the device is already closed"

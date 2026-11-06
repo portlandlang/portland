@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#frac" do
+context "BigDecimal#frac" do
   pending "returns a BigDecimal"
   pending "returns the fractional part of the absolute value"
   pending "returns 0 if the value is 0"

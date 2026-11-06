@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#closed_write?" do
+context "StringIO#closed_write?" do
   pending "returns true if self is not writable"
 end

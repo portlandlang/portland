@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#require_relative with a relative path" do
+context "Kernel#require_relative with a relative path" do
   pending "is a private method"
   context "when file is a symlink" do
     pending "loads a path relative to current file"
   end
   pending "loads a path relative to the current file"
-  context "in an \#instance_eval with a" do
+  context "in an #instance_eval with a" do
     pending "synthetic file base name loads a file base name relative to the working directory"
     pending "synthetic file path loads a relative path relative to the working directory plus the directory of the synthetic path"
     pending "synthetic relative file path with a Windows path separator specified loads a relative path relative to the working directory"
@@ -22,12 +22,12 @@ context "Kernel\#require_relative with a relative path" do
   pending "raises a LoadError that includes the missing path"
   pending "raises a LoadError if basepath does not exist"
   pending "stores the missing path in a LoadError object"
-  pending "calls \#to_str on non-String objects"
-  pending "raises a TypeError if argument does not respond to \#to_str"
-  pending "raises a TypeError if passed an object that has \#to_s but not \#to_str"
-  pending "raises a TypeError if \#to_str does not return a String"
-  pending "calls \#to_path on non-String objects"
-  pending "calls \#to_str on non-String objects returned by \#to_path"
+  pending "calls #to_str on non-String objects"
+  pending "raises a TypeError if argument does not respond to #to_str"
+  pending "raises a TypeError if passed an object that has #to_s but not #to_str"
+  pending "raises a TypeError if #to_str does not return a String"
+  pending "calls #to_path on non-String objects"
+  pending "calls #to_str on non-String objects returned by #to_path"
   context "(file extensions)" do
     pending "loads a .rb extensioned file when passed a non-extensioned path"
     pending "loads a .rb extensioned file when a C-extension file of the same name is loaded"
@@ -48,18 +48,18 @@ context "Kernel\#require_relative with a relative path" do
     pending "loads a path for a file already loaded with a relative path"
   end
 end
-context "Kernel\#require_relative with an absolute path" do
+context "Kernel#require_relative with an absolute path" do
   pending "loads a path relative to the current file"
   pending "loads a file defining many methods"
   pending "raises a LoadError if the file does not exist"
   pending "raises a LoadError if basepath does not exist"
   pending "stores the missing path in a LoadError object"
-  pending "calls \#to_str on non-String objects"
-  pending "raises a TypeError if argument does not respond to \#to_str"
-  pending "raises a TypeError if passed an object that has \#to_s but not \#to_str"
-  pending "raises a TypeError if \#to_str does not return a String"
-  pending "calls \#to_path on non-String objects"
-  pending "calls \#to_str on non-String objects returned by \#to_path"
+  pending "calls #to_str on non-String objects"
+  pending "raises a TypeError if argument does not respond to #to_str"
+  pending "raises a TypeError if passed an object that has #to_s but not #to_str"
+  pending "raises a TypeError if #to_str does not return a String"
+  pending "calls #to_path on non-String objects"
+  pending "calls #to_str on non-String objects returned by #to_path"
   context "(file extensions)" do
     pending "loads a .rb extensioned file when passed a non-extensioned path"
     pending "loads a .rb extensioned file when a C-extension file of the same name is loaded"

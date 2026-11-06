@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#new" do
+context "Logger#new" do
   pending "creates a new logger object"
   pending "receives a logging device as first argument"
   pending "receives a frequency rotation as second argument"

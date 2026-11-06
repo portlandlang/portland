@@ -20,9 +20,9 @@ context "Socket.pair" do
     pending "raises SocketError for an unknown address family"
     pending "raises SocketError for an unknown socket type"
   end
-  context "using an object that responds to \#to_str as the 1st and 2nd argument" do
+  context "using an object that responds to #to_str as the 1st and 2nd argument" do
     pending "returns two Socket objects"
-    pending "raises TypeError when \#to_str does not return a String"
+    pending "raises TypeError when #to_str does not return a String"
     pending "raises SocketError for an unknown address family"
     pending "raises SocketError for an unknown socket type"
   end

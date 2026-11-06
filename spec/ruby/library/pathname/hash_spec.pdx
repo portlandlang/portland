@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Pathname\#hash" do
+context "Pathname#hash" do
   pending "is equal to the hash of the pathname"
   pending "is not equal the hash of a different pathname"
 end

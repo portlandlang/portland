@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "String\#bitwise_and" do
+context "String#bitwise_and" do
   pending "returns a new string containing the byte-wise AND with another string"
   pending "converts the argument with to_str"
   pending "raises an ArgumentError if byte sizes differ"
   pending "returns a BINARY string"
 end
-context "String\#bitwise_and!" do
+context "String#bitwise_and!" do
   pending "replaces self with the byte-wise AND and returns self"
   pending "raises a FrozenError if self is frozen"
 end

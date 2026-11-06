@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#pos" do
+context "IO#pos" do
   pending "gets the offset"
   pending "raises IOError on closed stream"
-  pending "resets \#eof?"
+  pending "resets #eof?"
 end
-context "IO\#pos=" do
+context "IO#pos=" do
   pending "behaves like :io_set_pos :pos="
 end

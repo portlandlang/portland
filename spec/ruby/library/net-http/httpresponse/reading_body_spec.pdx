@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPResponse\#reading_body" do
+context "Net::HTTPResponse#reading_body" do
   context "when body_allowed is true" do
     pending "reads and returns the response body for self from the passed socket"
     pending "yields the passed block before reading the body"

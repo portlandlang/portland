@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#set_socket" do
+context "Net::FTP#set_socket" do
   pending "needs to be reviewed for spec completeness"
 end

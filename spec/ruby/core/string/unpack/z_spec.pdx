@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'Z'" do
+context "String#unpack with format 'Z'" do
   pending "behaves like :string_unpack_basic Z"
   pending "behaves like :string_unpack_no_platform Z"
   pending "behaves like :string_unpack_string Z"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#path" do
+context "IO#path" do
   pending "returns the path of the file associated with the IO object"
   pending "is set for STDIN"
   pending "is set for STDOUT"

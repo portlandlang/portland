@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#sendmsg_nonblock" do
+context "BasicSocket#sendmsg_nonblock" do
   context "using a disconnected socket" do
     context "without a destination address" do
       pending "raises \#{SocketSpecs.dest_addr_req_error}"

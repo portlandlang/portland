@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#noop" do
+context "Net::FTP#noop" do
   pending "sends the NOOP command to the server"
   pending "returns nil"
   pending "raises a Net::FTPPermError when the response code is 500"

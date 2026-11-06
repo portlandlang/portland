@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#utc?" do
+context "Time#utc?" do
   pending "returns true only if time represents a time in UTC (GMT)"
   pending "treats time as UTC what was created in different ways"
   pending "does treat time with 'UTC' offset as UTC"
@@ -27,7 +27,7 @@ context "Time.utc" do
   pending "handles bad leap seconds by carrying values forward"
   pending "handles a value of 60 for seconds by carrying values forward in zone 'UTC'"
 end
-context "Time\#utc" do
+context "Time#utc" do
   pending "converts self to UTC, modifying the receiver"
   pending "returns self"
   context "on a frozen time" do

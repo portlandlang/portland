@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#merge" do
+context "Set#merge" do
   pending "adds the elements of the passed Enumerable to self"
   pending "returns self"
   pending "raises an ArgumentError when passed a non-Enumerable"

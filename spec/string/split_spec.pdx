@@ -1,7 +1,7 @@
 # `String#split` with Ruby's rules (#142): trailing empty fields drop unless
 # the limit is negative, a positive limit caps the pieces, `" "` or no
 # separator splits on runs of whitespace, and `""` splits into characters.
-# Every expected value is Ruby 4.0.7's answer for the same call.
+# Every expected value is Ruby 4.0.9's answer for the same call.
 #
 # The rows below the house examples are from ruby/spec
 # core/string/split_spec.rb, "with String". The regex rows and the block

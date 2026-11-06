@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket\#remote_address" do
+context "Socket#remote_address" do
   pending "returns an Addrinfo"
   context "the returned Addrinfo" do
     pending "uses AF_INET as the address family"

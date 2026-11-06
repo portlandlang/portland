@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "ENV\#clone" do
+context "ENV#clone" do
   pending "raises ArgumentError when keyword argument 'freeze' is neither nil nor boolean"
   pending "raises ArgumentError when keyword argument is not 'freeze'"
   pending "raises TypeError"

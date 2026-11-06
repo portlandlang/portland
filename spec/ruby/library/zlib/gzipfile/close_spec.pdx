@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipFile\#close" do
+context "Zlib::GzipFile#close" do
   pending "finishes the stream and closes the io"
 end

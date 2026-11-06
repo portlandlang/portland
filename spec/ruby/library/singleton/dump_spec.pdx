@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Singleton\#_dump" do
+context "Singleton#_dump" do
   pending "returns an empty string"
   pending "returns an empty string from a singleton subclass"
 end

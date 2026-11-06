@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Net::FTP\#voidcmd" do
+context "Net::FTP#voidcmd" do
   pending "sends the passed command to the server"
   pending "returns nil"
   pending "raises a Net::FTPReplyError when the response code is 1xx"

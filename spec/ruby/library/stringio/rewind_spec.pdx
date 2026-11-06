@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#rewind" do
+context "StringIO#rewind" do
   pending "returns 0"
   pending "resets the position"
   pending "resets the line number"

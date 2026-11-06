@@ -4,15 +4,15 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#write when passed [Object]" do
+context "StringIO#write when passed [Object]" do
   pending "behaves like :stringio_write :write"
 end
-context "StringIO\#write when passed [String]" do
+context "StringIO#write when passed [String]" do
   pending "behaves like :stringio_write_string :write"
 end
-context "StringIO\#write when self is not writable" do
+context "StringIO#write when self is not writable" do
   pending "behaves like :stringio_write_not_writable :write"
 end
-context "StringIO\#write when in append mode" do
+context "StringIO#write when in append mode" do
   pending "behaves like :stringio_write_append :write"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#srand" do
+context "Kernel#srand" do
   pending "is a private method"
   pending "returns the previous seed value"
   pending "returns the system-initialized seed value on the first call"
@@ -13,7 +13,7 @@ context "Kernel\#srand" do
   pending "accepts and uses a seed of 0"
   pending "accepts a negative seed"
   pending "accepts an Integer as a seed"
-  pending "calls \#to_int on seed"
+  pending "calls #to_int on seed"
   pending "raises a TypeError when passed nil"
   pending "raises a TypeError when passed a String"
 end

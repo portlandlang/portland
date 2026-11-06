@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#wait_readable" do
+context "IO#wait_readable" do
   pending "waits for the IO to become readable with no timeout"
   pending "waits for the IO to become readable with the given timeout"
   pending "waits for the IO to become readable with the given large timeout"

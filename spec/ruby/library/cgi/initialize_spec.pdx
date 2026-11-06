@@ -4,18 +4,18 @@
 
 require_relative "../../../spec_helper"
 
-context "CGI\#initialize" do
+context "CGI#initialize" do
   pending "is private"
 end
-context "CGI\#initialize when passed no arguments" do
+context "CGI#initialize when passed no arguments" do
   pending "extends self with CGI::QueryExtension"
   pending "does not extend self with CGI::HtmlExtension"
   pending "does not extend self with any of the other HTML modules"
-  pending "sets \#cookies based on ENV['HTTP_COOKIE']"
-  pending "sets \#params based on ENV['QUERY_STRING'] when ENV['REQUEST_METHOD'] is GET"
-  pending "sets \#params based on ENV['QUERY_STRING'] when ENV['REQUEST_METHOD'] is HEAD"
+  pending "sets #cookies based on ENV['HTTP_COOKIE']"
+  pending "sets #params based on ENV['QUERY_STRING'] when ENV['REQUEST_METHOD'] is GET"
+  pending "sets #params based on ENV['QUERY_STRING'] when ENV['REQUEST_METHOD'] is HEAD"
 end
-context "CGI\#initialize when passed type" do
+context "CGI#initialize when passed type" do
   pending "extends self with CGI::QueryExtension"
   pending "extends self with CGI::QueryExtension, CGI::Html3 and CGI::HtmlExtension when the passed type is 'html3'"
   pending "extends self with CGI::QueryExtension, CGI::Html4 and CGI::HtmlExtension when the passed type is 'html4'"

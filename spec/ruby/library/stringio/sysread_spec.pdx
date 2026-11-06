@@ -4,27 +4,27 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#sysread when passed length, buffer" do
+context "StringIO#sysread when passed length, buffer" do
   pending "behaves like :stringio_read :sysread"
 end
-context "StringIO\#sysread when passed [length]" do
+context "StringIO#sysread when passed [length]" do
   pending "behaves like :stringio_read_length :sysread"
 end
-context "StringIO\#sysread when passed no arguments" do
+context "StringIO#sysread when passed no arguments" do
   pending "behaves like :stringio_read_no_arguments :sysread"
   pending "returns an empty String if at EOF"
 end
-context "StringIO\#sysread when self is not readable" do
+context "StringIO#sysread when self is not readable" do
   pending "behaves like :stringio_read_not_readable :sysread"
 end
-context "StringIO\#sysread when passed nil" do
+context "StringIO#sysread when passed nil" do
   pending "behaves like :stringio_read_nil :sysread"
   pending "returns an empty String if at EOF"
 end
-context "StringIO\#sysread when passed length" do
+context "StringIO#sysread when passed length" do
   pending "behaves like :stringio_sysread_length :sysread"
 end
-context "StringIO\#sysread when passed [length]" do
+context "StringIO#sysread when passed [length]" do
   pending "raises an EOFError when self's position is at the end"
   pending "returns an empty String when length is 0"
 end

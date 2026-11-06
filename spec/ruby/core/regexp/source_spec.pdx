@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Regexp\#source" do
+context "Regexp#source" do
   pending "returns the original string of the pattern"
   pending "keeps escape sequences as is"
   context "escaping" do

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "StringScanner\#dup" do
+context "StringScanner#dup" do
   pending "copies the passed StringScanner's content to self"
   pending "copies the passed StringScanner's position to self"
   pending "copies previous match state"

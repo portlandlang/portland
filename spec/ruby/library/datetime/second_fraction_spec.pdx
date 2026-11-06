@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "DateTime\#second_fraction" do
-  pending "is an alias of DateTime\#sec_fraction"
+context "DateTime#second_fraction" do
+  pending "is an alias of DateTime#sec_fraction"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#Complex" do
+context "Kernel#Complex" do
   pending "is a private method"
   context "when passed [Complex, Complex]" do
     pending "returns a new Complex number based on the two given numbers"
@@ -42,23 +42,23 @@ context "Kernel\#Complex" do
   context "when passes [String, String]" do
     pending "needs to be reviewed for spec completeness"
   end
-  context "when passed an Object which responds to \#to_c" do
+  context "when passed an Object which responds to #to_c" do
     pending "returns the passed argument"
   end
-  context "when passed a Numeric which responds to \#real? with false" do
+  context "when passed a Numeric which responds to #real? with false" do
     pending "returns the passed argument"
   end
-  context "when passed a Numeric which responds to \#real? with true" do
+  context "when passed a Numeric which responds to #real? with true" do
     pending "returns a Complex with the passed argument as the real component and 0 as the imaginary component"
   end
-  context "when passed Numerics n1 and n2 and at least one responds to \#real? with false" do
+  context "when passed Numerics n1 and n2 and at least one responds to #real? with false" do
     pending "returns n1 + n2 * Complex(0, 1)"
   end
-  context "when passed two Numerics and both respond to \#real? with true" do
+  context "when passed two Numerics and both respond to #real? with true" do
     pending "returns a Complex with the passed arguments as real and imaginary components respectively"
   end
   context "when passed a single non-Numeric" do
-    pending "coerces the passed argument using \#to_c"
+    pending "coerces the passed argument using #to_c"
   end
   context "when passed a non-Numeric second argument" do
     pending "raises TypeError"

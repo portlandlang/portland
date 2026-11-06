@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#route_from" do
+context "URI#route_from" do
   pending "gives the minimal difference between the current URI and the target"
   pending "accepts a string-like argument"
 end

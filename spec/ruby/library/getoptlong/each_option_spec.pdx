@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "GetoptLong\#each_option" do
+context "GetoptLong#each_option" do
   pending "passes each_option argument/value pair to the block"
 end

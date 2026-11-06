@@ -4,9 +4,9 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#dup" do
+context "Proc#dup" do
   pending "behaves like :proc_dup :dup"
   pending "does not copy the singleton class"
   pending "resets frozen status"
-  pending "calls \#initialize_dup on subclass"
+  pending "calls #initialize_dup on subclass"
 end

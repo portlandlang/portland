@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::ZStream\#avail_in" do
+context "Zlib::ZStream#avail_in" do
   pending "returns bytes in the input buffer"
 end

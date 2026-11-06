@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "CGI::Cookie\#name" do
+context "CGI::Cookie#name" do
   pending "returns self's name"
 end
-context "CGI::Cookie\#name=" do
+context "CGI::Cookie#name=" do
   pending "sets self's expiration date"
 end

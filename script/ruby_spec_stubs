@@ -133,10 +133,12 @@ class Stub
     end
   end
 
-  # A Portland string literal: backslash, quote, and `#` escaped, so no
-  # upstream title can interpolate or end the string early.
+  # A Portland string literal: backslash, quote, and `#{` escaped, so no
+  # upstream title can interpolate or end the string early. A bare `#` is a
+  # literal character in a Portland string, as in Ruby's, so `Complex#eql?`
+  # reads as it does upstream.
   def literal(text)
-    escaped = text.gsub("\\") { "\\\\" }.gsub('"') { '\\"' }.gsub("#") { "\\#" }
+    escaped = text.gsub("\\") { "\\\\" }.gsub('"') { '\\"' }.gsub("\#{") { "\\\#{" }
                   .gsub("\n") { "\\n" }.gsub("\t") { "\\t" }.gsub("\r", "")
     %("#{escaped}")
   end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "UDPSocket\#recvfrom_nonblock" do
+context "UDPSocket#recvfrom_nonblock" do
   context "using an unbound socket" do
     pending "raises IO::WaitReadable"
   end

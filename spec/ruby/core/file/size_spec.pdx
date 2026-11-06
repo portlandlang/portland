@@ -34,7 +34,7 @@ end
 context "File.size" do
   pending "behaves like :file_size_with_file_argument :size File"
 end
-context "File\#size" do
+context "File#size" do
   pending "is an instance method"
   pending "returns the file's size as an Integer"
   pending "returns the file's size in bytes"
@@ -43,6 +43,6 @@ context "File\#size" do
   pending "raises an IOError on a closed file"
   pending "follows symlinks if necessary"
 end
-context "File\#size for an empty file" do
+context "File#size for an empty file" do
   pending "returns 0"
 end

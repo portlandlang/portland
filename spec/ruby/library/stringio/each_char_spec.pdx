@@ -4,11 +4,11 @@
 
 require_relative "../../../spec_helper"
 
-context "StringIO\#each_char" do
+context "StringIO#each_char" do
   pending "yields each character code in turn"
   pending "returns self"
   pending "returns an Enumerator when passed no block"
 end
-context "StringIO\#each_char when self is not readable" do
+context "StringIO#each_char when self is not readable" do
   pending "raises an IOError"
 end

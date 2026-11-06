@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::BasicSocket\#shutdown" do
+context "Socket::BasicSocket#shutdown" do
   context "using an Integer" do
     pending "shuts down a socket for reading"
     pending "shuts down a socket for writing"
@@ -26,12 +26,12 @@ context "Socket::BasicSocket\#shutdown" do
     pending "shuts down a socket for writing using \"SHUT_WR\""
     pending "raises ArgumentError when using an invalid option"
   end
-  context "using an object that responds to \#to_str" do
+  context "using an object that responds to #to_str" do
     pending "shuts down a socket for reading using \"RD\""
     pending "shuts down a socket for reading using \"SHUT_RD\""
     pending "shuts down a socket for reading and writing"
   end
-  context "using an object that does not respond to \#to_str" do
+  context "using an object that does not respond to #to_str" do
     pending "raises TypeError"
   end
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::Option\#initialize" do
+context "Socket::Option#initialize" do
   context "using Integers" do
     pending "returns a Socket::Option"
   end

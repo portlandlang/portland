@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Zlib::GzipReader\#pos" do
+context "Zlib::GzipReader#pos" do
   pending "returns the position"
 end

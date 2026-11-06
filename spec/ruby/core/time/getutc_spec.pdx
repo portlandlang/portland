@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Time\#getutc" do
+context "Time#getutc" do
   pending "returns a new time which is the utc representation of time"
 end

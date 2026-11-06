@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Digest::SHA512\#update" do
-  pending "is an alias of Digest::SHA512\#<<"
+context "Digest::SHA512#update" do
+  pending "is an alias of Digest::SHA512#<<"
 end

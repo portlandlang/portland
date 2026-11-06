@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "Socket::AncillaryData\#family" do
+context "Socket::AncillaryData#family" do
   pending "returns the family as an Integer"
 end

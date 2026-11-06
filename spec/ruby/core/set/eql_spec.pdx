@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#eql?" do
+context "Set#eql?" do
   pending "returns true when the passed argument is a Set and contains the same elements"
-  pending "is an alias of Set\#=="
+  pending "is an alias of Set#=="
 end

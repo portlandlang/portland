@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "BigDecimal\#quo" do
+context "BigDecimal#quo" do
   pending "behaves like :bigdecimal_quo :quo []"
   pending "returns NaN if NaN is involved"
 end

@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#pid" do
+context "IO#pid" do
   pending "returns nil for IO not associated with a process"
 end
-context "IO\#pid" do
+context "IO#pid" do
   pending "returns the ID of a process associated with stream"
   pending "raises an IOError on closed stream"
 end

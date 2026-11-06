@@ -6,6 +6,6 @@ require_relative "../../../../spec_helper"
 
 context "Readline::HISTORY.<<" do
   pending "appends the given Object to the history"
-  pending "tries to convert the passed Object to a String using \#to_str"
+  pending "tries to convert the passed Object to a String using #to_str"
   pending "raises a TypeError when the passed Object can't be converted to a String"
 end

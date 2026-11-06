@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "URI\#eql?" do
+context "URI#eql?" do
   pending "behaves like :uri_eql :eql?"
   pending "behaves like :uri_eql_against_other_types :eql?"
 end

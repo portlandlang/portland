@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#wait_writable" do
+context "IO#wait_writable" do
   pending "waits for the IO to become writable with no timeout"
   pending "waits for the IO to become writable with the given timeout"
   pending "waits for the IO to become writable with the given large timeout"

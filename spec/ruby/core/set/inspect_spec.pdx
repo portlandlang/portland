@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Set\#inspect" do
-  pending "is an alias of Set\#to_s"
+context "Set#inspect" do
+  pending "is an alias of Set#to_s"
 end

@@ -24,8 +24,8 @@ context "IO.copy_stream" do
     end
   end
   context "from a file name" do
-    pending "calls \#to_path to convert on object to a file name"
-    pending "raises a TypeError if \#to_path does not return a String"
+    pending "calls #to_path to convert on object to a file name"
+    pending "raises a TypeError if #to_path does not return a String"
     pending "reads a file when given a path in a non-UTF-8, ASCII-compatible encoding containing non-ASCII characters"
     context "to a file name" do
       pending "behaves like :io_copy_stream_to_file nil IOSpecs::CopyStream"
@@ -47,14 +47,14 @@ context "IO.copy_stream" do
     end
   end
   context "with non-IO Objects" do
-    pending "calls \#readpartial on the source Object if defined"
-    pending "calls \#read on the source Object"
-    pending "calls \#write on the destination Object"
-    pending "does not call \#pos on the source if no offset is given"
-    pending "does not call \#read on the source or \#write on the destination if zero length is given"
+    pending "calls #readpartial on the source Object if defined"
+    pending "calls #read on the source Object"
+    pending "calls #write on the destination Object"
+    pending "does not call #pos on the source if no offset is given"
+    pending "does not call #read on the source or #write on the destination if zero length is given"
   end
   context "with a destination that does partial reads" do
-    pending "calls \#write repeatedly on the destination Object"
+    pending "calls #write repeatedly on the destination Object"
   end
 end
 context "IO.copy_stream" do
@@ -62,6 +62,6 @@ context "IO.copy_stream" do
 end
 context "IO.copy_stream" do
   context "given length" do
-    pending "calls \#read/\#readpartial with remaining bytes count"
+    pending "calls #read/#readpartial with remaining bytes count"
   end
 end

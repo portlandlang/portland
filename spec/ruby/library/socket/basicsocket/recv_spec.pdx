@@ -4,14 +4,14 @@
 
 require_relative "../../../../spec_helper"
 
-context "BasicSocket\#recv" do
+context "BasicSocket#recv" do
   pending "receives a specified number of bytes of a message from another socket"
   pending "accepts flags to specify unusual receiving behaviour"
   pending "gets lines delimited with a custom separator"
   pending "allows an output buffer as third argument"
   pending "preserves the encoding of the given buffer"
 end
-context "BasicSocket\#recv" do
+context "BasicSocket#recv" do
   context "using an unbound socket" do
     pending "blocks the caller"
   end
@@ -27,7 +27,7 @@ context "BasicSocket\#recv" do
     end
   end
 end
-context "BasicSocket\#recv" do
+context "BasicSocket#recv" do
   context "when recvfrom(2) returns 0 (if no messages are available to be received and the peer has performed an orderly shutdown)" do
     context "stream socket" do
       pending "returns nil on a closed stream socket"

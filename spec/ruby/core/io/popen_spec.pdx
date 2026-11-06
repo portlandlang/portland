@@ -16,7 +16,7 @@ context "IO.popen" do
   pending "waits for the child to finish"
   pending "does not throw an exception if child exited and has been waited for"
   pending "returns an instance of a subclass when called on a subclass"
-  pending "coerces mode argument with \#to_str"
+  pending "coerces mode argument with #to_str"
   pending "accepts a path using the chdir: keyword argument"
   pending "accepts a path using the chdir: keyword argument and a coercible path"
   context "with a block" do

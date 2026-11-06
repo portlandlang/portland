@@ -2,7 +2,7 @@
 
 **Summary:** The inventory of Portland grammar Ruby cannot parse — the locked-until-flip tier, in one place.
 
-**Status:** an index, verified by running `ruby -c` on Ruby 4.0.6 (2026-08-19) rather than by intuition — which the probe promptly corrected twice, see the last section. Each entry's story lives in its owner doc; this page only points (no fact has two homes).
+**Status:** an index, verified by running `ruby -c` on Ruby 4.0.9 (2026-08-19) rather than by intuition — which the probe promptly corrected twice, see the last section. Each entry's story lives in its owner doc; this page only points (no fact has two homes).
 
 ## Why this list matters
 

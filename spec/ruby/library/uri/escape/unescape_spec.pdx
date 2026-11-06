@@ -4,6 +4,6 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Escape\#unescape" do
+context "URI::Escape#unescape" do
   pending "needs to be reviewed for spec completeness"
 end

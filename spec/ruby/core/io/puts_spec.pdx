@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#puts" do
+context "IO#puts" do
   pending "writes just a newline when given no args"
   pending "writes just a newline when given just a newline"
   pending "writes empty string with a newline when given nil as an arg"

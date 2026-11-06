@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#fcntl" do
+context "IO#fcntl" do
   pending "raises IOError on closed stream"
 end

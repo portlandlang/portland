@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "File\#to_path" do
+context "File#to_path" do
   pending "returns a String"
   pending "returns a different String on every call"
   pending "returns a mutable String"

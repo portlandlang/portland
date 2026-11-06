@@ -4,9 +4,9 @@
 
 require_relative "../../../../spec_helper"
 
-context "URI::Generic\#host" do
+context "URI::Generic#host" do
   pending "returns empty string when host is empty"
 end
-context "URI::Generic\#host=" do
+context "URI::Generic#host=" do
   pending "needs to be reviewed for spec completeness"
 end

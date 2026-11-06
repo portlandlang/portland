@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Net::HTTPHeader\#sub_type" do
+context "Net::HTTPHeader#sub_type" do
   pending "returns the 'sub-content-type', as per 'Content-Type' header entry"
   pending "returns nil if no 'sub-content-type' is set"
   pending "returns nil if the 'Content-Type' header entry does not exist"

@@ -4,19 +4,19 @@
 
 require_relative "../../../../spec_helper"
 
-context "String\#unpack with format 'F'" do
+context "String#unpack with format 'F'" do
   pending "behaves like :string_unpack_basic F"
   pending "behaves like :string_unpack_float_le F"
 end
-context "String\#unpack with format 'f'" do
+context "String#unpack with format 'f'" do
   pending "behaves like :string_unpack_basic f"
   pending "behaves like :string_unpack_float_le f"
 end
-context "String\#unpack with format 'F'" do
+context "String#unpack with format 'F'" do
   pending "behaves like :string_unpack_basic F"
   pending "behaves like :string_unpack_float_be F"
 end
-context "String\#unpack with format 'f'" do
+context "String#unpack with format 'f'" do
   pending "behaves like :string_unpack_basic f"
   pending "behaves like :string_unpack_float_be f"
 end

@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "OpenSSL::Digest\#initialize" do
+context "OpenSSL::Digest#initialize" do
   context "can be called with a digest name" do
     pending "returns a SHA1 object"
     pending "returns a SHA256 object"

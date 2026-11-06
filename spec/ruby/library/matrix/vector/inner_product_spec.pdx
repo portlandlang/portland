@@ -4,7 +4,7 @@
 
 require_relative "../../../../spec_helper"
 
-context "Vector\#inner_product" do
+context "Vector#inner_product" do
   pending "returns the inner product of a vector"
   pending "returns 0 for empty vectors"
   pending "raises an error for mismatched vectors"

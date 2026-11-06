@@ -4,11 +4,11 @@
 
 require_relative "../../../../spec_helper"
 
-context "Logger\#warn?" do
+context "Logger#warn?" do
   pending "returns true if severity level allows printing warn messages"
   pending "returns false if severity level does not allow printing warn messages"
 end
-context "Logger\#warn" do
+context "Logger#warn" do
   pending "logs a WARN message"
   pending "accepts an application name with a block"
 end

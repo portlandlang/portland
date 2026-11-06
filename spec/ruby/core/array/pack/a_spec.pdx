@@ -4,12 +4,12 @@
 
 require_relative "../../../../spec_helper"
 
-context "Array\#pack with format 'A'" do
+context "Array#pack with format 'A'" do
   pending "behaves like :array_pack_basic A"
   pending "behaves like :array_pack_basic_non_float A"
   pending "behaves like :array_pack_no_platform A"
   pending "behaves like :array_pack_string A"
-  pending "calls \#to_str to convert an Object to a String"
+  pending "calls #to_str to convert an Object to a String"
   pending "will not implicitly convert a number to a string"
   pending "adds all the bytes to the output when passed the '*' modifier"
   pending "pads the output with spaces when the count exceeds the size of the String"
@@ -17,7 +17,7 @@ context "Array\#pack with format 'A'" do
   pending "pads the output with spaces when the value is nil"
   pending "does not pad with spaces when passed the '*' modifier and the value is nil"
 end
-context "Array\#pack with format 'a'" do
+context "Array#pack with format 'a'" do
   pending "behaves like :array_pack_basic a"
   pending "behaves like :array_pack_basic_non_float a"
   pending "behaves like :array_pack_no_platform a"

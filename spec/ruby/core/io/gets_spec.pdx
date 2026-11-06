@@ -4,10 +4,10 @@
 
 require_relative "../../../spec_helper"
 
-context "IO\#gets" do
+context "IO#gets" do
   pending "behaves like :io_gets_ascii :gets"
 end
-context "IO\#gets" do
+context "IO#gets" do
   pending "assigns the returned line to $_"
   pending "sets $_ to nil after the last line has been read"
   pending "returns nil if called at the end of the stream"
@@ -41,14 +41,14 @@ context "IO\#gets" do
     pending "raises exception when options passed as Hash"
   end
 end
-context "IO\#gets" do
+context "IO#gets" do
   pending "raises an IOError if the stream is opened for append only"
   pending "raises an IOError if the stream is opened for writing only"
 end
-context "IO\#gets" do
-  pending "calls \#to_int to convert a single object argument to an Integer limit"
-  pending "calls \#to_int to convert the second object argument to an Integer limit"
-  pending "calls \#to_str to convert the first argument to a String when passed a limit"
+context "IO#gets" do
+  pending "calls #to_int to convert a single object argument to an Integer limit"
+  pending "calls #to_int to convert the second object argument to an Integer limit"
+  pending "calls #to_str to convert the first argument to a String when passed a limit"
   pending "reads to the default separator when passed a single argument greater than the number of bytes to the separator"
   pending "reads limit bytes when passed a single argument less than the number of bytes to the default separator"
   pending "reads limit bytes when passed nil and a limit"
@@ -59,11 +59,11 @@ context "IO\#gets" do
   pending "returns empty string when 0 passed as a limit"
   pending "does not accept limit that doesn't fit in a C off_t"
 end
-context "IO\#gets" do
+context "IO#gets" do
   pending "reads limit bytes and extra bytes when limit is reached not at character boundary"
   pending "read limit bytes and extra bytes with maximum of 16"
 end
-context "IO\#gets" do
+context "IO#gets" do
   pending "uses the default external encoding"
   pending "uses the IO object's external encoding, when set"
   pending "transcodes into the default internal encoding"

@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Proc\#source_location" do
+context "Proc#source_location" do
   pending "returns an Array"
   pending "sets the first value to the path of the file in which the proc was defined"
   pending "sets the last value to an Integer representing the line on which the proc was defined"

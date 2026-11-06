@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Numeric\#rectangular" do
+context "Numeric#rectangular" do
   pending "returns an Array"
   pending "returns a two-element Array"
   pending "returns self as the first element"

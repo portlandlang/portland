@@ -4,6 +4,6 @@
 
 require_relative "../../../spec_helper"
 
-context "Tempfile\#unlink" do
-  pending "is an alias of Tempfile\#delete"
+context "Tempfile#unlink" do
+  pending "is an alias of Tempfile#delete"
 end

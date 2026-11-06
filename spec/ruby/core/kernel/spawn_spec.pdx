@@ -4,7 +4,7 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#spawn" do
+context "Kernel#spawn" do
   pending "is a private method"
   pending "executes the given command"
 end

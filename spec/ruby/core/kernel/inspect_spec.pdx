@@ -4,13 +4,13 @@
 
 require_relative "../../../spec_helper"
 
-context "Kernel\#inspect" do
+context "Kernel#inspect" do
   pending "returns a String"
-  pending "does not call \#to_s if it is defined"
+  pending "does not call #to_s if it is defined"
   pending "returns a String with the object class and object_id encoded"
-  pending "returns a String for an object without \#class method"
-  pending "calls \#instance_variables_to_inspect private method to know which variables to display"
-  pending "displays all instance variables if \#instance_variables_to_inspect returns nil"
-  pending "displays all instance variables if \#instance_variables_to_inspect is not defined"
-  pending "raises an error if \#instance_variables_to_inspect returns an invalid value"
+  pending "returns a String for an object without #class method"
+  pending "calls #instance_variables_to_inspect private method to know which variables to display"
+  pending "displays all instance variables if #instance_variables_to_inspect returns nil"
+  pending "displays all instance variables if #instance_variables_to_inspect is not defined"
+  pending "raises an error if #instance_variables_to_inspect returns an invalid value"
 end
