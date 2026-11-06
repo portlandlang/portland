@@ -63,11 +63,11 @@ context "An interpolated symbol" do
     name = "pending"
     expect(:"prefix_#{name}").to eq(:prefix_pending)
     expect(:"#{name}").to eq(name.to_sym)
-    expect(inspect(:"foo #{1 + 1}")).to eq(":\"foo 2\"")
+    expect(inspect(:"foo #{1 + 1}")).to eq(':"foo 2"')
   end
 
   specify "takes the string's escapes" do
-    expect(:"a\"b").to eq("a\"b".to_sym)
+    expect(:"a\"b").to eq('a"b'.to_sym)
     expect(:"tab\there".length).to eq(8)
   end
 end

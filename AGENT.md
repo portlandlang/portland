@@ -31,6 +31,8 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Tick issue-body checklists as parts land**, so an issue's state is readable without reading its comments.
 
+**Single quotes for a string that interpolates nothing and escapes only a quote.** Ruby's own preference, and the specs are where it shows: an expected value that is itself quoted text — JSON, an `inspect` rendering, a refusal's sentence — reads `'"sym"'`, never `"\"sym\""`. Double quotes stay for interpolation and for the escapes single quotes cannot spell (`\n`, `\t`). The repo has no `rubocop.yml`; this list is the style guide, and this is its first entry about how Portland itself is written ([#206](https://github.com/portlandlang/portland/issues/206)).
+
 **Adding, removing, or renaming a builtin in the seed changes the method table.** The checker's shape 2 and contract check read each builtin receiver's method set from the table in `compiler/inference.pdx`, which is derived from the seed's behavior, not from its Rust: run `script/probe_builtin_methods`, paste its eight lines over the table, and commit the two together. The seed reads the same eight lines at build (`seed/src/builtins.rs`) for its own wordings, so the table has one home; `script/check_builtin_table` diffs it against a fresh probe and runs from the pre-push hook whenever `seed/src` changed. The table retires with the seed at Stage 3, when the stdlib becomes Portland source.
 
 ## Running things

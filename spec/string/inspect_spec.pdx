@@ -15,7 +15,7 @@ context "String#inspect" do
   end
 
   specify "returns a string with \" and \\ escaped with a backslash" do
-    expect(inspect("\"")).to eq("\"\\\"\"")
+    expect(inspect('"')).to eq("\"\\\"\"")
     expect(inspect("\\")).to eq("\"\\\\\"")
   end
 
@@ -26,8 +26,8 @@ context "String#inspect" do
   end
 
   specify "returns a string with # not escaped when followed by any other character" do
-    expect(inspect("#")).to eq("\"#\"")
-    expect(inspect("#1")).to eq("\"#1\"")
+    expect(inspect("#")).to eq('"#"')
+    expect(inspect("#1")).to eq('"#1"')
   end
 
   specify "returns a string with printable non-alphanumeric characters unescaped" do
@@ -49,8 +49,8 @@ context "String#inspect" do
   end
 
   specify "returns a string with extended characters for Unicode strings" do
-    expect(inspect("é")).to eq("\"é\"")
-    expect(inspect("東京")).to eq("\"東京\"")
-    expect(inspect("🏳️‍🌈")).to eq("\"🏳️‍🌈\"")
+    expect(inspect("é")).to eq('"é"')
+    expect(inspect("東京")).to eq('"東京"')
+    expect(inspect("🏳️‍🌈")).to eq('"🏳️‍🌈"')
   end
 end

@@ -95,7 +95,7 @@ end
 
 context "Data#to_s" do
   specify "renders as the struct's constructor reads" do
-    expect(DataSpecs::Measure.new(amount: 42, unit: "km").to_s).to eq("DataSpecs::Measure(amount: 42, unit: \"km\")")
-    expect(inspect(DataSpecs::Measure.new(amount: 42, unit: "km"))).to eq("DataSpecs::Measure(amount: 42, unit: \"km\")")
+    expect(DataSpecs::Measure.new(amount: 42, unit: "km").to_s).to eq('DataSpecs::Measure(amount: 42, unit: "km")')
+    expect(inspect(DataSpecs::Measure.new(amount: 42, unit: "km"))).to eq('DataSpecs::Measure(amount: 42, unit: "km")')
   end
 end

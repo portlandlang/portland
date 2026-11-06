@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Spec strings that quote JSON or inspect text are single-quoted** ([#206](https://github.com/portlandlang/portland/issues/206)) — 92 expected values across 14 spec files read `'"sym"'` instead of `"\"sym\""`: Ruby's own preference where a string needs no interpolation, and the first entry in AGENT.md's conventions about how the specs are written. Found by Prism over the spec files, rewritten by byte offset.
+
 - **A parse refusal is the first refusal, hosted too** ([#202](https://github.com/portlandlang/portland/issues/202), [#205](https://github.com/portlandlang/portland/issues/205)) — the hosted compiler carried a parse error as a node and surfaced it only when the evaluator reached it, so `p 'it'` followed by `p 'it' 's'` printed `"it"` before refusing, and a refused argument in a paren-less call was counted toward the call's arity and reported as the wrong count. The checker now says an ErrorNode's sentence before any other check, and the arity check skips a call holding one; nothing runs on either oracle, pinned by a test that reads an empty standard output.
 
 - **Positional struct construction refuses hosted as it does on the seed** ([#203](https://github.com/portlandlang/portland/issues/203)) — `Point.new(1, 2)` read each argument as a keyword node and died on `"1" is a String, which has no method 'kind'`; it now says `Point.new takes keyword arguments, not positional ones`, and `with(2)` says the same for `with`.

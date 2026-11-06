@@ -9,32 +9,32 @@ require_relative "../spec_helper"
 
 context "JSON.parse" do
   specify "answers every JSON type" do
-    expect(JSON.parse("{\"a\":1,\"b\":[true,false,null],\"c\":\"x\",\"d\":2.5}")).to eq({"a" => 1, "b" => [true, false, nil], "c" => "x", "d" => 2.5})
+    expect(JSON.parse('{"a":1,"b":[true,false,null],"c":"x","d":2.5}')).to eq({"a" => 1, "b" => [true, false, nil], "c" => "x", "d" => 2.5})
   end
 
   specify "parses a top-level scalar" do
     expect(JSON.parse(" 2 ")).to eq(2)
-    expect(JSON.parse("\"x\"")).to eq("x")
+    expect(JSON.parse('"x"')).to eq("x")
     expect(JSON.parse("null")).to eq(nil)
     expect(JSON.parse("[1]\r\n")).to eq([1])
   end
 
   specify "reads null as nil, which a lookup tells apart from a missing key" do
-    document = JSON.parse("{\"a\":null}")
+    document = JSON.parse('{"a":null}')
     expect(document["a"]).to eq(some(nil))
     expect(document["missing"]).to eq(nil)
     expect(document.key?("a")).to eq(true)
   end
 
   specify "keeps insertion order" do
-    expect(JSON.parse("{\"z\":1,\"a\":2}").keys).to eq(["z", "a"])
+    expect(JSON.parse('{"z":1,"a":2}').keys).to eq(["z", "a"])
   end
 
   specify "makes the keys symbols with symbolize_names" do
-    document = JSON.parse("{\"a\":{\"b\":1}}", symbolize_names: true)
+    document = JSON.parse('{"a":{"b":1}}', symbolize_names: true)
     expect(document).to eq({a: {b: 1}})
     expect(document[:a]).to eq({b: 1})
-    expect(JSON.parse("{\"b c\":1}", symbolize_names: true).keys).to eq([:"b c"])
+    expect(JSON.parse('{"b c":1}', symbolize_names: true).keys).to eq([:"b c"])
   end
 
   specify "splits numbers on Ruby's rule" do
@@ -44,45 +44,45 @@ context "JSON.parse" do
   end
 
   specify "fails on an integer past 64 bits, where Ruby widens to a bignum" do
-    expect(inspect(JSON.parse("99999999999999999999"))).to eq("failure(\"99999999999999999999 overflows the 64-bit integers at line 1 column 1\")")
+    expect(inspect(JSON.parse("99999999999999999999"))).to eq('failure("99999999999999999999 overflows the 64-bit integers at line 1 column 1")')
   end
 
   specify "decodes the gem's escapes" do
     expect(JSON.parse("\"\\u00e9\\n\\t\\/\\\"\\\\\"")).to eq("é\n\t/\"\\")
     expect(JSON.parse("\"\\uD83D\\uDE00\"")).to eq("😀")
-    expect(JSON.parse("\"😀\"")).to eq("😀")
+    expect(JSON.parse('"😀"')).to eq("😀")
     expect(JSON.parse("\"\\u0000\"").length).to eq(1)
   end
 
   specify "fails in the gem's sentence, with its position" do
-    expect(inspect(JSON.parse(""))).to eq("failure(\"unexpected end of input at line 1 column 1\")")
+    expect(inspect(JSON.parse(""))).to eq('failure("unexpected end of input at line 1 column 1")')
     expect(inspect(JSON.parse("[1,]"))).to eq("failure(\"unexpected character: ']' at line 1 column 4\")")
     expect(inspect(JSON.parse("{a:1}"))).to eq("failure(\"expected object key, got 'a:1}' at line 1 column 2\")")
     expect(inspect(JSON.parse("NaN"))).to eq("failure(\"unexpected token 'NaN' at line 1 column 1\")")
-    expect(inspect(JSON.parse("{\"a\":1} x"))).to eq("failure(\"unexpected token at end of stream 'x' at line 1 column 9\")")
+    expect(inspect(JSON.parse('{"a":1} x'))).to eq("failure(\"unexpected token at end of stream 'x' at line 1 column 9\")")
     expect(inspect(JSON.parse("[1 2]"))).to eq("failure(\"expected ',' or ']' after array value at line 1 column 4\")")
     expect(inspect(JSON.parse("01"))).to eq("failure(\"invalid number: '01' at line 1 column 1\")")
     expect(inspect(JSON.parse("[1]\n\n x"))).to eq("failure(\"unexpected token at end of stream 'x' at line 3 column 2\")")
   end
 
   specify "counts a column in characters, not bytes" do
-    expect(inspect(JSON.parse("{\"é\":1} x"))).to eq("failure(\"unexpected token at end of stream 'x' at line 1 column 9\")")
+    expect(inspect(JSON.parse('{"é":1} x'))).to eq("failure(\"unexpected token at end of stream 'x' at line 1 column 9\")")
   end
 
   specify "refuses a duplicate key, pointing at the object" do
-    expect(inspect(JSON.parse("{\"a\":1,\"a\":2}"))).to eq("failure(\"duplicate key \\\"a\\\" at line 1 column 1\")")
-    expect(inspect(JSON.parse("{\"x\":{\"a\":1,\"a\":2}}"))).to eq("failure(\"duplicate key \\\"a\\\" at line 1 column 6\")")
+    expect(inspect(JSON.parse('{"a":1,"a":2}'))).to eq("failure(\"duplicate key \\\"a\\\" at line 1 column 1\")")
+    expect(inspect(JSON.parse('{"x":{"a":1,"a":2}}'))).to eq("failure(\"duplicate key \\\"a\\\" at line 1 column 6\")")
   end
 
   specify "fails on the gem's string edges" do
     expect(inspect(JSON.parse("\"\\ud83d\""))).to eq("failure(\"incomplete surrogate pair at '\\\\ud83d\\\"' at line 1 column 2\")")
     expect(inspect(JSON.parse("\"\\q\""))).to eq("failure(\"invalid escape character in string: '\\\\q\\\"' at line 1 column 2\")")
-    expect(inspect(JSON.parse("\"abc"))).to eq("failure(\"unexpected end of input, expected closing \\\" at line 1 column 5\")")
+    expect(inspect(JSON.parse('"abc'))).to eq("failure(\"unexpected end of input, expected closing \\\" at line 1 column 5\")")
   end
 
   specify "fails past 100 nested containers, without a position" do
     deep = "".ljust(101, "[") + "1" + "".ljust(101, "]")
-    expect(inspect(JSON.parse(deep))).to eq("failure(\"nesting of 101 is too deep\")")
+    expect(inspect(JSON.parse(deep))).to eq('failure("nesting of 101 is too deep")')
     fine = "".ljust(100, "[") + "1" + "".ljust(100, "]")
     expect(JSON.parse(fine).failure?).to eq(false)
   end

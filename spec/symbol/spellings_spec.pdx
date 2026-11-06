@@ -31,9 +31,9 @@ context "A Symbol literal" do
   end
 
   specify "is a ':' followed by a single- or double-quoted string that may contain otherwise invalid characters" do
-    expect(inspect(:"foo bar")).to eq(":\"foo bar\"")
-    expect(inspect(:"++")).to eq(":\"++\"")
-    expect(inspect(:"9")).to eq(":\"9\"")
+    expect(inspect(:"foo bar")).to eq(':"foo bar"')
+    expect(inspect(:"++")).to eq(':"++"')
+    expect(inspect(:"9")).to eq(':"9"')
   end
 
   specify "may contain '::' in the string" do
@@ -46,7 +46,7 @@ context "A Symbol literal" do
   end
 
   specify "can be an empty string" do
-    expect(inspect(:"")).to eq(":\"\"")
+    expect(inspect(:"")).to eq(':""')
   end
 end
 
@@ -77,41 +77,41 @@ context "Symbol#inspect" do
     expect(inspect(:_BAD!)).to eq(":_BAD!")
   end
 
-  specify "returns self as a symbol literal for :\"9\"" do
-    expect(inspect(:"9")).to eq(":\"9\"")
+  specify 'returns self as a symbol literal for :"9"' do
+    expect(inspect(:"9")).to eq(':"9"')
   end
 
-  specify "returns self as a symbol literal for :\"foo bar\"" do
-    expect(inspect(:"foo bar")).to eq(":\"foo bar\"")
+  specify 'returns self as a symbol literal for :"foo bar"' do
+    expect(inspect(:"foo bar")).to eq(':"foo bar"')
   end
 
-  specify "returns self as a symbol literal for :\"*foo\"" do
-    expect(inspect(:"*foo")).to eq(":\"*foo\"")
+  specify 'returns self as a symbol literal for :"*foo"' do
+    expect(inspect(:"*foo")).to eq(':"*foo"')
   end
 
-  specify "returns self as a symbol literal for :\"foo \"" do
-    expect(inspect(:"foo ")).to eq(":\"foo \"")
+  specify 'returns self as a symbol literal for :"foo "' do
+    expect(inspect(:"foo ")).to eq(':"foo "')
   end
 
-  specify "returns self as a symbol literal for :\" foo\"" do
-    expect(inspect(:" foo")).to eq(":\" foo\"")
+  specify 'returns self as a symbol literal for :" foo"' do
+    expect(inspect(:" foo")).to eq(':" foo"')
   end
 
-  specify "returns self as a symbol literal for :\" \"" do
-    expect(inspect(:" ")).to eq(":\" \"")
+  specify 'returns self as a symbol literal for :" "' do
+    expect(inspect(:" ")).to eq(':" "')
   end
 
   specify "keeps the quotes on a name beyond ASCII" do
-    expect(inspect(:"ê")).to eq(":\"ê\"")
-    expect(inspect(:"测")).to eq(":\"测\"")
+    expect(inspect(:"ê")).to eq(':"ê"')
+    expect(inspect(:"测")).to eq(':"测"')
   end
 
   specify "keeps the quotes on an operator, a global, or an instance variable name" do
-    expect(inspect(:"+")).to eq(":\"+\"")
-    expect(inspect(:"<=>")).to eq(":\"<=>\"")
-    expect(inspect(:"[]")).to eq(":\"[]\"")
-    expect(inspect(:"$ruby")).to eq(":\"$ruby\"")
-    expect(inspect(:"@ruby")).to eq(":\"@ruby\"")
+    expect(inspect(:"+")).to eq(':"+"')
+    expect(inspect(:"<=>")).to eq(':"<=>"')
+    expect(inspect(:"[]")).to eq(':"[]"')
+    expect(inspect(:"$ruby")).to eq(':"$ruby"')
+    expect(inspect(:"@ruby")).to eq(':"@ruby"')
   end
 
   specify "can be created from list syntax %i{a b c} without interpolation" do

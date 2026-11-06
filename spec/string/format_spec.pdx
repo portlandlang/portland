@@ -286,8 +286,8 @@ context "format" do
 
     describe "p" do
       specify "displays argument.inspect value" do
-        expect(format("%p", "a")).to eq("\"a\"")
-        expect(format("%p", [1, "a"])).to eq("[1, \"a\"]")
+        expect(format("%p", "a")).to eq('"a"')
+        expect(format("%p", [1, "a"])).to eq('[1, "a"]')
         expect(format("%p", :sym)).to eq(":sym")
       end
 
@@ -309,7 +309,7 @@ context "format" do
         expect(format("%s", 1.0)).to eq("1.0")
         expect(format("%s", :sym)).to eq("sym")
         expect(format("%s", true)).to eq("true")
-        expect(format("%s", [1, "a"])).to eq("[1, \"a\"]")
+        expect(format("%s", [1, "a"])).to eq('[1, "a"]')
       end
 
       specify "formats a partial substring without including omitted characters" do

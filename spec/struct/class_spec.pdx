@@ -51,7 +51,7 @@ context "class" do
       ticket = Ticket.new(row: "B", seat: 12, price: 40)
       expect(ticket == Ticket.new(row: "B", seat: 12, price: 40)).to eq(true)
       expect(ticket.with(seat: 13).seat).to eq(13)
-      expect(inspect(ticket)).to eq("Ticket(row: \"B\", seat: 12, price: 40)")
+      expect(inspect(ticket)).to eq('Ticket(row: "B", seat: 12, price: 40)')
       expect(ticket.to_h).to eq({row: "B", seat: 12, price: 40})
     end
   end
@@ -83,8 +83,8 @@ context "class" do
     end
 
     specify "inspects the way a struct does" do
-      expect(inspect(Parcel.new(size: 3, label: "books"))).to eq("Parcel(size: 3, label: \"books\")")
-      expect(inspect(Crate.new(size: 3, label: "books"))).to eq("Crate(size: 3, label: \"books\")")
+      expect(inspect(Parcel.new(size: 3, label: "books"))).to eq('Parcel(size: 3, label: "books")')
+      expect(inspect(Crate.new(size: 3, label: "books"))).to eq('Crate(size: 3, label: "books")')
     end
   end
 end

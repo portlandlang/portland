@@ -85,6 +85,6 @@ context "Hash#inspect" do
   end
 
   specify "does not call #to_s on a String returned from #inspect" do
-    expect(inspect({a: "abc"})).to eq("{a: \"abc\"}")
+    expect(inspect({a: "abc"})).to eq('{a: "abc"}')
   end
 end

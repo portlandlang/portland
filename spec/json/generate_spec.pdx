@@ -7,7 +7,7 @@ require_relative "../spec_helper"
 
 context "JSON.generate" do
   specify "writes every JSON type compactly" do
-    expect(JSON.generate({"a" => 1, "b" => [true, false, nil], "c" => "x", "d" => 2.5})).to eq("{\"a\":1,\"b\":[true,false,null],\"c\":\"x\",\"d\":2.5}")
+    expect(JSON.generate({"a" => 1, "b" => [true, false, nil], "c" => "x", "d" => 2.5})).to eq('{"a":1,"b":[true,false,null],"c":"x","d":2.5}')
   end
 
   specify "writes floats as the gem does, not as to_s does" do
@@ -18,29 +18,29 @@ context "JSON.generate" do
   specify "escapes the quote, the backslash, and the controls, and nothing else" do
     expect(JSON.generate("é\n\t\"\\/")).to eq("\"é\\n\\t\\\"\\\\/\"")
     controls = 1.chr + 127.chr + 0x2028.chr(Encoding::UTF_8)
-    expect(JSON.generate(controls)).to eq("\"\\u0001" + 127.chr + 0x2028.chr(Encoding::UTF_8) + "\"")
+    expect(JSON.generate(controls)).to eq("\"\\u0001" + 127.chr + 0x2028.chr(Encoding::UTF_8) + '"')
   end
 
   specify "writes a symbol as a string, and a hash's keys as strings" do
-    expect(JSON.generate(:sym)).to eq("\"sym\"")
-    expect(JSON.generate({a: 1, 1 => 2, 1.5 => 3, nil => 4, true => 5})).to eq("{\"a\":1,\"1\":2,\"1.5\":3,\"\":4,\"true\":5}")
+    expect(JSON.generate(:sym)).to eq('"sym"')
+    expect(JSON.generate({a: 1, 1 => 2, 1.5 => 3, nil => 4, true => 5})).to eq('{"a":1,"1":2,"1.5":3,"":4,"true":5}')
   end
 
   specify "keeps empties as [] and {}" do
-    expect(JSON.generate([[], {}, [[]], {"a" => {}}])).to eq("[[],{},[[]],{\"a\":{}}]")
+    expect(JSON.generate([[], {}, [[]], {"a" => {}}])).to eq('[[],{},[[]],{"a":{}}]')
   end
 
   specify "fails on NaN and Infinity" do
-    expect(inspect(JSON.generate(0.0 / 0.0))).to eq("failure(\"NaN not allowed in JSON\")")
-    expect(inspect(JSON.generate([1, 1.0 / 0.0]))).to eq("failure(\"Infinity not allowed in JSON\")")
-    expect(inspect(JSON.generate(-1.0 / 0.0))).to eq("failure(\"-Infinity not allowed in JSON\")")
+    expect(inspect(JSON.generate(0.0 / 0.0))).to eq('failure("NaN not allowed in JSON")')
+    expect(inspect(JSON.generate([1, 1.0 / 0.0]))).to eq('failure("Infinity not allowed in JSON")')
+    expect(inspect(JSON.generate(-1.0 / 0.0))).to eq('failure("-Infinity not allowed in JSON")')
   end
 
   specify "fails past 100 nested containers, empties included" do
     mutable deep = []
     99.times { deep = [deep] }
     expect(JSON.generate(deep).length).to eq(200)
-    expect(inspect(JSON.generate([deep]))).to eq("failure(\"nesting of 101 is too deep. Did you try to serialize objects with circular references?\")")
+    expect(inspect(JSON.generate([deep]))).to eq('failure("nesting of 101 is too deep. Did you try to serialize objects with circular references?")')
   end
 end
 

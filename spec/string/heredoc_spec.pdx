@@ -72,7 +72,7 @@ context "Heredoc string" do
     expect(unquoted).to eq("unquoted interpolated\n")
   end
 
-  specify "allows HEREDOC with <<~\"identifier\", interpolated" do
+  specify 'allows HEREDOC with <<~"identifier", interpolated' do
     word = "interpolated"
     doublequoted = <<~"HERE"
       doublequoted #{word}
