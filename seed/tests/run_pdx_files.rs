@@ -1438,7 +1438,7 @@ fn the_declined_percent_members_refuse_on_both_oracles() {
         ),
         (
             "x = %I[a b]\n",
-            "'%I[' is not a Portland literal — write %i[]; a symbol does not interpolate",
+            "'%I[' is not a Portland literal — write %i[] when no name interpolates, or [:\"#{a}\", :b] when one does",
         ),
         (
             "x = %r{a/b}\n",

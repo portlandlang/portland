@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`%I`'s refusal names the array that interpolates** — on both implementations the sentence read `write %i[]; a symbol does not interpolate`, a rule ADR 0071 retired when it made `:"#{a}"` legal; it now reads `write %i[] when no name interpolates, or [:"#{a}", :b] when one does`, the shape of `%W`'s. The ruling in ADR 0051 is unchanged: `%I` stays out.
+
 - **GitHub highlights `.pdx` as Ruby** — a `.gitattributes` with `*.pdx linguist-language=Ruby`, so the file view, diffs, and the language bar read Portland with Ruby's grammar; the superset forms go uncolored rather than breaking the view.
 
 - **Ruby 4.0.9** ([#204](https://github.com/portlandlang/portland/issues/204)) — `.ruby-version` and the lockfile move up two patches from 4.0.7, and this time the probe-Ruby references move with them: every "verified against Ruby 4.0.6" and "4.0.7" in the ADRs, the ledger, `principles.md`, the seed's comments, the specs, and the integration tests now says 4.0.9, after re-running 85 of the recorded edges — the JSON fixtures, `format`'s rounding, `split`, `clamp`, the `Math` family, ranges' slicing, `%w` contents, symbols from text, `chr`, float printing — under 4.0.6, 4.0.7, and 4.0.9 and finding every answer the same except the json gem's, which 4.0.6 shipped at 2.21.1 (duplicate keys accepted, lone surrogates decoded, comments allowed, columns counted a byte off) and 4.0.7 onward at 3.1.0, the version the JSON decisions were made against. The interned-symbol count ADR 0023 quotes is re-measured: a bare Ruby 4.0.9 interns 3,810 symbols. The CHANGELOG's own past entries and `docs/history/` keep the versions they were written against, being the record of what was run when.

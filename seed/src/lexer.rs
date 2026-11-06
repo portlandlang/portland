@@ -844,7 +844,7 @@ pub fn declined_percent_sentence(spelling: &str) -> String {
         b'q' | b'Q' => "write a quoted string or a heredoc",
         b's' => "write :name, or :\"odd name\" for a name with spaces",
         b'W' => "write %w[] when no word interpolates, or [\"#{a}\", \"b\"] when one does",
-        b'I' => "write %i[]; a symbol does not interpolate",
+        b'I' => "write %i[] when no name interpolates, or [:\"#{a}\", :b] when one does",
         b'r' => "there is no regex yet",
         b'x' => "there is no shell execution",
         _ => "write a quoted string or a heredoc",
@@ -1193,7 +1193,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "'%I[' is not a Portland literal — write %i[]; a symbol does not interpolate"
+        expected = "'%I[' is not a Portland literal — write %i[] when no name interpolates, or [:\"#{a}\", :b] when one does"
     )]
     fn the_interpolating_symbol_array_refuses() {
         lex("%I[a b]");

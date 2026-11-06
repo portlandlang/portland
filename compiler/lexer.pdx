@@ -348,7 +348,7 @@ end
 def declined_percent_sentence(spelling)
   letters = spelling.chars
   next_step = case letters[1]
-              when "I" then "write %i[]; a symbol does not interpolate"
+              when "I" then "write %i[] when no name interpolates, or [:\"\#{a}\", :b] when one does"
               when "W" then "write %w[] when no word interpolates, or [\"\#{a}\", \"b\"] when one does"
               when "r" then "there is no regex yet"
               when "s" then "write :name, or :\"odd name\" for a name with spaces"
