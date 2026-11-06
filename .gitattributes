@@ -1,0 +1,3 @@
+# GitHub highlights a .pdx file with Ruby's grammar: Portland is Ruby's
+# surface, and the superset forms Ruby cannot parse simply go uncolored.
+*.pdx linguist-language=Ruby
