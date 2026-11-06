@@ -1727,6 +1727,53 @@ core/nil/xor_spec.rb:
 # (abs2, arg, conjugate, denominator, i, imaginary, numerator, polar, real,
 # rectangular, to_c) wait on #198; step waits on its own rows.
 
+core/numeric/abs2_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "The mock-Numeric row has no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/arg_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "The Numeric-subclass rows have no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/conjugate_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum stays upstream; equal? is asked as ==."
+  link: docs/ruby/integers.md
+core/numeric/denominator_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "The mock-Numeric row has no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/i_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+core/numeric/imaginary_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "An argument to imaginary refuses where Ruby raises ArgumentError; failures are values, so the row is pinned by the two-oracle test instead, and the bignum stays upstream."
+  link: docs/ruby/errors.md
+core/numeric/numerator_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum and Float::MAX's numerator stay upstream; the mock-Numeric row has no Numeric to subclass."
+  link: docs/ruby/integers.md
+core/numeric/polar_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum stays upstream."
+  link: docs/ruby/integers.md
+core/numeric/real_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "An argument to real refuses where Ruby raises ArgumentError, the real? row drives a Numeric subclass, and the bignum stays upstream; real? is asked of the builtins."
+  link: docs/ruby/mixins-and-inheritance.md
+core/numeric/rectangular_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "An argument to rectangular refuses where Ruby raises ArgumentError; failures are values, and the bignum stays upstream."
+  link: docs/ruby/errors.md
 core/numeric/step_spec.rb:
   pdx: [spec/number/integer/step_spec.pdx]
   status: partial_intentional
@@ -1852,6 +1899,11 @@ core/numeric/singleton_method_added_spec.rb:
   status: skipped
   reason: "Singleton methods do not exist; the runtime kind is gone."
   link: docs/ruby/metaprogramming.md
+core/numeric/to_c_spec.rb:
+  pdx: [spec/number/tower_spec.pdx]
+  status: partial_intentional
+  reason: "Integers are 64-bit, so the bignum stays upstream."
+  link: docs/ruby/integers.md
 core/numeric/to_int_spec.rb:
   status: skipped
   reason: "to_int is a false alias of to_i that refuses (ADR 0036), and the row drives a mock Numeric subclass."

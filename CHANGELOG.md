@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`core/numeric/` fully ported** ([#109](https://github.com/portlandlang/portland/issues/109)) — `abs2`, `arg`, `conjugate`, `denominator`, `i`, `imaginary`, `numerator`, `polar`, `real`, `real?`, `rectangular`, and `to_c` port into `spec/number/tower_spec.pdx` on integers, floats, rationals, infinity, and NaN; the rows that drive a mock Numeric subclass have no Numeric to subclass, and the bignums stay upstream. No stubs remain under `spec/ruby/core/numeric/`.
+
 - **`core/float/` fully ported** ([#108](https://github.com/portlandlang/portland/issues/108)) — `Float#arg`, `denominator`, `numerator`, `rationalize`, and `to_r` port into `spec/number/float/tower_spec.pdx`. On the way, both implementations: NaN and the infinities answer themselves as `numerator` and 1 as `denominator`, as Ruby's do, where they refused; and the hosted compiler checks a float builtin's arity as the seed does, so `0.3.rationalize(0.1, 0.1)` refuses `'rationalize' takes 0 to 1 arguments, got 2` on both. The checker types an array flattened without a depth by its innermost elements, so `pairs.flatten.each { it.floor }` checks. The alias rows compare method objects and `coerce` waits on the coercion protocol ([#155](https://github.com/portlandlang/portland/issues/155)). No stubs remain under `spec/ruby/core/float/`.
 
 - **`core/range/` fully ported** ([#111](https://github.com/portlandlang/portland/issues/111)) — `core/range/to_set_spec.rb`'s rows join `spec/set/construction_spec.pdx`; the beginless and endless ranges refuse to be walked in Portland's words, and the Set-subclass row has no subclass to drive. No stubs remain under `spec/ruby/core/range/`.
