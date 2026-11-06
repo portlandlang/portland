@@ -46,9 +46,7 @@ end
 # From ruby/spec language/heredoc_spec.rb, its squiggly rows, with the
 # fixture module's heredocs written inline. The plain and dash openers
 # refuse (ADR 0020); the backslash-continuation row and the line-number row
-# stay upstream. The interpolated rows interpolate a local where the fixture
-# interpolates a string literal: a quoted string inside a heredoc's
-# interpolation does not lex yet (#164).
+# stay upstream.
 context "Heredoc string" do
   specify "allows HEREDOC with <<~'identifier', allowing to indent identifier and content" do
     message = <<~HEREDOC
@@ -65,17 +63,15 @@ context "Heredoc string" do
   end
 
   specify "allows HEREDOC with <<~identifier, interpolated" do
-    word = "interpolated"
     unquoted = <<~HERE
-      unquoted #{word}
+      unquoted #{"interpolated"}
     HERE
     expect(unquoted).to eq("unquoted interpolated\n")
   end
 
   specify 'allows HEREDOC with <<~"identifier", interpolated' do
-    word = "interpolated"
     doublequoted = <<~"HERE"
-      doublequoted #{word}
+      doublequoted #{"interpolated"}
     HERE
     expect(doublequoted).to eq("doublequoted interpolated\n")
   end

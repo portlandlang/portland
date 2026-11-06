@@ -201,7 +201,7 @@ fn encode(body: &[String], interpolating: bool) -> String {
     if interpolating {
         result.push('"');
         for line in body {
-            result.push_str(&line.replace('"', "\\\""));
+            result.push_str(&escape_quotes_outside_interpolation(line));
             result.push_str("\\n");
         }
         result.push('"');
@@ -212,6 +212,72 @@ fn encode(body: &[String], interpolating: bool) -> String {
             result.push('\n');
         }
         result.push('\'');
+    }
+    result
+}
+
+/// What the folding mode is at a character of an interpolating body.
+#[derive(Clone, Copy, PartialEq)]
+enum Fold {
+    /// The body's own text, where a quote must be escaped to survive
+    /// inside the double-quoted literal the body becomes.
+    Body,
+    /// Inside `#{...}`: code, copied verbatim, with its braces counted.
+    Code,
+    /// A double-quoted string inside the code, which may itself interpolate.
+    Quoted,
+    /// A single-quoted string inside the code.
+    SingleQuoted,
+}
+
+/// Escape the body's own quotes, leaving an interpolation's code — and any
+/// string literal written inside it — exactly as written (#164): the lexer
+/// reads `#{"interpolated"}` out of the folded literal as it would from any
+/// double-quoted string.
+fn escape_quotes_outside_interpolation(line: &str) -> String {
+    let mut result = String::new();
+    let mut modes = vec![Fold::Body];
+    let mut characters = line.chars().peekable();
+    while let Some(character) = characters.next() {
+        let mode = *modes.last().unwrap_or(&Fold::Body);
+        match (mode, character) {
+            (Fold::Body, '"') => result.push_str("\\\""),
+            (Fold::Body | Fold::Quoted, '#') if characters.peek() == Some(&'{') => {
+                characters.next();
+                result.push_str("#{");
+                modes.push(Fold::Code);
+            }
+            (Fold::Code, '{') => {
+                result.push(character);
+                modes.push(Fold::Code);
+            }
+            (Fold::Code, '}') => {
+                result.push(character);
+                modes.pop();
+            }
+            (Fold::Code, '"') => {
+                result.push(character);
+                modes.push(Fold::Quoted);
+            }
+            (Fold::Code, '\'') => {
+                result.push(character);
+                modes.push(Fold::SingleQuoted);
+            }
+            (Fold::Quoted, '"') | (Fold::SingleQuoted, '\'') => {
+                result.push(character);
+                modes.pop();
+            }
+            // An escape is two characters wherever it stands: `\#{` in the
+            // body is not an interpolation, `\"` in a quoted literal not
+            // its end.
+            (_, '\\') => {
+                result.push(character);
+                if let Some(escaped) = characters.next() {
+                    result.push(escaped);
+                }
+            }
+            _ => result.push(character),
+        }
     }
     result
 }
@@ -230,6 +296,17 @@ mod tests {
     fn leaves_interpolation_for_the_parser() {
         let source = "x = <<~TEXT\n  hi #{name}\nTEXT\n";
         assert_eq!(expand(source), "x = \"hi #{name}\\n\"\n");
+    }
+
+    /// A quote inside the interpolation is code, not body: it stays as
+    /// written, while the body's own quotes are escaped (#164).
+    #[test]
+    fn leaves_a_quoted_string_inside_the_interpolation_as_written() {
+        let source = "x = <<~TEXT\n  a #{\"x #{1 + 1} y\"} \"b\" #{{a: 1}.length}\nTEXT\n";
+        assert_eq!(
+            expand(source),
+            "x = \"a #{\"x #{1 + 1} y\"} \\\"b\\\" #{{a: 1}.length}\\n\"\n"
+        );
     }
 
     /// A single-quoted terminator suppresses interpolation, so the body

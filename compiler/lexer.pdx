@@ -491,24 +491,71 @@ def encode_heredoc_line(line, common, interpolating)
   else
     ""
   end
+  if interpolating
+    return escape_quotes_outside_interpolation(stripped) + "\\n"
+  end
   mutable encoded = ""
   stripped.chars.each do |character|
-    if interpolating && character == "\""
-      encoded << "\\\""
-    elsif !interpolating && character == "\\"
+    if character == "\\"
       encoded << "\\\\"
-    elsif !interpolating && character == "'"
+    elsif character == "'"
       encoded << "\\'"
     else
       encoded << character
     end
   end
-  if interpolating
-    encoded << "\\n"
-  else
-    encoded << "\n"
-  end
+  encoded << "\n"
   encoded
+end
+
+# Escape the body's own quotes, leaving an interpolation's code — and any
+# string literal written inside it — exactly as written (#164): the lexer
+# reads `#{"interpolated"}` out of the folded literal as it would from any
+# double-quoted string. The modes are the seed's: "body" is the heredoc's
+# own text, "code" is inside `#{...}` with its braces counted, "quoted"
+# and "single" are string literals inside that code.
+def escape_quotes_outside_interpolation(line)
+  characters = line.chars
+  mutable result = ""
+  mutable modes = ["body"]
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    mode = modes.last
+    following = index + 1 < characters.length ? characters[index + 1] : ""
+    if mode == "body" && character == "\""
+      result << "\\\""
+    elsif (mode == "body" || mode == "quoted") && character == "#" && following == "{"
+      result << "\#{"
+      modes << "code"
+      index += 1
+    elsif mode == "code" && character == "{"
+      result << character
+      modes << "code"
+    elsif mode == "code" && character == "}"
+      result << character
+      modes = modes[0...(modes.length - 1)]
+    elsif mode == "code" && character == "\""
+      result << character
+      modes << "quoted"
+    elsif mode == "code" && character == "'"
+      result << character
+      modes << "single"
+    elsif (mode == "quoted" && character == "\"") || (mode == "single" && character == "'")
+      result << character
+      modes = modes[0...(modes.length - 1)]
+    elsif character == "\\"
+      # An escape is two characters wherever it stands: `\#{` in the body
+      # is not an interpolation, `\"` in a quoted literal not its end.
+      result << character
+      result << following
+      index += 1
+    else
+      result << character
+    end
+    index += 1
+  end
+  result
 end
 
 # Rewrite one line, returning it plus how many body lines it swallowed.

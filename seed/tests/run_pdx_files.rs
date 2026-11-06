@@ -917,7 +917,7 @@ fn portland_evaluator_matches_the_seed_on_brace_blocks_and_it() {
 fn portland_evaluator_matches_the_seed_on_heredocs() {
     assert_evaluator_matches_seed(
         "evaluator_heredocs.pdx",
-        "db = <<~SQL\n  select *\n    from orders\nSQL\np(db)\nname = \"pdx\"\np(<<~TEXT)\n  hello, #{name}\nTEXT\np(<<~'TEXT')\n  literal #{name}\nTEXT\np(<<~TEXT.upcase)\n  shout\nTEXT\ndef show\n  inner = <<~TEXT\n    indented\n      deeper\n  TEXT\n  inner\nend\np(show)\nmutable list = [1]\nlist << 2\np(list)\n",
+        "db = <<~SQL\n  select *\n    from orders\nSQL\np(db)\nname = \"pdx\"\np(<<~TEXT)\n  hello, #{name}\nTEXT\np(<<~'TEXT')\n  literal #{name}\nTEXT\np(<<~TEXT.upcase)\n  shout\nTEXT\np(<<~TEXT)\n  quoted #{\"inside #{1 + 1}\"} and \"outside\" #{{a: 1}.length} \\#{kept}\nTEXT\ndef show\n  inner = <<~TEXT\n    indented\n      deeper\n  TEXT\n  inner\nend\np(show)\nmutable list = [1]\nlist << 2\np(list)\n",
     );
 }
 

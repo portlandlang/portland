@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A quoted string inside a heredoc's interpolation lexes** ([#164](https://github.com/portlandlang/portland/issues/164)) — on both implementations, folding a `<<~HERE` body into a literal escapes only the body's own quotes; the code inside `#{...}`, string literals and nested interpolations included, is kept as written, so `unquoted #{"interpolated"}` reads as Ruby reads it. The interpolated rows of `language/heredoc_spec.rb` port with the fixture's string literal; pinned by the two-oracle heredoc test.
+
 - **`<<` reads its name after its right side ran** on the hosted compiler, as the seed always has — a call on the right whose block rebinds the very name being appended to (`notes << yielding(notes) { notes << :b }`, the accumulator pattern of ADR 0001) now appends to what the block left instead of a stale read; pinned by a two-oracle test.
 
 - **`break` leaves the call that was handed its block** ([#166](https://github.com/portlandlang/portland/issues/166)) — on both implementations, a `break` written in a block ends the call the block was handed to, a yielding method of the program's own as much as a builtin walk, and that call answers nil (ADR 0012); it unwinds through a `while`, an `each`, or a delegating `yield` on the way to that frame, the way a `return` unwinds to its write site (ADR 0025), and a bare `break` in a method body still refuses `break outside of a loop`. The block rows of `language/break_spec.rb` port into `spec/control_flow/unwinding_spec.pdx`; pinned by a two-oracle test.
