@@ -468,13 +468,19 @@ mod tests {
         assert_eq!(preprocess("\\x41", false).unwrap(), "\\x41");
         assert_eq!(preprocess("\\u3042", false).unwrap(), "あ");
         assert_eq!(preprocess("\\u{41 3042}", false).unwrap(), "\\x41あ");
-        assert_eq!(preprocess("\\x{3042}", false).unwrap_err().message, "invalid hex escape");
+        assert_eq!(
+            preprocess("\\x{3042}", false).unwrap_err().message,
+            "invalid hex escape"
+        );
         assert_eq!(preprocess("\\c\\\\", false).unwrap(), "\\x1C");
         assert_eq!(
             preprocess("\\M-\\C-a", false).unwrap_err().message,
             "invalid multibyte escape"
         );
-        assert_eq!(preprocess("\\M-a", false).unwrap_err().message, "invalid multibyte escape");
+        assert_eq!(
+            preprocess("\\M-a", false).unwrap_err().message,
+            "invalid multibyte escape"
+        );
     }
 
     #[test]

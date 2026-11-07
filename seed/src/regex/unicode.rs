@@ -3,8 +3,7 @@
 //! generated from Ruby's own copies.
 
 use super::unicode_tables::{
-    CASE_FOLD, CASE_UNFOLD_ONE, CASE_UNFOLD_THREE, CASE_UNFOLD_TWO, PROPERTY_NAMES,
-    PROPERTY_RANGES,
+    CASE_FOLD, CASE_UNFOLD_ONE, CASE_UNFOLD_THREE, CASE_UNFOLD_TWO, PROPERTY_NAMES, PROPERTY_RANGES,
 };
 
 /// The builtin character types, in Onigmo's `ONIGENC_CTYPE_*` order, which
@@ -118,8 +117,11 @@ mod tests {
     fn property_names_normalize_as_ruby_does() {
         assert_eq!(property_ctype("Alpha"), Some(CTYPE_ALPHA));
         assert_eq!(property_ctype("ALPHA"), Some(CTYPE_ALPHA));
-        assert_eq!(property_ctype("In_Basic_Latin"), property_ctype("inbasiclatin"));
-        assert_eq!(property_ctype("Other Default Ignorable Code Point").is_some(), true);
+        assert_eq!(
+            property_ctype("In_Basic_Latin"),
+            property_ctype("inbasiclatin")
+        );
+        assert!(property_ctype("Other Default Ignorable Code Point").is_some());
         assert_eq!(property_ctype("あ"), None);
         assert_eq!(property_ctype("foobarbaz"), None);
     }

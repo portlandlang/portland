@@ -192,7 +192,8 @@ pub enum EncloseKind {
     /// `(?>...)`, and the wrapper of a possessive quantifier.
     StopBacktrack,
     /// `(?(regnum)yes|no)`; the target is always an alternation of two.
-    Condition { regnum: usize },
+    /// `by_name` is whether the condition named its group.
+    Condition { regnum: usize, by_name: bool },
     /// `(?~...)`.
     Absent,
 }
@@ -210,6 +211,17 @@ pub struct EncloseNode {
     pub char_len: Option<usize>,
 }
 
+/// What a quantifier's body can do when it matches nothing: nothing to
+/// watch, captures to watch, or recursion to watch (Onigmo's
+/// `NQ_TARGET_IS_EMPTY`, `_MEM`, `_REC`); set by setup.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EmptyInfo {
+    Never,
+    Plain,
+    Captures,
+    Recursion,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct QuantifierNode {
     pub target: Box<Node>,
@@ -219,6 +231,29 @@ pub struct QuantifierNode {
     pub greedy: bool,
     /// Written as `{n,m}` rather than `*`, `+`, or `?`.
     pub by_number: bool,
+    pub empty: EmptyInfo,
+    /// A `{0}` body holding a called group, which must still be emitted.
+    pub referred: bool,
+}
+
+impl QuantifierNode {
+    pub fn new(
+        target: Node,
+        lower: u32,
+        upper: Option<u32>,
+        greedy: bool,
+        by_number: bool,
+    ) -> QuantifierNode {
+        QuantifierNode {
+            target: Box::new(target),
+            lower,
+            upper,
+            greedy,
+            by_number,
+            empty: EmptyInfo::Never,
+            referred: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -247,12 +282,22 @@ pub struct CallNode {
 pub enum Node {
     Empty,
     /// A literal run; `ignore_case` makes it compare case-folded.
-    Str { chars: Vec<char>, ignore_case: bool },
+    Str {
+        chars: Vec<char>,
+        ignore_case: bool,
+    },
     Class(ClassNode),
     /// `\w` and `\W`, kept apart from classes as Onigmo does.
-    Word { not: bool, ascii_range: bool },
+    Word {
+        not: bool,
+        ascii_range: bool,
+    },
     /// `.`; `multiline` lets it match a newline.
-    AnyChar { multiline: bool },
+    AnyChar {
+        multiline: bool,
+    },
+    /// `\X`: one extended grapheme cluster.
+    GraphemeCluster,
     List(Vec<Node>),
     Alt(Vec<Node>),
     Quantifier(QuantifierNode),

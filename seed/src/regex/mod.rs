@@ -8,14 +8,21 @@
 //!
 //! The layers follow Onigmo's own: `preprocess` is CRuby's `re.c` pass that
 //! rewrites `\u`, `\x`, and the control and meta escapes before the engine
-//! sees the pattern; `parser` is `regparse.c`, pattern to tree; `compile` is
-//! `regcomp.c`, tree to a program; `vm` is `regexec.c`, a backtracking matcher
-//! over the program; `unicode` is `enc/unicode.c` over tables generated from
-//! Ruby's own copies.
+//! sees the pattern; `parser` is `regparse.c`, pattern to tree; `setup` and
+//! `compile` are `regcomp.c`, tree to a program; `vm` is `regexec.c`, a
+//! backtracking matcher over the program; `unicode` and `casefold` are
+//! `enc/unicode.c` over tables generated from Ruby's own copies.
 
+pub mod ast;
+pub mod casefold;
+pub mod compile;
 pub mod error;
+pub mod parser;
+pub mod preprocess;
+pub mod setup;
 pub mod unicode;
 pub mod unicode_tables;
+pub mod vm;
 
 pub use error::RegexError;
 
@@ -35,6 +42,9 @@ pub struct Options {
 pub struct Regex {
     source: String,
     options: Options,
+    program: compile::Program,
+    /// Group names in definition order, each with its group numbers.
+    names: Vec<(String, Vec<usize>)>,
 }
 
 /// Where a match and each of its groups landed, as byte offsets into the
@@ -52,8 +62,18 @@ impl Regex {
 
     /// Compiles `pattern` under the flags of a literal.
     pub fn with_options(pattern: &str, options: Options) -> Result<Regex, RegexError> {
-        let _ = (pattern, options);
-        Err(RegexError::new("regex is not built yet"))
+        let unescaped = preprocess::preprocess(pattern, options.extend)?;
+        let parse_options =
+            parser::ParseOptions::ruby(options.ignore_case, options.extend, options.multiline);
+        let parsed = parser::parse(&unescaped, parse_options)?;
+        let prepared = setup::setup(parsed)?;
+        let program = compile::compile(&prepared)?;
+        Ok(Regex {
+            source: pattern.to_string(),
+            options,
+            program,
+            names: prepared.names,
+        })
     }
 
     /// The pattern as written.
@@ -66,6 +86,17 @@ impl Regex {
         self.options
     }
 
+    /// How many capture groups the pattern has.
+    pub fn group_count(&self) -> usize {
+        self.program.num_mem
+    }
+
+    /// The capture names in definition order, each with its group numbers;
+    /// empty when the groups are numbered.
+    pub fn names(&self) -> &[(String, Vec<usize>)] {
+        &self.names
+    }
+
     /// Searches `text` from its start for the leftmost match, as
     /// `Regexp#match` does.
     pub fn search(&self, text: &str) -> Option<Captures> {
@@ -73,7 +104,9 @@ impl Regex {
     }
 
     /// Searches `text` for the leftmost match starting at or after the byte
-    /// offset `start`, as `Regexp#match(text, position)` does.
+    /// offset `start`, as `Regexp#match(text, position)` does; the whole
+    /// text stays in view, so `\A`, `^`, `\b`, and a lookbehind read what
+    /// comes before `start`.
     pub fn search_from(&self, text: &str, start: usize) -> Option<Captures> {
         self.search_bounded(text, start, u64::MAX)
             .expect("an unbounded search cannot run out of budget")
@@ -88,7 +121,28 @@ impl Regex {
         start: usize,
         budget: u64,
     ) -> Result<Option<Captures>, RegexError> {
-        let _ = (text, start, budget);
+        let chars: Vec<char> = text.chars().collect();
+        let mut byte_offsets: Vec<usize> = Vec::with_capacity(chars.len() + 1);
+        let mut offset = 0;
+        for character in &chars {
+            byte_offsets.push(offset);
+            offset += character.len_utf8();
+        }
+        byte_offsets.push(offset);
+        let start_char = byte_offsets
+            .iter()
+            .position(|candidate| *candidate >= start)
+            .unwrap_or(chars.len());
+        let mut matcher = vm::Matcher::new(&self.program, &chars, text, &byte_offsets, budget);
+        for attempt in start_char..=chars.len() {
+            if let Some(groups) = matcher.match_at(attempt, start_char)? {
+                let spans = groups
+                    .into_iter()
+                    .map(|group| group.map(|(from, to)| (byte_offsets[from], byte_offsets[to])))
+                    .collect();
+                return Ok(Some(Captures { groups: spans }));
+            }
+        }
         Ok(None)
     }
 }

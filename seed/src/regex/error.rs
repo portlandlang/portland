@@ -19,9 +19,21 @@ impl RegexError {
         }
     }
 
-    /// Onigmo's `%n` sentences name the group or property in question.
+    /// Onigmo's `%n` sentences name the group or property in question; a
+    /// name past 47 bytes is cut there with `...` (`MAX_ERROR_PAR_LEN`).
     pub fn named(template: &str, name: &str) -> RegexError {
-        RegexError::new(template.replace("%n", name))
+        const MAX_ERROR_PAR_LEN: usize = 50;
+        let limit = MAX_ERROR_PAR_LEN - 3;
+        let shown = if name.len() > limit {
+            let mut cut = limit;
+            while !name.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            format!("{}...", &name[..cut])
+        } else {
+            name.to_string()
+        };
+        RegexError::new(template.replace("%n", &shown))
     }
 }
 
@@ -47,15 +59,13 @@ pub const META_CODE_SYNTAX: &str = "invalid meta-code syntax";
 pub const CONTROL_CODE_SYNTAX: &str = "invalid control-code syntax";
 pub const CHAR_CLASS_VALUE_AT_END_OF_RANGE: &str = "char-class value at end of range";
 pub const CHAR_CLASS_VALUE_AT_START_OF_RANGE: &str = "char-class value at start of range";
-pub const UNMATCHED_RANGE_SPECIFIER_IN_CHAR_CLASS: &str =
-    "unmatched range specifier in char-class";
+pub const UNMATCHED_RANGE_SPECIFIER_IN_CHAR_CLASS: &str = "unmatched range specifier in char-class";
 pub const TARGET_OF_REPEAT_OPERATOR_NOT_SPECIFIED: &str =
     "target of repeat operator is not specified";
 pub const TARGET_OF_REPEAT_OPERATOR_INVALID: &str = "target of repeat operator is invalid";
 pub const NESTED_REPEAT_OPERATOR: &str = "nested repeat operator";
 pub const UNMATCHED_CLOSE_PARENTHESIS: &str = "unmatched close parenthesis";
-pub const END_PATTERN_WITH_UNMATCHED_PARENTHESIS: &str =
-    "end pattern with unmatched parenthesis";
+pub const END_PATTERN_WITH_UNMATCHED_PARENTHESIS: &str = "end pattern with unmatched parenthesis";
 pub const END_PATTERN_IN_GROUP: &str = "end pattern in group";
 pub const UNDEFINED_GROUP_OPTION: &str = "undefined group option";
 pub const INVALID_POSIX_BRACKET_TYPE: &str = "invalid POSIX bracket type";
