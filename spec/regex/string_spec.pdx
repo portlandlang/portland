@@ -1,0 +1,173 @@
+# A string's methods that take a pattern (ADR 0086): `sub`, `gsub`, `scan`,
+# `split`, `index`, `rindex`, `slice`, `[]`, `start_with?`, `partition`,
+# and `rpartition`, with Ruby's replacement escapes — `\0` and `\&` the
+# match, `\1` a group, `\k<name>` a named group, `` \` `` and `\'` the
+# text around it, `\\` a backslash — and the block forms, the block
+# receiving the matched text as Ruby's does.
+#
+# From ruby/spec core/string/{sub,gsub,scan,split,index,rindex,slice,
+# element_reference,start_with,partition,rpartition}_spec.rb's regex rows
+# and core/kernel/{match,not_match}_spec.rb. Upstream: `$~` and `$1` inside
+# a block (the match globals are gone), the hash form of `sub`/`gsub`, the
+# bang forms (values never mutate, ADR 0015), `[regex, name]` through the
+# index form (`slice(regex, name)` reads the same), the byte and encoding
+# rows, and the mocks.
+
+require_relative "../spec_helper"
+
+context "String#sub and #gsub with a pattern" do
+  specify "replace the first match or every one" do
+    expect("hello world".sub(/o/, "0")).to eq("hell0 world")
+    expect("hello world".gsub(/o/, "0")).to eq("hell0 w0rld")
+    expect("hello".gsub(/z/, "0")).to eq("hello")
+  end
+
+  specify "read the replacement's escapes" do
+    expect("2026-11-07".sub(/(\d+)-(\d+)-(\d+)/, '\3/\2/\1')).to eq("07/11/2026")
+    expect("ab".gsub(/(?<x>a)/, '<\k<x>>')).to eq("<a>b")
+    expect("ab".gsub(/b/, '\&\&')).to eq("abb")
+    expect("ab".gsub(/b/, '\0\0')).to eq("abb")
+    expect("hello".sub(/ll/, "[\\`|\\']")).to eq("he[he|o]o")
+    expect("ab".gsub(/b/, '\\\\')).to eq('a\\')
+    expect("ab".sub(/(a)/, '\2')).to eq("b")
+    expect("ab".sub(/a/, '\x')).to eq('\xb')
+  end
+
+  specify "read the escapes with a string pattern too" do
+    expect("hello".sub("l", '\0\0')).to eq("helllo")
+    expect("hello".gsub("l", '<\&>')).to eq("he<l><l>o")
+  end
+
+  specify "hand the block the matched text" do
+    expect("hello".sub(/l+/) { |text| text.upcase }).to eq("heLLo")
+    expect("hello world".gsub(/\w+/) { |word| word.capitalize }).to eq("Hello World")
+    expect("a1b2".gsub(/\d/) { |digit| (digit.to_i * 2).to_s }).to eq("a2b4")
+  end
+
+  specify "match the empty pattern at every character boundary" do
+    expect("aaa".gsub(//, "-")).to eq("-a-a-a-")
+    expect("abc".gsub(/b*/, "X")).to eq("XaXXcX")
+  end
+
+  specify "take the flags" do
+    expect("Hello".gsub(/l/i, "L")).to eq("HeLLo")
+    expect("a\nb".sub(/a.b/m, "X")).to eq("X")
+  end
+end
+
+context "String#scan" do
+  specify "returns an array of each match" do
+    expect("a1b22c333".scan(/\d+/)).to eq(["1", "22", "333"])
+    expect("abc".scan(/x/)).to eq([])
+  end
+
+  specify "returns an array of each match's groups when the pattern has any" do
+    expect("a1b22".scan(/([a-z])(\d+)/)).to eq([["a", "1"], ["b", "22"]])
+    expect("ab".scan(/(a)(x)?/)).to eq([["a", nil]])
+  end
+
+  specify "hands each match to a block and answers the string" do
+    mutable seen = []
+    answer = "Hello World".scan(/\w+/) { |word| seen << word }
+    expect(seen).to eq(["Hello", "World"])
+    expect(answer).to eq("Hello World")
+  end
+
+  specify "scans the absent operator's pieces" do
+    expect("foo".scan(Regexp.new("(?~foo)"))).to eq(["fo", "o", ""])
+  end
+end
+
+context "String#split with a pattern" do
+  specify "splits on each match" do
+    expect("a1b2c".split(/\d/)).to eq(["a", "b", "c"])
+    expect("a b  c".split(/\s+/)).to eq(["a", "b", "c"])
+  end
+
+  specify "includes the groups between the pieces" do
+    expect("a1b2c".split(/(\d)/)).to eq(["a", "1", "b", "2", "c"])
+  end
+
+  specify "splits into characters on the empty pattern" do
+    expect("abc".split(//)).to eq(["a", "b", "c"])
+  end
+
+  specify "caps the pieces by a positive limit and keeps trailing empties by a negative one" do
+    expect("a1b2c3".split(/\d/, 2)).to eq(["a", "b2c3"])
+    expect("a1b2c3".split(/\d/, -1)).to eq(["a", "b", "c", ""])
+    expect("a1b2c3".split(/\d/)).to eq(["a", "b", "c"])
+  end
+
+  specify "handles empty matches as Ruby does" do
+    expect("abc".split(/b*/)).to eq(["a", "c"])
+    expect("aaa".split(/a*/)).to eq([])
+    expect("".split(/x/)).to eq([])
+  end
+end
+
+context "String#index and #rindex with a pattern" do
+  specify "answer the position of the first and last match" do
+    expect("hello".index(/l/)).to eq(2)
+    expect("hello".rindex(/l/)).to eq(3)
+    expect("héllo".index(/l/)).to eq(2)
+  end
+
+  specify "answer nil for no match" do
+    expect("hello".index(/z/)).to be_nil
+    expect("hello".rindex(/z/)).to be_nil
+  end
+
+  specify "search from a position" do
+    expect("hello".index(/l/, 3)).to eq(3)
+    expect("hello".index(/l/, 4)).to be_nil
+    expect("hello".rindex(/l/, 2)).to eq(2)
+  end
+
+  specify "rindex finds a match that overlaps an earlier one" do
+    expect("aaa".rindex(/aa/)).to eq(1)
+  end
+end
+
+context "String#slice and #[] with a pattern" do
+  specify "answer the match's text or nil" do
+    expect("hello"[/l+/]).to eq("ll")
+    expect("hello".slice(/l+/)).to eq("ll")
+    expect("hello"[/z/]).to be_nil
+    expect("hello".slice(/z/)).to be_nil
+  end
+
+  specify "slice answers a group by number or name" do
+    expect("hello".slice(/(h)(e)/, 2)).to eq("e")
+    expect("hello".slice(/(?<first>h)/, :first)).to eq("h")
+    expect("hello".slice(/(h)(x)?/, 2)).to be_nil
+  end
+end
+
+context "String#start_with? with a pattern" do
+  specify "answers whether the pattern matches at the start" do
+    expect("hello".start_with?(/h.l/)).to be_true
+    expect("hello".start_with?(/l/)).to be_false
+    expect("hello".start_with?("x", /h/)).to be_true
+  end
+end
+
+context "String#partition and #rpartition with a pattern" do
+  specify "partition splits around the first match" do
+    expect("hello".partition(/l+/)).to eq(["he", "ll", "o"])
+    expect("hello".partition(/z/)).to eq(["hello", "", ""])
+  end
+
+  specify "rpartition splits around the last match" do
+    expect("hello".rpartition(/l/)).to eq(["hel", "l", "o"])
+    expect("hello".rpartition(/z/)).to eq(["", "", "hello"])
+  end
+end
+
+context "Symbol with a pattern" do
+  specify "answers the string questions by its name" do
+    found = :cat =~ /a/ or panic("no match")
+    expect(found[0]).to eq("a")
+    expect(:cat.match?(/t$/)).to be_true
+    expect(:cat !~ /z/).to be_true
+  end
+end

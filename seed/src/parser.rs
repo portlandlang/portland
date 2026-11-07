@@ -352,17 +352,22 @@ fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
         // `%r` + opener, closer last.
         &text[3..flags_start - 1]
     };
+    let slashed = text.starts_with('/');
     let mut parts: Vec<Expression> = Vec::new();
     let mut literal = String::new();
     let mut characters = body.char_indices().peekable();
     while let Some((index, character)) = characters.next() {
         match character {
-            '\\' => {
-                literal.push('\\');
-                if let Some((_, escaped)) = characters.next() {
+            // An escaped terminator that means nothing to the engine, `\/`,
+            // is the bare character in the source, as Ruby reads it.
+            '\\' => match characters.next() {
+                Some((_, '/')) if slashed => literal.push('/'),
+                Some((_, escaped)) => {
+                    literal.push('\\');
                     literal.push(escaped);
                 }
-            }
+                None => literal.push('\\'),
+            },
             '#' if matches!(characters.peek(), Some(&(_, '{'))) => {
                 characters.next(); // the `{`
                 let inner_start = index + 2;

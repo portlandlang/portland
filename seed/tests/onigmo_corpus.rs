@@ -4,21 +4,12 @@
 //!
 //! The count of agreeing cases is a ratchet: it may go up, never down. When
 //! a build makes more cases agree, raise `AGREEING_CASES` to the new count.
-//! A bad pattern agrees when both refuse it — the sentences are the
-//! engine's, not Ruby's, and are not compared. The cases the engine never
-//! returns from are listed in `HANGS` and counted as disagreements without
-//! being run (#212).
 
-use portland_seed::regex::Pattern;
+use portland_seed::regex::Regex;
 use std::path::Path;
 
-const AGREEING_CASES: usize = 904;
-
-/// The cases oniai does not return from within a second (#212).
-const HANGS: &[&str] = &[
-    "838", "1311", "1312", "1370", "1373", "1577", "1578", "1579", "1580", "1584", "1585", "1586",
-    "1587", "1591", "1592", "1593", "1594",
-];
+const AGREEING_CASES: usize = 1075;
+const STEP_BUDGET: u64 = 5_000_000;
 
 struct Case {
     id: String,
@@ -49,7 +40,9 @@ fn read_cases() -> Vec<Case> {
         .collect()
 }
 
-/// Ruby's answer line without its id: `error`, `nomatch`, or `match <spans>`.
+/// Ruby's answer line without its id: `error <sentence>`, `nomatch`, or
+/// `match <spans>`; an error sentence keeps only the part before `: /`,
+/// which is where Ruby appends the source.
 fn read_ruby_answers() -> std::collections::HashMap<String, String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/onigmo/ruby_4_0_9.tsv");
     let content = std::fs::read_to_string(path).expect("ruby_4_0_9.tsv");
@@ -57,10 +50,12 @@ fn read_ruby_answers() -> std::collections::HashMap<String, String> {
         .lines()
         .map(|line| {
             let (id, rest) = line.split_once('\t').expect("id");
-            let answer = if rest.starts_with("error\t") {
-                "error".to_string()
-            } else {
-                rest.to_string()
+            let answer = match rest.strip_prefix("error\t") {
+                Some(sentence) => {
+                    let bare = sentence.split(": /").next().unwrap_or(sentence);
+                    format!("error\t{bare}")
+                }
+                None => rest.to_string(),
             };
             (id.to_string(), answer)
         })
@@ -68,41 +63,35 @@ fn read_ruby_answers() -> std::collections::HashMap<String, String> {
 }
 
 fn seed_answer(case: &Case) -> String {
-    let compiled = std::panic::catch_unwind(|| Pattern::new(&case.pattern, false, false, false));
-    let Ok(pattern) = compiled else {
-        return "error".to_string();
-    };
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| pattern.search(&case.text))) {
-        Err(_) => "panic".to_string(),
-        Ok(None) => "nomatch".to_string(),
-        Ok(Some(found)) => {
-            let spans: Vec<String> = found
-                .spans
-                .iter()
-                .map(|group| match group {
-                    Some((start, end)) => format!("{start}-{end}"),
-                    None => "-".to_string(),
-                })
-                .collect();
-            format!("match\t{}", spans.join("\t"))
-        }
+    match Regex::new(&case.pattern) {
+        Err(error) => format!("error\t{}", error.message),
+        Ok(regex) => match regex.search_bounded(&case.text, 0, STEP_BUDGET) {
+            Err(error) => format!("budget\t{}", error.message),
+            Ok(None) => "nomatch".to_string(),
+            Ok(Some(captures)) => {
+                let spans: Vec<String> = captures
+                    .groups
+                    .iter()
+                    .map(|group| match group {
+                        Some((start, end)) => format!("{start}-{end}"),
+                        None => "-".to_string(),
+                    })
+                    .collect();
+                format!("match\t{}", spans.join("\t"))
+            }
+        },
     }
 }
 
 #[test]
 fn the_seed_agrees_with_ruby_on_the_onigmo_corpus() {
-    std::panic::set_hook(Box::new(|_| {}));
     let cases = read_cases();
     let ruby = read_ruby_answers();
     let mut agreeing = 0;
     let mut disagreements = Vec::new();
     for case in &cases {
         let expected = &ruby[&case.id];
-        let actual = if HANGS.contains(&case.id.as_str()) {
-            "hang".to_string()
-        } else {
-            seed_answer(case)
-        };
+        let actual = seed_answer(case);
         if &actual == expected {
             agreeing += 1;
         } else {
@@ -116,13 +105,13 @@ fn the_seed_agrees_with_ruby_on_the_onigmo_corpus() {
             ));
         }
     }
-    let _ = std::panic::take_hook();
+    let shown = disagreements.len().min(60);
     eprintln!(
-        "onigmo corpus: {agreeing} of {} agree with Ruby 4.0.9 ({} disagree, listed below)",
+        "onigmo corpus: {agreeing} of {} agree with Ruby 4.0.9 ({} disagree; first {shown} below)",
         cases.len(),
         disagreements.len()
     );
-    for line in &disagreements {
+    for line in &disagreements[..shown] {
         eprintln!("{line}");
     }
     assert!(

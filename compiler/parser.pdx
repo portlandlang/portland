@@ -2311,16 +2311,24 @@ def regex_expression(lexeme, line: nil)
   if flags.include?("o")
     panic "the 'o' flag interpolates a pattern once, which Portland does not spell — drop the flag; a constant pattern is built once anyway"
   end
-  body_start = lexeme.slice(0, 1) == "/" ? 1 : 3
+  slashed = lexeme.slice(0, 1) == "/"
+  body_start = slashed ? 1 : 3
   characters = lexeme.slice(body_start, flags_start - 1 - body_start).chars
   mutable parts = []
   mutable literal = ""
   mutable index = 0
   while index < characters.length
     character = characters[index]
+    # An escaped terminator that means nothing to the engine, `\/`, is the
+    # bare character in the source, as Ruby reads it.
     if character == "\\"
-      literal << character
-      literal << characters[index + 1] if index + 1 < characters.length
+      following = index + 1 < characters.length ? characters[index + 1] : ""
+      if slashed && following == "/"
+        literal << "/"
+      else
+        literal << character
+        literal << following
+      end
       index += 2
       next
     end

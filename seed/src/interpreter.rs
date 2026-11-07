@@ -2141,7 +2141,7 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
         // `text[/pattern/]` is the match's text or nil, and `found[1]`,
         // `found[:name]` a match's group (ADR 0086).
         (Value::String(_), Value::Regex(_)) | (Value::MatchData(_), _) => {
-            crate::regex::method(receiver, "[]", std::slice::from_ref(index))
+            crate::regexp::method(receiver, "[]", std::slice::from_ref(index))
                 .expect("the regex module answers [] for these")
         }
         (Value::Array(elements), Value::Integer(index)) => {
@@ -3645,7 +3645,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     Value::String(text) => text,
                     other => panic!("a regex source must be a String, got {}", other.shown()),
                 };
-                Some(Value::Regex(crate::regex::Pattern::new(
+                Some(Value::Regex(crate::regexp::Pattern::new(
                     &source,
                     flags.contains('i'),
                     flags.contains('m'),
@@ -4119,11 +4119,11 @@ impl<W: std::io::Write> Interpreter<W> {
             // `Regexp.new`, `Regexp.escape`, and `Regexp.union` (ADR 0086);
             // `Regexp.last_match` is the match global by another name.
             ("Regexp", "new") => match arguments.as_slice() {
-                [Value::String(source)] => Some(Value::Regex(crate::regex::Pattern::from_options(
-                    source, None,
-                ))),
+                [Value::String(source)] => Some(Value::Regex(
+                    crate::regexp::Pattern::from_options(source, None),
+                )),
                 [Value::String(source), options] => Some(Value::Regex(
-                    crate::regex::Pattern::from_options(source, Some(options)),
+                    crate::regexp::Pattern::from_options(source, Some(options)),
                 )),
                 [Value::Regex(pattern)] => Some(Value::Regex(pattern.clone())),
                 [other, ..] => panic!("Regexp.new takes a String, got {}", other.shown()),
@@ -4131,7 +4131,7 @@ impl<W: std::io::Write> Interpreter<W> {
             },
             ("Regexp", "escape" | "quote") => match arguments.as_slice() {
                 [Value::String(text)] | [Value::Symbol(text)] => {
-                    Some(Value::String(crate::regex::escape(text)))
+                    Some(Value::String(crate::regexp::escape(text)))
                 }
                 [other] => panic!(
                     "no implicit conversion of {} into String",
@@ -4139,7 +4139,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
                 _ => panic!("Regexp.{name} takes 1 argument, got {}", arguments.len()),
             },
-            ("Regexp", "union") => Some(Value::Regex(crate::regex::union(&arguments))),
+            ("Regexp", "union") => Some(Value::Regex(crate::regexp::union(&arguments))),
             ("Regexp", "last_match") => panic!(
                 "'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match"
             ),
@@ -5155,7 +5155,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // 0086), before the string arms so a pattern argument is never
         // mistaken for a missing string.
         if block.is_none()
-            && let Some(answer) = crate::regex::method(&receiver, name, &arguments)
+            && let Some(answer) = crate::regexp::method(&receiver, name, &arguments)
         {
             return Some(answer);
         }
@@ -5619,7 +5619,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 (Value::String(text), "scan", [Value::Regex(pattern)]) => {
                     for found in pattern.all(text) {
-                        self.run_block(block, vec![crate::regex::scan_item(&found)]);
+                        self.run_block(block, vec![crate::regexp::scan_item(&found)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
@@ -7577,8 +7577,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 let mut copied_to = 0;
                 for (start, end) in matched_spans(text, pattern, name == "gsub") {
                     result.push_str(&text[copied_to..start]);
-                    let found = crate::regex::literal_found(text, start, end);
-                    result.push_str(&crate::regex::expand_replacement(replacement, &found));
+                    let found = crate::regexp::literal_found(text, start, end);
+                    result.push_str(&crate::regexp::expand_replacement(replacement, &found));
                     copied_to = end;
                 }
                 result.push_str(&text[copied_to..]);
@@ -8591,7 +8591,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // A set's `===` is membership (ADR 0082), as Ruby's.
             (Value::Set(members), _) => members.contains(subject),
             // A pattern's `===` is a match on a string or a symbol (ADR 0086).
-            (Value::Regex(pattern), _) => crate::regex::case_matches(pattern, subject),
+            (Value::Regex(pattern), _) => crate::regexp::case_matches(pattern, subject),
             // Portland's own `==`, so `1 === 1.0` as `1 == 1.0` does.
             _ => {
                 apply_binary(pattern.clone(), &BinaryOperator::Equals, subject.clone())

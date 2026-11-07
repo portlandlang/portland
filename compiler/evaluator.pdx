@@ -2328,9 +2328,13 @@ def evaluate_builtin_type_function(node, mutable bindings)
     end
     if node.name == "escape" || node.name == "quote"
       panic("Regexp.#{node.name} takes 1 argument, got #{arguments.length}") unless arguments.length == 1
-      return outcome([Regexp.escape(value_at(arguments, 0))], bindings)
+      return outcome([Regexp.escape(host_text(value_at(arguments, 0)))], bindings)
     end
-    return outcome([Regexp.union(arguments)], bindings) if node.name == "union"
+    if node.name == "union"
+      # One array argument is the list itself; a symbol joins by its name.
+      members = arguments.length == 1 ? host_text(value_at(arguments, 0)) : arguments.map { host_text(it) }
+      return outcome([Regexp.union(members)], bindings)
+    end
     if node.name == "last_match"
       panic("'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match")
     end
@@ -3245,7 +3249,7 @@ def evaluate_method_call(node, mutable bindings)
   # A match's own names (ADR 0086), the host's: `begin`, `end`, and
   # `offset` take a group here, where a range's take none, so they answer
   # before the shared arms.
-  if (receiver in MatchData) && %w[captures named_captures names pre_match post_match string regexp to_a size length begin end offset values_at].include?(node.name)
+  if (receiver in MatchData) && %w[captures named_captures names pre_match post_match string regexp to_a size length begin end offset values_at match match_length].include?(node.name)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([matchdata_answer(receiver, node.name, arguments)], bindings)
   end
@@ -3361,6 +3365,7 @@ def evaluate_method_call(node, mutable bindings)
   when "options" then receiver.options
   when "casefold?" then receiver.casefold?
   when "names" then receiver.names
+  when "named_captures" then receiver.named_captures
   when "upcase" then receiver.upcase
   when "downcase" then receiver.downcase
   # The trimmers, the case moves, and the line splitter ride the host.
@@ -3490,9 +3495,14 @@ def evaluate_method_call(node, mutable bindings)
   when "slice"
     if receiver in Hash
       arguments.reduce({}) { |kept, key| kept.merge(receiver.slice(key)) }
-    elsif (receiver in String) && (value_at(arguments, 0) in Regexp) && arguments.length == 1
-      # A pattern alone (ADR 0086): the match's text or nil.
-      receiver.slice(value_at(arguments, 0))
+    elsif (receiver in String) && (value_at(arguments, 0) in Regexp)
+      # A pattern alone (ADR 0086) is the match's text or nil; with a group
+      # by number or name, that group's.
+      if arguments.length == 1
+        receiver.slice(value_at(arguments, 0))
+      else
+        receiver.slice(value_at(arguments, 0), host_group_key(value_at(arguments, 1)))
+      end
     else
       receiver.slice(arguments[0], arguments[1])
     end
@@ -3657,6 +3667,8 @@ def matchdata_answer(found, name, arguments)
   when "begin" then found.begin(host_group_key(value_at(arguments, 0)))
   when "end" then found.end(host_group_key(value_at(arguments, 0)))
   when "offset" then found.offset(host_group_key(value_at(arguments, 0)))
+  when "match" then found.match(host_group_key(value_at(arguments, 0)))
+  when "match_length" then found.match_length(host_group_key(value_at(arguments, 0)))
   else arguments.map { |group| found[host_group_key(group)] }
   end
 end

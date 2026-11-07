@@ -2,7 +2,7 @@
 
 **Summary:** Ruby's literals and Onigmo's pattern language, whole; `=~` and `match` both answer a `MatchData` or nil, the match globals (`$~`, `$1`) refuse, positions count graphemes, and replacement strings keep Ruby's `\1` escapes.
 
-**Status:** decided ([ADR 0086](../adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md), 2026-11-07, out of [#74](https://github.com/portlandlang/portland/issues/74)); nothing built yet. The engine — which code runs Onigmo's semantics — is the open item, [#212](https://github.com/portlandlang/portland/issues/212). Until the build, a regex literal refuses with `there is no regex yet`, naming the issue. Ruby behavior below was verified against Ruby 4.0.9.
+**Status:** decided ([ADR 0086](../adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md), 2026-11-07, out of [#74](https://github.com/portlandlang/portland/issues/74)) and **built** on both implementations 2026-11-07, with `core/regexp/`, `core/matchdata/`, and `language/regexp/` in the manifest and `spec/regex/` holding the ported rows. The engine is Onigmo ported to the seed, layer for layer from Ruby 4.0.9's own copy ([#212](https://github.com/portlandlang/portland/issues/212)), agreeing with Ruby on all 1,075 cases of Onigmo's own suite; the surface over it is `seed/src/regexp.rs`, the one boundary a program sees. Ruby behavior below was verified against Ruby 4.0.9.
 
 ## Ruby
 
@@ -27,15 +27,15 @@ pos = line =~ /x/          # an Integer or nil
 - **Positions count graphemes** ([characters.md](characters.md)): `begin`, `end`, `pre_match`, and `index(/x/)` answer numbers `slice` accepts. Inside the pattern, `.` and a character class match one codepoint as Onigmo's do, and `\X` matches one grapheme; on text with combining marks the two differ, and those rows are recorded against this page.
 - **Replacement strings keep Ruby's escapes**: `\0`, `\&`, `\1`–`\9`, `\k<name>`, `` \` ``, `\'`, `\\`. A `gsub` block receives the matched text as a String, as Ruby's does; a block that needs captures uses the escapes form or a `match` loop.
 - **`case` works both ways**: `when /pattern/` by `===`, and `in /pattern/` with captures bound by name once a port pulls for it.
-
-<!-- not-portland: regex is decided but unbuilt (ADR 0086) — a regex literal does not lex yet -->
+- **`inspect` is the function, as everywhere**: `inspect(/a/i)` is `/a/i` and `inspect(found)` is `#<MatchData "…">`; `/a/.inspect` refuses as `"a".inspect` does.
+- **Not yet, each waiting for a pull**: `found[start, length]` and the range forms of `[]` and `values_at`; `text[/pattern/, group]` through the index form (`slice(/pattern/, group)` reads the same); `match` with a block; `named_captures(symbolize_names:)`; a match in `case/in`; and `to_s` folding a lone leading group's options into the wrapper the way Ruby's does — `/(?i:a)/.to_s` is `(?-mix:(?i:a))` here, `(?i-mx:a)` in Ruby.
 
 ```ruby
-if found = line =~ /(\d+)-(\d+)/
-  from = found[1]
-  to = found[2]
-end
-pos = line.match(/x/)&.begin(0)
+found = line =~ /(\d+)-(\d+)/ or panic("no range in #{line}")
+from = found[1]
+to = found[2]
+puts("no digits") unless line.match?(/\d/)
+pos = line.index(/x/)
 
 "2026-11-07".sub(/(\d+)-(\d+)-(\d+)/, '\3/\2/\1')   # "07/11/2026"
 "hello world".gsub(/\w+/) { |word| word.capitalize }   # "Hello World"
@@ -52,9 +52,9 @@ Regex is the largest single refusal in the gem corpus: a literal stops roughly 3
 
 ## Migrating
 
-- `if line =~ /x/` — port verbatim; a `MatchData` or nil narrows as the index did.
-- `$1` after a match — bind the match: `found = line =~ /(\d+)/` then `found[1]`. The refusal names this rewrite.
-- `pos = line =~ /x/` — `line.match(/x/)&.begin(0)`, or `line.index(/x/)`.
+- `if line =~ /x/` — `if line.match?(/x/)`, or `if (line =~ /x/).some?`: a `MatchData` or nil is a maybe, and an `if` takes a boolean, never a maybe's truthiness ([nil and optionals](nil-and-optionals.md)).
+- `$1` after a match — bind the match: `found = line =~ /(\d+)/ or panic("…")`, then `found[1]`; or branch on `found.some?`. The refusal names this rewrite.
+- `pos = line =~ /x/` — `line.index(/x/)`, a maybe of the position; or bind the match and read `found.begin(0)`.
 - `gsub(/x/, '\1')` and `gsub(/x/) { |word| ... }` — port verbatim.
 - `gsub(/x/) { $1 }` — the escapes form, `gsub(/x/, '\1')`, or a `scan` with captures.
 - A position compared against `length` or handed to `slice` — the same number here, where in Ruby a combining mark made the two drift.

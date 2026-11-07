@@ -1,0 +1,324 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../spec_helper"
+
+context "Regexp#source" do
+  specify "returns the original string of the pattern" do
+    expect(/ab+c/ix.source).to eq("ab+c")
+    expect(/x(.)xz/.source).to eq("x(.)xz")
+  end
+
+  specify "keeps escape sequences as is" do
+    expect(/\x20\+/.source).to eq('\x20\+')
+    expect(/\$/.source).to eq('\$')
+    expect(/\@/.source).to eq('\@')
+  end
+
+  specify "keeps escaping of a metacharacter used as a terminator" do
+    expect(%r{\{}.source).to eq('\{')
+  end
+end
+
+context "Regexp#inspect" do
+  specify "returns a formatted string that would read as the same regexp" do
+    expect(inspect(/ab+c/ix)).to eq("/ab+c/ix")
+    expect(inspect(/a(.)+s/m)).to eq("/a(.)+s/m")
+  end
+
+  specify "returns options in the order 'mix'" do
+    expect(inspect(//xim)).to eq("//mix")
+  end
+
+  specify "correctly escapes forward slashes" do
+    expect(inspect(Regexp.new("/foo/bar"))).to eq('/\/foo\/bar/')
+    expect(inspect(Regexp.new("/foo/bar[/]"))).to eq('/\/foo\/bar[\/]/')
+    expect(inspect(Regexp.new("//"))).to eq('/\/\//')
+  end
+
+  specify "does not over escape forward slashes" do
+    expect(inspect(/\/foo\/bar/)).to eq('/\/foo\/bar/')
+  end
+end
+
+context "Regexp#to_s" do
+  specify "displays options if included" do
+    expect(/abc/mxi.to_s).to eq("(?mix:abc)")
+  end
+
+  specify "shows non-included options after a - sign" do
+    expect(/abc/i.to_s).to eq("(?i-mx:abc)")
+  end
+
+  specify "shows all options as excluded if none are selected" do
+    expect(/abc/.to_s).to eq("(?-mix:abc)")
+  end
+
+  specify "shows the pattern after the options" do
+    expect(/ab+c/mix.to_s).to eq("(?mix:ab+c)")
+    expect(/xyz/.to_s).to eq("(?-mix:xyz)")
+  end
+
+  specify "returns a string in (?xxx:yyy) notation" do
+    expect(/ab+c/ix.to_s).to eq("(?ix-m:ab+c)")
+    expect(/(?:.)/.to_s).to eq("(?-mix:(?:.))")
+    expect(/(?=5)/.to_s).to eq("(?-mix:(?=5))")
+    expect(/(?!5)/.to_s).to eq("(?-mix:(?!5))")
+  end
+
+  specify "displays groups with options as written" do
+    expect(/(?ix:foo)(?m:bar)/.to_s).to eq("(?-mix:(?ix:foo)(?m:bar))")
+    expect(/(?ix:foo)bar/m.to_s).to eq("(?m-ix:(?ix:foo)bar)")
+    expect(/whatever(?:0d)/ix.to_s).to eq("(?ix-m:whatever(?:0d))")
+  end
+end
+
+context "Regexp#options" do
+  specify "returns an Integer bitvector of regexp options" do
+    expect(/cat/.options).to eq(0)
+    expect(//.options).to eq(0)
+    expect(/cat/i.options).to eq(1)
+    expect(/cat/x.options).to eq(2)
+    expect(/cat/m.options).to eq(4)
+    expect(/cat/mx.options).to eq(6)
+    expect(/cat/xi.options).to eq(3)
+    expect(/cat/mix.options).to eq(7)
+  end
+
+  specify "allows checking for presence of a certain option with bit_and" do
+    expect(/cat/.options.bit_and(1)).to eq(0)
+    expect(/cat/i.options.bit_and(1)).to eq(1)
+    expect(/cat/m.options.bit_and(4)).to eq(4)
+  end
+end
+
+context "Regexp#casefold?" do
+  specify "returns the value of the case-insensitive flag" do
+    expect(/abc/i.casefold?).to be_true
+    expect(/xyz/.casefold?).to be_false
+  end
+end
+
+context "Regexp#names" do
+  specify "returns an empty Array if there are no named captures" do
+    expect(/needle/.names).to eq([])
+  end
+
+  specify "returns all of the named captures" do
+    expect(/n(?<cap>ee)d(?<ture>le)/.names).to eq(["cap", "ture"])
+  end
+
+  specify "works with nested named captures" do
+    expect(/n(?<cap>eed(?<ture>le))/.names).to eq(["cap", "ture"])
+  end
+
+  specify "returns each capture name only once" do
+    expect(/n(?<cap>ee)d(?<cap>le)/.names).to eq(["cap"])
+  end
+end
+
+context "Regexp#named_captures" do
+  specify "returns an empty Hash when there are no capture groups" do
+    expect(/foo/.named_captures).to eq({})
+  end
+
+  specify "sets each name to the corresponding group's index" do
+    rex = /this (?<is>is) [aA] (?<pat>pate?rn)/
+    expect(rex.named_captures).to eq({"is" => [1], "pat" => [2]})
+  end
+
+  specify "works with duplicate capture group names" do
+    rex = /this (?<is>is) [aA] (?<pat>pate?(?<is>rn))/
+    expect(rex.named_captures).to eq({"is" => [1, 3], "pat" => [2]})
+  end
+end
+
+context "Regexp#==" do
+  specify "is true if self and other have the same pattern" do
+    expect(/abc/ == /abc/).to be_true
+    expect(/abc/ == /abd/).to be_false
+  end
+
+  specify "is true only with the same options" do
+    expect(/abc/ == /abc/x).to be_false
+    expect(/abc/x == /abc/x).to be_true
+    expect(/abc/ == /abc/i).to be_false
+    expect(/abc/i == /abc/i).to be_true
+  end
+
+  specify "eql? asks the same" do
+    expect(/abc/.eql?(/abc/)).to be_true
+    expect(/abc/.eql?(/abc/i)).to be_false
+  end
+end
+
+context "Regexp#===" do
+  specify "is true if there is a match" do
+    expect(/abc/ === "aabcc").to be_true
+  end
+
+  specify "is false if there is no match" do
+    expect(/abc/ === "xyz").to be_false
+  end
+
+  specify "returns true if it matches a Symbol" do
+    expect(/a/ === :a).to be_true
+    expect(/a/ === :b).to be_false
+  end
+
+  specify "returns false if the other value is not text" do
+    expect(/abc/ === nil).to be_false
+    expect(/abc/ === /abc/).to be_false
+    expect(/1/ === 1).to be_false
+  end
+
+  specify "is what a when branch asks" do
+    answer = case "# title"
+             when /^\s*$/ then :blank
+             when /^#/ then :comment
+             else :text
+             end
+    expect(answer).to eq(:comment)
+  end
+end
+
+context "Regexp.new" do
+  specify "uses the String argument as an unescaped literal to construct a Regexp object" do
+    expect(Regexp.new("^hi{2,3}fo.o$")).to eq(/^hi{2,3}fo.o$/)
+  end
+
+  specify "answers the pattern itself for a Regexp argument" do
+    expect(Regexp.new(/ab/i)).to eq(/ab/i)
+  end
+
+  specify "does not set Regexp options if only given one argument, or nil or false" do
+    expect(Regexp.new("Hi").options).to eq(0)
+    expect(Regexp.new("Hi", nil).options).to eq(0)
+    expect(Regexp.new("Hi", false).options).to eq(0)
+  end
+
+  specify "sets options from second argument if it is true" do
+    expect(Regexp.new("Hi", true).options).to eq(1)
+  end
+
+  specify "sets options from second argument if it is one of the option bits" do
+    expect(Regexp.new("Hi", 1).casefold?).to be_true
+    expect(Regexp.new("Hi", 4).options).to eq(4)
+    expect(Regexp.new("Hi", 2).options).to eq(2)
+    expect(Regexp.new("Hi", 7)).to eq(/Hi/mix)
+  end
+
+  specify "sets options from a string of flag letters" do
+    expect(Regexp.new("Hi", "i")).to eq(/Hi/i)
+    expect(Regexp.new("Hi", "mx")).to eq(/Hi/mx)
+    expect(Regexp.new("Hi", "")).to eq(/Hi/)
+  end
+end
+
+context "Regexp.escape" do
+  specify "escapes any characters with special meaning in a regular expression" do
+    expect(Regexp.escape('\*?{}.+^[]()- ')).to eq('\\\\\*\?\{\}\.\+\^\[\]\(\)\-\ ')
+    expect(Regexp.escape("\n\r\t")).to eq('\n\r\t')
+    expect(Regexp.escape("a#b")).to eq('a\#b')
+  end
+
+  specify "works with symbols" do
+    expect(Regexp.escape(:"a.b")).to eq('a\.b')
+  end
+
+  specify "leaves plain text alone" do
+    expect(Regexp.escape("abc_123/")).to eq("abc_123/")
+  end
+
+  specify "quote is the same" do
+    expect(Regexp.quote("a.b")).to eq('a\.b')
+  end
+end
+
+context "Regexp.union" do
+  specify "returns /(?!)/ when passed no arguments" do
+    expect(Regexp.union).to eq(/(?!)/)
+  end
+
+  specify "returns a regular expression that will match passed arguments" do
+    expect(Regexp.union("penzance")).to eq(/penzance/)
+    expect(Regexp.union("skiing", "sledding")).to eq(/skiing|sledding/)
+    expect(Regexp.union(/dogs/, /cats/i)).to eq(/(?-mix:dogs)|(?i-mx:cats)/)
+  end
+
+  specify "quotes any string arguments" do
+    expect(Regexp.union("n", ".")).to eq(/n|\./)
+  end
+
+  specify "returns a Regexp if an array of strings with special characters is passed" do
+    expect(Regexp.union(["+", "-"])).to eq(/\+|\-/)
+  end
+
+  specify "answers a lone pattern itself" do
+    expect(Regexp.union(/a/i)).to eq(/a/i)
+  end
+end
+
+context "Regexp literals" do
+  specify "take the i, m, and x flags" do
+    expect(/foo/i.casefold?).to be_true
+    expect(/foo/mx.options).to eq(6)
+    expect(/foo/imx.options).to eq(7)
+  end
+
+  specify "spell %r with the family's delimiters, slashes unescaped" do
+    expect(%r{a/b}).to eq(/a\/b/)
+    expect(%r[a/b].source).to eq("a/b")
+    expect(%r(a/b)i.casefold?).to be_true
+    expect(%r{ () [c]{1} }).to eq(/ () [c]{1} /)
+    expect(%r[/].to_s).to eq(/\//.to_s)
+  end
+
+  specify "class is Regexp" do
+    expect(/a/.class).to eq(Regexp)
+    expect(Regexp.name).to eq("Regexp")
+  end
+
+  specify "allow interpolation of strings" do
+    text = "foo|bar"
+    expect(/#{text}/).to eq(/foo|bar/)
+  end
+
+  specify "allow interpolation of literal regexps" do
+    inner = /foo|bar/
+    expect(/#{inner}/).to eq(/(?-mix:foo|bar)/)
+  end
+
+  specify "allow interpolation which mixes modifiers" do
+    inner = /foo/i
+    expect(/#{inner} bar/m).to eq(/(?i-mx:foo) bar/m)
+  end
+
+  specify "allow interpolation to interact with other Regexp constructs" do
+    parts = "foo)|(bar"
+    expect(/(#{parts})/).to eq(/(foo)|(bar)/)
+    low = "a"
+    expect(/[#{low}-z]/).to eq(/[a-z]/)
+  end
+
+  specify "allow interpolation in extended mode" do
+    body = "#comment\n  foo  #comment\n  |  bar"
+    expect((/#{body}/x =~ "foo").nil?).to be_false
+  end
+
+  specify "interpolate a number through to_s" do
+    expect(/x#{1 + 1}y/).to eq(/x2y/)
+  end
+end

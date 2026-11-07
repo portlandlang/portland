@@ -91,10 +91,10 @@ pub enum Value {
     Random(std::rc::Rc<std::cell::RefCell<crate::random::Mt>>),
     /// `/pattern/` (ADR 0086): a compiled pattern with its source and
     /// flags; the engine behind it is `regex.rs`'s business.
-    Regex(std::rc::Rc<crate::regex::Pattern>),
+    Regex(std::rc::Rc<crate::regexp::Pattern>),
     /// What `=~` and `match` answer (ADR 0086): the match, its groups, and
     /// the text it ran over — Ruby's `MatchData`.
-    MatchData(std::rc::Rc<crate::regex::Found>),
+    MatchData(std::rc::Rc<crate::regexp::Found>),
 }
 
 /// Two strings are equal when they are the same *text*, not the same bytes

@@ -1642,6 +1642,137 @@ core/integer/case_compare_spec.rb:
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
 
+# — core/matchdata —
+# What a match answers (ADR 0086): Ruby's reading API, positions in
+# graphemes.
+
+core/matchdata/allocate_spec.rb:
+  status: skipped
+  reason: "There is no allocate; a match comes from a pattern."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/begin_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The mock and to_int coercion rows stay upstream; a closed runtime has no coercion protocol."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/bytebegin_spec.rb:
+  status: skipped
+  reason: "Positions count graphemes here; the byte-offset family is not spelled."
+  link: docs/ruby/characters.md
+core/matchdata/byteend_spec.rb:
+  status: skipped
+  reason: "Positions count graphemes here; the byte-offset family is not spelled."
+  link: docs/ruby/characters.md
+core/matchdata/byteoffset_spec.rb:
+  status: skipped
+  reason: "Positions count graphemes here; the byte-offset family is not spelled."
+  link: docs/ruby/characters.md
+core/matchdata/captures_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The String-subclass rows stay upstream; there is no subclassing."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/deconstruct_keys_spec.rb:
+  status: skipped
+  reason: "A match in case/in waits for a port to pull for it."
+  link: docs/ruby/regex.md
+core/matchdata/deconstruct_spec.rb:
+  status: skipped
+  reason: "A match in case/in waits for a port to pull for it."
+  link: docs/ruby/regex.md
+core/matchdata/dup_spec.rb:
+  status: skipped
+  reason: "A match is a value; dup and instance variables have no meaning."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/element_reference_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_planned
+  reason: "The [start, length] and range forms wait for a pull; the subclass row stays upstream."
+  link: docs/ruby/regex.md
+core/matchdata/end_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The mock and to_int coercion rows stay upstream; a closed runtime has no coercion protocol."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/eql_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "Upstream compares method objects; the spec asks eql? and == the same question."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/equal_value_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+core/matchdata/hash_spec.rb:
+  status: skipped
+  reason: "There is no hash method; a match is a value equal by its pattern, text, and positions."
+  link: docs/ruby/regex.md
+core/matchdata/inspect_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "inspect is the universal function here, not a method."
+  link: docs/ruby/regex.md
+core/matchdata/integer_at_spec.rb:
+  status: skipped
+  reason: "Ruby 4.1's integer_at waits for a pull."
+  link: docs/ruby/regex.md
+core/matchdata/length_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "Upstream compares method objects; the spec asks length and size the same question."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/match_length_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+core/matchdata/match_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+core/matchdata/named_captures_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The symbolize_names keyword waits for a pull; a key is a string."
+  link: docs/ruby/regex.md
+core/matchdata/names_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+core/matchdata/offset_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The mock and to_int coercion rows stay upstream; a closed runtime has no coercion protocol."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/post_match_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding and subclass rows stay upstream, and the match globals are gone."
+  link: docs/ruby/regex.md
+core/matchdata/pre_match_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding and subclass rows stay upstream, and the match globals are gone."
+  link: docs/ruby/regex.md
+core/matchdata/regexp_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The object_id and $~ rows stay upstream; a pattern is a value, and the match globals are gone."
+  link: docs/ruby/regex.md
+core/matchdata/size_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+core/matchdata/string_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The frozen and $~ rows stay upstream; a string is a value."
+  link: docs/ruby/regex.md
+core/matchdata/to_a_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The String-subclass rows stay upstream; there is no subclassing."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/to_s_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_intentional
+  reason: "The String-subclass rows stay upstream; there is no subclassing."
+  link: docs/ruby/metaprogramming.md
+core/matchdata/values_at_spec.rb:
+  pdx: [spec/regex/match_data_spec.pdx]
+  status: partial_planned
+  reason: "The range forms wait for a pull."
+  link: docs/ruby/regex.md
+
 # — core/nil —
 # nil has no methods beyond nil? and some? (ADR 0005), so its conversions
 # and operators stay behind by design, one entry each.
@@ -2359,6 +2490,114 @@ core/range/to_set_spec.rb:
   status: partial_intentional
   reason: "A beginless or endless range refuses to be walked in Portland's words (ADR 0055) where Ruby raises TypeError or RangeError, and there is no Set subclass to hand to_set."
   link: docs/ruby/ranges.md
+
+# — core/regexp —
+# Ruby's literals and Onigmo's pattern language (ADR 0086), a pattern as a
+# value; the engine is the seed's own port of Onigmo.
+
+core/regexp/case_compare_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The to_str string-like row stays upstream; a value is text or it is not."
+  link: docs/ruby/metaprogramming.md
+core/regexp/casefold_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+core/regexp/compile_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass, to_str, frozen, and encoding rows of the shared examples stay upstream; a bad pattern refuses, which a spec cannot assert."
+  link: docs/ruby/regex.md
+core/regexp/encoding_spec.rb:
+  status: skipped
+  reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
+  link: docs/ruby/encodings.md
+core/regexp/eql_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "Upstream compares method objects; the spec asks eql? and == the same question."
+  link: docs/ruby/metaprogramming.md
+core/regexp/equal_value_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The n, u, e, and s modifier rows have no spelling here; every pattern is UTF-8 (ADR 0069)."
+  link: docs/ruby/encodings.md
+core/regexp/escape_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "Upstream compares method objects; the spec asks escape and quote the same question."
+  link: docs/ruby/metaprogramming.md
+core/regexp/fixed_encoding_spec.rb:
+  status: skipped
+  reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
+  link: docs/ruby/encodings.md
+core/regexp/hash_spec.rb:
+  status: skipped
+  reason: "There is no hash method; a pattern is a value equal by its source and flags."
+  link: docs/ruby/regex.md
+core/regexp/initialize_spec.rb:
+  status: skipped
+  reason: "initialize, allocate, and frozen? have no meaning for a value; Regexp.new is the one constructor."
+  link: docs/ruby/metaprogramming.md
+core/regexp/inspect_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The o flag refuses by name and the n, u, e, and s codes do not exist; inspect is the universal function here, not a method."
+  link: docs/ruby/regex.md
+core/regexp/last_match_spec.rb:
+  status: skipped
+  reason: "Regexp.last_match is the match global by another name; a match is bound and read."
+  link: docs/ruby/regex.md
+core/regexp/linear_time_spec.rb:
+  status: skipped
+  reason: "There is no Regexp.linear_time?; the engine is Onigmo's backtracker, ported."
+  link: https://github.com/portlandlang/portland/issues/212
+core/regexp/match_spec.rb:
+  pdx: [spec/regex/match_spec.pdx]
+  status: partial_intentional
+  reason: "=~ answers the MatchData here, not an index, since the match globals are gone; the $~ reset, block, allocate, and invalid-encoding rows stay upstream."
+  link: docs/ruby/regex.md
+core/regexp/named_captures_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+core/regexp/names_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+core/regexp/new_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass, to_str, frozen, and encoding rows of the shared examples stay upstream; a bad pattern refuses, which a spec cannot assert."
+  link: docs/ruby/regex.md
+core/regexp/options_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "FIXEDENCODING and NOENCODING do not exist; every pattern is UTF-8 (ADR 0069). The option bits are read with bit_and (ADR 0003)."
+  link: docs/ruby/encodings.md
+core/regexp/quote_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding and broken-string rows stay upstream; every string is UTF-8 (ADR 0069)."
+  link: docs/ruby/encodings.md
+core/regexp/source_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding rows stay upstream; %r takes only the family's delimiters, so the non-meta terminator rows have no spelling."
+  link: docs/ruby/regex.md
+core/regexp/timeout_spec.rb:
+  status: skipped
+  reason: "There is no Regexp.timeout; a pattern that never returns is the engine's business."
+  link: https://github.com/portlandlang/portland/issues/212
+core/regexp/to_s_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_planned
+  reason: "A single leading group's options fold into the wrapper in Ruby's to_s; here the group is written as it is."
+  link: docs/ruby/regex.md
+core/regexp/try_convert_spec.rb:
+  status: skipped
+  reason: "There is no to_regexp protocol; a value is a pattern or it is not."
+  link: https://github.com/portlandlang/portland/issues/155
+core/regexp/union_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The encoding rows stay upstream; every string and pattern is UTF-8 (ADR 0069)."
+  link: docs/ruby/encodings.md
 
 # — core/string —
 
@@ -4037,14 +4276,62 @@ language/redo_spec.rb:
   status: skipped
   reason: "redo refuses by design; a loop that tries again is written as one."
   link: docs/ruby/removed-syntax.md
-language/regexp/:
+language/regexp/anchors_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The $~ and $1 rows stay upstream; the match globals are gone, and a match is bound and read. The subjects spelled with \\0 stay upstream too; Portland's strings do not escape it."
+  link: docs/ruby/removed-syntax.md
+language/regexp/back-references_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The $~ and $1 rows stay upstream; the match globals are gone, and a match is bound and read. The thread row has no Thread."
+  link: docs/ruby/removed-syntax.md
+language/regexp/character_classes_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_planned
+  reason: "The common classes and POSIX brackets port; the long property-by-property walk waits for a pull."
+  link: docs/ruby/regex.md
+language/regexp/empty_checks_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_planned
+  reason: "A selection of the empty-iteration rows port; the rest wait for a pull."
+  link: docs/ruby/regex.md
+language/regexp/encoding_spec.rb:
   status: skipped
-  reason: "Regex literals wait on the regex decision (#74)."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
+  link: docs/ruby/encodings.md
+language/regexp/escapes_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The file is binary-encoded upstream; the rows a UTF-8 source reads the same port, the eval-driven syntax errors refuse (which a spec cannot assert), and the subjects spelled with \\v, \\f, \\a, and \\e stay upstream."
+  link: docs/ruby/regex.md
+language/regexp/grouping_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The eval-driven syntax error rows refuse, which a spec cannot assert."
+  link: docs/ruby/regex.md
+language/regexp/interpolation_spec.rb:
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The to_s-object, o-flag, encoding, and RegexpError rows stay upstream; the o flag refuses by name and a bad pattern refuses."
+  link: docs/ruby/regex.md
+language/regexp/modifiers_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The o flag refuses by name, and (?a), (?d), (?u), and the eval-driven syntax errors stay upstream."
+  link: docs/ruby/regex.md
+language/regexp/repetition_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
+  status: partial_intentional
+  reason: "The rows that complain under eval stay upstream; a nested repeat is read as Ruby reads it."
+  link: docs/ruby/regex.md
+language/regexp/subexpression_call_spec.rb:
+  pdx: [spec/regex/pattern_spec.pdx]
 language/regexp_spec.rb:
-  status: skipped
-  reason: "Regex literals wait on the regex decision (#74)."
-  link: https://github.com/portlandlang/portland/issues/74
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "The $_ conditional, frozen?, caching, and syntax-error rows stay upstream; %r takes the family's delimiters only, so the other delimiter rows have no spelling."
+  link: docs/ruby/regex.md
 language/source_encoding_spec.rb:
   status: skipped
   reason: "Source is UTF-8 with ASCII outside strings and comments (#139); there is no encoding comment and no BOM handling to specify."
