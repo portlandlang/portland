@@ -4,8 +4,9 @@
 //! over characters does not need.
 
 use super::ast::{AnchorKind, EmptyInfo, EncloseKind, Node, QuantifierNode};
-use super::casefold;
+use super::cache;
 use super::error::RegexError;
+use super::length;
 use super::setup::Prepared;
 
 /// One instruction; addresses are indexes into `Program::ops`.
@@ -131,6 +132,9 @@ pub struct Program {
     /// missing any one of them is answered without a single attempt
     /// (Onigmo's exact-middle search, in its cheapest form).
     pub required: Vec<String>,
+    /// The instructions the match cache memoizes, when it can cover the
+    /// program.
+    pub cache: Option<cache::CacheOpcodes>,
 }
 
 struct Compiler {
@@ -157,7 +161,7 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         bt_mem_start: prepared.bt_mem_start.clone(),
         bt_mem_end: prepared.bt_mem_end.clone(),
     };
-    compiler.tree(&prepared.root, false)?;
+    compiler.tree(&prepared.root)?;
     compiler.emit(Op::End);
     for (index, group) in std::mem::take(&mut compiler.pending_calls) {
         let entry = compiler
@@ -177,6 +181,7 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
     required_literals(&prepared.root, &mut required);
     required.sort_by_key(|literal| std::cmp::Reverse(literal.len()));
     required.dedup();
+    let cache = cache::collect(&compiler.ops, &compiler.repeat_ranges);
     Ok(Program {
         ops: compiler.ops,
         repeat_ranges: compiler.repeat_ranges,
@@ -186,6 +191,7 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         prefix,
         head_bytes,
         required,
+        cache,
     })
 }
 
@@ -194,7 +200,9 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
 /// quantifiers that run at least once.
 fn required_literals(node: &Node, found: &mut Vec<String>) {
     match node {
-        Node::Str { chars, ignore_case } if !*ignore_case && !chars.is_empty() => {
+        Node::Str {
+            chars, ignore_case, ..
+        } if !*ignore_case && !chars.is_empty() => {
             found.push(chars.iter().collect());
         }
         Node::List(parts) => {
@@ -238,7 +246,9 @@ fn head_bytes(node: &Node) -> Option<([bool; 256], bool)> {
             | AnchorKind::NotWordBound
             | AnchorKind::Keep => Some((set, true)),
         },
-        Node::Str { chars, ignore_case } => {
+        Node::Str {
+            chars, ignore_case, ..
+        } => {
             let Some(first) = chars.first() else {
                 return Some((set, true));
             };
@@ -357,9 +367,9 @@ fn head_info(node: &Node) -> (bool, Option<String>) {
             None => (false, None),
         },
         Node::Anchor(anchor) if anchor.kind == AnchorKind::BeginBuf => (true, None),
-        Node::Str { chars, ignore_case } if !*ignore_case && !chars.is_empty() => {
-            (false, Some(chars.iter().collect()))
-        }
+        Node::Str {
+            chars, ignore_case, ..
+        } if !*ignore_case && !chars.is_empty() => (false, Some(chars.iter().collect())),
         _ => (false, None),
     }
 }
@@ -379,12 +389,12 @@ impl Compiler {
     }
 
     /// `compile_tree`.
-    fn tree(&mut self, node: &Node, in_lookbehind: bool) -> Result<(), RegexError> {
+    fn tree(&mut self, node: &Node) -> Result<(), RegexError> {
         match node {
             Node::Empty => {}
             Node::List(parts) => {
                 for part in parts {
-                    self.tree(part, in_lookbehind)?;
+                    self.tree(part)?;
                 }
             }
             Node::Alt(branches) => {
@@ -396,7 +406,7 @@ impl Compiler {
                     } else {
                         Some(self.emit(Op::Push(0)))
                     };
-                    self.tree(branch, in_lookbehind)?;
+                    self.tree(branch)?;
                     if let Some(push) = push {
                         jumps.push(self.emit(Op::Jump(0)));
                         let next = self.here();
@@ -408,9 +418,14 @@ impl Compiler {
                     self.patch(jump, Op::Jump(end));
                 }
             }
-            Node::Str { chars, ignore_case } => {
+            Node::Str {
+                chars, ignore_case, ..
+            } => {
                 if *ignore_case {
-                    self.case_fold_string(chars, in_lookbehind);
+                    // Already its full fold, from setup's expansion.
+                    self.emit(Op::ExactIc(
+                        chars.iter().map(|character| *character as u32).collect(),
+                    ));
                 } else {
                     self.emit(Op::Exact(chars.iter().collect()));
                 }
@@ -438,7 +453,7 @@ impl Compiler {
             Node::GraphemeCluster => {
                 self.emit(Op::GraphemeCluster);
             }
-            Node::Quantifier(quantifier) => self.quantifier(quantifier, in_lookbehind)?,
+            Node::Quantifier(quantifier) => self.quantifier(quantifier)?,
             Node::Enclose(enclose) => match enclose.kind {
                 EncloseKind::Memory { regnum, .. } => {
                     let mut after_jump = None;
@@ -453,7 +468,7 @@ impl Compiler {
                         mem: regnum,
                         push: self.bt_mem_start[regnum],
                     });
-                    self.tree(&enclose.target, in_lookbehind)?;
+                    self.tree(&enclose.target)?;
                     self.emit(Op::MemEnd {
                         mem: regnum,
                         push: self.bt_mem_end[regnum],
@@ -467,7 +482,7 @@ impl Compiler {
                 }
                 EncloseKind::StopBacktrack => {
                     self.emit(Op::PushStopBt);
-                    self.tree(&enclose.target, in_lookbehind)?;
+                    self.tree(&enclose.target)?;
                     self.emit(Op::PopStopBt);
                 }
                 EncloseKind::Condition { regnum, .. } => {
@@ -478,7 +493,7 @@ impl Compiler {
                         mem: regnum,
                         addr: 0,
                     });
-                    self.tree(&branches[0], in_lookbehind)?;
+                    self.tree(&branches[0])?;
                     let jump = self.emit(Op::Jump(0));
                     let no_start = self.here();
                     self.patch(
@@ -489,16 +504,16 @@ impl Compiler {
                         },
                     );
                     if let Some(no) = branches.get(1) {
-                        self.tree(no, in_lookbehind)?;
+                        self.tree(no)?;
                     }
                     let end = self.here();
                     self.patch(jump, Op::Jump(end));
                 }
-                EncloseKind::Option => self.tree(&enclose.target, in_lookbehind)?,
+                EncloseKind::Option => self.tree(&enclose.target)?,
                 EncloseKind::Absent => {
                     self.emit(Op::PushAbsentPos);
                     let absent = self.emit(Op::Absent(0));
-                    self.tree(&enclose.target, in_lookbehind)?;
+                    self.tree(&enclose.target)?;
                     self.emit(Op::AbsentEnd);
                     let after = self.here();
                     self.patch(absent, Op::Absent(after));
@@ -538,26 +553,26 @@ impl Compiler {
                 }
                 AnchorKind::PrecRead => {
                     self.emit(Op::PushPos);
-                    self.tree(anchor.target.as_ref().expect("a body"), in_lookbehind)?;
+                    self.tree(anchor.target.as_ref().expect("a body"))?;
                     self.emit(Op::PopPos);
                 }
                 AnchorKind::PrecReadNot => {
                     let push = self.emit(Op::PushPosNot(0));
-                    self.tree(anchor.target.as_ref().expect("a body"), in_lookbehind)?;
+                    self.tree(anchor.target.as_ref().expect("a body"))?;
                     self.emit(Op::FailPos);
                     let after = self.here();
                     self.patch(push, Op::PushPosNot(after));
                 }
                 AnchorKind::LookBehind => {
                     self.emit(Op::LookBehind(anchor.char_len));
-                    self.tree(anchor.target.as_ref().expect("a body"), true)?;
+                    self.tree(anchor.target.as_ref().expect("a body"))?;
                 }
                 AnchorKind::LookBehindNot => {
                     let push = self.emit(Op::PushLookBehindNot {
                         addr: 0,
                         len: anchor.char_len,
                     });
-                    self.tree(anchor.target.as_ref().expect("a body"), true)?;
+                    self.tree(anchor.target.as_ref().expect("a body"))?;
                     self.emit(Op::FailLookBehindNot);
                     let after = self.here();
                     self.patch(
@@ -597,79 +612,98 @@ impl Compiler {
     }
 
     /// `compile_tree_empty_check`.
-    fn body_with_empty_check(
-        &mut self,
-        body: &Node,
-        empty: EmptyInfo,
-        in_lookbehind: bool,
-    ) -> Result<(), RegexError> {
+    fn body_with_empty_check(&mut self, body: &Node, empty: EmptyInfo) -> Result<(), RegexError> {
         if empty == EmptyInfo::Never {
-            return self.tree(body, in_lookbehind);
+            return self.tree(body);
         }
         let id = self.num_null_check;
         self.num_null_check += 1;
         self.emit(Op::NullCheckStart(id));
-        self.tree(body, in_lookbehind)?;
+        self.tree(body)?;
         self.emit(Op::NullCheckEnd { id, kind: empty });
         Ok(())
     }
 
-    /// `compile_quantifier_node`.
-    fn quantifier(
-        &mut self,
-        quantifier: &QuantifierNode,
-        in_lookbehind: bool,
-    ) -> Result<(), RegexError> {
+    /// `compile_quantifier_node`: the shapes Onigmo gives a quantifier,
+    /// chosen by the body's size in Onigmo's bytes. A short body is
+    /// unrolled, `a{2,4}` into `aa` and two nested pushes over `a`, and
+    /// `a{2,}` into `aa` and a loop; a long one counts in a repeat.
+    fn quantifier(&mut self, quantifier: &QuantifierNode) -> Result<(), RegexError> {
         let target = quantifier.target.as_ref();
         let infinite = quantifier.upper.is_none();
-        if infinite && quantifier.lower <= 1 {
-            for _ in 0..quantifier.lower {
-                self.tree(target, in_lookbehind)?;
-            }
+        let lower = quantifier.lower;
+        let tlen = length::tree_length(target);
+        if infinite && (lower <= 1 || length::is_expand_limit_ok(tlen, lower)) {
+            // A body too long to write out once is entered by a jump into
+            // the loop instead.
+            let enter = if lower == 1 && tlen > length::QUANTIFIER_EXPAND_LIMIT_SIZE {
+                Some(self.emit(Op::Jump(0)))
+            } else {
+                for _ in 0..lower {
+                    self.tree(target)?;
+                }
+                None
+            };
             if quantifier.greedy {
                 let push = self.emit(Op::Push(0));
-                self.body_with_empty_check(target, quantifier.empty, in_lookbehind)?;
+                let body = self.here();
+                self.body_with_empty_check(target, quantifier.empty)?;
                 self.emit(Op::Jump(push));
                 let after = self.here();
                 self.patch(push, Op::Push(after));
+                if let Some(enter) = enter {
+                    self.patch(enter, Op::Jump(body));
+                }
             } else {
                 let jump = self.emit(Op::Jump(0));
                 let body = self.here();
-                self.body_with_empty_check(target, quantifier.empty, in_lookbehind)?;
+                self.body_with_empty_check(target, quantifier.empty)?;
                 let push = self.here();
                 self.emit(Op::Push(body));
                 self.patch(jump, Op::Jump(push));
+                if let Some(enter) = enter {
+                    self.patch(enter, Op::Jump(body));
+                }
             }
             return Ok(());
         }
-        if quantifier.upper == Some(0) {
-            if quantifier.referred {
-                // A called group inside `{0}`: emitted, never entered here.
-                let jump = self.emit(Op::Jump(0));
-                self.tree(target, in_lookbehind)?;
-                let after = self.here();
-                self.patch(jump, Op::Jump(after));
+        // An open repeat with a lower bound too long to write out counts
+        // in a repeat like a closed one.
+        let upper = quantifier.upper.unwrap_or(u32::MAX);
+        if upper == 0 && quantifier.referred {
+            // A called group inside `{0}`: emitted, never entered here.
+            let jump = self.emit(Op::Jump(0));
+            self.tree(target)?;
+            let after = self.here();
+            self.patch(jump, Op::Jump(after));
+            return Ok(());
+        }
+        if !infinite
+            && quantifier.greedy
+            && (upper == 1 || length::is_expand_limit_ok(tlen + length::SIZE_OP_PUSH, upper))
+        {
+            // Unrolled: the body `lower` times, then once per optional
+            // run behind a push that skips to the end.
+            for _ in 0..lower {
+                self.tree(target)?;
+            }
+            let mut pushes = Vec::new();
+            for _ in lower..upper {
+                pushes.push(self.emit(Op::Push(0)));
+                self.tree(target)?;
+            }
+            let end = self.here();
+            for push in pushes {
+                self.patch(push, Op::Push(end));
             }
             return Ok(());
         }
-        if !infinite && quantifier.greedy && quantifier.upper == Some(1) {
-            for _ in 0..quantifier.lower {
-                self.tree(target, in_lookbehind)?;
-            }
-            if quantifier.lower == 0 {
-                let push = self.emit(Op::Push(0));
-                self.tree(target, in_lookbehind)?;
-                let after = self.here();
-                self.patch(push, Op::Push(after));
-            }
-            return Ok(());
-        }
-        if !quantifier.greedy && quantifier.upper == Some(1) && quantifier.lower == 0 {
+        if !quantifier.greedy && upper == 1 && lower == 0 {
             let push = self.emit(Op::Push(0));
             let jump = self.emit(Op::Jump(0));
             let body = self.here();
             self.patch(push, Op::Push(body));
-            self.tree(target, in_lookbehind)?;
+            self.tree(target)?;
             let after = self.here();
             self.patch(jump, Op::Jump(after));
             return Ok(());
@@ -683,7 +717,7 @@ impl Compiler {
             greedy: quantifier.greedy,
             after: 0,
         });
-        self.body_with_empty_check(target, quantifier.empty, in_lookbehind)?;
+        self.body_with_empty_check(target, quantifier.empty)?;
         self.emit(Op::RepeatInc {
             id,
             greedy: quantifier.greedy,
@@ -699,101 +733,5 @@ impl Compiler {
             },
         );
         Ok(())
-    }
-
-    /// `expand_case_fold_string`: a string under `i` becomes, at each
-    /// position where a fold could be spelled differently, an alternation
-    /// of the spellings, up to eight branches; the rest compares folded.
-    fn case_fold_string(&mut self, chars: &[char], in_lookbehind: bool) {
-        const THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION: usize = 8;
-        let mut alt_num = 1usize;
-        self.case_fold_from(
-            chars,
-            0,
-            &mut alt_num,
-            in_lookbehind,
-            THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION,
-        );
-    }
-
-    fn case_fold_from(
-        &mut self,
-        chars: &[char],
-        start: usize,
-        alt_num: &mut usize,
-        in_lookbehind: bool,
-        threshold: usize,
-    ) {
-        let mut plain: Vec<char> = Vec::new();
-        let mut index = start;
-        while index < chars.len() {
-            let items = casefold::case_fold_items(chars, index);
-            let variable = items
-                .iter()
-                .any(|item| item.char_count != 1 || item.codes.len() != 1);
-            if items.is_empty() || !variable || in_lookbehind {
-                plain.push(chars[index]);
-                index += 1;
-                continue;
-            }
-            *alt_num *= items.len() + 1;
-            if *alt_num > threshold {
-                break;
-            }
-            if !plain.is_empty() {
-                let folded = Self::folded(&std::mem::take(&mut plain));
-                self.emit(Op::ExactIc(folded));
-            }
-            // The character as written, then each other spelling, each
-            // followed by the rest of the string.
-            let mut branches: Vec<(Vec<u32>, usize)> =
-                vec![(Self::folded(&[chars[index]]), index + 1)];
-            for item in &items {
-                if item.char_count == 1 && item.codes.len() == 1 {
-                    continue;
-                }
-                let spelled: Vec<char> = item
-                    .codes
-                    .iter()
-                    .filter_map(|code| char::from_u32(*code))
-                    .collect();
-                branches.push((Self::folded(&spelled), index + item.char_count));
-            }
-            let mut jumps = Vec::new();
-            for (branch_index, (spelled, resume)) in branches.iter().enumerate() {
-                let last = branch_index + 1 == branches.len();
-                let push = if last {
-                    None
-                } else {
-                    Some(self.emit(Op::Push(0)))
-                };
-                self.emit(Op::ExactIc(spelled.clone()));
-                self.case_fold_from(chars, *resume, alt_num, in_lookbehind, threshold);
-                if let Some(push) = push {
-                    jumps.push(self.emit(Op::Jump(0)));
-                    let next = self.here();
-                    self.patch(push, Op::Push(next));
-                }
-            }
-            let end = self.here();
-            for jump in jumps {
-                self.patch(jump, Op::Jump(end));
-            }
-            return;
-        }
-        if index < chars.len() {
-            plain.extend_from_slice(&chars[index..]);
-        }
-        if !plain.is_empty() {
-            self.emit(Op::ExactIc(Self::folded(&plain)));
-        }
-    }
-
-    /// `update_string_node_case_fold`: the full fold of a string.
-    fn folded(chars: &[char]) -> Vec<u32> {
-        chars
-            .iter()
-            .flat_map(|character| super::unicode::fold_sequence(*character as u32))
-            .collect()
     }
 }

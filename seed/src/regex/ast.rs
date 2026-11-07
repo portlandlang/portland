@@ -137,10 +137,15 @@ pub struct CallNode {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Node {
     Empty,
-    /// A literal run; `ignore_case` makes it compare case-folded.
+    /// A literal run; `ignore_case` makes it compare case-folded. Before
+    /// setup that flag means the string is under `i` and waits for the
+    /// case-fold expansion; `folded` (Onigmo's `NSTR_AMBIG`) marks a string
+    /// already holding its full case fold, which compares folded and is
+    /// expanded no further.
     Str {
         chars: Vec<char>,
         ignore_case: bool,
+        folded: bool,
     },
     Class(ClassNode),
     /// `\w` and `\W`, kept apart from classes as Onigmo does.
@@ -165,7 +170,20 @@ pub enum Node {
 
 impl Node {
     pub fn str_from(chars: Vec<char>, ignore_case: bool) -> Node {
-        Node::Str { chars, ignore_case }
+        Node::Str {
+            chars,
+            ignore_case,
+            folded: false,
+        }
+    }
+
+    /// A string holding its full case fold, compared folded.
+    pub fn folded_str(chars: Vec<char>) -> Node {
+        Node::Str {
+            chars,
+            ignore_case: true,
+            folded: true,
+        }
     }
 
     pub fn anchor(kind: AnchorKind) -> Node {

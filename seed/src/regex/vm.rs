@@ -14,6 +14,7 @@
 //! leans on it.
 
 use super::ast::EmptyInfo;
+use super::cache;
 use super::compile::{Op, Program};
 use super::error::{self, RegexError};
 use super::unicode::{self, CTYPE_WORD};
@@ -100,6 +101,61 @@ enum Entry {
         range: i64,
     },
     Absent,
+    /// A match cache point passed on the way down, memoized when
+    /// backtracking pops it: the path from here failed.
+    MatchCachePoint {
+        index: usize,
+        mask: u8,
+    },
+    /// The same inside an atomic group that has since closed: popping it
+    /// memoizes that the group succeeded from here and what followed failed.
+    AtomicMatchCachePoint {
+        index: usize,
+        mask: u8,
+    },
+}
+
+/// `STACK_POP_TIL_*`: which mark a pop runs back to, and what the entries
+/// on the way mean for the match cache and the failure count.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PopTo {
+    /// A negative lookahead whose body matched: the alternatives inside
+    /// count as failures, and the cache points memoize that the body
+    /// succeeds from them.
+    PosNot,
+    LookBehindNot,
+    Absent,
+}
+
+/// `STACK_POS_END` and `STACK_STOP_BT_END`: which mark the alternatives
+/// are voided back to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VoidTo {
+    /// A positive lookahead whose body matched: its cache points memoize
+    /// that the body succeeds from them.
+    Pos,
+    /// An atomic group that matched: its cache points turn atomic.
+    StopBt,
+}
+
+/// What a match cache check at a branching instruction decides.
+enum CacheVerdict {
+    /// Not memoized, or the cache is off: carry on.
+    Proceed,
+    /// Memoized as failing from here.
+    Fail,
+    /// Memoized as succeeding from here inside a lookaround: skip to its end.
+    Jump(usize),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CacheStatus {
+    /// Not yet failed often enough to be worth it.
+    Waiting,
+    /// On: the bit array is live.
+    Enabled,
+    /// The program cannot be cached.
+    Disabled,
 }
 
 impl Entry {
@@ -130,10 +186,20 @@ pub struct Matcher<'a> {
     budget: u64,
     /// `REGEX_TRACE` in the environment prints every step to stderr.
     trace: bool,
+    cache_status: CacheStatus,
+    /// Failures so far, across the attempts of one search: the match cache
+    /// turns on when they reach the text's length times the cache opcodes.
+    num_fails: u64,
+    /// The match cache's bit array, one search long.
+    match_cache: Vec<u8>,
 }
 
 impl<'a> Matcher<'a> {
     pub fn new(program: &'a Program, text: &'a str, budget: u64) -> Matcher<'a> {
+        let cache_status = match &program.cache {
+            Some(cache) if !cache.opcodes.is_empty() => CacheStatus::Waiting,
+            _ => CacheStatus::Disabled,
+        };
         Matcher {
             program,
             text,
@@ -144,6 +210,87 @@ impl<'a> Matcher<'a> {
             repeat_stk: vec![0; program.repeat_ranges.len()],
             budget,
             trace: std::env::var_os("REGEX_TRACE").is_some(),
+            cache_status,
+            num_fails: 0,
+            match_cache: Vec::new(),
+        }
+    }
+
+    /// `INC_NUM_FAILS`: an alternative thrown away by a lookaround or an
+    /// atomic group that matched counts as a failure.
+    fn count_fail(&mut self) {
+        self.num_fails += 1;
+    }
+
+    /// The failure count's threshold check, run after every pop on failure:
+    /// `num_fails` reaching the text's length times the cache opcodes turns
+    /// the match cache on for the rest of the search.
+    fn count_fail_and_check(&mut self) {
+        self.num_fails += 1;
+        if self.cache_status != CacheStatus::Waiting {
+            return;
+        }
+        let cache = self.program.cache.as_ref().expect("a cacheable program");
+        let threshold = self.bytes.len() as u64 * cache.opcodes.len() as u64;
+        if self.num_fails < threshold {
+            return;
+        }
+        self.cache_status = CacheStatus::Enabled;
+        self.match_cache = cache::new_buffer(cache.num_cache_points, self.bytes.len());
+    }
+
+    /// `CHECK_MATCH_CACHE` at the branching instruction `addr`, about to
+    /// try from `s`; `is_inc` says it is a repeat's end whose count was
+    /// just raised.
+    fn check_match_cache(&mut self, addr: usize, s: usize, is_inc: bool) -> CacheVerdict {
+        if self.cache_status != CacheStatus::Enabled {
+            return CacheVerdict::Proceed;
+        }
+        let program = self.program;
+        let cache = program.cache.as_ref().expect("a cacheable program");
+        let count_of = |id: usize| match self.stack[self.repeat_stk[id]] {
+            Entry::Repeat { count, .. } => count,
+            _ => unreachable!("a repeat entry"),
+        };
+        let Some((cache_point, opcode)) =
+            cache.find_cache_point(&program.repeat_ranges, addr, is_inc, count_of)
+        else {
+            return CacheVerdict::Proceed;
+        };
+        let (index, mask) = cache::match_cache_point(cache.num_cache_points, s, cache_point);
+        if cache::is_memoized(&self.match_cache, index, mask) {
+            let extended = cache::is_memoized_extended(&self.match_cache, index, mask);
+            if opcode.lookaround_nesting == 0 {
+                return CacheVerdict::Fail;
+            }
+            if opcode.lookaround_nesting < 0 {
+                if extended {
+                    self.stop_bt_fail();
+                }
+                return CacheVerdict::Fail;
+            }
+            if extended {
+                return CacheVerdict::Jump(opcode.match_addr.expect("a lookaround's end"));
+            }
+            return CacheVerdict::Fail;
+        }
+        self.stack.push(Entry::MatchCachePoint { index, mask });
+        CacheVerdict::Proceed
+    }
+
+    /// `STACK_STOP_BT_FAIL`: an atomic group known to succeed and then
+    /// fail from here is left wholesale, its cache points memoized as such,
+    /// restoring nothing on the way: the cache covers no capture or repeat
+    /// inside one.
+    fn stop_bt_fail(&mut self) {
+        while let Some(entry) = self.stack.pop() {
+            match entry {
+                Entry::StopBt => return,
+                Entry::MatchCachePoint { index, mask } => {
+                    cache::memoize_extended(&mut self.match_cache, index, mask);
+                }
+                _ => {}
+            }
         }
     }
 
@@ -343,6 +490,13 @@ impl<'a> Matcher<'a> {
                     *count -= 1;
                 }
             }
+            // `MEMOIZE_MATCH_CACHE_POINT`: a path backtracked over failed.
+            Entry::MatchCachePoint { index, mask } => {
+                cache::memoize(&mut self.match_cache, index, mask);
+            }
+            Entry::AtomicMatchCachePoint { index, mask } => {
+                cache::memoize_extended(&mut self.match_cache, index, mask);
+            }
             _ => {}
         }
     }
@@ -359,30 +513,69 @@ impl<'a> Matcher<'a> {
         None
     }
 
-    /// `STACK_POP_TIL_*`: pop with restoring until `stop` says the entry
-    /// is the one looked for (inclusive).
-    fn pop_until(&mut self, stop: fn(&Entry) -> bool) {
+    /// `STACK_POP_TIL_*`: pop with restoring until the mark `to` names
+    /// (inclusive).
+    fn pop_until(&mut self, to: PopTo) {
         while let Some(entry) = self.stack.pop() {
-            if stop(&entry) {
+            let is_mark = match to {
+                PopTo::PosNot => matches!(entry, Entry::PosNot { .. }),
+                PopTo::LookBehindNot => matches!(entry, Entry::LookBehindNot { .. }),
+                PopTo::Absent => matches!(entry, Entry::Absent),
+            };
+            if is_mark {
                 return;
+            }
+            if to == PopTo::PosNot {
+                match entry {
+                    Entry::MatchCachePoint { index, mask } => {
+                        cache::memoize_extended(&mut self.match_cache, index, mask);
+                        continue;
+                    }
+                    Entry::AtomicMatchCachePoint { .. } => continue,
+                    _ if entry.resumes() => self.count_fail(),
+                    _ => {}
+                }
             }
             self.restore(entry);
         }
     }
 
     /// `STACK_POS_END` and `STACK_STOP_BT_END`: void the resumable entries
-    /// back to the mark, and the mark itself.
-    fn void_until(&mut self, is_mark: fn(&Entry) -> bool) {
+    /// back to the mark, and the mark itself; each voided alternative
+    /// counts as a failure.
+    fn void_until(&mut self, to: VoidTo) {
         let mut index = self.stack.len();
         while index > 0 {
             index -= 1;
             let entry = self.stack[index];
-            if is_mark(&entry) {
+            let is_mark = match to {
+                VoidTo::Pos => matches!(entry, Entry::Pos { .. }),
+                VoidTo::StopBt => matches!(entry, Entry::StopBt),
+            };
+            if is_mark {
                 self.stack[index] = Entry::Void;
                 return;
             }
-            if entry.resumes() {
-                self.stack[index] = Entry::Void;
+            match entry {
+                _ if entry.resumes() => {
+                    self.count_fail();
+                    self.stack[index] = Entry::Void;
+                }
+                Entry::MatchCachePoint {
+                    index: point_index,
+                    mask,
+                } => match to {
+                    VoidTo::Pos => {
+                        cache::memoize_extended(&mut self.match_cache, point_index, mask);
+                    }
+                    VoidTo::StopBt => {
+                        self.stack[index] = Entry::AtomicMatchCachePoint {
+                            index: point_index,
+                            mask,
+                        };
+                    }
+                },
+                _ => {}
             }
         }
     }
@@ -861,14 +1054,18 @@ impl<'a> Matcher<'a> {
                     }
                 }
                 Op::Jump(addr) => pc = *addr,
-                Op::Push(addr) => {
-                    self.stack.push(Entry::Alt {
-                        pc: *addr,
-                        s,
-                        pkeep,
-                    });
-                    pc += 1;
-                }
+                Op::Push(addr) => match self.check_match_cache(pc, s, false) {
+                    CacheVerdict::Proceed => {
+                        self.stack.push(Entry::Alt {
+                            pc: *addr,
+                            s,
+                            pkeep,
+                        });
+                        pc += 1;
+                    }
+                    CacheVerdict::Fail => fail = true,
+                    CacheVerdict::Jump(addr) => pc = addr,
+                },
                 Op::Pop => {
                     self.stack.pop();
                     pc += 1;
@@ -882,20 +1079,26 @@ impl<'a> Matcher<'a> {
                         count: 0,
                     });
                     if lower == 0 {
-                        if *greedy {
-                            self.stack.push(Entry::Alt {
-                                pc: *after,
-                                s,
-                                pkeep,
-                            });
-                            pc += 1;
-                        } else {
-                            self.stack.push(Entry::Alt {
-                                pc: pc + 1,
-                                s,
-                                pkeep,
-                            });
-                            pc = *after;
+                        match self.check_match_cache(pc, s, false) {
+                            CacheVerdict::Proceed => {
+                                if *greedy {
+                                    self.stack.push(Entry::Alt {
+                                        pc: *after,
+                                        s,
+                                        pkeep,
+                                    });
+                                    pc += 1;
+                                } else {
+                                    self.stack.push(Entry::Alt {
+                                        pc: pc + 1,
+                                        s,
+                                        pkeep,
+                                    });
+                                    pc = *after;
+                                }
+                            }
+                            CacheVerdict::Fail => fail = true,
+                            CacheVerdict::Jump(addr) => pc = addr,
                         }
                     } else {
                         pc += 1;
@@ -925,26 +1128,49 @@ impl<'a> Matcher<'a> {
                     if *greedy {
                         if at_upper {
                             pc += 1;
+                            self.stack.push(Entry::RepeatInc { index });
                         } else if count >= lower {
-                            self.stack.push(Entry::Alt {
-                                pc: pc + 1,
-                                s,
-                                pkeep,
-                            });
-                            pc = body_pc;
+                            match self.check_match_cache(pc, s, true) {
+                                CacheVerdict::Proceed => {
+                                    self.stack.push(Entry::Alt {
+                                        pc: pc + 1,
+                                        s,
+                                        pkeep,
+                                    });
+                                    pc = body_pc;
+                                    self.stack.push(Entry::RepeatInc { index });
+                                }
+                                verdict => {
+                                    // `MATCH_CACHE_HIT`: the count goes
+                                    // back, since no entry will restore it.
+                                    if let Entry::Repeat { count, .. } = &mut self.stack[index] {
+                                        *count -= 1;
+                                    }
+                                    match verdict {
+                                        CacheVerdict::Jump(addr) => pc = addr,
+                                        _ => fail = true,
+                                    }
+                                }
+                            }
                         } else {
                             pc = body_pc;
+                            self.stack.push(Entry::RepeatInc { index });
                         }
-                        self.stack.push(Entry::RepeatInc { index });
                     } else if upper.is_none_or(|upper| count < upper) {
                         if count >= lower {
                             self.stack.push(Entry::RepeatInc { index });
-                            self.stack.push(Entry::Alt {
-                                pc: body_pc,
-                                s,
-                                pkeep,
-                            });
-                            pc += 1;
+                            match self.check_match_cache(pc, s, true) {
+                                CacheVerdict::Proceed => {
+                                    self.stack.push(Entry::Alt {
+                                        pc: body_pc,
+                                        s,
+                                        pkeep,
+                                    });
+                                    pc += 1;
+                                }
+                                CacheVerdict::Fail => fail = true,
+                                CacheVerdict::Jump(addr) => pc = addr,
+                            }
                         } else {
                             pc = body_pc;
                             self.stack.push(Entry::RepeatInc { index });
@@ -968,7 +1194,7 @@ impl<'a> Matcher<'a> {
                             break;
                         }
                     }
-                    self.void_until(|entry| matches!(entry, Entry::Pos { .. }));
+                    self.void_until(VoidTo::Pos);
                     s = saved;
                     pc += 1;
                 }
@@ -981,7 +1207,7 @@ impl<'a> Matcher<'a> {
                     pc += 1;
                 }
                 Op::FailPos => {
-                    self.pop_until(|entry| matches!(entry, Entry::PosNot { .. }));
+                    self.pop_until(PopTo::PosNot);
                     fail = true;
                 }
                 Op::PushStopBt => {
@@ -989,7 +1215,7 @@ impl<'a> Matcher<'a> {
                     pc += 1;
                 }
                 Op::PopStopBt => {
-                    self.void_until(|entry| matches!(entry, Entry::StopBt));
+                    self.void_until(VoidTo::StopBt);
                     pc += 1;
                 }
                 Op::LookBehind(len) => match self.step_back(s, *len) {
@@ -1014,7 +1240,7 @@ impl<'a> Matcher<'a> {
                     }
                 },
                 Op::FailLookBehindNot => {
-                    self.pop_until(|entry| matches!(entry, Entry::LookBehindNot { .. }));
+                    self.pop_until(PopTo::LookBehindNot);
                     fail = true;
                 }
                 Op::PushAbsentPos => {
@@ -1075,7 +1301,7 @@ impl<'a> Matcher<'a> {
                     if sprev < range {
                         range = sprev;
                     }
-                    self.pop_until(|entry| matches!(entry, Entry::Absent));
+                    self.pop_until(PopTo::Absent);
                     fail = true;
                 }
                 Op::Call(addr) => {
@@ -1119,6 +1345,7 @@ impl<'a> Matcher<'a> {
                         pc = resume_pc;
                         s = resume_s;
                         pkeep = resume_keep;
+                        self.count_fail_and_check();
                     }
                     _ => return Ok(None),
                 }

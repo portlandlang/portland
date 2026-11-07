@@ -1898,7 +1898,9 @@ impl<'a> Parser<'a> {
             return Some(target);
         }
         match target {
-            Node::Str { chars, ignore_case } if !group && chars.len() > 1 => {
+            Node::Str {
+                chars, ignore_case, ..
+            } if !group && chars.len() > 1 => {
                 // `abc+` quantifies the last character only.
                 let mut head = chars;
                 let last = head.pop().expect("more than one");

@@ -10,14 +10,18 @@
 //! rewrites `\u`, `\x`, and the control and meta escapes before the engine
 //! sees the pattern; `parser` is `regparse.c`, pattern to tree; `setup` and
 //! `compile` are `regcomp.c`, tree to a program; `vm` is `regexec.c`, a
-//! backtracking matcher over the program; `unicode` and `casefold` are
-//! `enc/unicode.c` over tables generated from Ruby's own copies.
+//! backtracking matcher over the program, and `cache` its match cache, the
+//! memoization that keeps Ruby's backtracking linear; `unicode` and
+//! `casefold` are `enc/unicode.c` over tables generated from Ruby's own
+//! copies.
 
 pub mod ast;
+pub mod cache;
 pub mod casefold;
 pub mod cclass;
 pub mod compile;
 pub mod error;
+pub mod length;
 pub mod parser;
 pub mod preprocess;
 pub mod setup;

@@ -6,6 +6,7 @@
 //! count; and each quantifier learns whether its body can match empty.
 
 use super::ast::{AnchorKind, EmptyInfo, EncloseKind, Node, QuantifierNode};
+use super::casefold;
 use super::error::{self, RegexError};
 use super::parser::Parsed;
 
@@ -662,7 +663,9 @@ enum CharLength {
 fn char_length(node: &Node, state: &SetupState, level: usize) -> CharLength {
     match node {
         Node::Empty | Node::Anchor(_) => CharLength::Fixed(0),
-        Node::Str { chars, ignore_case } => {
+        Node::Str {
+            chars, ignore_case, ..
+        } => {
             // A string under `i` is folded in place before its length is
             // read, so `ŉ` counts as its fold `ʼn`, two characters.
             if *ignore_case {
@@ -941,9 +944,18 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
             }
             _ => {}
         },
+        // A string under `i` becomes its case-fold expansion; one already
+        // folded (a class's multi-character spelling) stays.
+        Node::Str {
+            chars,
+            ignore_case: true,
+            folded: false,
+        } => {
+            let chars = std::mem::take(chars);
+            *node = casefold::expand_string(&chars, context.in_lookbehind);
+        }
         _ => {}
     }
-    let _ = context.in_lookbehind;
     Ok(())
 }
 
@@ -1042,17 +1054,22 @@ fn holds_called_group(node: &Node) -> bool {
 }
 
 /// The string expansion of `setup_tree`: `(?:abc){3,5}` becomes
-/// `abcabcabc(?:abc){0,2}`, up to a hundred characters. Answers the node
-/// that replaces the quantifier, if any.
+/// `abcabcabc(?:abc){0,2}`, up to a hundred bytes. Answers the node that
+/// replaces the quantifier, if any.
 fn expand_repeated_string(quantifier: &QuantifierNode) -> Option<Node> {
     const EXPAND_STRING_MAX_LENGTH: usize = 100;
-    let Node::Str { chars, ignore_case } = quantifier.target.as_ref() else {
+    let Node::Str {
+        chars,
+        ignore_case,
+        folded,
+    } = quantifier.target.as_ref()
+    else {
         return None;
     };
     if quantifier.lower <= 1 {
         return None;
     }
-    let length = chars.len();
+    let length: usize = chars.iter().map(|character| character.len_utf8()).sum();
     let mut repeated = chars.clone();
     let mut copies = 1u32;
     while copies < quantifier.lower && (copies as usize + 1) * length <= EXPAND_STRING_MAX_LENGTH {
@@ -1062,6 +1079,7 @@ fn expand_repeated_string(quantifier: &QuantifierNode) -> Option<Node> {
     let repeated = Node::Str {
         chars: repeated,
         ignore_case: *ignore_case,
+        folded: *folded,
     };
     let more = match quantifier.upper {
         None => true,
