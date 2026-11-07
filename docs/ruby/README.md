@@ -51,10 +51,11 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Ordering](ordering.md) — `<=>` and `include Comparable` migrate unchanged; strings order by canonical text, and `Comparable` is a builtin trait that needs your `<=>` to exist.
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
-- [The `%` literal family](percent-literals.md) — `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.
+- [The `%` literal family](percent-literals.md) — `%w[]`, `%i[]`, and `%r{}` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` is decided and waits on the regex build.
 - [Randomness](randomness.md) — `rand`, `srand`, `Random.new(seed)`, `sample`, and `shuffle` are Ruby's, and the generator is Ruby's step for step, so a seeded sequence is the same number in both languages.
 - [Ranges](ranges.md) — Slices are collections, never maybes; range patterns prove exhaustiveness; endless ranges close loudly.
 - [Redefinition](redefinition.md) — A top-level name is defined once — a second `def`, `struct`, `enum`, `trait`, `alias`, or constant of the same name refuses, and a builtin's name is never taken.
+- [Regex](regex.md) — Ruby's literals and Onigmo's pattern language, whole; `=~` and `match` both answer a `MatchData` or nil, the match globals (`$~`, `$1`) refuse, positions count graphemes, and replacement strings keep Ruby's `\1` escapes.
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
 - [`require` and `require_relative`](requires.md) — `require "name"` searches a load path for `name.pdx` or `name.rb`, and `require_relative` resolves against the requiring file; both take a string literal at a file's top level, since a program is its require closure, known at build.
 - [Sets](sets.md) — `Set` is a builtin immutable value, as it is core in Ruby 4 — `Set.new`, `Set[...]`, and `to_set` build one, `add` and `delete` answer a new one, and the query and algebra surface is Ruby's under its word names.

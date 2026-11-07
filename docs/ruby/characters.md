@@ -12,6 +12,8 @@
 
 **A character is what a human sees** — an extended grapheme cluster. `length`, `chars`, `reverse`, `slice`, and `index` positions all count them: one flag is one character, `é` is one character however encoded, and `reverse` cannot shred an emoji. This is Swift's and Elixir's model, chosen over Ruby's for the same reason both of them chose it: the scalar answer is one no human ever wanted, and on Apple platforms specifically, disagreeing with Swift about what a character is buys a bug class at every OS boundary.
 
+**A match's positions count them too** ([ADR 0086](../adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)): `begin`, `pre_match`, and `index(/x/)` answer grapheme indices, translated from the engine's bytes, so a position a match answers is one `slice` takes. Inside a pattern the engine keeps Onigmo's codepoints — `.` matches one scalar, `\X` one grapheme — see [regex.md](regex.md).
+
 **Equality is canonical** — `==` asks "same text?", not "same bytes?", so the two spellings of `é` are equal, and equal everywhere a string can hide: array membership, hash keys, `uniq`, pattern-match literals. Storage is never normalized; a file round-trip is byte-faithful.
 
 **Casing is Ruby's own** — full Unicode, locale-independent, `"ß".upcase == "SS"` — a non-difference, ratified.

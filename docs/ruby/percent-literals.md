@@ -1,6 +1,6 @@
 # The `%` literal family
 
-**Summary:** `%w[]` and `%i[]` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` waits on the regex decision.
+**Summary:** `%w[]`, `%i[]`, and `%r{}` survive, with `[]`, `()`, or `{}`; `%q`, `%Q`, `%()`, `%s`, `%W`, `%I`, and `%x` refuse by name; `%r` is decided and waits on the regex build.
 
 **Status:** decided member by member ([ADR 0051](../adr/0051-2026-09-24-the-percent-literal-family.md), 2026-09-24), built in both oracles the same day; `%w[]`'s content rules are [ADR 0030](../adr/0030-2026-07-27-word-array-contents.md)'s.
 
@@ -48,7 +48,7 @@ Delimiters: `()` 41.5% of sites, `[]` 29.0%, `{}` 23.4%, everything else under 2
 | `%x(ls)` | `'%x(' is not a Portland literal — there is no shell execution` | nothing yet — whether Portland spawns a process at all is [#179](https://github.com/portlandlang/portland/issues/179); the wording overstates the ruling and changes when that decides |
 | `%w|a b|` | `'%w|' is not a Portland delimiter — write %w[], %w(), or %w{}` | `%w[a b]` |
 
-**Deferred:** `%r{...}` refuses with `'%r{' is not a Portland literal — there is no regex yet` until [#74](https://github.com/portlandlang/portland/issues/74) decides regex.
+**`%r{...}` survives** ([ADR 0086](../adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md), 2026-11-07): a regex literal with the family's delimiters, for a pattern that holds slashes — see [regex.md](regex.md). Until the build it still refuses with `'%r{' is not a Portland literal — there is no regex yet`, naming [#212](https://github.com/portlandlang/portland/issues/212).
 
 A bare `%` is read as the string form only where Ruby reads it so — after a space and glued to its opener, `a %(b)` — so `a % (b)` and `a%(b)` are modulo, as they always were.
 

@@ -84,7 +84,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; jobs 1–3 are decided and built ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md) closed the ledger); job 4, stateful objects, was parked until `together` had semantics — it has ([ADR 0029](docs/adr/0029-2026-07-27-together-semantics.md)) — and now waits to be pulled for
 - Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
-- [#74](https://github.com/portlandlang/portland/issues/74) — regex: literals, engine, and what a match answers
+- ✅ [#74](https://github.com/portlandlang/portland/issues/74) — regex: Ruby's literals, Onigmo's pattern language, a match is a `MatchData` or nil, positions count graphemes, replacement strings keep Ruby's escapes ([ADR 0086](docs/adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)); the engine is evaluated in [#212](https://github.com/portlandlang/portland/issues/212), and nothing is built yet
 - ✅ [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: a character is a grapheme, equality is canonical, casing is full Unicode ([ADR 0038](docs/adr/0038-2026-08-19-what-a-character-is.md)); canonical _search_ is the recorded follow-on
 - [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>`, Comparable-as-a-trait, user types sorting
 - [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
