@@ -16,6 +16,12 @@ pub struct Prepared {
     pub num_mem: usize,
     pub names: Vec<(String, Vec<usize>)>,
     pub num_call: usize,
+    /// Per group, whether its start is kept on the stack and restored by
+    /// backtracking; otherwise it is assigned in place and a failed path's
+    /// value survives, which Ruby's answers depend on.
+    pub bt_mem_start: Vec<bool>,
+    /// Per group, whether its end is kept on the stack.
+    pub bt_mem_end: Vec<bool>,
 }
 
 pub fn setup(parsed: Parsed) -> Result<Prepared, RegexError> {
@@ -55,15 +61,21 @@ pub fn setup(parsed: Parsed) -> Result<Prepared, RegexError> {
         }
     }
 
+    let mut bt_mem_start = vec![false; num_mem + 1];
+    let mut bt_mem_end = vec![false; num_mem + 1];
     {
         let mut state = SetupState {
             num_mem,
             num_named,
             names: &names,
             groups: Vec::new(),
+            bt_mem_start: vec![false; num_mem + 1],
+            bt_mem_end: vec![false; num_mem + 1],
         };
         if num_call > 0 {
             resolve_calls(&mut root, &mut state)?;
+            // A called group keeps its start on the stack.
+            mark_called_starts(&root, &mut state.bt_mem_start);
             // The bodies kept for reachability must hold the resolved calls.
             let mut resolved = Vec::new();
             collect_groups(&root, &mut resolved);
@@ -79,13 +91,44 @@ pub fn setup(parsed: Parsed) -> Result<Prepared, RegexError> {
             infinite_recursion_check(&root, &state)?;
         }
         setup_tree(&mut root, &mut state, Context::default())?;
+        bt_mem_start = state.bt_mem_start;
+        bt_mem_end = state.bt_mem_end;
     }
     Ok(Prepared {
         root,
         num_mem,
         names,
         num_call,
+        bt_mem_start,
+        bt_mem_end,
     })
+}
+
+/// `setup_subexp_call`'s side effect: every called group keeps its start
+/// on the stack.
+fn mark_called_starts(node: &Node, bt_mem_start: &mut [bool]) {
+    match node {
+        Node::List(parts) | Node::Alt(parts) => {
+            for part in parts {
+                mark_called_starts(part, bt_mem_start);
+            }
+        }
+        Node::Quantifier(quantifier) => mark_called_starts(&quantifier.target, bt_mem_start),
+        Node::Enclose(enclose) => {
+            if let EncloseKind::Memory { regnum, .. } = enclose.kind
+                && enclose.call_target
+            {
+                bt_mem_start[regnum] = true;
+            }
+            mark_called_starts(&enclose.target, bt_mem_start);
+        }
+        Node::Anchor(anchor) => {
+            if let Some(target) = anchor.target.as_ref() {
+                mark_called_starts(target, bt_mem_start);
+            }
+        }
+        _ => {}
+    }
 }
 
 // --- unnamed groups ----------------------------------------------------
@@ -213,6 +256,10 @@ struct SetupState<'a> {
     /// Group number to a clone of the group's body, for length and
     /// recursion questions about calls.
     groups: Vec<(usize, Node)>,
+    /// Per group, whether its start is kept on the stack (`bt_mem_start`).
+    bt_mem_start: Vec<bool>,
+    /// Per group, whether its end is kept on the stack (`bt_mem_end`).
+    bt_mem_end: Vec<bool>,
 }
 
 impl SetupState<'_> {
@@ -694,6 +741,7 @@ fn char_length(node: &Node, state: &SetupState, level: usize) -> CharLength {
             EncloseKind::Memory { .. }
             | EncloseKind::StopBacktrack
             | EncloseKind::Condition { .. } => char_length(&enclose.target, state, level + 1),
+            EncloseKind::Option => char_length(&enclose.target, state, level + 1),
             EncloseKind::Absent => CharLength::Fixed(0),
         },
         Node::BackRef(_) => CharLength::Variable,
@@ -715,20 +763,48 @@ struct Context {
     in_lookbehind: bool,
     /// Inside a group a call can reach again.
     in_recursive: bool,
+    /// Inside a quantifier's body (Onigmo's `IN_REPEAT`).
+    in_repeat: bool,
+    /// Inside an alternation branch (`IN_ALT`).
+    in_alt: bool,
+    /// Inside a negative lookaround (`IN_NOT`).
+    in_not: bool,
+    /// Inside a quantifier whose bounds differ (`IN_VAR_REPEAT`).
+    in_var_repeat: bool,
+    /// Inside a group that is called (`IN_CALL`).
+    in_call: bool,
 }
 
 /// `setup_tree`.
 fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Result<(), RegexError> {
     match node {
-        Node::List(parts) | Node::Alt(parts) => {
+        Node::List(parts) => {
             for part in parts {
                 setup_tree(part, state, context)?;
+            }
+        }
+        Node::Alt(parts) => {
+            for part in parts {
+                setup_tree(
+                    part,
+                    state,
+                    Context {
+                        in_alt: true,
+                        ..context
+                    },
+                )?;
             }
         }
         Node::BackRef(backref) => {
             for group in &backref.groups {
                 if *group > state.num_mem {
                     return Err(RegexError::new(error::INVALID_BACKREF));
+                }
+                // A referred group keeps its start on the stack, and its
+                // end too when the reference carries a recursion level.
+                state.bt_mem_start[*group] = true;
+                if backref.level.is_some() {
+                    state.bt_mem_end[*group] = true;
                 }
             }
         }
@@ -747,7 +823,17 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
             quantifier.empty = info;
             quantifier.referred =
                 quantifier.upper == Some(0) && holds_called_group(&quantifier.target);
-            setup_tree(&mut quantifier.target, state, context)?;
+            quantifier.in_repeat = context.in_repeat;
+            setup_tree(
+                &mut quantifier.target,
+                state,
+                Context {
+                    in_repeat: true,
+                    in_var_repeat: context.in_var_repeat
+                        || Some(quantifier.lower) != quantifier.upper,
+                    ..context
+                },
+            )?;
             if let Some(expanded) = expand_repeated_string(quantifier) {
                 *node = expanded;
             }
@@ -767,7 +853,16 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
                 }
             }
             let mut inner = context;
-            if let EncloseKind::Memory { .. } = enclose.kind {
+            if let EncloseKind::Memory { regnum, .. } = enclose.kind {
+                // A group that backtracking may reach keeps its start on
+                // the stack; the rest assign it directly, and the value
+                // outlives a failed path, as Onigmo's does.
+                if context.in_alt || context.in_not || context.in_var_repeat || context.in_call {
+                    state.bt_mem_start[regnum] = true;
+                }
+                if enclose.call_target {
+                    inner.in_call = true;
+                }
                 // A group inside a recursive group records its end by
                 // recursion level too, so an outer instance wins.
                 if enclose.recursive {
@@ -780,8 +875,16 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
         }
         Node::Anchor(anchor) => match anchor.kind {
             AnchorKind::PrecRead | AnchorKind::PrecReadNot => {
+                let negative = anchor.kind == AnchorKind::PrecReadNot;
                 if let Some(target) = anchor.target.as_mut() {
-                    setup_tree(target, state, context)?;
+                    setup_tree(
+                        target,
+                        state,
+                        Context {
+                            in_not: context.in_not || negative,
+                            ..context
+                        },
+                    )?;
                 }
             }
             AnchorKind::LookBehind | AnchorKind::LookBehindNot => {
@@ -795,6 +898,7 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
                     state,
                     Context {
                         in_lookbehind: true,
+                        in_not: context.in_not || negative,
                         ..context
                     },
                 )?;
@@ -856,6 +960,7 @@ fn allowed_in_lookbehind(node: &Node, negative: bool) -> bool {
             EncloseKind::Memory { .. } => {
                 !negative && allowed_in_lookbehind(&enclose.target, negative)
             }
+            EncloseKind::Option => allowed_in_lookbehind(&enclose.target, negative),
             _ => false,
         },
         Node::Anchor(anchor) => match anchor.kind {

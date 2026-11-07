@@ -3,7 +3,7 @@
 //! is Onigmo's, minus the byte-level specializations a UTF-8-only engine
 //! over characters does not need.
 
-use super::ast::{AnchorKind, CharSet, EmptyInfo, EncloseKind, Node, QuantifierNode};
+use super::ast::{AnchorKind, EmptyInfo, EncloseKind, Node, QuantifierNode};
 use super::casefold;
 use super::error::RegexError;
 use super::setup::Prepared;
@@ -18,8 +18,13 @@ pub enum Op {
     /// The pattern's full case fold; the text is folded a character at a
     /// time and the folded streams must agree.
     ExactIc(Vec<u32>),
+    /// Onigmo's class halves: the bitset for single-byte codes, the ranges
+    /// for the rest. Which half a text character consults, and what a
+    /// multibyte character means to a class with no ranges, follows the
+    /// six `OP_CCLASS*` opcodes.
     Class {
-        set: CharSet,
+        bitset: [u64; 4],
+        mbuf: Option<Vec<(u32, u32)>>,
         not: bool,
     },
     Word {
@@ -42,10 +47,17 @@ pub enum Op {
         ascii: bool,
     },
     Keep,
-    MemStart(usize),
-    /// `rec` finds the matching start by recursion level.
+    /// `push` keeps the start on the stack, restored by backtracking;
+    /// otherwise it is assigned in place (`OP_MEMORY_START`).
+    MemStart {
+        mem: usize,
+        push: bool,
+    },
+    /// `rec` finds the matching start by recursion level; `push` keeps the
+    /// end on the stack.
     MemEnd {
         mem: usize,
+        push: bool,
         rec: bool,
     },
     /// The groups to try, last-defined first.
@@ -118,6 +130,8 @@ struct Compiler {
     call_entries: Vec<(usize, usize)>,
     /// Call instructions waiting for their group's entry address.
     pending_calls: Vec<(usize, usize)>,
+    bt_mem_start: Vec<bool>,
+    bt_mem_end: Vec<bool>,
 }
 
 pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
@@ -128,6 +142,8 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         num_call: prepared.num_call,
         call_entries: Vec::new(),
         pending_calls: Vec::new(),
+        bt_mem_start: prepared.bt_mem_start.clone(),
+        bt_mem_end: prepared.bt_mem_end.clone(),
     };
     compiler.tree(&prepared.root, false)?;
     compiler.emit(Op::End);
@@ -201,7 +217,8 @@ impl Compiler {
             }
             Node::Class(class) => {
                 self.emit(Op::Class {
-                    set: class.set.clone(),
+                    bitset: class.bitset,
+                    mbuf: class.mbuf.clone(),
                     not: class.not,
                 });
             }
@@ -232,10 +249,14 @@ impl Compiler {
                         self.patch(call, Op::Call(entry));
                         self.call_entries.push((regnum, entry));
                     }
-                    self.emit(Op::MemStart(regnum));
+                    self.emit(Op::MemStart {
+                        mem: regnum,
+                        push: self.bt_mem_start[regnum],
+                    });
                     self.tree(&enclose.target, in_lookbehind)?;
                     self.emit(Op::MemEnd {
                         mem: regnum,
+                        push: self.bt_mem_end[regnum],
                         rec: enclose.recursive,
                     });
                     if let Some(jump) = after_jump {
@@ -273,6 +294,7 @@ impl Compiler {
                     let end = self.here();
                     self.patch(jump, Op::Jump(end));
                 }
+                EncloseKind::Option => self.tree(&enclose.target, in_lookbehind)?,
                 EncloseKind::Absent => {
                     self.emit(Op::PushAbsentPos);
                     let absent = self.emit(Op::Absent(0));
@@ -465,7 +487,7 @@ impl Compiler {
         self.emit(Op::RepeatInc {
             id,
             greedy: quantifier.greedy,
-            by_stack: self.num_call > 0,
+            by_stack: self.num_call > 0 || quantifier.in_repeat,
         });
         let after = self.here();
         self.patch(

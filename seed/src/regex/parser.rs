@@ -5,9 +5,9 @@
 //! with the same sentences.
 
 use super::ast::{
-    AnchorKind, AnchorNode, BackRefNode, CallNode, CharSet, ClassNode, EncloseKind, Node,
-    QuantifierNode,
+    AnchorKind, AnchorNode, BackRefNode, CallNode, ClassNode, EncloseKind, Node, QuantifierNode,
 };
+use super::cclass;
 use super::error::{self, RegexError};
 use super::unicode::{self, CTYPE_ASCII, CTYPE_DIGIT, CTYPE_SPACE, CTYPE_WORD, CTYPE_XDIGIT};
 
@@ -1127,20 +1127,89 @@ impl<'a> Parser<'a> {
 
     /// `add_ctype_to_cc`: a builtin type's ranges, negated if asked, and
     /// clipped to ASCII (or, negated, extended over all non-ASCII) when the
-    /// ASCII-range option applies.
-    fn add_ctype_to_set(set: &mut CharSet, ctype: u16, not: bool, ascii_range: bool) {
-        let mut work = CharSet::from_ranges(unicode::ctype_ranges(ctype));
-        if not {
-            work = work.negated();
-        }
+    /// ASCII-range option applies, by Onigmo's own class arithmetic.
+    fn add_ctype_to_cc(class: &mut ClassNode, ctype: u16, not: bool, ascii_range: bool) {
+        let ranges = unicode::ctype_ranges(ctype);
         if ascii_range {
+            let mut work = ClassNode::new();
+            Self::add_ctype_to_cc_by_range(&mut work, not, ranges);
             if not {
-                work.add_range(0x80, super::ast::LAST_CODE_POINT);
+                work.add_code_range(cclass::MBCODE_START, cclass::LAST_CODE_POINT);
             } else {
-                work = work.intersection(&CharSet::from_ranges(&[(0, 0x7f)]));
+                let mut ascii = ClassNode::new();
+                ascii.set_bit_range(0, 0x7f);
+                work.and_with(&ascii);
+            }
+            class.or_with(&work);
+        } else {
+            Self::add_ctype_to_cc_by_range(class, not, ranges);
+        }
+    }
+
+    /// `add_ctype_to_cc_by_range` with UTF-8's single-byte bound: codes
+    /// below 0x80 go to the bitset, the rest to the ranges; negated, the
+    /// gaps are added instead, the last one running to 0x7fffffff.
+    fn add_ctype_to_cc_by_range(class: &mut ClassNode, not: bool, ranges: &[(u32, u32)]) {
+        let sb_out = cclass::MBCODE_START;
+        if !not {
+            let mut index = 0;
+            'single: while index < ranges.len() {
+                let (from, to) = ranges[index];
+                let mut code = from;
+                while code <= to {
+                    if code >= sb_out {
+                        if code > from {
+                            class.add_code_range(code, to);
+                            index += 1;
+                        }
+                        break 'single;
+                    }
+                    class.set_bit(code);
+                    code += 1;
+                }
+                index += 1;
+            }
+            while index < ranges.len() {
+                let (from, to) = ranges[index];
+                class.add_code_range(from, to);
+                index += 1;
+            }
+        } else {
+            let mut prev = 0u32;
+            let mut reached_multibyte = false;
+            for &(from, to) in ranges {
+                let mut code = prev;
+                while code < from {
+                    if code >= sb_out {
+                        reached_multibyte = true;
+                        break;
+                    }
+                    class.set_bit(code);
+                    code += 1;
+                }
+                if reached_multibyte {
+                    break;
+                }
+                prev = to.saturating_add(1);
+            }
+            if !reached_multibyte {
+                let mut code = prev;
+                while code < sb_out {
+                    class.set_bit(code);
+                    code += 1;
+                }
+            }
+            let mut prev = sb_out;
+            for &(from, to) in ranges {
+                if prev < from {
+                    class.add_code_range(prev, from - 1);
+                }
+                prev = to.saturating_add(1);
+            }
+            if prev < 0x7fff_ffff {
+                class.add_code_range(prev, 0x7fff_ffff);
             }
         }
-        *set = set.union(&work);
     }
 
     /// `fetch_char_property_to_ctype`: the name up to `}`.
@@ -1201,13 +1270,13 @@ impl<'a> Parser<'a> {
                     if !(self.chars[after..].starts_with(&[':', ']'])) {
                         return Err(RegexError::new(error::INVALID_POSIX_BRACKET_TYPE));
                     }
-                    Self::add_ctype_to_set(&mut class.set, ctype, not, ascii_range);
+                    Self::add_ctype_to_cc(class, ctype, not, ascii_range);
                     if let Some(twin) = class.ascii_twin.as_mut()
                         && ctype != CTYPE_WORD
                         && ctype != CTYPE_ASCII
                         && !ascii_range
                     {
-                        Self::add_ctype_to_set(&mut twin.set, ctype, not, ascii_range);
+                        Self::add_ctype_to_cc(twin, ctype, not, ascii_range);
                     }
                     self.pos = after + 2;
                     return Ok(true);
@@ -1339,21 +1408,21 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Token::CharType { ctype, not } => {
-                    Self::add_ctype_to_set(&mut class.set, ctype, not, self.option.ascii_range);
+                    Self::add_ctype_to_cc(&mut class, ctype, not, self.option.ascii_range);
                     if let Some(twin) = class.ascii_twin.as_mut()
                         && ctype != CTYPE_WORD
                     {
-                        Self::add_ctype_to_set(&mut twin.set, ctype, not, self.option.ascii_range);
+                        Self::add_ctype_to_cc(twin, ctype, not, self.option.ascii_range);
                     }
                     Self::next_state_class(&mut class, pending, &mut value_type, &mut state)?;
                 }
                 Token::CharProperty { not } => {
                     let ctype = self.fetch_char_property_to_ctype()?;
-                    Self::add_ctype_to_set(&mut class.set, ctype, not, false);
+                    Self::add_ctype_to_cc(&mut class, ctype, not, false);
                     if let Some(twin) = class.ascii_twin.as_mut()
                         && ctype != CTYPE_ASCII
                     {
-                        Self::add_ctype_to_set(&mut twin.set, ctype, not, false);
+                        Self::add_ctype_to_cc(twin, ctype, not, false);
                     }
                     Self::next_state_class(&mut class, pending, &mut value_type, &mut state)?;
                 }
@@ -1490,12 +1559,25 @@ impl<'a> Parser<'a> {
         state: &mut ClassState,
     ) {
         if value_type != ValueType::Class {
-            class.set.add_code(pending);
-            if let Some(twin) = class.ascii_twin.as_mut() {
-                twin.set.add_code(pending);
-            }
+            Self::add_value(class, pending, value_type);
         }
         *state = ClassState::Value;
+    }
+
+    /// One value into the class and its twin: the bitset for a single-byte
+    /// code, the ranges for a code point.
+    fn add_value(class: &mut ClassNode, value: u32, value_type: ValueType) {
+        if value_type == ValueType::SingleByte {
+            class.set_bit(value);
+            if let Some(twin) = class.ascii_twin.as_mut() {
+                twin.set_bit(value);
+            }
+        } else {
+            class.add_code_range(value, value);
+            if let Some(twin) = class.ascii_twin.as_mut() {
+                twin.add_code_range(value, value);
+            }
+        }
     }
 
     /// `next_state_val`.
@@ -1510,10 +1592,7 @@ impl<'a> Parser<'a> {
         match *state {
             ClassState::Value => {
                 if *value_type != ValueType::Class {
-                    class.set.add_code(*pending);
-                    if let Some(twin) = class.ascii_twin.as_mut() {
-                        twin.set.add_code(*pending);
-                    }
+                    Self::add_value(class, *pending, *value_type);
                 }
             }
             ClassState::Range => {
@@ -1521,9 +1600,25 @@ impl<'a> Parser<'a> {
                 if from > value {
                     return Err(RegexError::new(error::EMPTY_RANGE_IN_CHAR_CLASS));
                 }
-                class.set.add_range(from, value);
-                if let Some(twin) = class.ascii_twin.as_mut() {
-                    twin.set.add_range(from, value);
+                if in_type == *value_type && in_type == ValueType::SingleByte {
+                    class.set_bit_range(from, value);
+                    if let Some(twin) = class.ascii_twin.as_mut() {
+                        twin.set_bit_range(from, value);
+                    }
+                } else if in_type == *value_type {
+                    class.add_code_range(from, value);
+                    if let Some(twin) = class.ascii_twin.as_mut() {
+                        twin.add_code_range(from, value);
+                    }
+                } else {
+                    // A range from a single-byte code to a code point lands
+                    // in both halves.
+                    class.set_bit_range(from, value.min(0xff));
+                    class.add_code_range(from, value);
+                    if let Some(twin) = class.ascii_twin.as_mut() {
+                        twin.set_bit_range(from, value.min(0xff));
+                        twin.add_code_range(from, value);
+                    }
                 }
                 *state = ClassState::Complete;
                 *pending = value;
@@ -1549,10 +1644,7 @@ impl<'a> Parser<'a> {
             return Err(RegexError::new(error::CHAR_CLASS_VALUE_AT_END_OF_RANGE));
         }
         if *state == ClassState::Value && *value_type != ValueType::Class {
-            class.set.add_code(pending);
-            if let Some(twin) = class.ascii_twin.as_mut() {
-                twin.set.add_code(pending);
-            }
+            Self::add_value(class, pending, *value_type);
         }
         *state = ClassState::Value;
         *value_type = ValueType::Class;
@@ -1561,53 +1653,24 @@ impl<'a> Parser<'a> {
 
     /// `or_cclass` of a nested class into the one being built.
     fn merge_nested(class: &mut ClassNode, nested: ClassNode) {
-        let nested_set = if nested.not {
-            nested.set.negated()
-        } else {
-            nested.set.clone()
-        };
-        class.set = class.set.union(&nested_set);
+        class.or_with(&nested);
         if let (Some(twin), Some(nested_twin)) =
             (class.ascii_twin.as_mut(), nested.ascii_twin.as_ref())
         {
-            let nested_twin_set = if nested_twin.not {
-                nested_twin.set.negated()
-            } else {
-                nested_twin.set.clone()
-            };
-            twin.set = twin.set.union(&nested_twin_set);
+            twin.or_with(nested_twin);
         }
     }
 
-    /// `and_cclass`: the intersection of two classes being built.
+    /// `and_cclass`: the intersection of two classes being built, the
+    /// left one's negation flag kept as Onigmo keeps it.
     fn and_classes(left: ClassNode, right: ClassNode) -> ClassNode {
-        let left_set = if left.not {
-            left.set.negated()
-        } else {
-            left.set.clone()
-        };
-        let right_set = if right.not {
-            right.set.negated()
-        } else {
-            right.set.clone()
-        };
-        let mut result = ClassNode::new();
-        result.set = left_set.intersection(&right_set);
+        let mut result = left;
+        result.and_with(&right);
         if let (Some(left_twin), Some(right_twin)) =
-            (left.ascii_twin.as_ref(), right.ascii_twin.as_ref())
+            (result.ascii_twin.take(), right.ascii_twin.as_ref())
         {
-            let left_twin_set = if left_twin.not {
-                left_twin.set.negated()
-            } else {
-                left_twin.set.clone()
-            };
-            let right_twin_set = if right_twin.not {
-                right_twin.set.negated()
-            } else {
-                right_twin.set.clone()
-            };
-            let mut twin = ClassNode::new();
-            twin.set = left_twin_set.intersection(&right_twin_set);
+            let mut twin = *left_twin;
+            twin.and_with(right_twin);
             result.ascii_twin = Some(Box::new(twin));
         }
         result
@@ -1745,7 +1808,10 @@ impl<'a> Parser<'a> {
                             };
                             let body = self.parse_subexp(token, term);
                             self.option = previous;
-                            return Ok(EncloseResult::Node(body?));
+                            return Ok(EncloseResult::Node(Node::enclose(
+                                EncloseKind::Option,
+                                body?,
+                            )));
                         }
                         if self.at_end() {
                             return Err(RegexError::new(error::END_PATTERN_IN_GROUP));
@@ -1976,7 +2042,7 @@ impl<'a> Parser<'a> {
                     };
                     let rest = self.parse_subexp(first, term);
                     self.option = previous;
-                    let rest = rest?;
+                    let rest = Node::enclose(EncloseKind::Option, rest?);
                     return Ok((rest, term.clone()));
                 }
                 EncloseResult::Node(enclosed) => {
@@ -2025,7 +2091,7 @@ impl<'a> Parser<'a> {
                     };
                 } else {
                     let mut class = ClassNode::new();
-                    Self::add_ctype_to_set(&mut class.set, ctype, false, self.option.ascii_range);
+                    Self::add_ctype_to_cc(&mut class, ctype, false, self.option.ascii_range);
                     class.not = not;
                     node = Node::Class(class);
                 }
@@ -2034,7 +2100,7 @@ impl<'a> Parser<'a> {
             Token::CharProperty { not } => {
                 let ctype = self.fetch_char_property_to_ctype()?;
                 let mut class = ClassNode::new();
-                Self::add_ctype_to_set(&mut class.set, ctype, false, false);
+                Self::add_ctype_to_cc(&mut class, ctype, false, false);
                 class.not = not;
                 if self.option.ignore_case {
                     let twin = if ctype == CTYPE_ASCII {
@@ -2051,8 +2117,7 @@ impl<'a> Parser<'a> {
             }
             Token::CcOpen => {
                 let class = self.parse_char_class()?;
-                if !class.not && class.set.single_code().is_some() {
-                    let code = class.set.single_code().expect("checked");
+                if let Some(code) = class.single_code() {
                     let character = char::from_u32(code)
                         .ok_or_else(|| RegexError::new(error::INVALID_CODE_POINT_VALUE))?;
                     let mut chars = vec![character];
@@ -2204,10 +2269,9 @@ impl<'a> Parser<'a> {
     /// `\R`: `(?>\x0D\x0A|[\x0A-\x0D\x{85}\x{2028}\x{2029}])`.
     fn node_linebreak() -> Node {
         let mut class = ClassNode::new();
-        class.set.add_range(0x0a, 0x0d);
-        class.set.add_code(0x85);
-        class.set.add_code(0x2028);
-        class.set.add_code(0x2029);
+        class.set_bit_range(0x0a, 0x0d);
+        class.add_code_range(0x85, 0x85);
+        class.add_code_range(0x2028, 0x2029);
         Node::enclose(
             EncloseKind::StopBacktrack,
             Node::Alt(vec![

@@ -31,15 +31,21 @@ fn apply(class: &mut ClassNode, alternatives: &mut Vec<Node>, from: u32, to: &[u
             if is_ascii(from) == is_ascii(to[0]) {
                 true
             } else {
-                twin.set.contains(from)
+                twin.code_in_raw(from)
             }
         }
     };
     if to.len() == 1 {
         // In the raw set, before negation: a negated class gains the fold
-        // too, so `[^a]` under `i` refuses `A` as well.
-        if class.set.contains(from) && add_allowed {
-            class.set.add_code(to[0]);
+        // too, so `[^a]` under `i` refuses `A` as well. A single-byte fold
+        // lands in the bitset, any other in the ranges
+        // (`is_singlebyte_range`).
+        if class.code_in_raw(from) && add_allowed {
+            if to[0] < 0x80 {
+                class.set_bit(to[0]);
+            } else {
+                class.add_code_range(to[0], to[0]);
+            }
         }
     } else if class.matches(from) && !class.not {
         let chars: Vec<char> = to.iter().filter_map(|code| char::from_u32(*code)).collect();
@@ -224,18 +230,15 @@ fn single_fold(code: u32) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ast::CharSet;
     use super::*;
 
     #[test]
     fn a_class_gains_its_fold_equivalents() {
         let mut class = ClassNode::new();
-        class.set.add_code('a' as u32);
-        class.ascii_twin = Some(Box::new(ClassNode {
-            set: CharSet::from_ranges(&[('a' as u32, 'a' as u32)]),
-            not: false,
-            ascii_twin: None,
-        }));
+        class.set_bit('a' as u32);
+        let mut twin = ClassNode::new();
+        twin.set_bit('a' as u32);
+        class.ascii_twin = Some(Box::new(twin));
         let Node::Class(folded) = class_case_fold(class) else {
             panic!("a plain class stays a class");
         };

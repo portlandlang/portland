@@ -3,159 +3,7 @@
 //! at parse time, so there is no option node: Onigmo keeps one and applies it
 //! while compiling, which comes to the same thing.
 
-use super::unicode;
-
-/// The last code point a class can hold.
-pub const LAST_CODE_POINT: u32 = 0x10ffff;
-
-/// A set of code points as sorted, disjoint, inclusive ranges.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct CharSet {
-    pub ranges: Vec<(u32, u32)>,
-}
-
-impl CharSet {
-    pub fn new() -> CharSet {
-        CharSet { ranges: Vec::new() }
-    }
-
-    pub fn from_ranges(ranges: &[(u32, u32)]) -> CharSet {
-        let mut set = CharSet::new();
-        for (low, high) in ranges {
-            set.add_range(*low, *high);
-        }
-        set
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.ranges.is_empty()
-    }
-
-    pub fn contains(&self, code: u32) -> bool {
-        unicode::ranges_contain(&self.ranges, code)
-    }
-
-    pub fn add_code(&mut self, code: u32) {
-        self.add_range(code, code);
-    }
-
-    /// Inserts a range, merging with neighbours so the list stays sorted
-    /// and disjoint.
-    pub fn add_range(&mut self, low: u32, high: u32) {
-        if low > high {
-            return;
-        }
-        let mut merged: Vec<(u32, u32)> = Vec::with_capacity(self.ranges.len() + 1);
-        let mut new_low = low;
-        let mut new_high = high;
-        let mut placed = false;
-        for &(range_low, range_high) in &self.ranges {
-            if range_high.saturating_add(1) < new_low {
-                merged.push((range_low, range_high));
-            } else if new_high.saturating_add(1) < range_low {
-                if !placed {
-                    merged.push((new_low, new_high));
-                    placed = true;
-                }
-                merged.push((range_low, range_high));
-            } else {
-                new_low = new_low.min(range_low);
-                new_high = new_high.max(range_high);
-            }
-        }
-        if !placed {
-            merged.push((new_low, new_high));
-        }
-        self.ranges = merged;
-    }
-
-    pub fn union(&self, other: &CharSet) -> CharSet {
-        let mut result = self.clone();
-        for &(low, high) in &other.ranges {
-            result.add_range(low, high);
-        }
-        result
-    }
-
-    pub fn intersection(&self, other: &CharSet) -> CharSet {
-        let mut result = CharSet::new();
-        let mut index = 0;
-        let mut other_index = 0;
-        while index < self.ranges.len() && other_index < other.ranges.len() {
-            let (low, high) = self.ranges[index];
-            let (other_low, other_high) = other.ranges[other_index];
-            let start = low.max(other_low);
-            let end = high.min(other_high);
-            if start <= end {
-                result.ranges.push((start, end));
-            }
-            if high < other_high {
-                index += 1;
-            } else {
-                other_index += 1;
-            }
-        }
-        result
-    }
-
-    /// The complement within `0..=LAST_CODE_POINT`.
-    pub fn negated(&self) -> CharSet {
-        let mut result = CharSet::new();
-        let mut next = 0u32;
-        for &(low, high) in &self.ranges {
-            if low > next {
-                result.ranges.push((next, low - 1));
-            }
-            next = high.saturating_add(1);
-            if high >= LAST_CODE_POINT {
-                return result;
-            }
-        }
-        if next <= LAST_CODE_POINT {
-            result.ranges.push((next, LAST_CODE_POINT));
-        }
-        result
-    }
-
-    /// The one code point of a one-member set.
-    pub fn single_code(&self) -> Option<u32> {
-        match self.ranges.as_slice() {
-            [(low, high)] if low == high => Some(*low),
-            _ => None,
-        }
-    }
-}
-
-/// A `[...]` class, `\d`, `\s`, `\h`, or `\p{...}`: the set and whether it
-/// is negated. The ASCII twin exists only under `i`: it is the class as
-/// built without the word-class and ASCII-property additions, which is what
-/// decides whether a case-fold crossing the ASCII boundary may be added.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ClassNode {
-    pub set: CharSet,
-    pub not: bool,
-    pub ascii_twin: Option<Box<ClassNode>>,
-}
-
-impl ClassNode {
-    pub fn new() -> ClassNode {
-        ClassNode {
-            set: CharSet::new(),
-            not: false,
-            ascii_twin: None,
-        }
-    }
-
-    pub fn matches(&self, code: u32) -> bool {
-        self.set.contains(code) != self.not
-    }
-}
-
-impl Default for ClassNode {
-    fn default() -> Self {
-        ClassNode::new()
-    }
-}
+pub use super::cclass::ClassNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnchorKind {
@@ -196,6 +44,10 @@ pub enum EncloseKind {
     Condition { regnum: usize, by_name: bool },
     /// `(?~...)`.
     Absent,
+    /// `(?imx:...)` and the rest of a group after `(?imx)`: the options are
+    /// already recorded on the nodes inside, so this only keeps a quantifier
+    /// from reaching in, as Onigmo's option node does.
+    Option,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -234,6 +86,9 @@ pub struct QuantifierNode {
     pub empty: EmptyInfo,
     /// A `{0}` body holding a called group, which must still be emitted.
     pub referred: bool,
+    /// Nested inside another quantifier, so its counter is found on the
+    /// stack rather than by id (Onigmo's `_SG` opcodes).
+    pub in_repeat: bool,
 }
 
 impl QuantifierNode {
@@ -252,6 +107,7 @@ impl QuantifierNode {
             by_number,
             empty: EmptyInfo::Never,
             referred: false,
+            in_repeat: false,
         }
     }
 }
