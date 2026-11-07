@@ -789,6 +789,14 @@ impl<'a> Matcher<'a> {
             match &program.ops[pc] {
                 Op::Finish => return Ok(None),
                 Op::End => {
+                    // A path that ends before its start — a lookbehind
+                    // whose folded body consumed fewer characters than it
+                    // stepped back over — is no match, and Onigmo's `n >
+                    // best_len` test ends the attempt there, alternatives
+                    // untried.
+                    if s < sstart {
+                        return Ok(None);
+                    }
                     let mut groups = Vec::with_capacity(program.num_mem + 1);
                     groups.push(Some((pkeep.min(s), s)));
                     for mem in 1..=program.num_mem {
@@ -1351,5 +1359,21 @@ impl<'a> Matcher<'a> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::regex::Regex;
+
+    #[test]
+    fn a_lookbehind_body_ending_before_the_start_is_no_match() {
+        // `ﬁ` folds to two characters, so the lookbehind steps back two,
+        // and its body then consumes the one `ﬁ`, ending a character
+        // short of where the attempt began: Ruby answers nil.
+        let regex = Regex::new(r"(?i)(?<=ﬁ)").unwrap();
+        assert_eq!(regex.search("Θﬁµ"), None);
+        let regex = Regex::new(r"(?i)(?<=ss)x").unwrap();
+        assert_eq!(regex.search("ßx"), None);
     }
 }
