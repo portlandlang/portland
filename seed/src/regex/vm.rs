@@ -21,6 +21,34 @@ use unicode_segmentation::UnicodeSegmentation;
 /// took no part is `None`.
 pub type Spans = Vec<Option<(usize, usize)>>;
 
+fn bit_at(bitset: &[u64; 4], code: u32) -> bool {
+    code < 256 && (bitset[(code / 64) as usize] >> (code % 64)) & 1 == 1
+}
+
+/// The first byte of a code point's UTF-8 form, which is what Onigmo's
+/// bitset-only class opcodes read for a multibyte character.
+fn lead_byte(code: u32) -> u32 {
+    if code < 0x80 {
+        code
+    } else if code < 0x800 {
+        0xc0 | (code >> 6)
+    } else if code < 0x1_0000 {
+        0xe0 | (code >> 12)
+    } else {
+        0xf0 | (code >> 18)
+    }
+}
+
+/// Where a group's start or end lives: nowhere yet, in a stack entry that
+/// backtracking restores, or assigned in place, where a failed path's value
+/// outlives it (Onigmo's `mem_start_stk` holding an index or a pointer).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Slot {
+    Invalid,
+    Index(usize),
+    Pos(usize),
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Entry {
     Alt {
@@ -53,14 +81,19 @@ enum Entry {
     MemStart {
         mem: usize,
         s: usize,
-        prev_start: Option<usize>,
-        prev_end: Option<usize>,
+        prev_start: Slot,
+        prev_end: Slot,
     },
     MemEnd {
         mem: usize,
         s: usize,
-        prev_start: Option<usize>,
-        prev_end: Option<usize>,
+        prev_start: Slot,
+        prev_end: Slot,
+    },
+    /// An end assigned in place still leaves a mark, so the level count
+    /// that pairs a recursive group's start and end can see it.
+    MemEndMark {
+        mem: usize,
     },
     NullCheckStart {
         id: usize,
@@ -104,10 +137,12 @@ pub struct Matcher<'a> {
     text_str: &'a str,
     byte_offsets: &'a [usize],
     stack: Vec<Entry>,
-    mem_start: Vec<Option<usize>>,
-    mem_end: Vec<Option<usize>>,
+    mem_start: Vec<Slot>,
+    mem_end: Vec<Slot>,
     repeat_stk: Vec<usize>,
     budget: u64,
+    /// `REGEX_TRACE` in the environment prints every step to stderr.
+    trace: bool,
 }
 
 impl<'a> Matcher<'a> {
@@ -124,10 +159,11 @@ impl<'a> Matcher<'a> {
             text_str,
             byte_offsets,
             stack: Vec::new(),
-            mem_start: vec![None; program.num_mem + 1],
-            mem_end: vec![None; program.num_mem + 1],
+            mem_start: vec![Slot::Invalid; program.num_mem + 1],
+            mem_end: vec![Slot::Invalid; program.num_mem + 1],
             repeat_stk: vec![0; program.repeat_ranges.len()],
             budget,
+            trace: std::env::var_os("REGEX_TRACE").is_some(),
         }
     }
 
@@ -179,9 +215,18 @@ impl<'a> Matcher<'a> {
         Some(position)
     }
 
+    /// The position a slot holds: read from the stack entry or taken as is.
+    fn slot_pos(&self, slot: Slot) -> Option<usize> {
+        match slot {
+            Slot::Invalid => None,
+            Slot::Index(index) => Some(self.stack[index].mem_s()),
+            Slot::Pos(position) => Some(position),
+        }
+    }
+
     fn capture_span(&self, mem: usize) -> Option<(usize, usize)> {
-        let start = self.stack[self.mem_start[mem]?].mem_s();
-        let end = self.stack[self.mem_end[mem]?].mem_s();
+        let start = self.slot_pos(self.mem_start[mem])?;
+        let end = self.slot_pos(self.mem_end[mem])?;
         Some((start, end))
     }
 
@@ -193,7 +238,9 @@ impl<'a> Matcher<'a> {
         while index > 0 {
             index -= 1;
             match self.stack[index] {
-                Entry::MemEnd { mem: candidate, .. } if candidate == mem => {
+                Entry::MemEnd { mem: candidate, .. } | Entry::MemEndMark { mem: candidate }
+                    if candidate == mem =>
+                {
                     level += 1;
                 }
                 Entry::MemStart { mem: candidate, .. } if candidate == mem => {
@@ -282,8 +329,8 @@ impl<'a> Matcher<'a> {
             prev_end: self.mem_end[mem],
         };
         self.stack.push(entry);
-        self.mem_start[mem] = Some(self.stack.len() - 1);
-        self.mem_end[mem] = None;
+        self.mem_start[mem] = Slot::Index(self.stack.len() - 1);
+        self.mem_end[mem] = Slot::Invalid;
     }
 
     fn push_mem_end(&mut self, mem: usize, s: usize) {
@@ -294,7 +341,7 @@ impl<'a> Matcher<'a> {
             prev_end: self.mem_end[mem],
         };
         self.stack.push(entry);
-        self.mem_end[mem] = Some(self.stack.len() - 1);
+        self.mem_end[mem] = Slot::Index(self.stack.len() - 1);
     }
 
     /// `STACK_GET_REPEAT`: the repeat entry for `id` at the current call
@@ -371,13 +418,11 @@ impl<'a> Matcher<'a> {
                             ..
                         } = entry
                         {
-                            let Some(end_index) = prev_end else {
+                            let Some(end_pos) = self.slot_pos(*prev_end) else {
                                 return 0;
                             };
-                            let end_pos = self.stack[*end_index].mem_s();
-                            let start_pos = match prev_start {
-                                Some(start_index) => self.stack[*start_index].mem_s(),
-                                None => return 0,
+                            let Some(start_pos) = self.slot_pos(*prev_start) else {
+                                return 0;
                             };
                             if start_pos != end_pos {
                                 return 0;
@@ -459,13 +504,12 @@ impl<'a> Matcher<'a> {
     /// began, for `\G`. Answers the groups as character spans.
     pub fn match_at(&mut self, sstart: usize, gpos: usize) -> Result<Option<Spans>, RegexError> {
         let program = self.program;
-        let end = self.text.len();
         self.stack.clear();
         for slot in self.mem_start.iter_mut() {
-            *slot = None;
+            *slot = Slot::Invalid;
         }
         for slot in self.mem_end.iter_mut() {
-            *slot = None;
+            *slot = Slot::Invalid;
         }
         // The bottom of the stack: failing past it ends the attempt.
         self.stack.push(Entry::Alt {
@@ -476,7 +520,9 @@ impl<'a> Matcher<'a> {
         let mut pc = 0usize;
         let mut s = sstart;
         let mut pkeep = sstart;
-        let mut range: i64 = end as i64;
+        // Ruby's build lets the absence operator narrow the text's end
+        // itself, so one bound serves the reads and the end anchors alike.
+        let mut range: i64 = self.text.len() as i64;
         loop {
             if self.budget == 0 {
                 return Err(RegexError::new(error::MATCH_STACK_LIMIT_OVER));
@@ -487,6 +533,13 @@ impl<'a> Matcher<'a> {
             }
             let sprev: i64 = s as i64 - 1;
             let mut fail = false;
+            if self.trace {
+                eprintln!(
+                    "pc={pc} s={s} stack={} {:?}",
+                    self.stack.len(),
+                    program.ops[pc]
+                );
+            }
             match &program.ops[pc] {
                 Op::Finish => return Ok(None),
                 Op::End => {
@@ -513,12 +566,38 @@ impl<'a> Matcher<'a> {
                     }
                     None => fail = true,
                 },
-                Op::Class { set, not } => {
-                    if (s as i64) < range && (set.contains(self.text[s] as u32) != *not) {
-                        s += 1;
-                        pc += 1;
-                    } else {
+                Op::Class { bitset, mbuf, not } => {
+                    if (s as i64) >= range {
                         fail = true;
+                    } else {
+                        let code = self.text[s] as u32;
+                        let multibyte = code >= 0x80;
+                        // The six OP_CCLASS* behaviours: without ranges the
+                        // bitset is read at the character's lead byte; with
+                        // ranges a multibyte character consults them and a
+                        // single-byte one the bitset, or passes a negated
+                        // class outright when the bitset is empty.
+                        let found = match mbuf {
+                            None => bit_at(bitset, lead_byte(code)),
+                            Some(ranges) => {
+                                if multibyte {
+                                    super::cclass::in_ranges(ranges, code)
+                                } else if bitset == &[0u64; 4] {
+                                    // OP_CCLASS_MB fails on a single byte;
+                                    // OP_CCLASS_MB_NOT passes it: not found
+                                    // either way.
+                                    false
+                                } else {
+                                    bit_at(bitset, code)
+                                }
+                            }
+                        };
+                        if found != *not {
+                            s += 1;
+                            pc += 1;
+                        } else {
+                            fail = true;
+                        }
                     }
                 }
                 Op::Word { not, ascii } => {
@@ -547,7 +626,8 @@ impl<'a> Matcher<'a> {
                 }
                 Op::GraphemeCluster => {
                     if (s as i64) < range {
-                        let length = self.grapheme_length(s, end);
+                        let bound = (range.max(s as i64) as usize).min(self.text.len());
+                        let length = self.grapheme_length(s, bound);
                         if length == 0 || (s + length) as i64 > range {
                             fail = true;
                         } else {
@@ -566,28 +646,30 @@ impl<'a> Matcher<'a> {
                     }
                 }
                 Op::EndBuf => {
-                    if s == end {
+                    if (s as i64) == range {
                         pc += 1;
                     } else {
                         fail = true;
                     }
                 }
                 Op::SemiEndBuf => {
-                    if s == end || (self.text[s] == '\n' && s + 1 == end) {
+                    if (s as i64) == range
+                        || (s < self.text.len() && self.text[s] == '\n' && (s as i64) + 1 == range)
+                    {
                         pc += 1;
                     } else {
                         fail = true;
                     }
                 }
                 Op::BeginLine => {
-                    if s == 0 || (self.text[s - 1] == '\n' && s != end) {
+                    if s == 0 || (self.text[s - 1] == '\n' && (s as i64) != range) {
                         pc += 1;
                     } else {
                         fail = true;
                     }
                 }
                 Op::EndLine => {
-                    if s == end || self.text[s] == '\n' {
+                    if (s as i64) == range || (s < self.text.len() && self.text[s] == '\n') {
                         pc += 1;
                     } else {
                         fail = true;
@@ -603,7 +685,7 @@ impl<'a> Matcher<'a> {
                 Op::WordBound { ascii } => {
                     let ok = if s == 0 {
                         (s as i64) < range && self.is_word_at(s, *ascii)
-                    } else if s == end {
+                    } else if (s as i64) == range {
                         self.is_word_at(s - 1, *ascii)
                     } else {
                         self.is_word_at(s, *ascii) != self.is_word_at(s - 1, *ascii)
@@ -617,7 +699,7 @@ impl<'a> Matcher<'a> {
                 Op::NotWordBound { ascii } => {
                     let bad = if s == 0 {
                         (s as i64) < range && self.is_word_at(s, *ascii)
-                    } else if s == end {
+                    } else if (s as i64) == range {
                         self.is_word_at(s - 1, *ascii)
                     } else {
                         self.is_word_at(s, *ascii) != self.is_word_at(s - 1, *ascii)
@@ -632,19 +714,35 @@ impl<'a> Matcher<'a> {
                     pkeep = s;
                     pc += 1;
                 }
-                Op::MemStart(mem) => {
-                    self.push_mem_start(*mem, s);
+                Op::MemStart { mem, push } => {
+                    if *push {
+                        self.push_mem_start(*mem, s);
+                    } else {
+                        // OP_MEMORY_START: assigned in place, not restored
+                        // by backtracking.
+                        self.mem_start[*mem] = Slot::Pos(s);
+                        self.mem_end[*mem] = Slot::Invalid;
+                    }
                     pc += 1;
                 }
-                Op::MemEnd { mem, rec } => {
+                Op::MemEnd { mem, push, rec } => {
                     if *rec {
+                        // The start that pairs with this end by recursion
+                        // level; a called group's start is always pushed.
                         let start_index = self.matching_start(*mem);
-                        self.push_mem_end(*mem, s);
-                        if let Some(start_index) = start_index {
-                            self.mem_start[*mem] = Some(start_index);
+                        if *push {
+                            self.push_mem_end(*mem, s);
+                        } else {
+                            self.mem_end[*mem] = Slot::Pos(s);
+                            self.stack.push(Entry::MemEndMark { mem: *mem });
                         }
-                    } else {
+                        if let Some(start_index) = start_index {
+                            self.mem_start[*mem] = Slot::Index(start_index);
+                        }
+                    } else if *push {
                         self.push_mem_end(*mem, s);
+                    } else {
+                        self.mem_end[*mem] = Slot::Pos(s);
                     }
                     pc += 1;
                 }
@@ -894,7 +992,7 @@ impl<'a> Matcher<'a> {
                         } else {
                             pc = *addr;
                         }
-                    } else if s == end {
+                    } else if (s as i64) == range {
                         // At the end of the string: just match.
                         pc = *addr;
                     } else {
@@ -935,8 +1033,8 @@ impl<'a> Matcher<'a> {
                 }
                 Op::Condition { mem, addr } => {
                     if *mem > program.num_mem
-                        || self.mem_end[*mem].is_none()
-                        || self.mem_start[*mem].is_none()
+                        || self.mem_end[*mem] == Slot::Invalid
+                        || self.mem_start[*mem] == Slot::Invalid
                     {
                         pc = *addr;
                     } else {

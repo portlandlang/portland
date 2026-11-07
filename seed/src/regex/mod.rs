@@ -15,6 +15,7 @@
 
 pub mod ast;
 pub mod casefold;
+pub mod cclass;
 pub mod compile;
 pub mod error;
 pub mod parser;
