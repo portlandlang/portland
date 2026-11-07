@@ -2058,7 +2058,7 @@ impl<'a> Parser<'a> {
                 next = self.fetch_token()?;
             }
             Token::ExtendedGraphemeCluster => {
-                node = Node::GraphemeCluster;
+                node = Self::node_extended_grapheme_cluster();
                 next = self.fetch_token()?;
             }
             Token::Keep => {
@@ -2283,14 +2283,121 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// `node_extended_grapheme_cluster`: `\X` as the tree Ruby's Onigmo
+    /// builds at parse time from the Grapheme_Cluster_Break, InCB, and
+    /// Extended_Pictographic properties — UAX #29's extended grapheme
+    /// cluster with Ruby's two additions, that CR and LF each stand alone
+    /// and that any other character is a cluster of its own:
+    ///
+    /// ```text
+    /// (?-i:(?>\r\n | [Control CR LF] | precore* core postcore* | (?m:.)))
+    /// precore  = Prepend
+    /// core     = L* (V+ | LV V* | LVT) T* | L+ | T+
+    ///          | RI{2}
+    ///          | ExtPict (Extend* ZWJ ExtPict)*
+    ///          | Consonant ([Extend Linker]* Linker [Extend Linker]* Consonant)+
+    ///          | [^Control CR LF]
+    /// postcore = [Extend SpacingMark ZWJ]
+    /// ```
+    fn node_extended_grapheme_cluster() -> Node {
+        fn property(name: &str) -> ClassNode {
+            let mut class = ClassNode::new();
+            add_property(&mut class, name, false);
+            class
+        }
+        fn add_property(class: &mut ClassNode, name: &str, not: bool) {
+            let ctype = unicode::property_ctype(name).expect("a property Ruby's tables hold");
+            Parser::add_ctype_to_cc(class, ctype, not, false);
+        }
+        fn quantified(node: Node, lower: u32, upper: Option<u32>) -> Node {
+            Node::Quantifier(QuantifierNode::new(node, lower, upper, true, false))
+        }
+        fn star(node: Node) -> Node {
+            quantified(node, 0, None)
+        }
+        fn plus(node: Node) -> Node {
+            quantified(node, 1, None)
+        }
+        fn class_of(name: &str) -> Node {
+            Node::Class(property(name))
+        }
+        fn extend_or_linker() -> Node {
+            let mut class = property("InCB=Extend");
+            add_property(&mut class, "InCB=Linker", false);
+            Node::Class(class)
+        }
+
+        let crlf = Node::str_from(vec!['\r', '\n'], false);
+        let mut control = property("Grapheme_Cluster_Break=Control");
+        control.set_bit(0x0a);
+        control.set_bit(0x0d);
+        let precore = star(class_of("Grapheme_Cluster_Break=Prepend"));
+        let hangul = Node::List(vec![
+            star(class_of("Grapheme_Cluster_Break=L")),
+            Node::Alt(vec![
+                plus(class_of("Grapheme_Cluster_Break=V")),
+                Node::List(vec![
+                    class_of("Grapheme_Cluster_Break=LV"),
+                    star(class_of("Grapheme_Cluster_Break=V")),
+                ]),
+                class_of("Grapheme_Cluster_Break=LVT"),
+            ]),
+            star(class_of("Grapheme_Cluster_Break=T")),
+        ]);
+        let regional_pair = quantified(class_of("Regional_Indicator"), 2, Some(2));
+        let xpicto = Node::List(vec![
+            class_of("Extended_Pictographic"),
+            star(Node::List(vec![
+                star(class_of("Grapheme_Cluster_Break=Extend")),
+                Node::str_from(vec!['\u{200D}'], false),
+                class_of("Extended_Pictographic"),
+            ])),
+        ]);
+        let conjunct = Node::List(vec![
+            class_of("InCB=Consonant"),
+            plus(Node::List(vec![
+                star(extend_or_linker()),
+                class_of("InCB=Linker"),
+                star(extend_or_linker()),
+                class_of("InCB=Consonant"),
+            ])),
+        ]);
+        let mut other = ClassNode::new();
+        add_property(&mut other, "Grapheme_Cluster_Break=Control", true);
+        other.clear_bit(0x0a);
+        other.clear_bit(0x0d);
+        let core = Node::Alt(vec![
+            hangul,
+            plus(class_of("Grapheme_Cluster_Break=L")),
+            plus(class_of("Grapheme_Cluster_Break=T")),
+            regional_pair,
+            xpicto,
+            conjunct,
+            Node::Class(other),
+        ]);
+        let mut postcore = property("Grapheme_Cluster_Break=Extend");
+        add_property(&mut postcore, "Grapheme_Cluster_Break=SpacingMark", false);
+        postcore.add_code_range(0x200D, 0x200D);
+        let cluster = Node::List(vec![precore, core, star(Node::Class(postcore))]);
+        let any = Node::enclose(EncloseKind::Option, Node::AnyChar { multiline: true });
+        let top = Node::Alt(vec![crlf, Node::Class(control), cluster, any]);
+        Node::enclose(
+            EncloseKind::Option,
+            Node::enclose(EncloseKind::StopBacktrack, top),
+        )
+    }
+
     /// `parse_branch`: a sequence up to `|`, the terminator, or the end.
     fn parse_branch(&mut self, token: Token, term: &Token) -> ParseResult<(Node, Token)> {
         let (first, mut next) = self.parse_exp(token, term)?;
         if next == Token::Eot || &next == term || next == Token::Alt {
             return Ok((first, next));
         }
-        let mut parts = Vec::new();
-        Self::push_flat(&mut parts, first);
+        // Onigmo splices a later expression's list into the branch but
+        // keeps the first one whole, so `bx*ß` is a list of two, the
+        // `bx*` list and `ß`, and the loop and `ß` are never neighbours
+        // for `next_setup` to compare.
+        let mut parts = vec![first];
         while next != Token::Eot && &next != term && next != Token::Alt {
             let (node, following) = self.parse_exp(next, term)?;
             Self::push_flat(&mut parts, node);

@@ -50,11 +50,6 @@ pub fn is_expand_limit_ok(tlen: usize, n: u32) -> bool {
     n == 0 || tlen <= QUANTIFIER_EXPAND_LIMIT_SIZE / n as usize
 }
 
-/// `\X` is, in Ruby's Onigmo, a tree of alternations and lookaheads built
-/// at parse time, far past any expansion limit; here it is one instruction,
-/// so it is given a size past the limit.
-const GRAPHEME_CLUSTER_LENGTH: usize = 1000;
-
 pub fn tree_length(node: &Node) -> usize {
     match node {
         Node::Empty => 0,
@@ -78,7 +73,6 @@ pub fn tree_length(node: &Node) -> usize {
             head + SIZE_LENGTH + SIZE_CODE_POINT + 2 * SIZE_CODE_POINT * ranges.len()
         }
         Node::Word { .. } | Node::AnyChar { .. } => SIZE_OPCODE,
-        Node::GraphemeCluster => GRAPHEME_CLUSTER_LENGTH,
         Node::BackRef(backref) => {
             if backref.level.is_some() {
                 SIZE_OPCODE
@@ -196,7 +190,12 @@ fn quantifier_length(quantifier: &QuantifierNode) -> usize {
     let infinite = quantifier.upper.is_none();
     let lower = quantifier.lower;
     if matches!(target, Node::AnyChar { .. }) && quantifier.greedy && infinite {
-        return SIZE_OP_ANYCHAR_STAR + tlen * lower as usize;
+        let peek = if quantifier.next_head_byte.is_some() {
+            1
+        } else {
+            0
+        };
+        return SIZE_OP_ANYCHAR_STAR + peek + tlen * lower as usize;
     }
     let mod_tlen = if quantifier.empty != EmptyInfo::Never {
         tlen + SIZE_OP_NULL_CHECK_START + SIZE_OP_NULL_CHECK_END
@@ -210,7 +209,13 @@ fn quantifier_length(quantifier: &QuantifierNode) -> usize {
             tlen * lower as usize
         };
         if quantifier.greedy {
-            length += SIZE_OP_PUSH + mod_tlen + SIZE_OP_JUMP;
+            // A peeking push carries the byte it peeks at.
+            let peek = if quantifier.head_exact.is_some() || quantifier.next_head_byte.is_some() {
+                1
+            } else {
+                0
+            };
+            length += SIZE_OP_PUSH + peek + mod_tlen + SIZE_OP_JUMP;
         } else {
             length += SIZE_OP_JUMP + mod_tlen + SIZE_OP_PUSH;
         }
