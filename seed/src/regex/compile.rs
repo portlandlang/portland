@@ -125,6 +125,9 @@ pub struct Program {
     pub anchored: bool,
     /// The pattern begins with this literal, case-sensitively.
     pub prefix: Option<String>,
+    /// Onigmo's `set_bm_skip` table for the prefix: how far the search
+    /// window moves on the byte just past it.
+    pub prefix_skip: Box<[usize; 256]>,
     /// The bytes a match can begin with, when the pattern cannot match
     /// empty and its head is simple enough to say (Onigmo's map).
     pub head_bytes: Option<Box<[bool; 256]>>,
@@ -173,6 +176,7 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         compiler.ops[index] = Op::Call(entry);
     }
     let (anchored, prefix) = head_info(&prepared.root);
+    let prefix_skip = Box::new(bm_skip(prefix.as_deref().unwrap_or("")));
     let head_bytes = match head_bytes(&prepared.root) {
         Some((set, false)) => Some(Box::new(set)),
         _ => None,
@@ -189,10 +193,49 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         num_call: prepared.num_call,
         anchored,
         prefix,
+        prefix_skip,
         head_bytes,
         required,
         cache,
     })
+}
+
+/// `set_bm_skip`: for each byte, how far a search window of `needle`'s
+/// length moves when that byte sits just past it — the needle's length
+/// plus one for a byte not in it, else the distance from the byte's last
+/// occurrence to the needle's end.
+fn bm_skip(needle: &str) -> [usize; 256] {
+    let bytes = needle.as_bytes();
+    let mut skip = [bytes.len() + 1; 256];
+    for (index, byte) in bytes.iter().enumerate() {
+        skip[*byte as usize] = bytes.len() - index;
+    }
+    skip
+}
+
+/// `bm_search`: Onigmo's Boyer-Moore variant, the window compared from
+/// its tail and moved by the skip of the byte past it; a UTF-8 needle
+/// found this way lies on a character boundary, since its first byte can
+/// never be a continuation byte.
+pub fn bm_search(haystack: &[u8], needle: &[u8], skip: &[usize; 256]) -> Option<usize> {
+    let tail = needle.len() - 1;
+    let mut window_end = tail;
+    while window_end < haystack.len() {
+        let mut text_index = window_end;
+        let mut needle_index = tail;
+        while haystack[text_index] == needle[needle_index] {
+            if needle_index == 0 {
+                return Some(text_index);
+            }
+            text_index -= 1;
+            needle_index -= 1;
+        }
+        if window_end + 1 >= haystack.len() {
+            break;
+        }
+        window_end += skip[haystack[window_end + 1] as usize];
+    }
+    None
 }
 
 /// The case-sensitive literals on every path through the pattern: the
