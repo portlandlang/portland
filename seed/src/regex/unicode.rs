@@ -85,6 +85,27 @@ pub fn fold_sequence(code: u32) -> Vec<u32> {
     }
 }
 
+/// Whether some code point at or above 0x80 has a fold beginning with
+/// `ascii`: the Kelvin sign folds to `k`, the long s to `s`, and the
+/// ligatures `ﬀ`, `ﬁ`, `ﬆ` open with `f` and `s`.
+pub fn non_ascii_folds_to(ascii: u32) -> bool {
+    CASE_FOLD
+        .iter()
+        .any(|(code, folded)| *code >= 0x80 && folded.first() == Some(&ascii))
+}
+
+/// The fold of a code point as a borrowed slice, with no allocation: the
+/// table's entry, or the code itself held in `scratch`.
+pub fn fold_slice(code: u32, scratch: &mut [u32; 1]) -> &[u32] {
+    match fold(code) {
+        Some(folded) => folded,
+        None => {
+            scratch[0] = code;
+            &scratch[..]
+        }
+    }
+}
+
 /// The code points whose single-code fold is `code`.
 pub fn unfold_one(code: u32) -> Option<&'static [u32]> {
     CASE_UNFOLD_ONE
