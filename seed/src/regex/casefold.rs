@@ -49,10 +49,7 @@ fn apply(class: &mut ClassNode, alternatives: &mut Vec<Node>, from: u32, to: &[u
         }
     } else if class.matches(from) && !class.not {
         let chars: Vec<char> = to.iter().filter_map(|code| char::from_u32(*code)).collect();
-        alternatives.push(Node::Str {
-            chars,
-            ignore_case: true,
-        });
+        alternatives.push(Node::folded_str(chars));
     }
 }
 
@@ -226,6 +223,122 @@ fn single_fold(code: u32) -> u32 {
         Some(folded) if folded.len() == 1 => folded[0],
         _ => code,
     }
+}
+
+/// `update_string_node_case_fold`: the string replaced by its full fold,
+/// compared folded from then on.
+fn folded_run(chars: &[char]) -> Node {
+    let folded: Vec<char> = chars
+        .iter()
+        .flat_map(|character| unicode::fold_sequence(*character as u32))
+        .filter_map(char::from_u32)
+        .collect();
+    Node::folded_str(folded)
+}
+
+fn plain_str(codes: &[u32]) -> Node {
+    Node::str_from(
+        codes
+            .iter()
+            .filter_map(|code| char::from_u32(*code))
+            .collect(),
+        false,
+    )
+}
+
+/// `is_case_fold_variable_len`: an alternative that covers more pattern
+/// characters than this one, or spells it with several code points.
+fn is_variable_length(items: &[FoldItem]) -> bool {
+    items
+        .iter()
+        .any(|item| item.char_count != 1 || item.codes.len() != 1)
+}
+
+const THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION: usize = 8;
+
+/// `expand_case_fold_string`, the rewrite `setup_tree` gives a string
+/// under `i`: a run of characters with one spelling each becomes a string
+/// compared folded; a character with several spellings becomes an
+/// alternation of them, the rest of the string continuing inside the
+/// branch that spells it as written, while a spelling that covers more of
+/// the pattern (`ß` for `ss`) carries the remainder as one folded string.
+/// Past eight alternatives the remainder is one folded string too. Inside
+/// a lookbehind, whose length must be fixed, the whole string is one folded
+/// string.
+pub fn expand_string(chars: &[char], in_lookbehind: bool) -> Node {
+    let mut alt_num = 1usize;
+    let mut nodes = expand_from(chars, 0, in_lookbehind, &mut alt_num);
+    if nodes.len() == 1 {
+        nodes.pop().expect("one node")
+    } else {
+        Node::List(nodes)
+    }
+}
+
+/// The nodes for `chars[start..]`.
+fn expand_from(
+    chars: &[char],
+    start: usize,
+    in_lookbehind: bool,
+    alt_num: &mut usize,
+) -> Vec<Node> {
+    let mut nodes: Vec<Node> = Vec::new();
+    let mut run: Vec<char> = Vec::new();
+    let mut index = start;
+    while index < chars.len() {
+        let items = case_fold_items(chars, index);
+        if items.is_empty() || !is_variable_length(&items) || in_lookbehind {
+            run.push(chars[index]);
+            index += 1;
+            continue;
+        }
+        *alt_num *= items.len() + 1;
+        if *alt_num > THRESHOLD_CASE_FOLD_ALT_FOR_EXPANSION {
+            break;
+        }
+        if !run.is_empty() {
+            nodes.push(folded_run(&std::mem::take(&mut run)));
+        }
+        // `expand_case_fold_string_alt`: the character as written and the
+        // spellings of its own length in one alternation; a spelling that
+        // reaches further gets its own branch with the remainder folded.
+        let mut same_length: Vec<Node> = vec![Node::str_from(vec![chars[index]], false)];
+        let mut further: Vec<Node> = Vec::new();
+        for item in &items {
+            let spelled = plain_str(&item.codes);
+            if item.char_count == 1 {
+                same_length.push(spelled);
+            } else {
+                let after = index + item.char_count;
+                if after < chars.len() {
+                    further.push(Node::List(vec![spelled, folded_run(&chars[after..])]));
+                } else {
+                    further.push(spelled);
+                }
+            }
+        }
+        let same_length = Node::Alt(same_length);
+        if further.is_empty() {
+            nodes.push(same_length);
+            index += 1;
+            continue;
+        }
+        // The rest of the string continues inside the first branch.
+        let mut first = vec![same_length];
+        first.extend(expand_from(chars, index + 1, in_lookbehind, alt_num));
+        let mut branches = vec![Node::List(first)];
+        branches.extend(further);
+        nodes.push(Node::Alt(branches));
+        return nodes;
+    }
+    if !run.is_empty() {
+        nodes.push(folded_run(&run));
+    }
+    if index < chars.len() {
+        // Past the threshold: the remainder as one folded string.
+        nodes.push(folded_run(&chars[index..]));
+    }
+    nodes
 }
 
 #[cfg(test)]
