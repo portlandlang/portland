@@ -1,15 +1,17 @@
 //! The backtracking matcher: Onigmo's `match_at` over a program, as Ruby's
-//! copy of `regexec.c` has it. The text is a slice of characters; positions
-//! are character indexes and are turned into byte offsets by the caller.
-//! The stack is Onigmo's: besides the alternatives to resume, it records
+//! copy of `regexec.c` has it. Positions are byte offsets into the UTF-8
+//! text, always on a character boundary, so a capture is already what
+//! Ruby's `MatchData#byteoffset` answers and nothing is translated. The
+//! stack is Onigmo's: besides the alternatives to resume, it records
 //! capture starts and ends, repeat counts, null-check marks, call frames,
 //! and the atomic and lookaround marks, so that backtracking restores all
 //! of them in one walk.
 //!
-//! Two positions are signed: `range`, the bound reads may not pass, which
-//! the absence operator lowers while it runs, and the position before the
-//! current one, which is -1 at the start of the text; Onigmo has a null
-//! pointer there, and the absence operator's arithmetic leans on it.
+//! Two positions are signed: the text's end, which Ruby's build lets the
+//! absence operator narrow for every read and end anchor alike, and the
+//! position before the current one, which is -1 at the start of the text;
+//! Onigmo has a null pointer there, and the absence operator's arithmetic
+//! leans on it.
 
 use super::ast::EmptyInfo;
 use super::compile::{Op, Program};
@@ -17,26 +19,12 @@ use super::error::{self, RegexError};
 use super::unicode::{self, CTYPE_WORD};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// The groups of a match as character spans, group 0 first; a group that
-/// took no part is `None`.
+/// The groups of a match as byte spans, group 0 first; a group that took
+/// no part is `None`.
 pub type Spans = Vec<Option<(usize, usize)>>;
 
 fn bit_at(bitset: &[u64; 4], code: u32) -> bool {
     code < 256 && (bitset[(code / 64) as usize] >> (code % 64)) & 1 == 1
-}
-
-/// The first byte of a code point's UTF-8 form, which is what Onigmo's
-/// bitset-only class opcodes read for a multibyte character.
-fn lead_byte(code: u32) -> u32 {
-    if code < 0x80 {
-        code
-    } else if code < 0x800 {
-        0xc0 | (code >> 6)
-    } else if code < 0x1_0000 {
-        0xe0 | (code >> 12)
-    } else {
-        0xf0 | (code >> 18)
-    }
 }
 
 /// Where a group's start or end lives: nowhere yet, in a stack entry that
@@ -133,9 +121,8 @@ impl Entry {
 
 pub struct Matcher<'a> {
     program: &'a Program,
-    text: &'a [char],
-    text_str: &'a str,
-    byte_offsets: &'a [usize],
+    text: &'a str,
+    bytes: &'a [u8],
     stack: Vec<Entry>,
     mem_start: Vec<Slot>,
     mem_end: Vec<Slot>,
@@ -146,18 +133,11 @@ pub struct Matcher<'a> {
 }
 
 impl<'a> Matcher<'a> {
-    pub fn new(
-        program: &'a Program,
-        text: &'a [char],
-        text_str: &'a str,
-        byte_offsets: &'a [usize],
-        budget: u64,
-    ) -> Matcher<'a> {
+    pub fn new(program: &'a Program, text: &'a str, budget: u64) -> Matcher<'a> {
         Matcher {
             program,
             text,
-            text_str,
-            byte_offsets,
+            bytes: text.as_bytes(),
             stack: Vec::new(),
             mem_start: vec![Slot::Invalid; program.num_mem + 1],
             mem_end: vec![Slot::Invalid; program.num_mem + 1],
@@ -167,12 +147,68 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    fn is_word_at(&self, index: usize, ascii: bool) -> bool {
-        let character = self.text[index];
+    /// The character at byte `s` and its length; `s` is on a boundary.
+    fn char_at(&self, s: usize) -> (char, usize) {
+        let lead = self.bytes[s];
+        if lead < 0x80 {
+            (lead as char, 1)
+        } else {
+            let character = self.text[s..].chars().next().expect("a boundary");
+            (character, character.len_utf8())
+        }
+    }
+
+    /// The length in bytes of the character at `s`.
+    pub fn char_len_at(&self, s: usize) -> usize {
+        let lead = self.bytes[s];
+        if lead < 0x80 {
+            1
+        } else if lead >> 5 == 0b110 {
+            2
+        } else if lead >> 4 == 0b1110 {
+            3
+        } else {
+            4
+        }
+    }
+
+    /// The start of the character before byte `s`.
+    fn prev_head(&self, s: usize) -> Option<usize> {
+        if s == 0 {
+            return None;
+        }
+        let mut position = s - 1;
+        while !self.text.is_char_boundary(position) {
+            position -= 1;
+        }
+        Some(position)
+    }
+
+    /// `ONIGENC_STEP_BACK`: `count` characters back from `s`.
+    fn step_back(&self, s: usize, count: usize) -> Option<usize> {
+        let mut position = s;
+        for _ in 0..count {
+            position = self.prev_head(position)?;
+        }
+        Some(position)
+    }
+
+    fn is_word(&self, character: char, ascii: bool) -> bool {
         if ascii {
             character.is_ascii_alphanumeric() || character == '_'
         } else {
             unicode::ctype_contains(CTYPE_WORD, character as u32)
+        }
+    }
+
+    fn is_word_at(&self, s: usize, ascii: bool) -> bool {
+        self.is_word(self.char_at(s).0, ascii)
+    }
+
+    fn is_word_before(&self, s: usize, ascii: bool) -> bool {
+        match self.prev_head(s) {
+            Some(head) => self.is_word_at(head, ascii),
+            None => false,
         }
     }
 
@@ -185,37 +221,64 @@ impl<'a> Matcher<'a> {
             if (position as i64) >= range {
                 return None;
             }
+            let (character, length) = self.char_at(position);
             let mut scratch = [0u32; 1];
-            let text_fold = unicode::fold_slice(self.text[position] as u32, &mut scratch);
+            let text_fold = unicode::fold_slice(character as u32, &mut scratch);
             if folded.len() < index + text_fold.len()
                 || folded[index..index + text_fold.len()] != *text_fold
             {
                 return None;
             }
             index += text_fold.len();
-            position += 1;
+            position += length;
         }
         Some(position)
     }
 
     /// `string_cmp_ic`: `captured` against the text at `s`, each character
     /// folded, in lockstep. Answers the position after the text consumed.
-    fn compare_folded_lockstep(&self, captured: &[char], s: usize, range: i64) -> Option<usize> {
+    fn compare_folded_lockstep(&self, captured: &str, s: usize, range: i64) -> Option<usize> {
         let mut position = s;
-        for character in captured {
+        for character in captured.chars() {
             if (position as i64) >= range {
                 return None;
             }
+            let (text_character, length) = self.char_at(position);
             let mut scratch_captured = [0u32; 1];
             let mut scratch_text = [0u32; 1];
-            if unicode::fold_slice(*character as u32, &mut scratch_captured)
-                != unicode::fold_slice(self.text[position] as u32, &mut scratch_text)
+            if unicode::fold_slice(character as u32, &mut scratch_captured)
+                != unicode::fold_slice(text_character as u32, &mut scratch_text)
             {
                 return None;
             }
-            position += 1;
+            position += length;
         }
         Some(position)
+    }
+
+    /// A captured span against the text at `s`: `STRING_CMP` or its
+    /// case-insensitive twin. Answers the position after the text consumed.
+    fn compare_captured(
+        &self,
+        start: usize,
+        finish: usize,
+        ignore_case: bool,
+        s: usize,
+        range: i64,
+    ) -> Option<usize> {
+        let captured = &self.text[start..finish];
+        if ignore_case {
+            return self.compare_folded_lockstep(captured, s, range);
+        }
+        let length = captured.len();
+        if (s + length) as i64 > range {
+            return None;
+        }
+        if self.bytes[s..s + length] == *captured.as_bytes() {
+            Some(s + length)
+        } else {
+            None
+        }
     }
 
     /// The position a slot holds: read from the stack entry or taken as is.
@@ -468,17 +531,7 @@ impl<'a> Matcher<'a> {
                     mem, s: start_pos, ..
                 } if level == level_wanted && mems.contains(&mem) => {
                     if let Some(end_pos) = pend {
-                        let captured = &self.text[start_pos..end_pos];
-                        if (s + captured.len()) as i64 > range {
-                            return None;
-                        }
-                        if ignore_case {
-                            return self.compare_folded_lockstep(captured, s, range);
-                        }
-                        if self.text[s..s + captured.len()] == *captured {
-                            return Some(s + captured.len());
-                        }
-                        return None;
+                        return self.compare_captured(start_pos, end_pos, ignore_case, s, range);
                     }
                 }
                 Entry::MemEnd {
@@ -492,19 +545,17 @@ impl<'a> Matcher<'a> {
         None
     }
 
-    /// The length in characters of the grapheme cluster starting at `s`.
-    fn grapheme_length(&self, s: usize, end: usize) -> usize {
-        let from = self.byte_offsets[s];
-        let to = self.byte_offsets[end];
-        let slice = &self.text_str[from..to];
-        match slice.graphemes(true).next() {
-            Some(cluster) => cluster.chars().count(),
+    /// The length in bytes of the grapheme cluster starting at `s`, within
+    /// `bound`.
+    fn grapheme_length(&self, s: usize, bound: usize) -> usize {
+        match self.text[s..bound].graphemes(true).next() {
+            Some(cluster) => cluster.len(),
             None => 0,
         }
     }
 
     /// `match_at`: one attempt from `sstart`; `gpos` is where the search
-    /// began, for `\G`. Answers the groups as character spans.
+    /// began, for `\G`. Answers the groups as byte spans.
     pub fn match_at(&mut self, sstart: usize, gpos: usize) -> Result<Option<Spans>, RegexError> {
         let program = self.program;
         self.stack.clear();
@@ -525,7 +576,7 @@ impl<'a> Matcher<'a> {
         let mut pkeep = sstart;
         // Ruby's build lets the absence operator narrow the text's end
         // itself, so one bound serves the reads and the end anchors alike.
-        let mut range: i64 = self.text.len() as i64;
+        let mut range: i64 = self.bytes.len() as i64;
         loop {
             if self.budget == 0 {
                 return Err(RegexError::new(error::MATCH_STACK_LIMIT_OVER));
@@ -534,7 +585,6 @@ impl<'a> Matcher<'a> {
             if pc == usize::MAX {
                 return Ok(None);
             }
-            let sprev: i64 = s as i64 - 1;
             let mut fail = false;
             if self.trace {
                 eprintln!(
@@ -553,12 +603,14 @@ impl<'a> Matcher<'a> {
                     }
                     return Ok(Some(groups));
                 }
-                Op::Exact(chars) => {
-                    if (s + chars.len()) as i64 > range || self.text[s..s + chars.len()] != **chars
+                Op::Exact(literal) => {
+                    let length = literal.len();
+                    if (s + length) as i64 > range
+                        || self.bytes[s..s + length] != *literal.as_bytes()
                     {
                         fail = true;
                     } else {
-                        s += chars.len();
+                        s += length;
                         pc += 1;
                     }
                 }
@@ -573,17 +625,17 @@ impl<'a> Matcher<'a> {
                     if (s as i64) >= range {
                         fail = true;
                     } else {
-                        let code = self.text[s] as u32;
-                        let multibyte = code >= 0x80;
+                        let (character, length) = self.char_at(s);
+                        let code = character as u32;
                         // The six OP_CCLASS* behaviours: without ranges the
                         // bitset is read at the character's lead byte; with
                         // ranges a multibyte character consults them and a
                         // single-byte one the bitset, or passes a negated
                         // class outright when the bitset is empty.
                         let found = match mbuf {
-                            None => bit_at(bitset, lead_byte(code)),
+                            None => bit_at(bitset, u32::from(self.bytes[s])),
                             Some(ranges) => {
-                                if multibyte {
+                                if code >= 0x80 {
                                     super::cclass::in_ranges(ranges, code)
                                 } else if bitset == &[0u64; 4] {
                                     // OP_CCLASS_MB fails on a single byte;
@@ -596,7 +648,7 @@ impl<'a> Matcher<'a> {
                             }
                         };
                         if found != *not {
-                            s += 1;
+                            s += length;
                             pc += 1;
                         } else {
                             fail = true;
@@ -604,16 +656,21 @@ impl<'a> Matcher<'a> {
                     }
                 }
                 Op::Word { not, ascii } => {
-                    if (s as i64) < range && (self.is_word_at(s, *ascii) != *not) {
-                        s += 1;
-                        pc += 1;
+                    if (s as i64) < range {
+                        let (character, length) = self.char_at(s);
+                        if self.is_word(character, *ascii) != *not {
+                            s += length;
+                            pc += 1;
+                        } else {
+                            fail = true;
+                        }
                     } else {
                         fail = true;
                     }
                 }
                 Op::AnyChar => {
-                    if (s as i64) < range && self.text[s] != '\n' {
-                        s += 1;
+                    if (s as i64) < range && self.bytes[s] != b'\n' {
+                        s += self.char_len_at(s);
                         pc += 1;
                     } else {
                         fail = true;
@@ -621,7 +678,7 @@ impl<'a> Matcher<'a> {
                 }
                 Op::AnyCharMl => {
                     if (s as i64) < range {
-                        s += 1;
+                        s += self.char_len_at(s);
                         pc += 1;
                     } else {
                         fail = true;
@@ -629,7 +686,7 @@ impl<'a> Matcher<'a> {
                 }
                 Op::GraphemeCluster => {
                     if (s as i64) < range {
-                        let bound = (range.max(s as i64) as usize).min(self.text.len());
+                        let bound = (range.max(s as i64) as usize).min(self.bytes.len());
                         let length = self.grapheme_length(s, bound);
                         if length == 0 || (s + length) as i64 > range {
                             fail = true;
@@ -657,7 +714,9 @@ impl<'a> Matcher<'a> {
                 }
                 Op::SemiEndBuf => {
                     if (s as i64) == range
-                        || (s < self.text.len() && self.text[s] == '\n' && (s as i64) + 1 == range)
+                        || (s < self.bytes.len()
+                            && self.bytes[s] == b'\n'
+                            && (s as i64) + 1 == range)
                     {
                         pc += 1;
                     } else {
@@ -665,14 +724,14 @@ impl<'a> Matcher<'a> {
                     }
                 }
                 Op::BeginLine => {
-                    if s == 0 || (self.text[s - 1] == '\n' && (s as i64) != range) {
+                    if s == 0 || (self.bytes[s - 1] == b'\n' && (s as i64) != range) {
                         pc += 1;
                     } else {
                         fail = true;
                     }
                 }
                 Op::EndLine => {
-                    if (s as i64) == range || (s < self.text.len() && self.text[s] == '\n') {
+                    if (s as i64) == range || (s < self.bytes.len() && self.bytes[s] == b'\n') {
                         pc += 1;
                     } else {
                         fail = true;
@@ -689,9 +748,9 @@ impl<'a> Matcher<'a> {
                     let ok = if s == 0 {
                         (s as i64) < range && self.is_word_at(s, *ascii)
                     } else if (s as i64) == range {
-                        self.is_word_at(s - 1, *ascii)
+                        self.is_word_before(s, *ascii)
                     } else {
-                        self.is_word_at(s, *ascii) != self.is_word_at(s - 1, *ascii)
+                        self.is_word_at(s, *ascii) != self.is_word_before(s, *ascii)
                     };
                     if ok {
                         pc += 1;
@@ -703,9 +762,9 @@ impl<'a> Matcher<'a> {
                     let bad = if s == 0 {
                         (s as i64) < range && self.is_word_at(s, *ascii)
                     } else if (s as i64) == range {
-                        self.is_word_at(s - 1, *ascii)
+                        self.is_word_before(s, *ascii)
                     } else {
-                        self.is_word_at(s, *ascii) != self.is_word_at(s - 1, *ascii)
+                        self.is_word_at(s, *ascii) != self.is_word_before(s, *ascii)
                     };
                     if bad {
                         fail = true;
@@ -758,18 +817,9 @@ impl<'a> Matcher<'a> {
                         let Some((start, finish)) = self.capture_span(*mem) else {
                             continue;
                         };
-                        let captured = &self.text[start..finish];
-                        if (s + captured.len()) as i64 > range {
-                            continue;
-                        }
-                        let after = if *ignore_case {
-                            self.compare_folded_lockstep(captured, s, range)
-                        } else if self.text[s..s + captured.len()] == *captured {
-                            Some(s + captured.len())
-                        } else {
-                            None
-                        };
-                        if let Some(after) = after {
+                        if let Some(after) =
+                            self.compare_captured(start, finish, *ignore_case, s, range)
+                        {
                             s = after;
                             matched = true;
                             break;
@@ -942,29 +992,27 @@ impl<'a> Matcher<'a> {
                     self.void_until(|entry| matches!(entry, Entry::StopBt));
                     pc += 1;
                 }
-                Op::LookBehind(len) => {
-                    if s < *len {
-                        fail = true;
-                    } else {
-                        s -= len;
+                Op::LookBehind(len) => match self.step_back(s, *len) {
+                    Some(back) => {
+                        s = back;
                         pc += 1;
                     }
-                }
-                Op::PushLookBehindNot { addr, len } => {
-                    if s < *len {
-                        // Too short to hold the body: the negative lookbehind
-                        // succeeds.
-                        pc = *addr;
-                    } else {
+                    None => fail = true,
+                },
+                Op::PushLookBehindNot { addr, len } => match self.step_back(s, *len) {
+                    // Too short to hold the body: the negative lookbehind
+                    // succeeds.
+                    None => pc = *addr,
+                    Some(back) => {
                         self.stack.push(Entry::LookBehindNot {
                             pc: *addr,
                             s,
                             pkeep,
                         });
-                        s -= len;
+                        s = back;
                         pc += 1;
                     }
-                }
+                },
                 Op::FailLookBehindNot => {
                     self.pop_until(|entry| matches!(entry, Entry::LookBehindNot { .. }));
                     fail = true;
@@ -995,7 +1043,7 @@ impl<'a> Matcher<'a> {
                         } else {
                             pc = *addr;
                         }
-                    } else if (s as i64) == range {
+                    } else if s_signed == range {
                         // At the end of the string: just match.
                         pc = *addr;
                     } else {
@@ -1008,17 +1056,22 @@ impl<'a> Matcher<'a> {
                             abs_s: absent,
                             range,
                         });
-                        self.stack.push(Entry::Alt {
-                            pc,
-                            s: s + 1,
-                            pkeep,
-                        });
+                        if s < self.bytes.len() {
+                            // The next iteration, one character on; past
+                            // the text it could only fail.
+                            let next = s + self.char_len_at(s);
+                            self.stack.push(Entry::Alt { pc, s: next, pkeep });
+                        }
                         self.stack.push(Entry::Absent);
                         range = aend;
                         pc += 1;
                     }
                 }
                 Op::AbsentEnd => {
+                    let sprev: i64 = match self.prev_head(s) {
+                        Some(head) => head as i64,
+                        None => -1,
+                    };
                     if sprev < range {
                         range = sprev;
                     }

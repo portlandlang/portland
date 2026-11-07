@@ -14,7 +14,8 @@ pub enum Op {
     /// The bottom of the stack: no alternative left, the attempt failed.
     Finish,
     End,
-    Exact(Vec<char>),
+    /// A literal run, compared as bytes.
+    Exact(String),
     /// The pattern's full case fold; the text is folded a character at a
     /// time and the folded streams must agree.
     ExactIc(Vec<u32>),
@@ -241,7 +242,7 @@ impl Compiler {
                 if *ignore_case {
                     self.case_fold_string(chars, in_lookbehind);
                 } else {
-                    self.emit(Op::Exact(chars.clone()));
+                    self.emit(Op::Exact(chars.iter().collect()));
                 }
             }
             Node::Class(class) => {

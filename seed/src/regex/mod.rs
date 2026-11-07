@@ -122,44 +122,32 @@ impl Regex {
         start: usize,
         budget: u64,
     ) -> Result<Option<Captures>, RegexError> {
-        let chars: Vec<char> = text.chars().collect();
-        let mut byte_offsets: Vec<usize> = Vec::with_capacity(chars.len() + 1);
-        let mut offset = 0;
-        for character in &chars {
-            byte_offsets.push(offset);
-            offset += character.len_utf8();
+        // A start inside a character moves up to the next boundary.
+        let mut start = start.min(text.len());
+        while !text.is_char_boundary(start) {
+            start += 1;
         }
-        byte_offsets.push(offset);
-        let start_char = byte_offsets
-            .iter()
-            .position(|candidate| *candidate >= start)
-            .unwrap_or(chars.len());
-        let mut matcher = vm::Matcher::new(&self.program, &chars, text, &byte_offsets, budget);
-        let mut attempt = start_char;
-        while attempt <= chars.len() {
+        let mut matcher = vm::Matcher::new(&self.program, text, budget);
+        let mut attempt = start;
+        while attempt <= text.len() {
             // A pattern pinned to the text's start has one place to try;
             // one opening with a literal can jump to its next occurrence.
             if self.program.anchored && attempt > 0 {
                 return Ok(None);
             }
             if let Some(prefix) = &self.program.prefix {
-                let from = byte_offsets[attempt];
-                let Some(found) = text[from..].find(prefix.as_str()) else {
+                let Some(found) = text[attempt..].find(prefix.as_str()) else {
                     return Ok(None);
                 };
-                let target = from + found;
-                attempt = byte_offsets
-                    .binary_search(&target)
-                    .expect("a match starts on a character boundary");
+                attempt += found;
             }
-            if let Some(groups) = matcher.match_at(attempt, start_char)? {
-                let spans = groups
-                    .into_iter()
-                    .map(|group| group.map(|(from, to)| (byte_offsets[from], byte_offsets[to])))
-                    .collect();
-                return Ok(Some(Captures { groups: spans }));
+            if let Some(groups) = matcher.match_at(attempt, start)? {
+                return Ok(Some(Captures { groups }));
             }
-            attempt += 1;
+            if attempt == text.len() {
+                break;
+            }
+            attempt += matcher.char_len_at(attempt);
         }
         Ok(None)
     }
