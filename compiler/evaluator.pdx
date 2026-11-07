@@ -299,6 +299,8 @@ def guest_case_matches(pattern_node, subject, bindings)
   return outcome([set_member?(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__set__", *]
   # A range of structs covers by the structs' own `<=>` (ADR 0081).
   return outcome([guest_range_covers?(pattern, subject, step.bindings)], step.bindings) if (pattern in Range) && struct_range?(pattern)
+  # A pattern's `===` on a guest symbol reads its name (ADR 0086).
+  return outcome([pattern === host_text(subject)], step.bindings) if pattern in Regexp
   outcome([pattern === subject], step.bindings)
 end
 
@@ -369,6 +371,8 @@ def guest_type_matches(name, subject, bindings)
   when "Integer" then return Integer === subject
   when "Range" then return Range === subject
   when "Random" then return Random === subject
+  when "Regexp" then return Regexp === subject
+  when "MatchData" then return MatchData === subject
   when "Set" then return subject in ["__set__", *]
   when "String" then return String === subject
   when "Rational" then return Rational === subject
@@ -658,6 +662,8 @@ def match_builtin_type(pattern, subject)
   when "Hash"    then subject in Hash
   when "Integer" then subject in Integer
   when "Random"  then subject in Random
+  when "Regexp"  then subject in Regexp
+  when "MatchData" then subject in MatchData
   when "Range"   then subject in Range
   when "Set"     then subject in ["__set__", *]
   when "String"  then subject in String
@@ -673,7 +679,7 @@ def match_builtin_type(pattern, subject)
 end
 
 def match_struct(pattern, subject, bindings, earlier)
-  if %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(pattern.name)
+  if %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(pattern.name)
     return match_builtin_type(pattern, subject)
   end
   # A wrong-shaped subject misses rather than crashing — the seed's rule.
@@ -1011,6 +1017,11 @@ def evaluate_expression(node, bindings)
   in NilNode then outcome([nil], bindings)
   in SelfNode then evaluate_self(bindings)
   in StringNode(value:) then outcome([value], bindings)
+  # A regex literal (ADR 0086): its source, interpolated, compiled with its
+  # flags by the host each time it is reached.
+  in RegexNode(flags:, source:)
+    step = evaluate_expression(source, bindings)
+    outcome([Regexp.new(slot_value(step.value), flags)], step.bindings)
   # Guest symbols are tagged arrays, like guest structs — the compiler cannot
   # manufacture a host symbol, because ADR 0023 removed `to_sym` and there
   # is deliberately no way to build one from a name at runtime. That is the
@@ -1282,7 +1293,7 @@ end
 
 # The builtin types whose bare name is a type value (ADR 0074): the value
 # types, not the function namespaces `System` and `JSON`.
-def builtin_type_value_name?(name) = %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
+def builtin_type_value_name?(name) = %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(name)
 
 # What `value.class` answers (ADR 0074): a struct's qualified name, a
 # builtin's type name, tagged. An enum case, a wrapper, a type itself, and
@@ -1315,6 +1326,8 @@ def value_type_label(value)
   return ":#{value_at(value, 1)}" if value in ["__enum_case__", *]
   return "Type" if value in ["__type__", *]
   return "Set" if value in ["__set__", *]
+  return "Regexp" if value in Regexp
+  return "MatchData" if value in MatchData
   return "Array" if plain_array?(value)
   case value
   in Integer  then "Integer"
@@ -1325,6 +1338,8 @@ def value_type_label(value)
   in Hash     then "Hash"
   in Range    then "Range"
   in Random   then "Random"
+  in Regexp   then "Regexp"
+  in MatchData then "MatchData"
   else "String"
   end
 end
@@ -2007,6 +2022,9 @@ def render_inspect(value)
   # A rational or complex is a host value (ADR 0085): Ruby's `(1/3)` and
   # `(1+2i)` are the host's inspect.
   return inspect(value) if (value in Rational) || (value in Complex)
+  # A pattern and a match are host values (ADR 0086): `/a/i` and
+  # `#<MatchData "a">` are the host's inspect.
+  return inspect(value) if (value in Regexp) || (value in MatchData)
   # A range inspects each end (ADR 0081), so `"a".."f"` keeps its quotes.
   if value in Range
     low = value.begin.nil? ? "" : render_inspect(value.begin)
@@ -2183,8 +2201,18 @@ def evaluate_index(node, bindings)
     panic("a #{struct_name} is read by its field names, not indexed with #{render_inspect(key)}")
   end
 
+  # A match's group by a symbol name (ADR 0086): the guest symbol's name.
+  return outcome([receiver[host_group_key(slot_value(index_step.value))]], index_step.bindings) if receiver in MatchData
   outcome([receiver[slot_value(index_step.value)]], index_step.bindings)
 end
+
+# A group index for the host's match: a guest symbol by its name, anything
+# else as it is.
+def host_group_key(key) = (key in ["__symbol__", *]) ? value_at(key, 1) : key
+
+# A pattern's subject or operand for the host: a guest symbol by its name,
+# as Ruby's `=~` reads a symbol, anything else as it is.
+def host_text(value) = (value in ["__symbol__", *]) ? value_at(value, 1) : value
 
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 # `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
@@ -2285,6 +2313,27 @@ def evaluate_builtin_type_function(node, mutable bindings)
   # `Random.new(seed)` (ADR 0065): the host's generator, Ruby's MT19937.
   if type_name == "Random" && node.name == "new"
     return outcome([arguments.empty? ? Random.new : Random.new(value_at(arguments, 0))], bindings)
+  end
+  # `Regexp.new`, `Regexp.escape`, and `Regexp.union` (ADR 0086), the
+  # host's own; `Regexp.last_match` is the match global by another name.
+  if type_name == "Regexp"
+    if node.name == "new"
+      panic("Regexp.new takes 1 to 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+      compiled = if arguments.length == 1
+        Regexp.new(value_at(arguments, 0))
+      else
+        Regexp.new(value_at(arguments, 0), value_at(arguments, 1))
+      end
+      return outcome([compiled], bindings)
+    end
+    if node.name == "escape" || node.name == "quote"
+      panic("Regexp.#{node.name} takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+      return outcome([Regexp.escape(value_at(arguments, 0))], bindings)
+    end
+    return outcome([Regexp.union(arguments)], bindings) if node.name == "union"
+    if node.name == "last_match"
+      panic("'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match")
+    end
   end
   # `Set.new(enumerable)` and `Set[a, b]` (ADR 0082): the members in order,
   # repeats dropped; a block maps each member first, as Ruby's does.
@@ -2915,6 +2964,7 @@ def format_type_name(value)
   return value_at(value, 1) if value in ["__struct__", *]
   type = builtin_type_of(value)
   return "Object" if type.nil?
+  return "MatchData" if value in MatchData
   type_at(type, 0).capitalize
 end
 
@@ -3005,7 +3055,7 @@ end
 def evaluate_method_call(node, mutable bindings)
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
-  if (node.receiver in IdentifierNode) && %w[Array Complex Hash Integer JSON Math Random Range Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
+  if (node.receiver in IdentifierNode) && %w[Array Complex Hash Integer JSON Math Random Range Regexp Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
     return evaluate_builtin_type_function(node, bindings)
   end
   # `Name.new(...)` constructs through the written name; a local holding a
@@ -3192,6 +3242,13 @@ def evaluate_method_call(node, mutable bindings)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([symbol_text_answer(value_at(receiver, 1), node.name, arguments)], bindings)
   end
+  # A match's own names (ADR 0086), the host's: `begin`, `end`, and
+  # `offset` take a group here, where a range's take none, so they answer
+  # before the shared arms.
+  if (receiver in MatchData) && %w[captures named_captures names pre_match post_match string regexp to_a size length begin end offset values_at].include?(node.name)
+    check_builtin_count(receiver, node.name, arguments.length)
+    return outcome([matchdata_answer(receiver, node.name, arguments)], bindings)
+  end
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).
   check_builtin_count(receiver, node.name, arguments.length)
@@ -3291,6 +3348,19 @@ def evaluate_method_call(node, mutable bindings)
   when "to_sym", "intern" then ["__symbol__", receiver]
   when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))
   when "gsub" then receiver.gsub(value_at(arguments, 0), value_at(arguments, 1))
+  # A pattern's questions (ADR 0086), on a string, a symbol's name, or the
+  # pattern itself: the host's own, a match being a host value.
+  when "=~" then host_text(receiver) =~ host_text(value_at(arguments, 0))
+  when "!~" then host_text(receiver) !~ host_text(value_at(arguments, 0))
+  when "match"
+    arguments.length == 2 ? host_text(receiver).match(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match(host_text(value_at(arguments, 0)))
+  when "match?"
+    arguments.length == 2 ? host_text(receiver).match?(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match?(host_text(value_at(arguments, 0)))
+  when "scan" then receiver.scan(value_at(arguments, 0))
+  when "source" then receiver.source
+  when "options" then receiver.options
+  when "casefold?" then receiver.casefold?
+  when "names" then receiver.names
   when "upcase" then receiver.upcase
   when "downcase" then receiver.downcase
   # The trimmers, the case moves, and the line splitter ride the host.
@@ -3382,7 +3452,9 @@ def evaluate_method_call(node, mutable bindings)
     flatten_guest((receiver in Hash) ? receiver.to_a : receiver, depth)
   when "compact" then receiver.compact
   when "count" then count_of(receiver, arguments)
-  when "index", "find_index" then receiver.index(value_at(arguments, 0))
+  # A string's `index` takes a start position too (ADR 0086).
+  when "index", "find_index"
+    arguments.length == 2 ? receiver.index(value_at(arguments, 0), value_at(arguments, 1)) : receiver.index(value_at(arguments, 0))
   when "rindex" then receiver.rindex(value_at(arguments, 0))
   when "sum" then arguments.empty? ? receiver.sum : receiver.sum(value_at(arguments, 0))
   when "sort" then sorted_values(receiver, bindings)
@@ -3418,6 +3490,9 @@ def evaluate_method_call(node, mutable bindings)
   when "slice"
     if receiver in Hash
       arguments.reduce({}) { |kept, key| kept.merge(receiver.slice(key)) }
+    elsif (receiver in String) && (value_at(arguments, 0) in Regexp) && arguments.length == 1
+      # A pattern alone (ADR 0086): the match's text or nil.
+      receiver.slice(value_at(arguments, 0))
     else
       receiver.slice(arguments[0], arguments[1])
     end
@@ -3546,6 +3621,8 @@ def builtin_type_of(value)
   return ["hash", ["unknown"], ["unknown"]] if value in Hash
   return ["array", ["unknown"]] if plain_array?(value)
   return ["random"] if value in Random
+  return ["regexp"] if value in Regexp
+  return ["matchdata"] if value in MatchData
   return ["set"] if value in ["__set__", *]
   return ["rational"] if value in Rational
   return ["complex"] if value in Complex
@@ -3561,6 +3638,26 @@ def refuse_non_number(name, arguments)
   arguments.each do |argument|
     next if (argument in Integer) || (argument in Float) || (argument in Rational) || (argument in Complex)
     panic("#{name} takes numbers, got #{render_inspect(argument)}")
+  end
+end
+
+# A match's readers (ADR 0086), each the host's own; `values_at` takes any
+# number of groups, read one at a time.
+def matchdata_answer(found, name, arguments)
+  case name
+  when "captures" then found.captures
+  when "named_captures" then found.named_captures
+  when "names" then found.names
+  when "pre_match" then found.pre_match
+  when "post_match" then found.post_match
+  when "string" then found.string
+  when "regexp" then found.regexp
+  when "to_a" then found.to_a
+  when "size", "length" then found.size
+  when "begin" then found.begin(host_group_key(value_at(arguments, 0)))
+  when "end" then found.end(host_group_key(value_at(arguments, 0)))
+  when "offset" then found.offset(host_group_key(value_at(arguments, 0)))
+  else arguments.map { |group| found[host_group_key(group)] }
   end
 end
 
@@ -3649,6 +3746,19 @@ end
 # `block_interrupted` decides what the interrupted call answers. The arm
 # repetition is deliberate; the host `break` has to live inside each host
 # block to stop it.
+# One replacement for `sub`/`gsub` with a pattern and a block (ADR 0086):
+# the block's answer as text, the scope it left, and its signal if any —
+# a triple, since the host's replacer calls back and the caller's scope
+# must thread through. After a signal the rest replace with nothing.
+def guest_replacement(block, matched, scope, interrupt, entry, name)
+  return ["", scope, interrupt] if interrupt.some?
+  step = run_guest_block(block, [matched], scope)
+  settled = compacted_since(entry, step.bindings)
+  return ["", settled, step] if step.signal != "none"
+  panic("#{name} block produced no value") if step.value.empty?
+  [joined_guest([slot_value(step.value)], ""), settled, nil]
+end
+
 def evaluate_block_call(node, receiver, arguments, mutable scope)
   # Each pass's rebindings flow back as fresh shadows, so the pass boundary
   # compacts them the way a while iteration does (#62) — dead triples from
@@ -3879,6 +3989,19 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     outcome([results], scope)
   # A hash's one-value walks (#105): each rides the host's by name, its
   # rebindings threaded through like every other walk's.
+  # `scan` with a block (ADR 0086): each match's text — its groups as an
+  # array when the pattern has any — to the block, answering the string.
+  when "scan"
+    receiver.scan(value_at(arguments, 0)) do |item|
+      step = run_guest_block(block, [item], scope)
+      scope = compacted_since(entry, step.bindings)
+      if step.signal != "none"
+        interrupt = step
+        break
+      end
+    end
+    return block_interrupted(interrupt, scope) if interrupt.some?
+    outcome([receiver], scope)
   # A string's walks (#106): characters, lines, and successors, each
   # answering the string.
   when "each_char", "each_grapheme_cluster"
@@ -3931,6 +4054,28 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # characters with an empty piece at either end.
   when "sub", "gsub"
     pattern = value_at(arguments, 0)
+    # A pattern (ADR 0086): the host finds each match and hands its text to
+    # the guest block; once the block signals, the rest run as nothing.
+    if pattern in Regexp
+      mutable replaced = ""
+      if node.name == "gsub"
+        replaced = receiver.gsub(pattern) do |matched|
+          answer = guest_replacement(block, matched, scope, interrupt, entry, node.name)
+          scope = value_at(answer, 1)
+          interrupt = value_at(answer, 2)
+          value_at(answer, 0)
+        end
+      else
+        replaced = receiver.sub(pattern) do |matched|
+          answer = guest_replacement(block, matched, scope, interrupt, entry, node.name)
+          scope = value_at(answer, 1)
+          interrupt = value_at(answer, 2)
+          value_at(answer, 0)
+        end
+      end
+      return block_interrupted(interrupt, scope) if interrupt.some?
+      return outcome([replaced], scope)
+    end
     pieces = pattern.empty? ? [""] + receiver.chars + [""] : receiver.split(pattern, -1)
     mutable result = ""
     pieces.each_with_index do |piece, position|

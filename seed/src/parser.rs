@@ -330,6 +330,99 @@ fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
         .unwrap()
 }
 
+/// A regex literal (ADR 0086): `/body/flags` or `%r{body}flags`. The body
+/// stays raw for the engine — a backslash escape is the pattern's own, so
+/// `\/` and `\d` pass through as written — and only `#{...}` is read here,
+/// as in a string, each piece joined by `+` into the source expression.
+fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
+    let bytes = text.as_bytes();
+    let mut flags_start = text.len();
+    while flags_start > 0 && matches!(bytes[flags_start - 1], b'i' | b'm' | b'x' | b'o') {
+        flags_start -= 1;
+    }
+    let flags = &text[flags_start..];
+    if flags.contains('o') {
+        panic!(
+            "the 'o' flag interpolates a pattern once, which Portland does not spell — drop the flag; a constant pattern is built once anyway"
+        );
+    }
+    let body = if text.starts_with('/') {
+        &text[1..flags_start - 1]
+    } else {
+        // `%r` + opener, closer last.
+        &text[3..flags_start - 1]
+    };
+    let mut parts: Vec<Expression> = Vec::new();
+    let mut literal = String::new();
+    let mut characters = body.char_indices().peekable();
+    while let Some((index, character)) = characters.next() {
+        match character {
+            '\\' => {
+                literal.push('\\');
+                if let Some((_, escaped)) = characters.next() {
+                    literal.push(escaped);
+                }
+            }
+            '#' if matches!(characters.peek(), Some(&(_, '{'))) => {
+                characters.next(); // the `{`
+                let inner_start = index + 2;
+                let mut depth = 1;
+                let inner_end = loop {
+                    match characters.next() {
+                        None => panic!("unterminated interpolation in regex {text}"),
+                        Some((_, '{')) => depth += 1,
+                        Some((position, '}')) => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break position;
+                            }
+                        }
+                        Some((_, '"')) => loop {
+                            match characters.next() {
+                                None => panic!("unterminated interpolation in regex {text}"),
+                                Some((_, '\\')) => {
+                                    characters.next();
+                                }
+                                Some((_, '"')) => break,
+                                Some(_) => {}
+                            }
+                        },
+                        Some(_) => {}
+                    }
+                };
+                if !literal.is_empty() {
+                    parts.push(Expression::String(std::mem::take(&mut literal)));
+                }
+                let inner = expression_from(&body[inner_start..inner_end], it_frames);
+                parts.push(Expression::MethodCall {
+                    arguments: Vec::new(),
+                    block: None,
+                    keyword_arguments: Vec::new(),
+                    name: "to_s".to_string(),
+                    receiver: Box::new(inner),
+                    safe: false,
+                });
+            }
+            _ => literal.push(character),
+        }
+    }
+    if !literal.is_empty() || parts.is_empty() {
+        parts.push(Expression::String(literal));
+    }
+    let source = parts
+        .into_iter()
+        .reduce(|left, right| Expression::Binary {
+            left: Box::new(left),
+            operator: BinaryOperator::Add,
+            right: Box::new(right),
+        })
+        .unwrap();
+    Expression::Regex {
+        flags: flags.to_string(),
+        source: Box::new(source),
+    }
+}
+
 /// Parse a standalone expression source (used for interpolation innards).
 /// The caller's block frames move into the sub-parser and back out, so a
 /// block opened *inside* the interpolation still nests correctly under the
@@ -696,7 +789,8 @@ impl<'source> Parser<'source> {
             | TokenKind::String
             | TokenKind::Symbol
             | TokenKind::SymbolArray
-            | TokenKind::WordArray => true,
+            | TokenKind::WordArray
+            | TokenKind::Regex => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             // `p ::Config` — a spaced `::` starts a top-level name (#147).
             TokenKind::ColonColon => next.leading_space,
@@ -870,7 +964,8 @@ impl<'source> Parser<'source> {
             | TokenKind::String
             | TokenKind::Symbol
             | TokenKind::SymbolArray
-            | TokenKind::WordArray => true,
+            | TokenKind::WordArray
+            | TokenKind::Regex => true,
             TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
             TokenKind::Minus if next.leading_space => {
                 // `a.b - 1` is subtraction; `a.b -1` would be a guess. Ruby
@@ -2983,6 +3078,25 @@ impl<'source> Parser<'source> {
                 subject: Box::new(subject),
             };
         }
+        // `=~` and `!~` (ADR 0086) sit with `==`: a match is a method call
+        // on the left side, answering the MatchData or nil, or the boolean.
+        while let Some(name) = match self.peek_kind() {
+            Some(TokenKind::EqualTilde) => Some("=~"),
+            Some(TokenKind::BangTilde) => Some("!~"),
+            _ => None,
+        } {
+            self.position += 1;
+            self.skip_newlines();
+            let right = self.addition();
+            left = Expression::MethodCall {
+                arguments: vec![right],
+                block: None,
+                keyword_arguments: Vec::new(),
+                name: name.to_string(),
+                receiver: Box::new(left),
+                safe: false,
+            };
+        }
         while let Some(operator) = match self.peek_kind() {
             Some(TokenKind::EqualEqual) => Some(BinaryOperator::Equals),
             Some(TokenKind::Greater) => Some(BinaryOperator::Greater),
@@ -3392,6 +3506,7 @@ impl<'source> Parser<'source> {
                 }
             }
             TokenKind::String => string_expression(token.text, &mut self.it_frames),
+            TokenKind::Regex => regex_expression(token.text, &mut self.it_frames),
             // `:paid` alone is a symbol; `:paid(on: expr)` is an enum case
             // carrying a payload (ADR 0022). The paren must be attached —
             // `foo :paid (x)` is two things, not one.
@@ -3612,6 +3727,7 @@ impl<'source> Parser<'source> {
                     | TokenKind::Symbol
                     | TokenKind::SymbolArray
                     | TokenKind::WordArray
+                    | TokenKind::Regex
             ) || (next.kind == TokenKind::Keyword
                 && matches!(next.text, "false" | "nil" | "self" | "true")));
         if !starts_a_value {

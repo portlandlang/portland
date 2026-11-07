@@ -24,6 +24,10 @@ path = "src/main.rs"
 # its random source is private, and `Instant` has no absolute reading — so
 # the seed declares them through libc, which rustyline already pulls in.
 libc = "0.2.189"
+# The regex engine (ADR 0086, #212): oniai, a pure-Rust Onigmo, pinned to a
+# commit and without its Cranelift JIT. Unlicensed as of this pin, which is
+# why this sits on a branch; the choice of engine is #212's to make.
+oniai = { git = "https://github.com/makenowjust/oniai", rev = "c2f332ed65d94887a268bbfd16dc3076dc0dc79d", default-features = false }
 rustyline = "18.0.1"
 # The Unicode floor for ADR 0038: what a character is (grapheme clusters)
 # and when two strings are equal (canonical equivalence). Prior art over

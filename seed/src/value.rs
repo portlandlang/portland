@@ -89,6 +89,12 @@ pub enum Value {
     /// advancing as it is drawn from — the one value that moves, since a
     /// generator that answered the same number twice would not be one.
     Random(std::rc::Rc<std::cell::RefCell<crate::random::Mt>>),
+    /// `/pattern/` (ADR 0086): a compiled pattern with its source and
+    /// flags; the engine behind it is `regex.rs`'s business.
+    Regex(std::rc::Rc<crate::regex::Pattern>),
+    /// What `=~` and `match` answer (ADR 0086): the match, its groups, and
+    /// the text it ran over — Ruby's `MatchData`.
+    MatchData(std::rc::Rc<crate::regex::Found>),
 }
 
 /// Two strings are equal when they are the same *text*, not the same bytes
@@ -184,6 +190,19 @@ impl PartialEq for Value {
             // Two generators are equal when seeded alike and drawn alike,
             // as Ruby's are.
             (Value::Random(left), Value::Random(right)) => *left.borrow() == *right.borrow(),
+            // Two patterns are equal by source and flags; two matches by
+            // their pattern, their text, and where they fell (ADR 0086).
+            (Value::Regex(left), Value::Regex(right)) => {
+                left.source == right.source
+                    && left.ignore_case == right.ignore_case
+                    && left.multiline == right.multiline
+                    && left.extended == right.extended
+            }
+            (Value::MatchData(left), Value::MatchData(right)) => {
+                Value::Regex(left.pattern.clone()) == Value::Regex(right.pattern.clone())
+                    && left.text == right.text
+                    && left.spans == right.spans
+            }
             // Two sets are equal when each holds the other's members —
             // order is not a set's identity, and a member matches by `eql?`.
             (Value::Set(left), Value::Set(right)) => {
@@ -392,6 +411,8 @@ impl Value {
             Value::Integer(_) => Some("integer"),
             Value::Complex { .. } => Some("complex"),
             Value::Random(_) => Some("random"),
+            Value::Regex(_) => Some("regexp"),
+            Value::MatchData(_) => Some("matchdata"),
             Value::Range { .. } => Some("range"),
             Value::Rational { .. } => Some("rational"),
             Value::Set(_) => Some("set"),
@@ -414,6 +435,8 @@ impl Value {
             Value::Nil => "nil".to_string(),
             Value::Complex { .. } => "Complex".to_string(),
             Value::Random(_) => "Random".to_string(),
+            Value::Regex(_) => "Regexp".to_string(),
+            Value::MatchData(_) => "MatchData".to_string(),
             Value::Range { .. } => "Range".to_string(),
             Value::Rational { .. } => "Rational".to_string(),
             Value::Set(_) => "Set".to_string(),
@@ -464,6 +487,9 @@ impl Value {
             // The spelling that builds one from the same seed; where it has
             // been drawn from is not written, as Ruby's is not.
             Value::Random(generator) => format!("Random.new({})", generator.borrow().seed),
+            // `/source/flags` and `#<MatchData "…">` (ADR 0086), Ruby's.
+            Value::Regex(pattern) => pattern.inspect(),
+            Value::MatchData(found) => found.inspect(),
             // Ruby's `(1/3)` and `(1+2i)` (ADR 0085).
             Value::Rational { .. } | Value::Complex { .. } => crate::tower::inspect(self),
             // Ruby 4's spelling, which is also the constructor's.
@@ -608,6 +634,10 @@ impl fmt::Display for Value {
             }
             Value::Nil => write!(formatter, "nil"),
             Value::Random(_) | Value::Set(_) => write!(formatter, "{}", self.inspect()),
+            // A pattern's `to_s` is its embeddable form, `(?-mix:a)`; a
+            // match's is its text (ADR 0086).
+            Value::Regex(pattern) => write!(formatter, "{}", pattern.to_s()),
+            Value::MatchData(found) => write!(formatter, "{}", found.matched()),
             // `1/3` and `1+2i`: the inspect forms without their parentheses.
             Value::Rational { .. } | Value::Complex { .. } => {
                 write!(formatter, "{}", crate::tower::to_s(self))

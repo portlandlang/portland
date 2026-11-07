@@ -188,7 +188,7 @@ end
 def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_writer begin defined? ensure extend for redo rescue retry undef].include?(word)
 
 def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= => &. << .. :: **].include?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &. << .. :: ** =~ !~].include?(pair)
 end
 
 # `...`, `<<~`, `||=`, and `<=>` — the three-character operators (ADRs
@@ -260,6 +260,104 @@ def read_interpolation(characters, start)
     index += 1
   end
   text
+end
+
+# — regex literals (ADR 0086) —
+#
+# Whether a `/` here opens a regex literal: yes at the start and after
+# anything an operand cannot follow — an operator, an opener, a comma, a
+# newline, a keyword like `if` or `when`; no after a value, a closer, or a
+# name, where it divides. Mirrors the seed's `regex_begins`.
+def regex_begins?(tokens)
+  return true if tokens.empty?
+  previous = tokens.last
+  return false if %w[identifier integer float string symbol word_array symbol_array regex].include?(previous.kind)
+  return !%w[end self nil true false].include?(previous.text) if previous.kind == "keyword"
+  return !%w[) \] }].include?(previous.text) if previous.kind == "operator"
+  true
+end
+
+# `puts /x/`: a name, a space, and a `/` with none after it.
+def glued_to_a_name?(tokens, characters, index)
+  return false if tokens.empty? || tokens.last.kind != "identifier"
+  return false unless index > 0 && blank?(characters[index - 1])
+  return false if index + 1 >= characters.length
+  following = characters[index + 1]
+  !(blank?(following) || following == "=")
+end
+
+# The flag letters after a closing delimiter, `i`, `m`, `x`, or `o`.
+def read_regex_flags(characters, start)
+  mutable flags = ""
+  mutable index = start
+  while index < characters.length && "imxo".include?(characters[index])
+    flags << characters[index]
+    index += 1
+  end
+  flags
+end
+
+# `/.../flags`: the body raw — a backslash escapes the next character for
+# the engine's own reading, and an interpolation may hold a slash.
+def read_regex(characters, start)
+  mutable text = "/"
+  mutable index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
+      text << inner
+      index += inner.length
+      next
+    end
+    text << character
+    index += 1
+    return text + read_regex_flags(characters, index) if character == "/"
+  end
+  panic "unterminated regex starting at byte #{start}"
+end
+
+# `%r{...}flags`: `%w[]`'s delimiters and balancing, the body raw.
+def read_percent_regex(characters, start)
+  opener = start + 2 < characters.length ? characters[start + 2] : ""
+  panic "unterminated %r literal starting at byte #{start}" if opener.empty?
+  unless "[({".include?(opener)
+    panic "'%r#{opener}' is not a Portland delimiter — write %r[], %r(), or %r{}"
+  end
+  closer = closer_of(opener)
+  mutable text = "%r#{opener}"
+  mutable index = start + 3
+  mutable depth = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
+      text << inner
+      index += inner.length
+      next
+    end
+    text << character
+    index += 1
+    if character == opener
+      depth += 1
+    elsif character == closer
+      return text + read_regex_flags(characters, index) if depth == 0
+      depth -= 1
+    end
+  end
+  panic "unterminated %r#{opener}#{closer} starting at byte #{start}"
 end
 
 # Read a double-quoted lexeme: escapes and interpolation included.
@@ -337,7 +435,7 @@ end
 def declined_percent_literal?(characters, index)
   return false unless index + 1 < characters.length
   letter = characters[index + 1]
-  if "qQsWIrx".include?(letter)
+  if "qQsWIx".include?(letter)
     return false unless index + 2 < characters.length
     following = characters[index + 2]
     return !(name_character?(following) || blank?(following))
@@ -357,7 +455,6 @@ def declined_percent_sentence(spelling)
   next_step = case letters[1]
               when "I" then "write %i[] when no name interpolates, or [:\"\#{a}\", :b] when one does"
               when "W" then "write %w[] when no word interpolates, or [\"\#{a}\", \"b\"] when one does"
-              when "r" then "there is no regex yet"
               when "s" then "write :name, or :\"odd name\" for a name with spaces"
               when "x" then "there is no shell execution"
               else "write a quoted string or a heredoc"
@@ -720,6 +817,14 @@ def lex(raw_source, first_line: 1)
       index += text.length
       next
     end
+    # `%r{...}flags` (ADR 0086): the family's delimiters around a pattern.
+    if character == "%" && index + 1 < characters.length && characters[index + 1] == "r"
+      text = read_percent_regex(characters, index)
+      tokens << Token.new(kind: "regex", text: text, leading_space: leading, line: line)
+      line += text.count("\n")
+      index += text.length
+      next
+    end
     if character == "%" && declined_percent_literal?(characters, index)
       length = name_start?(characters[index + 1]) ? 3 : 2
       panic declined_percent_sentence(characters.slice(index, length).join(""))
@@ -853,6 +958,20 @@ def lex(raw_source, first_line: 1)
       tokens << Token.new(kind: "symbol", text: text, leading_space: leading, line: line)
       next
     end
+    # A regex literal (ADR 0086): `/.../flags` where an operand can begin —
+    # a `/` after a value divides — and `puts /x/`, glued to a name's
+    # argument, is the never-guess refusal (parentheses.md).
+    if character == "/" && glued_to_a_name?(tokens, characters, index)
+      name = tokens.last.text
+      panic "ambiguous without parens — write #{name}(/.../) to pass a pattern or #{name} / ... to divide"
+    end
+    if character == "/" && regex_begins?(tokens)
+      text = read_regex(characters, index)
+      tokens << Token.new(kind: "regex", text: text, leading_space: leading, line: line)
+      line += text.count("\n")
+      index += text.length
+      next
+    end
     if index + 2 < characters.length && three_character_operator?(character + characters[index + 1] + characters[index + 2])
       tokens << Token.new(kind: "operator", text: character + characters[index + 1] + characters[index + 2], leading_space: leading, line: line)
       index += 3
@@ -908,6 +1027,11 @@ def lex(raw_source, first_line: 1)
       end
       name_end += 1 if name_end == index + 1 && name_end < characters.length
       spelling = characters.slice(index, name_end - index).join("")
+      # The match globals (ADR 0086): the match is a value here, so the
+      # rewrite is to bind it and read it.
+      if %w[$~ $& $` $' $+].include?(spelling) || spelling.slice(1, spelling.length - 1).chars.all? { "0123456789".include?(it) }
+        panic "'#{spelling}' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match"
+      end
       panic "'#{spelling}' is a global, which Portland does not have — pass the value in, or name a constant"
     end
     # Ruby's instance and class variables have no Portland meaning (ADR

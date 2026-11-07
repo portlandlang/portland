@@ -2138,6 +2138,12 @@ fn floored_modulo(left: i64, right: i64) -> i64 {
 /// family cannot drift from plain indexing.
 fn index_read(receiver: &Value, index: &Value) -> Value {
     match (receiver, index) {
+        // `text[/pattern/]` is the match's text or nil, and `found[1]`,
+        // `found[:name]` a match's group (ADR 0086).
+        (Value::String(_), Value::Regex(_)) | (Value::MatchData(_), _) => {
+            crate::regex::method(receiver, "[]", std::slice::from_ref(index))
+                .expect("the regex module answers [] for these")
+        }
         (Value::Array(elements), Value::Integer(index)) => {
             // Partial operations return maybes (ADR 0010): negative
             // indices stay Ruby-style, out of range is nil.
@@ -3632,6 +3638,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 Some(crate::tower::complex(Value::Integer(0), imaginary))
             }
             Expression::String(value) => Some(Value::String(value.clone())),
+            // A regex literal (ADR 0086): its source, interpolated, compiled
+            // with its flags each time it is reached.
+            Expression::Regex { flags, source } => {
+                let source = match self.value_of(source) {
+                    Value::String(text) => text,
+                    other => panic!("a regex source must be a String, got {}", other.shown()),
+                };
+                Some(Value::Regex(crate::regex::Pattern::new(
+                    &source,
+                    flags.contains('i'),
+                    flags.contains('m'),
+                    flags.contains('x'),
+                )))
+            }
             Expression::Symbol(name) => Some(Value::Symbol(name.clone())),
             Expression::EnumCase { name, payload } => {
                 let values: Vec<(String, Value)> = payload
@@ -3703,6 +3723,7 @@ impl<W: std::io::Write> Interpreter<W> {
                             | "System"
                             | "Complex"
                             | "Rational"
+                            | "Regexp"
                     )
                     && !self.variables.contains_key(type_name)
                     && Self::resolve(&self.module_path, type_name, &self.structs).is_none()
@@ -3890,6 +3911,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Symbol"
                         | "Complex"
                         | "Rational"
+                        | "Regexp"
+                        | "MatchData"
                 ) {
                     Some(Value::Type(name.clone()))
                 } else {
@@ -4093,6 +4116,33 @@ impl<W: std::io::Write> Interpreter<W> {
             ("Hash", "new") => Some(hash_new(&arguments, block.is_some())),
             ("Integer", "sqrt") => Some(integer_sqrt(&arguments)),
             ("Random", "new") => Some(random_new(&arguments)),
+            // `Regexp.new`, `Regexp.escape`, and `Regexp.union` (ADR 0086);
+            // `Regexp.last_match` is the match global by another name.
+            ("Regexp", "new") => match arguments.as_slice() {
+                [Value::String(source)] => Some(Value::Regex(crate::regex::Pattern::from_options(
+                    source, None,
+                ))),
+                [Value::String(source), options] => Some(Value::Regex(
+                    crate::regex::Pattern::from_options(source, Some(options)),
+                )),
+                [Value::Regex(pattern)] => Some(Value::Regex(pattern.clone())),
+                [other, ..] => panic!("Regexp.new takes a String, got {}", other.shown()),
+                [] => panic!("Regexp.new takes 1 to 2 arguments, got 0"),
+            },
+            ("Regexp", "escape" | "quote") => match arguments.as_slice() {
+                [Value::String(text)] | [Value::Symbol(text)] => {
+                    Some(Value::String(crate::regex::escape(text)))
+                }
+                [other] => panic!(
+                    "no implicit conversion of {} into String",
+                    other.type_name()
+                ),
+                _ => panic!("Regexp.{name} takes 1 argument, got {}", arguments.len()),
+            },
+            ("Regexp", "union") => Some(Value::Regex(crate::regex::union(&arguments))),
+            ("Regexp", "last_match") => panic!(
+                "'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match"
+            ),
             // `Complex.polar` and `Complex.rectangular` (ADR 0085).
             ("Complex", _) => Some(
                 crate::tower::complex_type_function(name, &arguments)
@@ -5002,6 +5052,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "System"
                 | "Complex"
                 | "Rational"
+                | "Regexp"
         ) {
             return self.builtin_type_function(
                 type_name,
@@ -5097,6 +5148,14 @@ impl<W: std::io::Write> Interpreter<W> {
         // arms, so `1.quo(2)` is a rational and `3.to_r` exists.
         if block.is_none()
             && let Some(answer) = crate::tower::method(&receiver, name, &arguments)
+        {
+            return Some(answer);
+        }
+        // A pattern's, a match's, and a string's regex-taking names (ADR
+        // 0086), before the string arms so a pattern argument is never
+        // mistaken for a missing string.
+        if block.is_none()
+            && let Some(answer) = crate::regex::method(&receiver, name, &arguments)
         {
             return Some(answer);
         }
@@ -5524,6 +5583,43 @@ impl<W: std::io::Write> Interpreter<W> {
                     };
                     for number in numbers {
                         self.run_block(block, vec![Value::Integer(number)]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                    }
+                    Some(receiver)
+                }
+                // `sub`, `gsub`, and `scan` with a pattern and a block (ADR
+                // 0086): the block receives the matched text — `scan`'s the
+                // groups as an array when the pattern has any — and the two
+                // replacers answer the new string, `scan` its receiver.
+                (Value::String(text), "sub" | "gsub", [Value::Regex(pattern)]) => {
+                    let mut result = String::new();
+                    let mut copied_to = 0;
+                    let matches = if name == "gsub" {
+                        pattern.all(text)
+                    } else {
+                        pattern.search(text).into_iter().collect()
+                    };
+                    for found in matches {
+                        let (start, end) = found.spans[0].expect("a match has a whole");
+                        result.push_str(&text[copied_to..start]);
+                        let matched = Value::String(found.matched().to_string());
+                        let answer = self.run_block(block, vec![matched]);
+                        if let Some(interrupted) = self.block_interrupt() {
+                            return interrupted;
+                        }
+                        let answer =
+                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        result.push_str(&joined(&[answer], ""));
+                        copied_to = end;
+                    }
+                    result.push_str(&text[copied_to..]);
+                    Some(Value::String(result))
+                }
+                (Value::String(text), "scan", [Value::Regex(pattern)]) => {
+                    for found in pattern.all(text) {
+                        self.run_block(block, vec![crate::regex::scan_item(&found)]);
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
@@ -7470,17 +7566,8 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(_), "valid_encoding?", []) => Value::Boolean(true),
             (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
             (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
-            // Ruby reads `\0`, `\&`, and `\\` in a replacement as escapes;
-            // whether Portland does is undecided (#161), so a backslash
-            // refuses rather than passing through quietly (principle 5).
-            (Value::String(_), "sub" | "gsub", [Value::String(_), Value::String(replacement)])
-                if replacement.contains('\\') =>
-            {
-                refusal("arguments");
-                panic!(
-                    "a backslash in a replacement is undecided (#161) — Ruby reads \\0 and \\\\ as escapes; use a block"
-                )
-            }
+            // A replacement reads Ruby's escapes (ADR 0086, #161) with a
+            // string pattern too: `\0` and `\&` the match, a group empty.
             (
                 Value::String(text),
                 "sub" | "gsub",
@@ -7490,7 +7577,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 let mut copied_to = 0;
                 for (start, end) in matched_spans(text, pattern, name == "gsub") {
                     result.push_str(&text[copied_to..start]);
-                    result.push_str(replacement);
+                    let found = crate::regex::literal_found(text, start, end);
+                    result.push_str(&crate::regex::expand_replacement(replacement, &found));
                     copied_to = end;
                 }
                 result.push_str(&text[copied_to..]);
@@ -8406,6 +8494,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         | "Symbol"
                         | "Complex"
                         | "Rational"
+                        | "Regexp"
+                        | "MatchData"
                 ) {
                     if !pattern_fields.is_empty() {
                         panic!("the builtin type pattern {name} takes no fields");
@@ -8422,6 +8512,8 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Set", Value::Set(_))
                             | ("String", Value::String(_))
                             | ("Symbol", Value::Symbol(_))
+                            | ("Regexp", Value::Regex(_))
+                            | ("MatchData", Value::MatchData(_))
                             | ("Complex", Value::Complex { .. })
                             | ("Rational", Value::Rational { .. })
                     );
@@ -8498,6 +8590,8 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // A set's `===` is membership (ADR 0082), as Ruby's.
             (Value::Set(members), _) => members.contains(subject),
+            // A pattern's `===` is a match on a string or a symbol (ADR 0086).
+            (Value::Regex(pattern), _) => crate::regex::case_matches(pattern, subject),
             // Portland's own `==`, so `1 === 1.0` as `1 == 1.0` does.
             _ => {
                 apply_binary(pattern.clone(), &BinaryOperator::Equals, subject.clone())
@@ -8523,6 +8617,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "Symbol"
                 | "Complex"
                 | "Rational"
+                | "Regexp"
+                | "MatchData"
         ) {
             return Some(subject.type_name() == name);
         }

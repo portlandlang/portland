@@ -69,6 +69,9 @@ cargo test --package portland-seed --quiet --lib
 step "integration tests — seed/tests/run_pdx_files.rs"
 cargo test --package portland-seed --quiet --test run_pdx_files
 
+step "regex conformance — seed/tests/onigmo_corpus.rs: the engine against Onigmo's suite, Ruby 4.0.9 the ground truth"
+cargo test --package portland-seed --quiet --test onigmo_corpus
+
 step "docs checks — script/docs/check"
 script/docs/check
 

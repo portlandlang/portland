@@ -1437,10 +1437,6 @@ fn the_declined_percent_members_refuse_on_both_oracles() {
             "'%I[' is not a Portland literal — write %i[] when no name interpolates, or [:\"#{a}\", :b] when one does",
         ),
         (
-            "x = %r{a/b}\n",
-            "'%r{' is not a Portland literal — there is no regex yet",
-        ),
-        (
             "x = %x(ls)\n",
             "'%x(' is not a Portland literal — there is no shell execution",
         ),
@@ -1823,10 +1819,6 @@ fn string_methods_first_run_match_ruby() {
         (
             "p(\"hello\".sub(1, \"x\"))\n",
             "wrong argument type Integer (expected Regexp)",
-        ),
-        (
-            "p(\"hello\".sub(\"l\", \"\\\\0\"))\n",
-            "a backslash in a replacement is undecided (#161)",
         ),
     ];
     assert_both_oracles_refuse("string_first_run_refusal.pdx", None, &cases);
@@ -4896,6 +4888,7 @@ fn portland_evaluator_runs_the_fixture_suite() {
     // evaluator, byte-identical to the seed.
     for fixture in [
         "hello",
+        "regex",
         "arithmetic",
         "fizzbuzz",
         "showcase",
@@ -5595,6 +5588,158 @@ fn tower_constructors_with_complex_arguments_on_both_oracles() {
             (
                 "p(Complex(\"79+4i\"))\n",
                 "Complex takes numbers, got \"79+4i\"",
+            ),
+        ],
+    );
+}
+
+/// Regex (ADR 0086): Ruby's literals over Onigmo's pattern language, a
+/// match as a value, grapheme positions, and Ruby's replacement escapes —
+/// the fixture runs on both oracles, every answer pinned against Ruby
+/// 4.0.9 except the two grapheme positions it records as different.
+#[test]
+fn runs_regex_pdx() {
+    let output = run_fixture("regex.pdx");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        r#"#<MatchData "2024-01-15" year:"2024" month:"01" day:"15">
+"2024"
+"2024-01-15"
+"15"
+["2024", "01", "15"]
+{"year" => "2024", "month" => "01", "day" => "15"}
+["year", "month", "day"]
+"today is "
+""
+9
+[9, 13]
+["2024-01-15", "2024", "01", "15"]
+["2024", "15"]
+4
+#<MatchData "ab" 1:"a" 2:"b" 3:nil>
+/ab/i
+"(?i-mx:ab)"
+"(?-mix:ab)"
+"(?mix:ab)"
+/a\/b/
+"a/b"
+1
+7
+/a\.b|(?i-mx:c)|d/
+/(?!)/
+"a\\.b\\*c\\?\\[d\\]\\ e"
+["a", "b", "c"]
+["a", "1", "b", "2", "c"]
+["a", "b", "c"]
+["a", "b2c3"]
+["a", "b", "c", ""]
+["a", "c"]
+[]
+["1", "22", "333"]
+[["a", "1"], ["b", "22"]]
+[]
+"hell0 w0rld"
+"heLLo"
+"07/11/2026"
+"<a>b"
+"abb"
+"-a-a-a-"
+"XaXXcX"
+"helllo"
+"ll"
+"e"
+nil
+2
+3
+3
+2
+1
+true
+false
+["he", "ll", "o"]
+["hel", "l", "o"]
+["hello", "", ""]
+#<MatchData "ll">
+2
+1
+1
+true
+false
+true
+true
+false
+true
+true
+nil
+#<MatchData "b">
+true
+true
+#<MatchData "a">
+/a/i
+/a/i
+/a/i
+/a/mx
+false
+["x", "y"]
+[]
+Hello
+World
+""
+"aab"
+"Hello World"
+comment
+3
+"a2b4"
+["1", "2"]
+/ab\/cd/
+/x2y/i
+#<MatchData "a/b">
+"a.b"
+Regexp
+MatchData
+true
+true
+"#
+    );
+}
+
+/// The regex refusals (ADR 0086) in the same words on both oracles: the
+/// match globals name the rewrite, a pattern glued to a name's argument is
+/// ambiguous, a string is no pattern for `=~`, a bad pattern refuses in
+/// the engine's words with the source, the `o` flag is not spelled, and
+/// `%r` takes the family's delimiters.
+#[test]
+fn regex_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "regex_refusals",
+        None,
+        &[
+            (
+                "p($1)\n",
+                "'$1' is a match global, which Portland does not have — bind the match",
+            ),
+            (
+                "p($~)\n",
+                "'$~' is a match global, which Portland does not have — bind the match",
+            ),
+            (
+                "puts /x/\n",
+                "ambiguous without parens — write puts(/.../) to pass a pattern or puts / ... to divide",
+            ),
+            ("p(\"a\" =~ \"a\")\n", "type mismatch: String given"),
+            ("p(Regexp.new(\"(\"))\n", ": /(/"),
+            (
+                "x = /a/o\n",
+                "the 'o' flag interpolates a pattern once, which Portland does not spell",
+            ),
+            (
+                "x = %r|a|\n",
+                "'%r|' is not a Portland delimiter — write %r[], %r(), or %r{}",
+            ),
+            (
+                "p(Regexp.last_match)\n",
+                "'Regexp.last_match' is a match global",
             ),
         ],
     );

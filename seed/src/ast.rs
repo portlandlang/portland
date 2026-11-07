@@ -401,6 +401,13 @@ pub enum Expression {
     /// pass-myself-along case.
     SelfValue,
     String(String),
+    /// `/pattern/flags` and `%r{pattern}flags` (ADR 0086): the source as a
+    /// string-valued expression, since it may interpolate, and the flag
+    /// letters as written.
+    Regex {
+        flags: String,
+        source: Box<Expression>,
+    },
     /// `:name` — the name without its colon (ADR 0023).
     Symbol(String),
     /// `:paid(on: expr)` — an enum case with a keyword payload (ADR 0022).
