@@ -18,7 +18,6 @@ use super::cache;
 use super::compile::{Op, Program};
 use super::error::{self, RegexError};
 use super::unicode::{self, CTYPE_WORD};
-use unicode_segmentation::UnicodeSegmentation;
 
 /// The groups of a match as byte spans, group 0 first; a group that took
 /// no part is `None`.
@@ -738,15 +737,6 @@ impl<'a> Matcher<'a> {
         None
     }
 
-    /// The length in bytes of the grapheme cluster starting at `s`, within
-    /// `bound`.
-    fn grapheme_length(&self, s: usize, bound: usize) -> usize {
-        match self.text[s..bound].graphemes(true).next() {
-            Some(cluster) => cluster.len(),
-            None => 0,
-        }
-    }
-
     /// `match_at`: one attempt from `sstart`; `gpos` is where the search
     /// began, for `\G`. Answers the groups as byte spans.
     pub fn match_at(&mut self, sstart: usize, gpos: usize) -> Result<Option<Spans>, RegexError> {
@@ -881,20 +871,6 @@ impl<'a> Matcher<'a> {
                     if (s as i64) < range {
                         s += self.char_len_at(s);
                         pc += 1;
-                    } else {
-                        fail = true;
-                    }
-                }
-                Op::GraphemeCluster => {
-                    if (s as i64) < range {
-                        let bound = (range.max(s as i64) as usize).min(self.bytes.len());
-                        let length = self.grapheme_length(s, bound);
-                        if length == 0 || (s + length) as i64 > range {
-                            fail = true;
-                        } else {
-                            s += length;
-                            pc += 1;
-                        }
                     } else {
                         fail = true;
                     }
@@ -1074,6 +1050,76 @@ impl<'a> Matcher<'a> {
                     CacheVerdict::Fail => fail = true,
                     CacheVerdict::Jump(addr) => pc = addr,
                 },
+                Op::PushOrJumpExact1 { addr, byte } => {
+                    if s < self.bytes.len() && self.bytes[s] == *byte && (s as i64) < range {
+                        match self.check_match_cache(pc, s, false) {
+                            CacheVerdict::Proceed => {
+                                self.stack.push(Entry::Alt {
+                                    pc: *addr,
+                                    s,
+                                    pkeep,
+                                });
+                                pc += 1;
+                            }
+                            CacheVerdict::Fail => fail = true,
+                            CacheVerdict::Jump(addr) => pc = addr,
+                        }
+                    } else {
+                        pc = *addr;
+                    }
+                }
+                Op::PushIfPeekNext { addr, byte } => match self.check_match_cache(pc, s, false) {
+                    CacheVerdict::Proceed => {
+                        if s < self.bytes.len() && self.bytes[s] == *byte {
+                            self.stack.push(Entry::Alt {
+                                pc: *addr,
+                                s,
+                                pkeep,
+                            });
+                        } else {
+                            // No alternative to come back to: as good as a
+                            // failure for the match cache's count.
+                            self.count_fail();
+                        }
+                        pc += 1;
+                    }
+                    CacheVerdict::Fail => fail = true,
+                    CacheVerdict::Jump(addr) => pc = addr,
+                },
+                Op::AnyCharStar { multiline, peek } => {
+                    let mut jumped = false;
+                    while (s as i64) < range {
+                        match self.check_match_cache(pc, s, false) {
+                            CacheVerdict::Proceed => {}
+                            CacheVerdict::Fail => {
+                                fail = true;
+                                break;
+                            }
+                            CacheVerdict::Jump(addr) => {
+                                pc = addr;
+                                jumped = true;
+                                break;
+                            }
+                        }
+                        match peek {
+                            Some(byte) if self.bytes[s] != *byte => self.count_fail(),
+                            _ => self.stack.push(Entry::Alt {
+                                pc: pc + 1,
+                                s,
+                                pkeep,
+                            }),
+                        }
+                        let length = self.char_len_at(s);
+                        if (s + length) as i64 > range || (!multiline && self.bytes[s] == b'\n') {
+                            fail = true;
+                            break;
+                        }
+                        s += length;
+                    }
+                    if !fail && !jumped {
+                        pc += 1;
+                    }
+                }
                 Op::Pop => {
                     self.stack.pop();
                     pc += 1;

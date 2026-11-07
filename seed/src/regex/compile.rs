@@ -35,7 +35,6 @@ pub enum Op {
     },
     AnyChar,
     AnyCharMl,
-    GraphemeCluster,
     BeginBuf,
     EndBuf,
     SemiEndBuf,
@@ -79,6 +78,26 @@ pub enum Op {
     },
     Jump(usize),
     Push(usize),
+    /// `OP_PUSH_OR_JUMP_EXACT1`: a loop whose body opens with `byte`
+    /// pushes its alternative only where that byte is next, and jumps out
+    /// otherwise.
+    PushOrJumpExact1 {
+        addr: usize,
+        byte: u8,
+    },
+    /// `OP_PUSH_IF_PEEK_NEXT`: a loop followed by `byte` pushes its
+    /// alternative only where that byte is next, and runs its body either
+    /// way.
+    PushIfPeekNext {
+        addr: usize,
+        byte: u8,
+    },
+    /// `OP_ANYCHAR_STAR` and `_ML_STAR`, with `_PEEK_NEXT` when `peek` is
+    /// set: `.*` as one instruction, an alternative per character.
+    AnyCharStar {
+        multiline: bool,
+        peek: Option<u8>,
+    },
     Pop,
     Repeat {
         id: usize,
@@ -198,6 +217,16 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         required,
         cache,
     })
+}
+
+/// The first byte of a head string, what `OP_PUSH_OR_JUMP_EXACT1` peeks.
+fn first_byte(head: &Node) -> u8 {
+    let Node::Str { chars, .. } = head else {
+        unreachable!("a head is a string")
+    };
+    let mut bytes = [0u8; 4];
+    chars[0].encode_utf8(&mut bytes);
+    bytes[0]
 }
 
 /// `set_bm_skip`: for each byte, how far a search window of `needle`'s
@@ -384,7 +413,7 @@ fn head_bytes(node: &Node) -> Option<([bool; 256], bool)> {
             }
             EncloseKind::Absent => None,
         },
-        Node::AnyChar { .. } | Node::GraphemeCluster | Node::BackRef(_) | Node::Call(_) => None,
+        Node::AnyChar { .. } | Node::BackRef(_) | Node::Call(_) => None,
     }
 }
 
@@ -492,9 +521,6 @@ impl Compiler {
                 } else {
                     Op::AnyChar
                 });
-            }
-            Node::GraphemeCluster => {
-                self.emit(Op::GraphemeCluster);
             }
             Node::Quantifier(quantifier) => self.quantifier(quantifier)?,
             Node::Enclose(enclose) => match enclose.kind {
@@ -676,6 +702,20 @@ impl Compiler {
         let infinite = quantifier.upper.is_none();
         let lower = quantifier.lower;
         let tlen = length::tree_length(target);
+        if let Node::AnyChar { multiline } = target
+            && quantifier.greedy
+            && infinite
+        {
+            // `is_anychar_star_quantifier`: `.*` is one instruction.
+            for _ in 0..lower {
+                self.tree(target)?;
+            }
+            self.emit(Op::AnyCharStar {
+                multiline: *multiline,
+                peek: quantifier.next_head_byte,
+            });
+            return Ok(());
+        }
         if infinite && (lower <= 1 || length::is_expand_limit_ok(tlen, lower)) {
             // A body too long to write out once is entered by a jump into
             // the loop instead.
@@ -688,12 +728,22 @@ impl Compiler {
                 None
             };
             if quantifier.greedy {
+                // The alternative is pushed only where the body's own
+                // first byte, or the byte after the loop, is next.
                 let push = self.emit(Op::Push(0));
                 let body = self.here();
                 self.body_with_empty_check(target, quantifier.empty)?;
                 self.emit(Op::Jump(push));
                 let after = self.here();
-                self.patch(push, Op::Push(after));
+                let push_op = match (&quantifier.head_exact, quantifier.next_head_byte) {
+                    (Some(head), _) => Op::PushOrJumpExact1 {
+                        addr: after,
+                        byte: first_byte(head),
+                    },
+                    (None, Some(byte)) => Op::PushIfPeekNext { addr: after, byte },
+                    (None, None) => Op::Push(after),
+                };
+                self.patch(push, push_op);
                 if let Some(enter) = enter {
                     self.patch(enter, Op::Jump(body));
                 }

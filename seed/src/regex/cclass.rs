@@ -43,6 +43,13 @@ impl ClassNode {
         }
     }
 
+    /// `BITSET_CLEAR_BIT`.
+    pub fn clear_bit(&mut self, code: u32) {
+        if code < SINGLE_BYTE_SIZE {
+            self.bitset[(code / 64) as usize] &= !(1u64 << (code % 64));
+        }
+    }
+
     /// `bitset_set_range`, the upper end clipped to the bitset.
     pub fn set_bit_range(&mut self, from: u32, to: u32) {
         let top = to.min(SINGLE_BYTE_SIZE - 1);

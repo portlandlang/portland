@@ -610,7 +610,7 @@ fn min_match_length(node: &Node, state: &SetupState, visiting: &mut Vec<usize>) 
     match node {
         Node::Empty | Node::Anchor(_) | Node::BackRef(_) => 0,
         Node::Str { chars, .. } => chars.len(),
-        Node::Class(_) | Node::Word { .. } | Node::AnyChar { .. } | Node::GraphemeCluster => 1,
+        Node::Class(_) | Node::Word { .. } | Node::AnyChar { .. } => 1,
         Node::List(parts) => parts
             .iter()
             .map(|part| min_match_length(part, state, visiting))
@@ -680,7 +680,6 @@ fn char_length(node: &Node, state: &SetupState, level: usize) -> CharLength {
             }
         }
         Node::Class(_) | Node::Word { .. } | Node::AnyChar { .. } => CharLength::Fixed(1),
-        Node::GraphemeCluster => CharLength::Variable,
         Node::List(parts) => {
             let mut total = 0;
             for part in parts {
@@ -782,8 +781,12 @@ struct Context {
 fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Result<(), RegexError> {
     match node {
         Node::List(parts) => {
-            for part in parts {
-                setup_tree(part, state, context)?;
+            for index in 0..parts.len() {
+                setup_tree(&mut parts[index], state, context)?;
+                if index > 0 {
+                    let (before, after) = parts.split_at_mut(index);
+                    next_setup(&mut before[index - 1], &after[0]);
+                }
             }
         }
         Node::Alt(parts) => {
@@ -839,6 +842,14 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
             )?;
             if let Some(expanded) = expand_repeated_string(quantifier) {
                 *node = expanded;
+            } else if quantifier.greedy && quantifier.empty != EmptyInfo::Never {
+                // `USE_OP_PUSH_OR_JUMP_EXACT`: a greedy loop over a body
+                // that may be empty learns the literal its body opens
+                // with, taking a nested loop's own.
+                quantifier.head_exact = match quantifier.target.as_mut() {
+                    Node::Quantifier(inner) => inner.head_exact.take(),
+                    target => head_value_node(target, true).cloned().map(Box::new),
+                };
             }
         }
         Node::Enclose(enclose) => {
@@ -986,7 +997,7 @@ fn allowed_in_lookbehind(node: &Node, negative: bool) -> bool {
                 .is_some_and(|target| allowed_in_lookbehind(target, negative)),
             _ => true,
         },
-        Node::BackRef(_) | Node::GraphemeCluster => false,
+        Node::BackRef(_) => false,
         _ => true,
     }
 }
@@ -1049,6 +1060,200 @@ fn holds_called_group(node: &Node) -> bool {
             .target
             .as_ref()
             .is_some_and(|target| holds_called_group(target)),
+        _ => false,
+    }
+}
+
+/// `next_setup`: what a node learns from the one after it in a sequence.
+/// A greedy open loop followed by a literal records the literal's first
+/// byte, so it pushes an alternative only where that byte is next; and
+/// `a*b` becomes `(?>a*)b` when the loop's body and what follows can
+/// never open with the same character, since backtracking into the loop
+/// could then never help (Onigmo's automatic possessivation). A capturing
+/// group that is not called is looked through.
+fn next_setup(node: &mut Node, next: &Node) {
+    match node {
+        Node::Quantifier(quantifier) => {
+            if !quantifier.greedy || quantifier.upper.is_some() {
+                return;
+            }
+            if let Some(Node::Str { chars, .. }) = head_value_node(next, true) {
+                let first = chars[0].len_utf8();
+                let mut bytes = [0u8; 4];
+                chars[0].encode_utf8(&mut bytes);
+                if first > 0 && bytes[0] != 0 {
+                    quantifier.next_head_byte = Some(bytes[0]);
+                }
+            }
+            if quantifier.lower > 1 || !is_simple(&quantifier.target) {
+                return;
+            }
+            let Some(body_head) = head_value_node(&quantifier.target, false) else {
+                return;
+            };
+            let Some(next_head) = head_value_node(next, false) else {
+                return;
+            };
+            if is_not_included(body_head, next_head) {
+                let inner = std::mem::replace(node, Node::Empty);
+                *node = Node::Enclose(super::ast::EncloseNode {
+                    kind: EncloseKind::StopBacktrack,
+                    target: Box::new(inner),
+                    call_target: false,
+                    recursive: false,
+                    char_len: None,
+                });
+            }
+        }
+        Node::Enclose(enclose)
+            if matches!(enclose.kind, EncloseKind::Memory { .. }) && !enclose.call_target =>
+        {
+            next_setup(&mut enclose.target, next);
+        }
+        _ => {}
+    }
+}
+
+/// `IS_NODE_TYPE_SIMPLE`.
+fn is_simple(node: &Node) -> bool {
+    matches!(
+        node,
+        Node::Str { .. }
+            | Node::Class(_)
+            | Node::Word { .. }
+            | Node::AnyChar { .. }
+            | Node::BackRef(_)
+    )
+}
+
+/// `get_head_value_node`: the node a match of `node` must open with — a
+/// string, or with `exact` off a class or `\w` too — when the tree says
+/// so; a case-insensitive string is not exact.
+fn head_value_node(node: &Node, exact: bool) -> Option<&Node> {
+    match node {
+        Node::Word { .. } | Node::Class(_) => {
+            if exact {
+                None
+            } else {
+                Some(node)
+            }
+        }
+        Node::List(parts) => parts
+            .first()
+            .and_then(|first| head_value_node(first, exact)),
+        Node::Str {
+            chars, ignore_case, ..
+        } => {
+            if chars.is_empty() {
+                None
+            } else if !exact || !*ignore_case {
+                Some(node)
+            } else {
+                None
+            }
+        }
+        Node::Quantifier(quantifier) => {
+            if quantifier.lower == 0 {
+                return None;
+            }
+            match &quantifier.head_exact {
+                Some(head) => Some(head),
+                None => head_value_node(&quantifier.target, exact),
+            }
+        }
+        Node::Enclose(enclose) => match enclose.kind {
+            EncloseKind::Absent => None,
+            _ => head_value_node(&enclose.target, exact),
+        },
+        Node::Anchor(anchor) if anchor.kind == AnchorKind::PrecRead => anchor
+            .target
+            .as_ref()
+            .and_then(|target| head_value_node(target, exact)),
+        _ => None,
+    }
+}
+
+fn is_word_code(code: u32, ascii_range: bool) -> bool {
+    if ascii_range && code >= 0x80 {
+        return false;
+    }
+    super::unicode::ctype_contains(super::unicode::CTYPE_WORD, code)
+}
+
+/// `is_not_included`: whether no character can open both `x` and `y`,
+/// read off the two heads as Onigmo reads them: a byte at a time over the
+/// bitsets, so a class with ranges beyond them is never certain.
+fn is_not_included(x: &Node, y: &Node) -> bool {
+    match (x, y) {
+        (
+            Node::Word {
+                not: x_not,
+                ascii_range: x_ascii,
+            },
+            Node::Word {
+                not: y_not,
+                ascii_range: y_ascii,
+            },
+        ) => x_not != y_not && x_ascii == y_ascii,
+        (Node::Word { .. }, Node::Class(_)) | (Node::Word { .. }, Node::Str { .. }) => {
+            is_not_included(y, x)
+        }
+        (Node::Class(class), Node::Word { not, ascii_range }) => {
+            if !*not {
+                if class.mbuf.is_some() || class.not {
+                    return false;
+                }
+                (0..256u32).all(|byte| !class.bit(byte) || !is_word_code(byte, *ascii_range))
+            } else {
+                if class.mbuf.is_some() {
+                    return false;
+                }
+                (0..256u32)
+                    .all(|byte| is_word_code(byte, *ascii_range) || class.bit(byte) == class.not)
+            }
+        }
+        (Node::Class(x_class), Node::Class(y_class)) => {
+            for byte in 0..256u32 {
+                if x_class.bit(byte) != x_class.not && y_class.bit(byte) != y_class.not {
+                    return false;
+                }
+            }
+            (x_class.mbuf.is_none() && !x_class.not) || (y_class.mbuf.is_none() && !y_class.not)
+        }
+        (Node::Class(_), Node::Str { .. }) => is_not_included(y, x),
+        (Node::Str { chars, .. }, Node::Word { not, ascii_range }) => {
+            if chars.is_empty() {
+                return false;
+            }
+            let word = is_word_code(chars[0] as u32, *ascii_range);
+            if word { *not } else { !*not }
+        }
+        (Node::Str { chars, .. }, Node::Class(class)) => {
+            if chars.is_empty() {
+                return false;
+            }
+            !class.matches(chars[0] as u32)
+        }
+        (
+            Node::Str {
+                chars: x_chars,
+                ignore_case: x_ignore_case,
+                ..
+            },
+            Node::Str {
+                chars: y_chars,
+                ignore_case: y_ignore_case,
+                ..
+            },
+        ) => {
+            if x_chars.is_empty() || *x_ignore_case || *y_ignore_case {
+                return false;
+            }
+            let x_bytes: String = x_chars.iter().collect();
+            let y_bytes: String = y_chars.iter().collect();
+            let length = x_bytes.len().min(y_bytes.len());
+            x_bytes.as_bytes()[..length] != y_bytes.as_bytes()[..length]
+        }
         _ => false,
     }
 }

@@ -105,6 +105,12 @@ impl Regex {
         &self.names
     }
 
+    /// What Ruby's `Regexp.linear_time?` answers: whether the match cache
+    /// covers the pattern, so a search runs in time linear in the text.
+    pub fn linear_time(&self) -> bool {
+        self.program.cache.is_some()
+    }
+
     /// Searches `text` from its start for the leftmost match, as
     /// `Regexp#match` does.
     pub fn search(&self, text: &str) -> Option<Captures> {

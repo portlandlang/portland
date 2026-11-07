@@ -89,6 +89,14 @@ pub struct QuantifierNode {
     /// Nested inside another quantifier, so its counter is found on the
     /// stack rather than by id (Onigmo's `_SG` opcodes).
     pub in_repeat: bool,
+    /// Set by setup for a greedy loop whose body may be empty: the literal
+    /// the body opens with, so the loop pushes only where that literal is
+    /// next (Onigmo's `head_exact`, `OP_PUSH_OR_JUMP_EXACT1`).
+    pub head_exact: Option<Box<Node>>,
+    /// Set by setup for a greedy open loop followed by a literal: its
+    /// first byte, so the loop pushes an alternative only where that byte
+    /// is next (Onigmo's `next_head_exact`, `OP_PUSH_IF_PEEK_NEXT`).
+    pub next_head_byte: Option<u8>,
 }
 
 impl QuantifierNode {
@@ -108,6 +116,8 @@ impl QuantifierNode {
             empty: EmptyInfo::Never,
             referred: false,
             in_repeat: false,
+            head_exact: None,
+            next_head_byte: None,
         }
     }
 }
@@ -157,8 +167,6 @@ pub enum Node {
     AnyChar {
         multiline: bool,
     },
-    /// `\X`: one extended grapheme cluster.
-    GraphemeCluster,
     List(Vec<Node>),
     Alt(Vec<Node>),
     Quantifier(QuantifierNode),

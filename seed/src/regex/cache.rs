@@ -90,7 +90,12 @@ impl Walk<'_> {
             let addr = *pc;
             *pc += 1;
             match &self.ops[addr] {
-                Op::Push(_) => self.record(addr, current_repeat, lookaround_nesting, cache_point),
+                Op::Push(_)
+                | Op::PushOrJumpExact1 { .. }
+                | Op::PushIfPeekNext { .. }
+                | Op::AnyCharStar { .. } => {
+                    self.record(addr, current_repeat, lookaround_nesting, cache_point)
+                }
                 Op::Repeat { id, .. } => {
                     if current_repeat.is_some() {
                         // A counted repeat inside another.
@@ -373,6 +378,21 @@ mod tests {
         assert!(is_memoized(&buffer, 0, 0x80));
         assert!(is_memoized_extended(&buffer, 0, 0x80));
         assert_eq!(buffer, vec![0x80, 0x01, 0]);
+    }
+
+    #[test]
+    fn linear_time_follows_rubys_tree_shapes() {
+        // `a*b` is possessivized into `(?>a*)b`, which the cache covers;
+        // inside an atomic group that nests one atomic in another, which
+        // it does not. A loop split off a string's end (`bx*`) stays in
+        // its own list, so it is never compared with what follows.
+        assert!(Regex::new("a*b").unwrap().linear_time());
+        assert!(!Regex::new("(?>a*b)").unwrap().linear_time());
+        assert!(Regex::new("(?>bx*ß)").unwrap().linear_time());
+        assert!(Regex::new("(?>(?:a\\d*)b)").unwrap().linear_time());
+        assert!(!Regex::new("(?>(?:a)\\d*b)").unwrap().linear_time());
+        assert!(!Regex::new(r"\X").unwrap().linear_time());
+        assert!(!Regex::new(r"(a)\1").unwrap().linear_time());
     }
 
     #[test]
