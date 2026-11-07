@@ -85,6 +85,18 @@ pub fn fold_sequence(code: u32) -> Vec<u32> {
     }
 }
 
+/// The fold of a code point as a borrowed slice, with no allocation: the
+/// table's entry, or the code itself held in `scratch`.
+pub fn fold_slice(code: u32, scratch: &mut [u32; 1]) -> &[u32] {
+    match fold(code) {
+        Some(folded) => folded,
+        None => {
+            scratch[0] = code;
+            &scratch[..]
+        }
+    }
+}
+
 /// The code points whose single-code fold is `code`.
 pub fn unfold_one(code: u32) -> Option<&'static [u32]> {
     CASE_UNFOLD_ONE

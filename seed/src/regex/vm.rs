@@ -185,9 +185,10 @@ impl<'a> Matcher<'a> {
             if (position as i64) >= range {
                 return None;
             }
-            let text_fold = unicode::fold_sequence(self.text[position] as u32);
+            let mut scratch = [0u32; 1];
+            let text_fold = unicode::fold_slice(self.text[position] as u32, &mut scratch);
             if folded.len() < index + text_fold.len()
-                || folded[index..index + text_fold.len()] != text_fold[..]
+                || folded[index..index + text_fold.len()] != *text_fold
             {
                 return None;
             }
@@ -205,8 +206,10 @@ impl<'a> Matcher<'a> {
             if (position as i64) >= range {
                 return None;
             }
-            if unicode::fold_sequence(*character as u32)
-                != unicode::fold_sequence(self.text[position] as u32)
+            let mut scratch_captured = [0u32; 1];
+            let mut scratch_text = [0u32; 1];
+            if unicode::fold_slice(*character as u32, &mut scratch_captured)
+                != unicode::fold_slice(self.text[position] as u32, &mut scratch_text)
             {
                 return None;
             }

@@ -119,6 +119,10 @@ pub struct Program {
     pub repeat_ranges: Vec<(u32, Option<u32>)>,
     pub num_mem: usize,
     pub num_call: usize,
+    /// The pattern begins with `\A`: only the text's start can match.
+    pub anchored: bool,
+    /// The pattern begins with this literal, case-sensitively.
+    pub prefix: Option<String>,
 }
 
 struct Compiler {
@@ -156,12 +160,37 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
             .ok_or_else(|| RegexError::new("internal parser error (bug)"))?;
         compiler.ops[index] = Op::Call(entry);
     }
+    let (anchored, prefix) = head_info(&prepared.root);
     Ok(Program {
         ops: compiler.ops,
         repeat_ranges: compiler.repeat_ranges,
         num_mem: prepared.num_mem,
         num_call: prepared.num_call,
+        anchored,
+        prefix,
     })
+}
+
+/// What every match must begin with, read off the pattern's head: `\A`
+/// pins it to the text's start; a case-sensitive literal names the text it
+/// must open with. Either lets the search skip positions that cannot start
+/// a match, as Onigmo's optimizer does.
+fn head_info(node: &Node) -> (bool, Option<String>) {
+    match node {
+        Node::Enclose(enclose) => match enclose.kind {
+            EncloseKind::Memory { .. } | EncloseKind::Option => head_info(&enclose.target),
+            _ => (false, None),
+        },
+        Node::List(parts) => match parts.first() {
+            Some(first) => head_info(first),
+            None => (false, None),
+        },
+        Node::Anchor(anchor) if anchor.kind == AnchorKind::BeginBuf => (true, None),
+        Node::Str { chars, ignore_case } if !*ignore_case && !chars.is_empty() => {
+            (false, Some(chars.iter().collect()))
+        }
+        _ => (false, None),
+    }
 }
 
 impl Compiler {

@@ -135,7 +135,23 @@ impl Regex {
             .position(|candidate| *candidate >= start)
             .unwrap_or(chars.len());
         let mut matcher = vm::Matcher::new(&self.program, &chars, text, &byte_offsets, budget);
-        for attempt in start_char..=chars.len() {
+        let mut attempt = start_char;
+        while attempt <= chars.len() {
+            // A pattern pinned to the text's start has one place to try;
+            // one opening with a literal can jump to its next occurrence.
+            if self.program.anchored && attempt > 0 {
+                return Ok(None);
+            }
+            if let Some(prefix) = &self.program.prefix {
+                let from = byte_offsets[attempt];
+                let Some(found) = text[from..].find(prefix.as_str()) else {
+                    return Ok(None);
+                };
+                let target = from + found;
+                attempt = byte_offsets
+                    .binary_search(&target)
+                    .expect("a match starts on a character boundary");
+            }
             if let Some(groups) = matcher.match_at(attempt, start_char)? {
                 let spans = groups
                     .into_iter()
@@ -143,6 +159,7 @@ impl Regex {
                     .collect();
                 return Ok(Some(Captures { groups: spans }));
             }
+            attempt += 1;
         }
         Ok(None)
     }
