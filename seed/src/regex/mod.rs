@@ -127,6 +127,13 @@ impl Regex {
         while !text.is_char_boundary(start) {
             start += 1;
         }
+        // A literal every match must contain, missing from the text, ends
+        // the search before it starts.
+        for required in &self.program.required {
+            if !text[start..].contains(required.as_str()) {
+                return Ok(None);
+            }
+        }
         let mut matcher = vm::Matcher::new(&self.program, text, budget);
         let mut attempt = start;
         while attempt <= text.len() {
@@ -140,6 +147,17 @@ impl Regex {
                     return Ok(None);
                 };
                 attempt += found;
+            }
+            if let Some(head) = &self.program.head_bytes {
+                // Skip to the next byte a match can begin with; such a
+                // pattern cannot match empty, so the end is no place.
+                let bytes = text.as_bytes();
+                while attempt < bytes.len() && !head[bytes[attempt] as usize] {
+                    attempt += 1;
+                }
+                if attempt >= bytes.len() {
+                    return Ok(None);
+                }
             }
             if let Some(groups) = matcher.match_at(attempt, start)? {
                 return Ok(Some(Captures { groups }));

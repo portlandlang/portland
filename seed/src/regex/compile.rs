@@ -124,6 +124,13 @@ pub struct Program {
     pub anchored: bool,
     /// The pattern begins with this literal, case-sensitively.
     pub prefix: Option<String>,
+    /// The bytes a match can begin with, when the pattern cannot match
+    /// empty and its head is simple enough to say (Onigmo's map).
+    pub head_bytes: Option<Box<[bool; 256]>>,
+    /// The case-sensitive literals every match must contain; a text
+    /// missing any one of them is answered without a single attempt
+    /// (Onigmo's exact-middle search, in its cheapest form).
+    pub required: Vec<String>,
 }
 
 struct Compiler {
@@ -162,6 +169,14 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         compiler.ops[index] = Op::Call(entry);
     }
     let (anchored, prefix) = head_info(&prepared.root);
+    let head_bytes = match head_bytes(&prepared.root) {
+        Some((set, false)) => Some(Box::new(set)),
+        _ => None,
+    };
+    let mut required = Vec::new();
+    required_literals(&prepared.root, &mut required);
+    required.sort_by_key(|literal| std::cmp::Reverse(literal.len()));
+    required.dedup();
     Ok(Program {
         ops: compiler.ops,
         repeat_ranges: compiler.repeat_ranges,
@@ -169,7 +184,162 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
         num_call: prepared.num_call,
         anchored,
         prefix,
+        head_bytes,
+        required,
     })
+}
+
+/// The case-sensitive literals on every path through the pattern: the
+/// members of the top-level sequence, reached through groups and
+/// quantifiers that run at least once.
+fn required_literals(node: &Node, found: &mut Vec<String>) {
+    match node {
+        Node::Str { chars, ignore_case } if !*ignore_case && !chars.is_empty() => {
+            found.push(chars.iter().collect());
+        }
+        Node::List(parts) => {
+            for part in parts {
+                required_literals(part, found);
+            }
+        }
+        Node::Quantifier(quantifier) if quantifier.lower >= 1 => {
+            required_literals(&quantifier.target, found);
+        }
+        Node::Enclose(enclose) => match enclose.kind {
+            EncloseKind::Memory { .. } | EncloseKind::Option | EncloseKind::StopBacktrack => {
+                required_literals(&enclose.target, found);
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+/// The bytes a match of `node` can begin with, and whether it can match
+/// empty; `None` where the head is too open to say. A sequence takes the
+/// union of its parts until one that cannot be empty.
+fn head_bytes(node: &Node) -> Option<([bool; 256], bool)> {
+    let mut set = [false; 256];
+    match node {
+        Node::Empty => Some((set, true)),
+        Node::Anchor(anchor) => match anchor.kind {
+            // Zero width: the next part decides.
+            AnchorKind::PrecRead
+            | AnchorKind::PrecReadNot
+            | AnchorKind::LookBehind
+            | AnchorKind::LookBehindNot
+            | AnchorKind::BeginBuf
+            | AnchorKind::EndBuf
+            | AnchorKind::SemiEndBuf
+            | AnchorKind::BeginLine
+            | AnchorKind::EndLine
+            | AnchorKind::BeginPosition
+            | AnchorKind::WordBound
+            | AnchorKind::NotWordBound
+            | AnchorKind::Keep => Some((set, true)),
+        },
+        Node::Str { chars, ignore_case } => {
+            let Some(first) = chars.first() else {
+                return Some((set, true));
+            };
+            if *ignore_case {
+                if first.is_ascii() {
+                    set[first.to_ascii_lowercase() as usize] = true;
+                    set[first.to_ascii_uppercase() as usize] = true;
+                    // The Kelvin sign, the long s, and the ligatures fold
+                    // onto ASCII, so a non-ASCII character may open the
+                    // match.
+                    if super::unicode::non_ascii_folds_to(first.to_ascii_lowercase() as u32) {
+                        non_ascii_leads(&mut set);
+                    }
+                } else {
+                    // A non-ASCII head may fold onto ASCII, as the Kelvin
+                    // sign does: nothing safe to say.
+                    return None;
+                }
+            } else {
+                let mut buffer = [0u8; 4];
+                set[first.encode_utf8(&mut buffer).as_bytes()[0] as usize] = true;
+            }
+            Some((set, false))
+        }
+        Node::Class(class) => {
+            if class.not {
+                return None;
+            }
+            for code in 0..0x80u32 {
+                if class.bit(code) {
+                    set[code as usize] = true;
+                }
+            }
+            if class.mbuf.is_some() || (0x80..0x100u32).any(|code| class.bit(code)) {
+                non_ascii_leads(&mut set);
+            }
+            Some((set, false))
+        }
+        Node::Word { not, ascii_range } => {
+            if *not {
+                return None;
+            }
+            for code in 0..0x80u32 {
+                let character = char::from(code as u8);
+                if character.is_ascii_alphanumeric() || character == '_' {
+                    set[code as usize] = true;
+                }
+            }
+            if !*ascii_range {
+                non_ascii_leads(&mut set);
+            }
+            Some((set, false))
+        }
+        Node::List(parts) => {
+            let mut can_be_empty = true;
+            for part in parts {
+                let (part_set, part_empty) = head_bytes(part)?;
+                for index in 0..256 {
+                    set[index] |= part_set[index];
+                }
+                if !part_empty {
+                    can_be_empty = false;
+                    break;
+                }
+            }
+            Some((set, can_be_empty))
+        }
+        Node::Alt(branches) => {
+            let mut can_be_empty = false;
+            for branch in branches {
+                let (branch_set, branch_empty) = head_bytes(branch)?;
+                for index in 0..256 {
+                    set[index] |= branch_set[index];
+                }
+                can_be_empty |= branch_empty;
+            }
+            Some((set, can_be_empty))
+        }
+        Node::Quantifier(quantifier) => {
+            let (target_set, target_empty) = head_bytes(&quantifier.target)?;
+            Some((target_set, target_empty || quantifier.lower == 0))
+        }
+        Node::Enclose(enclose) => match enclose.kind {
+            EncloseKind::Memory { .. } | EncloseKind::Option | EncloseKind::StopBacktrack => {
+                head_bytes(&enclose.target)
+            }
+            EncloseKind::Condition { .. } => {
+                let (target_set, _) = head_bytes(&enclose.target)?;
+                Some((target_set, true))
+            }
+            EncloseKind::Absent => None,
+        },
+        Node::AnyChar { .. } | Node::GraphemeCluster | Node::BackRef(_) | Node::Call(_) => None,
+    }
+}
+
+/// Every byte a non-ASCII character can begin with.
+fn non_ascii_leads(set: &mut [bool; 256]) {
+    for lead in &mut set[0xc2..=0xf4] {
+        *lead = true;
+    }
 }
 
 /// What every match must begin with, read off the pattern's head: `\A`
