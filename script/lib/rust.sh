@@ -8,7 +8,7 @@
 # Which Rust runs is rust-toolchain.toml's to say; this only finds rustup.
 #
 # Sourced by script/bootstrap, script/test, script/spec, script/console, and
-# the pre-commit hook.
+# CI's builtin-table step.
 
 if command -v brew > /dev/null 2>&1; then
   rustup_prefix=$(brew --prefix rustup 2> /dev/null)

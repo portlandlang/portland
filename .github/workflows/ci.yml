@@ -12,6 +12,9 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The builtin-table step diffs against the base, so it needs history.
+          fetch-depth: 0
       # Reads .ruby-version. The runner ships an older Ruby than the doc
       # checks require, and `mdl` has to come from the lockfile rather than
       # whatever happens to be installed.
@@ -39,3 +42,24 @@ jobs:
           path: ~/.local/share/rv/rubies
           key: rv-rubies-${{ runner.os }}-${{ hashFiles('.ruby-version') }}
       - run: script/cibuild
+      # The builtin method table (#88) in compiler/inference.pdx is derived
+      # from the seed's behavior: re-derive it and diff, about five minutes,
+      # only when the seed, the table, or the probe changed against the base.
+      # A manual run, or a base this checkout cannot see, always checks.
+      - name: builtin method table
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] || ! git cat-file -e "$BASE^{commit}" 2> /dev/null; then
+            changed=all
+          else
+            changed=$(git diff --name-only "$BASE"...HEAD -- seed/src compiler/inference.pdx script/probe_builtin_methods script/check_builtin_table)
+          fi
+          if [ -z "$changed" ]; then
+            echo "seed, table, and probe unchanged — skipped"
+            exit 0
+          fi
+          . script/lib/rust.sh
+          cargo build --quiet
+          script/check_builtin_table

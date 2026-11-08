@@ -1,6 +1,6 @@
 # Select a Ruby the way script/test selects a Rust: the script's job, not the
 # caller's. Git hooks do not inherit an interactive shell, so without this the
-# pre-commit hook runs macOS's system Ruby 2.6, which cannot even parse the
+# pre-push hook runs macOS's system Ruby 2.6, which cannot even parse the
 # checks — a failure that reads as a docs error and is not one.
 #
 # rv answers with the Ruby this project pins in .ruby-version, and its

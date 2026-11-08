@@ -1,23 +1,12 @@
 #!/bin/sh
-# The one check CI does not run. The full gate is CI's (script/cibuild, on
-# every push to main and every pull request), so a push does not wait on it
-# here; pre-commit's fast gate has already run on every commit.
+# The fast gate — everything except the whole suites, about twenty seconds —
+# once before anything becomes public. The whole suites and the builtin
+# method table are CI's (.github/workflows/ci.yml): the suites run on every
+# push to main and every pull request, the table whenever the seed, the
+# table, or the probe changed. `script/test --fast` owns what the fast gate
+# is, so this hook cannot drift from it.
 #
 # Escape hatch: `git push --no-verify`.
 set -e
 cd "$(dirname "$0")/../.."
-
-# The builtin method table (#88) is derived from the seed's behavior, so a
-# push that touched the seed's source re-derives it and diffs — about five
-# minutes, only when it can matter. Against the upstream where one exists,
-# else against the whole history of a first push.
-upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
-if [ -n "$upstream" ]; then
-  seed_changes=$(git diff --name-only "$upstream"...HEAD -- seed/src)
-else
-  seed_changes=$(git ls-files seed/src)
-fi
-if [ -n "$seed_changes" ]; then
-  echo "seed/src changed — checking the builtin method table against the seed"
-  script/check_builtin_table
-fi
+script/test --fast

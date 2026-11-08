@@ -3,7 +3,7 @@
 #
 # `git_recurse` in that .mdlrc means mdl lints **git-tracked files only**. A
 # brand-new file is invisible to it until `git add`, which is fine for the
-# pre-commit hook (staging is what the hook runs against) but does mean a
+# pre-push hook and CI (what they check is committed) but does mean a
 # scratch file you have not added is silently unlinted.
 #
 # This is the one check that is not bespoke. mdl covers the generic formatting
