@@ -13,9 +13,6 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
-        with:
-          # The builtin-table step diffs against the base, so it needs history.
-          fetch-depth: 0
       # Reads .ruby-version. The runner ships an older Ruby than the doc
       # checks require, and `mdl` has to come from the lockfile rather than
       # whatever happens to be installed.
@@ -38,11 +35,22 @@ jobs:
           path: ~/.rustup
           key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
       - run: script/cibuild
-      # The builtin method table (#88) in compiler/inference.pdx is derived
-      # from the seed's behavior: re-derive it and diff, about five minutes,
-      # only when the seed, the table, or the probe changed against the base.
-      # A manual run, or a base this checkout cannot see, always checks.
-      - name: builtin method table
+
+  # The builtin method table (#88) in compiler/inference.pdx is derived from
+  # the seed's behavior: re-derive it and diff, about five minutes, only when
+  # the seed, the table, the probe, or this workflow changed against the
+  # base. A manual run, or a base this checkout cannot see, always checks.
+  # It uses nothing cibuild produces, so it is its own job and runs beside
+  # cibuild rather than after it (#259).
+  builtin-method-table:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The changed-paths gate diffs against the base, so it needs history.
+          fetch-depth: 0
+      - name: changed paths
+        id: gate
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -50,12 +58,39 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ] || ! git cat-file -e "$BASE^{commit}" 2> /dev/null; then
             changed=all
           else
-            changed=$(git diff --name-only "$BASE"...HEAD -- seed/src compiler/inference.pdx script/probe_builtin_methods script/check_builtin_table)
+            changed=$(git diff --name-only "$BASE"...HEAD -- seed/src compiler/inference.pdx script/probe_builtin_methods script/check_builtin_table .github/workflows/ci.yml)
           fi
           if [ -z "$changed" ]; then
-            echo "seed, table, and probe unchanged — skipped"
-            exit 0
+            echo "seed, table, probe, and workflow unchanged — skipped"
+            echo "check=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "check=true" >> "$GITHUB_OUTPUT"
           fi
+      # The same Ruby, caches, and toolchain as cibuild, set up only when the
+      # table is to be checked, so a skipped run finishes in seconds.
+      - if: steps.gate.outputs.check == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - if: steps.gate.outputs.check == 'true'
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - if: steps.gate.outputs.check == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.rustup
+          key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+      - if: steps.gate.outputs.check == 'true'
+        run: script/bootstrap
+      - name: builtin method table
+        if: steps.gate.outputs.check == 'true'
+        run: |
           . script/lib/rust.sh
           cargo build --quiet
           ruby script/check_builtin_table
