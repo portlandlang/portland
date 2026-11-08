@@ -124,6 +124,45 @@ struct Expectation
 
     puts "  FAIL #{matcher.negated_failure_message(actual)}"
   end
+
+  # `to_satisfy` (#252) passes when its block answers true for the actual:
+  #
+  #   expect(9).to_satisfy("be a multiple of 3") { it % 3 == 0 }
+  #   # FAIL expected 9 to be a multiple of 3
+  #
+  # This diverges from RSpec, whose `satisfy` is a matcher:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { |n| n % 3 == 0 }
+  #
+  # RSpec's matcher keeps the block until `to` hands it the value. Portland
+  # can't keep a block: `&block` parameters and `->` lambdas both refuse, so
+  # a block can only be yielded while the method it was handed to is still
+  # running. So the block goes to the expectation, which already holds the
+  # value, and yields at once. The description is required, because RSpec's
+  # fallback, which reads the block's own source, isn't possible here either.
+  #
+  # Once a block can be kept as a value, this can take RSpec's spelling:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { it % 3 == 0 }
+  def to_satisfy(description)
+    return if yield(actual)
+
+    puts "  FAIL #{satisfy_failure_message(description)}"
+  end
+
+  def not_to_satisfy(description)
+    return unless yield(actual)
+
+    puts "  FAIL #{satisfy_negated_failure_message(description)}"
+  end
+
+  def satisfy_failure_message(description)
+    "expected #{inspect(actual)} to #{description}"
+  end
+
+  def satisfy_negated_failure_message(description)
+    "expected #{inspect(actual)} not to #{description}"
+  end
 end
 
 def expect(actual)

@@ -1,0 +1,19 @@
+# The spec harness's `to_satisfy` (#252): a block that answers true or false
+# for the actual, with a description for the failure. RSpec spells it
+# `expect(x).to satisfy("…") { … }`; spec/spec_helper.pdx says why Portland
+# puts the block on the expectation instead, and what the RSpec spelling
+# needs.
+
+require_relative "../../spec_helper"
+
+context "to_satisfy" do
+  specify "passes when the block answers true for the actual" do
+    expect(9).to_satisfy("be a multiple of 3") { it % 3 == 0 }
+    expect(10).not_to_satisfy("be a multiple of 3") { it % 3 == 0 }
+  end
+
+  specify "says the description when it fails" do
+    expect(expect(10).satisfy_failure_message("be a multiple of 3")).to eq("expected 10 to be a multiple of 3")
+    expect(expect(9).satisfy_negated_failure_message("be a multiple of 3")).to eq("expected 9 not to be a multiple of 3")
+  end
+end
