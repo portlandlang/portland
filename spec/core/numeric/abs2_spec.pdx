@@ -12,12 +12,12 @@ context "Numeric#abs2" do
 
   specify "returns the square of the absolute value of self" do
     numbers.each do |number|
-      expect(number.abs2.eql?(number.abs ** 2)).to be_true
+      expect(number.abs2).to eql(number.abs ** 2)
     end
   end
 
   specify "returns NaN when self is NaN" do
-    expect((0.0 / 0.0).abs2.nan?).to be_true
+    expect((0.0 / 0.0).abs2).to be_nan
   end
 
   specify "squares" do

@@ -26,7 +26,7 @@ context "String#=~" do
 
   specify "class answers MatchData" do
     md = "a".match(/a/) or panic("no match")
-    expect(md.class).to eq(MatchData)
+    expect(md).to be_an_instance_of(MatchData)
     expect(MatchData === md).to be_true
     expect(MatchData === "a").to be_false
   end

@@ -22,6 +22,6 @@ context "Math.erf" do
     expect(Math.erf(10000)).to be_close(1.0, MATH_TOLERANCE)
     expect(Math.erf(-10000)).to be_close(-1.0, MATH_TOLERANCE)
     expect(Math.erf(0.00000000000001)).to be_close(0.0, MATH_TOLERANCE)
-    expect(Math.erf(nan_value).nan?).to eq(true)
+    expect(Math.erf(nan_value)).to be_nan
   end
 end

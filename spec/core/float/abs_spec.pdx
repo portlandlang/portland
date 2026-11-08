@@ -28,7 +28,7 @@ context "Float#abs" do
   end
 
   specify "returns NaN if NaN" do
-    expect((0.0 / 0.0).abs.nan?).to eq(true)
+    expect((0.0 / 0.0).abs).to be_nan
   end
 
   specify "drops the sign" do

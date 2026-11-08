@@ -1,0 +1,33 @@
+# The spec harness's `cover` and `be_nan` matchers (#252). `cover` is
+# `Range#cover?`. `be_nan` is `nan?`, written out where RSpec derives it
+# from the predicate through `method_missing`; a NaN equals nothing, itself
+# included, so `eq` can never check for one.
+
+require_relative "../../spec_helper"
+
+context "cover" do
+  specify "passes when the range covers the value" do
+    expect(1..6).to cover(6)
+    expect(1...6).not_to cover(6)
+    expect("a".."z").to cover("m")
+  end
+
+  specify "names the range and the value when it fails" do
+    expect(cover(6).failure_message(1...6)).to eq("expected 1...6 to cover 6")
+    expect(cover(3).negated_failure_message(1..6)).to eq("expected 1..6 not to cover 3")
+  end
+end
+
+context "be_nan" do
+  specify "passes for a NaN, which eq cannot check" do
+    not_a_number = 0.0 / 0.0
+    expect(not_a_number).to be_nan
+    expect(not_a_number).not_to eq(not_a_number)
+    expect(1.5).not_to be_nan
+  end
+
+  specify "names the value when it fails" do
+    expect(be_nan.failure_message(1.5)).to eq("expected NaN, got 1.5")
+    expect(be_nan.negated_failure_message(0.0 / 0.0)).to eq("expected not NaN, got NaN")
+  end
+end

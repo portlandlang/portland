@@ -22,6 +22,6 @@ context "Math.sin" do
   end
 
   specify "return NaN given NaN" do
-    expect(Math.sin(nan_value).nan?).to eq(true)
+    expect(Math.sin(nan_value)).to be_nan
   end
 end

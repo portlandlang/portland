@@ -31,7 +31,7 @@ context "Kernel#Complex" do
 
   describe "when passed [Integer, Integer]" do
     specify "returns a new Complex number" do
-      expect(Complex(1, 2).class).to eq(Complex)
+      expect(Complex(1, 2)).to be_an_instance_of(Complex)
       expect(Complex(1, 2).real).to eq(1)
       expect(Complex(1, 2).imag).to eq(2)
       expect(Complex(-3, -5).real).to eq(-3)
@@ -43,7 +43,7 @@ context "Kernel#Complex" do
 
   describe "when passed [Integer/Float]" do
     specify "returns a new Complex number with 0 as the imaginary component" do
-      expect(Complex(1).class).to eq(Complex)
+      expect(Complex(1)).to be_an_instance_of(Complex)
       expect(Complex(1).imag).to eq(0)
       expect(Complex(1).real).to eq(1)
       expect(Complex(-3).imag).to eq(0)

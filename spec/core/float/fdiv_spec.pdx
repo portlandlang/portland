@@ -21,8 +21,8 @@ context "Float#fdiv" do
   end
 
   specify "returns NaN when the argument is NaN" do
-    expect(-1819.999999.fdiv(Float::NAN).nan?).to eq(true)
-    expect(11109.1981271.fdiv(Float::NAN).nan?).to eq(true)
+    expect(-1819.999999.fdiv(Float::NAN)).to be_nan
+    expect(11109.1981271.fdiv(Float::NAN)).to be_nan
   end
 
   specify "returns Infinity when the argument is 0.0" do

@@ -9,7 +9,7 @@ require_relative "../../spec_helper"
 
 context "Integer#to_r" do
   specify "returns a Rational object" do
-    expect(309.to_r.class).to eq(Rational)
+    expect(309.to_r).to be_an_instance_of(Rational)
   end
 
   specify "constructs a rational number with self as the numerator" do

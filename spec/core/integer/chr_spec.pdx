@@ -15,7 +15,7 @@ require_relative "../../spec_helper"
 
 context "Integer#chr without argument" do
   specify "returns a String" do
-    expect(17.chr.class).to eq(String)
+    expect(17.chr).to be_an_instance_of(String)
   end
 
   specify "returns a String encoding self as a US-ASCII codepoint for 0 to 127" do
@@ -31,7 +31,7 @@ context "Integer#chr without argument" do
 end
 context "Integer#chr with an encoding argument" do
   specify "returns a String" do
-    expect(900.chr(Encoding::UTF_8).class).to eq(String)
+    expect(900.chr(Encoding::UTF_8)).to be_an_instance_of(String)
   end
 
   specify "accepts the encoding's name as a String" do

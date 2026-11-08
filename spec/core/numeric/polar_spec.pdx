@@ -13,7 +13,7 @@ context "Numeric#polar" do
 
   specify "returns a two-element Array" do
     numbers.each do |number|
-      expect(number.polar.class).to eq(Array)
+      expect(number.polar).to be_an_instance_of(Array)
       expect(number.polar.size).to eq(2)
     end
   end
@@ -40,8 +40,8 @@ context "Numeric#polar" do
 
   specify "returns [NaN, NaN] if self is NaN" do
     expect((0.0 / 0.0).polar.size).to eq(2)
-    expect((0.0 / 0.0).polar.first.nan?).to be_true
-    expect((0.0 / 0.0).polar.last.nan?).to be_true
+    expect((0.0 / 0.0).polar.first).to be_nan
+    expect((0.0 / 0.0).polar.last).to be_nan
   end
 
   specify "is the absolute value and 0 or pi" do

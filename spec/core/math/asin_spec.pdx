@@ -22,6 +22,6 @@ context "Math.asin" do
     expect(Math.asin(0.75)).to be_close(0.8480620789814816, MATH_TOLERANCE)
     expect(inspect(Math.asin(1.0001))).to eq('failure("Numerical argument is out of domain - asin")')
     expect(inspect(Math.asin(-1.0001))).to eq('failure("Numerical argument is out of domain - asin")')
-    expect(Math.asin(nan_value).nan?).to eq(true)
+    expect(Math.asin(nan_value)).to be_nan
   end
 end

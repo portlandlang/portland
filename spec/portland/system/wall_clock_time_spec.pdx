@@ -9,7 +9,7 @@ require_relative "../../spec_helper"
 context "System.wall_clock_time" do
   specify "answers nanoseconds since the Unix epoch, as an integer" do
     now = System.wall_clock_time
-    expect(now in Integer).to eq(true)
+    expect(now).to be_an(Integer)
     # 2023-11-14 in nanoseconds: any clock set to the present is past it.
     expect(now).to be_greater_than(1700000000000000000)
   end

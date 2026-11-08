@@ -7,7 +7,7 @@ require_relative "../../spec_helper"
 
 context "Numeric#i" do
   specify "returns a Complex object" do
-    expect(34.i.class).to eq(Complex)
+    expect(34.i).to be_an_instance_of(Complex)
   end
 
   specify "sets the real part to 0" do

@@ -10,7 +10,7 @@ require_relative "../../spec_helper"
 
 context "Symbol#capitalize" do
   specify "returns a Symbol" do
-    expect(:glark.capitalize in Symbol).to eq(true)
+    expect(:glark.capitalize).to be_a(Symbol)
   end
 
   specify "converts the first character to uppercase if it is ASCII" do

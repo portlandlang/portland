@@ -24,7 +24,7 @@ context "Range over any orderable" do
 
     specify "covers by the struct's own <=>" do
       expect((low..high).include?(middle)).to be_true
-      expect((low..high).cover?(beyond)).to be_false
+      expect(low..high).not_to cover(beyond)
       expect((low...high).include?(high)).to be_false
       expect((low..high).member?(low)).to be_true
     end

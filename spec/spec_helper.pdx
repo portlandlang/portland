@@ -124,6 +124,45 @@ struct Expectation
 
     puts "  FAIL #{matcher.negated_failure_message(actual)}"
   end
+
+  # `to_satisfy` (#252) passes when its block answers true for the actual:
+  #
+  #   expect(9).to_satisfy("be a multiple of 3") { it % 3 == 0 }
+  #   # FAIL expected 9 to be a multiple of 3
+  #
+  # This diverges from RSpec, whose `satisfy` is a matcher:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { |n| n % 3 == 0 }
+  #
+  # RSpec's matcher keeps the block until `to` hands it the value. Portland
+  # can't keep a block: `&block` parameters and `->` lambdas both refuse, so
+  # a block can only be yielded while the method it was handed to is still
+  # running. So the block goes to the expectation, which already holds the
+  # value, and yields at once. The description is required, because RSpec's
+  # fallback, which reads the block's own source, isn't possible here either.
+  #
+  # Once a block can be kept as a value, this can take RSpec's spelling:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { it % 3 == 0 }
+  def to_satisfy(description)
+    return if yield(actual)
+
+    puts "  FAIL #{satisfy_failure_message(description)}"
+  end
+
+  def not_to_satisfy(description)
+    return unless yield(actual)
+
+    puts "  FAIL #{satisfy_negated_failure_message(description)}"
+  end
+
+  def satisfy_failure_message(description)
+    "expected #{inspect(actual)} to #{description}"
+  end
+
+  def satisfy_negated_failure_message(description)
+    "expected #{inspect(actual)} not to #{description}"
+  end
 end
 
 def expect(actual)
@@ -157,6 +196,201 @@ end
 
 def eq(expected)
   EqualMatcher.new(expected: expected)
+end
+
+# `eql` is `eql?` (#252), which tells `1` from `1.0` where `eq`'s `==` does
+# not: `expect(1.0).to eq(1)` passes and `expect(1.0).to eql(1)` fails.
+# ruby/spec writes `should eql(...)` wherever the type of a number matters.
+struct EqlMatcher
+  expected
+
+  def matches?(actual)
+    actual.eql?(expected)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to be eql? to #{inspect(expected)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be eql? to #{inspect(expected)}"
+  end
+end
+
+def eql(expected)
+  EqlMatcher.new(expected: expected)
+end
+
+# The type matchers (#252): `be_an_instance_of(Integer)`, `be_a(String)`,
+# and `be_an`, `be_a`'s twin. The test is `actual.class == type`. Ruby's
+# would be `type === actual`, but here `===` type-tests only a type written
+# literally, and a type held in a field compares by equality, as does a
+# pinned `in ^type` (#255); `is_a?` and `instance_of?` are not defined. nil
+# has no class to ask, so it is no type's instance. In Ruby `be_a` admits
+# subclasses and `be_an_instance_of` does not; with no class hierarchy here
+# the two answer the same, and only the words differ.
+struct TypeMatcher
+  type
+  words
+
+  def matches?(actual)
+    !actual.nil? && actual.class == type
+  end
+
+  def failure_message(actual)
+    found = if actual.nil? then "nil" else "a #{inspect(actual.class)}" end
+    "expected #{inspect(actual)} to be #{words} #{inspect(type)}, but it is #{found}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be #{words} #{inspect(type)}"
+  end
+end
+
+def be_an_instance_of(type)
+  TypeMatcher.new(type: type, words: "an instance of")
+end
+
+def be_a(type)
+  TypeMatcher.new(type: type, words: "a")
+end
+
+def be_an(type)
+  TypeMatcher.new(type: type, words: "an")
+end
+
+# The string matchers (#252): `match(/l+/)`, `start_with("rose")`, and
+# `end_with("city")`. One struct apiece, each one method call apart, as the
+# predicate matchers below are. RSpec's `start_with` and `end_with` also
+# take an array's leading elements; that waits for a row that wants it.
+struct PatternMatcher
+  pattern
+
+  def matches?(actual)
+    actual.match?(pattern)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to match #{inspect(pattern)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to match #{inspect(pattern)}"
+  end
+end
+
+def match(pattern)
+  PatternMatcher.new(pattern: pattern)
+end
+
+struct StartMatcher
+  prefix
+
+  def matches?(actual)
+    actual.start_with?(prefix)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to start with #{inspect(prefix)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to start with #{inspect(prefix)}"
+  end
+end
+
+def start_with(prefix)
+  StartMatcher.new(prefix: prefix)
+end
+
+struct EndMatcher
+  suffix
+
+  def matches?(actual)
+    actual.end_with?(suffix)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to end with #{inspect(suffix)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to end with #{inspect(suffix)}"
+  end
+end
+
+def end_with(suffix)
+  EndMatcher.new(suffix: suffix)
+end
+
+# `cover(value)` is `Range#cover?` (#252).
+struct CoverMatcher
+  value
+
+  def matches?(actual)
+    actual.cover?(value)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to cover #{inspect(value)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to cover #{inspect(value)}"
+  end
+end
+
+def cover(value)
+  CoverMatcher.new(value: value)
+end
+
+# `all(matcher)` (#252) applies a matcher to every element, as in
+# `expect(values).to all(be_greater_than(0))`. Its failure names the first
+# element that missed and carries that matcher's own message, where
+# `expect(values.all? { … }).to be_true` could say only false.
+struct AllMatcher
+  matcher
+
+  def matches?(actual)
+    actual.all? { matcher.matches?(it) }
+  end
+
+  def failure_message(actual)
+    elements = actual.to_a
+    index = elements.find_index { !matcher.matches?(it) } or panic("all: every element passed")
+    "expected all of #{inspect(actual)} to pass, but the element at index #{index} did not: #{matcher.failure_message(elements[index])}"
+  end
+
+  def negated_failure_message(actual)
+    "expected some element of #{inspect(actual)} to fail: #{matcher.negated_failure_message(actual.to_a.first)}"
+  end
+end
+
+def all(matcher)
+  AllMatcher.new(matcher: matcher)
+end
+
+# `match_array(items)` (#252): the same elements, each as many times, in any
+# order — a Set's elements included. RSpec's `contain_exactly(1, 2, 3)` is
+# the same check with the items spread out, which waits on splats (ADR 0014).
+struct ArrayMatcher
+  items
+
+  def matches?(actual)
+    actual.to_a.tally == items.tally
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to hold exactly #{inspect(items)}, in any order"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to hold exactly #{inspect(items)}, in any order"
+  end
+end
+
+def match_array(items)
+  ArrayMatcher.new(items: items)
 end
 
 # ruby/spec's `be_close(expected, tolerance)`: within the tolerance, strictly.
@@ -311,7 +545,7 @@ end
 # one method call. This is what rspec's `be_empty` / `be_nil` / `be_whatever`
 # buys with `method_missing`, written out — the repetition is the honest cost
 # of having no runtime dynamism, and the shape a compile-time macro (#14)
-# would generate. Four of them is tolerable; forty would not be, which is the
+# would generate. Five of them is tolerable; forty would not be, which is the
 # argument for the macro when a real file asks.
 struct EmptyMatcher
   word
@@ -371,6 +605,28 @@ end
 
 def be_some
   SomeMatcher.new(word: "some")
+end
+
+# `be_nan` (#252): a NaN equals nothing, itself included, so `eq` can never
+# check for one. The fifth predicate matcher.
+struct NanMatcher
+  word
+
+  def matches?(actual)
+    actual.nan?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_nan
+  NanMatcher.new(word: "NaN")
 end
 
 struct FailureMatcher

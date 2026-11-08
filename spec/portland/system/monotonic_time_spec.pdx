@@ -16,7 +16,7 @@ context "System.monotonic_time" do
 
   specify "is positive and an integer" do
     reading = System.monotonic_time
-    expect(reading in Integer).to eq(true)
+    expect(reading).to be_an(Integer)
     expect(reading).to be_greater_than(0)
   end
 end

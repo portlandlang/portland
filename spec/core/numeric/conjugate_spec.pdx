@@ -12,7 +12,7 @@ context "Numeric#conjugate" do
     [20, 398.72, Rational(3, 4), 1.0 / 0.0].each do |number|
       expect(number.conjugate).to eq(number)
     end
-    expect((0.0 / 0.0).conjugate.nan?).to be_true
+    expect((0.0 / 0.0).conjugate).to be_nan
   end
 
   specify "is the number itself" do

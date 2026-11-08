@@ -33,7 +33,7 @@ end
 context "Regexp#match" do
   specify "returns a MatchData object" do
     found = /(.)(.)(.)/.match("abc") or panic("no match")
-    expect(found.class).to eq(MatchData)
+    expect(found).to be_an_instance_of(MatchData)
     expect(found.captures).to eq(["a", "b", "c"])
   end
 

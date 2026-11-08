@@ -16,7 +16,7 @@ context "Literal Regexps" do
   end
 
   specify "class is Regexp" do
-    expect(/a/.class).to eq(Regexp)
+    expect(/a/).to be_an_instance_of(Regexp)
     expect(Regexp.name).to eq("Regexp")
   end
 
@@ -52,18 +52,18 @@ context "Literal Regexps" do
 
   specify "conditional patterns with positional capture groups" do
     pattern = /\A(foo)?(?(1)(T)|(F))\z/
-    expect(pattern.match?("fooT")).to be_true
-    expect(pattern.match?("F")).to be_true
-    expect(pattern.match?("fooF")).to be_false
-    expect(pattern.match?("T")).to be_false
+    expect("fooT").to match(pattern)
+    expect("F").to match(pattern)
+    expect("fooF").not_to match(pattern)
+    expect("T").not_to match(pattern)
   end
 
   specify "conditional patterns with named capture groups" do
     pattern = /\A(?<word>foo)?(?(<word>)(T)|(F))\z/
-    expect(pattern.match?("fooT")).to be_true
-    expect(pattern.match?("F")).to be_true
-    expect(pattern.match?("fooF")).to be_false
-    expect(pattern.match?("T")).to be_false
+    expect("fooT").to match(pattern)
+    expect("F").to match(pattern)
+    expect("fooF").not_to match(pattern)
+    expect("T").not_to match(pattern)
   end
 
   specify "character class composition" do

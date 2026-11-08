@@ -23,8 +23,8 @@ context "Math.hypot" do
   end
 
   specify "returns NaN given NaN" do
-    expect(Math.hypot(nan_value, 0).nan?).to eq(true)
-    expect(Math.hypot(0, nan_value).nan?).to eq(true)
-    expect(Math.hypot(nan_value, nan_value).nan?).to eq(true)
+    expect(Math.hypot(nan_value, 0)).to be_nan
+    expect(Math.hypot(0, nan_value)).to be_nan
+    expect(Math.hypot(nan_value, nan_value)).to be_nan
   end
 end

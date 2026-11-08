@@ -1,0 +1,46 @@
+# The spec harness's type matchers (#252): `be_an_instance_of`, `be_a`, and
+# `be_an`, `be_a`'s twin. All three ask `actual.class == type`, since a type
+# held in a variable does not type-test with `===` (#255). With no class
+# hierarchy, the two names answer the same today.
+
+require_relative "../../spec_helper"
+
+struct Harbor
+  name
+end
+
+context "be_an_instance_of" do
+  specify "passes when the actual is of that type" do
+    expect(3).to be_an_instance_of(Integer)
+    expect(3.0).not_to be_an_instance_of(Integer)
+    expect(Harbor.new(name: "Swan Island")).to be_an_instance_of(Harbor)
+    expect(nil).not_to be_an_instance_of(Integer)
+  end
+
+  specify "names the value, the type, and the value's type when it fails" do
+    expect(be_an_instance_of(Integer).failure_message(3.0)).to eq("expected 3.0 to be an instance of Integer, but it is a Float")
+    expect(be_an_instance_of(Integer).failure_message(nil)).to eq("expected nil to be an instance of Integer, but it is nil")
+    expect(be_an_instance_of(Integer).negated_failure_message(3)).to eq("expected 3 not to be an instance of Integer")
+  end
+end
+
+context "be_a" do
+  specify "passes when the actual is of that type" do
+    expect("rose").to be_a(String)
+    expect(:rose).not_to be_a(String)
+    expect(true).to be_a(Boolean)
+  end
+
+  specify "names the value, the type, and the value's type when it fails" do
+    expect(be_a(String).failure_message(:rose)).to eq("expected :rose to be a String, but it is a Symbol")
+    expect(be_a(String).negated_failure_message("rose")).to eq("expected \"rose\" not to be a String")
+  end
+end
+
+context "be_an" do
+  specify "is be_a, for a type whose name wants an" do
+    expect(3).to be_an(Integer)
+    expect([1]).to be_an(Array)
+    expect({}).not_to be_an(Array)
+  end
+end

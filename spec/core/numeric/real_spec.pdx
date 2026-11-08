@@ -15,7 +15,7 @@ context "Numeric#real" do
     numbers.each do |number|
       expect(number.real).to eq(number)
     end
-    expect((0.0 / 0.0).real.nan?).to be_true
+    expect((0.0 / 0.0).real).to be_nan
   end
 
   specify "are the number itself, and true" do

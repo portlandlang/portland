@@ -17,8 +17,8 @@ require_relative "../../spec_helper"
 context "Kernel#Rational" do
   describe "passed Integer" do
     specify "returns a new Rational number with 1 as the denominator" do
-      expect(Rational(1).eql?(Rational(1, 1))).to be_true
-      expect(Rational(-3).eql?(Rational(-3, 1))).to be_true
+      expect(Rational(1)).to eql(Rational(1, 1))
+      expect(Rational(-3)).to eql(Rational(-3, 1))
     end
   end
 
@@ -27,11 +27,11 @@ context "Kernel#Rational" do
       half = Rational(1, 2)
       expect(half.numerator).to eq(1)
       expect(half.denominator).to eq(2)
-      expect(half.class).to eq(Rational)
+      expect(half).to be_an_instance_of(Rational)
       three_fifths = Rational(-3, -5)
       expect(three_fifths.numerator).to eq(3)
       expect(three_fifths.denominator).to eq(5)
-      expect(three_fifths.class).to eq(Rational)
+      expect(three_fifths).to be_an_instance_of(Rational)
     end
 
     specify "reduces the Rational" do

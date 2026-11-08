@@ -18,6 +18,6 @@ context "Math.cosh" do
     expect(Math.cosh(-0.0)).to eq(1.0)
     expect(Math.cosh(1.5)).to be_close(2.35240961524325, MATH_TOLERANCE)
     expect(Math.cosh(-2.99)).to be_close(9.96798496414416, MATH_TOLERANCE)
-    expect(Math.cosh(nan_value).nan?).to eq(true)
+    expect(Math.cosh(nan_value)).to be_nan
   end
 end

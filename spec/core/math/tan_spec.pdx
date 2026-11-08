@@ -19,11 +19,11 @@ context "Math.tan" do
     expect(Math.tan(-0.0)).to eq(-0.0)
     expect(Math.tan(4.22)).to be_close(1.86406937682395, MATH_TOLERANCE)
     expect(Math.tan(-9.65)).to be_close(-0.229109052606441, MATH_TOLERANCE)
-    expect(Math.tan(infinity_value).nan?).to eq(true)
-    expect(Math.tan(-infinity_value).nan?).to eq(true)
+    expect(Math.tan(infinity_value)).to be_nan
+    expect(Math.tan(-infinity_value)).to be_nan
   end
 
   specify "return NaN given NaN" do
-    expect(Math.tan(nan_value).nan?).to eq(true)
+    expect(Math.tan(nan_value)).to be_nan
   end
 end

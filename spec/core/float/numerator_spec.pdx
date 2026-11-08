@@ -22,7 +22,7 @@ context "Float#numerator" do
   end
 
   specify "returns NaN for NaN" do
-    expect((0.0 / 0.0).numerator.nan?).to be_true
+    expect((0.0 / 0.0).numerator).to be_nan
   end
 
   specify "returns Infinity for Infinity" do

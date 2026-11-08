@@ -55,6 +55,6 @@ context "Float constant" do
   end
 
   specify "NAN is 'not a number'" do
-    expect(Float::NAN.nan?).to eq(true)
+    expect(Float::NAN).to be_nan
   end
 end
