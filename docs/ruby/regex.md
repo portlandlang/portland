@@ -20,7 +20,8 @@ pos = line =~ /x/          # an Integer or nil
 
 ## Portland
 
-- **Literals are Ruby's**: `/\d+/`, the `i`, `m`, and `x` flags, interpolation, `%r{...}` with `[]`, `()`, or `{}` ([percent-literals.md](percent-literals.md)). `Regexp.new`, `Regexp.escape`, and `Regexp.union` are type functions. The `o` flag refuses by name — drop it; a constant pattern is hoisted anyway.
+- **Literals are Ruby's**: `/\d+/`, the `i`, `m`, and `x` flags, interpolation, `%r{...}` with `[]`, `()`, or `{}` ([percent-literals.md](percent-literals.md)). `Regexp.new`, `Regexp.escape`, and `Regexp.union` are type functions.
+- **`Regexp.linear_time?` is Ruby's**: true when the engine's match cache covers the pattern, so matching runs in time linear in the text whatever the input — the question to ask before running a pattern on text a user typed. A backreference defeats the cache, `Regexp.linear_time?(/(a)\1/)` is false. It takes a pattern, or a string with flags; flags beside a pattern refuse, where Ruby warns that it ignores them. The `o` flag refuses by name — drop it; a constant pattern is hoisted anyway.
 - **The pattern language is Onigmo's**: backreferences, lookahead and lookbehind, named captures, atomic and possessive groups, subexpression calls, Unicode properties, every construct Ruby reads. A construct the engine has not built yet refuses by name; nothing matches differently in silence.
 - **A match is a value.** `=~` and `match` both answer the `MatchData` or nil, so a match narrows like any maybe; `match?` and `!~` answer booleans. `MatchData` reads as Ruby's: `found[0]`, `found[1]`, `found[:year]`, `captures`, `named_captures`, `pre_match`, `post_match`, `begin(0)`, `to_a`. The one change from Ruby: `=~` no longer answers an index, because without `$~` an index alone cannot reach the captures.
 - **The globals refuse**: `$~`, `$1`–`$9`, `$&`, `` $` ``, `$'`, and `Regexp.last_match`, each with the rewrite — bind the match, read it.

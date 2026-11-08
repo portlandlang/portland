@@ -271,6 +271,39 @@ context "Regexp.union" do
   end
 end
 
+context "Regexp.linear_time?" do
+  specify "returns true if matching can be done in linear time" do
+    expect(Regexp.linear_time?(/a/)).to be_true
+    expect(Regexp.linear_time?("a")).to be_true
+  end
+
+  specify "returns false if matching can't be done in linear time" do
+    expect(Regexp.linear_time?(/(a)\1/)).to be_false
+    expect(Regexp.linear_time?("(a)\\1")).to be_false
+  end
+
+  specify "accepts flags for a string argument" do
+    expect(Regexp.linear_time?("a", 1)).to be_true
+    expect(Regexp.linear_time?("a", "i")).to be_true
+  end
+
+  specify "returns true for lookahead and lookbehind" do
+    expect(Regexp.linear_time?(/a*(?:(?=a*)a)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?<=a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?<!a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?!a*)a*)*b/)).to be_true
+  end
+
+  specify "returns true for atomic groups and possessive quantifiers" do
+    expect(Regexp.linear_time?(/a*(?:(?>a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?:a)?+a*)*b/)).to be_true
+  end
+
+  specify "returns true for positive lookbehind with a capture group" do
+    expect(Regexp.linear_time?(/.(?<=(a))/)).to be_true
+  end
+end
+
 context "Regexp literals" do
   specify "take the i, m, and x flags" do
     expect(/foo/i.casefold?).to be_true

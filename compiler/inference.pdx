@@ -469,6 +469,7 @@ def type_function_answer_for(type_name, name)
   # `Regexp.escape` answers text, `Regexp.union` a pattern (ADR 0086).
   when "escape", "quote"                  then if type_name == "Regexp" then ["string"] else ["unknown"] end
   when "union"                            then if type_name == "Regexp" then ["regexp"] else ["unknown"] end
+  when "linear_time?"                     then if type_name == "Regexp" then ["boolean"] else ["unknown"] end
   when "new"
     case type_name
     when "Hash"   then ["hash", ["unknown"], ["unknown"]]

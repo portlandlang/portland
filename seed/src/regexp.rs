@@ -145,6 +145,12 @@ impl Pattern {
         })
     }
 
+    /// Whether a search runs in time linear in the text: the engine's
+    /// match cache covers the pattern, Ruby's `Regexp.linear_time?`.
+    pub fn linear_time(&self) -> bool {
+        self.compiled.linear_time()
+    }
+
     /// The capture names each once, in order of first appearance.
     pub fn unique_names(&self) -> Vec<String> {
         let mut unique: Vec<String> = Vec::new();

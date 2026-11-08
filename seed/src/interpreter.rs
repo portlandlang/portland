@@ -4140,6 +4140,26 @@ impl<W: std::io::Write> Interpreter<W> {
                 _ => panic!("Regexp.{name} takes 1 argument, got {}", arguments.len()),
             },
             ("Regexp", "union") => Some(Value::Regex(crate::regexp::union(&arguments))),
+            // `Regexp.linear_time?` (ADR 0086): whether the match cache
+            // covers the pattern. A pattern's own flags are already set, so
+            // flags beside one refuse where Ruby warns them away.
+            ("Regexp", "linear_time?") => match arguments.as_slice() {
+                [Value::Regex(pattern)] => Some(Value::Boolean(pattern.linear_time())),
+                [Value::String(source)] => Some(Value::Boolean(
+                    crate::regexp::Pattern::from_options(source, None).linear_time(),
+                )),
+                [Value::String(source), options] => Some(Value::Boolean(
+                    crate::regexp::Pattern::from_options(source, Some(options)).linear_time(),
+                )),
+                [Value::Regex(_), _] => panic!(
+                    "Regexp.linear_time? takes flags only beside a string — a pattern's flags are its own; drop the second argument"
+                ),
+                [other, ..] => panic!(
+                    "no implicit conversion of {} into String",
+                    other.type_name()
+                ),
+                [] => panic!("Regexp.linear_time? takes 1 to 2 arguments, got 0"),
+            },
             ("Regexp", "last_match") => panic!(
                 "'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match"
             ),

@@ -2548,9 +2548,10 @@ core/regexp/last_match_spec.rb:
   reason: "Regexp.last_match is the match global by another name; a match is bound and read."
   link: docs/ruby/regex.md
 core/regexp/linear_time_spec.rb:
-  status: skipped
-  reason: "There is no Regexp.linear_time?; the engine is Onigmo's backtracker, ported."
-  link: https://github.com/portlandlang/portland/issues/212
+  pdx: [spec/regex/literal_spec.pdx]
+  status: partial_intentional
+  reason: "Flags beside a pattern refuse where Ruby warns them away; the binary-encoding row has no n flag (ADR 0069), and the rows guarded for DFA engines are not CRuby's answers."
+  link: docs/ruby/regex.md
 core/regexp/match_spec.rb:
   pdx: [spec/regex/match_spec.pdx]
   status: partial_intentional

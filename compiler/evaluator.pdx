@@ -2335,6 +2335,16 @@ def evaluate_builtin_type_function(node, mutable bindings)
       members = arguments.length == 1 ? host_text(value_at(arguments, 0)) : arguments.map { host_text(it) }
       return outcome([Regexp.union(members)], bindings)
     end
+    # `Regexp.linear_time?` (ADR 0086): the host's own answer and refusals.
+    if node.name == "linear_time?"
+      panic("Regexp.linear_time? takes 1 to 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+      answer = if arguments.length == 1
+        Regexp.linear_time?(value_at(arguments, 0))
+      else
+        Regexp.linear_time?(value_at(arguments, 0), value_at(arguments, 1))
+      end
+      return outcome([answer], bindings)
+    end
     if node.name == "last_match"
       panic("'Regexp.last_match' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match")
     end

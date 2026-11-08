@@ -5741,6 +5741,10 @@ fn regex_refusals_on_both_oracles() {
                 "p(Regexp.last_match)\n",
                 "'Regexp.last_match' is a match global",
             ),
+            (
+                "p(Regexp.linear_time?(/a/, 1))\n",
+                "Regexp.linear_time? takes flags only beside a string",
+            ),
         ],
     );
 }
