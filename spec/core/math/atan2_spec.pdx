@@ -1,0 +1,23 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+
+context "Math.atan2" do
+  specify "answer the arc tangent of y, x" do
+    expect(Math.atan2(4.2, 0.3)).to be_close(1.49948886200961, MATH_TOLERANCE)
+    expect(Math.atan2(0.0, 1.0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.atan2(-9.1, 3.2)).to be_close(-1.23265379809025, MATH_TOLERANCE)
+    expect(Math.atan2(7.22, -3.3)).to be_close(1.99950888779256, MATH_TOLERANCE)
+    expect(Math.atan2(0.0, 0.0)).to eq(0.0)
+    expect(Math.atan2(-0.0, 0.0)).to eq(-0.0)
+    expect(Math.atan2(0.0, -0.0)).to eq(Math::PI)
+    expect(Math.atan2(-0.0, -0.0)).to eq(-Math::PI)
+  end
+end

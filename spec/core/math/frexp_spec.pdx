@@ -1,0 +1,19 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+
+context "Math.frexp" do
+  specify "frexp returns the normalized fraction and exponent" do
+    parts = Math.frexp(102.83)
+    expect(parts[0] or 0.0).to be_close(0.803359375, MATH_TOLERANCE)
+    expect(parts[1]).to eq(some(7))
+    expect(Math.frexp(1234)).to eq([0.6025390625, 11])
+  end
+end

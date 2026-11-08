@@ -1,0 +1,23 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+
+context "Math.log10" do
+  specify "log10 returns the base-10 logarithm of the argument" do
+    expect(Math.log10(0.0001)).to be_close(-4.0, MATH_TOLERANCE)
+    expect(Math.log10(0.000000000001e-15)).to be_close(-27.0, MATH_TOLERANCE)
+    expect(Math.log10(1)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.log10(10)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.log10(10e15)).to be_close(16.0, MATH_TOLERANCE)
+    expect(Math.log10(nan_value).nan?).to eq(true)
+    expect(inspect(Math.log10(-1e-15))).to eq('failure("Numerical argument is out of domain - log10")')
+  end
+end

@@ -35,4 +35,15 @@ context "MatchData#begin" do
     expect(md.begin("a")).to eq(1)
     expect(md.begin(:b)).to eq(3)
   end
+
+  specify "a combining mark is part of its character" do
+    md = "éx".match(/x/) or panic("no match")
+    expect(md.begin(0)).to eq(1)
+    expect("éx".length).to eq(2)
+  end
+
+  specify "a flag is one character" do
+    md = "🇵🇹x".match(/x/) or panic("no match")
+    expect(md.begin(0)).to eq(1)
+  end
 end

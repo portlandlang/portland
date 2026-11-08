@@ -1,0 +1,45 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+def infinity_value = 1.0 / 0.0
+
+context "Math.gamma" do
+  # Accumulated as a float: every factorial through 22! is a double exactly,
+  # and 21! is already past the 64-bit integers (ADR 0070).
+  specify "gamma at the edges" do
+    expect(Math.gamma(0)).to eq(Float::INFINITY)
+    expect(Math.gamma(-0.0)).to eq(-Float::INFINITY)
+    expect(Math.gamma(0.5)).to be_close(Math.sqrt(Math::PI), MATH_TOLERANCE)
+    expect(Math.gamma(infinity_value).infinite?).to eq(true)
+    expect(Math.gamma(nan_value).nan?).to eq(true)
+    expect(inspect(Math.gamma(-1))).to eq('failure("Numerical argument is out of domain - gamma")')
+    expect(inspect(Math.gamma(-Float::INFINITY))).to eq('failure("Numerical argument is out of domain - gamma")')
+  end
+
+  # Accumulated as a float: every factorial through 22! is a double exactly,
+  # and 21! is already past the 64-bit integers (ADR 0070).
+  specify "gamma returns exactly (n-1)! given n for n between 2 and 23" do
+    mutable fact = 1.0
+    2.upto(23) do |n|
+      fact *= n - 1
+      expect(Math.gamma(n)).to eq(fact)
+    end
+  end
+
+  # Accumulated as a float: every factorial through 22! is a double exactly,
+  # and 21! is already past the 64-bit integers (ADR 0070).
+  specify "gamma gives good numerical approximations" do
+    expect(Math.gamma(3.2)).to be_close(2.423965, MATH_TOLERANCE)
+    expect(Math.gamma(-2.15)).to be_close(-2.999619, MATH_TOLERANCE)
+    expect(Math.gamma(0.00001)).to be_close(99999.422794, MATH_TOLERANCE)
+    expect(Math.gamma(-0.00001)).to be_close(-100000.577225, MATH_TOLERANCE)
+  end
+end

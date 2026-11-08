@@ -1,0 +1,25 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+
+context "Math.acos" do
+  specify "answer the arccosine of the argument" do
+    expect(Math.acos(1)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.acos(0)).to be_close(1.5707963267949, MATH_TOLERANCE)
+    expect(Math.acos(-1)).to be_close(Math::PI, MATH_TOLERANCE)
+    expect(Math.acos(0.25)).to be_close(1.31811607165282, MATH_TOLERANCE)
+    expect(Math.acos(0.50)).to be_close(1.0471975511966, MATH_TOLERANCE)
+    expect(Math.acos(0.75)).to be_close(0.722734247813416, MATH_TOLERANCE)
+    expect(inspect(Math.acos(1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
+    expect(inspect(Math.acos(-1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
+    expect(Math.acos(nan_value).nan?).to eq(true)
+  end
+end
