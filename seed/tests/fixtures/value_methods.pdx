@@ -443,3 +443,7 @@ p "5+3__1i".to_c
 angstrom = 0x212b.chr(Encoding::UTF_8)
 p angstrom.unicode_normalize(:nfd).codepoints
 p angstrom.unicode_normalized?
+p "hello".tr("el", "ip")
+p "hello".tr_s("el", "hx")
+p "hello world".delete("lo", "o")
+p "yellow moon".squeeze
