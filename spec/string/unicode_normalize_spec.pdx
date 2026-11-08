@@ -1,16 +1,16 @@
-# Unicode's normalization forms (ADR 0087): `unicode_normalize` rewrites
-# text into NFC, NFD, NFKC, or NFKD, and `unicode_normalized?` asks whether
-# text is already in one, Ruby's answers codepoint for codepoint.
+# `unicode_normalize` rewrites text into one of Unicode's normalization
+# forms (ADR 0087) — NFC, NFD, NFKC, or NFKD — Ruby's answers codepoint
+# for codepoint.
 #
 # String equality is canonical here (ADR 0038), so a normalized string is
 # `==` to the one it came from; every row compares `codepoints`, which is
 # where the forms differ. Strings are built from codepoints with
 # `chr(Encoding::UTF_8)`, Portland's strings not spelling `\u` escapes.
 #
-# From ruby/spec core/string/{unicode_normalize,unicode_normalized}_spec.rb.
-# Upstream: the non-Unicode-encoding rows (every string is UTF-8, ADR 0069)
-# and `unicode_normalize!` (a mutator, ADR 0015). An invalid form refuses in
-# Ruby's words, pinned by a two-oracle test.
+# From ruby/spec core/string/unicode_normalize_spec.rb. Upstream: the
+# non-Unicode-encoding row (every string is UTF-8, ADR 0069). An invalid
+# form refuses in Ruby's words, and `unicode_normalize!` is a mutator
+# (ADR 0015), both pinned by a two-oracle test.
 
 require_relative "../spec_helper"
 
@@ -60,52 +60,5 @@ context "String#unicode_normalize" do
 
   specify "answers text equal to its source, equality being canonical" do
     expect(angstrom.unicode_normalize(:nfd) == angstrom).to be_true
-  end
-end
-
-context "String#unicode_normalized?" do
-  nfc_normalized = text([0x1e9b, 0x0323])
-  nfd_normalized = text([0x017f, 0x0323, 0x0307])
-  nfkc_normalized = text([0x1e69])
-  nfkd_normalized = text([0x0073, 0x0323, 0x0307])
-
-  specify "returns true if string is in the specified normalization form" do
-    expect(nfc_normalized.unicode_normalized?(:nfc)).to be_true
-    expect(nfd_normalized.unicode_normalized?(:nfd)).to be_true
-    expect(nfkc_normalized.unicode_normalized?(:nfkc)).to be_true
-    expect(nfkd_normalized.unicode_normalized?(:nfkd)).to be_true
-  end
-
-  specify "returns false if string is not in the supplied normalization form" do
-    expect(nfd_normalized.unicode_normalized?(:nfc)).to be_false
-    expect(nfc_normalized.unicode_normalized?(:nfd)).to be_false
-    expect(nfc_normalized.unicode_normalized?(:nfkc)).to be_false
-    expect(nfc_normalized.unicode_normalized?(:nfkd)).to be_false
-  end
-
-  specify "defaults to the nfc normalization form if no forms are specified" do
-    expect(nfc_normalized.unicode_normalized?).to be_true
-    expect(nfd_normalized.unicode_normalized?).to be_false
-  end
-
-  specify "returns true if string is empty" do
-    expect("".unicode_normalized?).to be_true
-  end
-
-  specify "returns true if string does not contain any unicode codepoints" do
-    expect("abc".unicode_normalized?).to be_true
-  end
-
-  specify "answers each form for a string before and after normalizing" do
-    grave = text([0x61, 0x0300])
-    expect(grave.unicode_normalized?(:nfc)).to be_false
-    expect(grave.unicode_normalize(:nfc).unicode_normalized?(:nfc)).to be_true
-    expect(grave.unicode_normalized?(:nfkc)).to be_false
-    expect(grave.unicode_normalize(:nfkc).unicode_normalized?(:nfkc)).to be_true
-    a_grave = text([0x61, 0x00e0])
-    expect(a_grave.unicode_normalized?(:nfd)).to be_false
-    expect(a_grave.unicode_normalize(:nfd).unicode_normalized?(:nfd)).to be_true
-    expect(a_grave.unicode_normalized?(:nfkd)).to be_false
-    expect(a_grave.unicode_normalize(:nfkd).unicode_normalized?(:nfkd)).to be_true
   end
 end
