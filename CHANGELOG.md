@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **macOS 27 is the minimum** ([#231](https://github.com/portlandlang/portland/issues/231)) — CI runs on GitHub's macOS 27 image, labelled `xcode-27` while it is in preview, and the README, ROADMAP, architecture, and Ruby ledger say macOS 27+ where they said 26+.
+
 - **Rust 1.99.1** ([#232](https://github.com/portlandlang/portland/issues/232)) — `rust-toolchain.toml` moves from 1.98.1 to the current stable; clippy and rustfmt are clean on it with no code changes. libc moves to 0.2.191 and unicode-normalization to 0.1.26, with the lockfile's transitive crates to their latest compatible releases. rustyline moves to 19.0.0, a major release the REPL needs no change for.
 
 - **The seed's `cos(πx)` and `sin(πx)` are Apple's alone** ([#228](https://github.com/portlandlang/portland/issues/228)) — Portland targets only macOS on Apple silicon, so `seed/src/tower.rs` calls `__cospi` and `__sinpi` unconditionally and drops the `cos(x * π)` fallback no build ever compiled.

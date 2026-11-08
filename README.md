@@ -74,7 +74,7 @@ end
 | [**CHANGELOG**](CHANGELOG.md)            | what changed, newest first                                      |
 | [**History**](docs/history/)             | dated writing, frozen — never current, never a source of truth  |
 
-Try it with `script/console a_file.pdx`, or `script/console` alone for a REPL. Portland targets **macOS 26+ on Apple silicon** and nothing else, on purpose.
+Try it with `script/console a_file.pdx`, or `script/console` alone for a REPL. Portland targets **macOS 27+ on Apple silicon** and nothing else, on purpose.
 
 ## The name
 
