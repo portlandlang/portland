@@ -5637,7 +5637,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     result.push_str(&text[copied_to..]);
                     Some(Value::String(result))
                 }
-                (Value::String(text), "scan", [Value::Regex(pattern)]) => {
+                (Value::String(text), "scan", [pattern @ (Value::Regex(_) | Value::String(_))]) => {
+                    let pattern = match pattern {
+                        Value::Regex(pattern) => pattern.clone(),
+                        Value::String(needle) => crate::regexp::literal_pattern(needle),
+                        _ => unreachable!(),
+                    };
                     for found in pattern.all(text) {
                         self.run_block(block, vec![crate::regexp::scan_item(&found)]);
                         if let Some(interrupted) = self.block_interrupt() {

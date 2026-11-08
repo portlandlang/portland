@@ -1,0 +1,65 @@
+# An integer's place in the tower (ADR 0085): its numerator is itself, its
+# denominator 1, and `to_r` and `rationalize` answer the rational it is.
+#
+# From ruby/spec core/integer/{numerator,denominator,rationalize,to_r}_spec.rb.
+# Upstream: the bignum rows, integers being 64-bit here (ADR 0070); the rows
+# handing `to_r` or `rationalize` too many arguments refuse, which a spec
+# cannot assert — the refusals are pinned by a two-oracle test instead.
+
+require_relative "../../spec_helper"
+
+context "Integer#numerator" do
+  specify "returns self" do
+    [0, 29871, 72628191273].map { |number| [-number, number] }.flatten.each do |number|
+      expect(number.numerator).to eq(number)
+    end
+  end
+end
+
+context "Integer#denominator" do
+  specify "returns 1" do
+    [20, -2709, 0, 1].each do |number|
+      expect(number.denominator).to eq(1)
+    end
+  end
+end
+
+context "Integer#rationalize" do
+  numbers = [0, 29871, -72628191273]
+
+  specify "returns a Rational object" do
+    numbers.each do |number|
+      expect(number.rationalize.class).to eq(Rational)
+    end
+  end
+
+  specify "uses self as the numerator" do
+    numbers.each do |number|
+      expect(number.rationalize.numerator).to eq(number)
+    end
+  end
+
+  specify "uses 1 as the denominator" do
+    numbers.each do |number|
+      expect(number.rationalize.denominator).to eq(1)
+    end
+  end
+
+  specify "ignores a single argument" do
+    expect(1.rationalize(0.1)).to eq(Rational(1, 1))
+  end
+end
+
+context "Integer#to_r" do
+  specify "returns a Rational object" do
+    expect(309.to_r.class).to eq(Rational)
+  end
+
+  specify "constructs a rational number with self as the numerator" do
+    expect(34.to_r.numerator).to eq(34)
+  end
+
+  specify "constructs a rational number with 1 as the denominator" do
+    expect(298.to_r.denominator).to eq(1)
+  end
+end

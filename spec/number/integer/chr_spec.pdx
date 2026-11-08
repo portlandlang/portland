@@ -1,0 +1,58 @@
+# `Integer#chr` (ADR 0069): a string is UTF-8 text, so 0 to 127 answer the
+# one-character ASCII string, and `chr(Encoding::UTF_8)` answers any
+# codepoint as its character. A byte past ASCII on its own is not UTF-8 text
+# and refuses naming `chr(Encoding::UTF_8)`, where Ruby answers a binary
+# string.
+#
+# From ruby/spec core/integer/chr_spec.rb. Upstream: the 128-to-255 rows
+# answering binary strings (they refuse here); every encoding other than
+# UTF-8 (US-ASCII, BINARY, SHIFT_JIS, EUC-JP, and the rest have no string to
+# be, ADR 0069); `Encoding.default_internal`; `equal?`; the bignum rows; and
+# the RangeError rows, which refuse in Ruby's words — `-1 out of char range`,
+# `invalid codepoint 0xD800 in UTF-8` — and are pinned by a two-oracle test.
+# `chr("utf-8")` in another case refuses where Ruby's `Encoding.find` folds
+# case; only `"UTF-8"` is read.
+
+require_relative "../../spec_helper"
+
+context "Integer#chr without argument" do
+  specify "returns a String" do
+    expect(17.chr.class).to eq(String)
+  end
+
+  specify "returns a String encoding self as a US-ASCII codepoint for 0 to 127" do
+    (0..127).each do |code|
+      expect(code.chr.bytes).to eq([code])
+    end
+    expect(65.chr).to eq("A")
+  end
+
+  specify "answers UTF-8 text" do
+    expect(65.chr.encoding).to eq("UTF-8")
+  end
+end
+
+context "Integer#chr with an encoding argument" do
+  specify "returns a String" do
+    expect(900.chr(Encoding::UTF_8).class).to eq(String)
+  end
+
+  specify "accepts the encoding's name as a String" do
+    expect(7894.chr("UTF-8").encoding).to eq("UTF-8")
+  end
+
+  specify "returns a String with the specified encoding" do
+    [0x0000, 0x007F, 0x0080, 0x00FF, 0x0100, 0x3000].each do |code|
+      expect(code.chr(Encoding::UTF_8).encoding).to eq("UTF-8")
+    end
+  end
+
+  specify "returns a String encoding self as a UTF-8 codepoint" do
+    expect(0x0000.chr(Encoding::UTF_8).bytes).to eq([0x00])
+    expect(0x007F.chr(Encoding::UTF_8).bytes).to eq([0x7F])
+    expect(0x0080.chr(Encoding::UTF_8).bytes).to eq([0xC2, 0x80])
+    expect(0x00FF.chr(Encoding::UTF_8).bytes).to eq([0xC3, 0xBF])
+    expect(0x0100.chr(Encoding::UTF_8).bytes).to eq([0xC4, 0x80])
+    expect(0x3000.chr(Encoding::UTF_8).bytes).to eq([0xE3, 0x80, 0x80])
+  end
+end
