@@ -1178,6 +1178,19 @@ fn squeezed(text: &str, sets: &[Vec<String>]) -> String {
     result
 }
 
+/// `unicode_normalize` (ADR 0087): text in one of Unicode's four forms,
+/// named by Ruby's symbols; any other form refuses in Ruby's words.
+fn normalized(text: &str, form: &Value) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    match form {
+        Value::Symbol(name) if name == "nfc" => text.nfc().collect(),
+        Value::Symbol(name) if name == "nfd" => text.nfd().collect(),
+        Value::Symbol(name) if name == "nfkc" => text.nfkc().collect(),
+        Value::Symbol(name) if name == "nfkd" => text.nfkd().collect(),
+        other => panic!("Invalid normalization form {other}."),
+    }
+}
+
 /// `hex` and the prefixed half of `oct` (#106): a sign, an optional
 /// prefix, then digits of the base with underscores between, read as far
 /// as they go; anything else is 0, as Ruby's are.
@@ -5731,7 +5744,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     result.push_str(&text[copied_to..]);
                     Some(Value::String(result))
                 }
-                (Value::String(text), "scan", [Value::Regex(pattern)]) => {
+                (Value::String(text), "scan", [pattern @ (Value::Regex(_) | Value::String(_))]) => {
+                    let pattern = match pattern {
+                        Value::Regex(pattern) => pattern.clone(),
+                        Value::String(needle) => crate::regexp::literal_pattern(needle),
+                        _ => unreachable!(),
+                    };
                     for found in pattern.all(text) {
                         self.run_block(block, vec![crate::regexp::scan_item(&found)]);
                         if let Some(interrupted) = self.block_interrupt() {
@@ -7263,8 +7281,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
                 Err(_) => panic!("{code} out of char range"),
             },
+            // The name is read as `Encoding.find` reads it (#223): UTF-8's
+            // two names, `UTF-8` and `CP65001`, in any case.
             (Value::Integer(code), "chr", [Value::String(encoding)]) => {
-                if encoding != "UTF-8" {
+                if !encoding.eq_ignore_ascii_case("UTF-8")
+                    && !encoding.eq_ignore_ascii_case("CP65001")
+                {
                     panic!(
                         "'chr' takes Encoding::UTF_8, the one encoding a string has (ADR 0069), got {encoding:?}"
                     );
@@ -7704,6 +7726,24 @@ impl<W: std::io::Write> Interpreter<W> {
                     .collect();
                 Value::String(squeezed(text, &sets))
             }
+            // Unicode's four normalization forms, Ruby's (ADR 0087): the
+            // text rewritten, or whether rewriting would change nothing.
+            (Value::String(text), "unicode_normalize", []) => {
+                Value::String(normalized(text, &Value::Symbol("nfc".to_string())))
+            }
+            (Value::String(text), "unicode_normalize", [form]) => {
+                Value::String(normalized(text, form))
+            }
+            (Value::String(text), "unicode_normalized?", []) => {
+                Value::Boolean(normalized(text, &Value::Symbol("nfc".to_string())) == *text)
+            }
+            (Value::String(text), "unicode_normalized?", [form]) => {
+                Value::Boolean(normalized(text, form) == *text)
+            }
+            // The leading number as a rational or a complex (ADR 0085),
+            // Ruby's own lenient readers ported (#106).
+            (Value::String(text), "to_r", []) => crate::tower::string_to_r(text),
+            (Value::String(text), "to_c", []) => crate::tower::string_to_c(text),
             (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
             // A replacement reads Ruby's escapes (ADR 0086, #161) with a
             // string pattern too: `\0` and `\&` the match, a group empty.

@@ -5786,3 +5786,98 @@ fn character_list_refusals_on_both_oracles() {
         ],
     );
 }
+
+/// Unicode's normalization forms (ADR 0087): an unknown form, or a form
+/// spelled as a string, refuses in Ruby's words on both oracles, and the
+/// bang form is a mutator, which does not exist (ADR 0015).
+#[test]
+fn unicode_normalization_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "unicode_normalization_refusals",
+        None,
+        &[
+            (
+                "p(\"a\".unicode_normalize(:bogus))\n",
+                "Invalid normalization form bogus.",
+            ),
+            (
+                "p(\"a\".unicode_normalize(\"nfd\"))\n",
+                "Invalid normalization form nfd.",
+            ),
+            (
+                "p(\"a\".unicode_normalized?(:bogus))\n",
+                "Invalid normalization form bogus.",
+            ),
+            (
+                "p(\"a\".unicode_normalize!)\n",
+                "which has no method 'unicode_normalize!'",
+            ),
+        ],
+    );
+}
+
+/// `String#to_r` and `#to_c` (ADR 0085, #106): a zero denominator refuses
+/// as `1 / 0` does, in Ruby's words, and a part past the 64-bit integers
+/// refuses where Ruby would answer a bignum (ADR 0070), on both oracles.
+#[test]
+fn string_to_r_and_to_c_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "string_to_r_and_to_c_refusals",
+        None,
+        &[
+            ("p(\"1/0\".to_r)\n", "divided by 0"),
+            (
+                "p(\"99999999999999999999\".to_r)\n",
+                "overflows the 64-bit integers",
+            ),
+            (
+                "p(\"99999999999999999999\".to_c)\n",
+                "overflows the 64-bit integers",
+            ),
+        ],
+    );
+}
+
+/// The refusals the integer tower, `chr`, and the string pattern ports
+/// cannot assert as spec rows, in the same words on both oracles: Ruby's
+/// sentences where Ruby has them (ADRs 0069, 0085, 0086).
+#[test]
+fn integer_chr_and_string_pattern_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "integer_chr_and_string_pattern_refusals",
+        None,
+        &[
+            ("p(-1.chr)\n", "-1 out of char range"),
+            ("p(256.chr)\n", "256 out of char range"),
+            (
+                "p(128.chr)\n",
+                "128.chr is a single byte, which is not UTF-8 text here (ADR 0069)",
+            ),
+            (
+                "p(2206368128.chr(Encoding::UTF_8))\n",
+                "2206368128 out of char range",
+            ),
+            (
+                "p(0xD800.chr(Encoding::UTF_8))\n",
+                "invalid codepoint 0xD800 in UTF-8",
+            ),
+            ("p(287.to_r(2))\n", "'to_r' takes 0 arguments, got 1"),
+            (
+                "p(1.rationalize(0.1, 0.1))\n",
+                "'rationalize' takes 0 to 1 arguments, got 2",
+            ),
+            (
+                "p(\"cruel world\".scan(5))\n",
+                "wrong argument type Integer (expected Regexp)",
+            ),
+            (
+                "p(\"hello\".match(10))\n",
+                "wrong argument type Integer (expected Regexp)",
+            ),
+            (
+                "p(\"hello\".match(:ell))\n",
+                "wrong argument type Symbol (expected Regexp)",
+            ),
+        ],
+    );
+}
