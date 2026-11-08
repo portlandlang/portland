@@ -2218,6 +2218,15 @@ def host_text(value) = (value in ["__symbol__", *]) ? value_at(value, 1) : value
 # one; anything else as it is, so the host refuses it in its own words.
 def host_symbol(value) = (value in ["__symbol__", *]) ? value_at(value, 1).to_sym : value
 
+# What a `match` or `match?` argument is for the host: a subject read by its
+# name when the receiver is a pattern, a pattern left as it is otherwise, so
+# a symbol handed to a string refuses there as Ruby's does.
+def pattern_operand(receiver, operand)
+  return host_text(operand) if receiver in Regexp
+  return operand if (operand in Regexp) || (operand in String)
+  panic("wrong argument type #{value_type_label(operand)} (expected Regexp)")
+end
+
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 # `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
 # shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
@@ -3376,11 +3385,13 @@ def evaluate_method_call(node, mutable bindings)
   # pattern itself: the host's own, a match being a host value.
   when "=~" then host_text(receiver) =~ host_text(value_at(arguments, 0))
   when "!~" then host_text(receiver) !~ host_text(value_at(arguments, 0))
+  # A symbol subject reads by its name only beside a pattern receiver;
+  # handed to a string's `match`, a symbol is no pattern, as in Ruby.
   when "match"
-    arguments.length == 2 ? host_text(receiver).match(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match(host_text(value_at(arguments, 0)))
+    arguments.length == 2 ? host_text(receiver).match(pattern_operand(receiver, value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match(pattern_operand(receiver, value_at(arguments, 0)))
   when "match?"
-    arguments.length == 2 ? host_text(receiver).match?(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match?(host_text(value_at(arguments, 0)))
-  when "scan" then receiver.scan(value_at(arguments, 0))
+    arguments.length == 2 ? host_text(receiver).match?(pattern_operand(receiver, value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match?(pattern_operand(receiver, value_at(arguments, 0)))
+  when "scan" then receiver.scan(pattern_operand(receiver, value_at(arguments, 0)))
   when "source" then receiver.source
   when "options" then receiver.options
   when "casefold?" then receiver.casefold?
@@ -4024,7 +4035,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # `scan` with a block (ADR 0086): each match's text — its groups as an
   # array when the pattern has any — to the block, answering the string.
   when "scan"
-    receiver.scan(value_at(arguments, 0)) do |item|
+    receiver.scan(pattern_operand(receiver, value_at(arguments, 0))) do |item|
       step = run_guest_block(block, [item], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
