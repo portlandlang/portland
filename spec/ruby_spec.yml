@@ -1381,7 +1381,7 @@ core/integer/comparison_spec.rb:
   reason: "No bignums and no coercion protocol; a non-number argument refuses where Ruby answers nil."
   link: docs/ruby/ordering.md
 core/integer/denominator_spec.rb:
-  pdx: [spec/number/integer/tower_spec.pdx]
+  pdx: [spec/number/integer/denominator_spec.pdx]
   status: partial_intentional
   reason: "The bignum rows stay upstream; integers are 64-bit here."
   link: docs/ruby/integers.md
@@ -1419,7 +1419,7 @@ core/integer/multiply_spec.rb:
   status: partial_intentional
   reason: "No coercion protocol: a wrong operand type refuses rather than negotiating."
 core/integer/numerator_spec.rb:
-  pdx: [spec/number/integer/tower_spec.pdx]
+  pdx: [spec/number/integer/numerator_spec.pdx]
   status: partial_intentional
   reason: "The bignum rows stay upstream; integers are 64-bit here."
   link: docs/ruby/integers.md
@@ -1439,7 +1439,7 @@ core/integer/pow_spec.rb:
 core/integer/pred_spec.rb:
   pdx: [spec/number/integer/succession_spec.pdx]
 core/integer/rationalize_spec.rb:
-  pdx: [spec/number/integer/tower_spec.pdx]
+  pdx: [spec/number/integer/rationalize_spec.pdx]
   status: partial_intentional
   reason: "The bignum row stays upstream, integers being 64-bit; too many arguments refuses, pinned by a two-oracle test."
   link: docs/ruby/integers.md
@@ -1448,7 +1448,7 @@ core/integer/succ_spec.rb:
 core/integer/to_f_spec.rb:
   pdx: [spec/number/integer/conversion_spec.pdx]
 core/integer/to_r_spec.rb:
-  pdx: [spec/number/integer/tower_spec.pdx]
+  pdx: [spec/number/integer/to_r_spec.pdx]
   status: partial_intentional
   reason: "The bignum row stays upstream, integers being 64-bit; an argument refuses, pinned by a two-oracle test."
   link: docs/ruby/integers.md

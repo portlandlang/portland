@@ -1,0 +1,14 @@
+# An integer's denominator is 1 (ADR 0085).
+#
+# From ruby/spec core/integer/denominator_spec.rb. Upstream: the bignum
+# rows, integers being 64-bit here (ADR 0070).
+
+require_relative "../../spec_helper"
+
+context "Integer#denominator" do
+  specify "returns 1" do
+    [20, -2709, 0, 1].each do |number|
+      expect(number.denominator).to eq(1)
+    end
+  end
+end
