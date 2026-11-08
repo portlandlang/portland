@@ -199,8 +199,8 @@ core/array/detect_spec.rb:
   link: docs/ruby/metaprogramming.md
 core/array/constructor_spec.rb:
   status: skipped
-  reason: "Array.[] builds what the literal already writes, from a class object that does not exist; the subclass rows have no subclass."
-  link: docs/ruby/metaprogramming.md
+  reason: "Array[...] is decided with Ruby's behavior (ADR 0058, amended) and not yet built; the subclass rows and the dotted Array.[] spelling stay upstream."
+  link: https://github.com/portlandlang/portland/issues/218
 core/array/element_reference_spec.rb:
   pdx: [spec/array/index_spec.pdx, spec/array/slice_spec.pdx]
   status: partial_intentional

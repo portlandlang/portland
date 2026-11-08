@@ -1,6 +1,6 @@
 # 0058 — The builtin types carry Ruby's type functions
 
-- **Status:** Accepted (ruled by the deciding user 2026-10-16 on the recommendation in [#159](https://github.com/portlandlang/portland/issues/159); `Array.new` and `Integer.sqrt` built in the seed and the trio, differentially pinned, 2026-10-16)
+- **Status:** Accepted (ruled by the deciding user 2026-10-16 on the recommendation in [#159](https://github.com/portlandlang/portland/issues/159); `Array.new` and `Integer.sqrt` built in the seed and the trio, differentially pinned, 2026-10-16; amended 2026-11-08 to welcome `Array[...]` and `Hash[...]`, decided and not yet built, [#218](https://github.com/portlandlang/portland/issues/218))
 - **Date:** 2026-10-16
 - **Issue:** [#159](https://github.com/portlandlang/portland/issues/159)
 
@@ -15,7 +15,7 @@ A builtin type is not a class object here ([metaprogramming.md](../ruby/metaprog
 1. **The builtin types answer Ruby's type functions, spelled as Ruby spells them**, starting with the two a real port pulled for: `Array.new` in every arity Ruby gives it — bare, by count (nil-filled, as Ruby's), by count and fill, by count and a block handed each index, or copied from an array — and `Integer.sqrt`, exact where a float would round past 2^53. Tie goes to Ruby (principle 2).
 1. **The name is not a value.** `Array` and `Integer` on their own still refuse; only `Array.new(...)` and `Integer.sqrt(...)` have meaning. A struct or local wearing the name wins, as everywhere.
 1. **The refusals are Ruby's words where Ruby has them** — `negative array size`, `Numerical argument is out of domain - "isqrt"` — and name the argument otherwise: `Array.new takes a count or an array, got "a"`, `Integer.sqrt takes an Integer, got 2.5`. A fill beside a block refuses rather than letting one silently win, as Ruby's warning-then-block does.
-1. **Not decided here.** `Array[1, 2]` is a synonym for a literal, welcome under principle 3 but unpulled. `Hash.new`'s default value or block changes what a lookup answers, which [lookups.md](../ruby/lookups.md) retired with `fetch`; it is [#105](https://github.com/portlandlang/portland/issues/105)'s to decide. Further type functions arrive one real pull at a time.
+1. **Not decided here.** `Array[1, 2]` is a synonym for a literal, welcome under principle 3 but unpulled. *Amended 2026-11-08, ruled by the deciding user:* `Array[...]` and `Hash[...]` are both welcome, with Ruby's behavior and refusals — `Array[a, b]` is the array of its arguments; `Hash[...]` takes nothing, a hash to copy, an array of one- or two-element pairs, or an even list of keys and values, refusing as Ruby's does (`odd number of arguments for Hash`, `wrong element type Symbol at 0 (expected array)`, `invalid number of elements (3 for 1..2)`). Decided, not yet built: [#218](https://github.com/portlandlang/portland/issues/218). `Hash.new`'s default value or block changes what a lookup answers, which [lookups.md](../ruby/lookups.md) retired with `fetch`; it is [#105](https://github.com/portlandlang/portland/issues/105)'s to decide. Further type functions arrive one real pull at a time.
 
 ## Consequences
 
