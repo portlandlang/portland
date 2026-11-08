@@ -3379,6 +3379,11 @@ core/string/swapcase_spec.rb:
   status: partial_intentional
   reason: "Casing is full Unicode, locale-independent (ADR 0038): the :ascii, :turkic, :lithuanian, and :fold options are decided out."
   link: docs/ruby/characters.md
+core/string/to_c_spec.rb:
+  pdx: [spec/string/tower_spec.pdx]
+  status: partial_intentional
+  reason: "The NUL-byte rows stay upstream, Portland strings having no NUL escape; the UTF-16 row has no string to be, every string being UTF-8 (ADR 0069)."
+  link: docs/ruby/encodings.md
 core/string/to_i_spec.rb:
   pdx: [spec/string/radix_spec.pdx]
   status: partial_intentional
@@ -3386,6 +3391,8 @@ core/string/to_i_spec.rb:
   link: docs/ruby/conversions.md
 core/string/to_f_spec.rb:
   pdx: [spec/string/conversion_spec.pdx]
+core/string/to_r_spec.rb:
+  pdx: [spec/string/tower_spec.pdx]
 core/string/to_s_spec.rb:
   pdx: [spec/string/conversion_spec.pdx]
 core/string/to_str_spec.rb:

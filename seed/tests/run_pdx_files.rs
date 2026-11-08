@@ -5749,6 +5749,28 @@ fn regex_refusals_on_both_oracles() {
     );
 }
 
+/// `String#to_r` and `#to_c` (ADR 0085, #106): a zero denominator refuses
+/// as `1 / 0` does, in Ruby's words, and a part past the 64-bit integers
+/// refuses where Ruby would answer a bignum (ADR 0070), on both oracles.
+#[test]
+fn string_to_r_and_to_c_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "string_to_r_and_to_c_refusals",
+        None,
+        &[
+            ("p(\"1/0\".to_r)\n", "divided by 0"),
+            (
+                "p(\"99999999999999999999\".to_r)\n",
+                "overflows the 64-bit integers",
+            ),
+            (
+                "p(\"99999999999999999999\".to_c)\n",
+                "overflows the 64-bit integers",
+            ),
+        ],
+    );
+}
+
 /// The refusals the integer tower, `chr`, and the string pattern ports
 /// cannot assert as spec rows, in the same words on both oracles: Ruby's
 /// sentences where Ruby has them (ADRs 0069, 0085, 0086).
