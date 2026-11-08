@@ -1,0 +1,41 @@
+# The spec harness's string matchers (#252): `match`, `start_with`, and
+# `end_with`, so a failure shows the string where
+# `expect(text.match?(/x/)).to be_true` said only "expected true, got false".
+
+require_relative "../../spec_helper"
+
+context "match" do
+  specify "passes when the pattern matches the string" do
+    expect("hello").to match(/l+/)
+    expect("hello").not_to match(/z/)
+  end
+
+  specify "names the string and the pattern when it fails" do
+    expect(match(/z/).failure_message("hello")).to eq("expected \"hello\" to match /z/")
+    expect(match(/l/).negated_failure_message("hello")).to eq("expected \"hello\" not to match /l/")
+  end
+end
+
+context "start_with" do
+  specify "passes when the string starts with the prefix" do
+    expect("rose city").to start_with("rose")
+    expect("rose city").not_to start_with("city")
+  end
+
+  specify "names the string and the prefix when it fails" do
+    expect(start_with("city").failure_message("rose city")).to eq("expected \"rose city\" to start with \"city\"")
+    expect(start_with("rose").negated_failure_message("rose city")).to eq("expected \"rose city\" not to start with \"rose\"")
+  end
+end
+
+context "end_with" do
+  specify "passes when the string ends with the suffix" do
+    expect("rose city").to end_with("city")
+    expect("rose city").not_to end_with("rose")
+  end
+
+  specify "names the string and the suffix when it fails" do
+    expect(end_with("rose").failure_message("rose city")).to eq("expected \"rose city\" to end with \"rose\"")
+    expect(end_with("city").negated_failure_message("rose city")).to eq("expected \"rose city\" not to end with \"city\"")
+  end
+end
