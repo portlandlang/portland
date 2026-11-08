@@ -24,6 +24,6 @@ Every refusal is one sentence in ADR 0047's voice — the spelling as written in
 
 - The seed gains a `SymbolArray` token beside `WordArray`; the trio a `SymbolArrayNode` beside `WordArrayNode`; the word-splitting helper on each side takes the delimiter pair. The type of `%i[]` is `array of symbol`.
 - ADR 0030's "`[` stays the only delimiter" is superseded on that one point; its content rules stand, now keyed to the pair in use.
-- Pinned by seed lexer tests for each form and each refusal, a two-oracle evaluator test, a two-oracle refusal test over all ten sentences, `spec/array/word_array_spec.pdx` (delimiters) and `spec/array/symbol_array_spec.pdx`.
+- Pinned by seed lexer tests for each form and each refusal, a two-oracle evaluator test, a two-oracle refusal test over all ten sentences, `spec/language/array_spec.pdx` (delimiters) and `spec/portland/array/symbol_array_spec.pdx`.
 - Ledger: [percent-literals.md](../ruby/percent-literals.md) carries the corpus table and the migration rewrite for each declined member. The migration linter ([#36](https://github.com/portlandlang/portland/issues/36)) can apply every rewrite mechanically, since each refusal names it.
 - The corpus tool itself — `script/report percent-literals` in `ruby_research` — is reusable; the full run takes about twenty minutes and no network.

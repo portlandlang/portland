@@ -26,4 +26,4 @@ Three models were on the table for `length`: bytes (systems-honest, human-wrong)
 - The four parked pendings become examples, and **the compatibility-hole inventory reaches zero**: `script/spec | grep PENDING` is empty for the first time since the harness learned the word.
 - The compiler needed *no changes*: every string builtin and `==` ride the host, so grapheme semantics and canonical equality arrived hosted the moment the seed built.
 - Ledger: [characters.md](../ruby/characters.md) carries both divergences and the migration story; [string-count.md](../ruby/string-count.md)'s "single character" now means one grapheme.
-- `spec/string/unicode_spec.pdx` contains invisible ink on purpose — composed and decomposed `é` render identically in every editor — and its header says so.
+- `spec/portland/string/unicode_spec.pdx` contains invisible ink on purpose — composed and decomposed `é` render identically in every editor — and its header says so.

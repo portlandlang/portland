@@ -2,7 +2,7 @@
 
 **Summary:** `Math.sqrt`, `Math.log`, `Math::PI`, and the rest of Ruby's module functions are builtins spelled as Ruby spells them; a domain error is a failure in Ruby's own sentence, and `include Math` refuses.
 
-**Status:** decided ([ADR 0083](../adr/0083-2026-11-03-math-is-rubys.md), 2026-11-03, out of [#126](https://github.com/portlandlang/portland/issues/126)) and built the same day on both implementations under [#196](https://github.com/portlandlang/portland/issues/196): every function in `core/math/`, ported whole into `spec/math/functions_spec.pdx` against Ruby 4.0.9's answers. `Integer.sqrt` was already built ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)). Two of Ruby's edges kept on purpose: `Math.log(x, 1)` answers NaN as Ruby's does, and `gamma` answers the exact factorial for the integers 1 through 23 as Ruby's table does.
+**Status:** decided ([ADR 0083](../adr/0083-2026-11-03-math-is-rubys.md), 2026-11-03, out of [#126](https://github.com/portlandlang/portland/issues/126)) and built the same day on both implementations under [#196](https://github.com/portlandlang/portland/issues/196): every function in `core/math/`, ported whole into `spec/portland/math/functions_spec.pdx` (with `sqrt`, `cbrt`, and `hypot` in `spec/core/math/`) against Ruby 4.0.9's answers. `Integer.sqrt` was already built ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)). Two of Ruby's edges kept on purpose: `Math.log(x, 1)` answers NaN as Ruby's does, and `gamma` answers the exact factorial for the integers 1 through 23 as Ruby's table does.
 
 ## Ruby
 

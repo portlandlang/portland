@@ -17,7 +17,7 @@ The ruby/spec import's Float batch compared against `0x4fffffff` and the literal
 
 ## Consequences
 
-- Both lexers refuse with one wording each, pinned by the seed's unit tests and by an integration test that runs `017` through both oracles; the seed marks it a parse refusal for the probe (#88). The values are pinned by a two-oracle evaluator test and by `spec/number/integer/literal_spec.pdx`.
+- Both lexers refuse with one wording each, pinned by the seed's unit tests and by an integration test that runs `017` through both oracles; the seed marks it a parse refusal for the probe (#88). The values are pinned by a two-oracle evaluator test and by `spec/portland/number/integer/literal_spec.pdx`.
 - The import's exclusion note in the Float comparison spec flips: a hex row is back.
 - The ledger's [integer-literals.md](../ruby/integer-literals.md) records the one real difference for a migrating Rubyist: `File.chmod(0644, path)` refuses here and is written `0o644`. The migration linter (#36) can rewrite it mechanically, since the refusal's sentence already names the spelling.
 - ADR 0003 took the bitwise operators out of the grammar, so a hex literal here is read by named methods rather than `&` and `|`; that does not change what the literal is worth.

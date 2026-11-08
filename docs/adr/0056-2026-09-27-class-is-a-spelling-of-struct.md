@@ -22,7 +22,7 @@ The object model itself holds up. What removed the word was a sentence, not an a
 - Value-shaped Ruby classes — data plus methods, built once and not mutated — keep their `class` line when migrated; the migration linter (#36) no longer rewrites the keyword.
 - The two walls between most real Ruby classes and Portland are now named and tracked in one place each: inheritance (declined, trait rewrite) and mutable instance state (#103, open).
 - A per-gem readiness assessment can count `class` as runs-as-is for value-shaped classes and route the rest to exactly those two reasons.
-- Built (#127): both lexers treat `class` as a keyword and both parsers read it into the struct node; `spec/struct/class_spec.pdx` pins `class` and `struct` answering the same values. The refusals' wordings, settled at build, pinned on both implementations:
+- Built (#127): both lexers treat `class` as a keyword and both parsers read it into the struct node; `spec/language/class_spec.pdx` pins `class` and `struct` answering the same values. The refusals' wordings, settled at build, pinned on both implementations:
   - `'class Token < Node' inherits, and Portland has no inheritance — move Node's shared methods into a trait and 'include' it` (spelled with `struct` when `struct` declared it);
   - `'class << self' has no Portland meaning — write each method as 'def self.name' in the type's body`;
   - `'@count' is an instance variable, which Portland does not have — a field is read by its bare name, 'count'`;
