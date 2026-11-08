@@ -2300,6 +2300,14 @@ impl<'a> Parser<'a> {
     /// postcore = [Extend SpacingMark ZWJ]
     /// ```
     fn node_extended_grapheme_cluster() -> Node {
+        // The tree depends on nothing in the pattern, so it is built once
+        // and cloned: building it means a dozen large property classes.
+        static TREE: std::sync::OnceLock<Node> = std::sync::OnceLock::new();
+        TREE.get_or_init(Self::build_extended_grapheme_cluster)
+            .clone()
+    }
+
+    fn build_extended_grapheme_cluster() -> Node {
         fn property(name: &str) -> ClassNode {
             let mut class = ClassNode::new();
             add_property(&mut class, name, false);

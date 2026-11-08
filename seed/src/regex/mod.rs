@@ -136,6 +136,18 @@ impl Regex {
         start: usize,
         budget: u64,
     ) -> Result<Option<Captures>, RegexError> {
+        self.search_counted(text, start, budget).0
+    }
+
+    /// `search_bounded`, also answering how many matcher steps the search
+    /// took: a count that depends only on the engine, the pattern, and the
+    /// text, so a regression test can pin it where a timer would flake.
+    pub fn search_counted(
+        &self,
+        text: &str,
+        start: usize,
+        budget: u64,
+    ) -> (Result<Option<Captures>, RegexError>, u64) {
         // A start inside a character moves up to the next boundary.
         let mut start = start.min(text.len());
         while !text.is_char_boundary(start) {

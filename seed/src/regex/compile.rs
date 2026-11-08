@@ -5,7 +5,7 @@
 
 use super::ast::{AnchorKind, EmptyInfo, EncloseKind, Node, QuantifierNode};
 use super::cache;
-use super::error::RegexError;
+use super::error::{self, RegexError};
 use super::length;
 use super::optimize;
 use super::setup::Prepared;
@@ -195,6 +195,35 @@ pub fn compile(prepared: &Prepared) -> Result<Program, RegexError> {
     })
 }
 
+/// `compile_length_enclose_node`'s one refusal, for a body that is
+/// measured but not emitted: a conditional with more than two branches.
+fn refuse_wide_conditions(node: &Node) -> Result<(), RegexError> {
+    match node {
+        Node::List(parts) | Node::Alt(parts) => {
+            for part in parts {
+                refuse_wide_conditions(part)?;
+            }
+        }
+        Node::Quantifier(quantifier) => refuse_wide_conditions(&quantifier.target)?,
+        Node::Enclose(enclose) => {
+            if let EncloseKind::Condition { .. } = enclose.kind
+                && let Node::Alt(branches) = enclose.target.as_ref()
+                && branches.len() > 2
+            {
+                return Err(RegexError::new(error::INVALID_CONDITION_PATTERN));
+            }
+            refuse_wide_conditions(&enclose.target)?;
+        }
+        Node::Anchor(anchor) => {
+            if let Some(target) = &anchor.target {
+                refuse_wide_conditions(target)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// The first byte of a head string, what `OP_PUSH_OR_JUMP_EXACT1` peeks.
 fn first_byte(head: &Node) -> u8 {
     let Node::Str { chars, .. } = head else {
@@ -317,6 +346,11 @@ impl Compiler {
                     let Node::Alt(branches) = enclose.target.as_ref() else {
                         return Err(RegexError::new("internal parser error (bug)"));
                     };
+                    // `compile_length_enclose_node`: more than a yes and a
+                    // no branch is refused here, after all of setup.
+                    if branches.len() > 2 {
+                        return Err(RegexError::new(error::INVALID_CONDITION_PATTERN));
+                    }
                     let condition = self.emit(Op::Condition {
                         mem: regnum,
                         addr: 0,
@@ -461,6 +495,11 @@ impl Compiler {
         let infinite = quantifier.upper.is_none();
         let lower = quantifier.lower;
         let tlen = length::tree_length(target);
+        if quantifier.upper == Some(0) {
+            // Onigmo measures a body even when `{0}` means it is never
+            // emitted, and measuring refuses a third conditional branch.
+            refuse_wide_conditions(target)?;
+        }
         if let Node::AnyChar { multiline } = target
             && quantifier.greedy
             && infinite

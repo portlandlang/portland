@@ -194,6 +194,11 @@ pub struct Matcher<'a> {
 }
 
 impl<'a> Matcher<'a> {
+    /// The steps left of the budget the matcher was made with.
+    pub fn remaining_budget(&self) -> u64 {
+        self.budget
+    }
+
     pub fn new(program: &'a Program, text: &'a str, budget: u64) -> Matcher<'a> {
         let cache_status = match &program.cache {
             Some(cache) if !cache.opcodes.is_empty() => CacheStatus::Waiting,

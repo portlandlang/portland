@@ -19,12 +19,25 @@ use super::vm::Matcher;
 use super::{Captures, RegexError};
 
 /// The search over `text` from the byte offset `start`, with `budget`
-/// matcher steps.
+/// matcher steps; also answers how many steps it took, which is what a
+/// regression test can pin where a timer would flake.
 pub fn search(
     program: &Program,
     text: &str,
     start: usize,
     budget: u64,
+) -> (Result<Option<Captures>, RegexError>, u64) {
+    let mut matcher = Matcher::new(program, text, budget);
+    let result = search_with(&mut matcher, program, text, start);
+    let steps = budget - matcher.remaining_budget();
+    (result, steps)
+}
+
+fn search_with(
+    matcher: &mut Matcher,
+    program: &Program,
+    text: &str,
+    start: usize,
 ) -> Result<Option<Captures>, RegexError> {
     let bytes = text.as_bytes();
     let end = bytes.len();
@@ -35,7 +48,6 @@ pub fn search(
     if start > end {
         return Ok(None);
     }
-    let mut matcher = Matcher::new(program, text, budget);
     // `MATCH_AND_RETURN_CHECK`.
     macro_rules! attempt {
         ($s:expr) => {
@@ -229,7 +241,7 @@ fn forward_search_range(info: &Info, text: &str, s: usize, range: usize) -> Opti
     loop {
         let found = match info.optimize {
             Optimize::None => return None,
-            Optimize::Exact => slow_search(&info.exact, bytes, p, range),
+            Optimize::Exact => slow_search(&info.exact, text, p, range),
             Optimize::ExactIc => slow_search_ic(&info.exact, text, p, range),
             Optimize::ExactBm => bm_search(&info.exact, &info.bm_skip, text, p, range),
             Optimize::ExactBmIc => bm_search_ic(&info.exact, &info.bm_skip, text, p, range),
@@ -327,17 +339,12 @@ fn left_adjust(text: &str, s: usize) -> usize {
     index
 }
 
-/// `slow_search`: a plain scan, character by character.
-fn slow_search(target: &[u8], bytes: &[u8], text: usize, range: usize) -> Option<usize> {
-    let end = (bytes.len() + 1).saturating_sub(target.len()).min(range);
-    let mut s = text;
-    while s < end {
-        if bytes[s] == target[0] && bytes[s..].starts_with(target) {
-            return Some(s);
-        }
-        s += char_len(bytes, s);
-    }
-    None
+/// `slow_search`: Onigmo's plain scan, character by character. A
+/// literal's first byte is never a continuation byte, so a byte search
+/// finds the same positions; the standard library's is vectorized.
+fn slow_search(target: &[u8], source: &str, text: usize, range: usize) -> Option<usize> {
+    let end = (range + target.len() - 1).min(source.len());
+    find_str(source, target, text, end)
 }
 
 /// `str_lower_case_match`: whether the text at `p` folds to `target`.
@@ -442,6 +449,14 @@ fn find_str(text: &str, needle: &[u8], start: usize, end: usize) -> Option<usize
     if needle.len() > end - start {
         return None;
     }
+    if let [byte] = needle
+        && byte.is_ascii()
+    {
+        // One ASCII byte: the character search, which is `memchr`.
+        return text[start..end]
+            .find(char::from(*byte))
+            .map(|found| start + found);
+    }
     match std::str::from_utf8(needle) {
         Ok(needle) => text[start..end].find(needle).map(|found| start + found),
         Err(_) => text.as_bytes()[start..end]
@@ -477,14 +492,13 @@ fn bm_search_ic(
     None
 }
 
-/// `map_search`: the next byte a match can begin with.
+/// `map_search`: the next character whose first byte a match can begin
+/// with. Stepping byte by byte and passing over continuation bytes visits
+/// the same positions as stepping character by character, with less work.
 fn map_search(map: &[bool; 256], bytes: &[u8], text: usize, range: usize) -> Option<usize> {
-    let mut s = text;
-    while s < range {
-        if map[bytes[s] as usize] {
-            return Some(s);
-        }
-        s += char_len(bytes, s);
-    }
-    None
+    let range = range.min(bytes.len());
+    bytes[text..range]
+        .iter()
+        .position(|byte| map[*byte as usize] && !(0x80..0xc0).contains(byte))
+        .map(|found| text + found)
 }

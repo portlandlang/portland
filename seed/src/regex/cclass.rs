@@ -218,28 +218,31 @@ pub fn in_ranges(ranges: &[(u32, u32)], code: u32) -> bool {
 /// `add_code_range_to_buf`: insert with merging of overlapping or touching
 /// ranges, the list kept sorted.
 fn add_range_to(ranges: &mut Vec<(u32, u32)>, from: u32, to: u32) {
-    let mut merged: Vec<(u32, u32)> = Vec::with_capacity(ranges.len() + 1);
-    let mut new_low = from;
-    let mut new_high = to;
-    let mut placed = false;
-    for &(range_low, range_high) in ranges.iter() {
-        if range_high < u32::MAX && range_high + 1 < new_low {
-            merged.push((range_low, range_high));
-        } else if new_high < u32::MAX && new_high + 1 < range_low {
-            if !placed {
-                merged.push((new_low, new_high));
-                placed = true;
-            }
-            merged.push((range_low, range_high));
-        } else {
-            new_low = new_low.min(range_low);
-            new_high = new_high.max(range_high);
+    // The ranges are sorted and disjoint: skip, by binary search, those
+    // wholly before the new one and not touching it; merge in those that
+    // overlap or touch it; leave those after it. A property's ranges arrive
+    // in order, so building a class is linear rather than quadratic.
+    if let Some(&(_, last_high)) = ranges.last()
+        && last_high < u32::MAX
+        && last_high + 1 < from
+    {
+        ranges.push((from, to));
+        return;
+    }
+    let first = ranges.partition_point(|&(_, high)| high < u32::MAX && high + 1 < from);
+    let mut last = first;
+    let mut low = from;
+    let mut high = to;
+    while last < ranges.len() {
+        let (range_low, range_high) = ranges[last];
+        if high < u32::MAX && high + 1 < range_low {
+            break;
         }
+        low = low.min(range_low);
+        high = high.max(range_high);
+        last += 1;
     }
-    if !placed {
-        merged.push((new_low, new_high));
-    }
-    *ranges = merged;
+    ranges.splice(first..last, [(low, high)]);
 }
 
 fn to_buf(ranges: Vec<(u32, u32)>) -> Option<Vec<(u32, u32)>> {

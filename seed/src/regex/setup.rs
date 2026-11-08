@@ -860,11 +860,8 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
                 if regnum > state.num_mem {
                     return Err(RegexError::new(error::INVALID_BACKREF));
                 }
-                if let Node::Alt(branches) = enclose.target.as_ref()
-                    && branches.len() > 2
-                {
-                    return Err(RegexError::new(error::INVALID_CONDITION_PATTERN));
-                }
+                // A third branch is refused by the compiler, after every
+                // setup check has had its turn, as Onigmo's is.
             }
             let mut inner = context;
             if let EncloseKind::Memory { regnum, .. } = enclose.kind {
