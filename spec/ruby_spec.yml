@@ -1373,7 +1373,7 @@ core/integer/abs_spec.rb:
 core/integer/chr_spec.rb:
   pdx: [spec/number/integer/chr_spec.pdx]
   status: partial_intentional
-  reason: "A string is UTF-8 text: 128 to 255 on their own refuse where Ruby answers binary strings, encodings other than UTF-8 have no string to be, and a lower-case encoding name refuses where Encoding.find folds case. The range errors are Ruby's words, pinned by a two-oracle test."
+  reason: "A string is UTF-8 text: 128 to 255 on their own refuse where Ruby answers binary strings, and encodings other than UTF-8 have no string to be. The range errors are Ruby's words, pinned by a two-oracle test."
   link: docs/ruby/encodings.md
 core/integer/comparison_spec.rb:
   pdx: [spec/number/integer/spaceship_spec.pdx]
