@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The seed's `cos(πx)` and `sin(πx)` are Apple's alone** ([#228](https://github.com/portlandlang/portland/issues/228)) — Portland targets only macOS on Apple silicon, so `seed/src/tower.rs` calls `__cospi` and `__sinpi` unconditionally and drops the `cos(x * π)` fallback no build ever compiled.
+
 - **`tr`, `tr_s`, `delete`, and `squeeze`** ([ADR 0088](docs/adr/0088-2026-11-08-character-lists-are-literal.md), [#106](https://github.com/portlandlang/portland/issues/106)) — on both implementations, reading their arguments as lists of literal characters, with Ruby's answers for everything such an argument means: `"hello".tr("el", "ip")` is `"hippo"`, `"hello".delete("l", "lo")` is `"heo"`, `"yellow moon".squeeze` is `"yelow mon"`. Ruby's set spellings — a range, a negation, an escape — refuse naming the `gsub` that says the same. The literal rows of `core/string/{tr,tr_s,delete,squeeze}_spec.rb` port into `spec/string/character_lists_spec.pdx`, agreeing with Ruby 4.0.9 on all 46 rows tried.
 
 - **`unicode_normalize` and `unicode_normalized?`** ([ADR 0087](docs/adr/0087-2026-11-08-normalization-forms-are-rubys.md), [#106](https://github.com/portlandlang/portland/issues/106)) — on both implementations, Unicode's four normalization forms with Ruby's answers, over the tables canonical equality already uses. An unknown form refuses in Ruby's words, `Invalid normalization form bogus.`. `core/string/unicode_normalize_spec.rb` and `unicode_normalized_spec.rb` port into `spec/string/normalization_spec.pdx`, each row comparing codepoints since `==` cannot tell the forms apart.

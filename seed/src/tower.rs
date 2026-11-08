@@ -510,7 +510,6 @@ fn real_pow(left: &Value, right: &Value) -> Value {
     Value::Float(base.powf(exponent))
 }
 
-#[cfg(target_os = "macos")]
 unsafe extern "C" {
     #[link_name = "__cospi"]
     fn cospi(x: f64) -> f64;
@@ -518,29 +517,14 @@ unsafe extern "C" {
     fn sinpi(x: f64) -> f64;
 }
 
-/// `cos(πx)` and `sin(πx)`: the platform's own where it has them, as
-/// CRuby uses them, so `(-8.0) ** (1.0 / 3)` reads `1.0+1.73…i` and not
-/// `1.0000000000000002+…`.
+/// `cos(πx)` and `sin(πx)`: Apple's own, as CRuby uses them on macOS, so
+/// `(-8.0) ** (1.0 / 3)` reads `1.0+1.73…i` and not `1.0000000000000002+…`.
 fn cos_pi(x: f64) -> f64 {
-    #[cfg(target_os = "macos")]
-    {
-        unsafe { cospi(x) }
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        (x * std::f64::consts::PI).cos()
-    }
+    unsafe { cospi(x) }
 }
 
 fn sin_pi(x: f64) -> f64 {
-    #[cfg(target_os = "macos")]
-    {
-        unsafe { sinpi(x) }
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        (x * std::f64::consts::PI).sin()
-    }
+    unsafe { sinpi(x) }
 }
 
 /// `rb_dbl_complex_new_polar_pi`: a magnitude turned by `angle` half-turns
