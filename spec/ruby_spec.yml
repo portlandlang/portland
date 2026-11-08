@@ -1675,11 +1675,11 @@ core/matchdata/captures_spec.rb:
 core/matchdata/deconstruct_keys_spec.rb:
   status: skipped
   reason: "A match in case/in waits for a port to pull for it."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/216
 core/matchdata/deconstruct_spec.rb:
   status: skipped
   reason: "A match in case/in waits for a port to pull for it."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/216
 core/matchdata/dup_spec.rb:
   status: skipped
   reason: "A match is a value; dup and instance variables have no meaning."
@@ -1688,7 +1688,7 @@ core/matchdata/element_reference_spec.rb:
   pdx: [spec/regex/match_data_spec.pdx]
   status: partial_planned
   reason: "The [start, length] and range forms wait for a pull; the subclass row stays upstream."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/214
 core/matchdata/end_spec.rb:
   pdx: [spec/regex/match_data_spec.pdx]
   status: partial_intentional
@@ -1727,7 +1727,7 @@ core/matchdata/named_captures_spec.rb:
   pdx: [spec/regex/match_data_spec.pdx]
   status: partial_intentional
   reason: "The symbolize_names keyword waits for a pull; a key is a string."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/215
 core/matchdata/names_spec.rb:
   pdx: [spec/regex/match_data_spec.pdx]
 core/matchdata/offset_spec.rb:
@@ -1771,7 +1771,7 @@ core/matchdata/values_at_spec.rb:
   pdx: [spec/regex/match_data_spec.pdx]
   status: partial_planned
   reason: "The range forms wait for a pull."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/214
 
 # — core/nil —
 # nil has no methods beyond nil? and some? (ADR 0005), so its conversions
@@ -2589,7 +2589,7 @@ core/regexp/to_s_spec.rb:
   pdx: [spec/regex/literal_spec.pdx]
   status: partial_planned
   reason: "A single leading group's options fold into the wrapper in Ruby's to_s; here the group is written as it is."
-  link: docs/ruby/regex.md
+  link: https://github.com/portlandlang/portland/issues/217
 core/regexp/try_convert_spec.rb:
   status: skipped
   reason: "There is no to_regexp protocol; a value is a pattern or it is not."
