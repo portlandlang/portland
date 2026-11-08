@@ -8639,6 +8639,11 @@ impl<W: std::io::Write> Interpreter<W> {
                             .value
                             .clone()
                     });
+                // A pinned type type-tests (#255), as `Integer` written in
+                // the pattern does.
+                if let Value::Type(name) = &value {
+                    return Self::held_type_matches(name, subject).then(Vec::new);
+                }
                 if value == *subject {
                     Some(Vec::new())
                 } else {
@@ -8746,6 +8751,9 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         let pattern = self.value_of(pattern);
         match (&pattern, subject) {
+            // A type held in a local, a parameter, or a field type-tests as
+            // the written name does (#255).
+            (Value::Type(name), _) => Self::held_type_matches(name, subject),
             // A range's `===` is `cover?` (ADR 0081), over any ends.
             (Value::Range { .. }, _) => self.range_covers(&pattern, subject),
             (Value::Struct { name, .. }, _) if self.struct_defines(name, "===") => {
@@ -8805,6 +8813,18 @@ impl<W: std::io::Write> Interpreter<W> {
         Some(
             matches!(subject, Value::Struct { name: struct_name, .. } if *struct_name == qualified),
         )
+    }
+
+    /// Whether `subject` is of the type a type value names (#255): a type
+    /// held in a local, a parameter, a field, or a pin. The name is already
+    /// qualified, so a struct compares by it directly.
+    fn held_type_matches(name: &str, subject: &Value) -> bool {
+        match subject {
+            Value::Struct {
+                name: struct_name, ..
+            } => struct_name == name,
+            _ => subject.type_name() == name,
+        }
     }
 
     fn struct_defines(&self, name: &str, method: &str) -> bool {

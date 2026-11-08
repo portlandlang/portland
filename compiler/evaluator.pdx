@@ -286,6 +286,9 @@ def guest_case_matches(pattern_node, subject, bindings)
   end
   step = evaluate_expression(pattern_node, bindings)
   pattern = slot_value(step.value)
+  # A type held in a local, a parameter, or a field type-tests as the
+  # written name does (#255).
+  return outcome([guest_held_type_matches(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__type__", *]
   if pattern in ["__struct__", *]
     method = struct_method_for(pattern, "===", step.bindings)
     unless method.nil?
@@ -362,6 +365,26 @@ end
 # type — a builtin's, the host answering, or a struct's. Guest symbols and
 # arrays wear the host's array shape, so those two are told apart here.
 def guest_type_matches(name, subject, bindings)
+  builtin = guest_builtin_type_matches(name, subject)
+  return builtin unless builtin.nil?
+  slot = resolve(bindings, name)
+  return nil if slot.empty? || slot.first[1] != "struct"
+
+  (subject in ["__struct__", *]) && value_at(subject, 1) == slot.first[0]
+end
+
+# A type held in a local, a parameter, or a field (#255): the type value
+# carries its qualified name, so a struct compares by it directly.
+def guest_held_type_matches(name, subject)
+  builtin = guest_builtin_type_matches(name, subject)
+  return builtin unless builtin.nil?
+
+  (subject in ["__struct__", *]) && value_at(subject, 1) == name
+end
+
+# Whether `subject` is of the builtin type `name` names, or nil when
+# `name` names no builtin type.
+def guest_builtin_type_matches(name, subject)
   case name
   when "Array" then return guest_array?(subject)
   when "Symbol" then return subject in ["__symbol__", *]
@@ -378,10 +401,7 @@ def guest_type_matches(name, subject, bindings)
   when "Rational" then return Rational === subject
   when "Complex" then return Complex === subject
   end
-  slot = resolve(bindings, name)
-  return nil if slot.empty? || slot.first[1] != "struct"
-
-  (subject in ["__struct__", *]) && value_at(subject, 1) == slot.first[0]
+  nil
 end
 
 def evaluate_case_in(node, mutable bindings)
@@ -611,13 +631,20 @@ end
 # 0080), then the variables.
 def match_pin(pattern, subject, bindings, earlier)
   bound = earlier.reverse.find { it[0] == pattern.name }
-  unless bound.nil?
-    return [] if value_at(bound, 1) == subject
-    return nil
+  pinned = if bound.nil?
+    slot = lookup(bindings, pattern.name)
+    panic("undefined variable #{pattern.name} in a ^ pin") if slot.empty?
+    value_at(slot.first, 2)
+  else
+    value_at(bound, 1)
   end
-  slot = lookup(bindings, pattern.name)
-  panic("undefined variable #{pattern.name} in a ^ pin") if slot.empty?
-  return [] if value_at(slot.first, 2) == subject
+  # A pinned type type-tests (#255), as `Integer` written in the pattern does.
+  matched = if pinned in ["__type__", *]
+    guest_held_type_matches(value_at(pinned, 1), subject)
+  else
+    pinned == subject
+  end
+  return [] if matched
   nil
 end
 

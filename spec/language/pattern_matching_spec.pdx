@@ -312,6 +312,19 @@ context "Pattern matching" do
       end
       expect(differ).to be_false
     end
+
+    # Ruby's pin matches by `===`, so a pinned type type-tests as the type
+    # written in the pattern does (#255).
+    specify "type-tests with a pinned type" do
+      kind = Integer
+      expect((3 in ^kind)).to be_true
+      expect((3.0 in ^kind)).to be_false
+      answer = case "rose"
+      in ^kind then "integer"
+      else "other"
+      end
+      expect(answer).to eq("other")
+    end
   end
 
   describe "AS pattern" do
