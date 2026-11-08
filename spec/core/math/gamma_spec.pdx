@@ -21,7 +21,7 @@ context "Math.gamma" do
     expect(Math.gamma(-0.0)).to eq(-Float::INFINITY)
     expect(Math.gamma(0.5)).to be_close(Math.sqrt(Math::PI), MATH_TOLERANCE)
     expect(Math.gamma(infinity_value).infinite?).to eq(true)
-    expect(Math.gamma(nan_value).nan?).to eq(true)
+    expect(Math.gamma(nan_value)).to be_nan
     expect(inspect(Math.gamma(-1))).to eq('failure("Numerical argument is out of domain - gamma")')
     expect(inspect(Math.gamma(-Float::INFINITY))).to eq('failure("Numerical argument is out of domain - gamma")')
   end

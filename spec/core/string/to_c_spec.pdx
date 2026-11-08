@@ -11,7 +11,7 @@ require_relative "../../spec_helper"
 
 context "String#to_c" do
   specify "returns a Complex object" do
-    expect("9".to_c.class).to eq(Complex)
+    expect("9".to_c).to be_an_instance_of(Complex)
   end
 
   specify "understands integers" do

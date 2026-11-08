@@ -31,8 +31,8 @@ context "Integer#fdiv" do
   end
 
   specify "returns NaN when the argument is NaN" do
-    expect(-1.fdiv(Float::NAN).nan?).to eq(true)
-    expect(1.fdiv(Float::NAN).nan?).to eq(true)
+    expect(-1.fdiv(Float::NAN)).to be_nan
+    expect(1.fdiv(Float::NAN)).to be_nan
   end
 
   specify "returns Infinity when the argument is 0" do

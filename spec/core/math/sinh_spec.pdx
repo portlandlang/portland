@@ -18,6 +18,6 @@ context "Math.sinh" do
     expect(Math.sinh(-0.0)).to eq(0.0)
     expect(Math.sinh(1.5)).to be_close(2.12927945509482, MATH_TOLERANCE)
     expect(Math.sinh(-2.8)).to be_close(-8.19191835423591, MATH_TOLERANCE)
-    expect(Math.sinh(nan_value).nan?).to eq(true)
+    expect(Math.sinh(nan_value)).to be_nan
   end
 end

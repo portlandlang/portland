@@ -19,6 +19,6 @@ context "Math.acosh" do
     expect(inspect(Math.acosh(1.0 - MATH_TOLERANCE))).to eq('failure("Numerical argument is out of domain - acosh")')
     expect(inspect(Math.acosh(0))).to eq('failure("Numerical argument is out of domain - acosh")')
     expect(inspect(Math.acosh(-1.0))).to eq('failure("Numerical argument is out of domain - acosh")')
-    expect(Math.acosh(nan_value).nan?).to eq(true)
+    expect(Math.acosh(nan_value)).to be_nan
   end
 end

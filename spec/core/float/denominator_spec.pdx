@@ -11,7 +11,7 @@ context "Float#denominator" do
 
   specify "returns an Integer" do
     numbers.each do |number|
-      expect(number.denominator.class).to eq(Integer)
+      expect(number.denominator).to be_an_instance_of(Integer)
     end
   end
 

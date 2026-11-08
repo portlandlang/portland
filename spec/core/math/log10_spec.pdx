@@ -19,7 +19,7 @@ context "Math.log10" do
     expect(Math.log10(1)).to be_close(0.0, MATH_TOLERANCE)
     expect(Math.log10(10)).to be_close(1.0, MATH_TOLERANCE)
     expect(Math.log10(10e15)).to be_close(16.0, MATH_TOLERANCE)
-    expect(Math.log10(nan_value).nan?).to eq(true)
+    expect(Math.log10(nan_value)).to be_nan
     expect(inspect(Math.log10(-1e-15))).to eq('failure("Numerical argument is out of domain - log10")')
   end
 end

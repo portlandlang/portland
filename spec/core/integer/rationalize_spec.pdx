@@ -12,7 +12,7 @@ context "Integer#rationalize" do
 
   specify "returns a Rational object" do
     numbers.each do |number|
-      expect(number.rationalize.class).to eq(Rational)
+      expect(number.rationalize).to be_an_instance_of(Rational)
     end
   end
 

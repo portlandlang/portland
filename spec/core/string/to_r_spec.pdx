@@ -11,7 +11,7 @@ require_relative "../../spec_helper"
 
 context "String#to_r" do
   specify "returns a Rational object" do
-    expect("".to_r.class).to eq(Rational)
+    expect("".to_r).to be_an_instance_of(Rational)
   end
 
   specify "returns (0/1) for the empty String" do

@@ -40,6 +40,6 @@ context "Float#-@" do
 
   specify "returns NaN for NaN" do
     nan = 0.0 / 0.0
-    expect((-nan).nan?).to eq(true)
+    expect((-nan)).to be_nan
   end
 end

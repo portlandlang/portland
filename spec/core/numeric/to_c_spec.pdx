@@ -11,16 +11,16 @@ context "Numeric#to_c" do
 
   specify "returns a Complex object" do
     numbers.each do |number|
-      expect(number.to_c.class).to eq(Complex)
+      expect(number.to_c).to be_an_instance_of(Complex)
     end
-    expect((0.0 / 0.0).to_c.class).to eq(Complex)
+    expect((0.0 / 0.0).to_c).to be_an_instance_of(Complex)
   end
 
   specify "uses self as the real component" do
     numbers.each do |number|
       expect(number.to_c.real).to eq(number)
     end
-    expect((0.0 / 0.0).to_c.real.nan?).to be_true
+    expect((0.0 / 0.0).to_c.real).to be_nan
   end
 
   specify "uses 0 as the imaginary component" do

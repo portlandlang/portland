@@ -7,7 +7,7 @@ require_relative "../../spec_helper"
 
 context "Float#arg" do
   specify "returns NaN if NaN" do
-    expect((0.0 / 0.0).arg.nan?).to be_true
+    expect((0.0 / 0.0).arg).to be_nan
   end
 
   specify "returns 0 if positive" do

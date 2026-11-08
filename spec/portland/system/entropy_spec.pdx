@@ -12,7 +12,7 @@ context "System.entropy" do
   end
 
   specify "every byte is an integer from 0 to 255" do
-    expect(System.entropy(64).all? { it >= 0 && it <= 255 }).to eq(true)
+    expect(System.entropy(64)).to all(be_between(0, 255))
   end
 
   specify "reaches past getentropy's 256 bytes per call" do

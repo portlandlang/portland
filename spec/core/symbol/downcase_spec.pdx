@@ -10,7 +10,7 @@ require_relative "../../spec_helper"
 
 context "Symbol#downcase" do
   specify "returns a Symbol" do
-    expect(:glark.downcase in Symbol).to eq(true)
+    expect(:glark.downcase).to be_a(Symbol)
   end
 
   specify "converts uppercase ASCII characters to their lowercase equivalents" do

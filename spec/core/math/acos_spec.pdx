@@ -22,6 +22,6 @@ context "Math.acos" do
     expect(Math.acos(0.75)).to be_close(0.722734247813416, MATH_TOLERANCE)
     expect(inspect(Math.acos(1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
     expect(inspect(Math.acos(-1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
-    expect(Math.acos(nan_value).nan?).to eq(true)
+    expect(Math.acos(nan_value)).to be_nan
   end
 end

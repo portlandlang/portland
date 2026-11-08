@@ -16,6 +16,6 @@ context "MatchData#regexp" do
   specify "regexp returns the pattern used in the match" do
     md = "haystack".match(/hay/) or panic("no match")
     expect(md.regexp).to eq(/hay/)
-    expect(md.regexp.class).to eq(Regexp)
+    expect(md.regexp).to be_an_instance_of(Regexp)
   end
 end

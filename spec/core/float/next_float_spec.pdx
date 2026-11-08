@@ -50,6 +50,6 @@ context "Float#next_float" do
   end
 
   specify "returns NAN if NAN was the receiver" do
-    expect(Float::NAN.next_float.nan?).to eq(true)
+    expect(Float::NAN.next_float).to be_nan
   end
 end

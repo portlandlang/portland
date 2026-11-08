@@ -27,13 +27,13 @@ context "Float#%" do
   end
 
   specify "returns NaN when called on NaN or Infinities" do
-    expect((Float::NAN % 42).nan?).to eq(true)
-    expect((Float::INFINITY % 42).nan?).to eq(true)
-    expect((-Float::INFINITY % 42).nan?).to eq(true)
+    expect((Float::NAN % 42)).to be_nan
+    expect((Float::INFINITY % 42)).to be_nan
+    expect((-Float::INFINITY % 42)).to be_nan
   end
 
   specify "returns NaN when modulus is NaN" do
-    expect((4.2 % Float::NAN).nan?).to eq(true)
+    expect((4.2 % Float::NAN)).to be_nan
   end
 
   specify "returns -0.0 when called on -0.0 with a non zero modulus" do

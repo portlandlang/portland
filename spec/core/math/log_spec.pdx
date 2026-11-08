@@ -19,7 +19,7 @@ context "Math.log" do
     expect(Math.log(1)).to be_close(0.0, MATH_TOLERANCE)
     expect(Math.log(10)).to be_close(2.30258509299405, MATH_TOLERANCE)
     expect(Math.log(10e15)).to be_close(36.8413614879047, MATH_TOLERANCE)
-    expect(Math.log(nan_value).nan?).to eq(true)
+    expect(Math.log(nan_value)).to be_nan
     expect(inspect(Math.log(-1e-15))).to eq('failure("Numerical argument is out of domain - log")')
   end
 
@@ -27,6 +27,6 @@ context "Math.log" do
     expect(Math.log(9, 3)).to be_close(2, MATH_TOLERANCE)
     expect(Math.log(8, 1.4142135623730951)).to be_close(6, MATH_TOLERANCE)
     expect(Math.log(0, 2)).to eq(-Float::INFINITY)
-    expect(Math.log(8, 1).nan?).to eq(true)
+    expect(Math.log(8, 1)).to be_nan
   end
 end

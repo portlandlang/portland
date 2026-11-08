@@ -20,6 +20,6 @@ context "Math.asinh" do
     expect(Math.asinh(-0.0)).to eq(-0.0)
     expect(Math.asinh(1.05367e-08)).to be_close(1.05367e-08, MATH_TOLERANCE)
     expect(Math.asinh(-1.05367e-08)).to be_close(-1.05367e-08, MATH_TOLERANCE)
-    expect(Math.asinh(nan_value).nan?).to eq(true)
+    expect(Math.asinh(nan_value)).to be_nan
   end
 end

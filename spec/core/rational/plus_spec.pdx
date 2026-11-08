@@ -6,7 +6,7 @@ require_relative "../../spec_helper"
 
 context "Rational#+" do
   specify "an integer with a rational is a rational, with a complex a complex" do
-    expect((Rational(1, 2) + 0.5).class).to eq(Float)
-    expect((Rational(1, 3) + Complex(1, 2)).class).to eq(Complex)
+    expect((Rational(1, 2) + 0.5)).to be_an_instance_of(Float)
+    expect((Rational(1, 3) + Complex(1, 2))).to be_an_instance_of(Complex)
   end
 end

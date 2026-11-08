@@ -17,6 +17,6 @@ context "Math.expm1" do
     expect(Math.expm1(3)).to eq(Math.exp(3) - 1)
     expect(Math.expm1(1.0e-16)).to be_close(1.0e-16, MATH_TOLERANCE)
     expect(Math.expm1(1.0e-16) != 0.0).to eq(true)
-    expect(Math.expm1(nan_value).nan?).to eq(true)
+    expect(Math.expm1(nan_value)).to be_nan
   end
 end

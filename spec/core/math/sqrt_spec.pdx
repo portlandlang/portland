@@ -15,7 +15,7 @@ def infinity_value = 1.0 / 0.0
 
 context "Math.sqrt" do
   specify "returns a float" do
-    expect(Math.sqrt(1) in Float).to eq(true)
+    expect(Math.sqrt(1)).to be_a(Float)
   end
 
   specify "returns the square root of the argument" do
@@ -25,7 +25,7 @@ context "Math.sqrt" do
   end
 
   specify "returns NaN given NaN" do
-    expect(Math.sqrt(nan_value).nan?).to eq(true)
+    expect(Math.sqrt(nan_value)).to be_nan
   end
 
   specify "fails with Ruby's sentence given a negative number" do

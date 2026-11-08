@@ -20,6 +20,6 @@ context "Math.atan" do
     expect(Math.atan(0.25)).to be_close(0.244978663126864, MATH_TOLERANCE)
     expect(Math.atan(0.50)).to be_close(0.463647609000806, MATH_TOLERANCE)
     expect(Math.atan(0.75)).to be_close(0.643501108793284, MATH_TOLERANCE)
-    expect(Math.atan(nan_value).nan?).to eq(true)
+    expect(Math.atan(nan_value)).to be_nan
   end
 end
