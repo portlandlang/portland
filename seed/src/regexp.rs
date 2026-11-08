@@ -416,6 +416,11 @@ impl Found {
     }
 }
 
+/// A string used as a pattern by `scan`: its text, every character literal.
+pub fn literal_pattern(needle: &str) -> Rc<Pattern> {
+    Pattern::new(&escape(needle), false, false, false)
+}
+
 /// `Regexp.escape`: Ruby's set, the characters a pattern reads specially
 /// plus space and the whitespace escapes.
 pub fn escape(text: &str) -> String {
@@ -849,6 +854,20 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         }
         (Value::String(text), "scan", [Value::Regex(pattern)]) => {
             Some(Value::array(scan_values(text, pattern)))
+        }
+        // A string pattern is that text, matched literally, as Ruby's is.
+        (Value::String(text), "scan", [Value::String(needle)]) => {
+            Some(Value::array(scan_values(text, &literal_pattern(needle))))
+        }
+        // Anything else is not a pattern, in Ruby's words.
+        (Value::String(_), "scan" | "match" | "match?", [other, ..])
+            if !matches!(other, Value::Regex(_) | Value::String(_)) =>
+        {
+            crate::interpreter::refusal("arguments");
+            panic!(
+                "wrong argument type {} (expected Regexp)",
+                other.type_name()
+            )
         }
         (Value::String(text), "split", [Value::Regex(pattern)]) => {
             Some(Value::array(split(text, pattern, 0)))
