@@ -23,10 +23,10 @@ path = "src/main.rs"
 # `getentropy` for `System.entropy`. Rust's `std` reads neither out loud —
 # its random source is private, and `Instant` has no absolute reading — so
 # the seed declares them through libc, which rustyline already pulls in.
-libc = "0.2.189"
+libc = "0.2.191"
 rustyline = "18.0.1"
 # The Unicode floor for ADR 0038: what a character is (grapheme clusters)
 # and when two strings are equal (canonical equivalence). Prior art over
 # inventing (principle 10) — these are the reference implementations.
-unicode-normalization = "0.1.25"
+unicode-normalization = "0.1.26"
 unicode-segmentation = "1.13.3"

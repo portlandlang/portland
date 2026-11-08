@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Rust 1.99.1** ([#232](https://github.com/portlandlang/portland/issues/232)) — `rust-toolchain.toml` moves from 1.98.1 to the current stable; clippy and rustfmt are clean on it with no code changes.
+- **Rust 1.99.1** ([#232](https://github.com/portlandlang/portland/issues/232)) — `rust-toolchain.toml` moves from 1.98.1 to the current stable; clippy and rustfmt are clean on it with no code changes. libc moves to 0.2.191 and unicode-normalization to 0.1.26, with the lockfile's transitive crates to their latest compatible releases.
 
 - **The seed's `cos(πx)` and `sin(πx)` are Apple's alone** ([#228](https://github.com/portlandlang/portland/issues/228)) — Portland targets only macOS on Apple silicon, so `seed/src/tower.rs` calls `__cospi` and `__sinpi` unconditionally and drops the `cos(x * π)` fallback no build ever compiled.
 
