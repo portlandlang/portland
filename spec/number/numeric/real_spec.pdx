@@ -1,0 +1,35 @@
+# `real` and `real?` on every real (ADR 0085): the number itself, and
+# true. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/real_spec.rb, where a row runs on a
+# builtin. Upstream: the row that drives a mock Numeric subclass — there
+# is no Numeric to subclass — the bignums, integers being 64-bit, and the
+# rows that hand an argument to a name taking none, which refuse.
+
+require_relative "../../spec_helper"
+
+context "Numeric#real" do
+  numbers = [20, 398.72, Rational(3, 4), 1.0 / 0.0].map { |number| [number, -number] }.flatten
+
+  specify "returns self" do
+    numbers.each do |number|
+      expect(number.real).to eq(number)
+    end
+    expect((0.0 / 0.0).real.nan?).to be_true
+  end
+end
+
+context "Numeric#real?" do
+  specify "returns true" do
+    expect(20.real?).to be_true
+    expect(398.72.real?).to be_true
+    expect(Rational(3, 4).real?).to be_true
+  end
+end
+
+context "Numeric#real and #real? on an integer" do
+  specify "are the number itself, and true" do
+    expect(3.real).to eq(3)
+    expect(3.real?).to be_true
+  end
+end

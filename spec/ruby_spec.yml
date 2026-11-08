@@ -704,7 +704,7 @@ core/enumerable/sort_by_spec.rb:
 core/enumerable/sum_spec.rb:
   pdx: [spec/enumerable/extremes_spec.pdx]
   status: partial_intentional
-  reason: "The rational rows sum exactly (spec/number/tower_spec.pdx); symbol-to-block waits on #77."
+  reason: "The rational rows sum exactly (spec/number/promotion_spec.pdx); symbol-to-block waits on #77."
   link: docs/ruby/types.md
 core/enumerable/each_with_index_spec.rb:
   pdx: [spec/enumerable/walks_spec.pdx]
@@ -880,7 +880,7 @@ core/float/abs_spec.rb:
   link: docs/ruby/truthiness.md
 core/float/angle_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/arg_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/float/arg_spec.rb:
   pdx: [spec/number/float/arg_spec.pdx]
@@ -933,7 +933,7 @@ core/float/numerator_spec.rb:
   link: docs/ruby/integers.md
 core/float/phase_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/arg_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/float/positive_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
@@ -1884,49 +1884,49 @@ core/nil/xor_spec.rb:
 # rectangular, to_c) wait on #198; step waits on its own rows.
 
 core/numeric/abs2_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/abs2_spec.pdx]
   status: partial_intentional
   reason: "The mock-Numeric row has no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/arg_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/arg_spec.pdx]
   status: partial_intentional
   reason: "The Numeric-subclass rows have no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/conjugate_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/conjugate_spec.pdx]
   status: partial_intentional
   reason: "Integers are 64-bit, so the bignum stays upstream; equal? is asked as ==."
   link: docs/ruby/integers.md
 core/numeric/denominator_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/denominator_spec.pdx]
   status: partial_intentional
   reason: "The mock-Numeric row has no Numeric to subclass, and the bignum stays upstream, integers being 64-bit."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/i_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/i_spec.pdx]
 core/numeric/imaginary_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/imaginary_spec.pdx]
   status: partial_intentional
   reason: "An argument to imaginary refuses where Ruby raises ArgumentError; failures are values, so the row is pinned by the two-oracle test instead, and the bignum stays upstream."
   link: docs/ruby/errors.md
 core/numeric/numerator_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/numerator_spec.pdx]
   status: partial_intentional
   reason: "Integers are 64-bit, so the bignum and Float::MAX's numerator stay upstream; the mock-Numeric row has no Numeric to subclass."
   link: docs/ruby/integers.md
 core/numeric/polar_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/polar_spec.pdx]
   status: partial_intentional
   reason: "Integers are 64-bit, so the bignum stays upstream."
   link: docs/ruby/integers.md
 core/numeric/real_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/real_spec.pdx]
   status: partial_intentional
   reason: "An argument to real refuses where Ruby raises ArgumentError, the real? row drives a Numeric subclass, and the bignum stays upstream; real? is asked of the builtins."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/rectangular_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/rectangular_spec.pdx]
   status: partial_intentional
   reason: "An argument to rectangular refuses where Ruby raises ArgumentError; failures are values, and the bignum stays upstream."
   link: docs/ruby/errors.md
@@ -1941,7 +1941,7 @@ core/numeric/abs_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/angle_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/arg_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/ceil_spec.rb:
   status: skipped
@@ -1961,7 +1961,7 @@ core/numeric/comparison_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/conj_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/conjugate_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/div_spec.rb:
   status: skipped
@@ -1994,7 +1994,7 @@ core/numeric/floor_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/imag_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/imaginary_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/infinite_spec.rb:
   status: skipped
@@ -2027,7 +2027,7 @@ core/numeric/numeric_spec.rb:
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/phase_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/arg_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/positive_spec.rb:
   pdx: [spec/number/integer/sign_spec.pdx, spec/number/float/sign_spec.pdx]
@@ -2041,7 +2041,7 @@ core/numeric/quo_spec.rb:
   link: https://github.com/portlandlang/portland/issues/198
 core/numeric/rect_spec.rb:
   status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
+  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/numeric/rectangular_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/numeric/remainder_spec.rb:
   status: skipped
@@ -2056,7 +2056,7 @@ core/numeric/singleton_method_added_spec.rb:
   reason: "Singleton methods do not exist; the runtime kind is gone."
   link: docs/ruby/metaprogramming.md
 core/numeric/to_c_spec.rb:
-  pdx: [spec/number/tower_spec.pdx]
+  pdx: [spec/number/numeric/to_c_spec.pdx]
   status: partial_intentional
   reason: "Integers are 64-bit, so the bignum stays upstream."
   link: docs/ruby/integers.md

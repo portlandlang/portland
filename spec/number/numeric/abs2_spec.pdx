@@ -1,0 +1,29 @@
+# `abs2` on every real (ADR 0085): the square of the absolute value.
+# NaN is 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/abs2_spec.rb, where a row runs on a
+# builtin. Upstream: the row that drives a mock Numeric subclass — there
+# is no Numeric to subclass — and the bignums, integers being 64-bit.
+
+require_relative "../../spec_helper"
+
+context "Numeric#abs2" do
+  numbers = [0, 0.0, 1, 20, 278202.292871, 72829, 3.333333333333, 0.1, 1.0 / 0.0].map { |number| [-number, number] }.flatten
+
+  specify "returns the square of the absolute value of self" do
+    numbers.each do |number|
+      expect(number.abs2.eql?(number.abs ** 2)).to be_true
+    end
+  end
+
+  specify "returns NaN when self is NaN" do
+    expect((0.0 / 0.0).abs2.nan?).to be_true
+  end
+end
+
+context "Numeric#abs2 on an integer and a float" do
+  specify "squares" do
+    expect(3.abs2).to eq(9)
+    expect(1.5.abs2).to eq(2.25)
+  end
+end
