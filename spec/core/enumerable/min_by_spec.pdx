@@ -65,4 +65,19 @@ context "Enumerable#min_by" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.min_by { |item| item.length }).to eq([1, 2])
   end
+
+  specify "picks the element of an array whose key is least" do
+    words = %w[pear fig apple kiwi]
+    expect(words.min_by { it.length }).to eq("fig")
+  end
+
+  specify "takes the first of equals" do
+    pairs = [[1, "b"], [1, "a"]]
+    expect(pairs.min_by { it[0] }).to eq([1, "b"])
+  end
+
+  specify "comes back absent for an empty array" do
+    empty = []
+    expect(empty.min_by { it }).to be_nil
+  end
 end

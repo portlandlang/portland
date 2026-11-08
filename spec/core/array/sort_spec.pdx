@@ -125,4 +125,15 @@ context "Array#sort" do
     numbers = [1, 2, 5, 10, 7, -4, 12]
     expect(numbers.sort { |left, right| left - right }).to eq([-4, 1, 2, 5, 7, 10, 12])
   end
+
+  specify "orders by the block's answer, keeping equals in order" do
+    words = %w[pear fig apple kiwi]
+    expect(words.sort { |a, b| a.length <=> b.length }).to eq(["fig", "pear", "kiwi", "apple"])
+    expect(words.sort { |a, b| b <=> a }).to eq(["pear", "kiwi", "fig", "apple"])
+  end
+
+  specify "reads any integer by its sign" do
+    numbers = [3, 1, 2]
+    expect(numbers.sort { |a, b| (a - b) * 10 }).to eq([1, 2, 3])
+  end
 end

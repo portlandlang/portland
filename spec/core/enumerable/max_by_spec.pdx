@@ -65,4 +65,9 @@ context "Enumerable#max_by" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.max_by { |item| item.length }).to eq([6, 7, 8, 9])
   end
+
+  specify "picks the element of an array whose key is greatest" do
+    words = %w[pear fig apple kiwi]
+    expect(words.max_by { it.length }).to eq("apple")
+  end
 end

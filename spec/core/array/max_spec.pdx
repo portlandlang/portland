@@ -73,4 +73,9 @@ context "Array#max" do
     multi = [[1, 2], [3, 4, 5], [6, 7, 8, 9]]
     expect(multi.max).to eq([6, 7, 8, 9])
   end
+
+  specify "picks by the block's answer" do
+    words = %w[pear fig apple kiwi]
+    expect(words.max { |a, b| a.length <=> b.length }).to eq("apple")
+  end
 end
