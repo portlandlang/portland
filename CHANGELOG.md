@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Rust 1.99.1** ([#232](https://github.com/portlandlang/portland/issues/232)) — `rust-toolchain.toml` moves from 1.98.1 to the current stable; clippy and rustfmt are clean on it with no code changes.
+
 - **The seed's `cos(πx)` and `sin(πx)` are Apple's alone** ([#228](https://github.com/portlandlang/portland/issues/228)) — Portland targets only macOS on Apple silicon, so `seed/src/tower.rs` calls `__cospi` and `__sinpi` unconditionally and drops the `cos(x * π)` fallback no build ever compiled.
 
 - **`tr`, `tr_s`, `delete`, and `squeeze`** ([ADR 0088](docs/adr/0088-2026-11-08-character-lists-are-literal.md), [#106](https://github.com/portlandlang/portland/issues/106)) — on both implementations, reading their arguments as lists of literal characters, with Ruby's answers for everything such an argument means: `"hello".tr("el", "ip")` is `"hippo"`, `"hello".delete("l", "lo")` is `"heo"`, `"yellow moon".squeeze` is `"yelow mon"`. Ruby's set spellings — a range, a negation, an escape — refuse naming the `gsub` that says the same. The literal rows of `core/string/{tr,tr_s,delete,squeeze}_spec.rb` port into `spec/string/character_lists_spec.pdx`, agreeing with Ruby 4.0.9 on all 46 rows tried.
