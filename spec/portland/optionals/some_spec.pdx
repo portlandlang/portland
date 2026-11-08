@@ -19,6 +19,5 @@ context "the unwrap toolkit" do
       notes = {note: nil}
       expect((notes[:note] or "default")).to be_nil
     end
-
   end
 end

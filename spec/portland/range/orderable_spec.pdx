@@ -1,19 +1,8 @@
-# Ranges over any orderable value (ADR 0081): the ends are any two values
-# `<=>` orders — numbers, strings, symbols, arrays, Comparable structs — and
-# membership, the extremes, the ends, equality, clamping, `overlap?`, `when`,
-# and `in` work over them by `<=>`. Iteration stays with integer ranges: a
-# float start refuses as Ruby's does, and `1..2.5` walks the integers up to
-# the floor, as Ruby's does.
-#
-# From ruby/spec core/range/{cover,include,case_compare,min,max,minmax,
-# first,last,begin,end,equal_value,eql,inspect,to_s,to_a,new,overlap}_spec.rb,
-# the rows with string and float ends, and core/range/shared/
-# cover_and_include.rb. Upstream: `include?` on a string range walks by
-# `succ` in Ruby, so `("a".."f").include?("aa")` is false there and true
-# here, where every membership question is `cover?`; Ruby's TypeError on
-# `include?` over an open string range (it covers here); the Time, mock,
-# subrange, and Set-like rows; and `("a"..."f").max`, which Ruby finds by
-# walking.
+# Ranges over Comparable structs (ADR 0081): membership, clamping, the
+# extremes, and `when` work by the struct's own `<=>`. The struct and its
+# Comparable trait are Portland's, so these rows stay here; ranges over
+# numbers, strings, symbols, and arrays are Ruby's, and their rows live in
+# the ruby/spec mirror under spec/core/range/ and spec/core/comparable/.
 
 require_relative "../../spec_helper"
 
@@ -27,7 +16,6 @@ struct Version
 end
 
 context "Range over any orderable" do
-
   describe "a range of Comparable structs" do
     low = Version.new(major: 1, minor: 0)
     middle = Version.new(major: 1, minor: 5)

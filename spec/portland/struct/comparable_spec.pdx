@@ -18,7 +18,6 @@ struct Size
   def <=>(other) = amount <=> other.amount
 end
 context "Ordering" do
-
   describe "a Comparable struct" do
     older = Version.new(major: 1, minor: 2)
     newer = Version.new(major: 1, minor: 10)
@@ -26,7 +25,6 @@ context "Ordering" do
     specify "takes the four orderings from its <=>" do
       expect(older <=> newer).to eq(-1)
     end
-
   end
 
   describe "a struct with <=> alone" do

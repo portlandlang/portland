@@ -17,9 +17,7 @@
 require_relative "../../spec_helper"
 
 context "format" do
-
   describe "width" do
-
     specify "counts graphemes, as every width here does" do
       expect(format("%3s|", "🇺🇸")).to eq("  🇺🇸|")
     end

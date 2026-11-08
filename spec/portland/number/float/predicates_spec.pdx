@@ -1,8 +1,7 @@
-# The float predicates. `infinite?` is a predicate proper — true or false —
-# not Ruby's nil/1/-1, which is unusable here where nil is not falsy
-# (recorded in the ledger).
-#
-# From ruby/spec core/float/{zero,finite,infinite,nan}_spec.rb.
+# `infinite?` is a predicate proper — true or false — not Ruby's nil/1/-1,
+# which is unusable here where nil is not falsy (recorded in the ledger).
+# The other float predicates are Ruby's, and their rows live in the
+# ruby/spec mirror under spec/core/float/.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the compiler) — not against `spec/`.
@@ -11,7 +10,6 @@ require_relative "../../../spec_helper"
 
 context "Float" do
   describe "the predicates" do
-
     specify "Float#finite? and #infinite? split the line's ends off" do
       expect((1.0 / 0.0).infinite?).to be_true
       expect((-1.0 / 0.0).infinite?).to be_true

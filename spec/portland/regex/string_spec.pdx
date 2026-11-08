@@ -1,17 +1,7 @@
-# A string's methods that take a pattern (ADR 0086): `sub`, `gsub`, `scan`,
-# `split`, `index`, `rindex`, `slice`, `[]`, `start_with?`, `partition`,
-# and `rpartition`, with Ruby's replacement escapes — `\0` and `\&` the
-# match, `\1` a group, `\k<name>` a named group, `` \` `` and `\'` the
-# text around it, `\\` a backslash — and the block forms, the block
-# receiving the matched text as Ruby's does.
-#
-# From ruby/spec core/string/{sub,gsub,scan,split,index,rindex,slice,
-# element_reference,start_with,partition,rpartition}_spec.rb's regex rows
-# and core/kernel/{match,not_match}_spec.rb. Upstream: `$~` and `$1` inside
-# a block (the match globals are gone), the hash form of `sub`/`gsub`, the
-# bang forms (values never mutate, ADR 0015), `[regex, name]` through the
-# index form (`slice(regex, name)` reads the same), the byte and encoding
-# rows, and the mocks.
+# `Symbol#=~` answers the match (ADR 0086), as `String#=~` does here, where
+# Ruby answers the position. A string's pattern-taking methods are Ruby's,
+# and their rows live in the ruby/spec mirror under spec/core/string/ and
+# spec/core/symbol/.
 
 require_relative "../../spec_helper"
 

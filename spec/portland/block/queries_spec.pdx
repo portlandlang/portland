@@ -1,22 +1,15 @@
-# The block-taking library beyond the original twelve arms — each of these
-# is an arm in the compiler's deliberately-repetitive block-call dispatch
-# riding the seed's builtin of the same name, so the two oracles cannot
-# drift. `tally`, `zip`, and `each_slice` take no block and answer values
-# outright; `each_slice` answers the slices as an array (no lazy enumerator
-# here), so `.to_a` on it is the identity.
-#
-# From ruby/spec core/array/{any,all,find,zip,tally,sort_by,each_slice,
-# flat_map}_spec.rb and core/enumerable kin.
+# `each_slice` without a block answers the slices as an array — there is no
+# lazy enumerator here (#80) — where Ruby answers an Enumerator, so `.to_a`
+# on it is the identity. The rest of the block-taking library is Ruby's, and
+# its rows live in the ruby/spec mirror under spec/core/array/ and
+# spec/core/enumerable/.
 
 require_relative "../../spec_helper"
 
 context "the block-taking library" do
-
   describe "the finders and shapers" do
-
     specify "each_slice chunks and flat_map opens one level" do
       expect([1, 2, 3, 4, 5].each_slice(2)).to eq([[1, 2], [3, 4], [5]])
     end
-
   end
 end

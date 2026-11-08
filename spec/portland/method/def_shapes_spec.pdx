@@ -34,12 +34,9 @@ struct Circle
 end
 
 context "the def shapes" do
-
   describe "endless defs" do
-
     specify "take a postfix guard, answering nil when it fails" do
       expect(cautious).to be_nil
     end
-
   end
 end

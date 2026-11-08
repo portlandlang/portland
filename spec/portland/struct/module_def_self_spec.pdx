@@ -16,7 +16,6 @@ module Halving
 end
 context "construction" do
   describe "def self. in a module body" do
-
     specify "and the unmarked spelling means exactly the same thing" do
       expect(Halving.half(42)).to eq(21)
     end

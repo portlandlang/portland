@@ -14,6 +14,5 @@ context "rebinding under mutable" do
       list[0] = 9
       expect(snapshot).to eq([1, 2, 3])
     end
-
   end
 end

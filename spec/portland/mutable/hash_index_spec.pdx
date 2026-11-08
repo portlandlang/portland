@@ -12,6 +12,5 @@ context "rebinding under mutable" do
     specify "rebinds the name, leaving aliases alone" do
       expect(frozen_view).to have_length(1)
     end
-
   end
 end

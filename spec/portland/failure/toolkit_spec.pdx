@@ -8,6 +8,5 @@ context "a failure" do
     specify "takes the fallback on a failure" do
       expect((failure("why") or "fallback")).to eq("fallback")
     end
-
   end
 end
