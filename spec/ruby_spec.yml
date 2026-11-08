@@ -2207,37 +2207,37 @@ core/data/with_spec.rb:
 # namespace is not a mixin and `include Math` refuses (ADR 0021).
 
 core/math/acos_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/acos_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/acosh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/acosh_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/asin_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/asin_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/asinh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/asinh_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/atan_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/atan_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/atan2_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/atan2_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/atanh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/atanh_spec.pdx]
   status: partial_intentional
   reason: "The TypeError and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
@@ -2247,47 +2247,47 @@ core/math/cbrt_spec.rb:
   reason: "The Float() coercion row stays upstream: a non-number refuses at the call."
   link: docs/ruby/math.md
 core/math/constants_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/constants_spec.pdx]
   status: partial_intentional
   reason: "The rows reading the constants through a class that includes Math stay upstream: a namespace is not a mixin, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/cos_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/cos_spec.pdx]
   status: partial_intentional
   reason: "The to_f coercion mocks, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/cosh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/cosh_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/erf_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/erf_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/erfc_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/erfc_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/exp_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/exp_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/expm1_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/expm1_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/frexp_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/frexp_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/gamma_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/gamma_spec.pdx]
   status: partial_intentional
   reason: "The approximate-factorial rows for n from 24 to 30 compare against bignums (ADR 0070); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
@@ -2297,42 +2297,42 @@ core/math/hypot_spec.rb:
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/ldexp_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/ldexp_spec.pdx]
   status: partial_intentional
   reason: "The Float() and Integer() coercion, TypeError, RangeError, and private-instance-method rows stay upstream: a wrong argument refuses at the call in Ruby's words, and include Math refuses (ADR 0021); the row past Float::MAX needs a literal with more digits than a double holds."
   link: docs/ruby/math.md
 core/math/lgamma_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/lgamma_spec.pdx]
   status: partial_intentional
   reason: "A domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/log_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/log_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/log10_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/log10_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/log1p_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/log1p_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, ArgumentError, and private-instance-method rows stay upstream: a wrong argument refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/log2_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/log2_spec.pdx]
   status: partial_intentional
   reason: "The bignum rows (2**101 and up) are past 64 bits (ADR 0070); the Float() coercion and TypeError rows stay upstream, and a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/sin_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/sin_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/sinh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/sinh_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
@@ -2342,12 +2342,12 @@ core/math/sqrt_spec.rb:
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021); a domain error is a failure (ADR 0083)."
   link: docs/ruby/math.md
 core/math/tan_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/tan_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
 core/math/tanh_spec.rb:
-  pdx: []
+  pdx: [spec/core/math/tanh_spec.pdx]
   status: partial_intentional
   reason: "The Float() coercion, TypeError, and private-instance-method rows stay upstream: a non-number refuses at the call, and include Math refuses (ADR 0021)."
   link: docs/ruby/math.md
