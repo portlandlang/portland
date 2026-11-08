@@ -182,6 +182,44 @@ def eql(expected)
   EqlMatcher.new(expected: expected)
 end
 
+# The type matchers (#252): `be_an_instance_of(Integer)`, `be_a(String)`,
+# and `be_an`, `be_a`'s twin. The test is `actual.class == type`. Ruby's
+# would be `type === actual`, but here `===` type-tests only a type written
+# literally, and a type held in a field compares by equality, as does a
+# pinned `in ^type` (#255); `is_a?` and `instance_of?` are not defined. nil
+# has no class to ask, so it is no type's instance. In Ruby `be_a` admits
+# subclasses and `be_an_instance_of` does not; with no class hierarchy here
+# the two answer the same, and only the words differ.
+struct TypeMatcher
+  type
+  words
+
+  def matches?(actual)
+    !actual.nil? && actual.class == type
+  end
+
+  def failure_message(actual)
+    found = if actual.nil? then "nil" else "a #{inspect(actual.class)}" end
+    "expected #{inspect(actual)} to be #{words} #{inspect(type)}, but it is #{found}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be #{words} #{inspect(type)}"
+  end
+end
+
+def be_an_instance_of(type)
+  TypeMatcher.new(type: type, words: "an instance of")
+end
+
+def be_a(type)
+  TypeMatcher.new(type: type, words: "a")
+end
+
+def be_an(type)
+  TypeMatcher.new(type: type, words: "an")
+end
+
 # ruby/spec's `be_close(expected, tolerance)`: within the tolerance, strictly.
 struct CloseMatcher
   expected
