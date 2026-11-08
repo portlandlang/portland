@@ -3159,7 +3159,7 @@ core/string/dedup_spec.rb:
   reason: "Every string is frozen, so dedup and -@ have nothing to deduplicate (ADR 0015)."
   link: docs/ruby/mutability.md
 core/string/delete_spec.rb:
-  pdx: [spec/string/character_lists_spec.pdx]
+  pdx: [spec/string/delete_spec.pdx]
   status: partial_intentional
   reason: "Arguments are literal characters (ADR 0088): the range, negation, and escape rows refuse naming the gsub that says the same; the bang forms are mutators (ADR 0015); the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
   link: docs/ruby/string-count.md
@@ -3362,7 +3362,7 @@ core/string/split_spec.rb:
   reason: "The regex rows and the block form wait on the regex decision."
   link: https://github.com/portlandlang/portland/issues/74
 core/string/squeeze_spec.rb:
-  pdx: [spec/string/character_lists_spec.pdx]
+  pdx: [spec/string/squeeze_spec.pdx]
   status: partial_intentional
   reason: "Arguments are literal characters (ADR 0088): the range, negation, and escape rows refuse naming the gsub that says the same; the bang forms are mutators (ADR 0015); the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
   link: docs/ruby/string-count.md
@@ -3415,12 +3415,12 @@ core/string/to_sym_spec.rb:
   reason: "to_sym answers a Symbol of no declared vocabulary (ADR 0071); the encoding rows describe tags a string has none of (ADR 0069), so the US-ASCII, UTF-16, binary, and invalid-byte rows stay upstream, and @cat has no spelling since instance variables are not names here."
   link: docs/ruby/symbols.md
 core/string/tr_s_spec.rb:
-  pdx: [spec/string/character_lists_spec.pdx]
+  pdx: [spec/string/tr_s_spec.pdx]
   status: partial_intentional
   reason: "Arguments are literal characters (ADR 0088): the range, negation, and escape rows refuse naming the gsub that says the same; the bang forms are mutators (ADR 0015); the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
   link: docs/ruby/string-count.md
 core/string/tr_spec.rb:
-  pdx: [spec/string/character_lists_spec.pdx]
+  pdx: [spec/string/tr_spec.pdx]
   status: partial_intentional
   reason: "Arguments are literal characters (ADR 0088): the range, negation, and escape rows refuse naming the gsub that says the same; the bang forms are mutators (ADR 0015); the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type. Ruby 4.1's hash form waits for a pull."
   link: docs/ruby/string-count.md
