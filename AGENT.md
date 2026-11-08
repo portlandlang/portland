@@ -49,7 +49,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`. Every file not yet taken in has a generated stub under `spec/ruby/` (`script/ruby_spec_stubs ~/Developer/ruby/spec`): its upstream titles as pendings, parsed by the gate but never run. Importing a file means deleting its stub and regenerating.
 
-Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` runs everything. Both take `--no-verify`.
+Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. `pre-commit` is the fast gate; `pre-push` re-derives the builtin method table when `seed/src` changed, the one check CI does not run; the full gate is CI's. Both take `--no-verify`.
 
 Rust lives at `/opt/homebrew/opt/rustup/bin`, which is not on the default PATH. Repo layout is in [architecture.md](docs/architecture.md#repo-layout).
 
