@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Spec files take ruby/spec's names** ([#230](https://github.com/portlandlang/portland/issues/230)) — the four `tower_spec.pdx` files, `spec/string/normalization_spec.pdx`, and `spec/string/character_lists_spec.pdx` split into one file per upstream spec, named as upstream names it: `spec/string/{to_r,to_c,unicode_normalize,unicode_normalized,tr,tr_s,delete,squeeze}_spec.pdx`, `spec/number/{integer,float}/{numerator,denominator,rationalize,to_r}_spec.pdx` with `float/arg_spec.pdx`, and `spec/number/numeric/`, one file per `core/numeric` spec. The alias rows (`angle`, `phase`, `conj`, `imag`, `rect`) sit beside their method, the contagion rows move into `spec/number/promotion_spec.pdx`, and the manifest follows. Every expectation moved verbatim.
+
 - **Rust 1.99.1** ([#232](https://github.com/portlandlang/portland/issues/232)) — `rust-toolchain.toml` moves from 1.98.1 to the current stable; clippy and rustfmt are clean on it with no code changes. libc moves to 0.2.191 and unicode-normalization to 0.1.26, with the lockfile's transitive crates to their latest compatible releases. rustyline moves to 19.0.0, a major release the REPL needs no change for.
 
 - **The seed's `cos(πx)` and `sin(πx)` are Apple's alone** ([#228](https://github.com/portlandlang/portland/issues/228)) — Portland targets only macOS on Apple silicon, so `seed/src/tower.rs` calls `__cospi` and `__sinpi` unconditionally and drops the `cos(x * π)` fallback no build ever compiled.
