@@ -30,4 +30,25 @@ context "The loop expression" do
     end
     expect(seen).to eq([1, 2, 4])
   end
+
+  specify "runs until break leaves it" do
+    mutable count = 0
+    loop do
+      count += 1
+      break if count > 2
+    end
+    expect(count).to eq(3)
+  end
+
+  specify "next skips to the following spin" do
+    mutable evens = 0
+    mutable seen = 0
+    loop do
+      seen += 1
+      break if seen > 6
+      next if seen.odd?
+      evens += 1
+    end
+    expect(evens).to eq(3)
+  end
 end

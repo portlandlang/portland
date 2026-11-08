@@ -1,0 +1,25 @@
+# From ruby/spec core/integer/bit_xor_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#^" do
+  specify "returns self bitwise EXCLUSIVE OR other" do
+    expect(3.bit_xor(5)).to eq(6)
+    expect(-2.bit_xor(-255)).to eq(255)
+  end
+
+  specify "returns self bitwise XOR other when one operand is negative" do
+    expect(1.shift_left(33).bit_xor(-1)).to eq(-8589934593)
+    expect(-1.bit_xor(1.shift_left(33))).to eq(-8589934593)
+    expect((-(1.shift_left(33)) - 1).bit_xor(5)).to eq(-8589934598)
+  end
+
+  specify "returns self bitwise XOR other when both operands are negative" do
+    expect(-5.bit_xor(-1)).to eq(4)
+    expect(-3.bit_xor(-4)).to eq(1)
+    expect(-12.bit_xor(-13)).to eq(7)
+    expect(-13.bit_xor(-12)).to eq(7)
+  end
+end

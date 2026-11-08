@@ -79,3 +79,15 @@ context "or-equals" do
     end
   end
 end
+
+context "Assignments" do
+  specify "rebinds through all five operators" do
+    mutable count = 10
+    count += 5
+    count -= 3
+    count *= 2
+    count /= 4
+    count %= 4
+    expect(count).to eq(2)
+  end
+end

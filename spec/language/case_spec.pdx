@@ -150,4 +150,17 @@ context "The 'case'-construct" do
     end
     expect(answer).to eq("good")
   end
+
+  specify "with when arms" do
+    word = case 2 when 2 then "two" else "no" end
+    expect(word).to eq("two")
+  end
+
+  specify "else takes a same-line body in the block forms too" do
+    grade = case 7
+    when 9 then "high"
+    else "plain"
+    end
+    expect(grade).to eq("plain")
+  end
 end

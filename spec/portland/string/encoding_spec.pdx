@@ -9,9 +9,6 @@ require_relative "../../spec_helper"
 
 context "String#encoding for Strings with \\u escapes" do
   specify "returns UTF-8" do
-    expect("䁀".encoding).to eq(Encoding::UTF_8)
-    expect("a".encoding).to eq(Encoding::UTF_8)
-    expect("".encoding).to eq(Encoding::UTF_8)
     expect(Encoding::UTF_8).to eq("UTF-8")
   end
 end

@@ -9,12 +9,7 @@ context "absence" do
       expect(42).to be_some
     end
 
-    specify "and not absent" do
-      expect(42).not_to be_nil
-    end
-
     specify "and answer for nil itself, the one thing it can do" do
-      expect(nil).to be_nil
       expect(nil).not_to be_some
     end
   end

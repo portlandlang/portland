@@ -1,0 +1,14 @@
+# From ruby/spec core/set/to_s_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#to_s" do
+  specify "spell the set as Ruby 4 does, which is the constructor" do
+    expect(Set["1"].to_s).to eq('Set["1"]')
+    expect(Set[].to_s).to eq("Set[]")
+    expect(Set["1", "2"].to_s.include?('", "')).to be_true
+    expect(Set[:a, "b", Set["c"]].to_s).to eq('Set[:a, "b", Set["c"]]')
+  end
+end

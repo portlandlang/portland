@@ -72,4 +72,10 @@ context "Range#overlap?" do
     expect((10..).overlap?(...10)).to eq(false)
     expect((6..).overlap?(0...6)).to eq(false)
   end
+
+  specify "overlap? reads the ends by <=> too" do
+    expect(("a".."c").overlap?("b".."d")).to be_true
+    expect(("a".."c").overlap?("d".."f")).to be_false
+    expect((1.5..2.5).overlap?(2.0..3.0)).to be_true
+  end
 end

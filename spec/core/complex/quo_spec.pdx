@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/quo_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#quo" do
+  specify "divides exactly where the parts are exact" do
+    expect(inspect(Complex(1, 2).quo(2))).to eq("((1/2)+1i)")
+  end
+end

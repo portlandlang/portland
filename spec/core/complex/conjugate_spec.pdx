@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/conjugate_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#conjugate" do
+  specify "real, imaginary, rectangular, conjugate" do
+    expect(Complex(3, 4).conjugate).to eq(Complex(3, -4))
+  end
+end

@@ -18,4 +18,27 @@ context "String#sub with pattern, replacement" do
     expect("12345".sub('\d', "a")).to eq("12345")
     expect('\d'.sub('\d', "a")).to eq("a")
   end
+
+  specify "replace the first match or every one" do
+    expect("hello world".sub(/o/, "0")).to eq("hell0 world")
+  end
+
+  specify "read the replacement's escapes" do
+    expect("2026-11-07".sub(/(\d+)-(\d+)-(\d+)/, '\3/\2/\1')).to eq("07/11/2026")
+    expect("hello".sub(/ll/, "[\\`|\\']")).to eq("he[he|o]o")
+    expect("ab".sub(/(a)/, '\2')).to eq("b")
+    expect("ab".sub(/a/, '\x')).to eq('\xb')
+  end
+
+  specify "read the escapes with a string pattern too" do
+    expect("hello".sub("l", '\0\0')).to eq("helllo")
+  end
+
+  specify "hand the block the matched text" do
+    expect("hello".sub(/l+/) { |text| text.upcase }).to eq("heLLo")
+  end
+
+  specify "take the flags" do
+    expect("a\nb".sub(/a.b/m, "X")).to eq("X")
+  end
 end

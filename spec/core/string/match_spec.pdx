@@ -23,6 +23,13 @@ context "String#=~" do
   specify "returns the character index of a found match" do
     expect(("こにちわ" =~ /に/).begin(0)).to eq(1)
   end
+
+  specify "class answers MatchData" do
+    md = "a".match(/a/) or panic("no match")
+    expect(md.class).to eq(MatchData)
+    expect(MatchData === md).to be_true
+    expect(MatchData === "a").to be_false
+  end
 end
 context "String#match" do
   specify "matches the pattern against self" do

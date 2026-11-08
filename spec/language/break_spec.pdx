@@ -147,4 +147,8 @@ context "The break statement in a block" do
       expect(break_through_delegation).to eq([:begin, :prebreak, nil, :end])
     end
   end
+
+  specify "produces nil, not the collection" do
+    expect(broken_out).to be_nil
+  end
 end

@@ -1,0 +1,12 @@
+# From ruby/spec core/complex/abs_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#abs" do
+  specify "abs, abs2, arg, polar" do
+    expect(Complex(3, 4).abs).to eq(5.0)
+    expect(Complex(1, 2).abs).to eq(2.23606797749979)
+  end
+end

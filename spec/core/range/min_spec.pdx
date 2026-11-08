@@ -1,0 +1,31 @@
+# From ruby/spec core/range/min_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Range#min" do
+  specify "min and max are the ends, by <=>, walking nothing" do
+    expect(("f".."l").min).to eq("f")
+    expect((303.20..908.1111).min).to eq(303.20)
+  end
+
+  specify "are nil for an empty range" do
+    expect(("z".."l").min).to be_nil
+    expect((3003.20..908.1111).min).to be_nil
+    expect((7...7).min).to be_nil
+  end
+
+  specify "keep an excluded integer end out and an included one in" do
+    expect((7..7).min).to eq(7)
+    expect((1.5...2.5).min).to eq(1.5)
+  end
+
+  specify "answer the one end of an open range" do
+    expect((1.0...).min).to eq(1.0)
+  end
+
+  specify "Range#min and #max honor the exclusive end" do
+    expect((1..9).min).to eq(1)
+  end
+end

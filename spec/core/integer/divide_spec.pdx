@@ -41,4 +41,9 @@ context "Integer#/" do
     expect((-8) / 2).to eq(-4)
     expect((-8) / (-2)).to eq(4)
   end
+
+  specify "promotes division, where the same operands floored as integers" do
+    expect(7 / 2.0).to eq(3.5)
+    expect(7 / 2).to eq(3)
+  end
 end

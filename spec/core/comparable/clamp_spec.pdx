@@ -9,6 +9,15 @@
 
 require_relative "../../spec_helper"
 
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+
 struct Weird
   value
 
@@ -90,5 +99,26 @@ context "Comparable" do
       expect(0.clamp(..3)).to eq(0)
       expect(5.clamp(1...)).to eq(5)
     end
+  end
+end
+
+context "Comparable#clamp" do
+  specify "clamps floats and strings by their ends" do
+    expect(2.0.clamp(1.5..2.5)).to eq(2.0)
+    expect(3.0.clamp(1.5..2.5)).to eq(2.5)
+    expect("b".clamp("c".."f")).to eq("c")
+    expect("m".clamp("c".."f")).to eq("f")
+    expect("d".clamp("c"..)).to eq("d")
+  end
+
+  specify "work on numbers and strings" do
+    expect(11.clamp(1, 9)).to eq(9)
+    expect("m".clamp("a", "f")).to eq("f")
+  end
+
+  specify "takes between? and clamp" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+    expect(older.clamp(newer, newer)).to eq(newer)
   end
 end

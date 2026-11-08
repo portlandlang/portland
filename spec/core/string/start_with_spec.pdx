@@ -37,4 +37,10 @@ context "String#start_with?" do
   specify "works for multibyte strings" do
     expect("céréale".start_with?("cér")).to be_true
   end
+
+  specify "answers whether the pattern matches at the start" do
+    expect("hello".start_with?(/h.l/)).to be_true
+    expect("hello".start_with?(/l/)).to be_false
+    expect("hello".start_with?("x", /h/)).to be_true
+  end
 end

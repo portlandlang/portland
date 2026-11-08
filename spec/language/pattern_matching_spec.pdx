@@ -11,6 +11,11 @@
 
 require_relative "../spec_helper"
 
+struct Node
+  kind
+  text
+end
+
 context "Pattern matching" do
   describe "Rightward assignment (`=>`) that can be standalone assoc operator that" do
     specify "deconstructs value" do
@@ -423,6 +428,162 @@ context "Pattern matching" do
       expect(({k: 1} in {k:})).to be_true
       expect(k).to eq(1)
       expect(({k: 1} in {k: 2})).to be_false
+    end
+  end
+
+  specify "with in arms — the subject does not eat the first in" do
+    status = :paid
+    note = case status in :paid then "receipt" else "other" end
+    expect(note).to eq("receipt")
+  end
+
+  specify "answers its class and the type pattern" do
+    answer = case 2i
+    in Complex then "complex"
+    else "other"
+    end
+    expect(answer).to eq("complex")
+  end
+
+  specify "takes any branch" do
+    expect((2 in 1 | 2 | 3)).to be_true
+  end
+
+  specify "and misses when none of them hit" do
+    expect((9 in 1 | 2 | 3)).to be_false
+  end
+
+  specify "splits head from rest" do
+    answer = case [9, 8, 7]
+    in []              then "empty"
+    in [first, *rest]  then [first, rest.length]
+    end
+    expect(answer).to eq([9, 2])
+  end
+
+  specify "matches the empty array by shape" do
+    answer = case []
+    in []             then "empty"
+    in [first, *rest] then "some"
+    end
+    expect(answer).to eq("empty")
+  end
+
+  specify "outlives its case" do
+    case [1, 2]
+    in [head, tail] then head
+    end
+    expect(head).to eq(1)
+    expect(tail).to eq(2)
+  end
+
+  specify "vetoes a structural hit" do
+    answer = case 15
+    in count if count > 10 then "many"
+    else
+      "few"
+    end
+    expect(answer).to eq("many")
+  end
+
+  # The next branch binds the same name fresh instead of tripping
+  # no-shadow, because the vetoed branch never happened.
+  specify "discards its captures when it fails" do
+    answer = case 5
+    in count if count > 10 then "many"
+    in count               then "few — #{count}"
+    end
+    expect(answer).to eq("few — 5")
+  end
+
+  specify "matches only absence" do
+    expect((nil in nil)).to be_true
+    expect((5 in nil)).to be_false
+  end
+
+  specify "is a boolean that binds on a hit" do
+    scores = [70, 80]
+    hit = scores in [low, high]
+    expect(hit).to be_true
+    expect(low + high).to eq(150)
+  end
+
+  specify "destructures rightward" do
+    [1, 2, 3] => [first, *rest]
+    expect(first).to eq(1)
+    expect(rest).to eq([2, 3])
+  end
+
+  specify "give it to the first match" do
+    answer = case 5
+    in 1..9 then "the range, written first"
+    in 5    then "the literal, written second"
+    end
+    expect(answer).to eq("the range, written first")
+  end
+
+  specify "matches the named value instead of binding it" do
+    expected = 5
+    expect((5 in ^expected)).to be_true
+  end
+
+  specify "and misses when the values differ" do
+    expected = 5
+    expect((9 in ^expected)).to be_false
+  end
+
+  specify "matches by membership, exclusive end honored" do
+    expect((5 in 1..9)).to be_true
+    expect((5 in 1...5)).to be_false
+  end
+
+  specify "may run beginless or endless" do
+    edges = case 50
+    in ..0  then "low"
+    in 1..9 then "single"
+    in 10.. then "high"
+    end
+    expect(edges).to eq("high")
+  end
+
+  specify "matches on fields and binds the shorthand" do
+    node = Node.new(kind: "integer", text: "42")
+    answer = case node
+    in Node(kind: "word", text:)    then "the word #{text}"
+    in Node(kind: "integer", text:) then "the number #{text}"
+    end
+    expect(answer).to eq("the number 42")
+  end
+
+  specify "and a miss is just false" do
+    expect(("x" in Integer)).to be_false
+  end
+
+  specify "match float and string ranges, with an else" do
+    answer = case 2.5
+    in 1.5..3.0 then "in range"
+    else "out"
+    end
+    expect(answer).to eq("in range")
+    third = case "b"
+    in "a".."c" then "first third"
+    in "d".."z" then "rest"
+    else "other"
+    end
+    expect(third).to eq("first third")
+    negative = case -0.5
+    in -1.0..0.0 then "small"
+    else "other"
+    end
+    expect(negative).to eq("small")
+  end
+
+  specify "matches the type pattern and the when value" do
+    expect((Set[1] in Set)).to be_true
+    expect(([1] in Set)).to be_false
+    answer = case Set[1]
+    when Set then "set"
+    else "other"
     end
   end
 end

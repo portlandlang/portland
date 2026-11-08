@@ -39,4 +39,48 @@ context "Range#include?" do
   specify "returns false if range is empty" do
     expect((30...30).include?(30)).to eq(false)
   end
+
+  specify "respects the exclusive end" do
+    expect((1..5)).to contain(5)
+    expect((1...5)).not_to contain(5)
+  end
+
+  specify "answers for an endless range" do
+    expect((1..)).to contain(99)
+  end
+
+  specify "answers for a beginless one" do
+    expect((..4)).to contain(0 - 5)
+    expect((..4)).not_to contain(5)
+  end
+
+  specify "covers strings between the ends, by <=>" do
+    expect(("C".."X").include?("M")).to be_true
+    expect(("C".."X").include?("A")).to be_false
+    expect(("B"..."W").include?("W")).to be_false
+  end
+
+  specify "covers floats and integers alike" do
+    expect((0.5..2.4).include?(2)).to be_true
+    expect((0.5..2.4).include?(2.5)).to be_false
+    expect((0.5..2.4).include?(2.4)).to be_true
+    expect((0.5...2.4).include?(2.4)).to be_false
+    expect((-10..-2).include?(-2.5)).to be_true
+    expect((-1...1).include?(10.5)).to be_false
+  end
+
+  specify "reaches everything on an open side" do
+    expect((1..).include?(2.4)).to be_true
+    expect((0.5...).include?(2.4)).to be_true
+    expect((..10).include?(2.4)).to be_true
+    expect((...10.5).include?(2.4)).to be_true
+    expect((1..).include?(0.4)).to be_false
+    expect((..10).include?(12.4)).to be_false
+  end
+
+  specify "answers false for a value the ends cannot order" do
+    expect((1..10).include?(nil)).to be_false
+    expect(("A".."C").include?(20.9)).to be_false
+    expect((30...30).include?(30)).to be_false
+  end
 end

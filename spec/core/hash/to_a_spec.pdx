@@ -24,4 +24,8 @@ context "Hash#to_a" do
     table.each_pair { |key, value| pairs = pairs + [[key, value]] }
     expect(table.entries).to eq(pairs)
   end
+
+  specify "Hash#to_a answers pairs in insertion order" do
+    expect({a: 1, b: 2}.to_a).to eq([[:a, 1], [:b, 2]])
+  end
 end

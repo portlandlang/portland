@@ -22,4 +22,10 @@ context "String#include? with String" do
   specify "returns true if the RHS is empty" do
     expect("a".include?("")).to be_true
   end
+
+  specify "finds a substring anywhere" do
+    city = "portland"
+    expect(city).to contain("tla")
+    expect(city).not_to contain("rose")
+  end
 end

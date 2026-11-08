@@ -77,4 +77,12 @@ context "Integer#times" do
       expect(0.times.size).to eq(0)
     end
   end
+
+  specify "times runs the block that many times" do
+    mutable ticks = 0
+    3.times do
+      ticks += 1
+    end
+    expect(ticks).to eq(3)
+  end
 end

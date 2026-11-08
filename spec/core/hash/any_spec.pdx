@@ -31,4 +31,12 @@ context "Hash#any?" do
       expect(table.any? { |key, value| value == 42 }).to eq(false)
     end
   end
+
+  specify "returns true if the pattern ever returns a truthy value" do
+    expect({a: 1, b: 2}.any?([:b, 2])).to be_true
+  end
+
+  specify "returns false if the block never returns other than false or nil" do
+    expect({a: 1}.any?([:b, 1])).to be_false
+  end
 end

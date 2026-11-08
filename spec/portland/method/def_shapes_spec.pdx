@@ -34,47 +34,12 @@ struct Circle
 end
 
 context "the def shapes" do
-  describe "multiline parenthesized parameters" do
-    specify "continue past commas and close on their own line" do
-      expect(add(1, 2)).to eq(3)
-    end
-  end
-
-  describe "paren-less parameters" do
-    specify "take a comma-separated list to the end of the line" do
-      expect(greet("pdx", "!")).to eq("hi pdx!")
-    end
-
-    specify "continue past a trailing comma" do
-      expect(label("word", "rose")).to eq("word: rose")
-    end
-
-    specify "take defaults, which is why endless defs require parens" do
-      expect(fallback).to eq(9)
-      expect(fallback(3)).to eq(3)
-    end
-  end
 
   describe "endless defs" do
-    specify "hold one expression" do
-      expect(answer).to eq(42)
-    end
-
-    specify "take empty parens" do
-      expect(blank).to eq(42)
-    end
-
-    specify "take parenthesized parameters" do
-      expect(double(21)).to eq(42)
-    end
 
     specify "take a postfix guard, answering nil when it fails" do
       expect(cautious).to be_nil
     end
 
-    specify "work as struct methods and type functions" do
-      expect(Circle.new(radius: 2).area).to eq(12)
-      expect(Circle.tau).to eq(6)
-    end
   end
 end

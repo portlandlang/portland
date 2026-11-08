@@ -68,4 +68,22 @@ context "Operators" do
     expect((not false and false)).to be_false
     expect((not false or true)).to be_true
   end
+
+  specify "nests with parens, and only with parens" do
+    expect(false ? 1 : (true ? 2 : 3)).to eq(2)
+  end
+
+  specify "associates rightward — the tower reading" do
+    expect(2 ** 3 ** 2).to eq(512)
+  end
+
+  specify "binds above *" do
+    expect(4 * 2 ** 3).to eq(32)
+  end
+
+  specify "applies a leading minus last — math's -x²" do
+    expect(-2 ** 2).to eq(-4)
+    bound = 3
+    expect(-bound ** 2).to eq(-9)
+  end
 end

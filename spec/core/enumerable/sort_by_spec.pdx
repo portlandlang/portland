@@ -56,4 +56,8 @@ context "Enumerable#sort_by" do
   specify "calls #each to iterate over the elements to be sorted" do
     expect(numerous([1, 2, 3]).sort_by { |item| -item }).to eq([3, 2, 1])
   end
+
+  specify "sort_by sorts by the block's answers" do
+    expect(%w[bb a ccc].sort_by { it.length }).to eq(["a", "bb", "ccc"])
+  end
 end

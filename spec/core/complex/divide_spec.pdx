@@ -1,0 +1,14 @@
+# From ruby/spec core/complex/divide_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#/" do
+  specify "divides exactly where the parts are exact" do
+    expect(inspect(Complex(1, 2) / 2)).to eq("((1/2)+1i)")
+    expect(inspect(Complex(1, 2) / 2.0)).to eq("(0.5+1.0i)")
+    expect(inspect(Complex(1, 2) / Complex(3, 4))).to eq("((11/25)+(2/25)*i)")
+    expect(inspect(Complex(1.0, 2) / Complex(3, 4))).to eq("(0.44+0.08i)")
+  end
+end

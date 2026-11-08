@@ -6,6 +6,20 @@
 
 require_relative "../../spec_helper"
 
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+struct Size
+  amount
+
+  def <=>(other) = amount <=> other.amount
+end
+
 context "Array" do
   describe "#sort" do
     numbers = [3, 1, 2]
@@ -135,5 +149,19 @@ context "Array#sort" do
   specify "reads any integer by its sign" do
     numbers = [3, 1, 2]
     expect(numbers.sort { |a, b| (a - b) * 10 }).to eq([1, 2, 3])
+  end
+
+  specify "sort, and answer min and max" do
+    expect(%w[pear apple fig].sort).to eq(["apple", "fig", "pear"])
+  end
+
+  specify "sorts, and answers min and max" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+    expect([newer, older].sort).to eq([older, newer])
+  end
+
+  specify "answers <=> and sorts, without the four orderings" do
+    expect([Size.new(amount: 2), Size.new(amount: 1)].sort.first.amount).to eq(1)
   end
 end

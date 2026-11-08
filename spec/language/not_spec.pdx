@@ -29,6 +29,10 @@ context "The not keyword" do
   specify "returns true if the argument is false" do
     expect((not(false))).to be_true
   end
+
+  specify "not is !" do
+    expect((not true)).to eq((!true))
+  end
 end
 
 context "The `!' keyword" do

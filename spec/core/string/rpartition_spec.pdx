@@ -23,4 +23,9 @@ context "String#rpartition with String" do
   specify "handles multibyte string correctly" do
     expect("ユーザ@ドメイン".rpartition("@")).to eq(["ユーザ", "@", "ドメイン"])
   end
+
+  specify "rpartition splits around the last match" do
+    expect("hello".rpartition(/l/)).to eq(["hel", "l", "o"])
+    expect("hello".rpartition(/z/)).to eq(["", "", "hello"])
+  end
 end

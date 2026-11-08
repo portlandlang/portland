@@ -23,4 +23,8 @@ context "Range#minmax" do
       expect((1...3).minmax).to eq([1, 2])
     end
   end
+
+  specify "min and max are the ends, by <=>, walking nothing" do
+    expect((1.5..2.5).minmax).to eq([1.5, 2.5])
+  end
 end

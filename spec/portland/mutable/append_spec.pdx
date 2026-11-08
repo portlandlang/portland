@@ -16,8 +16,5 @@ context "rebinding under mutable" do
       expect(alias_of).to have_length(1)
     end
 
-    specify "and the name itself sees the append" do
-      expect(numbers).to have_length(2)
-    end
   end
 end

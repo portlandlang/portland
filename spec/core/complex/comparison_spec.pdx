@@ -1,0 +1,12 @@
+# From ruby/spec core/complex/comparison_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#<=>" do
+  specify "answers <=> only where both sides are real" do
+    expect(Complex(1, 2) <=> Complex(1, 3)).to be_nil
+    expect(Complex(1, 0) <=> 2).to eq(-1)
+  end
+end

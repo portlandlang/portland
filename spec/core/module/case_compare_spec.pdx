@@ -1,0 +1,15 @@
+# From ruby/spec core/module/case_compare_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Module#===" do
+  specify "matches the type pattern and the when value" do
+    answer = case Set[1]
+    when Set then "set"
+    else "other"
+    end
+    expect(answer).to eq("set")
+  end
+end

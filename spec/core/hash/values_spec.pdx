@@ -15,4 +15,9 @@ context "Hash#values" do
     table = {1 => :a, "a" => :a, "the" => "lang"}
     expect(table.values.sort { |left, right| left.to_s <=> right.to_s }).to eq([:a, :a, "lang"])
   end
+
+  specify "lists the values in the keys' order" do
+    config = {name: "pdx", port: 8080}
+    expect(config.values).to eq(["pdx", 8080])
+  end
 end

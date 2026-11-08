@@ -20,4 +20,13 @@ context "Range#size" do
   specify "returns 0 if last is less than first" do
     expect((16..0).size).to eq(0)
   end
+
+  specify "a range from an integer to a float walks the integers up to its floor" do
+    expect((1..2.5).size).to eq(2)
+  end
+
+  specify "size and count answer how many elements it walks (ADR 0036)" do
+    expect((1..9).size).to eq(9)
+    expect((1...9).size).to eq(8)
+  end
 end

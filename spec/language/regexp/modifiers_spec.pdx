@@ -1,0 +1,67 @@
+# From ruby/spec language/regexp/modifiers_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with modifiers" do
+  specify "i, m, and x" do
+    expect(found(/foo/i, "FOO")).to eq(["FOO"])
+    expect(found(/foo.bar/m, "foo\nbar")).to eq(["foo\nbar"])
+    expect(/foo.bar/.match("foo\nbar")).to be_nil
+    expect(found(/\d +/x, "abc123")).to eq(["123"])
+    expect(found(/./m, "\n")).to eq(["\n"])
+  end
+
+  specify "a comment in extended syntax ends at a newline" do
+    expect(found(Regexp.new("(a) # comment \\\n(b)", 2), "ab")).to eq(["ab", "a", "b"])
+    expect(found(Regexp.new("(x # comment \\\n)", 2), "x")).to eq(["x", "x"])
+  end
+
+  specify "modifier combinations" do
+    expect(found(/foo/imx, "foo")).to eq(["foo"])
+    expect(found(/foo/imximx, "foo")).to eq(["foo"])
+  end
+
+  specify "(?imx-imx) inline modifiers" do
+    expect(found(/(?i)foo/, "FOO")).to eq(["FOO"])
+    expect(/foo(?i)/.match("FOO")).to be_nil
+    expect(/(?-i)foo/i.match("FOO")).to be_nil
+    expect(found(/foo(?-i)/i, "FOO")).to eq(["FOO"])
+    expect(found(/foo (?i)bar (?-i)baz/, "foo BAR baz")).to eq(["foo BAR baz"])
+    expect(/foo (?i)bar (?-i)baz/.match("foo BAR BAZ")).to be_nil
+    expect(found(/(?m)./, "\n")).to eq(["\n"])
+    expect(/.(?m)/.match("\n")).to be_nil
+    expect(/(?-m)./m.match("\n")).to be_nil
+    expect(found(/.(?-m)/m, "\n")).to eq(["\n"])
+    expect(found(/(?x) foo /, "foo")).to eq(["foo"])
+    expect(/ foo (?x)/.match("foo")).to be_nil
+    expect(found(/( foo )(?x)( bar )(?-x)( baz )/, " foo bar baz ")).to eq([" foo bar baz ", " foo ", "bar", " baz "])
+    expect(/(?i-i)foo/.match("FOO")).to be_nil
+    expect(found(/(?ii)foo/, "FOO")).to eq(["FOO"])
+    expect(found(/(?-)foo/, "foo")).to eq(["foo"])
+  end
+
+  specify "(?imx-imx:expr) scoped inline modifiers" do
+    expect(found(/foo (?i:bar) baz/, "foo BAR baz")).to eq(["foo BAR baz"])
+    expect(/foo (?i:bar) baz/.match("foo BAR BAZ")).to be_nil
+    expect(/foo (?-i:bar) baz/i.match("foo BAR BAZ")).to be_nil
+    expect(found(/. (?m:.) ./, ". \n .")).to eq([". \n ."])
+    expect(/. (?-m:.) ./m.match("\n \n \n")).to be_nil
+    expect(found(/( foo )(?x: bar )( baz )/, " foo bar baz ")).to eq([" foo bar baz ", " foo ", " baz "])
+    expect(found(/( foo )(?-x: bar )( baz )/x, "foo bar baz")).to eq(["foo bar baz", "foo", "baz"])
+    expect(/(?i-i:foo)/.match("FOO")).to be_nil
+    expect(found(/(?ii:foo)/, "FOO")).to eq(["FOO"])
+    expect(found(/(?-:)foo/, "foo")).to eq(["foo"])
+  end
+
+  specify "the absent operator" do
+    expect(found(Regexp.new("(?~foo)"), "hello")).to eq(["hello"])
+  end
+
+  specify "scans the absent operator's pieces" do
+    expect("foo".scan(Regexp.new("(?~foo)"))).to eq(["fo", "o", ""])
+  end
+end

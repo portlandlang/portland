@@ -1,0 +1,13 @@
+# From ruby/spec core/complex/equal_value_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#==" do
+  specify "equals by parts, and a real when the imaginary part is zero" do
+    expect(Complex(1, 0) == 1).to be_true
+    expect(Complex(1, 2) == Complex(1.0, 2.0)).to be_true
+    expect(Complex(1, 2) == 1).to be_false
+  end
+end

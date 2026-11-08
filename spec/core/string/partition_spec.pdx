@@ -15,4 +15,9 @@ context "String#partition with String" do
     expect("hello".partition("x")).to eq(["hello", "", ""])
     expect("hello".partition("hello")).to eq(["", "hello", ""])
   end
+
+  specify "partition splits around the first match" do
+    expect("hello".partition(/l+/)).to eq(["he", "ll", "o"])
+    expect("hello".partition(/z/)).to eq(["hello", "", ""])
+  end
 end

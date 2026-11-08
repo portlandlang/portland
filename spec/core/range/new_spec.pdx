@@ -37,4 +37,12 @@ context "Range.new" do
       expect(range.end).to be_nil
     end
   end
+
+  specify "Range.new takes any two orderable ends" do
+    built = Range.new("a", "c")
+    expect(built).to eq("a".."c")
+    expect(built.first).to eq("a")
+    expect(built.last).to eq("c")
+    expect(Range.new(1.5, nil)).to eq(1.5..)
+  end
 end

@@ -17,4 +17,9 @@ context "Float#to_i" do
     expect(5_213_451.9201.to_i).to eq(5213451)
     expect(1.233450999123389e+12.to_i).to eq(1233450999123)
   end
+
+  specify "truncates toward zero, Ruby's rule" do
+    expect(2.9.to_i).to eq(2)
+    expect((0 - 2.9).to_i).to eq(-2)
+  end
 end

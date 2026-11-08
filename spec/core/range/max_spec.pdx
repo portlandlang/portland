@@ -1,0 +1,37 @@
+# From ruby/spec core/range/max_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Range#max" do
+  specify "min and max are the ends, by <=>, walking nothing" do
+    expect(("f".."l").max).to eq("l")
+    expect((303.20..908.1111).max).to eq(908.1111)
+  end
+
+  specify "are nil for an empty range" do
+    expect(("z".."l").max).to be_nil
+    expect((3003.20..908.1111).max).to be_nil
+    expect((5...5).max).to be_nil
+  end
+
+  specify "keep an excluded integer end out and an included one in" do
+    expect((1...10).max).to eq(9)
+    expect((1..2.5).max).to eq(2.5)
+  end
+
+  specify "answer the one end of an open range" do
+    expect((..1.0).max).to eq(1.0)
+  end
+
+  specify "Range#min and #max honor the exclusive end" do
+    expect((1..9).max).to eq(9)
+    expect((1...9).max).to eq(8)
+  end
+
+  specify "the extremes of an empty range are maybes" do
+    expect((5..1).max).to be_nil
+    expect((1...1).max).to be_nil
+  end
+end

@@ -1,0 +1,16 @@
+# From ruby/spec core/complex/inspect_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#inspect" do
+  specify "to_s drops the parentheses, and a rational part is starred" do
+    expect(inspect(Complex(Rational(1, 2), 1))).to eq("((1/2)+1i)")
+    expect(inspect(Complex(1, Rational(1, 2)))).to eq("(1+(1/2)*i)")
+    expect(inspect(Complex(1, Rational(-1, 2)))).to eq("(1-(1/2)*i)")
+    expect(inspect(Complex(1, -0.0))).to eq("(1-0.0i)")
+    expect(inspect(Complex(Float::INFINITY, 0))).to eq("(Infinity+0i)")
+    expect(inspect(Complex(1, Float::NAN))).to eq("(1+NaN*i)")
+  end
+end

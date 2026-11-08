@@ -1,0 +1,14 @@
+# From ruby/spec core/integer/complement_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#~" do
+  specify "returns self with each bit flipped" do
+    expect(0.bit_not).to eq(-1)
+    expect(1221.bit_not).to eq(-1222)
+    expect(-2.bit_not).to eq(1)
+    expect(-599.bit_not).to eq(598)
+  end
+end

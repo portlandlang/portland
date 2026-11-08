@@ -91,4 +91,12 @@ context "Enumerable#min" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.min).to eq([1, 2])
   end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).min).to eq(1)
+  end
+
+  specify "answers an empty walk as nothing" do
+    expect(Empty.new.min).to be_nil
+  end
 end

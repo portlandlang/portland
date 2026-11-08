@@ -1,0 +1,13 @@
+# From ruby/spec core/float/round_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#round" do
+  specify "Float#round goes half away from zero" do
+    expect(2.5.round).to eq(3)
+    expect((-2.5).round).to eq(-3)
+    expect(2.4.round).to eq(2)
+  end
+end

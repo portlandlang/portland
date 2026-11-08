@@ -1,0 +1,14 @@
+# From ruby/spec core/array/append_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#<<" do
+  specify "and the name itself sees the append" do
+    mutable numbers = [1]
+    alias_of = numbers
+    numbers << 2
+    expect(numbers).to have_length(2)
+  end
+end

@@ -1,0 +1,12 @@
+# From ruby/spec core/complex/infinite_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#infinite?" do
+  specify "the predicates" do
+    expect(Complex(1, 2).infinite?).to be_nil
+    expect(Complex(Float::INFINITY, 0).infinite?).to eq(1)
+  end
+end

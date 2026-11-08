@@ -1,0 +1,12 @@
+# From ruby/spec core/set/hash_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#hash" do
+  specify "is found by an equal set" do
+    labels = {Set[1, 2] => "pair"}
+    expect(labels[Set[1, 2]]).to eq("pair")
+  end
+end

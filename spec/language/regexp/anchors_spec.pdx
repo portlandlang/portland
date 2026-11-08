@@ -1,0 +1,90 @@
+# From ruby/spec language/regexp/anchors_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with anchors" do
+  specify "^ is the line start anchor" do
+    expect(found(/^foo/, "foo")).to eq(["foo"])
+    expect(found(/^bar/, "foo\nbar")).to eq(["bar"])
+    expect(/^foo/.match(" foo")).to be_nil
+    expect(/foo^/.match("foo\n\n\n")).to be_nil
+    expect(found(/^^^foo/, "foo")).to eq(["foo"])
+    expect(/^bar/.match("foo\rbar")).to be_nil
+    expect(found(/^/, "foo")).to eq([""])
+    expect(found(/(^foo)/, "foo")).to eq(["foo", "foo"])
+    expect(found(/(^)/, "foo")).to eq(["", ""])
+    expect(found(/(foo\n^)(^bar)/, "foo\nbar")).to eq(["foo\nbar", "foo\n", "bar"])
+    expect(/^(?!\A)/.match("foo\n")).to be_nil
+  end
+
+  specify "$ is the line end anchor" do
+    expect(found(/foo$/, "foo")).to eq(["foo"])
+    expect(found(/foo$/, "foo\nbar")).to eq(["foo"])
+    expect(/foo$/.match("foo ")).to be_nil
+    expect(/$foo/.match("\n\n\nfoo")).to be_nil
+    expect(found(/foo$$$/, "foo")).to eq(["foo"])
+    expect(/foo$/.match("foo\r\nbar")).to be_nil
+    expect(found(/(foo$)/, "foo")).to eq(["foo", "foo"])
+    expect(found(/(foo$)($\nbar)/, "foo\nbar")).to eq(["foo\nbar", "foo", "\nbar"])
+  end
+
+  specify "\\A is the string start anchor" do
+    expect(found(/\Afoo/, "foo")).to eq(["foo"])
+    expect(/\Abar/.match("foo\nbar")).to be_nil
+    expect(/\Afoo/.match(" foo")).to be_nil
+    expect(found(/\A\A\Afoo/, "foo")).to eq(["foo"])
+    expect(found(/(\A\Z)(\A\Z)/, "")).to eq(["", "", ""])
+    expect(found(/(\A)/, "foo")).to eq(["", ""])
+  end
+
+  specify "\\Z is the string end anchor, including before a trailing newline" do
+    expect(found(/foo\Z/, "foo")).to eq(["foo"])
+    expect(found(/foo\Z/, "foo\n")).to eq(["foo"])
+    expect(/foo\Z/.match("foo\nbar")).to be_nil
+    expect(/foo\Z/.match("foo ")).to be_nil
+    expect(found(/foo\Z\Z\Z/, "foo\n")).to eq(["foo"])
+    expect(/foo\Z/.match("foo\r\n")).to be_nil
+    expect(found(/(foo\Z)/, "foo")).to eq(["foo", "foo"])
+  end
+
+  specify "\\z is the string end anchor" do
+    expect(found(/foo\z/, "foo")).to eq(["foo"])
+    expect(/foo\z/.match("foo\nbar")).to be_nil
+    expect(/foo\z/.match("foo\n")).to be_nil
+    expect(found(/foo\z\z\z/, "foo")).to eq(["foo"])
+    expect(found(/($\z)($\z)/, "foo")).to eq(["", "", ""])
+    expect(found(/(foo\z)/, "foo")).to eq(["foo", "foo"])
+  end
+
+  specify "\\b is the word boundary" do
+    expect(found(/foo\b/, "foo")).to eq(["foo"])
+    expect(found(/foo\b/, "foo\n")).to eq(["foo"])
+    expect(found(/foo\b/, "foo ")).to eq(["foo"])
+    expect(found(/foo\b/, "foo.")).to eq(["foo"])
+    expect(/foo\b/.match("foobar")).to be_nil
+    expect(/foo\b/.match("foo123")).to be_nil
+    expect(/foo\b/.match("foo_")).to be_nil
+  end
+
+  specify "\\B is the non-word boundary" do
+    expect(found(/foo\B/, "foobar")).to eq(["foo"])
+    expect(found(/foo\B/, "foo123")).to eq(["foo"])
+    expect(found(/foo\B/, "foo_")).to eq(["foo"])
+    expect(/foo\B/.match("foo")).to be_nil
+    expect(/foo\B/.match("foo\n")).to be_nil
+    expect(/foo\B/.match("foo ")).to be_nil
+  end
+
+  specify "lookahead and lookbehind" do
+    expect(found(/foo.(?=bar)/, "foo1 foo2bar")).to eq(["foo2"])
+    expect(found(/foo.(?!bar)/, "foo1bar foo2")).to eq(["foo2"])
+    expect(found(/(?<!foo)bar./, "foobar1 bar2")).to eq(["bar2"])
+    expect(found(/(?<=foo)bar./, "bar1 foobar2")).to eq(["bar2"])
+    expect(found(/(?<=\bfoo)bar./, "1foobar1 foobar2")).to eq(["bar2"])
+    expect(found(/(?<!\bfoo)bar./, "foobar1 1foobar2")).to eq(["bar2"])
+  end
+end

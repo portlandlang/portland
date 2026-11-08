@@ -22,4 +22,8 @@ context "Range#to_set" do
   specify "passes down passed blocks" do
     expect((1..3).to_set { |x| x * x }).to eq(Set[1, 4, 9])
   end
+
+  specify "builds a set from an array, a hash's pairs, and a range" do
+    expect((1..3).to_set).to eq(Set[1, 2, 3])
+  end
 end

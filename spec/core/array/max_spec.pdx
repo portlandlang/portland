@@ -2,6 +2,15 @@
 
 require_relative "../../spec_helper"
 
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+
 context "Array#max" do
   numbers = [3, 1, 2]
   specify "answers the largest" do
@@ -77,5 +86,31 @@ context "Array#max" do
   specify "picks by the block's answer" do
     words = %w[pear fig apple kiwi]
     expect(words.max { |a, b| a.length <=> b.length }).to eq("apple")
+  end
+
+  specify "compare floats numerically" do
+    numbers = [3, 1, 2]
+    expect([1.5, 0.5, 2.25].max).to eq(2.25)
+  end
+
+  specify "answer the element itself across the integer/float line" do
+    numbers = [3, 1, 2]
+    expect([1, 2.5].max).to eq(2.5)
+  end
+
+  specify "compare strings alphabetically" do
+    numbers = [3, 1, 2]
+    expect(["pear", "apple"].max).to eq("pear")
+  end
+
+  specify "of nothing are absent" do
+    numbers = [3, 1, 2]
+    expect([].max).to be_nil
+  end
+
+  specify "sorts, and answers min and max" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+    expect([older, newer].max).to eq(newer)
   end
 end

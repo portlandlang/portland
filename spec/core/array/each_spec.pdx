@@ -16,4 +16,12 @@ context "Array#each" do
     expect(numbers.each { |item| seen = seen + [item] }).to eq(numbers)
     expect(seen).to eq([1, 2, 3])
   end
+
+  specify "walks an array" do
+    mutable seen = []
+    %w[rose city].each do |word|
+      seen << word
+    end
+    expect(seen).to eq(["rose", "city"])
+  end
 end

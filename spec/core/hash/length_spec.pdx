@@ -15,4 +15,8 @@ context "Hash#length" do
     expect({a: 1, b: 2}.length).to eq({a: 1, b: 2}.size)
     expect({}.length).to eq({}.size)
   end
+
+  specify "counts the pairs" do
+    expect({name: "pdx", port: 8080}).to have_length(2)
+  end
 end

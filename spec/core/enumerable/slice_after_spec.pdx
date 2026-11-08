@@ -60,4 +60,8 @@ context "Enumerable#slice_after" do
   specify "doesn't yield an empty array if the filter matches the first entry or the last entry" do
     expect(elements.slice_after { true }).to eq([[7], [6], [5], [4], [3], [2], [1]])
   end
+
+  specify "processes all yielded values" do
+    expect(YieldsMulti.new.slice_after { |item| item == [3, 4, 5] }).to eq([[[1, 2], [3, 4, 5]], [[6, 7, 8, 9]]])
+  end
 end

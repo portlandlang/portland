@@ -71,4 +71,12 @@ context "Enumerable#count" do
       expect(YieldsMulti.new.count([1, 2])).to eq(1)
     end
   end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).count).to eq(6)
+  end
+
+  specify "answers an empty walk as nothing" do
+    expect(Empty.new.count).to eq(0)
+  end
 end

@@ -1,0 +1,11 @@
+# From ruby/spec core/set/inspect_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#inspect" do
+  specify "spell the set as Ruby 4 does, which is the constructor" do
+    expect(inspect(Set[1, 2, 3])).to eq("Set[1, 2, 3]")
+  end
+end

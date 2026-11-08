@@ -32,4 +32,9 @@ context "Regexp#options" do
     expect(/cat/i.options.bit_and(1)).to eq(1)
     expect(/cat/m.options.bit_and(4)).to eq(4)
   end
+
+  specify "take the i, m, and x flags" do
+    expect(/foo/mx.options).to eq(6)
+    expect(/foo/imx.options).to eq(7)
+  end
 end

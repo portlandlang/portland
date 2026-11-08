@@ -1,0 +1,26 @@
+# From ruby/spec core/string/index_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#index" do
+  specify "answer the position of the first and last match" do
+    expect("hello".index(/l/)).to eq(2)
+    expect("héllo".index(/l/)).to eq(2)
+  end
+
+  specify "answer nil for no match" do
+    expect("hello".index(/z/)).to be_nil
+  end
+
+  specify "search from a position" do
+    expect("hello".index(/l/, 3)).to eq(3)
+    expect("hello".index(/l/, 4)).to be_nil
+  end
+
+  specify "String#index of a substring answers where it starts — a maybe" do
+    expect("portland".index("land")).to eq(4)
+    expect("portland".index("rose")).to be_nil
+  end
+end

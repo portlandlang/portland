@@ -20,4 +20,9 @@ context "Array#map" do
     letters.map { |letter| letter + "!" }
     expect(letters).to eq(["a", "b", "c", "d"])
   end
+
+  specify "map builds a new array from the block's answers" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.map { it * 10 }).to eq([10, 20, 30, 40])
+  end
 end

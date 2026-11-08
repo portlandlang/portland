@@ -13,4 +13,9 @@ context "Integer#zero?" do
     expect(1.zero?).to eq(false)
     expect(-1.zero?).to eq(false)
   end
+
+  specify "answers only for zero" do
+    expect(0.zero?).to be_true
+    expect(1.zero?).to be_false
+  end
 end

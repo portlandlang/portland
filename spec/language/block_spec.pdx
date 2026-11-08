@@ -8,6 +8,25 @@
 
 require_relative "../spec_helper"
 
+def repeat
+  first = yield
+  second = yield
+  "#{first} #{second}"
+end
+def greet(name:)
+  "hello, #{name}"
+end
+def outer(argument)
+  yield
+end
+def inner
+  "inner's value"
+end
+def unwrap
+  handed = yield
+  handed[:name]
+end
+
 def hand(value)
   yield value
 end
@@ -29,6 +48,54 @@ context "A block yielded a single" do
     specify "assigns elements to required arguments" do
       expect(hand([1, 2, 3]) { |first, second| [first, second] }).to eq([1, 2])
     end
+  end
+
+  specify "calls the same way" do
+    braced = repeat { "brace" }
+    donned = repeat do
+      "do"
+    end
+    expect(braced).to eq("brace brace")
+    expect(donned).to eq("do do")
+  end
+
+  specify "is that call's block" do
+    greeted = repeat { greet name: "pdx" }
+    expect(greeted).to eq("hello, pdx hello, pdx")
+  end
+
+  specify "hands the hash through" do
+    unwrapped = unwrap {{name: 1}}
+    expect(unwrapped).to eq(1)
+  end
+
+  specify "belongs to the outermost call" do
+    mutable record = []
+    outer inner do
+      record << "ran under outer"
+    end
+    expect(record).to eq(["ran under outer"])
+  end
+
+  specify "is reachable from the block" do
+    factor = 10
+    expect([1, 2].map { it * factor }).to eq([10, 20])
+  end
+
+  specify "shadows an outer local and restores it" do
+    factor = 10
+    word = "outer"
+    seen = %w[inner].map { |word| word }
+    expect(seen).to eq(["inner"])
+    expect(word).to eq("outer")
+  end
+
+  specify "accumulates" do
+    mutable total = 0
+    [1, 2, 3].each do |number|
+      total += number
+    end
+    expect(total).to eq(6)
   end
 end
 context "A block" do

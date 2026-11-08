@@ -52,4 +52,12 @@ context "Kernel#Complex" do
       expect(Complex(-4.5).real).to eq(-4.5)
     end
   end
+
+  specify "holds its two parts" do
+    expect(inspect(Complex(1, 2))).to eq("(1+2i)")
+    expect(inspect(Complex(1.0, 2.0))).to eq("(1.0+2.0i)")
+    expect(inspect(Complex(1, -2))).to eq("(1-2i)")
+    expect(inspect(Complex(1))).to eq("(1+0i)")
+    expect(inspect(Complex(0, 0))).to eq("(0+0i)")
+  end
 end

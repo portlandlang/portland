@@ -39,3 +39,10 @@ context "Integer" do
     end
   end
 end
+
+context "Integer#<=>" do
+  specify "answers -1, 0, or 1 on numbers" do
+    expect(1 <=> 2).to eq(-1)
+    expect(2 <=> 2).to eq(0)
+  end
+end

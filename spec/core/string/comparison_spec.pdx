@@ -48,3 +48,10 @@ context "String" do
     end
   end
 end
+
+context "String#<=> with String" do
+  specify "orders strings by their text" do
+    expect("apple" <=> "banana").to eq(-1)
+    expect("pear" <=> "pear").to eq(0)
+  end
+end

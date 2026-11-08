@@ -1,0 +1,19 @@
+# From ruby/spec core/float/plus_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#+" do
+  specify "adds, subtracts, and multiplies part by part" do
+    expect(inspect(1.0 + Complex(1, 2))).to eq("(2.0+2i)")
+  end
+
+  specify "add, subtract, multiply, divide" do
+    expect(5.5 + 4.2).to eq(9.7)
+  end
+
+  specify "carry IEEE's imprecision honestly" do
+    expect((0.1 + 0.2).to_s).to eq("0.30000000000000004")
+  end
+end

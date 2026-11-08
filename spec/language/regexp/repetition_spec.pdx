@@ -1,0 +1,78 @@
+# From ruby/spec language/regexp/repetition_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with repetition" do
+  specify "* and *?" do
+    expect(found(/a*/, "aaa")).to eq(["aaa"])
+    expect(found(/a*/, "bbb")).to eq([""])
+    expect(found(/<.*>/, "<a>foo</a>")).to eq(["<a>foo</a>"])
+    expect(found(/a*?/, "aaa")).to eq([""])
+    expect(found(/<.*?>/, "<a>foo</a>")).to eq(["<a>"])
+  end
+
+  specify "+ and +?" do
+    expect(found(/a+/, "aaa")).to eq(["aaa"])
+    expect(/a+/.match("bbb")).to be_nil
+    expect(found(/<.+>/, "<a>foo</a>")).to eq(["<a>foo</a>"])
+    expect(found(/a+?/, "aaa")).to eq(["a"])
+    expect(found(/<.+?>/, "<a>foo</a>")).to eq(["<a>"])
+  end
+
+  specify "{m,n} and {m,n}?" do
+    expect(found(/a{2,4}/, "aaaaaa")).to eq(["aaaa"])
+    expect(found(/<.{1,}>/, "<a>foo</a>")).to eq(["<a>foo</a>"])
+    expect(found(/<.{1,}?>/, "<a>foo</a>")).to eq(["<a>"])
+    expect(found(/.([0-9]){3,5}?foo/, "9876543210foo")).to eq(["543210foo", "0"])
+  end
+
+  specify "?" do
+    expect(found(/a?/, "aaa")).to eq(["a"])
+    expect(found(/a?/, "bbb")).to eq([""])
+  end
+
+  specify "incomplete range quantifiers are literal" do
+    expect(found(/a{}/, "a{}")).to eq(["a{}"])
+    expect(found(/a{,}/, "a{,}")).to eq(["a{,}"])
+    expect(found(/a{1/, "a{1")).to eq(["a{1"])
+    expect(found(/a{1,2/, "a{1,2")).to eq(["a{1,2"])
+    expect(found(/a{,5}/, "aaa")).to eq(["aaa"])
+  end
+
+  specify "quantifiers on assertions" do
+    expect(found(/a^?b/, "ab")).to eq(["ab"])
+    expect(found(/a$?b/, "ab")).to eq(["ab"])
+    expect(found(/a\A?b/, "ab")).to eq(["ab"])
+    expect(found(/a\Z?b/, "ab")).to eq(["ab"])
+    expect(found(/a\z?b/, "ab")).to eq(["ab"])
+    expect(found(/a\b?b/, "ab")).to eq(["ab"])
+    expect(found(/a\B?b/, "ab")).to eq(["ab"])
+    expect(found(/a(?=c)?b/, "ab")).to eq(["ab"])
+    expect(found(/a(?!=b)?b/, "ab")).to eq(["ab"])
+    expect(found(/a(?<=c)?b/, "ab")).to eq(["ab"])
+    expect(found(/a(?<!a)?b/, "ab")).to eq(["ab"])
+    expect(found(/(?=(a))?/, "a")).to eq(["", "a"])
+  end
+
+  specify "nested quantifiers" do
+    expect(found(/a***/, "aaa")).to eq(["aaa"])
+    expect(found(/(a+?)*/, "aa")).to eq(["aa", "a"])
+    expect(/(a+?)+/.match("")).to be_nil
+    expect(found(/(a+)*?/, "aaa")).to eq(["", nil])
+    expect(found(/b(.+)*?b/, "baaabaaab")).to eq(["baaabaaab", "aaabaaa"])
+  end
+
+  specify "? after {n} is another quantifier, not the lazy marker" do
+    expect(found(/a{2}?/, "")).to eq([""])
+  end
+
+  specify "zero-width groups in optional iterations of loops" do
+    expect(found(/()?/, "")).to eq(["", ""])
+    expect(found(/(a*)?/, "")).to eq(["", ""])
+    expect(found(/(a*)*/, "")).to eq(["", ""])
+  end
+end

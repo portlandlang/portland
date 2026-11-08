@@ -161,4 +161,12 @@ context "The return keyword" do
       expect(returns_within_while).to eq(["before while"])
     end
   end
+
+  specify "unwinds the enclosing method" do
+    expect(through_blocks).to eq("unwound")
+  end
+
+  specify "unwinds to its write site, through a yielding helper" do
+    expect(through_a_yield).to eq("unwound past the helper")
+  end
 end

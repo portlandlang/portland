@@ -17,6 +17,10 @@ context "The '&&' statement" do
   specify "evaluates to the last condition if all are true" do
     expect(true && true).to be_true
   end
+
+  specify "and is &&" do
+    expect((true and false)).to eq((true && false))
+  end
 end
 
 context "The 'and' statement" do

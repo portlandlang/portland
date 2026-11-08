@@ -1,0 +1,12 @@
+# From ruby/spec core/complex/to_s_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#to_s" do
+  specify "to_s drops the parentheses, and a rational part is starred" do
+    expect(Complex(1, 2).to_s).to eq("1+2i")
+    expect(Complex(1.0, 2).to_s).to eq("1.0+2i")
+  end
+end

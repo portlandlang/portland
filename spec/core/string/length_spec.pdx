@@ -32,4 +32,8 @@ context "String#length" do
     utf8_str = "こにちわ" * 100
     expect(utf8_str.length).to eq(400)
   end
+
+  specify "a character is what a human sees, however encoded" do
+    expect("café".length).to eq(4)
+  end
 end

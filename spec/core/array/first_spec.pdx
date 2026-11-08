@@ -20,4 +20,14 @@ context "Array#first" do
   specify "with a count clamps — asking for more answers what there is" do
     expect([1, 2, 3].first(9)).to eq([1, 2, 3])
   end
+
+  specify "answers nil for first on an empty array" do
+    expect([].first).to be_nil
+  end
+
+  specify "comes back absent when the array was empty" do
+    stored = [nil]
+    missing = []
+    expect(missing.first).to be_nil
+  end
 end

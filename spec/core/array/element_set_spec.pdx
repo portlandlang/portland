@@ -1,0 +1,26 @@
+# From ruby/spec core/array/element_set_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#[]=" do
+  specify "rebinds the name, leaving aliases alone" do
+    mutable list = [1, 2, 3]
+    snapshot = list
+    list[0] = 9
+    expect(list).to eq([9, 2, 3])
+  end
+
+  specify "replaces in range, counting negatives from the end" do
+    mutable list = [1, 2, 3]
+    list[0 - 1] = 7
+    expect(list).to eq([1, 2, 7])
+  end
+
+  specify "appends at the position one past the end" do
+    mutable list = [1, 2]
+    list[2] = 3
+    expect(list).to eq([1, 2, 3])
+  end
+end

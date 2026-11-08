@@ -2,6 +2,11 @@
 
 require_relative "../spec_helper"
 
+def negated_guard(flag)
+  return "stopped" unless flag
+  "went on"
+end
+
 context "control flow" do
   describe "unless" do
     specify "answers when the condition is false" do
@@ -65,5 +70,15 @@ context "The unless expression" do
   specify "allows expression and body to be on one line (using 'then')" do
     one_liner = unless false then "foo" else "bar" end
     expect(one_liner).to eq("foo")
+  end
+
+  specify "and unless inverts the test" do
+    expect(negated_guard(false)).to eq("stopped")
+    expect(negated_guard(true)).to eq("went on")
+  end
+
+  specify "take unless too" do
+    quiet = unless 1 > 2 then "hushed" else "loud" end
+    expect(quiet).to eq("hushed")
   end
 end

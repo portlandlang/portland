@@ -1,0 +1,24 @@
+# From ruby/spec core/array/any_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#any?" do
+  specify "any? asks whether one hit is enough" do
+    expect([1, 2, 3].any? { it > 2 }).to be_true
+    expect([1, 2, 3].any? { it > 5 }).to be_false
+  end
+
+  specify "always returns false on empty enumeration" do
+    expect([].any?(1..9)).to be_false
+  end
+
+  specify "returns true if the pattern ever returns a truthy value" do
+    expect([1, 42, 3].any?(42)).to be_true
+  end
+
+  specify "returns false if the block never returns other than false or nil" do
+    expect([1, 2, 3].any?(9)).to be_false
+  end
+end

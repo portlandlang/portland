@@ -16,4 +16,9 @@ context "Hash#size" do
     expect({a: 1, b: 1, c: 1}.size).to eq(3)
     expect({}.size).to eq(0)
   end
+
+  specify "size is length's" do
+    counts = {a: 1, b: 2}
+    expect(counts.size).to eq(2)
+  end
 end

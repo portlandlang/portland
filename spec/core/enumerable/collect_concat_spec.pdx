@@ -49,4 +49,8 @@ context "Enumerable#collect_concat" do
   specify "is an alias of Enumerable#flat_map" do
     expect(numerous(DEFAULT).collect_concat { |item| [item, item] }).to eq(numerous(DEFAULT).flat_map { |item| [item, item] })
   end
+
+  specify "collect_concat is flat_map's twin (ADR 0036, revised)" do
+    expect([1, 2].collect_concat { [it, it] }).to eq([1, 1, 2, 2])
+  end
 end

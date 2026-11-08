@@ -1,0 +1,29 @@
+# From ruby/spec core/integer/exponent_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#**" do
+  specify "is what a negative base to a fractional power answers" do
+    expect(inspect((-8) ** 0.5)).to eq("(0.0+2.8284271247461903i)")
+  end
+
+  specify "raises to the power" do
+    expect(2 ** 8).to eq(256)
+  end
+
+  specify "while a parenthesized negative base raises whole" do
+    expect((-2) ** 2).to eq(4)
+    expect((-2) ** 3).to eq(-8)
+  end
+
+  specify "answers one for a zero exponent, zero included" do
+    expect(2 ** 0).to eq(1)
+    expect(0 ** 0).to eq(1)
+  end
+
+  specify "crosses into floats for roots" do
+    expect(9 ** 0.5).to eq(3.0)
+  end
+end

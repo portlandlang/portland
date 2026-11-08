@@ -45,6 +45,23 @@ context "String#scan" do
   specify "does not raise any errors when passed a multi-byte string" do
     expect("あああaaaあああ".scan("あああ")).to eq(["あああ", "あああ"])
   end
+
+  specify "returns an array of each match" do
+    expect("a1b22c333".scan(/\d+/)).to eq(["1", "22", "333"])
+    expect("abc".scan(/x/)).to eq([])
+  end
+
+  specify "returns an array of each match's groups when the pattern has any" do
+    expect("a1b22".scan(/([a-z])(\d+)/)).to eq([["a", "1"], ["b", "22"]])
+    expect("ab".scan(/(a)(x)?/)).to eq([["a", nil]])
+  end
+
+  specify "hands each match to a block and answers the string" do
+    mutable seen = []
+    answer = "Hello World".scan(/\w+/) { |word| seen << word }
+    expect(seen).to eq(["Hello", "World"])
+    expect(answer).to eq("Hello World")
+  end
 end
 context "String#scan with pattern and block" do
   specify "returns self" do

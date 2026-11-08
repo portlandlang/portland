@@ -1,0 +1,12 @@
+# From ruby/spec core/float/truncate_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#truncate" do
+  specify "Float#truncate goes toward zero" do
+    expect(1.9.truncate).to eq(1)
+    expect((-1.9).truncate).to eq(-1)
+  end
+end

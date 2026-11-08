@@ -39,4 +39,18 @@ context "Range#cover?" do
   specify "returns false if range is empty" do
     expect((30...30).cover?(30)).to eq(false)
   end
+
+  specify "covers strings between the ends, by <=>" do
+    expect(("B"..."W").cover?("Q")).to be_true
+    expect(("a".."f").cover?("aa")).to be_true
+    expect(("a".."f").cover?("ga")).to be_false
+  end
+
+  specify "reaches everything on an open side" do
+    expect(("a"..).cover?("b")).to be_true
+  end
+
+  specify "answers false for a value the ends cannot order" do
+    expect((1..10).cover?("a")).to be_false
+  end
 end

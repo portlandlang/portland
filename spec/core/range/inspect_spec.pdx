@@ -26,4 +26,12 @@ context "Range#inspect" do
   specify "works for beginless ranges" do
     expect(inspect(..1)).to eq("..1")
   end
+
+  specify "inspect each end, and to_s renders them" do
+    expect(inspect("A".."Z")).to eq('"A".."Z"')
+    expect(inspect("A"..."Z")).to eq('"A"..."Z"')
+    expect(inspect(0.5..2.4)).to eq("0.5..2.4")
+    expect(inspect(0.1...)).to eq("0.1...")
+    expect(inspect(...0.1)).to eq("...0.1")
+  end
 end

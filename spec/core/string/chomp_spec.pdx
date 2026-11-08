@@ -1,0 +1,13 @@
+# From ruby/spec core/string/chomp_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#chomp" do
+  specify "String#chomp takes one trailing line ending, crlf as a unit" do
+    expect("rose\n".chomp).to eq("rose")
+    expect("rose\r\n".chomp).to eq("rose")
+    expect("rose".chomp).to eq("rose")
+  end
+end

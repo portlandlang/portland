@@ -1,0 +1,11 @@
+# From ruby/spec core/range/step_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Range#step" do
+  specify "Range#step walks in strides" do
+    expect((1..9).step(3).to_a).to eq([1, 4, 7])
+  end
+end

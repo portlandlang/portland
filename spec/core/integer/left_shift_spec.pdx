@@ -1,0 +1,53 @@
+# From ruby/spec core/integer/left_shift_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#<< (with n << m)" do
+  specify "returns n shifted left m bits when n > 0, m > 0" do
+    expect(1.shift_left(1)).to eq(2)
+  end
+
+  specify "returns n shifted left m bits when n < 0, m > 0" do
+    expect(-1.shift_left(1)).to eq(-2)
+    expect(-7.shift_left(1)).to eq(-14)
+    expect(-42.shift_left(2)).to eq(-168)
+  end
+
+  specify "returns n shifted right m bits when n > 0, m < 0" do
+    expect(2.shift_left(-1)).to eq(1)
+  end
+
+  specify "returns n shifted right m bits when n < 0, m < 0" do
+    expect(-2.shift_left(-1)).to eq(-1)
+  end
+
+  specify "returns 0 when n == 0" do
+    expect(0.shift_left(1)).to eq(0)
+  end
+
+  specify "returns n when n > 0, m == 0" do
+    expect(1.shift_left(0)).to eq(1)
+  end
+
+  specify "returns n when n < 0, m == 0" do
+    expect(-1.shift_left(0)).to eq(-1)
+  end
+
+  specify "returns 0 when n > 0, m < 0 and n < 2**-m" do
+    expect(3.shift_left(-2)).to eq(0)
+    expect(7.shift_left(-3)).to eq(0)
+    expect(127.shift_left(-7)).to eq(0)
+    expect(7.shift_left(-32)).to eq(0)
+    expect(7.shift_left(-64)).to eq(0)
+  end
+
+  specify "returns -1 when n < 0, m < 0 and n > -(2**-m)" do
+    expect(-3.shift_left(-2)).to eq(-1)
+    expect(-7.shift_left(-3)).to eq(-1)
+    expect(-127.shift_left(-7)).to eq(-1)
+    expect(-7.shift_left(-32)).to eq(-1)
+    expect(-7.shift_left(-64)).to eq(-1)
+  end
+end

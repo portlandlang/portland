@@ -16,4 +16,9 @@ context "Range#member?" do
     expect((1..4).member?(3)).to eq((1..4).include?(3))
     expect((1..4).member?(9)).to eq((1..4).include?(9))
   end
+
+  specify "covers strings between the ends, by <=>" do
+    expect(("f".."s").member?("f")).to be_true
+    expect(("f".."s").member?("s")).to be_true
+  end
 end

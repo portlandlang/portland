@@ -15,4 +15,24 @@ context "Symbol#==" do
     expect(:ruby == :"ruby").to eq(true)
     expect(:foo == :bar).to eq(false)
   end
+
+  specify "is the plain symbol" do
+    expect(:less).to eq(:less)
+  end
+
+  specify "and differs from its siblings, as symbols do" do
+    expect(:less).not_to eq(:greater)
+  end
+
+  specify "holds against itself" do
+    expect(:paid).to eq(:paid)
+  end
+
+  specify "breaks against the string of its name" do
+    expect(:paid).not_to eq("paid")
+  end
+
+  specify "breaks against any other symbol" do
+    expect(:paid).not_to eq(:pending)
+  end
 end

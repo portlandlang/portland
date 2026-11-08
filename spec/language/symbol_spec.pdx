@@ -35,4 +35,46 @@ context "A Symbol literal" do
   specify "can be an empty string" do
     expect(inspect(:"")).to eq(':""')
   end
+
+  specify "answers symbols" do
+    expect(%i[rose city]).to eq([:rose, :city])
+    expect(%i[]).to eq([])
+  end
+
+  specify "opens with (), {}, or [] alike" do
+    expect(%i(rose city)).to eq([:rose, :city])
+    expect(%i{rose city}).to eq([:rose, :city])
+  end
+
+  specify "takes the word-array content rules" do
+    expect(%i[a [b] c]).to eq([:a, :"[b]", :c])
+    expect(%i[rose\ city]).to eq([:"rose city"])
+    expect(%i[rose  city]).to eq([:rose, :city])
+  end
+
+  specify "answers symbols that are the ordinary kind" do
+    expect(%i[paid pending].include?(:paid)).to be_true
+    expect(%i[paid].first).to eq(:paid)
+  end
+
+  specify "is the string's to_sym" do
+    name = "pending"
+    expect(:"prefix_#{name}").to eq(:prefix_pending)
+    expect(:"#{name}").to eq(name.to_sym)
+    expect(inspect(:"foo #{1 + 1}")).to eq(':"foo 2"')
+  end
+
+  specify "takes the string's escapes" do
+    expect(:"a\"b").to eq('a"b'.to_sym)
+    expect(:"tab\there".length).to eq(8)
+  end
+
+  specify "may end in a question mark, the suffix part of the name" do
+    expect(:paid?).to eq(:paid?)
+    expect(:paid).not_to eq(:paid?)
+  end
+
+  specify "take quotes when the name is not identifier-shaped" do
+    expect(:"odd key").to eq(:"odd key")
+  end
 end

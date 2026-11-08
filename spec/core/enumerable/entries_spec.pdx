@@ -49,4 +49,13 @@ context "Enumerable#entries" do
   specify "is an alias of Enumerable#to_a" do
     expect(numerous(DEFAULT).entries).to eq(numerous(DEFAULT).to_a)
   end
+
+  specify "entries is to_a's, and each_pair is each's (ADR 0036, revised)" do
+    counts = {a: 1, b: 2}
+    expect(counts.entries).to eq(counts.to_a)
+    mutable total = 0
+    counts.each_pair do |key, value|
+      total += value
+    end
+  end
 end

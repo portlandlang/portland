@@ -18,4 +18,12 @@ context "Integer#==" do
   specify "calls 'other == self' if the given argument is not an Integer" do
     expect(1 == "*").to eq(false)
   end
+
+  specify "equals by parts, and a real when the imaginary part is zero" do
+    expect(1 == Complex(1, 0)).to be_true
+  end
+
+  specify "reaches across the integer/float line" do
+    expect(1).to eq(1.0)
+  end
 end

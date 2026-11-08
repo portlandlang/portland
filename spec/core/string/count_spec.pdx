@@ -1,0 +1,15 @@
+# From ruby/spec core/string/count_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#count" do
+  specify "String#count counts one character's occurrences" do
+    expect("banana".count("a")).to eq(3)
+  end
+
+  specify "count sees through the encodings too" do
+    expect("café".count("é")).to eq(1)
+  end
+end

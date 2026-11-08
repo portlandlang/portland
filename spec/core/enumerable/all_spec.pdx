@@ -96,4 +96,20 @@ context "Enumerable#all?" do
       expect(yielded).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
     end
   end
+
+  specify "always returns true on empty enumeration" do
+    expect(Empty.new.all?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns false or nil" do
+    expect(numerous(DEFAULT).all?(1..6)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns false or nil" do
+    expect(numerous([0, 1, 2, -1]).all?(0..9)).to be_false
+  end
+
+  specify "calls the pattern with gathered array when yielded with multiple arguments" do
+    expect(YieldsMulti.new.all?([1, 2])).to be_false
+  end
 end

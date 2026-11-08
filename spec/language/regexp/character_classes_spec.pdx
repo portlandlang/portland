@@ -1,0 +1,19 @@
+# From ruby/spec language/regexp/character_classes_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexp with character classes" do
+  specify "the common classes" do
+    expect(found(/\d+/, "ab12")).to eq(["12"])
+    expect(found(/\w+/, "a_1 b")).to eq(["a_1"])
+    expect(found(/\s+/, "a \t b")).to eq([" \t "])
+    expect(found(/\h+/, "xyzcafe")).to eq(["cafe"])
+    expect(found(/[^\d]+/, "12ab34")).to eq(["ab"])
+    expect(found(/\p{Alpha}+/, "12ab")).to eq(["ab"])
+    expect(found(/\p{Hiragana}+/, "aあいb")).to eq(["あい"])
+  end
+end

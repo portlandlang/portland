@@ -93,4 +93,8 @@ context "Enumerable#max" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.max).to eq([6, 7, 8, 9])
   end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).max).to eq(6)
+  end
 end

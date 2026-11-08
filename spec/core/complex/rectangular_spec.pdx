@@ -1,0 +1,15 @@
+# From ruby/spec core/complex/rectangular_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#rectangular" do
+  specify "comes from polar and rectangular coordinates" do
+    expect(Complex.rectangular(1, 2)).to eq(Complex(1, 2))
+  end
+
+  specify "real, imaginary, rectangular, conjugate" do
+    expect(Complex(3, 4).rectangular).to eq([3, 4])
+  end
+end

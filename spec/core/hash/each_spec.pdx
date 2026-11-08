@@ -18,4 +18,12 @@ context "Hash#each" do
     {a: 1, b: 2}.each_pair { |key, value| seen_pairwise = seen_pairwise + [key, value] }
     expect(seen).to eq(seen_pairwise)
   end
+
+  specify "walks a hash as key and value pairs, in insertion order" do
+    mutable seen = []
+    {name: "pdx", port: 8080}.each do |key, value|
+      seen << "#{value}"
+    end
+    expect(seen).to eq(["pdx", "8080"])
+  end
 end

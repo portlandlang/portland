@@ -2,6 +2,11 @@
 
 require_relative "../spec_helper"
 
+def guarded(flag)
+  return "early" if flag
+  "late"
+end
+
 context "control flow" do
   describe "if" do
     specify "answers the taken branch" do
@@ -191,5 +196,70 @@ context "The if expression" do
     else 456
     end
     expect(answer).to eq(456)
+  end
+
+  specify "return early on a hit" do
+    expect(guarded(true)).to eq("early")
+    expect(guarded(false)).to eq("late")
+  end
+
+  specify "answers the then side on true" do
+    expect(1 < 2 ? "yes" : "no").to eq("yes")
+  end
+
+  specify "answers the else side on false" do
+    expect(1 > 2 ? "yes" : "no").to eq("no")
+  end
+
+  specify "takes symbol operands — their colons are attached" do
+    expect(true ? :x : :y).to eq(:x)
+  end
+
+  specify "reads a predicate's ? and its own apart" do
+    found = [7].first
+    expect(found.nil? ? 0 : 1).to eq(1)
+  end
+
+  specify "the untaken side never runs" do
+    expect(true ? 1 : panic("unreachable")).to eq(1)
+  end
+
+  specify "make a decision table" do
+    total = 60
+    discount = if total > 100 then 20
+    elsif total > 50 then 10
+    else 0
+    end
+    expect(discount).to eq(10)
+  end
+
+  specify "fit on one line" do
+    label = if 1 > 2 then "big" else "small" end
+    expect(label).to eq("small")
+  end
+
+  specify "an empty then branch is nil, typed (ADR 0012)" do
+    fell = if false then else "fell through" end
+    expect(fell).to eq("fell through")
+  end
+
+  specify "a one-liner whose condition fails answers nil" do
+    answered = if false then "foo" end
+    expect(answered).to be_nil
+  end
+
+  specify "before an indented body" do
+    mutable seen = ""
+    if true then
+      seen = "ran"
+    end
+    expect(seen).to eq("ran")
+  end
+
+  specify "produces nil" do
+    branchless = if false
+      "taken"
+    end
+    expect(branchless).to be_nil
   end
 end

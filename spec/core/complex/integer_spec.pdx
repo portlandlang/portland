@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/integer_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#integer?" do
+  specify "the predicates" do
+    expect(Complex(1, 2).integer?).to be_false
+  end
+end

@@ -53,3 +53,11 @@ context "Array" do
     end
   end
 end
+
+context "Array#<=>" do
+  specify "orders arrays element by element, shorter first on a tie" do
+    expect([1, 2] <=> [1, 10]).to eq(-1)
+    expect([1] <=> [1, 0]).to eq(-1)
+    expect([2] <=> [1, 9]).to eq(1)
+  end
+end

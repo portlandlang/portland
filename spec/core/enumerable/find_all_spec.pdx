@@ -49,4 +49,9 @@ context "Enumerable#find_all" do
   specify "is an alias of Enumerable#select" do
     expect(numerous(DEFAULT).find_all { |item| item > 3 }).to eq(numerous(DEFAULT).select { |item| item > 3 })
   end
+
+  specify "filter and find_all are select's twins (ADR 0036, revised)" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.find_all { it.even? }).to eq(numbers.select { it.even? })
+  end
 end

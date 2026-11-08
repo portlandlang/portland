@@ -10,4 +10,8 @@ context "NilClass#inspect" do
   specify "returns the string 'nil'" do
     expect(inspect(nil)).to eq("nil")
   end
+
+  specify "renders nil — a function takes absence without ceremony" do
+    expect(inspect(nil)).to eq("nil")
+  end
 end

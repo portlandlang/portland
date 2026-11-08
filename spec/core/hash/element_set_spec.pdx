@@ -13,4 +13,11 @@ context "Hash#[]=" do
     table[:b] = 2
     expect(table).to eq({b: 2, a: 1})
   end
+
+  specify "and the name itself sees the entry" do
+    mutable scores = {home: 1}
+    frozen_view = scores
+    scores[:away] = 2
+    expect(scores[:away]).to eq(2)
+  end
 end

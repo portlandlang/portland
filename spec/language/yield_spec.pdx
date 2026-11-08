@@ -4,6 +4,12 @@
 
 require_relative "../spec_helper"
 
+def relay
+  apply do
+    yield
+  end
+end
+
 def apply
   yield
 end
@@ -60,5 +66,23 @@ context "The yield call" do
     specify "passes only the first argument if the block takes one parameter" do
       expect(yield_three(1, 2, 3) { it }).to eq(1)
     end
+  end
+
+  specify "delegates from inside a yielded block" do
+    handed = relay do
+      "handed through two layers"
+    end
+    expect(handed).to eq("handed through two layers")
+  end
+
+  specify "and an accumulator flows through the delegation" do
+    mutable count = 0
+    relay do
+      count += 1
+    end
+    relay do
+      count += 10
+    end
+    expect(count).to eq(11)
   end
 end

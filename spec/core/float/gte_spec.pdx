@@ -1,0 +1,11 @@
+# From ruby/spec core/float/gte_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#>=" do
+  specify "mirror them" do
+    expect(5.5 >= 5.5).to be_true
+  end
+end

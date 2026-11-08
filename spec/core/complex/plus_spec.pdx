@@ -1,0 +1,13 @@
+# From ruby/spec core/complex/plus_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#+" do
+  specify "adds, subtracts, and multiplies part by part" do
+    expect(Complex(1, 2) + 1).to eq(Complex(2, 2))
+    expect(inspect(Complex(1, 2) + 1.0)).to eq("(2.0+2i)")
+    expect(inspect(Complex(1, 2) + Rational(1, 2))).to eq("((3/2)+2i)")
+  end
+end

@@ -1,0 +1,11 @@
+# From ruby/spec core/enumerable/flat_map_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Enumerable#flat_map" do
+  specify "each_slice chunks and flat_map opens one level" do
+    expect([1, 2].flat_map { [it, it] }).to eq([1, 1, 2, 2])
+  end
+end

@@ -1,0 +1,15 @@
+# From ruby/spec core/complex/real_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#real" do
+  specify "real, imaginary, rectangular, conjugate" do
+    expect(Complex(3, 4).real).to eq(3)
+  end
+
+  specify "the predicates" do
+    expect(Complex(3, 4).real?).to be_false
+  end
+end

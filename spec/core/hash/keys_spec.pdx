@@ -22,4 +22,9 @@ context "Hash#keys" do
       expect(table[table.keys[index]]).to eq(table.values[index])
     end
   end
+
+  specify "lists the keys in insertion order" do
+    config = {name: "pdx", port: 8080}
+    expect(config.keys).to eq([:name, :port])
+  end
 end

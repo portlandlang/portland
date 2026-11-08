@@ -1,0 +1,20 @@
+# From ruby/spec core/set/case_compare_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#===" do
+  specify "is membership under when" do
+    held = case 2
+    when Set[1, 2] then "held"
+    else "missed"
+    end
+    expect(held).to eq("held")
+    missed = case 3
+    when Set[1, 2] then "held"
+    else "missed"
+    end
+    expect(missed).to eq("missed")
+  end
+end

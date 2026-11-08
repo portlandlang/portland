@@ -53,4 +53,12 @@ context "String#inspect" do
     expect(inspect("東京")).to eq('"東京"')
     expect(inspect("🏳️‍🌈")).to eq('"🏳️‍🌈"')
   end
+
+  specify "quotes a string, where to_s would not" do
+    expect(inspect("rose")).to eq('"rose"')
+  end
+
+  specify "is what a failure line wants" do
+    expect("got #{inspect(nil)}, not #{inspect("nil")}").to eq('got nil, not "nil"')
+  end
 end

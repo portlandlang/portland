@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/numerator_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#numerator" do
+  specify "numerator and denominator over exact parts" do
+    expect(Complex(Rational(1, 2), Rational(1, 3)).numerator).to eq(Complex(3, 2))
+  end
+end

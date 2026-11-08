@@ -1,0 +1,11 @@
+# From ruby/spec core/string/strip_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#strip" do
+  specify "String#strip takes whitespace off both ends" do
+    expect("  rose  ".strip).to eq("rose")
+  end
+end

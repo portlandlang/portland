@@ -11,4 +11,8 @@ context "TrueClass#to_s" do
   specify "returns the string 'true'" do
     expect(true.to_s).to eq("true")
   end
+
+  specify "renders numbers, booleans, and collections" do
+    expect(true.to_s).to eq("true")
+  end
 end

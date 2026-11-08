@@ -39,4 +39,8 @@ context "Range#eql?" do
     expect((1..).eql?(1..)).to be_true
     expect((1..).eql?(1...)).to be_false
   end
+
+  specify "asks == of the ends, and eql? asks eql?" do
+    expect((0..1).eql?(0..1.0)).to be_false
+  end
 end

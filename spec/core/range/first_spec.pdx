@@ -33,4 +33,9 @@ context "Range#first" do
   specify "returns all elements in the range when count exceeds the number of elements" do
     expect((0..2).first(4)).to eq([0, 1, 2])
   end
+
+  specify "begin, end, first, and last are the ends themselves" do
+    expect(("a".."f").first).to eq("a")
+    expect((1.5..2.5).first).to eq(1.5)
+  end
 end

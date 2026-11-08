@@ -66,4 +66,16 @@ context "Enumerable#each_with_index" do
     expect(seen).to eq([[2, 0], [5, 1], [3, 2], [6, 3], [1, 4], [4, 5]])
     expect(answer).to eq(numerous(DEFAULT))
   end
+
+  specify "hands the element first and the count second" do
+    mutable seen = []
+    %w[rose city].each_with_index do |word, index|
+      seen << "#{index}:#{word}"
+    end
+    expect(seen).to eq(["0:rose", "1:city"])
+  end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).each_with_index { |item, index| }).to eq(numerous(DEFAULT))
+  end
 end

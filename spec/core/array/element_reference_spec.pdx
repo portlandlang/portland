@@ -255,4 +255,28 @@ context "Array#[]" do
   specify "returns an empty array when m > n and m, n are negative with [m..n]" do
     expect([1, 2, 3, 4, 5][-2..-3]).to eq([])
   end
+
+  specify "answers nil for an out-of-range index" do
+    expect([1, 2][9]).to be_nil
+  end
+
+  specify "a slice by a float range truncates the ends" do
+    expect([1, 2, 3][1.0..2]).to eq([2, 3])
+  end
+
+  specify "slices an array, inclusive or exclusive" do
+    words = %w[a b c d e]
+    expect(words[1..2]).to eq(["b", "c"])
+    expect(words[1...3]).to eq(["b", "c"])
+  end
+
+  specify "slices from the start with a beginless range" do
+    words = %w[a b c d e]
+    expect(words[..1]).to eq(["a", "b"])
+  end
+
+  specify "slices to the end with an endless one" do
+    words = %w[a b c d e]
+    expect(words[3..]).to eq(["d", "e"])
+  end
 end

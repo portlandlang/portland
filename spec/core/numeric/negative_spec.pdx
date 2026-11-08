@@ -1,0 +1,11 @@
+# From ruby/spec core/numeric/negative_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Numeric#negative?" do
+  specify "split around zero, which is neither" do
+    expect((0 - 5).negative?).to be_true
+  end
+end

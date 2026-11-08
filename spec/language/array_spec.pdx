@@ -56,3 +56,13 @@ c d)).to eq(["a", "b\nc", "d"])
     end
   end
 end
+
+context "Array literals" do
+  specify "holds any mix of types, nesting included" do
+    expect([1, "two", [3]]).to have_length(3)
+  end
+
+  specify "is empty when written empty" do
+    expect([]).to be_empty
+  end
+end

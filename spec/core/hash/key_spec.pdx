@@ -24,3 +24,20 @@ context "Hash#key" do
     expect({1 => 0.0}.key(0)).to eq(1)
   end
 end
+
+context "Hash#key?" do
+  specify "finds a key" do
+    config = {name: "pdx", port: 8080}
+    expect(config).to have_key(:name)
+  end
+
+  specify "and misses one that is absent" do
+    config = {name: "pdx", port: 8080}
+    expect(config).not_to have_key(:nope)
+  end
+
+  specify "holds for a key whose value is nil" do
+    config = {name: "pdx", port: 8080}
+    expect({note: nil}).to have_key(:note)
+  end
+end

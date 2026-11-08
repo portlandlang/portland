@@ -13,4 +13,9 @@ context "Array#collect" do
   specify "is an alias of Array#map" do
     expect([1, 2, 3].collect { it * 2 }).to eq([1, 2, 3].map { it * 2 })
   end
+
+  specify "collect and inject are the twins of map and reduce (ADR 0036)" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.collect { it * 2 }).to eq(numbers.map { it * 2 })
+  end
 end

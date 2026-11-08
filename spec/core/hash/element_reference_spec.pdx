@@ -28,4 +28,8 @@ context "Hash#[]" do
     expect({1 => "x"}[1.0]).to eq(nil)
     expect({1 => "x"}[1]).to eq("x")
   end
+
+  specify "answers nil for a missing hash key" do
+    expect({name: "pdx"}[:nope]).to be_nil
+  end
 end

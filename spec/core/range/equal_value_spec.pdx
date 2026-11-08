@@ -35,4 +35,12 @@ context "Range#==" do
   specify "returns true if the endpoints are == for beginless ranges" do
     expect((...10) == (...10)).to eq(true)
   end
+
+  specify "asks == of the ends, and eql? asks eql?" do
+    expect((0..1) == (0..1.0)).to be_true
+    expect(("a".."c") == ("a".."c")).to be_true
+    expect(("a".."c") == ("a"..."c")).to be_false
+    expect((1.0..) == (1.0..)).to be_true
+    expect((...10) == (...10)).to be_true
+  end
 end

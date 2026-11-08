@@ -10,4 +10,8 @@ context "NilClass#nil?" do
   specify "returns true" do
     expect(nil.nil?).to eq(true)
   end
+
+  specify "and answer for nil itself, the one thing it can do" do
+    expect(nil).to be_nil
+  end
 end

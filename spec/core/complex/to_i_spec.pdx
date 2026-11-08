@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/to_i_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#to_i" do
+  specify "to a real when the imaginary part is an exact zero" do
+    expect(Complex(1, 0).to_i).to eq(1)
+  end
+end

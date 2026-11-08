@@ -65,9 +65,4 @@ context "failure propagation, spelled out" do
     end
   end
 
-  describe "the freed suffix" do
-    specify "a bang is just part of a method's name now" do
-      expect(bang_named!).to eq("loud and proud")
-    end
-  end
 end

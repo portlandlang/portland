@@ -17,4 +17,8 @@ context "Hash#inspect" do
   specify "does not call #to_s on a String returned from #inspect" do
     expect(inspect({a: "abc"})).to eq('{a: "abc"}')
   end
+
+  specify "writes a hash back the way it would be typed" do
+    expect(inspect({name: "pdx"})).to eq('{name: "pdx"}')
+  end
 end

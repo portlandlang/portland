@@ -20,4 +20,8 @@ context "Regexp#casefold?" do
     expect(/abc/i.casefold?).to be_true
     expect(/xyz/.casefold?).to be_false
   end
+
+  specify "take the i, m, and x flags" do
+    expect(/foo/i.casefold?).to be_true
+  end
 end

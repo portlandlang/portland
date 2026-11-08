@@ -9,8 +9,5 @@ context "a failure" do
       expect((failure("why") or "fallback")).to eq("fallback")
     end
 
-    specify "and keeps a present value" do
-      expect(("present" or "unused")).to eq("present")
-    end
   end
 end

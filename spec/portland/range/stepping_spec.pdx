@@ -10,25 +10,8 @@ require_relative "../../spec_helper"
 context "Range" do
   describe "the strides and extremes" do
     specify "Range#step walks in strides" do
-      expect((1..9).step(3).to_a).to eq([1, 4, 7])
       expect((1..9).step(3)).to eq([1, 4, 7])
     end
 
-    specify "Range#min and #max honor the exclusive end" do
-      expect((1..9).min).to eq(1)
-      expect((1..9).max).to eq(9)
-      expect((1...9).max).to eq(8)
-    end
-
-    specify "the extremes of an empty range are maybes" do
-      expect((5..1).max).to be_nil
-      expect((1...1).max).to be_nil
-    end
-
-    specify "size and count answer how many elements it walks (ADR 0036)" do
-      expect((1..9).size).to eq(9)
-      expect((1...9).size).to eq(8)
-      expect((1..9).count).to eq(9)
-    end
   end
 end

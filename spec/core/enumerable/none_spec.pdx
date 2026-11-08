@@ -84,4 +84,16 @@ context "Enumerable#none?" do
       expect(yielded).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
     end
   end
+
+  specify "always returns true on empty enumeration" do
+    expect(Empty.new.none?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns a truthy value" do
+    expect(numerous([0, 1, 2, -1]).none?(3)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns other than false or nil" do
+    expect(numerous([0, 1, 2, -1]).none?(-9..-1)).to be_false
+  end
 end

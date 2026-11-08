@@ -43,6 +43,17 @@ context "String#[]" do
     expect(""[0]).to be_nil
     expect(""[-1]).to be_nil
   end
+
+  specify "slices strings the same way" do
+    words = %w[a b c d e]
+    expect("portland"[0..3]).to eq("port")
+    expect("portland"[5..]).to eq("and")
+  end
+
+  specify "answer the match's text or nil" do
+    expect("hello"[/l+/]).to eq("ll")
+    expect("hello"[/z/]).to be_nil
+  end
 end
 
 context "String#[] with Range" do

@@ -22,4 +22,8 @@ context "Integer#to_s" do
     expect(255.to_s(36)).to eq("73")
     expect(0.to_s(2)).to eq("0")
   end
+
+  specify "renders numbers, booleans, and collections" do
+    expect(42.to_s).to eq("42")
+  end
 end

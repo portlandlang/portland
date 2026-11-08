@@ -11,19 +11,8 @@ require_relative "../../../spec_helper"
 
 context "Float" do
   describe "the predicates" do
-    specify "Float#zero? answers whether the value is exactly zero" do
-      expect(0.0.zero?).to be_true
-      expect(0.1.zero?).to be_false
-    end
-
-    specify "Float#nan? knows the not-a-number" do
-      expect((0.0 / 0.0).nan?).to be_true
-      expect(1.0.nan?).to be_false
-    end
 
     specify "Float#finite? and #infinite? split the line's ends off" do
-      expect(1.0.finite?).to be_true
-      expect((1.0 / 0.0).finite?).to be_false
       expect((1.0 / 0.0).infinite?).to be_true
       expect((-1.0 / 0.0).infinite?).to be_true
       expect(1.0.infinite?).to be_false

@@ -2,6 +2,15 @@
 
 require_relative "../../spec_helper"
 
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+
 context "Array#min" do
   numbers = [3, 1, 2]
   specify "answers the smallest" do
@@ -75,5 +84,35 @@ context "Array#min" do
   specify "picks by the block's answer" do
     words = %w[pear fig apple kiwi]
     expect(words.min { |a, b| a.length <=> b.length }).to eq("fig")
+  end
+
+  specify "compare floats numerically" do
+    numbers = [3, 1, 2]
+    expect([1.5, 0.5, 2.25].min).to eq(0.5)
+  end
+
+  specify "answer the element itself across the integer/float line" do
+    numbers = [3, 1, 2]
+    expect([1, 2.5].min).to eq(1)
+  end
+
+  specify "compare strings alphabetically" do
+    numbers = [3, 1, 2]
+    expect(["pear", "apple"].min).to eq("apple")
+  end
+
+  specify "of nothing are absent" do
+    numbers = [3, 1, 2]
+    expect([].min).to be_nil
+  end
+
+  specify "sort, and answer min and max" do
+    expect(%w[pear apple].min).to eq("apple")
+  end
+
+  specify "sorts, and answers min and max" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+    expect([newer, older].min).to eq(older)
   end
 end

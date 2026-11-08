@@ -112,3 +112,21 @@ context "String#rindex with String" do
     expect("hello".rindex("h", -6)).to be_nil
   end
 end
+
+context "String#rindex with object" do
+  specify "answer the position of the first and last match" do
+    expect("hello".rindex(/l/)).to eq(3)
+  end
+
+  specify "answer nil for no match" do
+    expect("hello".rindex(/z/)).to be_nil
+  end
+
+  specify "search from a position" do
+    expect("hello".rindex(/l/, 2)).to eq(2)
+  end
+
+  specify "rindex finds a match that overlaps an earlier one" do
+    expect("aaa".rindex(/aa/)).to eq(1)
+  end
+end

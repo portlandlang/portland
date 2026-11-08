@@ -12,4 +12,9 @@ context "Integer#next" do
     expect(41.next).to eq(41.succ)
     expect(-1.next).to eq(-1.succ)
   end
+
+  specify "is succ's other name — a keyword everywhere but after a dot" do
+    expect(2.next).to eq(3)
+    expect(2.next).to eq(2.succ)
+  end
 end

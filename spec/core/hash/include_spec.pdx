@@ -26,4 +26,10 @@ context "Hash#include?" do
   specify "returns true if the key's matching value was false" do
     expect({xyz: false}.include?(:xyz)).to eq(true)
   end
+
+  specify "has_key?, include?, and member? are key?'s — all four ask about keys" do
+    counts = {a: 1, b: 2}
+    expect(counts.include?(:a)).to be_true
+    expect(counts.include?(:zed)).to be_false
+  end
 end

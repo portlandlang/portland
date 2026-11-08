@@ -49,4 +49,9 @@ context "Enumerable#reduce" do
   specify "is an alias of Enumerable#inject" do
     expect(numerous(DEFAULT).reduce(0) { |sum, item| sum + item }).to eq(numerous(DEFAULT).inject(0) { |sum, item| sum + item })
   end
+
+  specify "reduce folds from an initial value" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.reduce(10) { |total, number| total + number }).to eq(20)
+  end
 end

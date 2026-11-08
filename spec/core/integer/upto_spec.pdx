@@ -57,4 +57,12 @@ context "Integer#upto [stop] when self and stop are Integers" do
       expect(-3.upto(-5).size).to eq(0)
     end
   end
+
+  specify "upto counts up, ends included" do
+    mutable counted = []
+    1.upto(3) do |number|
+      counted << number
+    end
+    expect(counted).to eq([1, 2, 3])
+  end
 end

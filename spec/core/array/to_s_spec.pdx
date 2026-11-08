@@ -20,4 +20,8 @@ context "Array#to_s" do
     expect("#{[1, "two"]}").to eq('[1, "two"]')
     expect([1, [2, "x"]].join(",")).to eq("1,2,x")
   end
+
+  specify "renders numbers, booleans, and collections" do
+    expect([1, "two"].to_s).to eq('[1, "two"]')
+  end
 end

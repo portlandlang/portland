@@ -1,0 +1,13 @@
+# From ruby/spec core/string/append_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#<<" do
+  specify "appends to a string with <<" do
+    mutable line = "rose"
+    line << " city"
+    expect(line).to eq("rose city")
+  end
+end

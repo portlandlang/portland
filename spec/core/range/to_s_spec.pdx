@@ -26,4 +26,8 @@ context "Range#to_s" do
   specify "can show beginless ranges" do
     expect((..1).to_s).to eq("..1")
   end
+
+  specify "inspect each end, and to_s renders them" do
+    expect(("a".."b").to_s).to eq("a..b")
+  end
 end

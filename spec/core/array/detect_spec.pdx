@@ -14,4 +14,9 @@ context "Array#detect" do
     expect([1, 2, 3].detect { it > 1 }).to eq([1, 2, 3].find { it > 1 })
     expect([1, 2, 3].detect { it > 5 }).to eq([1, 2, 3].find { it > 5 })
   end
+
+  specify "detect is find's twin (ADR 0036)" do
+    expect([1, 2, 3].detect { it > 1 }).to eq(2)
+    expect([1, 2, 3].detect { it > 9 }).to be_nil
+  end
 end

@@ -37,4 +37,13 @@ context "String#to_sym" do
   specify "answers the empty symbol for the empty string" do
     expect("".to_sym).to eq(:"")
   end
+
+  specify "is a case subject like any symbol" do
+    answer = case "paid".to_sym
+             in :paid then "receipt"
+             in :pending then "wait"
+             else "unknown"
+             end
+    expect(answer).to eq("receipt")
+  end
 end

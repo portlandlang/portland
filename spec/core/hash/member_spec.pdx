@@ -13,4 +13,10 @@ context "Hash#member?" do
     expect({a: 1}.member?(:a)).to eq({a: 1}.include?(:a))
     expect({a: 1}.member?(:b)).to eq({a: 1}.include?(:b))
   end
+
+  specify "has_key?, include?, and member? are key?'s — all four ask about keys" do
+    counts = {a: 1, b: 2}
+    expect(counts.member?(:a)).to be_true
+    expect(counts.member?(:zed)).to be_false
+  end
 end

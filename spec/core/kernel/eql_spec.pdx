@@ -41,4 +41,12 @@ context "Kernel#eql?" do
     long42 = (2 ** 35) * 42 / (2 ** 35)
     expect(42.eql?(long42)).to be_true
   end
+
+  specify "nil, booleans, and symbols are eql? to themselves and nothing else" do
+    expect(nil.eql?(nil)).to be_true
+    expect(true.eql?(true)).to be_true
+    expect(true.eql?(false)).to be_false
+    expect(:a.eql?(:a)).to be_true
+    expect(:a.eql?("a")).to be_false
+  end
 end

@@ -1,0 +1,26 @@
+# From ruby/spec core/integer/bit_and_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#&" do
+  specify "returns self bitwise AND other" do
+    expect(256.bit_and(16)).to eq(0)
+    expect(2010.bit_and(5)).to eq(0)
+    expect(65535.bit_and(1)).to eq(1)
+  end
+
+  specify "returns self bitwise AND other when one operand is negative" do
+    expect(1.shift_left(33).bit_and(-1)).to eq(1.shift_left(33))
+    expect(-1.bit_and(1.shift_left(33))).to eq(1.shift_left(33))
+    expect((-(1.shift_left(33)) - 1).bit_and(5)).to eq(5)
+  end
+
+  specify "returns self bitwise AND other when both operands are negative" do
+    expect(-5.bit_and(-1)).to eq(-5)
+    expect(-3.bit_and(-4)).to eq(-4)
+    expect(-12.bit_and(-13)).to eq(-16)
+    expect(-13.bit_and(-12)).to eq(-16)
+  end
+end

@@ -28,4 +28,8 @@ context "Struct#size" do
     expect(Car.new(make: "Cadillac", model: "DeVille", year: nil).length).to eq(3)
     expect(Car.new(make: nil, model: nil, year: nil).length).to eq(3)
   end
+
+  specify "does not override the instance accessor method" do
+    expect(Sized.new(size: 42).size).to eq(42)
+  end
 end

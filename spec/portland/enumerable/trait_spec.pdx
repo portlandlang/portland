@@ -52,18 +52,4 @@ context "Enumerable" do
     expect(seen).to eq(DEFAULT)
   end
 
-  specify "answers Ruby's names from what each yields" do
-    expect(numerous(DEFAULT).count).to eq(6)
-    expect(numerous(DEFAULT).min).to eq(1)
-    expect(numerous(DEFAULT).max).to eq(6)
-    expect(numerous(DEFAULT).sum).to eq(21)
-    expect(numerous(DEFAULT).inject(0) { |sum, item| sum + item }).to eq(21)
-    expect(numerous(DEFAULT).each_with_index { |item, index| }).to eq(numerous(DEFAULT))
-  end
-
-  specify "answers an empty walk as nothing" do
-    expect(Empty.new.to_a).to eq([])
-    expect(Empty.new.count).to eq(0)
-    expect(Empty.new.min).to be_nil
-  end
 end

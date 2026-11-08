@@ -7,6 +7,23 @@
 
 require_relative "../spec_helper"
 
+module Statistics
+  BASE = 10
+
+  struct Summary
+    mean
+  end
+
+  def scaled(value)
+    value * BASE
+  end
+end
+
+MAX = 5
+module Limits
+  CEILING = 99
+end
+
 LIMIT = 9
 LABELS = %w[low high]
 def over?(count) = count > LIMIT
@@ -42,5 +59,19 @@ context "Constant" do
       expect(Config::LIMIT).to eq(3)
       expect(LIMIT).to eq(9)
     end
+  end
+end
+
+context "Literal (A::X) constant resolution" do
+  specify "lives at the top level too" do
+    expect(MAX).to eq(5)
+  end
+
+  specify "and inside a module, named through it" do
+    expect(Limits::CEILING).to eq(99)
+  end
+
+  specify ":: names a constant" do
+    expect(Statistics::BASE).to eq(10)
   end
 end

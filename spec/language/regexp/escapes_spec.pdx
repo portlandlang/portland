@@ -1,0 +1,69 @@
+# From ruby/spec language/regexp/escapes_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with escape characters" do
+  specify "the whitespace escapes" do
+    expect(found(/\t/, "\t")).to eq(["\t"])
+    expect(found(/\n/, "\n")).to eq(["\n"])
+    expect(found(/\r/, "\r")).to eq(["\r"])
+  end
+
+  specify "quoting meta-characters via escape sequence" do
+    expect(found(/\(/, "(")).to eq(["("])
+    expect(found(/\)/, ")")).to eq([")"])
+    expect(found(/\[/, "[")).to eq(["["])
+    expect(found(/\]/, "]")).to eq(["]"])
+    expect(found(/\{/, "{")).to eq(["{"])
+    expect(found(/\}/, "}")).to eq(["}"])
+    expect(found(/\|/, "|")).to eq(["|"])
+    expect(found(/\?/, "?")).to eq(["?"])
+    expect(found(/\./, ".")).to eq(["."])
+    expect(found(/\*/, "*")).to eq(["*"])
+    expect(found(/\+/, "+")).to eq(["+"])
+    expect(found(/\^/, "^")).to eq(["^"])
+    expect(found(/\$/, "$")).to eq(["$"])
+  end
+
+  specify "quoting meta-characters used as a %r terminator" do
+    expect(found(%r(\(), "(")).to eq(["("])
+    expect(found(%r[\]], "]")).to eq(["]"])
+    expect(found(%r{\}}, "}")).to eq(["}"])
+  end
+
+  specify "allows any character to be escaped" do
+    expect(found(/\y/, "y")).to eq(["y"])
+  end
+
+  specify "\\x hex characters" do
+    expect(found(/\xA/, "\nxyz")).to eq(["\n"])
+    expect(found(/\x0A/, "\n")).to eq(["\n"])
+    expect(found(/\x0AA/, "\nA")).to eq(["\nA"])
+    expect(found(/\xAG/, "\nG")).to eq(["\nG"])
+  end
+
+  specify "\\c control characters" do
+    expect(found(/\c)\cI\ci/, "\t\t\t")).to eq(["\t\t\t"])
+    expect(found(/\c*\cJ\cj/, "\n\n\n")).to eq(["\n\n\n"])
+    expect(found(/\c-\cM\cm/, "\r\r\r")).to eq(["\r\r\r"])
+    expect(/\cJ/.match("\r")).to be_nil
+    expect(found(/\cJ+/, "\n\n")).to eq(["\n\n"])
+    expect(found(/\\cJ/, '\cJ')).to eq(['\cJ'])
+    expect(found(/\C-*\C-J\C-j/, "\n\n\n")).to eq(["\n\n\n"])
+  end
+
+  specify "\\K keeps and \\R is a line break" do
+    expect(found(/a\Kb/, "ab")).to eq(["b"])
+    expect(found(/\R/, "\n")).to eq(["\n"])
+    expect(found(/\R/, "\r\n")).to eq(["\r\n"])
+  end
+
+  specify "\\u unicode escapes" do
+    expect(found(/あ/, "あ")).to eq(["あ"])
+    expect(found(/\u{3042 3044}/, "あい")).to eq(["あい"])
+  end
+end

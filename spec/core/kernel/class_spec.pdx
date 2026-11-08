@@ -89,4 +89,16 @@ context "Kernel#class" do
     expect([1, 2].class).to eq(Array)
     expect({1 => 2}.class).to eq(Hash)
   end
+
+  specify "answers its class and the type pattern" do
+    expect(Complex(1, 2).class).to eq(Complex)
+    answer = case 2i
+    in Complex then "complex"
+    else "other"
+    end
+  end
+
+  specify "answers class and name" do
+    expect(Set[1].class).to eq(Set)
+  end
 end

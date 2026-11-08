@@ -1,0 +1,18 @@
+# From ruby/spec core/set/disjoint_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#disjoint?" do
+  specify "tell whether the two share a member" do
+    four = Set[1, 2, 3, 4]
+    expect(Set[1, 2].disjoint?(Set[2, 3])).to be_false
+    expect(Set[1, 2].disjoint?(Set[3, 4])).to be_true
+  end
+
+  specify "take any enumerable" do
+    four = Set[1, 2, 3, 4]
+    expect(Set[1, 2].disjoint?(3..4)).to be_true
+  end
+end

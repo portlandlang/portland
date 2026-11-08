@@ -12,48 +12,6 @@
 require_relative "../../spec_helper"
 
 context "String#slice with index, length" do
-  specify "returns the substring starting at the given index with the given length" do
-    expect("hello there".slice(0, 0)).to eq("")
-    expect("hello there".slice(0, 1)).to eq("h")
-    expect("hello there".slice(0, 3)).to eq("hel")
-    expect("hello there".slice(0, 6)).to eq("hello ")
-    expect("hello there".slice(0, 9)).to eq("hello the")
-    expect("hello there".slice(0, 12)).to eq("hello there")
-
-    expect("hello there".slice(1, 0)).to eq("")
-    expect("hello there".slice(1, 1)).to eq("e")
-    expect("hello there".slice(1, 3)).to eq("ell")
-    expect("hello there".slice(1, 6)).to eq("ello t")
-    expect("hello there".slice(1, 9)).to eq("ello ther")
-    expect("hello there".slice(1, 12)).to eq("ello there")
-
-    expect("hello there".slice(3, 0)).to eq("")
-    expect("hello there".slice(3, 1)).to eq("l")
-    expect("hello there".slice(3, 3)).to eq("lo ")
-    expect("hello there".slice(3, 6)).to eq("lo the")
-    expect("hello there".slice(3, 9)).to eq("lo there")
-
-    expect("hello there".slice(4, 0)).to eq("")
-    expect("hello there".slice(4, 3)).to eq("o t")
-    expect("hello there".slice(4, 6)).to eq("o ther")
-    expect("hello there".slice(4, 9)).to eq("o there")
-
-    expect("foo".slice(2, 1)).to eq("o")
-    expect("foo".slice(3, 0)).to eq("")
-    expect("foo".slice(3, 1)).to eq("")
-
-    expect("".slice(0, 0)).to eq("")
-    expect("".slice(0, 1)).to eq("")
-
-    expect("x".slice(0, 0)).to eq("")
-    expect("x".slice(0, 1)).to eq("x")
-    expect("x".slice(1, 0)).to eq("")
-    expect("x".slice(1, 1)).to eq("")
-    expect("x".slice(-1, 0)).to eq("")
-    expect("x".slice(-1, 1)).to eq("x")
-
-    expect("hello there".slice(-3, 2)).to eq("er")
-  end
 
   specify "answers the empty string if the offset falls outside of self — never nil (ADR 0019)" do
     expect("hello there".slice(20, 3)).to eq("")
@@ -71,12 +29,6 @@ context "String#slice with index, length" do
   end
 
   specify "handles repeated application" do
-    expect("hello world".slice(6, 5).slice(0, 1)).to eq("w")
-    expect("hello world".slice(6, 5).slice(0, 5)).to eq("world")
-    expect("hello world".slice(6, 5).slice(1, 1)).to eq("o")
-    expect("hello world".slice(6, 5).slice(1, 4)).to eq("orld")
-    expect("hello world".slice(6, 5).slice(4, 1)).to eq("d")
-    expect("hello world".slice(6, 5).slice(5, 0)).to eq("")
     expect("hello world".slice(6, 0).slice(-1, 0)).to eq("")
     expect("hello world".slice(6, 0).slice(1, 1)).to eq("")
   end

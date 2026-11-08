@@ -17,4 +17,8 @@ context "Range#end" do
     expect((0..1).end).to eq(1)
     expect((0xffff...0xfffff).end).to eq(1048575)
   end
+
+  specify "begin, end, first, and last are the ends themselves" do
+    expect(("a"..).end).to be_nil
+  end
 end

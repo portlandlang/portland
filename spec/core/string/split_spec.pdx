@@ -167,4 +167,29 @@ context "String#split with String" do
   specify "doesn't split on non-ascii whitespace" do
     expect("a　b".split(" ")).to eq(["a　b"])
   end
+
+  specify "splits on each match" do
+    expect("a1b2c".split(/\d/)).to eq(["a", "b", "c"])
+    expect("a b  c".split(/\s+/)).to eq(["a", "b", "c"])
+  end
+
+  specify "includes the groups between the pieces" do
+    expect("a1b2c".split(/(\d)/)).to eq(["a", "1", "b", "2", "c"])
+  end
+
+  specify "splits into characters on the empty pattern" do
+    expect("abc".split(//)).to eq(["a", "b", "c"])
+  end
+
+  specify "caps the pieces by a positive limit and keeps trailing empties by a negative one" do
+    expect("a1b2c3".split(/\d/, 2)).to eq(["a", "b2c3"])
+    expect("a1b2c3".split(/\d/, -1)).to eq(["a", "b", "c", ""])
+    expect("a1b2c3".split(/\d/)).to eq(["a", "b", "c"])
+  end
+
+  specify "handles empty matches as Ruby does" do
+    expect("abc".split(/b*/)).to eq(["a", "c"])
+    expect("aaa".split(/a*/)).to eq([])
+    expect("".split(/x/)).to eq([])
+  end
 end

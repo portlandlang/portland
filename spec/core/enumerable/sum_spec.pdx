@@ -70,4 +70,12 @@ context "Enumerable#sum" do
     expect(naive_sum).to eq(50.00000000000001)
     expect(floats.sum).to eq(50.0)
   end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).sum).to eq(21)
+  end
+
+  specify "adds without being spelled out" do
+    expect((1..5).sum).to eq(15)
+  end
 end

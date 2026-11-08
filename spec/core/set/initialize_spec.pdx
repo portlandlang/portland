@@ -1,0 +1,48 @@
+# From ruby/spec core/set/initialize_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Set#initialize" do
+  specify "adds every element of the passed array" do
+    built = Set.new([1, 2, 3])
+    expect(built.size).to eq(3)
+    expect(built).to contain(1)
+    expect(built).to contain(2)
+    expect(built).to contain(3)
+  end
+
+  specify "starts empty with no argument, an empty array, or an empty hash" do
+    expect(Set.new.size).to eq(0)
+    expect(Set.new([]).size).to eq(0)
+    expect(Set.new({}).size).to eq(0)
+  end
+
+  specify "takes a set" do
+    original = Set.new([1, 2])
+    copied = Set.new(original)
+    expect(copied.size).to eq(2)
+    expect(copied).to eq(original)
+  end
+
+  specify "takes a range, and a hash as its pairs" do
+    expect(Set.new(1..3)).to eq(Set[1, 2, 3])
+    expect(Set.new({a: 1})).to eq(Set[[:a, 1]])
+  end
+
+  specify "preprocesses every element through a block" do
+    squared = Set.new([1, 2, 3]) { it * it }
+    expect(squared.size).to eq(3)
+    expect(squared).to contain(1)
+    expect(squared).to contain(4)
+    expect(squared).to contain(9)
+  end
+
+  specify "stays empty with an empty array or set and a block" do
+    from_array = Set.new([]) { it * it }
+    from_set = Set.new(Set.new) { it * it }
+    expect(from_array.size).to eq(0)
+    expect(from_set.size).to eq(0)
+  end
+end

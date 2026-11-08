@@ -1,0 +1,23 @@
+# From ruby/spec language/it_parameter_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../spec_helper"
+
+context "it_parameter" do
+  specify "is the single parameter, never declared" do
+    words = %w[rose city]
+    expect(words.map { it.upcase }).to eq(["ROSE", "CITY"])
+  end
+
+  # An `it` whose only appearance is inside an interpolation counts (#47)
+  # — both oracles used to miss it there, each in its own way.
+  specify "declares itself from inside an interpolation" do
+    words = %w[rose city]
+    expect(words.map { "#{it}!" }).to eq(["rose!", "city!"])
+  end
+
+  specify "provides it in a block" do
+    expect(["a"].map { it }).to eq(["a"])
+  end
+end

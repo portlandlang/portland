@@ -1,0 +1,11 @@
+# From ruby/spec core/range/count_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Range#count" do
+  specify "size and count answer how many elements it walks (ADR 0036)" do
+    expect((1..9).count).to eq(9)
+  end
+end

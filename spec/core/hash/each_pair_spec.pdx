@@ -29,4 +29,13 @@ context "Hash#each_pair" do
     expect(keys).to eq(table.keys)
     expect(values).to eq(table.values)
   end
+
+  specify "entries is to_a's, and each_pair is each's (ADR 0036, revised)" do
+    counts = {a: 1, b: 2}
+    mutable total = 0
+    counts.each_pair do |key, value|
+      total += value
+    end
+    expect(total).to eq(3)
+  end
 end

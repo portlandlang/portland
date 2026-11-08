@@ -18,6 +18,36 @@ context "String#gsub with pattern and replacement" do
     expect("12345".gsub('\d', "a")).to eq("12345")
     expect('\d'.gsub('\d', "a")).to eq("a")
   end
+
+  specify "replace the first match or every one" do
+    expect("hello world".gsub(/o/, "0")).to eq("hell0 w0rld")
+    expect("hello".gsub(/z/, "0")).to eq("hello")
+  end
+
+  specify "read the replacement's escapes" do
+    expect("ab".gsub(/(?<x>a)/, '<\k<x>>')).to eq("<a>b")
+    expect("ab".gsub(/b/, '\&\&')).to eq("abb")
+    expect("ab".gsub(/b/, '\0\0')).to eq("abb")
+    expect("ab".gsub(/b/, '\\\\')).to eq('a\\')
+  end
+
+  specify "read the escapes with a string pattern too" do
+    expect("hello".gsub("l", '<\&>')).to eq("he<l><l>o")
+  end
+
+  specify "hand the block the matched text" do
+    expect("hello world".gsub(/\w+/) { |word| word.capitalize }).to eq("Hello World")
+    expect("a1b2".gsub(/\d/) { |digit| (digit.to_i * 2).to_s }).to eq("a2b4")
+  end
+
+  specify "match the empty pattern at every character boundary" do
+    expect("aaa".gsub(//, "-")).to eq("-a-a-a-")
+    expect("abc".gsub(/b*/, "X")).to eq("XaXXcX")
+  end
+
+  specify "take the flags" do
+    expect("Hello".gsub(/l/i, "L")).to eq("HeLLo")
+  end
 end
 
 context "String#gsub with pattern and block" do

@@ -69,4 +69,8 @@ context "Symbol#inspect" do
   specify "can be created from list syntax %i{a b c} without interpolation" do
     expect(%i{a b}).to eq([:a, :b])
   end
+
+  specify "keeps a symbol's colon, where to_s drops it" do
+    expect(inspect(:paid)).to eq(":paid")
+  end
 end
