@@ -1,0 +1,33 @@
+# The spec harness's collection matchers (#252): `all(matcher)`, which
+# applies a matcher to every element and names the first that misses, and
+# `match_array(items)`, equality in any order. RSpec's `contain_exactly`
+# takes the items spread out, which waits on splats (ADR 0014).
+
+require_relative "../../spec_helper"
+
+context "all" do
+  specify "passes when the matcher passes for every element" do
+    expect([1, 2, 3]).to all(be_greater_than(0))
+    expect([1, 0, 3]).not_to all(be_greater_than(0))
+    expect(Set[2, 4]).to all(be_an(Integer))
+  end
+
+  specify "names the first element that misses, and why" do
+    expect(all(be_greater_than(0)).failure_message([1, 0, -1])).to eq("expected all of [1, 0, -1] to pass, but the element at index 1 did not: expected 0 to be greater than 0")
+    expect(all(be_greater_than(0)).negated_failure_message([1, 2])).to eq("expected some element of [1, 2] to fail: expected 1 not to be greater than 0")
+  end
+end
+
+context "match_array" do
+  specify "passes when the two hold the same elements, in any order" do
+    expect([3, 1, 2]).to match_array([1, 2, 3])
+    expect([1, 1, 2]).not_to match_array([1, 2, 2])
+    expect([1, 2]).not_to match_array([1, 2, 3])
+    expect(Set[:b, :a]).to match_array([:a, :b])
+  end
+
+  specify "names both when it fails" do
+    expect(match_array([1, 2, 3]).failure_message([1, 2])).to eq("expected [1, 2] to hold exactly [1, 2, 3], in any order")
+    expect(match_array([2, 1]).negated_failure_message([1, 2])).to eq("expected [1, 2] not to hold exactly [2, 1], in any order")
+  end
+end

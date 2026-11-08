@@ -305,6 +305,55 @@ def cover(value)
   CoverMatcher.new(value: value)
 end
 
+# `all(matcher)` (#252) applies a matcher to every element, as in
+# `expect(values).to all(be_greater_than(0))`. Its failure names the first
+# element that missed and carries that matcher's own message, where
+# `expect(values.all? { … }).to be_true` could say only false.
+struct AllMatcher
+  matcher
+
+  def matches?(actual)
+    actual.all? { matcher.matches?(it) }
+  end
+
+  def failure_message(actual)
+    elements = actual.to_a
+    index = elements.find_index { !matcher.matches?(it) } or panic("all: every element passed")
+    "expected all of #{inspect(actual)} to pass, but the element at index #{index} did not: #{matcher.failure_message(elements[index])}"
+  end
+
+  def negated_failure_message(actual)
+    "expected some element of #{inspect(actual)} to fail: #{matcher.negated_failure_message(actual.to_a.first)}"
+  end
+end
+
+def all(matcher)
+  AllMatcher.new(matcher: matcher)
+end
+
+# `match_array(items)` (#252): the same elements, each as many times, in any
+# order — a Set's elements included. RSpec's `contain_exactly(1, 2, 3)` is
+# the same check with the items spread out, which waits on splats (ADR 0014).
+struct ArrayMatcher
+  items
+
+  def matches?(actual)
+    actual.to_a.tally == items.tally
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to hold exactly #{inspect(items)}, in any order"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to hold exactly #{inspect(items)}, in any order"
+  end
+end
+
+def match_array(items)
+  ArrayMatcher.new(items: items)
+end
+
 # ruby/spec's `be_close(expected, tolerance)`: within the tolerance, strictly.
 struct CloseMatcher
   expected
