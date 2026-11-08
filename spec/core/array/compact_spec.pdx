@@ -1,0 +1,11 @@
+# From ruby/spec core/array/compact_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#compact" do
+  specify "Array#compact drops the nils" do
+    expect([1, nil, 2].compact).to eq([1, 2])
+  end
+end

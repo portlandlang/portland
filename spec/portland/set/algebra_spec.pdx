@@ -1,0 +1,17 @@
+# The symmetric difference without `^`: `|`, `&`, and `^` are out of the
+# grammar (ADR 0003; #207 holds that question), so it is spelled from union
+# and intersection. A set's algebra under Ruby's names (ADR 0082) — `union`,
+# `intersection`, `difference`, `+`, `-` — is Ruby's, and its rows live in
+# the ruby/spec mirror under spec/core/set/.
+
+require_relative "../../spec_helper"
+
+context "Set" do
+  describe "the symmetric difference" do
+    specify "is spelled from union and intersection" do
+      left = Set[1, 2, 3, 4]
+      right = Set[3, 4, 5]
+      expect((left + right) - left.intersection(right)).to eq(Set[1, 2, 5])
+    end
+  end
+end

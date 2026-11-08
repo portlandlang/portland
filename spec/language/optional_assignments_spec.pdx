@@ -1,0 +1,83 @@
+# `||=` is the or-guard's question as a rebind (ADR 0043, #115), from
+# ruby/spec language/optional_assignments_spec.rb's single-variable rows. A
+# declared maybe or a boolean takes it; a false non-boolean refuses, since
+# `||` takes booleans; an undeclared name refuses; assignment is a
+# statement, so the rows reading the assignment's value stay upstream, with
+# the accessor, constant, and index forms and the undecided `&&=`.
+
+require_relative "../spec_helper"
+
+context "Optional variable assignments" do
+  describe "using ||=" do
+    describe "using a single variable" do
+      specify "re-assigns an existing variable set to nil" do
+        mutable value = nil
+        value ||= 10
+        expect(value).to eq(10)
+      end
+
+      specify "does not re-assign a variable with a truthy value" do
+        mutable value = 10
+        value ||= 20
+        expect(value).to eq(10)
+      end
+
+      specify "does not evaluate the right side when not needed" do
+        mutable value = 10
+        value ||= 1 / 0
+        expect(value).to eq(10)
+      end
+    end
+  end
+
+  specify "fills absence with the fallback" do
+    mutable name = [].first
+    name ||= "friend"
+    expect(name).to eq("friend")
+  end
+
+  specify "keeps a present value" do
+    mutable found = [7].first
+    found ||= 0
+    expect(found).to eq(7)
+  end
+
+  specify "narrows — the binding is plain below" do
+    mutable greeting = [].first
+    greeting ||= "hi"
+    expect(greeting.upcase).to eq("HI")
+  end
+
+  specify "never evaluates the right side of a hit" do
+    mutable found = [7].first
+    found ||= panic("unreachable")
+    expect(found).to eq(7)
+  end
+
+  specify "fills a missing hash key and keeps a present one" do
+    mutable counts = {"a" => 1}
+    counts["b"] ||= 0
+    counts["a"] ||= 9
+    expect(counts["b"]).to eq(0)
+    expect(counts["a"]).to eq(1)
+  end
+
+  specify "the index is any expression, evaluated once" do
+    mutable counts = {}
+    key = "a"
+    counts[key.upcase] ||= 1
+    expect(counts["A"]).to eq(1)
+  end
+
+  specify "a present slot never evaluates the right side" do
+    mutable counts = {"a" => 1}
+    counts["a"] ||= panic("unreachable")
+    expect(counts["a"]).to eq(1)
+  end
+
+  specify "is boolean-or, stated as fact" do
+    mutable flag = false
+    flag ||= true
+    expect(flag).to be_true
+  end
+end

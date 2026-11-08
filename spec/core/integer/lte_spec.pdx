@@ -1,0 +1,16 @@
+# From ruby/spec core/integer/lte_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#<=" do
+  specify "order strictly and inclusively" do
+    expect(5 <= 5).to be_true
+    expect(5 <= 4).to be_false
+  end
+
+  specify "order below zero" do
+    expect((-5) <= (-5)).to be_true
+  end
+end

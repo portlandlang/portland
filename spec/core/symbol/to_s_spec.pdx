@@ -1,0 +1,30 @@
+# Where a symbol stops being text (ADR 0023): `to_s` is the one crossing.
+#
+# From ruby/spec core/symbol/ (#23) — and most of that directory is
+# deliberately not here: `length`, `upcase`, `succ`, `<=>`, `casecmp` refuse
+# today and stay refused, because a symbol is a name, not a string that
+# happens to be short. The ledger (docs/ruby/symbols.md) owns the story;
+# these are exclusions by doctrine, not inventory.
+#
+# A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
+# start_with?, end_with?, name, id2name, to_s, encoding, ==, and ===. A
+# symbol answers questions about its name here, as in Ruby; making one from
+# text is from_text_spec's (ADR 0071). Upstream's alias checks compare
+# method objects, which a closed runtime has none of; they ask the same
+# question of the two answers instead. A symbol's text is UTF-8 like every
+# string's (ADR 0069), so the US-ASCII answers upstream expects of an ASCII
+# name are UTF-8 here, and a non-ASCII name does not lex (#139).
+
+require_relative "../../spec_helper"
+
+context "Symbol#to_s" do
+  specify "returns the string corresponding to self" do
+    expect(:rubinius.to_s).to eq("rubinius")
+    expect(:squash.to_s).to eq("squash")
+  end
+
+  specify "sheds the colon — the one sanctioned crossing into text" do
+    expect(:paid.to_s).to eq("paid")
+    expect(:"odd key".to_s).to eq("odd key")
+  end
+end

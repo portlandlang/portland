@@ -1,0 +1,19 @@
+# `numerator` on every real (ADR 0085): the numerator of the rational it
+# is.
+#
+# From ruby/spec core/numeric/numerator_spec.rb, where a row runs on a
+# builtin. Upstream: the rows that drive a mock Numeric subclass — there
+# is no Numeric to subclass — the bignums, integers being 64-bit, and the
+# row that hands an argument to a name taking none, which refuses.
+
+require_relative "../../spec_helper"
+
+context "Numeric#numerator" do
+  numbers = [0, 29871, -72628191273, 29282.2827, -2927.00091, 0.0, 12.0]
+
+  specify "converts self to a Rational object then returns its numerator" do
+    numbers.each do |number|
+      expect(number.numerator).to eq(Rational(number).numerator)
+    end
+  end
+end

@@ -1,0 +1,12 @@
+# From ruby/spec core/float/ceil_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#ceil" do
+  specify "Float#ceil goes up" do
+    expect(1.5.ceil).to eq(2)
+    expect((-1.5).ceil).to eq(-1)
+  end
+end

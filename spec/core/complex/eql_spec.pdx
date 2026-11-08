@@ -1,0 +1,12 @@
+# From ruby/spec core/complex/eql_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#eql?" do
+  specify "equals by parts, and a real when the imaginary part is zero" do
+    expect(Complex(1, 0).eql?(1)).to be_false
+    expect(Complex(1, 2).eql?(Complex(1.0, 2.0))).to be_false
+  end
+end

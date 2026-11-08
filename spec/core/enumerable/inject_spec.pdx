@@ -1,0 +1,83 @@
+# Ruby's Enumerable walks, runs, and groups on an Enumerable struct
+# (#110): `each_with_index`, `each_slice`, `each_cons`, `take_while`,
+# `drop`, `drop_while`, `inject`, `cycle`, `to_h`, `uniq`, `zip`,
+# `group_by`, `filter_map`, `chunk`, `chunk_while`, `slice_when`,
+# `slice_before`, and `slice_after`. A method Ruby answers with an
+# enumerator answers the finished array here (ADR 0055), so `each_cons(2)`
+# is its runs and `.to_a` on it is the identity.
+#
+# From ruby/spec core/enumerable/{each_with_index,each_cons,take_while,
+# drop,drop_while,inject,cycle,to_h,uniq,zip,group_by,filter_map,chunk,
+# chunk_while,slice_when,slice_before,slice_after}_spec.rb. What stays
+# behind: the blockless enumerators and their sizes, `each` taking
+# arguments, to_int and to_ary conversions (ADR 0036), the pattern
+# argument to `slice_before` and `slice_after` (asking `===`), a seedless
+# `inject` and `inject(:+)`, a block answering 1 or nil for a verdict, the
+# splat block parameter, `break` with a value out of a builtin's block,
+# and mocks of `hash` and `eql?`.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#inject" do
+  specify "with argument takes a block with an accumulator (with argument as initial value) and the current element. Value of block becomes new accumulator" do
+    mutable seen = []
+    numerous(DEFAULT).inject(0) do |memo, item|
+      seen << [memo, item]
+      item
+    end
+    expect(seen).to eq([[0, 2], [2, 5], [5, 3], [3, 6], [6, 1], [1, 4]])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.inject([]) { |gathered, item| gathered + [item] }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+
+  specify "with inject arguments(legacy rubycon)" do
+    expect(Empty.new.inject(1) { |memo, item| 999 }).to eq(1)
+    expect(numerous([2]).inject(1) { |memo, item| 999 }).to eq(999)
+    expect(numerous([2]).inject(1) { |memo, item| memo }).to eq(1)
+    expect(numerous([2]).inject(1) { |memo, item| item }).to eq(2)
+
+    expect(numerous([1, 2, 3, 4]).inject(100) { |memo, item| memo + item }).to eq(110)
+    expect(numerous([1, 2, 3, 4]).inject(100) { |memo, item| memo * item }).to eq(2400)
+
+    expect(numerous(["a", "b", "c"]).inject("z") { |memo, item| item + memo }).to eq("cbaz")
+  end
+
+  specify "collect and inject are the twins of map and reduce (ADR 0036)" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.inject(10) { |total, number| total + number }).to eq(20)
+  end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).inject(0) { |sum, item| sum + item }).to eq(21)
+  end
+end

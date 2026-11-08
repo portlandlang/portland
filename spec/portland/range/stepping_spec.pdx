@@ -1,0 +1,14 @@
+# `step` answers an array outright — Portland has no lazy enumerator to hand
+# back (#80) — where Ruby answers an ArithmeticSequence, so `.to_a` on it is
+# the identity. The rest of a range's strides and extremes are Ruby's, and
+# their rows live in the ruby/spec mirror under spec/core/range/.
+
+require_relative "../../spec_helper"
+
+context "Range" do
+  describe "the strides and extremes" do
+    specify "Range#step walks in strides" do
+      expect((1..9).step(3)).to eq([1, 4, 7])
+    end
+  end
+end

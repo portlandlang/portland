@@ -1,0 +1,27 @@
+# From ruby/spec language/regexp/grouping_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with grouping" do
+  specify "() captures and nests" do
+    expect(found(/(a)/, "a")).to eq(["a", "a"])
+    expect(found(/(hay(st)a)ck/, "haystack")).to eq(["haystack", "haysta", "st"])
+  end
+
+  specify "(?: ) does not capture" do
+    expect(found(/(?:foo)(bar)/, "foobar")).to eq(["foobar", "bar"])
+    expect(found(/(?:xdigit:)/, "xdigit:")).to eq(["xdigit:"])
+  end
+
+  specify "ignores capture groups in extended-mode line comments" do
+    pattern = /^
+      (a) # there is a capture group on this line
+      b   # there is no capture group on this line (not even here)
+      $/x
+    expect(found(pattern, "ab")).to eq(["ab", "a"])
+  end
+end

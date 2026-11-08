@@ -1,0 +1,32 @@
+# `eql?` on every value (ADR 0059): the equality a hash key matches by —
+# same kind and same value, no promotion between numbers, element by
+# element through arrays, hashes, ranges, and structs. `hash` is not
+# exposed; `value.hash` refuses, pinned by a two-oracle test.
+#
+# From ruby/spec core/{array,hash,range,struct,integer,float,string}/
+# eql_spec.rb and their shared files. What stays behind: the mocks counting
+# their calls, the recursive arrays and hashes (values never mutate, so
+# none can hold itself), to_ary and to_hash, subclasses, Hash.new defaults,
+# bignums, rationals, encodings, and the String rows Ruby's `<=>` answers.
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+
+context "Integer#eql?" do
+  specify "returns true for the same value" do
+    expect(42.eql?(42)).to be_true
+  end
+
+  specify "returns false for a different Integer value" do
+    expect(42.eql?(43)).to be_false
+  end
+
+  specify "returns false for a Float with the same numeric value" do
+    expect(42.eql?(42.0)).to be_false
+  end
+end

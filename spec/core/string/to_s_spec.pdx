@@ -1,0 +1,21 @@
+# `to_i`, `to_f`, and the universal `to_s`.
+#
+# `to_s` is universal — it is what interpolation calls, and every value has an
+# answer. Every value except nil, which has no methods at all (ADR 0006); its
+# absence from these examples is the point of that ADR.
+
+require_relative "../../spec_helper"
+
+# From ruby/spec core/string/to_s_spec.rb; the identity check and the
+# subclass row stay upstream.
+
+context "String#to_s" do
+  specify "is identity on a string" do
+    expect("already".to_s).to eq("already")
+  end
+
+  specify "returns self when self.class == String" do
+    text = "a string"
+    expect(text.to_s).to eq(text)
+  end
+end

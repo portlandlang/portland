@@ -1,0 +1,36 @@
+# A float's `arg` by its sign (#108, ADR 0085), the signed zeros and
+# infinities included. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/float/arg_spec.rb.
+
+require_relative "../../spec_helper"
+
+context "Float#arg" do
+  specify "returns NaN if NaN" do
+    expect((0.0 / 0.0).arg.nan?).to be_true
+  end
+
+  specify "returns 0 if positive" do
+    expect(1.0.arg).to eq(0)
+  end
+
+  specify "returns 0 if +0.0" do
+    expect(0.0.arg).to eq(0)
+  end
+
+  specify "returns 0 if +Infinity" do
+    expect((1.0 / 0.0).arg).to eq(0)
+  end
+
+  specify "returns Pi if negative" do
+    expect((-1.0).arg).to eq(Math::PI)
+  end
+
+  specify "returns Pi if -0.0" do
+    expect((-0.0).arg).to eq(Math::PI)
+  end
+
+  specify "returns Pi if -Infinity" do
+    expect((-1.0 / 0.0).arg).to eq(Math::PI)
+  end
+end

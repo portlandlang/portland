@@ -1,0 +1,24 @@
+# From ruby/spec core/data/eql_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+module DataSpecs
+  Measure = Data.define(:amount, :unit)
+  Single = Data.define(:value)
+  Empty = Data.define()
+end
+
+context "Data#eql?" do
+  specify "answer true for the same fields" do
+    a = DataSpecs::Measure.new(amount: 42, unit: "km")
+    b = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(a.eql?(b)).to eq(true)
+  end
+
+  specify "answer false for different fields, and for a different type" do
+    a = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(a.eql?(DataSpecs::Measure.new(amount: 42.0, unit: "km"))).to eq(false)
+  end
+end

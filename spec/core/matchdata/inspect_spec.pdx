@@ -1,0 +1,30 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#inspect" do
+  specify "returns a human readable representation that contains the matched string and the captures" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(inspect(md)).to eq('#<MatchData "HX1138" 1:"H" 2:"X" 3:"113" 4:"8">')
+  end
+
+  specify "returns a human readable representation of named captures" do
+    md = "abc def ghi".match(/(?<first>\w+)\s+(?<last>\w+)\s+(\w+)/) or panic("no match")
+    expect(inspect(md)).to eq('#<MatchData "abc def ghi" first:"abc" last:"def">')
+  end
+
+  specify "shows a group that took no part as nil" do
+    md = "ab".match(/(a)(b)?(c)?/) or panic("no match")
+    expect(inspect(md)).to eq('#<MatchData "ab" 1:"a" 2:"b" 3:nil>')
+  end
+end

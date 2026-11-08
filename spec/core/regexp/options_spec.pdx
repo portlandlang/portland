@@ -1,0 +1,40 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp#options" do
+  specify "returns an Integer bitvector of regexp options" do
+    expect(/cat/.options).to eq(0)
+    expect(//.options).to eq(0)
+    expect(/cat/i.options).to eq(1)
+    expect(/cat/x.options).to eq(2)
+    expect(/cat/m.options).to eq(4)
+    expect(/cat/mx.options).to eq(6)
+    expect(/cat/xi.options).to eq(3)
+    expect(/cat/mix.options).to eq(7)
+  end
+
+  specify "allows checking for presence of a certain option with bit_and" do
+    expect(/cat/.options.bit_and(1)).to eq(0)
+    expect(/cat/i.options.bit_and(1)).to eq(1)
+    expect(/cat/m.options.bit_and(4)).to eq(4)
+  end
+
+  specify "take the i, m, and x flags" do
+    expect(/foo/mx.options).to eq(6)
+    expect(/foo/imx.options).to eq(7)
+  end
+end

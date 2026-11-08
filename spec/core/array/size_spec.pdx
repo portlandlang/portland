@@ -1,0 +1,12 @@
+# From ruby/spec core/array/size_spec.rb.
+#
+# How many elements an array holds.
+
+require_relative "../../spec_helper"
+
+context "Array#size" do
+  specify "returns the number of elements" do
+    expect([].size).to eq(0)
+    expect([1, 2, 3].size).to eq(3)
+  end
+end

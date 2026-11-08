@@ -1,0 +1,42 @@
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#key" do
+  specify "returns the corresponding key for value" do
+    expect({2 => "a", 1 => "b"}.key("b")).to eq(1)
+  end
+
+  specify "returns nil if the value is not found" do
+    expect({a: -1, b: 3.14, c: 2.718}.key(1)).to eq(nil)
+  end
+
+  specify "compares values using ==" do
+    expect({1 => 0}.key(0.0)).to eq(1)
+    expect({1 => 0.0}.key(0)).to eq(1)
+  end
+end
+
+context "Hash#key?" do
+  specify "finds a key" do
+    config = {name: "pdx", port: 8080}
+    expect(config).to have_key(:name)
+  end
+
+  specify "and misses one that is absent" do
+    config = {name: "pdx", port: 8080}
+    expect(config).not_to have_key(:nope)
+  end
+
+  specify "holds for a key whose value is nil" do
+    expect({note: nil}).to have_key(:note)
+  end
+end

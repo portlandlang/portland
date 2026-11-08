@@ -1,0 +1,24 @@
+# From ruby/spec core/array/none_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#none?" do
+  specify "none? asks for silence" do
+    expect([1, 2, 3].none? { it > 5 }).to be_true
+    expect([1, 2, 3].none? { it > 2 }).to be_false
+  end
+
+  specify "always returns true on empty enumeration" do
+    expect([].none?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns a truthy value" do
+    expect([1, 42, 3].none?(50..60)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns other than false or nil" do
+    expect([1, 2, 3, -1].none?(-1)).to be_false
+  end
+end

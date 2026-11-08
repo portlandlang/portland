@@ -1,0 +1,45 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#last" do
+  specify "end returns the last element of self" do
+    expect((-1..1).last).to eq(1)
+    expect((0..1).last).to eq(1)
+    expect((0xffff...0xfffff).last).to eq(1048575)
+  end
+
+  specify "returns the specified number of elements from the end" do
+    expect((1..5).last(3)).to eq([3, 4, 5])
+  end
+
+  specify "returns the specified number if elements for single element inclusive range" do
+    expect((1..1).last(1)).to eq([1])
+  end
+
+  specify "returns an empty array for an empty Range" do
+    expect((0...0).last(2)).to eq([])
+  end
+
+  specify "returns an empty array when passed zero" do
+    expect((0..2).last(0)).to eq([])
+  end
+
+  specify "returns all elements in the range when count exceeds the number of elements" do
+    expect((2..4).last(5)).to eq([2, 3, 4])
+  end
+
+  specify "begin, end, first, and last are the ends themselves" do
+    expect(("a".."f").last).to eq("f")
+    expect((1.5..2.5).last).to eq(2.5)
+  end
+end

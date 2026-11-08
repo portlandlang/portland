@@ -1,0 +1,43 @@
+# `upcase` and `downcase` answer new strings; the receiver is untouched.
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{upcase,downcase,capitalize,swapcase}_spec.rb. Casing is full
+# Unicode, locale-independent (ADR 0038), so the :ascii, :turkic,
+# :lithuanian, and :fold options are decided out (fold lives in casecmp?);
+# the bang forms (ADR 0015), subclasses, encodings, and ascii_only? stay
+# upstream. downcase's Kelvin-sign row spells it with a \u escape Portland
+# does not have.
+
+require_relative "../../spec_helper"
+
+context "String#upcase" do
+  specify "raises every letter" do
+    city = "portland"
+    expect(city.upcase).to eq("PORTLAND")
+  end
+
+  specify "returns a copy of self with all lowercase letters upcased" do
+    expect("Hello".upcase).to eq("HELLO")
+    expect("hello".upcase).to eq("HELLO")
+  end
+
+  specify "works for all of Unicode with no option" do
+    expect("äöü".upcase).to eq("ÄÖÜ")
+  end
+
+  specify "updates string metadata" do
+    upcased = "aßet".upcase
+    expect(upcased).to eq("ASSET")
+    expect(upcased.size).to eq(5)
+    expect(upcased.bytesize).to eq(5)
+  end
+
+  specify "is full Unicode, locale-independent" do
+    expect("café".upcase).to eq("CAFÉ")
+    expect("ß".upcase).to eq("SS")
+  end
+
+  specify "and can therefore change a string.length" do
+    expect("ß".upcase.length).to eq(2)
+  end
+end

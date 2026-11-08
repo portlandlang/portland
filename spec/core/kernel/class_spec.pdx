@@ -1,0 +1,84 @@
+# `value.class` answers the type (ADR 0074) — the one piece of reflection a
+# closed runtime can answer statically. A type is a value with `name`,
+# `new`, and its own type functions, equal to another by identity, and a
+# type's bare name is the same value, so `value.class == Token` works as
+# Ruby's does (`value in Token` is the house spelling). There is no class
+# object: `ancestors`, `instance_methods`, and kin refuse by name.
+
+require_relative "../../spec_helper"
+
+module Shop
+  struct Token
+    text
+
+    def twin = self.class.new(text: text)
+
+    def self.blank = Shop::Token.new(text: "")
+  end
+end
+struct Counted
+  count
+
+  def self.new(count:)
+    fields(count: count + 1)
+  end
+end
+# From ruby/spec core/kernel/class_spec.rb: the builtins' row. Upstream:
+# Object.new, a class's own class, and the singleton row — nil has no
+# methods, and a type has no class.
+context "Kernel#class" do
+  specify "returns the class of the object" do
+    expect(1.class).to eq(Integer)
+    expect(3.14.class).to eq(Float)
+    expect(:hello.class).to eq(Symbol)
+    expect("hello".class).to eq(String)
+    expect([1, 2].class).to eq(Array)
+    expect({1 => 2}.class).to eq(Hash)
+  end
+
+  specify "answers its class and the type pattern" do
+    expect(Complex(1, 2).class).to eq(Complex)
+    answer = case 2i
+    in Complex then "complex"
+    else "other"
+    end
+  end
+
+  specify "answers class and name" do
+    expect(Set[1].class).to eq(Set)
+  end
+
+  specify "answers the type, whose name is its qualified spelling" do
+    token = Shop::Token.new(text: "x")
+    expect(token.class.name).to eq("Shop::Token")
+    expect(inspect(token.class)).to eq("Shop::Token")
+    expect("#{token.class}").to eq("Shop::Token")
+  end
+
+  specify "compares by identity with the written name" do
+    token = Shop::Token.new(text: "x")
+    expect(token.class == Shop::Token).to eq(true)
+    expect(token.class == Counted).to eq(false)
+    expect(token.class == token.twin.class).to eq(true)
+  end
+
+  specify "reaches the type's own functions" do
+    expect(Shop::Token.new(text: "x").class.blank).to eq(Shop::Token.new(text: ""))
+  end
+
+  specify "answers the builtin's type" do
+    expect(1.class.name).to eq("Integer")
+    expect("a".class.name).to eq("String")
+    expect(:s.class.name).to eq("Symbol")
+    expect([1].class.name).to eq("Array")
+    expect({a: 1}.class.name).to eq("Hash")
+    expect(1.5.class.name).to eq("Float")
+    expect((1..2).class.name).to eq("Range")
+  end
+
+  specify "reaches the type functions" do
+    expect([1].class.new(2, 0)).to eq([0, 0])
+    expect(9.class.sqrt(16)).to eq(4)
+    expect(1.class == Integer).to eq(true)
+  end
+end

@@ -1,0 +1,54 @@
+# The logical operators on booleans (#115), from ruby/spec
+# language/{and,or,not}_spec.rb. Conditions and the logical operators take
+# booleans and nothing else (docs/ruby/truthiness.md), so the rows with
+# strings, integers, nil, or () as operands refuse; `and` and `or` are
+# dead-identical to `&&` and `||` (docs/ruby/word-operators.md), so the
+# precedence rows that lean on Ruby's secret low precedence diverge on
+# purpose; assignment is a statement, so the assignment-in-expression rows
+# stay upstream, as do the lambda rows.
+
+require_relative "../spec_helper"
+
+context "The not keyword" do
+  specify "negates a `true' value" do
+    expect((not true)).to be_false
+  end
+
+  specify "negates a `false' value" do
+    expect((not false)).to be_true
+  end
+
+  specify "accepts an argument" do
+    expect(not(true)).to be_false
+  end
+
+  specify "returns false if the argument is true" do
+    expect((not(true))).to be_false
+  end
+
+  specify "returns true if the argument is false" do
+    expect((not(false))).to be_true
+  end
+
+  specify "not is !" do
+    expect((not true)).to eq((!true))
+  end
+end
+
+context "The `!' keyword" do
+  specify "negates a `true' value" do
+    expect(!true).to be_false
+  end
+
+  specify "negates a `false' value" do
+    expect(!false).to be_true
+  end
+
+  specify "doubled turns a truthful object into `true'" do
+    expect(!!true).to be_true
+  end
+
+  specify "doubled turns a not truthful object into `false'" do
+    expect(!!false).to be_false
+  end
+end

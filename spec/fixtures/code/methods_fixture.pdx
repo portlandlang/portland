@@ -1,0 +1,8 @@
+# A file for spec/core/kernel/require_relative_spec.pdx to load: several
+# definitions, standing in for ruby/spec's fixtures/code/methods_fixture.rb.
+
+def required_one = 1
+
+def required_two = 2
+
+def required_greeting(name) = "hello, #{name}"

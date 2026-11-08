@@ -1,0 +1,11 @@
+# From ruby/spec core/integer/pow_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#pow" do
+  specify "raises to the power" do
+    expect(2.pow(8)).to eq(256)
+  end
+end

@@ -1,0 +1,24 @@
+# From ruby/spec core/hash/new_spec.rb.
+#
+# The hash literal: any type of key, insertion-ordered. The symbol-key
+# shorthand's own rules live in spec/symbol/shorthand_spec.pdx.
+
+require_relative "../../spec_helper"
+
+# `{name:}` — a key with no value takes the name's own, as Ruby 3.1 reads it
+# (ADR 0078); the bare name resolves as any does, a local first and then a
+# method. From ruby/spec language/hash_spec.rb's "hash with omitted value"
+# rows; the mixed-syntax row drops its `:d => 4`, which refuses here.
+def bar = "baz"
+def foo(val) = {bar:, val:}
+
+# `Hash.new` (ADR 0063, ADR 0058): the empty hash as a type function, for
+# migrating code. A hash has no default: `Hash.new(0)` and the block form
+# refuse naming the or-guard, pinned by a two-oracle test, and `default`
+# and `default_proc` do not exist. From ruby/spec core/hash/new_spec.rb.
+context "Hash.new" do
+  specify "creates an empty Hash if passed no arguments" do
+    expect(Hash.new).to eq({})
+    expect(Hash.new.size).to eq(0)
+  end
+end

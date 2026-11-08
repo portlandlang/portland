@@ -1,0 +1,45 @@
+# `Enumerable` is a builtin trait (#110, after ADR 0054's Comparable): a
+# struct that defines `each` and includes it answers Ruby's Enumerable
+# names through what its `each` yields. The trait and the struct are
+# Portland's, so the row that walks the struct's own `each` stays here;
+# the Enumerable names themselves are Ruby's, and their rows live in the
+# ruby/spec mirror under spec/core/enumerable/.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable" do
+  specify "walks through the struct's own each" do
+    mutable seen = []
+    numerous(DEFAULT).each { |item| seen << item }
+    expect(seen).to eq(DEFAULT)
+  end
+
+end

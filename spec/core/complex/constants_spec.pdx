@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/constants_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex::I" do
+  specify "has the i suffix for literals and the unit constant" do
+    expect(Complex::I).to eq(Complex(0, 1))
+  end
+end

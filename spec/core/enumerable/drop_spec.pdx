@@ -1,0 +1,67 @@
+# Ruby's Enumerable walks, runs, and groups on an Enumerable struct
+# (#110): `each_with_index`, `each_slice`, `each_cons`, `take_while`,
+# `drop`, `drop_while`, `inject`, `cycle`, `to_h`, `uniq`, `zip`,
+# `group_by`, `filter_map`, `chunk`, `chunk_while`, `slice_when`,
+# `slice_before`, and `slice_after`. A method Ruby answers with an
+# enumerator answers the finished array here (ADR 0055), so `each_cons(2)`
+# is its runs and `.to_a` on it is the identity.
+#
+# From ruby/spec core/enumerable/{each_with_index,each_cons,take_while,
+# drop,drop_while,inject,cycle,to_h,uniq,zip,group_by,filter_map,chunk,
+# chunk_while,slice_when,slice_before,slice_after}_spec.rb. What stays
+# behind: the blockless enumerators and their sizes, `each` taking
+# arguments, to_int and to_ary conversions (ADR 0036), the pattern
+# argument to `slice_before` and `slice_after` (asking `===`), a seedless
+# `inject` and `inject(:+)`, a block answering 1 or nil for a verdict, the
+# splat block parameter, `break` with a value out of a builtin's block,
+# and mocks of `hash` and `eql?`.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#drop" do
+  elements = numerous([3, 2, 1, :go])
+
+  describe "passed a number n as an argument" do
+    specify "returns [] for empty enumerables" do
+      expect(Empty.new.drop(0)).to eq([])
+      expect(Empty.new.drop(2)).to eq([])
+    end
+
+    specify "returns [] if dropping all" do
+      expect(elements.drop(5)).to eq([])
+      expect(numerous([3, 2, 1, :go]).drop(4)).to eq([])
+    end
+
+    specify "drops the first n elements" do
+      expect(elements.drop(2)).to eq([1, :go])
+    end
+  end
+end

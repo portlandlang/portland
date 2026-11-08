@@ -1,0 +1,52 @@
+# `eql?` on every value (ADR 0059): the equality a hash key matches by —
+# same kind and same value, no promotion between numbers, element by
+# element through arrays, hashes, ranges, and structs. `hash` is not
+# exposed; `value.hash` refuses, pinned by a two-oracle test.
+#
+# From ruby/spec core/{array,hash,range,struct,integer,float,string}/
+# eql_spec.rb and their shared files. What stays behind: the mocks counting
+# their calls, the recursive arrays and hashes (values never mutate, so
+# none can hold itself), to_ary and to_hash, subclasses, Hash.new defaults,
+# bignums, rationals, encodings, and the String rows Ruby's `<=>` answers.
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+
+# From ruby/spec core/kernel/eql_spec.rb through shared/kernel/equal.rb:
+# the rows on values. Upstream: Object.new and the mocks (no identity to
+# compare), the bignum, and the public_instance_methods row.
+context "Kernel#eql?" do
+  specify "returns true for the same immediate object" do
+    expect(1.eql?(1)).to be_true
+    expect(:hola.eql?(:hola)).to be_true
+  end
+
+  specify "returns false for objects of different classes" do
+    expect(:hola.eql?(1)).to be_false
+  end
+
+  specify "returns true only if self and other are the same boolean" do
+    expect(true.eql?(true)).to be_true
+    expect(false.eql?(false)).to be_true
+    expect(true.eql?(false)).to be_false
+    expect(false.eql?(true)).to be_false
+  end
+
+  specify "returns true for integers of initially different ranges" do
+    long42 = (2 ** 35) * 42 / (2 ** 35)
+    expect(42.eql?(long42)).to be_true
+  end
+
+  specify "nil, booleans, and symbols are eql? to themselves and nothing else" do
+    expect(nil.eql?(nil)).to be_true
+    expect(true.eql?(true)).to be_true
+    expect(true.eql?(false)).to be_false
+    expect(:a.eql?(:a)).to be_true
+    expect(:a.eql?("a")).to be_false
+  end
+end

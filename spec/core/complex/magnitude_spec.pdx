@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/magnitude_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#magnitude" do
+  specify "abs, abs2, arg, polar" do
+    expect(Complex(3, 4).magnitude).to eq(5.0)
+  end
+end

@@ -1,0 +1,38 @@
+# From ruby/spec language/regexp/interpolation_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Regexps with interpolation" do
+  specify "allow interpolation of strings" do
+    text = "foo|bar"
+    expect(/#{text}/).to eq(/foo|bar/)
+  end
+
+  specify "allow interpolation of literal regexps" do
+    inner = /foo|bar/
+    expect(/#{inner}/).to eq(/(?-mix:foo|bar)/)
+  end
+
+  specify "allow interpolation which mixes modifiers" do
+    inner = /foo/i
+    expect(/#{inner} bar/m).to eq(/(?i-mx:foo) bar/m)
+  end
+
+  specify "allow interpolation to interact with other Regexp constructs" do
+    parts = "foo)|(bar"
+    expect(/(#{parts})/).to eq(/(foo)|(bar)/)
+    low = "a"
+    expect(/[#{low}-z]/).to eq(/[a-z]/)
+  end
+
+  specify "allow interpolation in extended mode" do
+    body = "#comment\n  foo  #comment\n  |  bar"
+    expect((/#{body}/x =~ "foo").nil?).to be_false
+  end
+
+  specify "interpolate a number through to_s" do
+    expect(/x#{1 + 1}y/).to eq(/x2y/)
+  end
+end

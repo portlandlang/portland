@@ -1,0 +1,31 @@
+# The question-shaped library: does this string contain, start, or end with?
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{include,start_with,end_with}_spec.rb and the shared
+# start_with/end_with rows. `start_with?` and `end_with?` take any number of
+# candidates. The regex rows wait on #74; the to_str conversion and the
+# refusals (ADR 0036), subclasses, encodings, and the partial-character rows
+# stay upstream.
+
+require_relative "../../spec_helper"
+
+context "String#include? with String" do
+  specify "returns true if self contains other_str" do
+    expect("hello".include?("lo")).to be_true
+    expect("hello".include?("ol")).to be_false
+  end
+
+  specify "returns true if both strings are empty" do
+    expect("".include?("")).to be_true
+  end
+
+  specify "returns true if the RHS is empty" do
+    expect("a".include?("")).to be_true
+  end
+
+  specify "finds a substring anywhere" do
+    city = "portland"
+    expect(city).to contain("tla")
+    expect(city).not_to contain("rose")
+  end
+end

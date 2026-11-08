@@ -1,0 +1,29 @@
+# A slice is a collection, never a maybe (ADR 0019): where Ruby answers nil
+# for a start outside the string, Portland answers the empty string. The
+# rest of `slice` is Ruby's, and its rows live in the ruby/spec mirror,
+# spec/core/string/slice_spec.pdx; the range spelling's difference lives in
+# spec/portland/range/slicing_spec.pdx.
+
+require_relative "../../spec_helper"
+
+context "String#slice with index, length" do
+  specify "answers the empty string if the offset falls outside of self — never nil (ADR 0019)" do
+    expect("hello there".slice(20, 3)).to eq("")
+    expect("hello there".slice(-20, 3)).to eq("")
+
+    expect("".slice(1, 0)).to eq("")
+    expect("".slice(1, 1)).to eq("")
+    expect("".slice(-1, 0)).to eq("")
+    expect("".slice(-1, 1)).to eq("")
+
+    expect("x".slice(2, 0)).to eq("")
+    expect("x".slice(2, 1)).to eq("")
+    expect("x".slice(-2, 0)).to eq("")
+    expect("x".slice(-2, 1)).to eq("")
+  end
+
+  specify "handles repeated application" do
+    expect("hello world".slice(6, 0).slice(-1, 0)).to eq("")
+    expect("hello world".slice(6, 0).slice(1, 1)).to eq("")
+  end
+end

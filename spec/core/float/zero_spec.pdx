@@ -1,0 +1,12 @@
+# From ruby/spec core/float/zero_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#zero?" do
+  specify "Float#zero? answers whether the value is exactly zero" do
+    expect(0.0.zero?).to be_true
+    expect(0.1.zero?).to be_false
+  end
+end

@@ -1,0 +1,11 @@
+# From ruby/spec core/float/minus_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#-" do
+  specify "add, subtract, multiply, divide" do
+    expect(9.0 - 2.5).to eq(6.5)
+  end
+end

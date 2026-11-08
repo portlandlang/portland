@@ -1,0 +1,40 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../../spec_helper"
+
+context "Array#assoc" do
+  specify "returns the first array whose 1st item is == obj or nil" do
+    colors = ["colors", "red", "blue", "green"]
+    letters = [:letters, "a", "b", "c"]
+    four = [4]
+    more_colors = ["colors", "cyan", "yellow", "magenta"]
+    more_letters = [:letters, "a", "i", "u"]
+    nils = [nil, nil]
+    table = [colors, letters, four, more_colors, more_letters, nils]
+    expect(table.assoc(colors.first)).to eq(colors)
+    expect(table.assoc(letters.first)).to eq(letters)
+    expect(table.assoc(four.first)).to eq(four)
+    expect(table.assoc(more_colors.first)).to eq(colors)
+    expect(table.assoc(more_letters.first)).to eq(letters)
+    expect(table.assoc(nil)).to eq(nils)
+    expect(table.assoc(4)).to eq(four)
+    expect(table.assoc("key not in array")).to eq(nil)
+  end
+
+  specify "ignores any non-Array elements" do
+    expect([1, 2, 3].assoc(2)).to eq(nil)
+    four = [4]
+    five = [5, 4, 3]
+    mixed = ["foo", [], four, five, nil, []]
+    expect(mixed.assoc(four.first)).to eq(four)
+    expect(mixed.assoc(five.first)).to eq(five)
+  end
+end

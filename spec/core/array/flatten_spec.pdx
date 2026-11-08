@@ -1,0 +1,12 @@
+# From ruby/spec core/array/flatten_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#flatten" do
+  specify "Array#flatten opens every nesting in one call" do
+    expect([[1], [2, 3]].flatten).to eq([1, 2, 3])
+    expect([[1, [2]], [[[3]]]].flatten).to eq([1, 2, 3])
+  end
+end

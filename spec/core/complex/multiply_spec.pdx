@@ -1,0 +1,13 @@
+# From ruby/spec core/complex/multiply_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#*" do
+  specify "adds, subtracts, and multiplies part by part" do
+    expect(Complex(1, 2) * 2).to eq(Complex(2, 4))
+    expect(Complex(1, 2) * Complex(3, 4)).to eq(Complex(-5, 10))
+    expect(inspect(Complex(1.5, 2.5) * Complex(1, 2))).to eq("(-3.5+5.5i)")
+  end
+end

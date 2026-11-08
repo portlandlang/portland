@@ -1,0 +1,56 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#cover?" do
+  specify "returns true if other is an element of self" do
+    expect((0..5).cover?(2)).to eq(true)
+    expect((-5..5).cover?(0)).to eq(true)
+    expect((0xffff..0xfffff).cover?(0xffffd)).to eq(true)
+    expect((0xffff..0xfffff).cover?(0xfffd)).to eq(false)
+  end
+
+  specify "returns true if argument is equal to the first value of the range" do
+    expect((0..5).cover?(0)).to eq(true)
+  end
+
+  specify "returns true if argument is equal to the last value of the range" do
+    expect((0..5).cover?(5)).to eq(true)
+    expect((0...5).cover?(4)).to eq(true)
+  end
+
+  specify "returns true if argument is less than the last value of the range and greater than the first value" do
+    expect((20..30).cover?(28)).to eq(true)
+  end
+
+  specify "returns true if argument is sole element in the range" do
+    expect((30..30).cover?(30)).to eq(true)
+  end
+
+  specify "returns false if range is empty" do
+    expect((30...30).cover?(30)).to eq(false)
+  end
+
+  specify "covers strings between the ends, by <=>" do
+    expect(("B"..."W").cover?("Q")).to be_true
+    expect(("a".."f").cover?("aa")).to be_true
+    expect(("a".."f").cover?("ga")).to be_false
+  end
+
+  specify "reaches everything on an open side" do
+    expect(("a"..).cover?("b")).to be_true
+  end
+
+  specify "answers false for a value the ends cannot order" do
+    expect((1..10).cover?("a")).to be_false
+  end
+end

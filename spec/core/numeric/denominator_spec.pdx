@@ -1,0 +1,13 @@
+# `denominator` on every real (ADR 0085).
+#
+# From ruby/spec core/numeric/denominator_spec.rb, where a row runs on a
+# builtin. Upstream: the rows that drive a mock Numeric subclass — there
+# is no Numeric to subclass — and the bignums, integers being 64-bit.
+
+require_relative "../../spec_helper"
+
+context "Numeric#denominator" do
+  specify "returns 1" do
+    expect(20.denominator).to eq(1)
+  end
+end

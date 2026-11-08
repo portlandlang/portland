@@ -1,0 +1,34 @@
+# An integer's `rationalize` is the rational it is (ADR 0085).
+#
+# From ruby/spec core/integer/rationalize_spec.rb. Upstream: the bignum
+# rows, integers being 64-bit here (ADR 0070); the rows handing it too
+# many arguments refuse, which a spec cannot assert — the refusals are
+# pinned by a two-oracle test instead.
+
+require_relative "../../spec_helper"
+
+context "Integer#rationalize" do
+  numbers = [0, 29871, -72628191273]
+
+  specify "returns a Rational object" do
+    numbers.each do |number|
+      expect(number.rationalize.class).to eq(Rational)
+    end
+  end
+
+  specify "uses self as the numerator" do
+    numbers.each do |number|
+      expect(number.rationalize.numerator).to eq(number)
+    end
+  end
+
+  specify "uses 1 as the denominator" do
+    numbers.each do |number|
+      expect(number.rationalize.denominator).to eq(1)
+    end
+  end
+
+  specify "ignores a single argument" do
+    expect(1.rationalize(0.1)).to eq(Rational(1, 1))
+  end
+end

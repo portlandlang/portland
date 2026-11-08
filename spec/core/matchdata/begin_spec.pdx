@@ -1,0 +1,49 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#begin" do
+  specify "returns the character offset of the start of the nth element" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md.begin(0)).to eq(1)
+    expect(md.begin(2)).to eq(2)
+  end
+
+  specify "returns nil when the nth match isn't found" do
+    md = /something is( not)? (right)/.match("something is right") or panic("no match")
+    expect(md.begin(1)).to be_nil
+  end
+
+  specify "returns the character offset for multi-byte strings" do
+    md = /(.)(.)(\d+)(\d)/.match("TñX1138.") or panic("no match")
+    expect(md.begin(0)).to eq(1)
+    expect(md.begin(2)).to eq(2)
+  end
+
+  specify "returns the character offset of the start of a named capture" do
+    md = /(?<a>.)(.)(?<b>\d+)(\d)/.match("TñX1138.") or panic("no match")
+    expect(md.begin("a")).to eq(1)
+    expect(md.begin(:b)).to eq(3)
+  end
+
+  specify "a combining mark is part of its character" do
+    md = "éx".match(/x/) or panic("no match")
+    expect(md.begin(0)).to eq(1)
+    expect("éx".length).to eq(2)
+  end
+
+  specify "a flag is one character" do
+    md = "🇵🇹x".match(/x/) or panic("no match")
+    expect(md.begin(0)).to eq(1)
+  end
+end

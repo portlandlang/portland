@@ -1,0 +1,51 @@
+# `polar` on every real (ADR 0085): the absolute value, and 0 or pi by the
+# sign. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/polar_spec.rb. Upstream: the bignums,
+# integers being 64-bit.
+
+require_relative "../../spec_helper"
+
+context "Numeric#polar" do
+  positive_numbers = [1, 987.18273, Float::MAX, Rational(13, 7), 1.0 / 0.0]
+  negative_numbers = positive_numbers.map { |number| -number }
+  numbers = positive_numbers + negative_numbers + [0, 0.0]
+
+  specify "returns a two-element Array" do
+    numbers.each do |number|
+      expect(number.polar.class).to eq(Array)
+      expect(number.polar.size).to eq(2)
+    end
+  end
+
+  specify "sets the first value to the absolute value of self" do
+    numbers.each do |number|
+      expect(number.polar.first).to eq(number.abs)
+    end
+  end
+
+  specify "sets the last value to 0 if self is positive" do
+    (positive_numbers + [0, 0.0]).each do |number|
+      expect(number >= 0).to be_true
+      expect(number.polar.last).to eq(0)
+    end
+  end
+
+  specify "sets the last value to Pi if self is negative" do
+    negative_numbers.each do |number|
+      expect(number < 0).to be_true
+      expect(number.polar.last).to eq(Math::PI)
+    end
+  end
+
+  specify "returns [NaN, NaN] if self is NaN" do
+    expect((0.0 / 0.0).polar.size).to eq(2)
+    expect((0.0 / 0.0).polar.first.nan?).to be_true
+    expect((0.0 / 0.0).polar.last.nan?).to be_true
+  end
+
+  specify "is the absolute value and 0 or pi" do
+    expect(3.polar).to eq([3, 0])
+    expect(-3.polar).to eq([3, 3.141592653589793])
+  end
+end

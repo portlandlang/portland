@@ -1,0 +1,20 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#length" do
+  specify "size and length count the match and its groups" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md.length).to eq(5)
+  end
+end

@@ -1,0 +1,12 @@
+# From ruby/spec core/float/finite_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#finite?" do
+  specify "Float#finite? and #infinite? split the line's ends off" do
+    expect(1.0.finite?).to be_true
+    expect((1.0 / 0.0).finite?).to be_false
+  end
+end

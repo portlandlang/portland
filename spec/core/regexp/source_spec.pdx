@@ -1,0 +1,33 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp#source" do
+  specify "returns the original string of the pattern" do
+    expect(/ab+c/ix.source).to eq("ab+c")
+    expect(/x(.)xz/.source).to eq("x(.)xz")
+  end
+
+  specify "keeps escape sequences as is" do
+    expect(/\x20\+/.source).to eq('\x20\+')
+    expect(/\$/.source).to eq('\$')
+    expect(/\@/.source).to eq('\@')
+  end
+
+  specify "keeps escaping of a metacharacter used as a terminator" do
+    expect(%r{\{}.source).to eq('\{')
+  end
+end

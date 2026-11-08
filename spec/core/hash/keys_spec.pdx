@@ -1,0 +1,30 @@
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#keys" do
+  specify "returns an array with the keys in the order they were inserted" do
+    expect({}.keys).to eq([])
+    expect({1 => 2, 4 => 8, 2 => 4}.keys).to eq([1, 4, 2])
+  end
+
+  specify "uses the same order as #values" do
+    table = {1 => "1", 2 => "2", 3 => "3", 4 => "4"}
+    table.size.times do |index|
+      expect(table[table.keys[index]]).to eq(table.values[index])
+    end
+  end
+
+  specify "lists the keys in insertion order" do
+    config = {name: "pdx", port: 8080}
+    expect(config.keys).to eq([:name, :port])
+  end
+end

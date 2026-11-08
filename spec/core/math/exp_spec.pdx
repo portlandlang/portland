@@ -1,0 +1,23 @@
+# From ruby/spec core/math/exp_spec.rb.
+#
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+
+context "Math.exp" do
+  specify "exp returns the base-e exponential of the argument" do
+    expect(Math.exp(0.0)).to eq(1.0)
+    expect(Math.exp(-0.0)).to eq(1.0)
+    expect(Math.exp(-1.8)).to be_close(0.165298888221587, MATH_TOLERANCE)
+    expect(Math.exp(1.25)).to be_close(3.49034295746184, MATH_TOLERANCE)
+    expect(Math.exp(nan_value).nan?).to eq(true)
+  end
+end

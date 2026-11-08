@@ -1,0 +1,18 @@
+# From ruby/spec core/kernel/not_match_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Kernel#!~" do
+  specify "answers the string questions by its name" do
+    expect(:cat !~ /z/).to be_true
+  end
+
+  specify "is match?'s negation" do
+    expect("hello" !~ /z/).to be_true
+    expect("hello" !~ /l/).to be_false
+    expect(/z/ !~ "hello").to be_true
+    expect(:hello !~ /h/).to be_false
+  end
+end

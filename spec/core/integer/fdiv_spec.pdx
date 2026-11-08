@@ -1,0 +1,57 @@
+# From ruby/spec core/integer/fdiv_spec.rb.
+#
+# Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/divide_spec.rb (#23); the
+# divide-by-zero half stays behind — the panic is the seed's whole error
+# story today, and a panic ends the file.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+# The named division family (#107), from ruby/spec core/integer: divmod,
+# div, remainder, ceildiv, and fdiv, fixnum halves. Upstream's be_close is
+# close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
+# infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
+# (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
+# ends a run, so those examples stay upstream with the bignum, Rational,
+# and coercion ones.
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Integer#fdiv" do
+  specify "performs floating-point division between self and a fixnum" do
+    expect(close_to?(8.fdiv(7), 1.14285714285714)).to eq(true)
+  end
+
+  specify "performs floating-point division between self and a Float" do
+    expect(close_to?(8.fdiv(9.0), 0.888888888888889)).to eq(true)
+  end
+
+  specify "returns NaN when the argument is NaN" do
+    expect(-1.fdiv(Float::NAN).nan?).to eq(true)
+    expect(1.fdiv(Float::NAN).nan?).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0" do
+    expect(1.fdiv(0).infinite?).to eq(true)
+    expect(1.fdiv(0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0 and self is negative" do
+    expect(-1.fdiv(0).infinite?).to eq(true)
+    expect(-1.fdiv(0) < 0.0).to eq(true)
+  end
+
+  specify "returns Infinity when the argument is 0.0" do
+    expect(1.fdiv(0.0).infinite?).to eq(true)
+    expect(1.fdiv(0.0) > 0.0).to eq(true)
+  end
+
+  specify "returns -Infinity when the argument is 0.0 and self is negative" do
+    expect(-1.fdiv(0.0).infinite?).to eq(true)
+    expect(-1.fdiv(0.0) < 0.0).to eq(true)
+  end
+end

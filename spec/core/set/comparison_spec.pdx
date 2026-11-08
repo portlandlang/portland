@@ -1,0 +1,32 @@
+# The subset family (ADR 0082): `subset?`/`<=`, `superset?`/`>=`,
+# `proper_subset?`/`<`, `proper_superset?`/`>`, each taking a set; `<=>` as
+# 0, -1, 1, or nil by the same relations; and `disjoint?` and `intersect?`
+# over any enumerable.
+#
+# From ruby/spec core/set/{subset,superset,proper_subset,proper_superset,
+# lte,gte,lt,gt,comparison,disjoint,intersect}_spec.rb. Upstream: the alias
+# checks, the Set-like objects, the rows that raise on a non-set — that
+# refusal is pinned by the two-oracle test — and `<=>` against a non-set,
+# which the checker refuses at build where the types are known.
+
+require_relative "../../spec_helper"
+
+context "Set#<=>" do
+  four = Set[1, 2, 3, 4]
+  specify "is 0 for equal sets" do
+    expect(Set[] <=> Set[]).to eq(0)
+    expect(Set[:a, :b, :c] <=> Set[:a, :b, :c]).to eq(0)
+  end
+
+  specify "is -1 for a proper subset and 1 for a proper superset" do
+    expect(Set[] <=> Set[1]).to eq(-1)
+    expect(Set[1, 2] <=> Set[1, 2, 3]).to eq(-1)
+    expect(Set[1] <=> Set[]).to eq(1)
+    expect(Set[1, 2, 3] <=> Set[1, 2]).to eq(1)
+  end
+
+  specify "is nil for sets each with members of their own" do
+    expect(Set[1, 2, 3] <=> Set[:a, :b, :c]).to be_nil
+    expect(Set[1, 2] <=> Set[2, 3]).to be_nil
+  end
+end

@@ -1,0 +1,14 @@
+# An integer's numerator is itself (ADR 0085).
+#
+# From ruby/spec core/integer/numerator_spec.rb. Upstream: the bignum
+# rows, integers being 64-bit here (ADR 0070).
+
+require_relative "../../spec_helper"
+
+context "Integer#numerator" do
+  specify "returns self" do
+    [0, 29871, 72628191273].map { |number| [-number, number] }.flatten.each do |number|
+      expect(number.numerator).to eq(number)
+    end
+  end
+end

@@ -1,0 +1,40 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp.union" do
+  specify "returns /(?!)/ when passed no arguments" do
+    expect(Regexp.union).to eq(/(?!)/)
+  end
+
+  specify "returns a regular expression that will match passed arguments" do
+    expect(Regexp.union("penzance")).to eq(/penzance/)
+    expect(Regexp.union("skiing", "sledding")).to eq(/skiing|sledding/)
+    expect(Regexp.union(/dogs/, /cats/i)).to eq(/(?-mix:dogs)|(?i-mx:cats)/)
+  end
+
+  specify "quotes any string arguments" do
+    expect(Regexp.union("n", ".")).to eq(/n|\./)
+  end
+
+  specify "returns a Regexp if an array of strings with special characters is passed" do
+    expect(Regexp.union(["+", "-"])).to eq(/\+|\-/)
+  end
+
+  specify "answers a lone pattern itself" do
+    expect(Regexp.union(/a/i)).to eq(/a/i)
+  end
+end

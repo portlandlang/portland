@@ -1,0 +1,14 @@
+# ADR 0019 — a slice is a collection, never a maybe. The past-the-end half
+# of that promise lives in spec/portland/optionals/partial_spec.pdx.
+
+require_relative "../../spec_helper"
+
+context "Range" do
+  describe "as an index" do
+    words = %w[a b c d e]
+
+    specify "answers an empty string past the end, never nil" do
+      expect("portland"[9..]).to be_empty
+    end
+  end
+end

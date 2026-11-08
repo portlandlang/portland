@@ -1,0 +1,23 @@
+# From ruby/spec core/string/plus_spec.rb.
+#
+# `+` concatenates and `*` repeats — neither mutates, because nothing does.
+
+require_relative "../../spec_helper"
+
+# From ruby/spec core/string/{plus,multiply}_spec.rb and the shared times
+# rows. The to_str and to_int conversions (ADR 0036), the refusals (a
+# negative count refuses as `negative argument`), subclasses, encodings,
+# and the bignum rows stay upstream.
+
+context "String#+" do
+  specify "concatenates" do
+    expect("rose" + " city").to eq("rose city")
+  end
+
+  specify "returns a new string containing the given string concatenated to self" do
+    expect("" + "").to eq("")
+    expect("" + "Hello").to eq("Hello")
+    expect("Hello" + "").to eq("Hello")
+    expect("Ruby !" + "= Rubinius").to eq("Ruby != Rubinius")
+  end
+end

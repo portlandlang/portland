@@ -1,0 +1,18 @@
+# From ruby/spec core/hash/dig_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Hash#dig" do
+  specify "Hash#dig is a maybe at every step" do
+    nested = {outer: {inner: 7}}
+    expect(nested.dig(:outer, :inner)).to eq(7)
+    expect(nested.dig(:outer, :nope)).to be_nil
+  end
+
+  specify "Hash#dig short-circuits at the first miss" do
+    nested = {outer: {inner: 7}}
+    expect(nested.dig(:nope, :inner)).to be_nil
+  end
+end

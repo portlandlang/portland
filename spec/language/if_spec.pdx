@@ -1,0 +1,262 @@
+# `if` is an expression, and conditions are booleans only.
+
+require_relative "../spec_helper"
+
+def guarded(flag)
+  return "early" if flag
+  "late"
+end
+
+# From ruby/spec language/if_spec.rb. Conditions take booleans only
+# (docs/ruby/truthiness.md), so the nil, zero, and object rows refuse; the
+# multiple-assignment rows go through eval, the `;` spellings are newlines
+# here, and the flip-flop rows are removed syntax. Assignment is a
+# statement, so each row binds the whole expression.
+context "The if expression" do
+  specify "evaluates body if expression is true" do
+    mutable seen = []
+    if true
+      seen << 123
+    end
+    expect(seen).to eq([123])
+  end
+
+  specify "does not evaluate body if expression is false" do
+    mutable seen = []
+    if false
+      seen << 123
+    end
+    expect(seen).to eq([])
+  end
+
+  specify "does not evaluate else-body if expression is true" do
+    mutable seen = []
+    if true
+      seen << 123
+    else
+      seen << 456
+    end
+    expect(seen).to eq([123])
+  end
+
+  specify "evaluates only else-body if expression is false" do
+    mutable seen = []
+    if false
+      seen << 123
+    else
+      seen << 456
+    end
+    expect(seen).to eq([456])
+  end
+
+  specify "returns result of then-body evaluation if expression is true" do
+    answer = if true
+      123
+    end
+    expect(answer).to eq(123)
+  end
+
+  specify "returns result of last statement in then-body if expression is true" do
+    answer = if true
+      "foo"
+      "bar"
+      "baz"
+    end
+    expect(answer).to eq("baz")
+  end
+
+  specify "returns result of then-body evaluation if expression is true and else part is present" do
+    answer = if true
+      123
+    else
+      456
+    end
+    expect(answer).to eq(123)
+  end
+
+  specify "returns result of else-body evaluation if expression is false" do
+    answer = if false
+      123
+    else
+      456
+    end
+    expect(answer).to eq(456)
+  end
+
+  specify "returns nil if then-body is empty and expression is true" do
+    answer = if true
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "returns nil if then-body is empty, expression is true and else part is present" do
+    answer = if true
+    else
+      456
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "returns nil if else-body is empty and expression is false" do
+    answer = if false
+      123
+    else
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "allows starting else-body on the same line" do
+    answer = if false
+      123
+    else 456
+    end
+    expect(answer).to eq(456)
+  end
+
+  specify "evaluates subsequent elsif statements and execute body of first matching" do
+    answer = if false
+      123
+    elsif false
+      234
+    elsif true
+      345
+    elsif true
+      456
+    end
+    expect(answer).to eq(345)
+  end
+
+  specify "evaluates else-body if no if/elsif statements match" do
+    answer = if false
+      123
+    elsif false
+      234
+    elsif false
+      345
+    else
+      456
+    end
+    expect(answer).to eq(456)
+  end
+
+  specify "allows 'then' after expression when then-body is on the next line" do
+    answer = if true then
+      123
+    end
+    expect(answer).to eq(123)
+  end
+
+  specify "allows then-body on the same line separated with 'then'" do
+    answer = if true then 123
+    end
+    expect(answer).to eq(123)
+  end
+
+  specify "returns nil when then-body on the same line separated with 'then' and expression is false" do
+    answer = if false then 123
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "returns nil when then-body separated by 'then' is empty and expression is true" do
+    answer = if true then
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "returns nil when then-body separated by 'then', expression is false and no else part" do
+    answer = if false then
+    end
+    expect(answer).to be_nil
+  end
+
+  specify "evaluates then-body when then-body separated by 'then', expression is true and else part is present" do
+    answer = if true then 123
+    else 456
+    end
+    expect(answer).to eq(123)
+  end
+
+  specify "evaluates else-body when then-body separated by 'then' and expression is false" do
+    answer = if false then 123
+    else 456
+    end
+    expect(answer).to eq(456)
+  end
+
+  specify "return early on a hit" do
+    expect(guarded(true)).to eq("early")
+    expect(guarded(false)).to eq("late")
+  end
+
+  specify "answers the then side on true" do
+    expect(1 < 2 ? "yes" : "no").to eq("yes")
+  end
+
+  specify "answers the else side on false" do
+    expect(1 > 2 ? "yes" : "no").to eq("no")
+  end
+
+  specify "takes symbol operands — their colons are attached" do
+    expect(true ? :x : :y).to eq(:x)
+  end
+
+  specify "reads a predicate's ? and its own apart" do
+    found = [7].first
+    expect(found.nil? ? 0 : 1).to eq(1)
+  end
+
+  specify "the untaken side never runs" do
+    expect(true ? 1 : panic("unreachable")).to eq(1)
+  end
+
+  specify "make a decision table" do
+    total = 60
+    discount = if total > 100 then 20
+    elsif total > 50 then 10
+    else 0
+    end
+    expect(discount).to eq(10)
+  end
+
+  specify "fit on one line" do
+    label = if 1 > 2 then "big" else "small" end
+    expect(label).to eq("small")
+  end
+
+  specify "an empty then branch is nil, typed (ADR 0012)" do
+    fell = if false then else "fell through" end
+    expect(fell).to eq("fell through")
+  end
+
+  specify "a one-liner whose condition fails answers nil" do
+    answered = if false then "foo" end
+    expect(answered).to be_nil
+  end
+
+  specify "before an indented body" do
+    mutable seen = ""
+    if true then
+      seen = "ran"
+    end
+    expect(seen).to eq("ran")
+  end
+
+  specify "produces nil" do
+    branchless = if false
+      "taken"
+    end
+    expect(branchless).to be_nil
+  end
+
+  specify "answers the taken branch" do
+    greeting = if false
+      "morning"
+    elsif true
+      "afternoon"
+    else
+      "hello"
+    end
+    expect(greeting).to eq("afternoon")
+  end
+end

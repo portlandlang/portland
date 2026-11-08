@@ -1,0 +1,27 @@
+# `+`, `-`, and `*` on integers stay integers; mixing with a float promotes,
+# and the promotion rules have their own home in spec/number/promotion_spec.
+#
+# Grown from ruby/spec core/integer/{plus,minus,multiply,uminus,pow,
+# exponent}_spec.rb (#23); the coercion protocol stays behind — there is no
+# `coerce`, and a wrong operand type panics rather than negotiating.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#+" do
+  specify "adds" do
+    expect(491 + 2).to eq(493)
+    expect(90210 + 10).to eq(90220)
+  end
+
+  specify "promotes addition" do
+    expect(1 + 2.5).to eq(3.5)
+  end
+
+  specify "an integer with a rational is a rational, with a complex a complex" do
+    expect((1 + Rational(1, 2)).class).to eq(Rational)
+    expect((1 + Complex(0, 1)).class).to eq(Complex)
+  end
+end

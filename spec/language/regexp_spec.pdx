@@ -1,0 +1,78 @@
+# From ruby/spec language/regexp_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Literal Regexps" do
+  specify "spell %r with the family's delimiters, slashes unescaped" do
+    expect(%r{a/b}).to eq(/a\/b/)
+    expect(%r[a/b].source).to eq("a/b")
+    expect(%r(a/b)i.casefold?).to be_true
+    expect(%r{ () [c]{1} }).to eq(/ () [c]{1} /)
+    expect(%r[/].to_s).to eq(/\//.to_s)
+  end
+
+  specify "class is Regexp" do
+    expect(/a/.class).to eq(Regexp)
+    expect(Regexp.name).to eq("Regexp")
+  end
+
+  specify "lookahead and lookbehind" do
+    expect(found(/foo.(?<=\d)/, "fooA foo1")).to eq(["foo1"])
+    expect(found(/foo.(?<!\d)/, "foo1 fooA")).to eq(["fooA"])
+  end
+
+  specify "possessive quantifiers and atomic groups" do
+    expect(found(/fooA++bar/, "fooAAAbar")).to eq(["fooAAAbar"])
+    expect(/fooA++Abar/.match("fooAAAbar")).to be_nil
+    expect(/fooA?+Abar/.match("fooAAAbar")).to be_nil
+    expect(/fooA*+Abar/.match("fooAAAbar")).to be_nil
+    expect(found(/(?>foo)(?>bar)/, "foobar")).to eq(["foobar"])
+    expect(/(?>foo*)obar/.match("foooooooobar")).to be_nil
+  end
+
+  specify "(?# ) is a comment" do
+    expect(found(/foo(?#comment)bar/, "foobar")).to eq(["foobar"])
+    expect(found(/foo(?#)bar/, "foobar")).to eq(["foobar"])
+  end
+
+  specify "| alternates and . is any character but a newline" do
+    expect(found(/a|b/, "a")).to eq(["a"])
+    expect(found(/./, "foo")).to eq(["f"])
+    expect(/./.match("")).to be_nil
+    expect(/./.match("\n")).to be_nil
+  end
+
+  specify "\\k<name> is a named back-reference and \\g<name> a call" do
+    expect(found(/(?<foo>foo.)bar\g<foo>/, "foo1barfoo2")).to eq(["foo1barfoo2", "foo2"])
+  end
+
+  specify "conditional patterns with positional capture groups" do
+    pattern = /\A(foo)?(?(1)(T)|(F))\z/
+    expect(pattern.match?("fooT")).to be_true
+    expect(pattern.match?("F")).to be_true
+    expect(pattern.match?("fooF")).to be_false
+    expect(pattern.match?("T")).to be_false
+  end
+
+  specify "conditional patterns with named capture groups" do
+    pattern = /\A(?<word>foo)?(?(<word>)(T)|(F))\z/
+    expect(pattern.match?("fooT")).to be_true
+    expect(pattern.match?("F")).to be_true
+    expect(pattern.match?("fooF")).to be_false
+    expect(pattern.match?("T")).to be_false
+  end
+
+  specify "character class composition" do
+    expect(found(/[a-z&&[^a-c]]+/, "abcdef")).to eq(["def"])
+    expect(found(/[a-z&&[^d-i&&[^d-f]]]+/, "abcdefghi")).to eq(["abcdef"])
+  end
+
+  specify "POSIX brackets reach past the basic plane" do
+    expect(found(/[[:lower:]]/, "𐓘")).to eq(["𐓘"])
+    expect(found(/[[:upper:]]/, "𐒰")).to eq(["𐒰"])
+  end
+end

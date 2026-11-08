@@ -1,0 +1,63 @@
+# Complex (ADR 0085): `Complex(a, b)`, `2i`, `Complex.polar`, and
+# `Complex.rectangular` build a value of two real parts — integers, floats,
+# or rationals — and the arithmetic, the parts, the polar form, and
+# `inspect` are Ruby's: `(1+2i)`, `((1/2)+1i)`, `(1-(1/2)*i)`. Every answer
+# here is Ruby 4.0.9's.
+#
+# From ruby/spec core/complex/{abs,abs2,arg,angle,phase,conj,conjugate,
+# constants,denominator,numerator,divide,eql,equal_value,exponent,fdiv,
+# finite,infinite,imag,imaginary,inspect,integer,magnitude,minus,multiply,
+# plus,polar,quo,rationalize,real,rect,rectangular,to_c,to_f,to_i,to_r,to_s,
+# and core/kernel/Complex_spec.rb,
+# uminus}_spec.rb. Upstream: the coercion rows (#155), the mocks, the
+# bignum rows (ADR 0070), hash, Marshal, and the rows asserting
+# NoMethodError, which the method table answers.
+
+require_relative "../../spec_helper"
+
+context "Kernel#Complex" do
+  describe "when passed [Complex, Complex]" do
+    specify "returns a new Complex number based on the two given numbers" do
+      expect(Complex(Complex(3, 4), Complex(5, 6))).to eq(Complex(3 - 6, 4 + 5))
+      expect(Complex(Complex(1.5, 2), Complex(-5, 6.3))).to eq(Complex(1.5 - 6.3, 2 - 5))
+    end
+  end
+
+  describe "when passed [Complex]" do
+    specify "returns the passed Complex number" do
+      expect(Complex(Complex(1, 2))).to eq(Complex(1, 2))
+    end
+  end
+
+  describe "when passed [Integer, Integer]" do
+    specify "returns a new Complex number" do
+      expect(Complex(1, 2).class).to eq(Complex)
+      expect(Complex(1, 2).real).to eq(1)
+      expect(Complex(1, 2).imag).to eq(2)
+      expect(Complex(-3, -5).real).to eq(-3)
+      expect(Complex(-3, -5).imag).to eq(-5)
+      expect(Complex(3.5, -4.5).real).to eq(3.5)
+      expect(Complex(3.5, -4.5).imag).to eq(-4.5)
+    end
+  end
+
+  describe "when passed [Integer/Float]" do
+    specify "returns a new Complex number with 0 as the imaginary component" do
+      expect(Complex(1).class).to eq(Complex)
+      expect(Complex(1).imag).to eq(0)
+      expect(Complex(1).real).to eq(1)
+      expect(Complex(-3).imag).to eq(0)
+      expect(Complex(-3).real).to eq(-3)
+      expect(Complex(-4.5).imag).to eq(0)
+      expect(Complex(-4.5).real).to eq(-4.5)
+    end
+  end
+
+  specify "holds its two parts" do
+    expect(inspect(Complex(1, 2))).to eq("(1+2i)")
+    expect(inspect(Complex(1.0, 2.0))).to eq("(1.0+2.0i)")
+    expect(inspect(Complex(1, -2))).to eq("(1-2i)")
+    expect(inspect(Complex(1))).to eq("(1+0i)")
+    expect(inspect(Complex(0, 0))).to eq("(0+0i)")
+  end
+end

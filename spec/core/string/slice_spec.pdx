@@ -1,0 +1,85 @@
+# `slice` takes a start and a length. The range spelling's house examples
+# live in spec/range/slicing_spec.pdx, since there the range is the subject;
+# its ruby/spec rows are below.
+#
+# From ruby/spec core/string/{slice,element_reference}_spec.rb and the
+# shared slice rows. A slice is a collection, never a maybe (ADR 0019): where
+# Ruby answers nil for a start outside the string, Portland answers the
+# empty string, and those rows are reworded. A negative length refuses. The
+# to_int conversions (ADR 0036), the bignum rows, subclasses, encodings,
+# slice! (ADR 0015), and the regex and string-pattern rows stay upstream.
+
+require_relative "../../spec_helper"
+
+context "String#slice" do
+  specify "takes a start and a length" do
+    expect("portland".slice(0, 4)).to eq("port")
+  end
+
+  specify "stops at the end rather than running past it" do
+    expect("portland".slice(5, 99)).to eq("and")
+  end
+
+  specify "answer the match's text or nil" do
+    expect("hello".slice(/l+/)).to eq("ll")
+    expect("hello".slice(/z/)).to be_nil
+  end
+
+  specify "slice answers a group by number or name" do
+    expect("hello".slice(/(h)(e)/, 2)).to eq("e")
+    expect("hello".slice(/(?<first>h)/, :first)).to eq("h")
+    expect("hello".slice(/(h)(x)?/, 2)).to be_nil
+  end
+
+  specify "returns the substring starting at the given index with the given length" do
+    expect("hello there".slice(0, 0)).to eq("")
+    expect("hello there".slice(0, 1)).to eq("h")
+    expect("hello there".slice(0, 3)).to eq("hel")
+    expect("hello there".slice(0, 6)).to eq("hello ")
+    expect("hello there".slice(0, 9)).to eq("hello the")
+    expect("hello there".slice(0, 12)).to eq("hello there")
+
+    expect("hello there".slice(1, 0)).to eq("")
+    expect("hello there".slice(1, 1)).to eq("e")
+    expect("hello there".slice(1, 3)).to eq("ell")
+    expect("hello there".slice(1, 6)).to eq("ello t")
+    expect("hello there".slice(1, 9)).to eq("ello ther")
+    expect("hello there".slice(1, 12)).to eq("ello there")
+
+    expect("hello there".slice(3, 0)).to eq("")
+    expect("hello there".slice(3, 1)).to eq("l")
+    expect("hello there".slice(3, 3)).to eq("lo ")
+    expect("hello there".slice(3, 6)).to eq("lo the")
+    expect("hello there".slice(3, 9)).to eq("lo there")
+
+    expect("hello there".slice(4, 0)).to eq("")
+    expect("hello there".slice(4, 3)).to eq("o t")
+    expect("hello there".slice(4, 6)).to eq("o ther")
+    expect("hello there".slice(4, 9)).to eq("o there")
+
+    expect("foo".slice(2, 1)).to eq("o")
+    expect("foo".slice(3, 0)).to eq("")
+    expect("foo".slice(3, 1)).to eq("")
+
+    expect("".slice(0, 0)).to eq("")
+    expect("".slice(0, 1)).to eq("")
+
+    expect("x".slice(0, 0)).to eq("")
+    expect("x".slice(0, 1)).to eq("x")
+    expect("x".slice(1, 0)).to eq("")
+    expect("x".slice(1, 1)).to eq("")
+    expect("x".slice(-1, 0)).to eq("")
+    expect("x".slice(-1, 1)).to eq("x")
+
+    expect("hello there".slice(-3, 2)).to eq("er")
+  end
+
+  specify "handles repeated application" do
+    expect("hello world".slice(6, 5).slice(0, 1)).to eq("w")
+    expect("hello world".slice(6, 5).slice(0, 5)).to eq("world")
+    expect("hello world".slice(6, 5).slice(1, 1)).to eq("o")
+    expect("hello world".slice(6, 5).slice(1, 4)).to eq("orld")
+    expect("hello world".slice(6, 5).slice(4, 1)).to eq("d")
+    expect("hello world".slice(6, 5).slice(5, 0)).to eq("")
+  end
+end

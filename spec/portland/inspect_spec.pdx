@@ -1,0 +1,17 @@
+# `inspect` — the source-shaped rendering as a value, `p` without the
+# printing (ADR 0026).
+
+require_relative "../spec_helper"
+
+struct Badge
+  label
+end
+
+context "inspect" do
+  describe "on the value kinds" do
+    specify "and a struct as its constructor would read" do
+      expect(inspect(Badge.new(label: "pdx"))).to eq('Badge(label: "pdx")')
+    end
+  end
+
+end

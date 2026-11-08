@@ -1,0 +1,35 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../../spec_helper"
+
+context "Array#to_h" do
+  specify "converts empty array to empty hash" do
+    expect([].to_h).to eq({})
+  end
+
+  specify "converts [key, value] pairs to a hash" do
+    expect([[:a, 1], [:b, 2]].to_h).to eq({a: 1, b: 2})
+  end
+
+  specify "uses the last value of a duplicated key" do
+    expect([[:a, 1], [:b, 2], [:a, 3]].to_h).to eq({a: 3, b: 2})
+  end
+
+  specify "produces a hash that returns nil for a missing element" do
+    expect([[:a, 1], [:b, 2]].to_h[:c]).to eq(nil)
+  end
+
+  describe "with block" do
+    specify "converts [key, value] pairs returned by the block to a Hash" do
+      expect([:a, :b].to_h { |key| [key, key.to_s] }).to eq({a: "a", b: "b"})
+    end
+  end
+end

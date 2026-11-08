@@ -1,0 +1,42 @@
+# Asking a hash which pairs it holds (#105), from ruby/spec core/hash:
+# include? and its twins member? and has_key?, any?, select, reject,
+# except, and values_at. Alias checks compare the two answers rather than
+# method objects. Staying upstream: `|*args|` and `|*pair|` (no splats, ADR
+# 0014), the bang mutators and delete_if (values never mutate), defaults,
+# default_proc, compare_by_identity, subclasses, identity, mocks stubbing
+# hash and eql?, is_a? checks, and blockless Enumerators (ADR 0055).
+
+require_relative "../../spec_helper"
+
+context "Hash#any?" do
+  describe "with no block given" do
+    specify "checks if there are any members of a Hash" do
+      expect({}.any?).to eq(false)
+      expect({"key" => "value"}.any?).to eq(true)
+    end
+  end
+
+  describe "with a block given" do
+    specify "is false if the hash is empty" do
+      expect({}.any? { |key, value| 1 == 1 }).to eq(false)
+    end
+
+    specify "is true if the block returns true for any member of the hash" do
+      table = {"a" => false, "b" => false, "c" => true, "d" => false}
+      expect(table.any? { |key, value| value == true }).to eq(true)
+    end
+
+    specify "is false if the block returns false for all members of the hash" do
+      table = {"a" => false, "b" => false, "c" => true, "d" => false}
+      expect(table.any? { |key, value| value == 42 }).to eq(false)
+    end
+  end
+
+  specify "returns true if the pattern ever returns a truthy value" do
+    expect({a: 1, b: 2}.any?([:b, 2])).to be_true
+  end
+
+  specify "returns false if the block never returns other than false or nil" do
+    expect({a: 1}.any?([:b, 1])).to be_false
+  end
+end

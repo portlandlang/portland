@@ -1,0 +1,28 @@
+# A float's `rationalize` by CRuby's simplest rational within the span
+# (#108, ADR 0085).
+#
+# From ruby/spec core/float/rationalize_spec.rb. Upstream: the rows that
+# raise — a refusal ends the file, so NaN, infinity, and a second
+# argument are pinned by the two-oracle test instead.
+
+require_relative "../../spec_helper"
+
+context "Float#rationalize" do
+  specify "returns self as a simplified Rational with no argument" do
+    expect(3382729202.92822.rationalize).to eq(Rational(4806858197361, 1421))
+  end
+
+  specify "simplifies self to the degree specified by a Rational argument" do
+    expect(0.3.rationalize(Rational(1, 10))).to eq(Rational(1, 3))
+    expect(0.3.rationalize(Rational(-1, 10))).to eq(Rational(1, 3))
+    expect((-0.3).rationalize(Rational(1, 10))).to eq(Rational(-1, 3))
+    expect((-0.3).rationalize(Rational(-1, 10))).to eq(Rational(-1, 3))
+  end
+
+  specify "simplifies self to the degree specified by a Float argument" do
+    expect(0.3.rationalize(0.05)).to eq(Rational(1, 3))
+    expect(0.3.rationalize(0.001)).to eq(Rational(3, 10))
+    expect((-0.3).rationalize(0.05)).to eq(Rational(-1, 3))
+    expect((-0.3).rationalize(0.001)).to eq(Rational(-3, 10))
+  end
+end

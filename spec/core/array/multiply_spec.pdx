@@ -1,0 +1,20 @@
+# From ruby/spec core/array/multiply_spec.rb.
+#
+# `+` concatenates and `*` repeats, both answering new arrays.
+
+require_relative "../../spec_helper"
+
+context "Array#*" do
+  specify "repeats" do
+    expect([0] * 3).to eq([0, 0, 0])
+  end
+end
+
+context "Array#* with an integer" do
+  specify "concatenates n copies of the array when passed an integer" do
+    expect([1, 2, 3] * 0).to eq([])
+    expect([1, 2, 3] * 1).to eq([1, 2, 3])
+    expect([1, 2, 3] * 3).to eq([1, 2, 3, 1, 2, 3, 1, 2, 3])
+    expect([] * 10).to eq([])
+  end
+end

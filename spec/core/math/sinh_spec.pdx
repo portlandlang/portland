@@ -1,0 +1,23 @@
+# From ruby/spec core/math/sinh_spec.rb.
+#
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+
+context "Math.sinh" do
+  specify "sinh" do
+    expect(Math.sinh(0.0)).to eq(0.0)
+    expect(Math.sinh(-0.0)).to eq(0.0)
+    expect(Math.sinh(1.5)).to be_close(2.12927945509482, MATH_TOLERANCE)
+    expect(Math.sinh(-2.8)).to be_close(-8.19191835423591, MATH_TOLERANCE)
+    expect(Math.sinh(nan_value).nan?).to eq(true)
+  end
+end

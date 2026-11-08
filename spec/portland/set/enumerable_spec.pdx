@@ -1,0 +1,12 @@
+# Portland's own: what differs from Ruby here, moved out of the ruby/spec
+# mirror.
+
+require_relative "../../spec_helper"
+
+context "Set" do
+  specify "select and reject answer sets" do
+    expect(Set[1, 2, 3, 4].select { it.even? }).to eq(Set[2, 4])
+    expect(Set[1, 2, 3, 4].reject { it.even? }).to eq(Set[1, 3])
+    expect(Set[1, 2, 3, 4].filter { it > 2 }).to eq(Set[3, 4])
+  end
+end

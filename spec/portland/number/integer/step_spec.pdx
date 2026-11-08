@@ -1,0 +1,12 @@
+# Portland's own: what differs from Ruby here, moved out of the ruby/spec
+# mirror.
+
+require_relative "../../../spec_helper"
+
+context "Integer#step" do
+  specify "answers the walk as an array" do
+    expect(1.step(10, 3)).to eq([1, 4, 7, 10])
+    expect(5.step(1, -2)).to eq([5, 3, 1])
+    expect(2.step(1)).to eq([])
+  end
+end

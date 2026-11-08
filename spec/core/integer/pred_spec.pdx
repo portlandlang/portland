@@ -1,0 +1,19 @@
+# `succ` and `pred` — the neighbors, synonyms for `+ 1` and `- 1` kept on
+# purpose (principle 3: one behavior may have many spellings; #79).
+#
+# From ruby/spec core/integer/succ_spec.rb and pred_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#pred" do
+  specify "answers the next integer down" do
+    expect(2.pred).to eq(1)
+  end
+
+  specify "crosses zero from above" do
+    expect(0.pred).to eq(-1)
+  end
+end

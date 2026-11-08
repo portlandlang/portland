@@ -1,0 +1,16 @@
+# A float's `to_r` is its exact rational (#108, ADR 0085).
+#
+# From ruby/spec core/float/to_r_spec.rb, which upstream holds only a
+# placeholder. NaN and infinity refuse — a refusal ends the file — and
+# are pinned by the two-oracle test instead.
+
+require_relative "../../spec_helper"
+
+context "Float#to_r" do
+  specify "answers the float's exact rational" do
+    expect(0.5.to_r).to eq(Rational(1, 2))
+    expect(1.4592.to_r).to eq(Rational(1642913144064757, 1125899906842624))
+    expect(0.0.to_r).to eq(Rational(0, 1))
+    expect(12.0.to_r).to eq(Rational(12, 1))
+  end
+end

@@ -58,7 +58,7 @@ total_failures=0
 total_pendings=0
 
 # `find` rather than a glob, so a spec nested in a subdirectory is picked up
-# too — `spec/numbers/integers_spec.pdx` is not matched by `spec/*_spec.pdx`,
+# too — `spec/core/integer/to_r_spec.pdx` is not matched by `spec/*_spec.pdx`,
 # and a spec silently not running is the worst way to be green. Sorted because
 # directory order is not stable across filesystems, and a run whose output
 # reorders itself is a run whose diffs lie.

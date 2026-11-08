@@ -1,0 +1,38 @@
+# ADR 0029 — a failed task binds its `failure` for the toolkit, which is
+# what ADR 0027 dissolved: there is nothing to throw across a join.
+
+require_relative "../../spec_helper"
+
+def fetch_user(id)
+  "user-#{id}"
+end
+def recent_orders(id)
+  return failure("orders down") if id == 0
+  ["order-a", "order-b"]
+end
+context "a together block" do
+  describe "a failed task" do
+    specify "binds its failure like any value" do
+      together do
+        ~ sad_orders = recent_orders(0)
+      end
+      expect(sad_orders).to be_failure
+    end
+
+    specify "which is one or away from a fallback, after the join" do
+      together do
+        ~ sad_orders = recent_orders(0)
+      end
+      expect((sad_orders or "no orders today")).to eq("no orders today")
+    end
+
+    specify "while its siblings run to completion" do
+      together do
+        ~ sad_orders = recent_orders(0)
+        ~ user = fetch_user(7)
+      end
+      expect(sad_orders).to be_failure
+      expect(user).to eq("user-7")
+    end
+  end
+end

@@ -1,0 +1,21 @@
+# Walking an array with a block (#104), from ruby/spec core/array: map and
+# collect, select and filter, reject, each, and detect. Alias checks
+# compare the two answers rather than method objects. Blocks answer true
+# or false where they choose, so reject's rows where nil or 5 stands for a
+# truth stay upstream; so do identity checks, recursive arrays, and
+# mid-walk mutation (values never mutate), the bang forms, subclasses,
+# break with a value (ADR 0012), blockless Enumerators, and each's
+# multi-parameter row, which waits on #158.
+
+require_relative "../../spec_helper"
+
+context "Array#collect" do
+  specify "is an alias of Array#map" do
+    expect([1, 2, 3].collect { it * 2 }).to eq([1, 2, 3].map { it * 2 })
+  end
+
+  specify "collect and inject are the twins of map and reduce (ADR 0036)" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.collect { it * 2 }).to eq(numbers.map { it * 2 })
+  end
+end

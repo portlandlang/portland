@@ -1,0 +1,11 @@
+# From ruby/spec core/array/zip_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#zip" do
+  specify "zip pairs elements by position" do
+    expect([1, 2].zip([3, 4])).to eq([[1, 3], [2, 4]])
+  end
+end

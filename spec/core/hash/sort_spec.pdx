@@ -1,0 +1,25 @@
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#sort" do
+  specify "converts self to a nested array of [key, value] arrays and sort with Array#sort" do
+    expect({"a" => "b", "1" => "2", "b" => "a"}.sort).to eq([["1", "2"], ["a", "b"], ["b", "a"]])
+  end
+
+  specify "works when some of the keys are themselves arrays" do
+    expect({[1, 2] => 5, [1, 1] => 5}.sort).to eq([[[1, 1], 5], [[1, 2], 5]])
+  end
+
+  specify "uses block to sort array if passed a block" do
+    expect({1 => 2, 2 => 9, 3 => 4}.sort { |left, right| right <=> left }).to eq([[3, 4], [2, 9], [1, 2]])
+  end
+end

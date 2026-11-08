@@ -1,0 +1,28 @@
+# A symbol's case changers and successor (ADR 0071): `upcase`, `downcase`,
+# `capitalize`, `swapcase`, `succ`, and its twin `next` answer a symbol of
+# the changed name, as Ruby's do — the string's answer, made a symbol
+# again. From ruby/spec core/symbol/{upcase,downcase,capitalize,swapcase,
+# succ,next}_spec.rb. Upstream's `instance_of?(Symbol)` rows ask `in
+# Symbol`; its alias check compares method objects, which a closed runtime
+# has none of, so it asks the two answers instead.
+
+require_relative "../../spec_helper"
+
+context "Symbol#upcase" do
+  specify "returns a Symbol" do
+    expect(:glark.upcase in Symbol).to eq(true)
+  end
+
+  specify "converts lowercase ASCII characters to their uppercase equivalents" do
+    expect(:lOwEr.upcase).to eq(:LOWER)
+  end
+
+  specify "capitalizes all Unicode characters" do
+    expect("äöü".to_sym.upcase).to eq(:"ÄÖÜ")
+    expect("aou".to_sym.upcase).to eq(:AOU)
+  end
+
+  specify "leaves non-alphabetic ASCII characters as they were" do
+    expect("Glark?!?".to_sym.upcase).to eq(:"GLARK?!?")
+  end
+end

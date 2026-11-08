@@ -1,0 +1,69 @@
+# `Enumerable` is the second builtin trait (#110, after ADR 0054's
+# Comparable): a struct that defines `each` and includes it answers Ruby's
+# Enumerable names through what its `each` yields — gathered once, then
+# the array's own arm. A yield of several values packs into one array,
+# as Ruby's Enumerable packs them, for every name alike; the twins
+# (`collect`, `detect`, `entries`, `filter`, `find_all`, `member?`,
+# `reduce`, `collect_concat`) answer what their survivors answer.
+#
+# From ruby/spec core/enumerable/{to_a,entries,collect,collect_concat,
+# detect,filter,find_all,member,reduce,first,take,map,select,find,sort,
+# reject,include,partition,reverse_each,minmax,compact}_spec.rb and
+# shared/take.rb. Upstream's fixtures are classes; here they are structs.
+# What stays behind: the blockless enumerators (ADR 0055), `each` taking
+# arguments, the `ifnone` proc, mocks of `<=>` and `==`, and the rows
+# where a block's one parameter takes the first of several yielded values
+# — here the block sees the packed array.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#sort" do
+  specify "sorts by the natural order as defined by <=>" do
+    expect(numerous(DEFAULT).sort).to eq([1, 2, 3, 4, 5, 6])
+  end
+
+  specify "yields elements to the provided block" do
+    expect(numerous(DEFAULT).sort { |left, right| right <=> left }).to eq([6, 5, 4, 3, 2, 1])
+    expect(numerous([2, 0, 1, 3, 4]).sort { |left, right| -(left <=> right) }).to eq([4, 3, 2, 1, 0])
+  end
+
+  specify "compare values returned by block with 0" do
+    expect(numerous(DEFAULT).sort { |left, right| -(left + right) * (left <=> right) }).to eq([6, 5, 4, 3, 2, 1])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.sort { |left, right| left.first <=> right.first }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+  end
+
+  specify "sort, sort_by, and partition answer arrays" do
+    expect(Set[3, 1, 2].sort).to eq([1, 2, 3])
+  end
+end

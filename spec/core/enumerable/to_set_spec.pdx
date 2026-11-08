@@ -1,0 +1,16 @@
+# From ruby/spec core/enumerable/to_set_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Enumerable#to_set" do
+  specify "builds a set from an array, a hash's pairs, and a range" do
+    expect([1, 2, 3].to_set).to eq(Set[1, 2, 3])
+    expect({a: 1, b: 2}.to_set).to eq(Set[[:b, 2], [:a, 1]])
+  end
+
+  specify "passes a block down" do
+    expect([1, 2, 3].to_set { it * it }).to eq(Set[1, 4, 9])
+  end
+end

@@ -1,0 +1,18 @@
+# From ruby/spec core/float/lt_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#<" do
+  specify "order strictly and inclusively" do
+    expect(71.3 < 91.8).to be_true
+    expect(5.5 < 5.5).to be_false
+  end
+
+  specify "reach across the integer line" do
+    expect(192.6 < -500).to be_false
+    expect(-0.12 < 100).to be_true
+    expect(1.5 < 0x4fffffff).to be_true
+  end
+end

@@ -1,0 +1,33 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#to_s" do
+  specify "provides a printable form of self" do
+    expect((0..21).to_s).to eq("0..21")
+    expect((-8..0).to_s).to eq("-8..0")
+    expect((-411..959).to_s).to eq("-411..959")
+    expect((0xfff..0xfffff).to_s).to eq("4095..1048575")
+  end
+
+  specify "can show endless ranges" do
+    expect((1..).to_s).to eq("1..")
+  end
+
+  specify "can show beginless ranges" do
+    expect((..1).to_s).to eq("..1")
+  end
+
+  specify "inspect each end, and to_s renders them" do
+    expect(("a".."b").to_s).to eq("a..b")
+  end
+end

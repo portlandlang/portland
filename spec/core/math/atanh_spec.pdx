@@ -1,0 +1,25 @@
+# From ruby/spec core/math/atanh_spec.rb.
+#
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+
+context "Math.atanh" do
+  specify "atanh" do
+    expect(Math.atanh(0.0)).to eq(0.0)
+    expect(Math.atanh(-0.0)).to eq(-0.0)
+    expect(Math.atanh(0.5)).to be_close(0.549306144334055, MATH_TOLERANCE)
+    expect(Math.atanh(-0.2)).to be_close(-0.202732554054082, MATH_TOLERANCE)
+    expect(Math.atanh(1.0)).to eq(Float::INFINITY)
+    expect(Math.atanh(-1.0)).to eq(-Float::INFINITY)
+    expect(inspect(Math.atanh(1.0 + Float::EPSILON))).to eq('failure("Numerical argument is out of domain - atanh")')
+    expect(inspect(Math.atanh(-1.0 - Float::EPSILON))).to eq('failure("Numerical argument is out of domain - atanh")')
+  end
+end

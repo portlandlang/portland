@@ -1,0 +1,12 @@
+# `count` bare is the length; with a value, its occurrences under `==`.
+#
+# From ruby/spec core/array/count_spec.rb.
+
+require_relative "../../spec_helper"
+
+context "Array#count" do
+  specify "bare is the length, with a value its occurrences" do
+    expect([1, 2, 2, 3].count).to eq(4)
+    expect([1, 2, 2, 3].count(2)).to eq(2)
+  end
+end

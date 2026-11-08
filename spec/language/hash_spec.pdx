@@ -1,0 +1,88 @@
+# The hash literal: any type of key, insertion-ordered. The symbol-key
+# shorthand's own rules live in spec/symbol/shorthand_spec.pdx.
+
+require_relative "../spec_helper"
+
+# `{name:}` — a key with no value takes the name's own, as Ruby 3.1 reads it
+# (ADR 0078); the bare name resolves as any does, a local first and then a
+# method. From ruby/spec language/hash_spec.rb's "hash with omitted value"
+# rows; the mixed-syntax row drops its `:d => 4`, which refuses here.
+def bar = "baz"
+def foo(val) = {bar:, val:}
+
+# From ruby/spec language/hash_spec.rb. The shorthand is the only
+# symbol-key spelling, so `:a => 1` refuses (docs/ruby/symbols.md); `**` is
+# a splat (ADR 0014); the empty-expression, frozen-key,
+# duplicate-key-warning, `a=` key, and `a!:`/`a?:` syntax-error rows stay
+# upstream.
+context "Hash literal" do
+  specify "{} should return an empty hash" do
+    expect({}.size).to eq(0)
+    expect({}).to eq({})
+  end
+
+  specify "{} should return a new hash populated with the given elements" do
+    built = {a: "a", "b" => 3, 44 => 2.3}
+    expect(built.size).to eq(3)
+    expect(built).to eq({a: "a", "b" => 3, 44 => 2.3})
+  end
+
+  specify "accepts a hanging comma" do
+    built = {a: 1, b: 2,}
+    expect(built.size).to eq(2)
+    expect(built).to eq({a: 1, b: 2})
+  end
+
+  specify "accepts mixed 'key: value' and 'key => value' syntax" do
+    built = {a: 1, "b" => 2, 3 => 4}
+    expect(built).to eq({a: 1, "b" => 2, 3 => 4})
+  end
+
+  specify "takes any type of key, rockets and shorthand mixed" do
+    mixed = {"string" => 1, sym: 2}
+    expect(mixed["string"]).to eq(1)
+    expect(mixed[:sym]).to eq(2)
+  end
+
+  specify "keeps insertion order" do
+    config = {name: "pdx", port: 8080}
+    expect(config.keys).to eq([:name, :port])
+  end
+
+  specify "accepts short notation 'key' for 'key: value' syntax" do
+    a = 1
+    b = 2
+    c = 3
+    expect({a:}).to eq({a: 1})
+    expect({a:, b:, c:}).to eq({a: 1, b: 2, c: 3})
+  end
+
+  specify "ignores hanging comma on short notation" do
+    a = 1
+    b = 2
+    c = 3
+    expect({a:, b:, c:,}).to eq({a: 1, b: 2, c: 3})
+  end
+
+  specify "accepts mixed syntax" do
+    a = 1
+    e = 5
+    expect({a:, b: 2, "c" => 3, e:}).to eq({a: 1, b: 2, "c" => 3, e: 5})
+  end
+
+  specify "works with methods and local vars" do
+    expect(foo(1)).to eq({bar: "baz", val: 1})
+  end
+
+  specify "takes the next line's value inside the braces, as Ruby does" do
+    a = 1
+    expect({a:
+    }).to eq({a: 1})
+    expect({a:
+      2}).to eq({a: 2})
+  end
+
+  specify "builds symbol keys" do
+    expect({name: "pdx"}[:name]).to eq("pdx")
+  end
+end

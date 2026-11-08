@@ -1,0 +1,29 @@
+# `Symbol#=~` answers the match (ADR 0086), as `String#=~` does here, where
+# Ruby answers the position. A string's pattern-taking methods are Ruby's,
+# and their rows live in the ruby/spec mirror under spec/core/string/ and
+# spec/core/symbol/.
+
+require_relative "../../spec_helper"
+
+context "Symbol with a pattern" do
+  specify "answers the string questions by its name" do
+    found = :cat =~ /a/ or panic("no match")
+    expect(found[0]).to eq("a")
+  end
+end
+
+context "String#=~" do
+  specify "answers the MatchData or nil" do
+    found = "hello" =~ /l+/ or panic("no match")
+    expect(found[0]).to eq("ll")
+    expect(found.begin(0)).to eq(2)
+    expect("hello" =~ /z/).to be_nil
+  end
+
+  specify "narrows like any maybe" do
+    answer = if ("line 12" =~ /\d+/).some? then :digits else :none end
+    expect(answer).to eq(:digits)
+    fallback = ("line" =~ /\d+/) or "none"
+    expect(fallback).to eq("none")
+  end
+end

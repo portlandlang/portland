@@ -1,0 +1,22 @@
+# An integer's `to_r` is the rational it is (ADR 0085).
+#
+# From ruby/spec core/integer/to_r_spec.rb. Upstream: the bignum row,
+# integers being 64-bit here (ADR 0070); the rows handing it arguments
+# refuse, which a spec cannot assert — the refusals are pinned by a
+# two-oracle test instead.
+
+require_relative "../../spec_helper"
+
+context "Integer#to_r" do
+  specify "returns a Rational object" do
+    expect(309.to_r.class).to eq(Rational)
+  end
+
+  specify "constructs a rational number with self as the numerator" do
+    expect(34.to_r.numerator).to eq(34)
+  end
+
+  specify "constructs a rational number with 1 as the denominator" do
+    expect(298.to_r.denominator).to eq(1)
+  end
+end

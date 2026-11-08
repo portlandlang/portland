@@ -1,0 +1,38 @@
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../../spec_helper"
+
+context "Array#shuffle" do
+  specify "returns the same values, in a usually different order" do
+    list = [1, 2, 3, 4, 5, 6, 7, 8]
+    shuffled = (1..10).map { list.shuffle }
+    expect(shuffled.all? { |drawn| drawn.sort == list }).to be_true
+    expect(shuffled.any? { |drawn| drawn != list }).to be_true
+  end
+
+  specify "is not destructive" do
+    list = [1, 2, 3]
+    list.shuffle
+    expect(list).to eq([1, 2, 3])
+  end
+
+  specify "matches CRuby with random:" do
+    expect(%w[a b c].shuffle(random: Random.new(1))).to eq(%w[a c b])
+    expect((0..10).to_a.shuffle(random: Random.new(10))).to eq([2, 6, 8, 5, 7, 10, 3, 1, 0, 4, 9])
+  end
+
+  specify "matches CRuby with srand" do
+    srand(123)
+    expect(%w[a b c d e f g h i j k].shuffle).to eq(%w[a e f h i j d b g k c])
+  end
+end

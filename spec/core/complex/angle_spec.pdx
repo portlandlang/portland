@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/angle_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#angle" do
+  specify "abs, abs2, arg, polar" do
+    expect(Complex(3, 4).angle).to eq(0.9272952180016122)
+  end
+end

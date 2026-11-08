@@ -1,0 +1,20 @@
+# From ruby/spec core/kernel/sprintf_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Kernel#sprintf" do
+  specify "formats a partial substring without including omitted characters" do
+    expect(sprintf("%.3s", "aabbccddhelloddccbbaa".slice(8, 5))).to eq("hel")
+  end
+
+  specify "does not raise error when passed more arguments than needed" do
+    expect(sprintf("%s %d %c", "string", 2, "c", [])).to eq("string 2 c")
+  end
+
+  specify "sprintf is format's twin" do
+    expect(sprintf("%05.2f|%-10s|%+d", 3.14159, "pdx", 5)).to eq("03.14|pdx       |+5")
+    expect(sprintf("%<a>s %{b}", a: 1, b: 2)).to eq(format("%<a>s %{b}", a: 1, b: 2))
+  end
+end

@@ -1,0 +1,12 @@
+# From ruby/spec core/array/find_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#find" do
+  specify "find answers the first hit — a maybe" do
+    expect([1, 2, 3].find { it > 1 }).to eq(2)
+    expect([1, 2, 3].find { it > 9 }).to be_nil
+  end
+end

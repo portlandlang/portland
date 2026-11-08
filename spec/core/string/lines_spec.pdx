@@ -1,0 +1,12 @@
+# From ruby/spec core/string/lines_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#lines" do
+  specify "String#lines keeps the newlines, and a last bare line arrives whole" do
+    expect("a\nb\n".lines).to eq(["a\n", "b\n"])
+    expect("a\nb".lines).to eq(["a\n", "b"])
+  end
+end

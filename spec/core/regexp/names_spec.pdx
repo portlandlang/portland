@@ -1,0 +1,34 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp#names" do
+  specify "returns an empty Array if there are no named captures" do
+    expect(/needle/.names).to eq([])
+  end
+
+  specify "returns all of the named captures" do
+    expect(/n(?<cap>ee)d(?<ture>le)/.names).to eq(["cap", "ture"])
+  end
+
+  specify "works with nested named captures" do
+    expect(/n(?<cap>eed(?<ture>le))/.names).to eq(["cap", "ture"])
+  end
+
+  specify "returns each capture name only once" do
+    expect(/n(?<cap>ee)d(?<cap>le)/.names).to eq(["cap"])
+  end
+end

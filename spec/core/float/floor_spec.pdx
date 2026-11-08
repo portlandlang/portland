@@ -1,0 +1,12 @@
+# From ruby/spec core/float/floor_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#floor" do
+  specify "Float#floor goes down" do
+    expect(1.5.floor).to eq(1)
+    expect((-1.5).floor).to eq(-2)
+  end
+end

@@ -1,0 +1,10 @@
+# Portland's own: what differs from Ruby here, moved out of the ruby/spec
+# mirror.
+
+require_relative "../../spec_helper"
+
+context "value.class" do
+  specify "answers the builtin's type" do
+    expect(true.class.name).to eq("Boolean")
+  end
+end

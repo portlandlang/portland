@@ -1,0 +1,86 @@
+# Ruby's Enumerable predicates and counts on an Enumerable struct (#110):
+# `all?`, `any?`, `none?`, and `one?` take a block that answers true or
+# false — the blockless forms ask an element's own truthiness, which is a
+# refusal here, as is a block answering 5 or nil — and `count`, `include?`,
+# and `find_index` ask `==`.
+#
+# From ruby/spec core/enumerable/{all,any,none,one,count,find_index}_spec.rb.
+# What stays behind: the pattern argument (`all?(Integer)`, asking `===`),
+# exceptions out of `each` or the block, the extra-argument arity rows
+# (checked statically here), the ignored block beside an argument, the
+# splat block parameter, and the row where a one-parameter block takes
+# the first of several yielded values — here it sees the packed array.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#count" do
+  elements = numerous([1, 2, 4, 2])
+
+  describe "when no argument or a block" do
+    specify "returns size" do
+      expect(elements.count).to eq(4)
+    end
+  end
+
+  specify "counts nils if given nil as an argument" do
+    expect(numerous([nil, nil, nil, false]).count(nil)).to eq(3)
+  end
+
+  specify "accepts an argument for comparison using ==" do
+    expect(elements.count(2)).to eq(2)
+  end
+
+  specify "uses a block for comparison" do
+    expect(elements.count { |item| item % 2 == 0 }).to eq(3)
+  end
+
+  describe "when each yields multiple values" do
+    specify "gathers whole arrays as elements" do
+      expect(YieldsMulti.new.count { |item| item == [1, 2] }).to eq(1)
+    end
+
+    specify "accepts an argument for comparison using ==" do
+      expect(YieldsMulti.new.count([1, 2])).to eq(1)
+    end
+  end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).count).to eq(6)
+  end
+
+  specify "answers an empty walk as nothing" do
+    expect(Empty.new.count).to eq(0)
+  end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].count { it > 1 }).to eq(2)
+  end
+end

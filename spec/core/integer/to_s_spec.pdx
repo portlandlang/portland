@@ -1,0 +1,29 @@
+# `to_f` promotes across the integer/float line; `to_s` writes the number
+# back out.
+#
+# Grown from ruby/spec core/integer/to_f_spec.rb and to_s_spec.rb (#23).
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#to_s" do
+  specify "writes the digits back out, sign included" do
+    expect(255.to_s).to eq("255")
+    expect((-121).to_s).to eq("-121")
+    expect(0.to_s).to eq("0")
+  end
+
+  specify "with a base writes lowercase digits, the sign out front" do
+    expect(5.to_s(2)).to eq("101")
+    expect(255.to_s(16)).to eq("ff")
+    expect((-255).to_s(16)).to eq("-ff")
+    expect(255.to_s(36)).to eq("73")
+    expect(0.to_s(2)).to eq("0")
+  end
+
+  specify "renders numbers, booleans, and collections" do
+    expect(42.to_s).to eq("42")
+  end
+end

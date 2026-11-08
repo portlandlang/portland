@@ -1,0 +1,27 @@
+# From ruby/spec core/integer/bit_or_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#|" do
+  specify "returns self bitwise OR other" do
+    expect(1.bit_or(0)).to eq(1)
+    expect(5.bit_or(4)).to eq(5)
+    expect(5.bit_or(6)).to eq(7)
+    expect(248.bit_or(4096)).to eq(4344)
+  end
+
+  specify "returns self bitwise OR other when one operand is negative" do
+    expect(1.shift_left(33).bit_or(-1)).to eq(-1)
+    expect(-1.bit_or(1.shift_left(33))).to eq(-1)
+    expect((-(1.shift_left(33)) - 1).bit_or(5)).to eq(-8589934593)
+  end
+
+  specify "returns self bitwise OR other when both operands are negative" do
+    expect(-5.bit_or(-1)).to eq(-1)
+    expect(-3.bit_or(-4)).to eq(-3)
+    expect(-12.bit_or(-13)).to eq(-9)
+    expect(-13.bit_or(-12)).to eq(-9)
+  end
+end

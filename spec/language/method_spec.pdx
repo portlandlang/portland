@@ -1,0 +1,94 @@
+# From ruby/spec language/method_spec.rb.
+#
+# ADR 0032 — a dot call takes paren-less arguments, which is what lets a
+# chain read as a sentence: this very suite's `expect(x).to eq(y)`.
+
+require_relative "../spec_helper"
+
+def tag(name:, level: 1)
+  "#{name}@#{level}"
+end
+
+def implicit
+  "the last expression"
+end
+
+def answer = 42
+def blank() = 42
+def double(number) = number * 2
+struct Circle
+  radius
+
+  def area = radius * radius * 3
+
+  def self.tau = 6
+end
+
+struct Wrap
+  actual
+
+  def to(matcher)
+    matcher + actual
+  end
+end
+
+context "A method send" do
+  specify "hold one expression" do
+    expect(answer).to eq(42)
+  end
+
+  specify "take empty parens" do
+    expect(blank).to eq(42)
+  end
+
+  specify "take parenthesized parameters" do
+    expect(double(21)).to eq(42)
+  end
+
+  specify "work as struct methods and type functions" do
+    expect(Circle.new(radius: 2).area).to eq(12)
+    expect(Circle.tau).to eq(6)
+  end
+
+  specify "returns its last expression" do
+    expect(implicit).to eq("the last expression")
+  end
+
+  specify "take the local of the same name" do
+    name = "pdx"
+    level = 4
+    expect(tag(name:, level:)).to eq("pdx@4")
+    expect(tag(level: 2, name:)).to eq("pdx@2")
+  end
+
+  specify "take the next line's value inside the parens, as Ruby does" do
+    name = "pdx"
+    expect(tag(name:
+    )).to eq("pdx@1")
+    expect(tag(name:
+      "other")).to eq("other@1")
+  end
+
+  specify "carry like a command call's" do
+    expect(Wrap.new(actual: 1).to 41).to eq(42)
+  end
+
+  specify "take several, comma-separated" do
+    expect("portland".slice 0, 4).to eq("port")
+  end
+
+  specify "nest — the innermost call takes the arguments" do
+    expect(Wrap.new(actual: 2).to Wrap.new(actual: 3).to 1).to eq(6)
+  end
+
+  specify "leave subtraction alone when the minus is spaced" do
+    expect(Wrap.new(actual: 1).to 5 - 1).to eq(5)
+  end
+
+  specify "hand a do block to the call, past the arguments" do
+    folded = [1, 2, 3].reduce 10 do |total, number|
+      total + number
+    end
+    expect(folded).to eq(16)
+  end
+end

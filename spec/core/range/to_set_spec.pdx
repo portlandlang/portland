@@ -1,0 +1,29 @@
+# Building a set (ADR 0082): `Set.new` over any enumerable, `Set[...]`, and
+# `to_set` on the collections, each dropping repeats and keeping insertion
+# order; a block maps the members first. `inspect` and `to_s` are Ruby 4's
+# `Set[1, 2]`, which is also the constructor.
+#
+# From ruby/spec core/set/{constructor,initialize,inspect,to_s,set}_spec.rb,
+# core/enumerable/to_set_spec.rb (also under core/set/enumerable/), and
+# core/range/to_set_spec.rb. Upstream: the mock enumerables answering
+# each_entry or each, the private-method and alias checks, the cyclic set
+# (no value here can hold itself), the row that shells out to ruby, the
+# Set-subclass argument (no subclasses), and the beginless and endless
+# ranges, which refuse to be walked in Portland's words (ADR 0055).
+
+require_relative "../../spec_helper"
+
+context "Range#to_set" do
+  specify "returns a new Set created from self" do
+    expect((1..4).to_set).to eq(Set[1, 2, 3, 4])
+    expect((1...4).to_set).to eq(Set[1, 2, 3])
+  end
+
+  specify "passes down passed blocks" do
+    expect((1..3).to_set { |x| x * x }).to eq(Set[1, 4, 9])
+  end
+
+  specify "builds a set from an array, a hash's pairs, and a range" do
+    expect((1..3).to_set).to eq(Set[1, 2, 3])
+  end
+end

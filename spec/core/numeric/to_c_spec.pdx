@@ -1,0 +1,38 @@
+# `to_c` on every real (ADR 0085): the complex with the number as its
+# real part. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/to_c_spec.rb. Upstream: the bignums,
+# integers being 64-bit.
+
+require_relative "../../spec_helper"
+
+context "Numeric#to_c" do
+  numbers = [0, 29871, -72628191273, Rational(2, 3), Rational(1.898), Rational(-238), 29282.2827, -2927.00091, 0.0, 12.0, Float::MAX, 1.0 / 0.0]
+
+  specify "returns a Complex object" do
+    numbers.each do |number|
+      expect(number.to_c.class).to eq(Complex)
+    end
+    expect((0.0 / 0.0).to_c.class).to eq(Complex)
+  end
+
+  specify "uses self as the real component" do
+    numbers.each do |number|
+      expect(number.to_c.real).to eq(number)
+    end
+    expect((0.0 / 0.0).to_c.real.nan?).to be_true
+  end
+
+  specify "uses 0 as the imaginary component" do
+    numbers.each do |number|
+      expect(number.to_c.imag).to eq(0)
+    end
+    expect((0.0 / 0.0).to_c.imag).to eq(0)
+  end
+
+  specify "comes from to_c on the reals" do
+    expect(inspect(3.to_c)).to eq("(3+0i)")
+    expect(inspect(1.5.to_c)).to eq("(1.5+0i)")
+    expect(inspect(Rational(1, 3).to_c)).to eq("((1/3)+0i)")
+  end
+end

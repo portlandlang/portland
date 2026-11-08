@@ -1,0 +1,33 @@
+# The subset family (ADR 0082): `subset?`/`<=`, `superset?`/`>=`,
+# `proper_subset?`/`<`, `proper_superset?`/`>`, each taking a set; `<=>` as
+# 0, -1, 1, or nil by the same relations; and `disjoint?` and `intersect?`
+# over any enumerable.
+#
+# From ruby/spec core/set/{subset,superset,proper_subset,proper_superset,
+# lte,gte,lt,gt,comparison,disjoint,intersect}_spec.rb. Upstream: the alias
+# checks, the Set-like objects, the rows that raise on a non-set — that
+# refusal is pinned by the two-oracle test — and `<=>` against a non-set,
+# which the checker refuses at build where the types are known.
+
+require_relative "../../spec_helper"
+
+context "Set#proper_superset?" do
+  four = Set[1, 2, 3, 4]
+  specify "is true for a set whose every member self holds, and more" do
+    expect(four.proper_superset?(Set[])).to be_true
+    expect(Set["a", :b, "c"].proper_superset?(Set[])).to be_true
+    expect(four.proper_superset?(Set[1, 2, 3])).to be_true
+    expect(four.proper_superset?(Set[1, 3])).to be_true
+    expect(four.proper_superset?(Set[1])).to be_true
+    expect(four.proper_superset?(Set[5])).to be_false
+    expect(four.proper_superset?(Set[1, 5])).to be_false
+    expect(four.proper_superset?(Set["test"])).to be_false
+    expect(four.proper_superset?(four)).to be_false
+    expect(Set[].proper_superset?(Set[])).to be_false
+  end
+
+  specify "is also >" do
+    expect(four > Set[1, 2]).to be_true
+    expect(four > four).to be_false
+  end
+end

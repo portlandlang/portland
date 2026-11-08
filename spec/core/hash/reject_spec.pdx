@@ -1,0 +1,16 @@
+# Asking a hash which pairs it holds (#105), from ruby/spec core/hash:
+# include? and its twins member? and has_key?, any?, select, reject,
+# except, and values_at. Alias checks compare the two answers rather than
+# method objects. Staying upstream: `|*args|` and `|*pair|` (no splats, ADR
+# 0014), the bang mutators and delete_if (values never mutate), defaults,
+# default_proc, compare_by_identity, subclasses, identity, mocks stubbing
+# hash and eql?, is_a? checks, and blockless Enumerators (ADR 0055).
+
+require_relative "../../spec_helper"
+
+context "Hash#reject" do
+  specify "returns a new hash removing keys for which the block yields true" do
+    table = {1 => false, 2 => true, 3 => false, 4 => true}
+    expect(table.reject { |key, value| value }.keys.sort).to eq([1, 3])
+  end
+end

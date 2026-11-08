@@ -1,0 +1,21 @@
+# A string's ends (#106), from ruby/spec core/string/{chop,chr,delete_prefix,delete_suffix}_spec.rb.
+# The bang forms (values never mutate, ADR 0015), the to_str conversion
+# (ADR 0036), subclasses, encodings, the broken-byte rows, and identity
+# checks stay upstream; chr's row mixing character widths spells one of
+# them with a \u escape Portland does not have.
+
+require_relative "../../spec_helper"
+
+context "String#delete_prefix" do
+  specify "returns a copy of the string, with the given prefix removed" do
+    expect("hello".delete_prefix("hell")).to eq("o")
+    expect("hello".delete_prefix("hello")).to eq("")
+  end
+
+  specify "returns a copy of the string, when the prefix isn't found" do
+    s = "hello"
+    expect(s.delete_prefix("hello!")).to eq(s)
+    expect(s.delete_prefix("ell")).to eq(s)
+    expect(s.delete_prefix("")).to eq(s)
+  end
+end

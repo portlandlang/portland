@@ -1,0 +1,25 @@
+# Walking an array with a block (#104), from ruby/spec core/array: map and
+# collect, select and filter, reject, each, and detect. Alias checks
+# compare the two answers rather than method objects. Blocks answer true
+# or false where they choose, so reject's rows where nil or 5 stands for a
+# truth stay upstream; so do identity checks, recursive arrays, and
+# mid-walk mutation (values never mutate), the bang forms, subclasses,
+# break with a value (ADR 0012), blockless Enumerators, and each's
+# multi-parameter row, which waits on #158.
+
+require_relative "../../spec_helper"
+
+context "Array#reject" do
+  specify "returns a new array without elements for which block is true" do
+    numbers = [1, 2, 3, 4, 5]
+    expect(numbers.reject { true }).to eq([])
+    expect(numbers.reject { false }).to eq(numbers)
+    expect(numbers.reject { |number| number < 3 }).to eq([3, 4, 5])
+    expect(numbers.reject { |number| number % 2 == 0 }).to eq([1, 3, 5])
+  end
+
+  specify "select keeps the hits and reject drops them" do
+    numbers = [1, 2, 3, 4]
+    expect(numbers.reject { it.even? }).to eq([1, 3])
+  end
+end

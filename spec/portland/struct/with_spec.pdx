@@ -1,0 +1,37 @@
+# The record is immutable; `with` is the only way forward, and it copies.
+
+require_relative "../../spec_helper"
+
+struct Wrap
+  actual
+
+  def to(matcher)
+    matcher + actual
+  end
+end
+
+struct Token
+  kind
+  text
+end
+context "a struct" do
+  describe "#with" do
+    token = Token.new(kind: "integer", text: "42")
+    copy = token.with(text: "43")
+
+    specify "answers an updated copy" do
+      expect(copy.text).to eq("43")
+    end
+
+    specify "leaves the original untouched" do
+      expect(token.text).to eq("42")
+    end
+  end
+end
+
+context "a dot call" do
+  specify "take keywords" do
+    wrap = Wrap.new(actual: 1)
+    expect(wrap.with(actual: 2).actual).to eq(2)
+  end
+end

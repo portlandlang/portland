@@ -1,0 +1,18 @@
+# From ruby/spec core/integer/uminus_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#-@" do
+  specify "negates a value, both directions" do
+    bound = 5
+    expect(-bound).to eq(-5)
+    expect(-(-bound)).to eq(5)
+  end
+
+  specify "and zero is its own negation" do
+    zero = 0
+    expect(-zero).to eq(0)
+  end
+end

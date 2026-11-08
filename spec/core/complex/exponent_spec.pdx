@@ -1,0 +1,15 @@
+# From ruby/spec core/complex/exponent_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#**" do
+  specify "raises to powers as Ruby does" do
+    expect(Complex(1, 2) ** 2).to eq(Complex(-3, 4))
+    expect(inspect(Complex(1, 2) ** 0)).to eq("(1+0i)")
+    expect(inspect(Complex(1, 2) ** -1)).to eq("((1/5)-(2/5)*i)")
+    expect(inspect(Complex(1, 2) ** 0.5)).to eq("(1.272019649514069+0.7861513777574233i)")
+    expect(inspect(Complex(1, 2) ** Complex(0, 1))).to eq("(0.2291401859804338+0.23817011512167555i)")
+  end
+end

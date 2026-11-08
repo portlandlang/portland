@@ -1,0 +1,27 @@
+# `to_i`, `to_f`, and the universal `to_s`.
+#
+# `to_s` is universal — it is what interpolation calls, and every value has an
+# answer. Every value except nil, which has no methods at all (ADR 0006); its
+# absence from these examples is the point of that ADR.
+
+require_relative "../../spec_helper"
+
+# A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's, and
+# interpolation follows: the quotes and colons are what tell `["1"]` from
+# `[1]` in a log line. From ruby/spec core/array/to_s_spec.rb and
+# core/hash/to_s_spec.rb, which compare method objects; here the two
+# answers are compared. `join` is unaffected: it renders each element with
+# its own `to_s`, as Ruby's does.
+context "Array#to_s" do
+  specify "is an alias of Array#inspect" do
+    list = [1, "two", :a, nil, [2, "x"], {a: 1}]
+    expect(list.to_s).to eq(inspect(list))
+    expect(list.to_s).to eq('[1, "two", :a, nil, [2, "x"], {a: 1}]')
+    expect("#{[1, "two"]}").to eq('[1, "two"]')
+    expect([1, [2, "x"]].join(",")).to eq("1,2,x")
+  end
+
+  specify "renders numbers, booleans, and collections" do
+    expect([1, "two"].to_s).to eq('[1, "two"]')
+  end
+end

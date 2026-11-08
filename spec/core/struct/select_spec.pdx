@@ -1,0 +1,31 @@
+# Ruby's Struct as a walk over its fields (#114), from ruby/spec
+# core/struct/{to_a,values,to_h,members,size,length,each,each_pair,select,filter}_spec.rb.
+# The fixtures are struct declarations, not Struct.new, and a Portland
+# struct takes every field by keyword, so Ruby's nil-filled trailing
+# fields are written nil. A field named for one of these views wins, as
+# Ruby's accessor does (the last context). The blockless enumerators, the
+# to_ary coercion (ADR 0036), the class-side members, and the subclass
+# rows stay upstream; the to_h row that interpolates a nil field is
+# written with a year, since nil has no to_s (ADR 0006).
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+struct Ruby
+  version
+  platform
+end
+struct Sized
+  size
+end
+
+context "Struct#select" do
+  specify "returns a new array of elements for which block is true" do
+    car = Car.new(make: "Toyota", model: "Tercel", year: "2000")
+    expect(car.select { |value| value == "2000" }).to eq(["2000"])
+  end
+end

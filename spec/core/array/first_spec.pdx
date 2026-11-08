@@ -1,0 +1,32 @@
+# ADR 0010 — `first` and `last` are partial, so each answers a maybe. The
+# empty-array halves live in spec/portland/optionals/partial_spec.pdx; these
+# are the present halves, and the counted form, which answers an array
+# clamped at the edge.
+#
+# From ruby/spec core/array/first_spec.rb.
+
+require_relative "../../spec_helper"
+
+context "Array#first" do
+  numbers = [3, 1, 2]
+  specify "answers the front" do
+    expect(numbers.first).to eq(3)
+  end
+
+  specify "with a count answers an array" do
+    expect([1, 2, 3].first(2)).to eq([1, 2])
+  end
+
+  specify "with a count clamps — asking for more answers what there is" do
+    expect([1, 2, 3].first(9)).to eq([1, 2, 3])
+  end
+
+  specify "answers nil for first on an empty array" do
+    expect([].first).to be_nil
+  end
+
+  specify "comes back absent when the array was empty" do
+    missing = []
+    expect(missing.first).to be_nil
+  end
+end

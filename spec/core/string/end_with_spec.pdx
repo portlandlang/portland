@@ -1,0 +1,41 @@
+# The question-shaped library: does this string contain, start, or end with?
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{include,start_with,end_with}_spec.rb and the shared
+# start_with/end_with rows. `start_with?` and `end_with?` take any number of
+# candidates. The regex rows wait on #74; the to_str conversion and the
+# refusals (ADR 0036), subclasses, encodings, and the partial-character rows
+# stay upstream.
+
+require_relative "../../spec_helper"
+
+context "String#end_with?" do
+  specify "anchors at the back" do
+    city = "portland"
+    expect(city.end_with?("land")).to be_true
+    expect(city.end_with?("port")).to be_false
+  end
+
+  specify "returns true only if ends match" do
+    greeting = "hello"
+    expect(greeting.end_with?("o")).to be_true
+    expect(greeting.end_with?("llo")).to be_true
+  end
+
+  specify "returns false if the end does not match" do
+    expect("hello".end_with?("ll")).to be_false
+  end
+
+  specify "returns true if the search string is empty" do
+    expect("hello".end_with?("")).to be_true
+    expect("".end_with?("")).to be_true
+  end
+
+  specify "returns true only if any ending match" do
+    expect("hello".end_with?("x", "y", "llo", "z")).to be_true
+  end
+
+  specify "works for multibyte strings" do
+    expect("céréale".end_with?("réale")).to be_true
+  end
+end

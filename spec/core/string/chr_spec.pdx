@@ -1,0 +1,27 @@
+# A string's ends (#106), from ruby/spec core/string/{chop,chr,delete_prefix,delete_suffix}_spec.rb.
+# The bang forms (values never mutate, ADR 0015), the to_str conversion
+# (ADR 0036), subclasses, encodings, the broken-byte rows, and identity
+# checks stay upstream; chr's row mixing character widths spells one of
+# them with a \u escape Portland does not have.
+
+require_relative "../../spec_helper"
+
+context "String#chr" do
+  specify "returns an empty String if self is an empty String" do
+    expect("".chr).to eq("")
+  end
+
+  specify "returns a 1-character String" do
+    expect("glark".chr.size).to eq(1)
+  end
+
+  specify "returns the character at the start of the String" do
+    expect("Goodbye, world".chr).to eq("G")
+  end
+
+  specify "understands multi-byte characters" do
+    s = "项"
+    expect(s.bytesize).to eq(3)
+    expect(s.chr).to eq(s)
+  end
+end

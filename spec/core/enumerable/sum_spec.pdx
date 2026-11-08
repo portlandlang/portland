@@ -1,0 +1,85 @@
+# Ruby's Enumerable extremes and sums on an Enumerable struct (#110):
+# `min`, `max`, `minmax_by`, `min_by`, `max_by`, `sort_by`, and `sum`,
+# ordering by `<=>` (ADR 0054) or by the block's answers.
+#
+# From ruby/spec core/enumerable/{min,max,min_by,max_by,minmax_by,sort_by,
+# sum}_spec.rb. Upstream's EachDefiner is a loop over an array; here it
+# is the same struct as Numerous. What stays behind: `min(n)` and `max(n)`
+# with a count, the blockless enumerators (ADR 0055), elements without
+# `<=>` and incompatible pairs (which refuse where Ruby raises), the rows
+# that order nils through truthiness or find a nil (`min_by` answers a
+# maybe, so a found nil is a present nil), the comparator block answering
+# something other than -1, 0, or 1, mocks of `each`, and rationals.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+STRINGS = ["333", "22", "666666", "1", "55555", "1010101010"]
+INTEGERS = [333, 22, 666666, 55555, 1010101010]
+
+context "Enumerable#sum" do
+  elements = numerous([0, -1, 2, 3])
+
+  specify "returns amount of the elements with taking an argument as the initial value" do
+    expect(elements.sum(10)).to eq(14)
+  end
+
+  specify "gives 0 as a default argument" do
+    expect(elements.sum).to eq(4)
+  end
+
+  describe "with a block" do
+    specify "transforms the elements" do
+      expect(elements.sum { |element| element * 2 }).to eq(8)
+    end
+
+    specify "does not destructure array elements" do
+      expect(numerous([[1, 2], [3]]).sum { |pair| pair.last }).to eq(5)
+    end
+  end
+
+  specify "uses Kahan's compensated summation algorithm for precise sum of float numbers" do
+    floats = numerous([2.7800000000000002, 5.0, 2.5, 4.44, 3.89, 3.89, 4.44, 7.78, 5.0, 2.7800000000000002, 5.0, 2.5])
+    naive_sum = floats.inject(0.0) { |sum, element| sum + element }
+    expect(naive_sum).to eq(50.00000000000001)
+    expect(floats.sum).to eq(50.0)
+  end
+
+  specify "answers Ruby's names from what each yields" do
+    expect(numerous(DEFAULT).sum).to eq(21)
+  end
+
+  specify "adds without being spelled out" do
+    expect((1..5).sum).to eq(15)
+  end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].sum).to eq(6)
+  end
+end

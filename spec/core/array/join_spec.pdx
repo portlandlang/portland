@@ -1,0 +1,38 @@
+# `join` renders each element the way `to_s` would, then splices (#39).
+
+require_relative "../../spec_helper"
+
+# From ruby/spec core/array/join_spec.rb and its shared rows. The to_str
+# and to_ary conversions (ADR 0036), $,, recursive arrays (values never
+# mutate), encodings, and the refusal rows stay upstream.
+context "Array#join" do
+  specify "returns a string formed by concatenating each element.to_str separated by separator" do
+    expect([1, 2, 3, 4, "foo"].join(" | ")).to eq("1 | 2 | 3 | 4 | foo")
+  end
+
+  specify "uses the same separator with nested arrays" do
+    expect([1, [2, [3, 4], 5], 6].join(":")).to eq("1:2:3:4:5:6")
+  end
+
+  specify "does not separate elements when the passed separator is nil" do
+    expect([1, 2, 3].join(nil)).to eq("123")
+  end
+
+  specify "splices on a separator" do
+    expect([3, 1, 2].join("-")).to eq("3-1-2")
+  end
+
+  specify "renders each element as to_s would" do
+    expect([1, "two", true].join(" ")).to eq("1 two true")
+  end
+
+  specify "joins with nothing between when given no separator" do
+    expect(["a", "b"].join).to eq("ab")
+    expect([1, 2].join).to eq("12")
+  end
+end
+context "Array#join with default separator" do
+  specify "returns an empty string if the Array is empty" do
+    expect([].join).to eq("")
+  end
+end

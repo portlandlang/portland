@@ -1,0 +1,48 @@
+# From ruby/spec core/range/equal_value_spec.rb.
+#
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#==" do
+  specify "returns true if other has same begin, end, and exclude_end? values" do
+    expect((0..2) == (0..2)).to eq(true)
+    expect((0xffff..0xfffff) == (0xffff..0xfffff)).to eq(true)
+  end
+
+  specify "returns false if one of the attributes differs" do
+    expect((1482..1911) == (1482...1911)).to eq(false)
+    expect((0xffff..0xfffff) == (0xffff...0xfffff)).to eq(false)
+  end
+
+  specify "returns false if other is not a Range" do
+    expect((1..10) == 1).to eq(false)
+    expect((1..10) == "a").to eq(false)
+  end
+
+  specify "works for endless Ranges" do
+    expect((1..) == (1..)).to eq(true)
+    expect((1..) == (1...)).to eq(false)
+  end
+
+  specify "returns true if the endpoints are == for beginless ranges" do
+    expect((...10) == (...10)).to eq(true)
+  end
+
+  specify "asks == of the ends, and eql? asks eql?" do
+    expect((0..1) == (0..1.0)).to be_true
+    expect(("a".."c") == ("a".."c")).to be_true
+    expect(("a".."c") == ("a"..."c")).to be_false
+    expect((1.0..) == (1.0..)).to be_true
+    expect((...10) == (...10)).to be_true
+  end
+end

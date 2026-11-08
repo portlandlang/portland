@@ -1,0 +1,31 @@
+# From ruby/spec core/array/minus_spec.rb.
+#
+# Array's set arithmetic (#104), from ruby/spec core/array: - and
+# difference (through upstream's shared array_binary_difference), union
+# (array_binary_union), intersection (array_intersection), and intersect?.
+# Elements match by eql?, as Ruby's do. Staying upstream: the Array#| and
+# Array#& groups (ADR 0003 keeps both operators out of the grammar; union
+# and intersection are their spelling), mocks stubbing hash and eql?,
+# to_ary conversion (ADR 0036), recursive arrays and identity checks
+# (values never mutate), and subclasses. Upstream's uniq! check asks
+# whether uniq changes the answer.
+
+require_relative "../../spec_helper"
+
+context "Array#-" do
+  specify "creates an array minus any items from other array" do
+    expect([] - [1, 2, 4]).to eq([])
+    expect([1, 2, 4] - []).to eq([1, 2, 4])
+    expect([1, 2, 3, 4, 5] - [1, 2, 4]).to eq([3, 5])
+  end
+
+  specify "removes multiple items on the lhs equal to one on the rhs" do
+    expect([1, 1, 2, 2, 3, 3, 4, 5] - [1, 2, 4]).to eq([3, 3, 5])
+  end
+
+  specify "is not destructive" do
+    numbers = [1, 2, 3]
+    numbers - [1]
+    expect(numbers).to eq([1, 2, 3])
+  end
+end

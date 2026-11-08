@@ -97,8 +97,8 @@ fn the_checker_passes_the_compilers_own_source() {
 
 /// Every `*_spec.pdx` under a directory, recursively.
 ///
-/// Recursive because specs nest: `spec/numbers/integers_spec.pdx` groups by
-/// subject, and a spec that silently never runs is the worst way to be green.
+/// Recursive because specs nest: `spec/core/integer/to_r_spec.pdx` mirrors
+/// ruby/spec's layout, and a spec that silently never runs is the worst way to be green.
 /// Named rather than extension-matched so `spec_helper.pdx` is left alone —
 /// running a library as a spec reports zero examples and passes, which is noise
 /// dressed as coverage.

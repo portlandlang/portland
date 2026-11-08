@@ -1,0 +1,20 @@
+# From ruby/spec core/float/divide_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#/" do
+  specify "add, subtract, multiply, divide" do
+    expect(7.5 / 2.5).to eq(3.0)
+  end
+
+  specify "answers Infinity, signed" do
+    expect((1.0 / 0.0).to_s).to eq("Infinity")
+    expect((-1.0 / 0.0).to_s).to eq("-Infinity")
+  end
+
+  specify "and zero by zero answers NaN" do
+    expect((0.0 / 0.0).to_s).to eq("NaN")
+  end
+end

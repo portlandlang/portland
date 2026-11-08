@@ -1,0 +1,12 @@
+# Portland's own: what differs from Ruby here, moved out of the ruby/spec
+# mirror.
+
+require_relative "../../spec_helper"
+
+context "or-equals" do
+  specify "a stored nil beats the fallback — fetch's rule" do
+    mutable stock = {"b" => nil}
+    stock["b"] ||= 3
+    expect(stock["b"]).to eq(some(nil))
+  end
+end

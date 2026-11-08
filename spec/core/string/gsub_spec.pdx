@@ -1,0 +1,65 @@
+# Finding, counting, and replacing inside a string.
+#
+# From ruby/spec core/string/{index,rindex,count,lines,each_line,sub,gsub}_spec.rb.
+# `sub` and `gsub` take a string pattern and a string replacement or a
+# block; the regex patterns, the hash replacement, and Ruby's backslash
+# escapes in a replacement (#161) wait on the regex decision (#74), and the
+# to_str conversions (ADR 0036), subclasses, encodings, and the $~ rows
+# stay upstream. `count` takes a single character only: Ruby's
+# multi-character count is a character-set count, not a substring count,
+# and following it quietly would be principle 5's exact shape — so more
+# than one character refuses, naming the trap. `each_line` takes no
+# separator yet (#106).
+
+require_relative "../../spec_helper"
+
+context "String#gsub with pattern and replacement" do
+  specify "doesn't interpret regexp metacharacters if pattern is a string" do
+    expect("12345".gsub('\d', "a")).to eq("12345")
+    expect('\d'.gsub('\d', "a")).to eq("a")
+  end
+
+  specify "replace the first match or every one" do
+    expect("hello world".gsub(/o/, "0")).to eq("hell0 w0rld")
+    expect("hello".gsub(/z/, "0")).to eq("hello")
+  end
+
+  specify "read the replacement's escapes" do
+    expect("ab".gsub(/(?<x>a)/, '<\k<x>>')).to eq("<a>b")
+    expect("ab".gsub(/b/, '\&\&')).to eq("abb")
+    expect("ab".gsub(/b/, '\0\0')).to eq("abb")
+    expect("ab".gsub(/b/, '\\\\')).to eq('a\\')
+  end
+
+  specify "read the escapes with a string pattern too" do
+    expect("hello".gsub("l", '<\&>')).to eq("he<l><l>o")
+  end
+
+  specify "hand the block the matched text" do
+    expect("hello world".gsub(/\w+/) { |word| word.capitalize }).to eq("Hello World")
+    expect("a1b2".gsub(/\d/) { |digit| (digit.to_i * 2).to_s }).to eq("a2b4")
+  end
+
+  specify "match the empty pattern at every character boundary" do
+    expect("aaa".gsub(//, "-")).to eq("-a-a-a-")
+    expect("abc".gsub(/b*/, "X")).to eq("XaXXcX")
+  end
+
+  specify "take the flags" do
+    expect("Hello".gsub(/l/i, "L")).to eq("HeLLo")
+  end
+end
+
+context "String#gsub with pattern and block" do
+  specify "returns a copy of self with all occurrences of pattern replaced with the block's return value" do
+    expect("hello".gsub("l") { "x" }).to eq("hexxo")
+  end
+end
+
+context "String#gsub with a string pattern" do
+  specify "handles multibyte characters" do
+    expect("é".gsub("é", "â")).to eq("â")
+    expect("aé".gsub("é", "â")).to eq("aâ")
+    expect("éa".gsub("é", "â")).to eq("âa")
+  end
+end

@@ -1,0 +1,48 @@
+# `eql?` on every value (ADR 0059): the equality a hash key matches by —
+# same kind and same value, no promotion between numbers, element by
+# element through arrays, hashes, ranges, and structs. `hash` is not
+# exposed; `value.hash` refuses, pinned by a two-oracle test.
+#
+# From ruby/spec core/{array,hash,range,struct,integer,float,string}/
+# eql_spec.rb and their shared files. What stays behind: the mocks counting
+# their calls, the recursive arrays and hashes (values never mutate, so
+# none can hold itself), to_ary and to_hash, subclasses, Hash.new defaults,
+# bignums, rationals, encodings, and the String rows Ruby's `<=>` answers.
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+
+context "Hash#eql?" do
+  specify "does not compare values when keys don't match" do
+    expect({1 => "x"}.eql?({2 => "x"})).to be_false
+  end
+
+  specify "returns false when the numbers of keys differ without comparing any elements" do
+    expect({}.eql?({1 => 1})).to be_false
+    expect({1 => 1}.eql?({})).to be_false
+  end
+
+  specify "compares keys with eql? semantics" do
+    expect({1.0 => "x"}.eql?({1.0 => "x"})).to be_true
+    expect({1 => "x"}.eql?({1.0 => "x"})).to be_false
+    expect({1.0 => "x"}.eql?({1 => "x"})).to be_false
+  end
+
+  specify "returns true if and only if other Hash has the same number of keys and each key-value pair matches" do
+    expect({a: 5}.eql?({})).to be_false
+    expect({a: 5}.eql?({a: 5})).to be_true
+    expect({a: 5}.eql?({"a" => 5})).to be_false
+    expect({a: 5}.eql?({"A" => 5})).to be_false
+    expect({a: 5}.eql?({a: 6})).to be_false
+  end
+
+  specify "compares the values in self to values in other hash" do
+    expect({1 => 2}.eql?({1 => 2.0})).to be_false
+    expect({1 => [2]}.eql?({1 => [2]})).to be_true
+  end
+end

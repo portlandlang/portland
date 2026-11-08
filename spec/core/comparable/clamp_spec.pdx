@@ -1,0 +1,119 @@
+# `Comparable#clamp` with two bounds (ADR 0054).
+#
+# From ruby/spec core/comparable/clamp_spec.rb, the two-argument half. Ruby's
+# `should.equal?` asks identity; Portland values have none, and a struct is
+# equal field by field, so these ask `==`. What stays behind: bounds given
+# backwards refuse rather than raise (a spec never refuses — the seed's unit
+# tests and a two-oracle test pin it); nil as either bound (no ambient nil);
+# and an exclusive range with an end, which refuses as Ruby raises.
+
+require_relative "../../spec_helper"
+
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+
+struct Weird
+  value
+
+  include Comparable
+
+  def <=>(other) = value <=> other.value
+end
+
+context "Comparable#clamp" do
+  specify "clamps floats and strings by their ends" do
+    expect(2.0.clamp(1.5..2.5)).to eq(2.0)
+    expect(3.0.clamp(1.5..2.5)).to eq(2.5)
+    expect("b".clamp("c".."f")).to eq("c")
+    expect("m".clamp("c".."f")).to eq("f")
+    expect("d".clamp("c"..)).to eq("d")
+  end
+
+  specify "work on numbers and strings" do
+    expect(11.clamp(1, 9)).to eq(9)
+    expect("m".clamp("a", "f")).to eq("f")
+  end
+
+  specify "takes between? and clamp" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+    expect(older.clamp(newer, newer)).to eq(newer)
+  end
+
+  specify "returns self if within the given parameters" do
+    one = Weird.new(value: 1)
+    two = Weird.new(value: 2)
+    three = Weird.new(value: 3)
+    c = Weird.new(value: 2)
+    expect(c.clamp(one, two)).to eq(c)
+    expect(c.clamp(two, two)).to eq(c)
+    expect(c.clamp(one, three)).to eq(c)
+    expect(c.clamp(two, three)).to eq(c)
+  end
+
+  specify "returns the min parameter if less than it" do
+    one = Weird.new(value: 1)
+    two = Weird.new(value: 2)
+    expect(Weird.new(value: 0).clamp(one, two)).to eq(one)
+  end
+
+  specify "returns the max parameter if greater than it" do
+    one = Weird.new(value: 1)
+    two = Weird.new(value: 2)
+    expect(Weird.new(value: 3).clamp(one, two)).to eq(two)
+  end
+
+  specify "works on the builtin orderables too" do
+    expect(5.clamp(1, 9)).to eq(5)
+    expect(0.clamp(1, 9)).to eq(1)
+    expect(2.5.clamp(1, 2)).to eq(2)
+    expect("m".clamp("a", "f")).to eq("f")
+  end
+
+  specify "clamps a struct by a range of structs" do
+    one = Weird.new(value: 1)
+    two = Weird.new(value: 2)
+    three = Weird.new(value: 3)
+    inside = Weird.new(value: 2)
+    expect(inside.clamp(one..two)).to eq(inside)
+    expect(inside.clamp(two..two)).to eq(inside)
+    expect(inside.clamp(one..three)).to eq(inside)
+    expect(inside.clamp(two..three)).to eq(inside)
+    expect(Weird.new(value: 0).clamp(one..two)).to eq(one)
+    expect(Weird.new(value: 3).clamp(one..two)).to eq(two)
+  end
+
+  specify "clamps a struct on one side by an open range" do
+    one = Weird.new(value: 1)
+    zero = Weird.new(value: 0)
+    inside_two = Weird.new(value: 2)
+    expect(zero.clamp(one..)).to eq(one)
+    expect(zero.clamp(zero..)).to eq(zero)
+    expect(inside_two.clamp(one..)).to eq(inside_two)
+    expect(inside_two.clamp(one...)).to eq(inside_two)
+    expect(inside_two.clamp(..one)).to eq(one)
+    expect(zero.clamp(..one)).to eq(zero)
+  end
+
+  specify "clamps a number between the range's ends" do
+    expect(5.clamp(1..3)).to eq(3)
+    expect(0.clamp(1..3)).to eq(1)
+    expect(2.clamp(1..3)).to eq(2)
+    expect(2.5.clamp(1..3)).to eq(2.5)
+    expect(7.5.clamp(1..3)).to eq(3)
+  end
+
+  specify "clamps one side only for an endless or beginless range" do
+    expect(5.clamp(1..)).to eq(5)
+    expect(0.clamp(1..)).to eq(1)
+    expect(5.clamp(..3)).to eq(3)
+    expect(0.clamp(..3)).to eq(0)
+    expect(5.clamp(1...)).to eq(5)
+  end
+end

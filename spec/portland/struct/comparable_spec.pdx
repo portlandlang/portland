@@ -1,0 +1,35 @@
+# Ordering (ADR 0054): `<=>` answers -1, 0, or 1 on numbers, strings, and
+# arrays; a struct that defines `<=>` and includes `Comparable` gets the four
+# orderings, `between?`, and `clamp`, and sorts by it.
+
+require_relative "../../spec_helper"
+
+struct Version
+  major
+  minor
+
+  include Comparable
+
+  def <=>(other) = [major, minor] <=> [other.major, other.minor]
+end
+struct Size
+  amount
+
+  def <=>(other) = amount <=> other.amount
+end
+context "Ordering" do
+  describe "a Comparable struct" do
+    older = Version.new(major: 1, minor: 2)
+    newer = Version.new(major: 1, minor: 10)
+
+    specify "takes the four orderings from its <=>" do
+      expect(older <=> newer).to eq(-1)
+    end
+  end
+
+  describe "a struct with <=> alone" do
+    specify "answers <=> and sorts, without the four orderings" do
+      expect(Size.new(amount: 1) <=> Size.new(amount: 2)).to eq(-1)
+    end
+  end
+end

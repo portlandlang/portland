@@ -1,0 +1,172 @@
+# `break` and `return` leave a block for the caller to handle — a `break`
+# ends the call that was handed its block (#166), and a `return` aims at
+# the method its block was *written* in (ADR 0025).
+
+require_relative "../spec_helper"
+
+def broken_out
+  [1, 2].each do
+    break
+  end
+end
+# From ruby/spec language/break_spec.rb, "The break statement in a block":
+# the notes are the upstream fixture's, kept in a mutable array the blocks
+# rebind in place of ScratchPad. Values never mutate (ADR 0015), so a note
+# the yielding method takes on its own copy is not the caller's to see;
+# what the method would have answered after the yield stands in for its
+# notes, and the call answering nil shows it was never reached. `break`
+# carries no value here (ADR 0012), so the value rows stay upstream.
+def yielding
+  yielded = yield
+  [:bb, yielded]
+end
+def break_nil
+  mutable notes = [:a]
+  answer = yielding {
+    notes << :b
+    break
+    notes << :c
+  }
+  notes << answer
+  notes << :d
+  notes
+end
+def invoke_yield_in_while
+  mutable looping = true
+  while looping
+    yield
+    looping = false
+  end
+  :should_not_reach_here
+end
+def break_in_block_in_while
+  mutable notes = []
+  answer = invoke_yield_in_while do
+    notes << :break
+    break
+    notes << :c
+  end
+  [notes, answer]
+end
+# A block's `yield` reaches its writer's block (#49), so a helper handed
+# `{ yield }` delegates; the `break` in the outermost block still ends the
+# call that was handed it, not the helper's.
+def delegating
+  yield_value { yield }
+  :postdelegate
+end
+def yield_value
+  yield
+  :postyield
+end
+def break_through_delegation
+  mutable notes = [:begin]
+  answer = delegating do
+    notes << :prebreak
+    break
+    notes << :postbreak
+  end
+  notes << answer
+  notes << :end
+  notes
+end
+# `return` exits the enclosing method, unwinding through blocks — the
+# or-guard's load-bearing half, and a promise the compiler dropped until #41.
+def through_blocks
+  [1, 2, 3].each do
+    return "unwound"
+  end
+  "never reached"
+end
+# ADR 0025 — a return belongs to the method its block was *written* in, so a
+# yielding helper is transparent to it: `apply` here never gets to answer.
+def apply
+  yield
+  "apply's own answer"
+end
+def through_a_yield
+  apply do
+    return "unwound past the helper"
+  end
+  "never reached"
+end
+# From ruby/spec language/return_spec.rb, the rows a method can carry
+# here: the lambda rows wait on the proc question (#77), the ensure rows
+# have no begin to attach to, splats are deferred (ADR 0014), there are no
+# threads, loaded files, or define_method, and a bare `return` answers no
+# value rather than nil — reading it refuses (ADR 0012), so the default row
+# stays upstream. Declarations sit at the top level.
+def returns_one
+  return 1
+end
+def returns_a_single_element_array
+  return [1]
+end
+def returns_a_multi_element_array
+  return [1, 2]
+end
+def returns_through_two_blocks
+  [1].each do
+    [1].each do
+      return true
+    end
+    false
+  end
+  false
+end
+def returns_within_if
+  mutable seen = ["before if"]
+  if true
+    return seen
+  end
+  seen << "after if"
+  seen
+end
+def returns_within_while
+  mutable seen = ["before while"]
+  while true
+    return seen
+  end
+  seen << "after while"
+  seen
+end
+
+context "The return keyword" do
+  specify "returns any object directly" do
+    expect(returns_one).to eq(1)
+  end
+
+  specify "returns an single element array directly" do
+    expect(returns_a_single_element_array).to eq([1])
+  end
+
+  specify "returns an multi element array directly" do
+    expect(returns_a_multi_element_array).to eq([1, 2])
+  end
+
+  describe "within two blocks" do
+    specify "causes the method that lexically encloses the block to return" do
+      expect(returns_through_two_blocks).to be_true
+    end
+  end
+
+  describe "within if" do
+    specify "is allowed" do
+      expect(returns_within_if).to eq(["before if"])
+    end
+  end
+
+  describe "within while loop" do
+    specify "is allowed" do
+      expect(returns_within_while).to eq(["before while"])
+    end
+  end
+
+  specify "unwinds the enclosing method" do
+    expect(through_blocks).to eq("unwound")
+  end
+
+  specify "unwinds to its write site, through a yielding helper" do
+    expect(through_a_yield).to eq("unwound past the helper")
+  end
+end

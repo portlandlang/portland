@@ -1,0 +1,58 @@
+# From ruby/spec language/def_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../spec_helper"
+
+module Doubling
+  def self.double(value)
+    value * 2
+  end
+end
+
+def add(first,
+        second)
+  first + second
+end
+def greet name, punctuation
+  "hi #{name}#{punctuation}"
+end
+def label kind,
+          text
+  "#{kind}: #{text}"
+end
+def double(number) = number * 2
+def fallback bar = 9
+  bar
+end
+
+def bang_named!
+  "loud and proud"
+end
+
+context "Redefining a method" do
+  specify "a bang is just part of a method's name now" do
+    expect(bang_named!).to eq("loud and proud")
+  end
+
+  specify "continue past commas and close on their own line" do
+    expect(add(1, 2)).to eq(3)
+  end
+
+  specify "take a comma-separated list to the end of the line" do
+    expect(greet("pdx", "!")).to eq("hi pdx!")
+  end
+
+  specify "continue past a trailing comma" do
+    expect(label("word", "rose")).to eq("word: rose")
+  end
+
+  specify "take defaults, which is why endless defs require parens" do
+    expect(fallback).to eq(9)
+    expect(fallback(3)).to eq(3)
+  end
+
+  specify "is a plain def — Ruby's spelling of the same meaning" do
+    expect(Doubling.double(21)).to eq(42)
+  end
+end

@@ -1,0 +1,33 @@
+# From ruby/spec core/matchdata/equal_value_spec.rb.
+#
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#==" do
+  specify "returns true if both operands have equal target strings, patterns, and match positions" do
+    expect("haystack".match(/hay/) == "haystack".match(/hay/)).to be_true
+  end
+
+  specify "returns false if the operands have different target strings" do
+    expect("hay".match(/hay/) == "haystack".match(/hay/)).to be_false
+  end
+
+  specify "returns false if the operands have different patterns" do
+    expect("haystack".match(/h.y/) == "haystack".match(/hay/)).to be_false
+  end
+
+  specify "returns false if the argument is not a MatchData object" do
+    expect("haystack".match(/hay/) == "hay").to be_false
+  end
+end

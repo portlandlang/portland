@@ -1,0 +1,28 @@
+# A float's denominator through its exact rational (#108, ADR 0085), NaN
+# and the infinities answering 1 as Ruby's do. NaN is 0.0 / 0.0 and
+# infinity 1.0 / 0.0.
+#
+# From ruby/spec core/float/denominator_spec.rb.
+
+require_relative "../../spec_helper"
+
+context "Float#denominator" do
+  numbers = [0.0, 29871.22736282, 7772222663.0, 1.4592].map { |number| [0 - number, number] }.flatten
+
+  specify "returns an Integer" do
+    numbers.each do |number|
+      expect(number.denominator.class).to eq(Integer)
+    end
+  end
+
+  specify "converts self to a Rational and returns the denominator" do
+    numbers.each do |number|
+      expect(number.denominator).to eq(Rational(number).denominator)
+    end
+  end
+
+  specify "returns 1 for NaN and Infinity" do
+    expect((0.0 / 0.0).denominator).to eq(1)
+    expect((1.0 / 0.0).denominator).to eq(1)
+  end
+end

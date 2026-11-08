@@ -1,0 +1,40 @@
+# From ruby/spec language/regexp/subexpression_call_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect(pattern)} on #{inspect(text)}")).to_a
+
+context "Regexps with subexpression calls" do
+  specify "\\k<name> is a named back-reference and \\g<name> a call" do
+    expect(found(/(?<three_digits>[0-9]{3})-\k<three_digits>/, "123-123")).to eq(["123-123", "123"])
+    expect(/(?<three_digits>[0-9]{3})-\k<three_digits>/.match("123-456")).to be_nil
+    expect(found(/(?<three_digits>[0-9]{3})-\g<three_digits>/, "123-456")).to eq(["123-456", "456"])
+  end
+
+  specify "numeric calls" do
+    expect(found(/(a)\g<1>/, "aa")).to eq(["aa", "a"])
+  end
+
+  specify "recursive calls" do
+    parens = /^ (?<parens>  (?: \( \g<parens> \) | [^()] )*  ) $/x
+    expect(found(parens, "((a)(b))c(d)")).to eq(["((a)(b))c(d)", "((a)(b))c(d)"])
+    expect(parens.match("((a)(b)c(d)")).to be_nil
+  end
+
+  specify "back-references from the current level" do
+    mirror = /^ (?<mirror> (?: (?<first_char>.) \g<mirror> \k<first_char-0> )? ) $/x
+    expect(found(mirror, "abccba")[0]).to eq("abccba")
+    expect(mirror.match("abccbd")).to be_nil
+    broken_mirror = /^ (?<mirror> (?: (?<first_char>.) \g<mirror> \k<first_char> )? ) $/x
+    expect(broken_mirror.match("abccba")).to be_nil
+    expect(found(broken_mirror, "abcccc")[0]).to eq("abcccc")
+  end
+
+  specify "+ and - in group names" do
+    expect(found(/(?<a+>a)\g<a+>/, "aa")).to eq(["aa", "a"])
+    expect(found(/(?<a-b>a)\g<a-b>/, "aa")).to eq(["aa", "a"])
+    expect(found(/(?<a-1>a)\g<a-1>/, "aa")).to eq(["aa", "a"])
+  end
+end

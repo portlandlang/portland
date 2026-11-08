@@ -1,0 +1,116 @@
+# A string's leading number as a complex (ADR 0085): Ruby's own lenient
+# reader, ported from complex.c — leading spaces skipped, reading
+# stopping at the first character that does not fit, text with no number
+# answering zero.
+#
+# From ruby/spec core/string/to_c_spec.rb and the shared kernel_complex
+# examples. Upstream: the NUL-byte rows (Portland strings do not escape
+# `\0`) and the UTF-16 encoding row (every string is UTF-8, ADR 0069).
+
+require_relative "../../spec_helper"
+
+context "String#to_c" do
+  specify "returns a Complex object" do
+    expect("9".to_c.class).to eq(Complex)
+  end
+
+  specify "understands integers" do
+    expect("20".to_c).to eq(Complex(20))
+    expect("-3".to_c).to eq(Complex(-3))
+  end
+
+  specify "understands fractions for the real and the imaginary part" do
+    expect("2/3".to_c).to eq(Complex(Rational(2, 3)))
+    expect("4+2/3i".to_c).to eq(Complex(4, Rational(2, 3)))
+    expect("-2/3".to_c).to eq(Complex(Rational(-2, 3)))
+    expect("7-2/3i".to_c).to eq(Complex(7, Rational(-2, 3)))
+  end
+
+  specify "understands floats for the real and the imaginary part" do
+    expect("2.3".to_c).to eq(Complex(2.3))
+    expect("4+2.3i".to_c).to eq(Complex(4, 2.3))
+    expect("-2.33".to_c).to eq(Complex(-2.33))
+    expect("7-28.771i".to_c).to eq(Complex(7, -28.771))
+  end
+
+  specify "understands a number followed by 'i' as the imaginary part" do
+    expect("35i".to_c).to eq(Complex(0, 35))
+    expect("-29i".to_c).to eq(Complex(0, -29))
+  end
+
+  specify "understands an 'i' by itself as an imaginary part of 1, and '-i' as -1" do
+    expect("i".to_c).to eq(Complex(0, 1))
+    expect("-i".to_c).to eq(Complex(0, -1))
+  end
+
+  specify "understands 'a+bi' and 'a-bi'" do
+    expect("79+4i".to_c).to eq(Complex(79, 4))
+    expect("79-4i".to_c).to eq(Complex(79, -4))
+  end
+
+  specify "understands 'a+i' and 'a-i'" do
+    expect("79+i".to_c).to eq(Complex(79, 1))
+    expect("79-i".to_c).to eq(Complex(79, -1))
+  end
+
+  specify "understands i, I, j, and J imaginary units" do
+    expect("79+4i".to_c).to eq(Complex(79, 4))
+    expect("79+4I".to_c).to eq(Complex(79, 4))
+    expect("79+4j".to_c).to eq(Complex(79, 4))
+    expect("79+4J".to_c).to eq(Complex(79, 4))
+  end
+
+  specify "understands scientific notation, with e and E" do
+    expect("2e3+4i".to_c).to eq(Complex(2e3, 4))
+    expect("-2e3+4i".to_c).to eq(Complex(-2e3, 4))
+    expect("4+2e3i".to_c).to eq(Complex(4, 2e3))
+    expect("4-2e3i".to_c).to eq(Complex(4, -2e3))
+    expect("2e3+2e4i".to_c).to eq(Complex(2e3, 2e4))
+    expect("-2e3-2e4i".to_c).to eq(Complex(-2e3, -2e4))
+    expect("2E3+2E4i".to_c).to eq(Complex(2e3, 2e4))
+  end
+
+  specify "understands 'm@a' as polar form, the modulus and the argument" do
+    expect("79@4".to_c).to eq(Complex.polar(79, 4))
+    expect("-79@4".to_c).to eq(Complex.polar(-79, 4))
+    expect("79@-4".to_c).to eq(Complex.polar(79, -4))
+  end
+
+  specify "ignores leading and trailing whitespace" do
+    expect("  79+4i".to_c).to eq(Complex(79, 4))
+    expect("79+4i  ".to_c).to eq(Complex(79, 4))
+  end
+
+  specify "understands _" do
+    expect("7_9+4_0i".to_c).to eq(Complex(79, 40))
+  end
+
+  specify "returns 0 for both parts of an unrecognised String" do
+    expect("ruby".to_c).to eq(Complex(0, 0))
+  end
+
+  specify "ignores trailing garbage" do
+    expect("79+4iruby".to_c).to eq(Complex(79, 4))
+    expect("7__9+4__0i".to_c).to eq(Complex(7, 0))
+  end
+
+  specify "parses any string that starts with 'I' as 1i" do
+    expect("Infinity".to_c).to eq(Complex(0, 1))
+    expect("-Infinity".to_c).to eq(Complex(0, -1))
+    expect("Insecure".to_c).to eq(Complex(0, 1))
+    expect("-Insecure".to_c).to eq(Complex(0, -1))
+  end
+
+  specify "does not parse any numeric information in 'NaN'" do
+    expect("NaN".to_c).to eq(Complex(0, 0))
+  end
+
+  specify "treats a sequence of underscores as an end of Complex string" do
+    expect("5+3_1i".to_c).to eq(Complex(5, 31))
+    expect("5+3__1i".to_c).to eq(Complex(5))
+    expect("5+3___1i".to_c).to eq(Complex(5))
+    expect("12_3".to_c).to eq(Complex(123))
+    expect("12__3".to_c).to eq(Complex(12))
+    expect("12___3".to_c).to eq(Complex(12))
+  end
+end

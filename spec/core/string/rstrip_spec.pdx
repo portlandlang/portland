@@ -1,0 +1,11 @@
+# From ruby/spec core/string/rstrip_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#rstrip" do
+  specify "String#lstrip and #rstrip take one end each" do
+    expect("rose  ".rstrip).to eq("rose")
+  end
+end

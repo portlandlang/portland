@@ -1,0 +1,17 @@
+# From ruby/spec core/string/multiply_spec.rb.
+#
+# `+` concatenates and `*` repeats — neither mutates, because nothing does.
+
+require_relative "../../spec_helper"
+
+context "String#*" do
+  specify "repeats" do
+    expect("ab" * 3).to eq("ababab")
+  end
+
+  specify "returns a new string containing count copies of self" do
+    expect("cool" * 0).to eq("")
+    expect("cool" * 1).to eq("cool")
+    expect("cool" * 3).to eq("coolcoolcool")
+  end
+end

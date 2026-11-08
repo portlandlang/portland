@@ -1,0 +1,54 @@
+# ADR 0031 — `new` is one of the definable names: defining it replaces the
+# raw constructor everywhere, and inside it — and only there — `fields(...)`
+# is the raw kwargs-in-fields-out layer.
+
+require_relative "../../spec_helper"
+
+module Shop
+  struct Token
+    text
+
+    def twin = self.class.new(text: text)
+
+    def self.blank = Shop::Token.new(text: "")
+  end
+end
+struct Counted
+  count
+
+  def self.new(count:)
+    fields(count: count + 1)
+  end
+end
+
+struct Badge
+  label
+
+  def self.new(raw)
+    return failure("a badge needs text") if raw.empty?
+    fields(label: raw)
+  end
+end
+context "construction" do
+  describe "a defined new" do
+    specify "replaces the raw constructor, positional signature included" do
+      expect(Badge.new("rose").label).to eq("rose")
+    end
+
+    specify "answers a failure when its own rule refuses" do
+      expect(Badge.new("")).to be_failure
+    end
+
+    specify "and the failure is one the toolkit handles" do
+      badge = Badge.new("") or Badge.new("fallback")
+      expect(badge.label).to eq("fallback")
+    end
+  end
+end
+
+context "value.class" do
+  specify "builds another through new, a defined new included" do
+    expect(Shop::Token.new(text: "x").twin).to eq(Shop::Token.new(text: "x"))
+    expect(Counted.new(count: 1).class.new(count: 5)).to eq(Counted.new(count: 5))
+  end
+end

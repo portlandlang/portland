@@ -1,0 +1,77 @@
+# Stepping a string forward (#106), from ruby/spec core/string/{succ,next,upto}_spec.rb.
+# `succ` follows Ruby's own carry rule, so its rows are Ruby's rows; the
+# binary \xFF rows, the bang forms (ADR 0015), subclasses, encodings, and
+# the to_str conversion (ADR 0036) stay upstream. `upto` without a block is
+# an enumerator in Ruby and nothing here (ADR 0055), so its blockless rows
+# stay upstream too, and the Integer#upto row collects through a range.
+
+require_relative "../../spec_helper"
+
+context "String#upto" do
+  specify "passes successive values, starting at self and ending at other_string, to the block" do
+    mutable seen = []
+    "*+".upto("*3") { |step| seen << step }
+    expect(seen).to eq(["*+", "*,", "*-", "*.", "*/", "*0", "*1", "*2", "*3"])
+  end
+
+  specify "calls the block once even when start equals stop" do
+    mutable seen = []
+    "abc".upto("abc") { |step| seen << step }
+    expect(seen).to eq(["abc"])
+  end
+
+  specify "doesn't call block with self even if self is less than stop but stop length is less than self length" do
+    mutable seen = []
+    "25".upto("5") { |step| seen << step }
+    expect(seen).to eq([])
+  end
+
+  specify "doesn't call block if stop is less than self and stop length is less than self length" do
+    mutable seen = []
+    "25".upto("1") { |step| seen << step }
+    expect(seen).to eq([])
+  end
+
+  specify "doesn't call the block if self is greater than stop" do
+    mutable seen = []
+    "5".upto("2") { |step| seen << step }
+    expect(seen).to eq([])
+  end
+
+  specify "stops iterating as soon as the current value's character count gets higher than stop's" do
+    mutable seen = []
+    "96".upto("AA") { |step| seen << step }
+    expect(seen).to eq(["96", "97", "98", "99"])
+  end
+
+  specify "returns self" do
+    expect("abc".upto("abd") { }).to eq("abc")
+    expect("5".upto("2") { |step| step }).to eq("5")
+  end
+
+  specify "returns non-alphabetic characters in the ASCII range for single letters" do
+    mutable seen = []
+    "9".upto("A") { |step| seen << step }
+    expect(seen).to eq(["9", ":", ";", "<", "=", ">", "?", "@", "A"])
+  end
+
+  specify "stops before the last value if exclusive" do
+    mutable seen = []
+    "a".upto("d", true) { |step| seen << step }
+    expect(seen).to eq(["a", "b", "c"])
+  end
+
+  specify "works with non-ASCII ranges" do
+    mutable seen = []
+    "Σ".upto("Ω") { |step| seen << step }
+    expect(seen).to eq(["Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"])
+  end
+
+  describe "on sequence of numbers" do
+    specify "calls the block as Integer#upto" do
+      mutable seen = []
+      "8".upto("11") { |step| seen << step }
+      expect(seen).to eq((8..11).map { it.to_s })
+    end
+  end
+end

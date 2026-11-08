@@ -1,0 +1,32 @@
+# From ruby/spec core/math/lgamma_spec.rb.
+#
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def infinity_value = 1.0 / 0.0
+
+context "Math.lgamma" do
+  # Accumulated as a float: every factorial through 22! is a double exactly,
+  # and 21! is already past the 64-bit integers (ADR 0070).
+  specify "lgamma answers the log of the absolute gamma and its sign" do
+    expect(Math.lgamma(0)).to eq([infinity_value, 1])
+    expect(Math.lgamma(-0.0)).to eq([infinity_value, -1])
+    expect(Math.lgamma(-1)[0]).to eq(some(infinity_value))
+    expect(Math.lgamma(infinity_value)).to eq([infinity_value, 1])
+    expect(Math.lgamma(0.5)[0] or 0.0).to be_close(Math.log(Math.sqrt(Math::PI)), MATH_TOLERANCE)
+    expect(Math.lgamma(0.5)[1]).to eq(some(1))
+    expect(Math.lgamma(6.0)[0] or 0.0).to be_close(Math.log(120.0), MATH_TOLERANCE)
+    expect(Math.lgamma(-0.5)[0] or 0.0).to be_close(1.2655121, MATH_TOLERANCE)
+    expect(Math.lgamma(-0.5)[1]).to eq(some(-1))
+    expect(Math.lgamma(-1.5)[0] or 0.0).to be_close(0.8600470, MATH_TOLERANCE)
+    expect(Math.lgamma(-1.5)[1]).to eq(some(1))
+    expect(inspect(Math.lgamma(-infinity_value))).to eq('failure("Numerical argument is out of domain - lgamma")')
+  end
+end

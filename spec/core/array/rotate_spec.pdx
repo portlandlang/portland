@@ -1,0 +1,35 @@
+# An array by its positions (#104), from ruby/spec core/array: rotate,
+# values_at, and each_index. Values never mutate, so the frozen, identity,
+# recursive-array, and mid-walk-shift examples stay upstream, with rotate!
+# and the subclass ones; so do the to_int rows (ADR 0036), where a Float
+# or a mock would stand in for an integer, and the blockless Enumerator.
+
+require_relative "../../spec_helper"
+
+context "Array#rotate" do
+  describe "when passed no argument" do
+    specify "returns a copy of the array with the first element moved at the end" do
+      expect([1, 2, 3, 4, 5].rotate).to eq([2, 3, 4, 5, 1])
+    end
+  end
+
+  describe "with an argument n" do
+    specify "returns a copy of the array with the first (n % size) elements moved at the end" do
+      numbers = [1, 2, 3, 4, 5]
+      expect(numbers.rotate(2)).to eq([3, 4, 5, 1, 2])
+      expect(numbers.rotate(-1)).to eq([5, 1, 2, 3, 4])
+      expect(numbers.rotate(-21)).to eq([5, 1, 2, 3, 4])
+      expect(numbers.rotate(13)).to eq([4, 5, 1, 2, 3])
+      expect(numbers.rotate(0)).to eq(numbers)
+    end
+  end
+
+  specify "returns a copy of the array when its length is one or zero" do
+    expect([1].rotate).to eq([1])
+    expect([1].rotate(2)).to eq([1])
+    expect([1].rotate(-42)).to eq([1])
+    expect([].rotate).to eq([])
+    expect([].rotate(2)).to eq([])
+    expect([].rotate(-42)).to eq([])
+  end
+end

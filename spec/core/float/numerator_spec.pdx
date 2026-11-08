@@ -1,0 +1,35 @@
+# A float's numerator through its exact rational (#108, ADR 0085), NaN
+# and the infinities answering themselves as Ruby's do. NaN is 0.0 / 0.0
+# and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/float/numerator_spec.rb. Upstream: the numerators
+# past the 64-bit integers (Float::MAX, 999.1 ** 99.928888).
+
+require_relative "../../spec_helper"
+
+context "Float#numerator" do
+  numbers = [29871.2722891, -72628191273.22, 29282.2827, -2927.00091, 12.0]
+
+  specify "converts self to a Rational object then returns its numerator" do
+    numbers.each do |number|
+      expect(number.infinite?).to be_false
+      expect(number.numerator).to eq(Rational(number).numerator)
+    end
+  end
+
+  specify "returns 0 for 0.0" do
+    expect(0.0.numerator).to eq(0)
+  end
+
+  specify "returns NaN for NaN" do
+    expect((0.0 / 0.0).numerator.nan?).to be_true
+  end
+
+  specify "returns Infinity for Infinity" do
+    expect((1.0 / 0.0).numerator).to eq(1.0 / 0.0)
+  end
+
+  specify "returns -Infinity for -Infinity" do
+    expect((-1.0 / 0.0).numerator).to eq(-1.0 / 0.0)
+  end
+end

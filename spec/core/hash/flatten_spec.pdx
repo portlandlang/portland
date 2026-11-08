@@ -1,0 +1,52 @@
+# A hash's pairs by lookup and as a list, and the subset comparisons
+# (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
+# the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method
+# objects. Staying upstream: instance_of? checks, compare_by_identity,
+# Hash.new defaults, to_hash conversion and the TypeError rows (Portland
+# refuses a non-hash operand), and []='s rows about dup, freeze, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#flatten" do
+  table = {plato: :greek, witgenstein: [:austrian, :british], russell: :welsh}
+
+  specify "returns an empty Array for an empty Hash" do
+    expect({}.flatten).to eq([])
+  end
+
+  specify "sets each even index of the Array to a key of the Hash" do
+    flat = table.flatten
+    expect(flat[0]).to eq(:plato)
+    expect(flat[2]).to eq(:witgenstein)
+    expect(flat[4]).to eq(:russell)
+  end
+
+  specify "sets each odd index of the Array to the value corresponding to the previous element" do
+    flat = table.flatten
+    expect(flat[1]).to eq(:greek)
+    expect(flat[3]).to eq([:austrian, :british])
+    expect(flat[5]).to eq(:welsh)
+  end
+
+  specify "does not recursively flatten Array values when called without arguments" do
+    expect(table.flatten[3]).to eq([:austrian, :british])
+  end
+
+  specify "does not recursively flatten Hash values when called without arguments" do
+    nested = table.merge({russell: {born: :wales, influenced_by: :mill}})
+    expect(nested.flatten[5] == {born: :wales, influenced_by: :mill}.flatten).to eq(false)
+  end
+
+  specify "recursively flattens Array values when called with an argument >= 2" do
+    flat = table.flatten(2)
+    expect(flat[3]).to eq(:austrian)
+    expect(flat[4]).to eq(:british)
+  end
+
+  specify "recursively flattens Array values to the given depth" do
+    nested = table.merge({russell: [[:born, :wales], [:influenced_by, :mill]]})
+    flat = nested.flatten(2)
+    expect(flat[6]).to eq([:born, :wales])
+    expect(flat[7]).to eq([:influenced_by, :mill])
+  end
+end

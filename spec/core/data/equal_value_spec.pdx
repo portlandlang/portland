@@ -1,0 +1,30 @@
+# From ruby/spec core/data/equal_value_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+module DataSpecs
+  Measure = Data.define(:amount, :unit)
+  Single = Data.define(:value)
+  Empty = Data.define()
+end
+Movie = Data.define(:title, :year) do
+  def title_with_year = "#{title} (#{year})"
+
+  def self.classic = Movie.new(title: "Metropolis", year: 1927)
+end
+
+context "Data#==" do
+  specify "answer true for the same fields" do
+    a = DataSpecs::Measure.new(amount: 42, unit: "km")
+    b = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(a == b).to eq(true)
+  end
+
+  specify "answer false for different fields, and for a different type" do
+    a = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(a == DataSpecs::Measure.new(amount: 42, unit: "mi")).to eq(false)
+    expect(a == Movie.new(title: "42", year: 1)).to eq(false)
+  end
+end

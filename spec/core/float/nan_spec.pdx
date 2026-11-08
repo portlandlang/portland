@@ -1,0 +1,12 @@
+# From ruby/spec core/float/nan_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#nan?" do
+  specify "Float#nan? knows the not-a-number" do
+    expect((0.0 / 0.0).nan?).to be_true
+    expect(1.0.nan?).to be_false
+  end
+end

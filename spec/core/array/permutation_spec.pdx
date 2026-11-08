@@ -1,0 +1,42 @@
+# Ruby's combinatorics and cycle (#104), from ruby/spec
+# core/array/{combination,repeated_combination,permutation,repeated_permutation,product,cycle}_spec.rb.
+# Without a block each answers its arrangements as an array — there are no
+# enumerators (ADR 0055), so the enumerator-size rows stay upstream — and
+# with one hands them over in turn and answers the array; `cycle` takes a
+# count, since a cycle with no count never ends, so the unbounded rows stay
+# upstream with the StopIteration, to_int, and to_ary rows and the
+# mid-walk mutation rows (values never mutate).
+
+require_relative "../../spec_helper"
+
+context "Array#permutation" do
+  specify "yields all permutations to the block then returns self when called with block but no arguments" do
+    mutable yielded = []
+    answer = [1, 2, 3].permutation { |arrangement| yielded << arrangement }
+    expect(answer).to eq([1, 2, 3])
+    expect(yielded.sort).to eq([[1, 2, 3], [1, 3, 2], [2, 1, 3], [2, 3, 1], [3, 1, 2], [3, 2, 1]])
+  end
+
+  specify "yields all permutations of given length to the block then returns self when called with block and argument" do
+    mutable yielded = []
+    answer = [1, 2, 3].permutation(2) { |arrangement| yielded << arrangement }
+    expect(answer).to eq([1, 2, 3])
+    expect(yielded.sort).to eq([[1, 2], [1, 3], [2, 1], [2, 3], [3, 1], [3, 2]])
+  end
+
+  specify "returns the empty permutation ([[]]) when the given length is 0" do
+    expect([1, 2, 3].permutation(0)).to eq([[]])
+  end
+
+  specify "returns the empty permutation([]) when called on an empty Array" do
+    expect([].permutation).to eq([[]])
+  end
+
+  specify "returns no permutations when the given length has no permutations" do
+    expect([1, 2, 3].permutation(9).length).to eq(0)
+  end
+
+  specify "handles duplicate elements correctly" do
+    expect([1, 2, 3, 1].permutation(2).sort).to eq([[1, 1], [1, 1], [1, 2], [1, 2], [1, 3], [1, 3], [2, 1], [2, 1], [2, 3], [3, 1], [3, 1], [3, 2]])
+  end
+end

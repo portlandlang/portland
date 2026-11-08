@@ -1,0 +1,13 @@
+# From ruby/spec core/string/encoding_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "String#encoding" do
+  specify "returns UTF-8" do
+    expect("䁀".encoding).to eq(Encoding::UTF_8)
+    expect("a".encoding).to eq(Encoding::UTF_8)
+    expect("".encoding).to eq(Encoding::UTF_8)
+  end
+end

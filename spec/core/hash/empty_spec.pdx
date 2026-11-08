@@ -1,0 +1,29 @@
+# `empty?` — the question every collection answers.
+#
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#empty?" do
+  specify "returns true if the hash has no entries" do
+    expect({}.empty?).to eq(true)
+    expect({1 => 1}.empty?).to eq(false)
+  end
+
+  specify "holds for the empty hash" do
+    blank = {}
+    expect(blank).to be_empty
+  end
+
+  specify "and for nothing else" do
+    expect({name: "pdx"}).not_to be_empty
+  end
+end

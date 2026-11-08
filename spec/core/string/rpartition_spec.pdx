@@ -1,0 +1,31 @@
+# Splitting a string at a match, three ways (#106), from ruby/spec
+# core/string/{partition,rpartition}_spec.rb. The regex rows wait on #74;
+# the to_str conversion (ADR 0036), the refusals, encodings, identity
+# checks, and partition's block (which Ruby ignores) stay upstream. The
+# multibyte row asks for "@" as a string where upstream asks /@/.
+
+require_relative "../../spec_helper"
+
+context "String#rpartition with String" do
+  specify "returns an array of substrings based on splitting on the given string" do
+    expect("hello world".rpartition("o")).to eq(["hello w", "o", "rld"])
+  end
+
+  specify "always returns 3 elements" do
+    expect("hello".rpartition("x")).to eq(["", "", "hello"])
+    expect("hello".rpartition("hello")).to eq(["", "hello", ""])
+  end
+
+  specify "returns original string if regexp doesn't match" do
+    expect("hello".rpartition("/x/")).to eq(["", "", "hello"])
+  end
+
+  specify "handles multibyte string correctly" do
+    expect("ユーザ@ドメイン".rpartition("@")).to eq(["ユーザ", "@", "ドメイン"])
+  end
+
+  specify "rpartition splits around the last match" do
+    expect("hello".rpartition(/l/)).to eq(["hel", "l", "o"])
+    expect("hello".rpartition(/z/)).to eq(["", "", "hello"])
+  end
+end

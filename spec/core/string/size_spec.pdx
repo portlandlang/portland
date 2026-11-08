@@ -1,0 +1,11 @@
+# From ruby/spec core/string/size_spec.rb.
+#
+# How long a string is.
+
+require_relative "../../spec_helper"
+
+context "String#size" do
+  specify "is an alias of String#length" do
+    expect("こにちわ".size).to eq("こにちわ".length)
+  end
+end

@@ -1,0 +1,55 @@
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../../spec_helper"
+
+context "Kernel#srand" do
+  specify "returns the previous argument to srand if one was given and no argument is supplied" do
+    srand(34)
+    expect(srand).to eq(34)
+  end
+
+  specify "returns the previous argument to srand if one was given and 0 is supplied" do
+    srand(34)
+    expect(srand(0)).to eq(34)
+  end
+
+  specify "seeds rand such that its return value is deterministic" do
+    srand(176542)
+    first = (1..20).map { rand }
+    srand(176542)
+    second = (1..20).map { rand }
+    expect(first).to eq(second)
+  end
+
+  specify "returns the previous seed value" do
+    srand(10)
+    expect(srand(20)).to eq(10)
+  end
+
+  specify "seeds the RNG correctly and repeatably" do
+    srand(10)
+    first = rand
+    srand(10)
+    expect(rand).to eq(first)
+  end
+
+  specify "defaults number to a random value" do
+    srand
+    expect(srand == 0).to be_false
+  end
+
+  specify "accepts a negative seed" do
+    srand(-17)
+    expect(srand).to eq(-17)
+  end
+end

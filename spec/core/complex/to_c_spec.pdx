@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/to_c_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#to_c" do
+  specify "comes from to_c on the reals" do
+    expect(Complex(1, 2).to_c).to eq(Complex(1, 2))
+  end
+end

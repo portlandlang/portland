@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/imaginary_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#imaginary" do
+  specify "real, imaginary, rectangular, conjugate" do
+    expect(Complex(3, 4).imaginary).to eq(4)
+  end
+end

@@ -1,0 +1,84 @@
+# The logical operators on booleans (#115), from ruby/spec
+# language/{and,or,not}_spec.rb. Conditions and the logical operators take
+# booleans and nothing else (docs/ruby/truthiness.md), so the rows with
+# strings, integers, nil, or () as operands refuse; `and` and `or` are
+# dead-identical to `&&` and `||` (docs/ruby/word-operators.md), so the
+# precedence rows that lean on Ruby's secret low precedence diverge on
+# purpose; assignment is a statement, so the assignment-in-expression rows
+# stay upstream, as do the lambda rows.
+
+require_relative "../spec_helper"
+
+def first_or_bail(values)
+  found = values.first or return "bailed"
+  found
+end
+
+context "The || operator" do
+  specify "evaluates to true if any of its operands are true" do
+    taken = if false || true then true else false end
+    expect(taken).to be_true
+  end
+
+  specify "evaluated to false if all of its operands are false" do
+    taken = if false || false then true else false end
+    expect(taken).to be_false
+  end
+
+  specify "is evaluated before assignment operators" do
+    flag = nil || true
+    expect(flag).to be_true
+  end
+
+  specify "and keeps a present value" do
+    expect(("present" or "unused")).to eq("present")
+  end
+
+  specify "returns early on an absent maybe" do
+    expect(first_or_bail([])).to eq("bailed")
+  end
+
+  specify "passes a present value straight through" do
+    expect(first_or_bail([5])).to eq(5)
+  end
+
+  specify "while a genuinely missing key takes the default" do
+    notes = {note: nil}
+    expect((notes[:nope] or "default")).to eq("default")
+  end
+
+  specify "or is ||" do
+    expect((false or true)).to eq((false || true))
+  end
+
+  specify "on booleans is logical" do
+    expect((false or true)).to be_true
+  end
+
+  specify "on an absent maybe takes the default" do
+    expect((nil or "anonymous")).to eq("anonymous")
+  end
+
+  specify "on a present maybe keeps the value" do
+    expect(("found" or "unused")).to eq("found")
+  end
+
+  # `or panic` is the only crash you can write (ADR 0008), which makes it
+  # the sharpest probe of laziness there is: if the right side ran eagerly,
+  # this example would not fail — it would take the whole file down with it.
+  specify "never evaluates the right side of a hit" do
+    expect(("present" or panic("the right side ran"))).to eq("present")
+  end
+end
+
+context "The or operator" do
+  specify "evaluates to true if any of its operands are true" do
+    taken = if false or true then true else false end
+    expect(taken).to be_true
+  end
+
+  specify "is evaluated before variables are assigned, as || is — the two are one operator here" do
+    flag = nil or true
+    expect(flag).to be_true
+  end
+end

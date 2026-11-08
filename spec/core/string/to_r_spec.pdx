@@ -1,0 +1,71 @@
+# A string's leading number as a rational (ADR 0085): Ruby's own lenient
+# reader, ported from rational.c — leading spaces skipped, reading
+# stopping at the first character that does not fit, text with no number
+# answering zero.
+#
+# From ruby/spec core/string/to_r_spec.rb. Upstream: `String.new`, asked
+# here of `""`. `"1/0".to_r` refuses as `1 / 0` does, pinned by a
+# two-oracle test.
+
+require_relative "../../spec_helper"
+
+context "String#to_r" do
+  specify "returns a Rational object" do
+    expect("".to_r.class).to eq(Rational)
+  end
+
+  specify "returns (0/1) for the empty String" do
+    expect("".to_r).to eq(Rational(0, 1))
+  end
+
+  specify "returns (n/1) for a String starting with a decimal n" do
+    expect("2".to_r).to eq(Rational(2, 1))
+    expect("1765".to_r).to eq(Rational(1765, 1))
+  end
+
+  specify "ignores trailing characters" do
+    expect("2 foo".to_r).to eq(Rational(2, 1))
+    expect("1765, ".to_r).to eq(Rational(1765, 1))
+  end
+
+  specify "ignores leading spaces" do
+    expect(" 2".to_r).to eq(Rational(2, 1))
+    expect("  1765, ".to_r).to eq(Rational(1765, 1))
+  end
+
+  specify "does not ignore arbitrary, non-numeric leading characters" do
+    expect("The rational form of 33 is...".to_r == Rational(33, 1)).to be_false
+    expect("a1765, ".to_r == Rational(1765, 1)).to be_false
+  end
+
+  specify "treats leading hyphens as minus signs" do
+    expect("-20".to_r).to eq(Rational(-20, 1))
+  end
+
+  specify "accepts leading plus signs" do
+    expect("+20".to_r).to eq(Rational(20, 1))
+  end
+
+  specify "does not treat a leading period without a numeric prefix as a decimal point" do
+    expect(".9".to_r == Rational(8106479329266893, 9007199254740992)).to be_false
+  end
+
+  specify "understands decimal points" do
+    expect("3.33".to_r).to eq(Rational(333, 100))
+    expect("-3.33".to_r).to eq(Rational(-333, 100))
+  end
+
+  specify "ignores underscores between numbers" do
+    expect("190_22".to_r).to eq(Rational(19022, 1))
+    expect("-190_22.7".to_r).to eq(Rational(-190227, 10))
+  end
+
+  specify "understands a forward slash as separating the numerator from the denominator" do
+    expect("20/3".to_r).to eq(Rational(20, 3))
+    expect(" -19.10/3".to_r).to eq(Rational(-191, 30))
+  end
+
+  specify "returns (0/1) for Strings it can't parse" do
+    expect("glark".to_r).to eq(Rational(0, 1))
+  end
+end

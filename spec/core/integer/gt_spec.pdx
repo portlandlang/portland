@@ -1,0 +1,13 @@
+# From ruby/spec core/integer/gt_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Integer#>" do
+  specify "mirror them" do
+    expect(13 > 2).to be_true
+    expect(5 > 5).to be_false
+    expect((-500) > (-600)).to be_true
+  end
+end

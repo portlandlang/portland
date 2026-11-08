@@ -1,0 +1,11 @@
+# From ruby/spec core/complex/fdiv_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Complex#fdiv" do
+  specify "divides exactly where the parts are exact" do
+    expect(inspect(Complex(1, 2).fdiv(2))).to eq("(0.5+1.0i)")
+  end
+end

@@ -1,0 +1,32 @@
+# Ruby's combinatorics and cycle (#104), from ruby/spec
+# core/array/{combination,repeated_combination,permutation,repeated_permutation,product,cycle}_spec.rb.
+# Without a block each answers its arrangements as an array — there are no
+# enumerators (ADR 0055), so the enumerator-size rows stay upstream — and
+# with one hands them over in turn and answers the array; `cycle` takes a
+# count, since a cycle with no count never ends, so the unbounded rows stay
+# upstream with the StopIteration, to_int, and to_ary rows and the
+# mid-walk mutation rows (values never mutate).
+
+require_relative "../../spec_helper"
+
+context "Array#repeated_permutation" do
+  specify "yields all repeated_permutations to the block then returns self when called with block but no arguments" do
+    mutable yielded = []
+    answer = [10, 11, 12].repeated_permutation(2) { |arrangement| yielded << arrangement }
+    expect(answer).to eq([10, 11, 12])
+    expect(yielded.sort).to eq([[10, 10], [10, 11], [10, 12], [11, 10], [11, 11], [11, 12], [12, 10], [12, 11], [12, 12]])
+  end
+
+  specify "yields the empty repeated_permutation ([[]]) when the given length is 0" do
+    expect([10, 11, 12].repeated_permutation(0)).to eq([[]])
+    expect([].repeated_permutation(0)).to eq([[]])
+  end
+
+  specify "does not yield when called on an empty Array with a nonzero argument" do
+    expect([].repeated_permutation(10)).to eq([])
+  end
+
+  specify "allows permutations larger than the number of elements" do
+    expect([1, 2].repeated_permutation(3).sort).to eq([[1, 1, 1], [1, 1, 2], [1, 2, 1], [1, 2, 2], [2, 1, 1], [2, 1, 2], [2, 2, 1], [2, 2, 2]])
+  end
+end

@@ -1,0 +1,34 @@
+# Padding a string to a width (#106), from ruby/spec core/string/{center,ljust,rjust}_spec.rb.
+# A width counts characters (ADR 0038). The to_int and to_str conversions
+# (ADR 0036), subclasses, encodings, and the refusals — a width that is not
+# an integer, a padding that is not a string, an empty padding — stay upstream.
+
+require_relative "../../spec_helper"
+
+context "String#ljust with length, padding" do
+  specify "returns a new string of specified length with self left justified and padded with padstr" do
+    expect("hello".ljust(20, "1234")).to eq("hello123412341234123")
+    expect("".ljust(1, "abcd")).to eq("a")
+    expect("".ljust(2, "abcd")).to eq("ab")
+    expect("".ljust(3, "abcd")).to eq("abc")
+    expect("".ljust(4, "abcd")).to eq("abcd")
+    expect("".ljust(6, "abcd")).to eq("abcdab")
+    expect("OK".ljust(3, "abcd")).to eq("OKa")
+    expect("OK".ljust(4, "abcd")).to eq("OKab")
+    expect("OK".ljust(6, "abcd")).to eq("OKabcd")
+    expect("OK".ljust(8, "abcd")).to eq("OKabcdab")
+  end
+
+  specify "pads with whitespace if no padstr is given" do
+    expect("hello".ljust(20)).to eq("hello               ")
+  end
+
+  specify "returns self if it's longer than or as long as the specified length" do
+    expect("".ljust(0)).to eq("")
+    expect("".ljust(-1)).to eq("")
+    expect("hello".ljust(4)).to eq("hello")
+    expect("hello".ljust(-1)).to eq("hello")
+    expect("this".ljust(3)).to eq("this")
+    expect("radiology".ljust(8, "-")).to eq("radiology")
+  end
+end

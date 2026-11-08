@@ -1,0 +1,20 @@
+# Ruby's output wrappers over the two standard streams (ADR 0068, #185):
+# `puts`, `p`, `pp`, `print`, `putc`, `printf` on standard output and `warn`
+# on standard error. Each spec asserts what the call answers; what it writes
+# is pinned by the two-oracle test, since nothing here can capture a stream.
+# A line written here passes through the harness harmlessly, so every write
+# ends in a newline.
+#
+# From ruby/spec core/kernel/{p,pp,print,putc,printf,warn,puts}_spec.rb.
+# Upstream: the privacy and reflection rows, `$stdout` and `$VERBOSE`
+# reassignment, the mocks, `$_`, the IO-first-argument forms of printf, and
+# warn's uplevel and category keywords. `puts` answers no value (ADR 0012),
+# so its one row is the two-oracle test's.
+
+require_relative "../../spec_helper"
+
+context "Kernel#pp" do
+  specify "lazily loads the 'pp' library and delegates the call to that library" do
+    expect(pp([1, 2, 3])).to eq([1, 2, 3])
+  end
+end

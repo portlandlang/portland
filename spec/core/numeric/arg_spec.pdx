@@ -1,0 +1,31 @@
+# `arg`, and its names `angle` and `phase`, on every real (ADR 0085): 0
+# or pi by the sign. Infinity is 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/arg_spec.rb, where a row runs on a builtin;
+# angle_spec.rb and phase_spec.rb compare method objects, so their names
+# are specced here. Upstream: the rows that drive a mock Numeric
+# subclass — there is no Numeric to subclass — and the bignums, integers
+# being 64-bit.
+
+require_relative "../../spec_helper"
+
+context "Numeric#arg" do
+  numbers = [20, Rational(3, 4), 1.0 / 0.0]
+
+  specify "returns 0 if positive" do
+    numbers.each do |number|
+      expect(number.arg).to eq(0)
+    end
+  end
+
+  specify "returns Pi if negative" do
+    numbers.each do |number|
+      expect((0 - number).arg).to eq(Math::PI)
+    end
+  end
+
+  specify "is 0 or pi by the sign" do
+    expect(3.arg).to eq(0)
+    expect(-3.arg).to eq(3.141592653589793)
+  end
+end

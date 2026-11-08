@@ -1,0 +1,19 @@
+# What an integer is to itself (#107), from ruby/spec core/integer: to_i,
+# zero?, ==, and the aliases next, magnitude, inspect, and ===. Alias
+# checks compare the two answers rather than method objects, which a closed
+# runtime has none of; upstream's type check through eql? is asked of
+# inspect's answer. The bignum rows, the mocks whose own == takes over, and
+# zero?'s method-owner check stay upstream.
+
+require_relative "../../spec_helper"
+
+context "Integer#magnitude" do
+  specify "is an alias of Integer#abs" do
+    expect(-7.magnitude).to eq(-7.abs)
+    expect(7.magnitude).to eq(7.abs)
+  end
+
+  specify "magnitude is its twin, floats included (ADR 0036, revised)" do
+    expect((-5).magnitude).to eq(5)
+  end
+end

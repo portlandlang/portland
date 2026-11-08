@@ -1,0 +1,35 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../../spec_helper"
+
+context "Array#dig" do
+  specify "returns #at with one arg" do
+    expect(["a"].dig(0)).to eq("a")
+    expect(["a"].dig(1)).to eq(nil)
+  end
+
+  specify "recurses array elements" do
+    nested = [[1, [2, "3"]]]
+    expect(nested.dig(0, 0)).to eq(1)
+    expect(nested.dig(0, 1, 1)).to eq("3")
+    expect(nested.dig(0, -1, 0)).to eq(2)
+  end
+
+  specify "returns the nested value specified if the sequence includes a key" do
+    mixed = [42, {foo: :bar}]
+    expect(mixed.dig(1, :foo)).to eq(:bar)
+  end
+
+  specify "returns nil if any intermediate step is nil" do
+    nested = [[1, [2, 3]]]
+    expect(nested.dig(1, 2, 3)).to eq(nil)
+  end
+end

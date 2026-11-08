@@ -1,0 +1,21 @@
+# `to_f` promotes across the integer/float line; `to_s` writes the number
+# back out.
+#
+# Grown from ruby/spec core/integer/to_f_spec.rb and to_s_spec.rb (#23).
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#to_f" do
+  specify "promotes" do
+    expect(2.to_f).to eq(2.0)
+    expect(0.to_f).to eq(0.0)
+    expect(9641278.to_f).to eq(9641278.0)
+  end
+
+  specify "keeps the sign" do
+    expect((-500).to_f).to eq(-500.0)
+  end
+end

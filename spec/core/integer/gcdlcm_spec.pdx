@@ -1,0 +1,38 @@
+# From ruby/spec core/integer/gcdlcm_spec.rb.
+#
+# `gcd` — Euclid on magnitudes: the answer never carries a sign, and a zero
+# yields the other side's magnitude.
+#
+# From ruby/spec core/integer/gcd_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#gcdlcm" do
+  specify "returns [self, self] if self is equal to the argument" do
+    expect(1.gcdlcm(1)).to eq([1, 1])
+    expect(398.gcdlcm(398)).to eq([398, 398])
+  end
+
+  specify "returns an Array" do
+    expect(inspect(36.gcdlcm(6))).to eq("[6, 36]")
+    expect(inspect(4.gcdlcm(20981))).to eq("[1, 83924]")
+  end
+
+  specify "returns a two-element Array" do
+    expect(36.gcdlcm(876).size).to eq(2)
+    expect(29.gcdlcm(17).size).to eq(2)
+  end
+
+  specify "returns the greatest common divisor of self and argument as the first element" do
+    expect(10.gcdlcm(5)[0]).to eq(10.gcd(5))
+    expect(200.gcdlcm(20)[0]).to eq(200.gcd(20))
+  end
+
+  specify "returns the least common multiple of self and argument as the last element" do
+    expect(10.gcdlcm(5)[1]).to eq(10.lcm(5))
+    expect(200.gcdlcm(20)[1]).to eq(200.lcm(20))
+  end
+end

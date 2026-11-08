@@ -1,0 +1,29 @@
+# `Name = Data.define(:a, :b)` at a file's or a module's top level declares
+# `struct Name` (ADR 0084), the same many-names-one-behavior move as
+# `class`; a `do … end` block on it is the struct body. Construction,
+# `with`, equality, `to_h`, and `members` are the struct's own. From
+# ruby/spec core/data: define, initialize (the keyword rows), with, to_h,
+# equal_value, eql, members, and to_s — positional construction refuses
+# naming the keywords (ADR 0062), string keywords are the implicit-conversion
+# protocol (ADR 0036), `inspect` is the struct's rendering rather than
+# `#<data …>` (ADR 0026), and the anonymous, subclassing, and
+# overridden-initialize rows build classes at runtime.
+
+require_relative "../../spec_helper"
+
+module DataSpecs
+  Measure = Data.define(:amount, :unit)
+  Single = Data.define(:value)
+  Empty = Data.define()
+end
+Movie = Data.define(:title, :year) do
+  def title_with_year = "#{title} (#{year})"
+
+  def self.classic = Movie.new(title: "Metropolis", year: 1927)
+end
+
+context "Data#to_h" do
+  specify "transforms the data object into a hash" do
+    expect(DataSpecs::Measure.new(amount: 42, unit: "km").to_h).to eq({amount: 42, unit: "km"})
+  end
+end

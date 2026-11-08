@@ -1,0 +1,18 @@
+# What a set holds (ADR 0082): membership by `eql?` under `include?`,
+# `member?`, and `===`; `size`, `length`, and `empty?`; and `add` and
+# `delete`, which answer a new set and leave the receiver as it was.
+#
+# From ruby/spec core/set/{include,member,case_compare,size,length,empty,
+# add,delete}_spec.rb. Upstream: the alias checks (method objects), the
+# objects defining hash and eql? by hand, the rows where add and delete
+# answer the receiver itself, and add? and delete?, which mutate (ADR 0015).
+
+require_relative "../../spec_helper"
+
+context "Set#empty?" do
+  specify "is true only with no members" do
+    expect(Set[].empty?).to be_true
+    expect(Set[1].empty?).to be_false
+    expect(Set[1, 2, 3].empty?).to be_false
+  end
+end

@@ -1,0 +1,32 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#names" do
+  specify "returns the names of the named capture groups" do
+    md = "haystack".match(/(?<yellow>hay).(?<pin>tack)/) or panic("no match")
+    expect(md.names).to eq(["yellow", "pin"])
+  end
+
+  specify "returns [] if there were no named captures" do
+    md = "haystack".match(/(hay).(tack)/) or panic("no match")
+    expect(md.names).to eq([])
+  end
+
+  specify "returns each name only once, and equals Regexp#names" do
+    pattern = /(?<hay>hay)(?<dot>.)(?<hay>tack)/
+    md = "haystack".match(pattern) or panic("no match")
+    expect(md.names).to eq(["hay", "dot"])
+    expect(md.names).to eq(pattern.names)
+  end
+end

@@ -1,0 +1,22 @@
+# Ruby's Enumerable on a set (ADR 0082), answering what it answers on an
+# array of the members: `each` and `each_with_index` answer the set,
+# `select` and `reject` a set of what they kept, `map` and `sort` arrays,
+# and the rest their own values.
+#
+# From ruby/spec core/set/each_spec.rb; the other walks are Enumerable's
+# own, specified under core/enumerable. Upstream: the Enumerator row.
+
+require_relative "../../spec_helper"
+
+context "Set#each" do
+  specify "yields every member" do
+    mutable seen = []
+    Set[1, 2, 3].each { seen << it }
+    expect(seen.sort).to eq([1, 2, 3])
+  end
+
+  specify "answers the set" do
+    members = Set[1, 2, 3]
+    expect(members.each { it }).to eq(members)
+  end
+end

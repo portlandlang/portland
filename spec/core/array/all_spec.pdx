@@ -1,0 +1,24 @@
+# From ruby/spec core/array/all_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Array#all?" do
+  specify "all? asks for unanimity" do
+    expect([1, 2, 3].all? { it > 0 }).to be_true
+    expect([1, 2, 3].all? { it > 1 }).to be_false
+  end
+
+  specify "always returns true on empty enumeration" do
+    expect([].all?(1..9)).to be_true
+  end
+
+  specify "returns true if the pattern never returns false or nil" do
+    expect([1, 42, 3].all?(1..42)).to be_true
+  end
+
+  specify "returns false if the pattern ever returns false or nil" do
+    expect([1, 2, 3, -1].all?(0..9)).to be_false
+  end
+end
