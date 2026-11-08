@@ -1,0 +1,22 @@
+# `System.monotonic_time` (ADR 0068): one reading of `clock_gettime(2)` with
+# `CLOCK_MONOTONIC`, in whole nanoseconds. A clock that only ever moves
+# forward, what a benchmark subtracts, and what Ruby spells
+# `Process.clock_gettime(Process::CLOCK_MONOTONIC)` (#245). Not a `Time`; the
+# arithmetic over it is Portland's to write. Its sibling is
+# wall_clock_time_spec.pdx.
+
+require_relative "../../spec_helper"
+
+context "System.monotonic_time" do
+  specify "never steps backwards between two readings" do
+    before = System.monotonic_time
+    after = System.monotonic_time
+    expect(after >= before).to eq(true)
+  end
+
+  specify "is positive and an integer" do
+    reading = System.monotonic_time
+    expect(reading in Integer).to eq(true)
+    expect(reading > 0).to eq(true)
+  end
+end

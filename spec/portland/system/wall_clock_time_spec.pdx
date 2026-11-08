@@ -1,0 +1,16 @@
+# `System.wall_clock_time` (ADR 0068): one reading of `clock_gettime(2)` with
+# `CLOCK_REALTIME`, in whole nanoseconds since the Unix epoch. The real
+# clock, what `Time.now` is spelled over. Not a `Time`; the arithmetic and
+# formatting over it are Portland's to write. Its sibling is
+# monotonic_time_spec.pdx.
+
+require_relative "../../spec_helper"
+
+context "System.wall_clock_time" do
+  specify "answers nanoseconds since the Unix epoch, as an integer" do
+    now = System.wall_clock_time
+    expect(now in Integer).to eq(true)
+    # 2023-11-14 in nanoseconds: any clock set to the present is past it.
+    expect(now > 1700000000000000000).to eq(true)
+  end
+end
