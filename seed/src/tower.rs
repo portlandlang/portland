@@ -1499,14 +1499,14 @@ pub fn string_to_r(text: &str) -> Value {
     };
     position = after;
     let mut denominator: i128 = 1;
-    if byte_at(bytes, position) == b'/' {
-        if let Some((below, below_exponent, _)) = read_rational_number(bytes, position + 1, text) {
-            if below == 0 {
-                panic!("divided by 0");
-            }
-            denominator = below;
-            exponent -= below_exponent;
+    if byte_at(bytes, position) == b'/'
+        && let Some((below, below_exponent, _)) = read_rational_number(bytes, position + 1, text)
+    {
+        if below == 0 {
+            panic!("divided by 0");
         }
+        denominator = below;
+        exponent -= below_exponent;
     }
     if exponent < 0 {
         numerator = numerator
