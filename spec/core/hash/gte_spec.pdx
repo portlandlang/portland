@@ -1,3 +1,5 @@
+# From ruby/spec core/hash/gte_spec.rb.
+#
 # A hash's pairs by lookup and as a list, and the subset comparisons
 # (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
 # the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method

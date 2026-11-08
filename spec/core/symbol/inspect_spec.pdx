@@ -1,3 +1,5 @@
+# From ruby/spec core/symbol/inspect_spec.rb.
+#
 # How a symbol may be written (ADR 0023).
 
 require_relative "../../spec_helper"

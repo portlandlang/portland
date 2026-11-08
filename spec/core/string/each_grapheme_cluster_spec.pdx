@@ -1,3 +1,5 @@
+# From ruby/spec core/string/each_grapheme_cluster_spec.rb.
+#
 # `chars` — a string as an array of one-character strings — and `each_char`,
 # the walk (#106). From ruby/spec core/string/{chars,each_char}_spec.rb and
 # their shared chars rows. A character is a grapheme (ADR 0038). The block

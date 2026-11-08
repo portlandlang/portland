@@ -1,3 +1,5 @@
+# From ruby/spec core/nil/case_compare_spec.rb.
+#
 # Case equality on `true`, `false`, and `nil` (#150), from ruby/spec
 # core/true/case_compare_spec.rb, core/false/, and core/nil/. Upstream also
 # asks each whether it matches `Object`, a class object Portland doesn't

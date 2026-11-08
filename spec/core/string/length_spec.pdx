@@ -1,3 +1,5 @@
+# From ruby/spec core/string/length_spec.rb.
+#
 # How long a string is.
 
 require_relative "../../spec_helper"

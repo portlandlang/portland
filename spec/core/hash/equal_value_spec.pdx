@@ -1,3 +1,5 @@
+# From ruby/spec core/hash/equal_value_spec.rb.
+#
 # Equality is by value, as it is for every Portland value.
 
 require_relative "../../spec_helper"

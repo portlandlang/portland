@@ -1,3 +1,5 @@
+# From ruby/spec language/method_spec.rb.
+#
 # ADR 0032 — a dot call takes paren-less arguments, which is what lets a
 # chain read as a sentence: this very suite's `expect(x).to eq(y)`.
 

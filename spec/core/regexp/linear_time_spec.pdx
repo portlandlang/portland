@@ -1,3 +1,5 @@
+# From ruby/spec core/regexp/linear_time_spec.rb.
+#
 # A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
 # `%r{}` with the family's delimiters, interpolation, and what a pattern
 # answers about itself — `source`, `inspect`, `to_s`, `options`,

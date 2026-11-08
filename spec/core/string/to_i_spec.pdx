@@ -1,3 +1,5 @@
+# From ruby/spec core/string/to_i_spec.rb.
+#
 # Reading a string as a number in another base (#106), from ruby/spec
 # core/string/{hex,oct}_spec.rb. Ruby's octal literals (077) are written
 # with Portland's 0o prefix (docs/ruby/integer-literals.md); `oct` still

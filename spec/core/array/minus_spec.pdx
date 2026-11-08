@@ -1,3 +1,5 @@
+# From ruby/spec core/array/minus_spec.rb.
+#
 # Array's set arithmetic (#104), from ruby/spec core/array: - and
 # difference (through upstream's shared array_binary_difference), union
 # (array_binary_union), intersection (array_intersection), and intersect?.

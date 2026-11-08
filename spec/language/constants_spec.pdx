@@ -1,3 +1,5 @@
+# From ruby/spec language/constants_spec.rb.
+#
 # A SCREAMING_CASE name at the top level is a constant (ADR 0053): computed
 # once, bound once, and read from every def and struct method — a def's
 # reach, where a lowercase local's stops at the def's door.

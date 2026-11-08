@@ -1,3 +1,5 @@
+# From ruby/spec language/assignments_spec.rb.
+#
 # `||=` — or-equals (ADR 0043, the last of #73's five spellings): sugar for
 # `x = x || fallback`. On a maybe it is the or-guard's question as a rebind
 # — absent takes the fallback, present is kept. On a plain Boolean it is

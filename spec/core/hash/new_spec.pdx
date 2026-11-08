@@ -1,3 +1,5 @@
+# From ruby/spec core/hash/new_spec.rb.
+#
 # The hash literal: any type of key, insertion-ordered. The symbol-key
 # shorthand's own rules live in spec/symbol/shorthand_spec.pdx.
 

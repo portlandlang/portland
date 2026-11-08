@@ -1,3 +1,5 @@
+# From ruby/spec core/array/length_spec.rb.
+#
 # How many elements an array holds.
 
 require_relative "../../spec_helper"

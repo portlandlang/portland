@@ -1,3 +1,5 @@
+# From ruby/spec core/integer/div_spec.rb.
+#
 # Arithmetic that follows Ruby rather than the Rust floor it is built on.
 #
 # Grown from ruby/spec core/integer/divide_spec.rb (#23); the

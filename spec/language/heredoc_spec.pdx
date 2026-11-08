@@ -1,3 +1,5 @@
+# From ruby/spec language/heredoc_spec.rb.
+#
 # Heredocs: another spelling of a string literal, squiggly only — which is
 # what keeps `<<` the append operator everywhere else.
 

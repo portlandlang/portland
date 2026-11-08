@@ -1,3 +1,5 @@
+# From ruby/spec core/range/equal_value_spec.rb.
+#
 # A range's ends and its printed, listed, compared, and walked forms
 # (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
 # to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,

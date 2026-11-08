@@ -1,3 +1,5 @@
+# From ruby/spec core/integer/gcdlcm_spec.rb.
+#
 # `gcd` — Euclid on magnitudes: the answer never carries a sign, and a zero
 # yields the other side's magnitude.
 #

@@ -1,3 +1,5 @@
+# From ruby/spec language/safe_navigator_spec.rb.
+#
 # ADR 0008 — `&.` short-circuits an absent receiver instead of crashing,
 # and leaves a present one alone. The whole chain answers nil on a miss.
 

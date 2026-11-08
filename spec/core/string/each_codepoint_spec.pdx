@@ -1,3 +1,5 @@
+# From ruby/spec core/string/each_codepoint_spec.rb.
+#
 # A string's codepoints and bytes (#106), from ruby/spec
 # core/string/{ord,bytes,bytesize,codepoints}_spec.rb. `bytes` and
 # `codepoints` answer arrays and take no block — the block form is each_byte's

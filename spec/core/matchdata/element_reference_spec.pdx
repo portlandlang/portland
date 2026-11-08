@@ -1,3 +1,5 @@
+# From ruby/spec core/matchdata/element_reference_spec.rb.
+#
 # What a match answers (ADR 0086): Ruby's MatchData reading API —
 # `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
 # `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,

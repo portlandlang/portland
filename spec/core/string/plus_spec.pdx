@@ -1,3 +1,5 @@
+# From ruby/spec core/string/plus_spec.rb.
+#
 # `+` concatenates and `*` repeats — neither mutates, because nothing does.
 
 require_relative "../../spec_helper"

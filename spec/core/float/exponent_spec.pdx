@@ -1,3 +1,5 @@
+# From ruby/spec core/float/exponent_spec.rb.
+#
 # A float's named division and its power (#108), from ruby/spec core/float:
 # divmod, % and modulo, fdiv, quo, and **. Upstream's be_close is close_to? here, at mspec's
 # own TOLERANCE. Where Ruby raises — ZeroDivisionError, FloatDomainError,

@@ -1,3 +1,5 @@
+# From ruby/spec core/range/case_compare_spec.rb.
+#
 # Two ranges against each other, and a range against a value (#111), from
 # ruby/spec core/range: overlap? and === (through upstream's shared
 # cover_and_include). Ranges hold integers here, so the string, float, and

@@ -1,3 +1,5 @@
+# From ruby/spec core/symbol/equal_value_spec.rb.
+#
 # A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
 # start_with?, end_with?, name, id2name, to_s, encoding, ==, and ===. A
 # symbol answers questions about its name here, as in Ruby; making one from

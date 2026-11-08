@@ -1,3 +1,5 @@
+# From ruby/spec core/hash/element_reference_spec.rb.
+#
 # Rewriting and reading a hash (#105), from ruby/spec core/hash:
 # transform_values, transform_keys, to_h with a block, [], and inspect.
 # Upstream's `&:succ` is a block here, and its ScratchPad a mutable. Staying
