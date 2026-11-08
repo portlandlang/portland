@@ -13,7 +13,7 @@ compiler/*.pdx     the compiler — Portland, written in Portland
        ↑ runs on
 seed/  (Rust)      the seed — lexer, parser, tree-walking interpreter, pdx binary
        ↑ runs on
-macOS 26+ / Apple silicon
+macOS 27+ / Apple silicon
 ```
 
 The compiler does not emit binaries yet — it checks, then runs programs through its evaluator; the back end (#5) is the missing part. The seed interprets, and the compiler is interpreted _by_ the seed. Everything below the seed is, for now, just the operating system.
