@@ -2,12 +2,6 @@
 
 require_relative "../../spec_helper"
 
-context "Array#+" do
-  specify "concatenates" do
-    expect([1, 2] + [3]).to eq([1, 2, 3])
-  end
-end
-
 # ruby/spec core/array/plus_spec.rb and multiply_spec.rb, title for title
 # (#104). Staying upstream: to_ary and to_int conversion (ADR 0036), the
 # refusals where Ruby raises, recursive arrays and identity (values never
@@ -16,6 +10,10 @@ end
 # is the spelling.
 
 context "Array#+" do
+  specify "concatenates" do
+    expect([1, 2] + [3]).to eq([1, 2, 3])
+  end
+
   specify "concatenates two arrays" do
     expect([1, 2, 3] + [3, 4, 5]).to eq([1, 2, 3, 3, 4, 5])
     expect([1, 2, 3] + []).to eq([1, 2, 3])

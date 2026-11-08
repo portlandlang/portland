@@ -144,24 +144,20 @@ context "Array#sort" do
   end
 
   specify "keeps duplicates" do
-    numbers = [3, 1, 2]
     expect([2, 1, 2].sort).to eq([1, 2, 2])
   end
 
   specify "answers the trivial cases whole" do
-    numbers = [3, 1, 2]
     expect([].sort).to eq([])
     expect([5].sort).to eq([5])
     expect([1, 2, 3].sort).to eq([1, 2, 3])
   end
 
   specify "sorts strings too — a uniform array, integers or strings alike" do
-    numbers = [3, 1, 2]
     expect(["banana", "apple"].sort).to eq(["apple", "banana"])
   end
 
   specify "sorts floats, and mixes them with whole numbers" do
-    numbers = [3, 1, 2]
     expect([1.5, 0.5, 2.25].sort).to eq([0.5, 1.5, 2.25])
     expect([2.5, 1].sort).to eq([1, 2.5])
   end

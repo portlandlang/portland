@@ -26,7 +26,6 @@ context "Array#first" do
   end
 
   specify "comes back absent when the array was empty" do
-    stored = [nil]
     missing = []
     expect(missing.first).to be_nil
   end

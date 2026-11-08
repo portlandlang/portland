@@ -11,27 +11,21 @@
 require_relative "../../spec_helper"
 
 context "String#downcase" do
-  city = "portland"
   specify "lowers every letter, round-tripping the upcase" do
+    city = "portland"
     expect(city.upcase.downcase).to eq("portland")
   end
-end
 
-context "String#downcase" do
   specify "returns a copy of self with all uppercase letters downcased" do
     expect("hELLO".downcase).to eq("hello")
     expect("hello".downcase).to eq("hello")
   end
 
-  describe "full Unicode case mapping" do
-    specify "works for all of Unicode with no option" do
-      expect("ÄÖÜ".downcase).to eq("äöü")
-    end
+  specify "works for all of Unicode with no option" do
+    expect("ÄÖÜ".downcase).to eq("äöü")
   end
 
-  describe "case folding" do
-    specify "case folds special characters" do
-      expect("ß".downcase).to eq("ß")
-    end
+  specify "case folds special characters" do
+    expect("ß".downcase).to eq("ß")
   end
 end

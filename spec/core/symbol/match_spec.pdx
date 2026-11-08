@@ -6,7 +6,6 @@ require_relative "../../spec_helper"
 
 context "Symbol#=~" do
   specify "answers the string questions by its name" do
-    found = :cat =~ /a/ or panic("no match")
     expect(:cat.match?(/t$/)).to be_true
   end
 end

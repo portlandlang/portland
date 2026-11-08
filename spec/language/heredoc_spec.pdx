@@ -74,7 +74,6 @@ context "Heredoc string" do
   end
 
   specify "dedents to the shallowest line" do
-    city = "portland"
     sql = <<~SQL
       select *
         from roses

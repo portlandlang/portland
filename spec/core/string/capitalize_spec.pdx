@@ -39,7 +39,6 @@ context "String#capitalize" do
   end
 
   specify "String#capitalize moves both ways — first up, the rest down" do
-    city = "portland"
     expect("portland".capitalize).to eq("Portland")
     expect("PDX".capitalize).to eq("Pdx")
   end

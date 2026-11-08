@@ -13,48 +13,9 @@
 
 require_relative "../../spec_helper"
 
-context "String#[]" do
-  city = "portland"
-  specify "answers the character at an index" do
-    expect(city[0]).to eq("p")
-  end
-
-  specify "counts negative indices from the end" do
-    expect(city[0 - 1]).to eq("d")
-  end
-
-  specify "answers nil past the end" do
-    expect(city[99]).to be_nil
-  end
-end
-
 # From ruby/spec core/string/element_reference_spec.rb's shared slice rows
 # for one index; the to_int conversion, the refusals, and the bignum row
 # stay upstream.
-context "String#[]" do
-  specify "returns the character code of the character at the given index" do
-    expect("hello"[0]).to eq("h")
-    expect("hello"[-1]).to eq("o")
-  end
-
-  specify "returns nil if index is outside of self" do
-    expect("hello"[20]).to be_nil
-    expect("hello"[-20]).to be_nil
-    expect(""[0]).to be_nil
-    expect(""[-1]).to be_nil
-  end
-
-  specify "slices strings the same way" do
-    words = %w[a b c d e]
-    expect("portland"[0..3]).to eq("port")
-    expect("portland"[5..]).to eq("and")
-  end
-
-  specify "answer the match's text or nil" do
-    expect("hello"[/l+/]).to eq("ll")
-    expect("hello"[/z/]).to be_nil
-  end
-end
 
 context "String#[] with Range" do
   specify "returns the substring given by the offsets of the range" do
@@ -133,5 +94,44 @@ context "String#[] with Range" do
     expect("hello there"[...5]).to eq("hello")
     expect("hello there"[..-4]).to eq("hello th")
     expect("hello there"[...-4]).to eq("hello t")
+  end
+end
+
+context "String#[]" do
+  specify "answers the character at an index" do
+    city = "portland"
+    expect(city[0]).to eq("p")
+  end
+
+  specify "counts negative indices from the end" do
+    city = "portland"
+    expect(city[0 - 1]).to eq("d")
+  end
+
+  specify "answers nil past the end" do
+    city = "portland"
+    expect(city[99]).to be_nil
+  end
+
+  specify "returns the character code of the character at the given index" do
+    expect("hello"[0]).to eq("h")
+    expect("hello"[-1]).to eq("o")
+  end
+
+  specify "returns nil if index is outside of self" do
+    expect("hello"[20]).to be_nil
+    expect("hello"[-20]).to be_nil
+    expect(""[0]).to be_nil
+    expect(""[-1]).to be_nil
+  end
+
+  specify "slices strings the same way" do
+    expect("portland"[0..3]).to eq("port")
+    expect("portland"[5..]).to eq("and")
+  end
+
+  specify "answer the match's text or nil" do
+    expect("hello"[/l+/]).to eq("ll")
+    expect("hello"[/z/]).to be_nil
   end
 end

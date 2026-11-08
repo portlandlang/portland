@@ -2,6 +2,10 @@
 
 require_relative "../../spec_helper"
 
+# From ruby/spec core/string/{length,size}_spec.rb; the encoding and
+# broken-byte rows stay upstream, and size's method-object row is written
+# as the twin's answer.
+
 context "String#length" do
   specify "counts the characters" do
     expect("portland").to have_length(8)
@@ -14,12 +18,7 @@ context "String#length" do
   specify "size is its twin (ADR 0036)" do
     expect("portland".size).to eq(8)
   end
-end
 
-# From ruby/spec core/string/{length,size}_spec.rb; the encoding and
-# broken-byte rows stay upstream, and size's method-object row is written
-# as the twin's answer.
-context "String#length" do
   specify "returns the length of self" do
     expect("".length).to eq(0)
     expect("one".length).to eq(3)

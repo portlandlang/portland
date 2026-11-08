@@ -18,7 +18,6 @@ context "Module#name" do
   end
 
   specify "is the same value" do
-    kind = Counted
     expect(Integer.name).to eq("Integer")
   end
 end

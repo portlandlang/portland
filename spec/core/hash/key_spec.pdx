@@ -37,7 +37,6 @@ context "Hash#key?" do
   end
 
   specify "holds for a key whose value is nil" do
-    config = {name: "pdx", port: 8080}
     expect({note: nil}).to have_key(:note)
   end
 end

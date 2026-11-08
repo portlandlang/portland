@@ -19,12 +19,10 @@ context "Integer#<=>" do
   end
 
   specify "returns 0 for -0.0 and 0" do
-    infinity = 1.0 / 0.0
     expect(0 <=> -0.0).to eq(0)
   end
 
   specify "returns 0 for 0.0 and 0" do
-    infinity = 1.0 / 0.0
     expect(0 <=> 0.0).to eq(0)
   end
 

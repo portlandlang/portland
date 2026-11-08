@@ -31,7 +31,6 @@ context "String#swapcase" do
   end
 
   specify "String#swapcase flips every letter" do
-    city = "portland"
     expect("PdX".swapcase).to eq("pDx")
   end
 end

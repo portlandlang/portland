@@ -11,13 +11,6 @@ struct Version
   def <=>(other) = [major, minor] <=> [other.major, other.minor]
 end
 
-context "Array#max" do
-  numbers = [3, 1, 2]
-  specify "answers the largest" do
-    expect(numbers.max).to eq(3)
-  end
-end
-
 # ruby/spec core/array/max_spec.rb and min_spec.rb, title for title
 # (#104), with the Enumerable examples upstream copies in. Staying
 # upstream: the method-owner check (reflection), the one-parameter block
@@ -25,8 +18,10 @@ end
 # truthiness, and the refusals where Ruby raises.
 
 context "Array#max" do
-  strings = ["333", "22", "666666", "1", "55555", "1010101010"]
-  integers = [333, 22, 666666, 55555, 1010101010]
+  specify "answers the largest" do
+    numbers = [3, 1, 2]
+    expect(numbers.max).to eq(3)
+  end
 
   specify "returns nil with no values" do
     expect([].max).to eq(nil)
@@ -47,6 +42,8 @@ context "Array#max" do
   end
 
   specify "returns the maximum element (basics cases)" do
+    strings = ["333", "22", "666666", "1", "55555", "1010101010"]
+    integers = [333, 22, 666666, 55555, 1010101010]
     expect([55].max).to eq(55)
     expect([11, 99].max).to eq(99)
     expect([99, 11].max).to eq(99)
@@ -67,6 +64,8 @@ context "Array#max" do
   end
 
   specify "returns the maximum element (with block)" do
+    strings = ["333", "22", "666666", "1", "55555", "1010101010"]
+    integers = [333, 22, 666666, 55555, 1010101010]
     expect(["2", "33", "4", "11"].max { |left, right| left <=> right }).to eq("4")
     expect([2, 33, 4, 11].max { |left, right| left <=> right }).to eq(33)
     expect(["2", "33", "4", "11"].max { |left, right| right <=> left }).to eq("11")
@@ -89,22 +88,18 @@ context "Array#max" do
   end
 
   specify "compare floats numerically" do
-    numbers = [3, 1, 2]
     expect([1.5, 0.5, 2.25].max).to eq(2.25)
   end
 
   specify "answer the element itself across the integer/float line" do
-    numbers = [3, 1, 2]
     expect([1, 2.5].max).to eq(2.5)
   end
 
   specify "compare strings alphabetically" do
-    numbers = [3, 1, 2]
     expect(["pear", "apple"].max).to eq("pear")
   end
 
   specify "of nothing are absent" do
-    numbers = [3, 1, 2]
     expect([].max).to be_nil
   end
 

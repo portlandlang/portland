@@ -10,14 +10,12 @@
 require_relative "../../spec_helper"
 
 context "String#end_with?" do
-  city = "portland"
   specify "anchors at the back" do
+    city = "portland"
     expect(city.end_with?("land")).to be_true
     expect(city.end_with?("port")).to be_false
   end
-end
 
-context "String#end_with?" do
   specify "returns true only if ends match" do
     greeting = "hello"
     expect(greeting.end_with?("o")).to be_true

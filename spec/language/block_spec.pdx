@@ -83,7 +83,6 @@ context "A block yielded a single" do
   end
 
   specify "shadows an outer local and restores it" do
-    factor = 10
     word = "outer"
     seen = %w[inner].map { |word| word }
     expect(seen).to eq(["inner"])

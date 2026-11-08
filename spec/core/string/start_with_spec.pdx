@@ -10,14 +10,12 @@
 require_relative "../../spec_helper"
 
 context "String#start_with?" do
-  city = "portland"
   specify "anchors at the front" do
+    city = "portland"
     expect(city.start_with?("port")).to be_true
     expect(city.start_with?("land")).to be_false
   end
-end
 
-context "String#start_with?" do
   specify "returns true only if beginning match" do
     greeting = "hello"
     expect(greeting.start_with?("h")).to be_true

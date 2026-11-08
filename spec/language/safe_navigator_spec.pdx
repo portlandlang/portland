@@ -44,12 +44,10 @@ context "Safe navigator" do
 
   specify "forwards to a present receiver" do
     words = %w[rose city]
-    empty = []
     expect(words.first&.upcase).to eq("ROSE")
   end
 
   specify "answers nil for an absent one" do
-    words = %w[rose city]
     empty = []
     expect(empty.first&.upcase).to be_nil
   end

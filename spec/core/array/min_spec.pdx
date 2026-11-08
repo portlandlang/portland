@@ -12,15 +12,10 @@ struct Version
 end
 
 context "Array#min" do
-  numbers = [3, 1, 2]
   specify "answers the smallest" do
+    numbers = [3, 1, 2]
     expect(numbers.min).to eq(1)
   end
-end
-
-context "Array#min" do
-  strings = ["333", "22", "666666", "1", "55555", "1010101010"]
-  integers = [333, 22, 666666, 55555, 1010101010]
 
   specify "returns nil with no values" do
     expect([].min).to eq(nil)
@@ -41,6 +36,8 @@ context "Array#min" do
   end
 
   specify "returns the minimum (basic cases)" do
+    strings = ["333", "22", "666666", "1", "55555", "1010101010"]
+    integers = [333, 22, 666666, 55555, 1010101010]
     expect([55].min).to eq(55)
     expect([11, 99].min).to eq(11)
     expect([99, 11].min).to eq(11)
@@ -61,6 +58,8 @@ context "Array#min" do
   end
 
   specify "returns the minimum when using a block rule" do
+    strings = ["333", "22", "666666", "1", "55555", "1010101010"]
+    integers = [333, 22, 666666, 55555, 1010101010]
     expect(["2", "33", "4", "11"].min { |left, right| left <=> right }).to eq("11")
     expect([2, 33, 4, 11].min { |left, right| left <=> right }).to eq(2)
     expect(["2", "33", "4", "11"].min { |left, right| right <=> left }).to eq("4")
@@ -87,22 +86,18 @@ context "Array#min" do
   end
 
   specify "compare floats numerically" do
-    numbers = [3, 1, 2]
     expect([1.5, 0.5, 2.25].min).to eq(0.5)
   end
 
   specify "answer the element itself across the integer/float line" do
-    numbers = [3, 1, 2]
     expect([1, 2.5].min).to eq(1)
   end
 
   specify "compare strings alphabetically" do
-    numbers = [3, 1, 2]
     expect(["pear", "apple"].min).to eq("apple")
   end
 
   specify "of nothing are absent" do
-    numbers = [3, 1, 2]
     expect([].min).to be_nil
   end
 
