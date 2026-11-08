@@ -7585,6 +7585,10 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(_), "encoding", []) => Value::String("UTF-8".to_string()),
             (Value::String(_), "valid_encoding?", []) => Value::Boolean(true),
             (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
+            // The leading number as a rational or a complex (ADR 0085),
+            // Ruby's own lenient readers ported (#106).
+            (Value::String(text), "to_r", []) => crate::tower::string_to_r(text),
+            (Value::String(text), "to_c", []) => crate::tower::string_to_c(text),
             (Value::String(text), "oct", []) => Value::Integer(parsed_octal(text)),
             // A replacement reads Ruby's escapes (ADR 0086, #161) with a
             // string pattern too: `\0` and `\&` the match, a group empty.

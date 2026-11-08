@@ -1355,3 +1355,355 @@ pub fn equals(left: &Value, right: &Value) -> Option<bool> {
     }
     Some(real_eq(left, right))
 }
+
+// — reading a number from text: `String#to_r` and `String#to_c` —
+//
+// Ported from Ruby 4.0.9's own readers, so every answer is Ruby's: `to_r`
+// is rational.c's `parse_rat` over `read_num`, and `to_c` is complex.c's
+// `read_comp`, which copies the characters it accepts into a buffer and
+// reads that buffer back by its shape. Both are lenient: leading spaces
+// are skipped, reading stops at the first character that does not fit, and
+// text with no number answers zero. Ruby's bignums are 64-bit here (ADR
+// 0070), so a part past the edge refuses.
+
+/// A byte at a position, or 0 past the end, as a C string reads.
+fn byte_at(bytes: &[u8], position: usize) -> u8 {
+    bytes.get(position).copied().unwrap_or(0)
+}
+
+fn skip_spaces(bytes: &[u8], mut position: usize) -> usize {
+    while byte_at(bytes, position).is_ascii_whitespace() {
+        position += 1;
+    }
+    position
+}
+
+/// rational.c's `rb_int_parse_cstr` with underscores: decimal digits, one
+/// underscore at a time between them. Answers the value, how many digits
+/// were read, and where reading stopped, or none when no digit starts here.
+fn read_decimal(bytes: &[u8], start: usize, text: &str) -> Option<(i128, u32, usize)> {
+    if !byte_at(bytes, start).is_ascii_digit() {
+        return None;
+    }
+    let mut value: i128 = 0;
+    let mut count = 0u32;
+    let mut position = start;
+    loop {
+        let byte = byte_at(bytes, position);
+        if byte.is_ascii_digit() {
+            value = value
+                .checked_mul(10)
+                .and_then(|scaled| scaled.checked_add(i128::from(byte - b'0')))
+                .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"));
+            count += 1;
+            position += 1;
+        } else if byte == b'_' && byte_at(bytes, position + 1).is_ascii_digit() {
+            position += 1;
+        } else {
+            break;
+        }
+    }
+    Some((value, count, position))
+}
+
+/// rational.c's `read_num`: an integer part, a fraction, an exponent. The
+/// value is the digits as one integer and `exponent` the power of ten to
+/// divide it by; `None` when nothing number-like starts here.
+fn read_rational_number(bytes: &[u8], start: usize, text: &str) -> Option<(i128, i128, usize)> {
+    let mut position = start;
+    let mut number: i128 = 0;
+    let mut exponent: i128 = 0;
+    let mut fraction_digits: i128 = 0;
+    let mut ok = false;
+    if position < bytes.len() && bytes[position] != b'.' {
+        let (value, _, after) = read_decimal(bytes, position, text)?;
+        number = value;
+        position = after;
+        ok = true;
+    }
+    if position < bytes.len() && bytes[position] == b'.' {
+        position += 1;
+        let Some((fraction, count, after)) = read_decimal(bytes, position, text) else {
+            return Some((number, exponent, position));
+        };
+        position = after;
+        let scale = 10i128
+            .checked_pow(count)
+            .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"));
+        number = number
+            .checked_mul(scale)
+            .and_then(|scaled| scaled.checked_add(fraction))
+            .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"));
+        exponent = i128::from(count);
+        fraction_digits = i128::from(count);
+        ok = true;
+    }
+    if ok && position + 1 < bytes.len() && matches!(bytes[position], b'e' | b'E') {
+        position += 1;
+        let negative = match byte_at(bytes, position) {
+            b'-' => {
+                position += 1;
+                true
+            }
+            b'+' => {
+                position += 1;
+                false
+            }
+            _ => false,
+        };
+        let Some((power, _, after)) = read_decimal(bytes, position, text) else {
+            return Some((number, exponent, position));
+        };
+        position = after;
+        if power != 0 {
+            exponent = if negative {
+                power + fraction_digits
+            } else {
+                fraction_digits - power
+            };
+        }
+    }
+    if ok {
+        Some((number, exponent, position))
+    } else {
+        None
+    }
+}
+
+/// Ten to a power, or a refusal past the integers.
+fn power_of_ten(power: i128, text: &str) -> i128 {
+    u32::try_from(power)
+        .ok()
+        .and_then(|power| 10i128.checked_pow(power))
+        .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"))
+}
+
+/// `String#to_r`: rational.c's `parse_rat`, lenient.
+pub fn string_to_r(text: &str) -> Value {
+    let bytes = text.as_bytes();
+    let mut position = skip_spaces(bytes, 0);
+    let negative = match byte_at(bytes, position) {
+        b'-' => {
+            position += 1;
+            true
+        }
+        b'+' => {
+            position += 1;
+            false
+        }
+        _ => false,
+    };
+    let Some((mut numerator, mut exponent, after)) = read_rational_number(bytes, position, text)
+    else {
+        return rational(0, 1);
+    };
+    position = after;
+    let mut denominator: i128 = 1;
+    if byte_at(bytes, position) == b'/' {
+        if let Some((below, below_exponent, _)) = read_rational_number(bytes, position + 1, text) {
+            if below == 0 {
+                panic!("divided by 0");
+            }
+            denominator = below;
+            exponent -= below_exponent;
+        }
+    }
+    if exponent < 0 {
+        numerator = numerator
+            .checked_mul(power_of_ten(-exponent, text))
+            .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"));
+    } else if exponent > 0 {
+        denominator = denominator
+            .checked_mul(power_of_ten(exponent, text))
+            .unwrap_or_else(|| panic!("{text:?} overflows the 64-bit integers"));
+    }
+    if negative {
+        numerator = -numerator;
+    }
+    rational_wide(numerator, denominator, &format!("{text:?}.to_r"))
+}
+
+/// complex.c's reader: the text, where reading stands, and the buffer the
+/// accepted characters are copied into.
+struct ComplexReader<'text> {
+    bytes: &'text [u8],
+    position: usize,
+    buffer: String,
+}
+
+impl ComplexReader<'_> {
+    fn at(&self) -> u8 {
+        byte_at(self.bytes, self.position)
+    }
+
+    fn take(&mut self) {
+        self.buffer.push(char::from(self.at()));
+        self.position += 1;
+    }
+
+    /// `read_sign`: a sign, copied, or nothing.
+    fn read_sign(&mut self) -> u8 {
+        let sign = self.at();
+        if matches!(sign, b'+' | b'-') {
+            self.take();
+            sign
+        } else {
+            b'?'
+        }
+    }
+
+    /// `read_digits`: digits with single underscores, which are not copied;
+    /// a doubled or trailing underscore ends the run and reading backs up
+    /// to the last digit, as Ruby's does.
+    fn read_digits(&mut self) -> bool {
+        if !self.at().is_ascii_digit() {
+            return false;
+        }
+        let mut after_underscore = true;
+        while self.at().is_ascii_digit() || self.at() == b'_' {
+            if self.at() == b'_' {
+                if after_underscore {
+                    break;
+                }
+                after_underscore = true;
+                self.position += 1;
+            } else {
+                self.take();
+                after_underscore = false;
+            }
+        }
+        if after_underscore {
+            loop {
+                self.position -= 1;
+                if self.at() != b'_' {
+                    break;
+                }
+            }
+        }
+        true
+    }
+
+    /// `read_num`: digits, a fraction, an exponent.
+    fn read_num(&mut self) -> bool {
+        if self.at() != b'.' && !self.read_digits() {
+            return false;
+        }
+        if self.at() == b'.' {
+            self.take();
+            if !self.read_digits() {
+                self.buffer.pop();
+                return false;
+            }
+        }
+        if matches!(self.at(), b'e' | b'E') {
+            self.take();
+            self.read_sign();
+            if !self.read_digits() {
+                self.buffer.pop();
+                return false;
+            }
+        }
+        true
+    }
+
+    /// `read_rat_nos`: a number, then an optional `/denominator`.
+    fn read_rat_nos(&mut self) -> bool {
+        if !self.read_num() {
+            return false;
+        }
+        if self.at() == b'/' {
+            self.take();
+            if !self.read_digits() {
+                self.buffer.pop();
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Start a fresh number in the buffer, keeping where the old one began.
+    fn fresh(&mut self) -> usize {
+        self.buffer.len()
+    }
+}
+
+fn is_imaginary_unit(byte: u8) -> bool {
+    matches!(byte, b'i' | b'I' | b'j' | b'J')
+}
+
+/// complex.c's `str2num`: the buffer read back by its shape — a slash a
+/// rational, a point or an exponent a float, otherwise an integer.
+fn buffer_number(written: &str, text: &str) -> Value {
+    if written.contains('/') {
+        return string_to_r(written);
+    }
+    if written.contains(['.', 'e', 'E']) {
+        let trimmed = written.trim_end_matches(['e', 'E']);
+        return Value::Float(trimmed.parse::<f64>().unwrap_or(0.0));
+    }
+    let digits = written.trim_start_matches(['+', '-']);
+    if digits.is_empty() {
+        return Value::Integer(0);
+    }
+    let magnitude: i128 = digits
+        .parse()
+        .unwrap_or_else(|_| panic!("{text:?} overflows the 64-bit integers"));
+    let value = if written.starts_with('-') {
+        -magnitude
+    } else {
+        magnitude
+    };
+    Value::Integer(narrow(value, &format!("{text:?}.to_c")))
+}
+
+/// `String#to_c`: complex.c's `read_comp`, lenient. Reading stops at a NUL,
+/// as Ruby's C string does.
+pub fn string_to_c(text: &str) -> Value {
+    let text = text.split('\0').next().unwrap_or("");
+    let bytes = text.as_bytes();
+    let mut reader = ComplexReader {
+        bytes,
+        position: skip_spaces(bytes, 0),
+        buffer: String::new(),
+    };
+    let sign = reader.read_sign();
+    if is_imaginary_unit(reader.at()) {
+        let unit = if sign == b'-' { -1 } else { 1 };
+        return complex(Value::Integer(0), Value::Integer(unit));
+    }
+    if !reader.read_rat_nos() {
+        return complex(buffer_number(&reader.buffer, text), Value::Integer(0));
+    }
+    let real = buffer_number(&reader.buffer, text);
+    if is_imaginary_unit(reader.at()) {
+        return complex(Value::Integer(0), real);
+    }
+    if reader.at() == b'@' {
+        reader.position += 1;
+        let start = reader.fresh();
+        reader.read_sign();
+        reader.read_rat_nos();
+        let angle_text = reader.buffer[start..].to_string();
+        if !angle_text.ends_with(|character: char| character.is_ascii_digit()) {
+            return complex(real, Value::Integer(0));
+        }
+        return complex_polar(&real, &buffer_number(&angle_text, text));
+    }
+    if matches!(reader.at(), b'+' | b'-') {
+        let start = reader.fresh();
+        let sign = reader.read_sign();
+        let imaginary = if is_imaginary_unit(reader.at()) {
+            Value::Integer(if sign == b'-' { -1 } else { 1 })
+        } else {
+            if !reader.read_rat_nos() {
+                return complex(real, Value::Integer(0));
+            }
+            buffer_number(&reader.buffer[start..], text)
+        };
+        if !is_imaginary_unit(reader.at()) {
+            return complex(real, Value::Integer(0));
+        }
+        return complex(real, imaginary);
+    }
+    complex(real, Value::Integer(0))
+}
