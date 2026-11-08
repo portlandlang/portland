@@ -2214,6 +2214,30 @@ def host_group_key(key) = (key in ["__symbol__", *]) ? value_at(key, 1) : key
 # as Ruby's `=~` reads a symbol, anything else as it is.
 def host_text(value) = (value in ["__symbol__", *]) ? value_at(value, 1) : value
 
+# A character list for `tr`, `tr_s`, `delete`, or `squeeze` (ADR 0088): a
+# guest string as it is, anything else refused in Ruby's words before the
+# host sees a guest's tagged shape.
+def character_list(value)
+  return value if value in String
+  panic("no implicit conversion of #{value_type_label(value)} into String")
+end
+
+# Several character lists to `delete` or `squeeze` as the one list the
+# host takes (ADR 0088). Each is checked alone first, so a set spelling
+# refuses naming the list as written; then the characters every list holds
+# are joined with a `-` first and a `^` last, where neither reads as set
+# syntax, so the host sees the same characters the lists share.
+def shared_characters(lists, method)
+  checked = lists.map { character_list(it) }
+  return value_at(checked, 0) if checked.length == 1
+  checked.each { |list| method == "delete" ? "".delete(list) : "".squeeze(list) }
+  shared = value_at(checked, 0).chars.select { |character| checked.all? { |list| list.chars.include?(character) } }
+  dash = shared.include?("-") ? "-" : ""
+  caret = shared.include?("^") ? "^" : ""
+  middle = shared.reject { it == "-" || it == "^" }
+  dash + middle.join + caret
+end
+
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 # `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
 # shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
@@ -3356,6 +3380,14 @@ def evaluate_method_call(node, mutable bindings)
   # A string is UTF-8, always (ADR 0069): the host's one answer to each.
   when "encoding" then receiver.encoding
   when "valid_encoding?" then receiver.valid_encoding?
+  # Ruby's character-list methods over literal characters (ADR 0088), the
+  # host's own. Several lists to `delete` or `squeeze` intersect, and the
+  # host takes them one call at a time, so see shared_characters.
+  when "tr" then receiver.tr(character_list(value_at(arguments, 0)), character_list(value_at(arguments, 1)))
+  when "tr_s" then receiver.tr_s(character_list(value_at(arguments, 0)), character_list(value_at(arguments, 1)))
+  when "delete" then receiver.delete(shared_characters(arguments, "delete"))
+  when "squeeze"
+    arguments.empty? ? receiver.squeeze : receiver.squeeze(shared_characters(arguments, "squeeze"))
   when "hex" then receiver.hex
   when "oct" then receiver.oct
   # A symbol may be made from text (ADR 0071): the guest's tagged shape.

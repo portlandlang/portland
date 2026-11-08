@@ -1,6 +1,6 @@
-# `String#count` and character sets
+# `String#count`, `tr`, and character sets
 
-**Summary:** `count` takes a single character; Ruby's multi-character set-count spelling refuses instead of quietly meaning something else.
+**Summary:** `count` takes a single character, and `tr`, `tr_s`, `delete`, and `squeeze` read their arguments as lists of literal characters; Ruby's set spellings — ranges, negation, escapes — refuse instead of quietly meaning something else.
 
 **Status:** decided in practice (the [#23](https://github.com/portlandlang/portland/issues/23) import, 2026-08-12; ratified 2026-08-18); no ADR — the refusal falls straight out of principle 5, and a future substring-count would be a new name, not a new reading of this one. A corpus question is filed ([ruby_research#1](https://github.com/portlandlang/ruby_research/issues/1)): how often real code passes a multi-character argument, and which meaning it intends.
 
@@ -24,8 +24,25 @@ count takes a single character — Ruby's multi-character count is a character s
 
 Counting occurrences of a substring is a different job and would get a different name if a real file pulls for it; the set semantics (negation, ranges) are declined, not deferred.
 
+**`tr`, `tr_s`, `delete`, and `squeeze` read their characters literally** ([ADR 0088](../adr/0088-2026-11-08-character-lists-are-literal.md)). Their arguments are plainly lists of characters, so the substring confusion that keeps `count` to one character does not arise; each character stands for itself, with Ruby's rules for everything else — the to-list padded with its last character, the last occurrence winning, an empty to-list deleting, several lists to `delete` and `squeeze` intersecting:
+
+```ruby
+"hello".tr("el", "ip")     # "hippo", same as Ruby
+"hello".delete("l", "lo")  # "heo", same as Ruby
+"yellow moon".squeeze      # "yelow mon", same as Ruby
+```
+
+The three set spellings refuse, naming the pattern that says the same: a `-` between two characters, a `^` first with more after it, and any backslash. A lone `^`, and a `-` first or last, are literal in Ruby too and read as themselves.
+
+```text
+'a-y' is a character range, which tr does not read here — its characters are literal; use a pattern: gsub(/[a-y]/) { ... }
+```
+
+A character is a grapheme, as for `count`, so the two differ from Ruby only around combining marks.
+
 ## Migration
 
 - Single-character `count` — the overwhelmingly common case — migrates verbatim, same answer.
+- `tr`, `tr_s`, `delete`, and `squeeze` with plain character lists migrate verbatim. A range or a negation refuses naming its `gsub`; `tr("a-z", "A-Z")` is `upcase`.
 - Multi-character `count` fails loudly with the explanation above; the migrating author decides whether they meant the set (rare, and usually a surprise to them) or a substring count (rewrite when the name exists; today, `split` or a loop).
 - Tier: _free_ for single characters; _gem-supplied_ lint for the rest — a linter can flag every multi-character `count` in valid Ruby before the flip.

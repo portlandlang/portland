@@ -437,3 +437,7 @@ p seen.add("z").union(Set["w"]) - ["x"]
 p Set[1, 2] <= Set[1, 2, 3]
 p Set[1, 2, 3].select { it.odd? }
 p Set.new(1..3) { it * it }.include?(4)
+p "hello".tr("el", "ip")
+p "hello".tr_s("el", "hx")
+p "hello world".delete("lo", "o")
+p "yellow moon".squeeze

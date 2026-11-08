@@ -5748,3 +5748,41 @@ fn regex_refusals_on_both_oracles() {
         ],
     );
 }
+
+/// `tr`, `tr_s`, `delete`, and `squeeze` read their characters literally
+/// (ADR 0088): Ruby's three set spellings — a range, a negation, an escape
+/// — refuse on both oracles, each naming the pattern that says the same,
+/// and a list that is not a string refuses in Ruby's words.
+#[test]
+fn character_list_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "character_list_refusals",
+        None,
+        &[
+            (
+                "p(\"hello\".tr(\"a-y\", \"b-z\"))\n",
+                "'a-y' is a character range, which tr does not read here — its characters are literal; use a pattern: gsub(/[a-y]/) { ... }",
+            ),
+            (
+                "p(\"hello\".tr_s(\"^aeiou\", \"*\"))\n",
+                "'^aeiou' is a negated character set, which tr_s does not read here",
+            ),
+            (
+                "p(\"a-b\".tr(\"a\\\\-b\", \"123\"))\n",
+                "is an escaped character set, which tr does not read here",
+            ),
+            (
+                "p(\"hello\".delete(\"ej-m\"))\n",
+                "'ej-m' is a character range, which delete does not read here — its characters are literal; use a pattern: gsub(/[ej-m]/, \"\")",
+            ),
+            (
+                "p(\"aaabbb\".squeeze(\"a-b\"))\n",
+                "'a-b' is a character range, which squeeze does not read here — its characters are literal; use a pattern: gsub(/([a-b])\\1+/, '\\1')",
+            ),
+            (
+                "p(\"hello\".tr(:e, \"a\"))\n",
+                "no implicit conversion of Symbol into String",
+            ),
+        ],
+    );
+}
