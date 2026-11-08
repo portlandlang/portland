@@ -2,7 +2,7 @@
 
 **Summary:** Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 
-**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The third family, inference-backed refusals, has its voice and its first five wordings decided ([ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)) and builds next. The rest of [#9](https://github.com/portlandlang/portland/issues/9)'s inventory (flow narrowing, the full exhaustiveness rule) lands here as it arrives.
+**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The third family, inference-backed refusals, is built in [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)'s voice, below. Still to come: ADR 0007's two never-guess checks on the word operators ([#219](https://github.com/portlandlang/portland/issues/219)), a refusal position on every node kind, enum-case widening, and patterns by capability ([#220](https://github.com/portlandlang/portland/issues/220)).
 
 ## Ruby
 

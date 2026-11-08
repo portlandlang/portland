@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The compiler — `lexer.pdx`, `parser.pdx`, `evaluator.pdx`, plus the two walkers the seed will never have, `checker.pdx` and `inference.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, the evaluator matches the seed byte-for-byte, the checker refuses only what it can disprove, and inference is what its refusals read — across a whole program, with run mode sharpening parameters from their callers. There is no compiler emitting binaries yet.
 
-**Next:** with [#9](https://github.com/portlandlang/portland/issues/9)'s ladder climbed end to end — ADRs 0047–0049 in three days: the error voice, contracts, the whole-program door with run-mode sharpening — the checker's remaining reach is a matter of positions on the other node kinds and reporting every refusal at once, both pulled when a real file wants them. The language questions come back to the front: the `%` zoo (#29), redefinition and the hijackable builtins (#70), ordering and `<=>` (#76), and the stdlib story (#78), which is also when the builtin method table retires. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
+**Next:** with [#9](https://github.com/portlandlang/portland/issues/9)'s ladder climbed end to end — ADRs 0047–0049 in three days: the error voice, contracts, the whole-program door with run-mode sharpening — what the checker has left is ADR 0007's two never-guess checks ([#219](https://github.com/portlandlang/portland/issues/219)) and three small follow-ons pulled when a real file wants them ([#220](https://github.com/portlandlang/portland/issues/220)). The language questions come back to the front: the `%` zoo (#29), redefinition and the hijackable builtins (#70), ordering and `<=>` (#76), and the stdlib story (#78), which is also when the builtin method table retires. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
 
 ## Done 🎉
 
@@ -94,7 +94,8 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Toward the fixpoint
 
-- [#9](https://github.com/portlandlang/portland/issues/9) — type inference: ADR 0040's ladder is climbed and the static half of optionals is built; what remains — positions on every node kind, reporting every refusal at once — waits to be pulled for
+- [#219](https://github.com/portlandlang/portland/issues/219) — ADR 0007's two never-guess checks on the word operators, the last static checks from the inference design ([#9](https://github.com/portlandlang/portland/issues/9), closed: ADR 0040's ladder is climbed)
+- [#220](https://github.com/portlandlang/portland/issues/220) — checker follow-ons: a position on every node kind, enum-case widening, patterns by capability; each waits to be pulled for
 - [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
 - **Stage 2** — the fixpoint; **the seed retires** and `architecture.md`'s seed section is deleted
 - **Stage 3** — the primitive boundary descends
@@ -109,7 +110,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - [#23](https://github.com/portlandlang/portland/issues/23) — a living ruby/spec fork as compatibility oracle
 - [#1](https://github.com/portlandlang/portland/issues/1) — brand story: voice, tagline, the teal carpet, the rose
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
-- [#25](https://github.com/portlandlang/portland/issues/25) — `script/bench` exists, baseline taken (hosted lex: 4741x, the fixpoint's scoreboard); receipts against Ruby still to come
+- [#221](https://github.com/portlandlang/portland/issues/221) — benchmark receipts: compiled Portland against Ruby and Swift, tracked across commits; the harness is built ([#25](https://github.com/portlandlang/portland/issues/25), closed: `script/bench` with a Ruby column, hosted lex 4741x as the fixpoint's scoreboard)
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
 - [#36](https://github.com/portlandlang/portland/issues/36) — the polyfill shim gem and migration linter; a placeholder holding the tier inventory, not a commitment
 

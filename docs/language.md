@@ -179,7 +179,7 @@ There is **no `if let`** and **no force-unwrap operator**. `or panic "why"` is t
 
 **Failure is absence with a reason** (ADR 0027). A fallible operation returns its value or a `failure(reason)` — always a real box, since its whole job is marking the sad path — and the toolkit above handles it unchanged: `or` takes the fallback, `case/in` reaches *through* the box to the reason (a failure is transparent to patterns, where a some-box stays opaque), and `failure?` joins `nil?`/`some?` as a universal dispatch. Propagation is the toolkit spelled out ([ADR 0044](adr/0044-2026-08-19-propagation-is-the-toolkit.md)): `return value if value.failure?` at each frame a failure crosses — every crossing written and greppable, unwinding to its write site like any `return` (ADR 0025). There is no `raise` and no `rescue`: a failure never crosses a frame that did not guard it. `puts` refuses a failure as it refuses nil; `p` and `inspect` render it. `System.read_file` and `System.write_file` are the first fallible operations. `!` is simply part of a method's name, as in Ruby — `def save!` is legal, its meaning the author's convention.
 
-The **static** half of this — flow narrowing, unhandled-maybe compile errors, the `Boolean?` never-guess, dead right-hand sides — is the checker's job (#9). Today those surface as runtime panics.
+The **static** half of this is the checker's: flow narrowing and the unhandled-maybe refusal are built ([static checks](ruby/static-checks.md)); the `Boolean?` never-guess and dead right-hand sides are not yet ([#219](https://github.com/portlandlang/portland/issues/219)), and compute with Ruby's answers until they are.
 
 ## Control flow
 
