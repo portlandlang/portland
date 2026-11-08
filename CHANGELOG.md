@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`script/probe_builtin_methods` runs its shapes in parallel** ([#260](https://github.com/portlandlang/portland/issues/260)) — a pool of workers, one per core, each with its own scratch file, takes the probe's thousands of one-line `pdx` runs from a queue; the table it prints is byte-for-byte the serial run's, and the whole probe takes 142 seconds on an eight-core M-series Mac where it took 360. Each run is still its own process, now killed after 30 seconds, and a killed run fails the probe naming its call rather than hanging it.
+
 - **CI checks the builtin method table beside cibuild** ([#259](https://github.com/portlandlang/portland/issues/259)) — the check is its own job, `builtin-method-table`, started with `cibuild` rather than after it, so a run that touches the seed takes about as long as the slower of the two instead of their sum. It keeps its changed-paths gate, now including the workflow itself, and a skipped check sets up nothing, finishing in seconds.
 
 - **A type held in a variable type-tests with `===`** ([#255](https://github.com/portlandlang/portland/issues/255)) — on both implementations, `kind = Integer; kind === 3` is true, as Ruby's is, where it compared the type to the value and answered false. The same holds for a type handed to a method, kept in a struct's field, used as a `when` value, or pinned in a pattern (`3 in ^kind`). Rows pin it in `spec/core/module/case_compare_spec.pdx` and `spec/language/pattern_matching_spec.pdx`.
