@@ -19,8 +19,12 @@ cargo --version
 
 # The Ruby .ruby-version pins, installed by rv if it is not already (rv says
 # so and succeeds when it is), then selected the way every script selects it —
-# see script/docs/lib/ruby.sh — so the gems below land under that Ruby.
-rv ruby install
+# see script/docs/lib/ruby.sh — so the gems below land under that Ruby. CI
+# brings its own Ruby from the same pin (ruby/setup-ruby), so rv is skipped
+# there; the Brewfile skips installing it too.
+if [ -z "$CI" ]; then
+  rv ruby install
+fi
 . script/docs/lib/ruby.sh
 ruby --version
 

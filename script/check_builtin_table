@@ -24,7 +24,9 @@ end
 abort "check_builtin_table: found no table in compiler/inference.pdx" if tabled.empty?
 
 probed = {}
-IO.popen([File.join(repo, "script", "probe_builtin_methods")]) do |output|
+# The probe runs under this same Ruby rather than through its own rv
+# shebang, so CI, which has no rv, runs it with setup-ruby's.
+IO.popen([RbConfig.ruby, File.join(repo, "script", "probe_builtin_methods")]) do |output|
   output.each_line do |line|
     type, names = line.chomp.split(": ", 2)
     probed[type] = (names || "").split.sort
