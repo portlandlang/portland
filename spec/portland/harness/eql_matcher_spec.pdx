@@ -1,0 +1,25 @@
+# The spec harness's `eql` matcher (#252): `actual.eql?(expected)`, which
+# tells an Integer from an equal Float where `eq`, being `==`, does not —
+# `expect(1.0).to eq(1)` passes. ruby/spec writes `should eql(...)` wherever
+# that difference matters.
+
+require_relative "../../spec_helper"
+
+context "eql" do
+  specify "passes when the two are eql?" do
+    expect(1).to eql(1)
+    expect("rose").to eql("rose")
+    expect([1, 2]).to eql([1, 2])
+  end
+
+  specify "tells an Integer from an equal Float, where eq does not" do
+    expect(1.0).to eq(1)
+    expect(1.0).not_to eql(1)
+    expect(1).not_to eql(1.0)
+  end
+
+  specify "names both values when it fails" do
+    expect(eql(1).failure_message(1.0)).to eq("expected 1.0 to be eql? to 1")
+    expect(eql(1).negated_failure_message(1)).to eq("expected 1 not to be eql? to 1")
+  end
+end
