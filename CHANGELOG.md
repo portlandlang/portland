@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Manifest reasons name specs that exist** ([#240](https://github.com/portlandlang/portland/issues/240)) — two reasons in `spec/ruby_spec.yml` cited `spec/portland/number/` files that #235 moved into the mirror; `core/float/exponent_spec.rb`'s now cites `spec/core/float/exponent_spec.pdx`. `core/enumerable/sum_spec.rb`'s rational rows, which had been written with integers, now port as upstream has them, `2/3r` as `Rational(2, 3)`, summing exactly on both oracles. The `ruby_spec_manifest` docs check fails on a reason that cites a spec path that does not exist.
+
 - **`MatchData#eql?` has spec rows** ([#236](https://github.com/portlandlang/portland/issues/236)) — `spec/core/matchdata/eql_spec.pdx` asks `eql?` the four questions `equal_value_spec.pdx` asks `==`, on both oracles, where the manifest claimed a row no spec had. Upstream's own row compares method objects and stays there.
 
 - **`script/probe_builtin_methods` runs its shapes in parallel** ([#260](https://github.com/portlandlang/portland/issues/260)) — a pool of workers, one per core, each with its own scratch file, takes the probe's thousands of one-line `pdx` runs from a queue; the table it prints is byte-for-byte the serial run's, and the whole probe takes 142 seconds on an eight-core M-series Mac where it took 360. Each run is still its own process, now killed after 30 seconds, and a killed run fails the probe naming its call rather than hanging it.

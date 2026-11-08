@@ -709,7 +709,7 @@ core/enumerable/sort_by_spec.rb:
 core/enumerable/sum_spec.rb:
   pdx: [spec/core/enumerable/sum_spec.pdx]
   status: partial_intentional
-  reason: "The rational rows sum exactly (spec/portland/number/promotion_spec.pdx); symbol-to-block waits on #77."
+  reason: "The rational rows sum exactly, upstream's 2/3r written Rational(2, 3); symbol-to-block waits on #77."
   link: docs/ruby/types.md
 core/enumerable/each_with_index_spec.rb:
   pdx: [spec/core/enumerable/each_with_index_spec.pdx]
@@ -995,7 +995,7 @@ core/float/fdiv_spec.rb:
 core/float/exponent_spec.rb:
   pdx: [spec/core/float/exponent_spec.pdx]
   status: partial_planned
-  reason: "A negative float to a fractional power is a Complex, as Ruby's is (spec/portland/number/complex_spec.pdx); the bignum and coercion rows stay upstream."
+  reason: "A negative float to a fractional power is a Complex, as Ruby's is (spec/core/float/exponent_spec.pdx); the bignum and coercion rows stay upstream."
   link: https://github.com/portlandlang/portland/issues/198
 core/float/next_float_spec.rb:
   pdx: [spec/core/float/next_float_spec.pdx]
