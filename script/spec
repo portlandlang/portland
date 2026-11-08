@@ -15,8 +15,17 @@
 # That split is how mspec separates examples from formatters too, and it buys
 # back the property panicking cost: every failure gets reported, not just the
 # first one.
+#
+# With no arguments it runs every spec under spec/. Given paths — spec files,
+# directories, or both — it runs only the specs they name, still on both
+# oracles, with the same tally and exit status (#248):
+#
+#   script/spec spec/portland/system/
+#   script/spec spec/core/float/zero_spec.pdx spec/core/float/modulo_spec.pdx
 set -e
+invoked_from=$(pwd)
 cd "$(dirname "$0")/.."
+root=$(pwd)
 
 . script/lib/rust.sh
 cargo build --quiet --package portland-seed --bin pdx
@@ -71,17 +80,62 @@ total_pendings=0
 # spec/ruby/ is left out: those are the ruby/spec stubs, every example a
 # pending, which cannot fail — running them would prove only that they parse,
 # at many minutes a run. They are parsed below instead, in under a second.
-specs=$(find spec -name "*_spec.pdx" -not -path "spec/ruby/*" | sort)
-[ -n "$specs" ] || { echo "no *_spec.pdx files under spec/"; exit 1; }
+if [ "$#" -eq 0 ]; then
+  specs=$(find spec -name "*_spec.pdx" -not -path "spec/ruby/*" | sort)
+  [ -n "$specs" ] || { echo "no *_spec.pdx files under spec/"; exit 1; }
+  stubs=$(find spec/ruby -name "*_spec.pdx" 2>/dev/null | sort)
+else
+  # Each path is taken relative to where the script was run from, then made
+  # relative to the repository, so the transcript names a spec the same way
+  # whether it ran alone or in the whole suite. A path that names no spec is
+  # an error, never an empty green run.
+  chosen=""
+  for argument in "$@"; do
+    case "$argument" in
+      /*) absolute="$argument" ;;
+      *) absolute="$invoked_from/$argument" ;;
+    esac
+    if [ -d "$absolute" ]; then
+      absolute=$(cd "$absolute" && pwd)
+    elif [ -f "$absolute" ]; then
+      absolute="$(cd "$(dirname "$absolute")" && pwd)/$(basename "$absolute")"
+    else
+      echo "script/spec: no such file or directory: $argument"
+      exit 1
+    fi
+    case "$absolute" in
+      "$root") relative="spec" ;;
+      "$root"/*) relative="${absolute#"$root"/}" ;;
+      *) echo "script/spec: outside the repository: $argument"; exit 1 ;;
+    esac
+    if [ -d "$relative" ]; then
+      found=$(find "$relative" -name "*_spec.pdx")
+      [ -n "$found" ] || { echo "script/spec: no *_spec.pdx files under $argument"; exit 1; }
+    else
+      case "$relative" in
+        *_spec.pdx) found="$relative" ;;
+        *) echo "script/spec: not a spec file: $argument"; exit 1 ;;
+      esac
+    fi
+    chosen="$chosen
+$found"
+  done
+  chosen=$(printf '%s\n' "$chosen" | sed '/^$/d' | sort -u)
+  specs=$(printf '%s\n' "$chosen" | grep -v '^spec/ruby/' || true)
+  stubs=$(printf '%s\n' "$chosen" | grep '^spec/ruby/' || true)
+fi
 
 # The stubs parse, all in one process; the counts are the generator's own,
-# from spec/ruby/pendings.yml.
-stubs=$(find spec/ruby -name "*_spec.pdx" 2>/dev/null | sort)
+# from spec/ruby/pendings.yml, when every stub was parsed.
 if [ -n "$stubs" ]; then
   if ./target/debug/pdx --parse $stubs; then
-    stub_count=$(sed -n 's/^stubs: //p' spec/ruby/pendings.yml)
-    stub_pendings=$(sed -n 's/^pendings: //p' spec/ruby/pendings.yml)
-    echo "ruby/spec stubs: $stub_count files parse, holding $stub_pendings pendings (not run)"
+    if [ "$#" -eq 0 ]; then
+      stub_count=$(sed -n 's/^stubs: //p' spec/ruby/pendings.yml)
+      stub_pendings=$(sed -n 's/^pendings: //p' spec/ruby/pendings.yml)
+      echo "ruby/spec stubs: $stub_count files parse, holding $stub_pendings pendings (not run)"
+    else
+      echo "ruby/spec stubs: $(counted "$(printf '%s\n' "$stubs" | wc -l | tr -d ' ')" file) parse (not run)"
+    fi
   else
     echo "ruby/spec stubs: some do not parse — regenerate with script/ruby_spec_stubs"
     failed=1
@@ -97,7 +151,9 @@ fi
 # Not under `set -e`: a spec that panics should still print everything that
 # ran before it, the way one-process-per-spec used to.
 hosted_status=0
-./target/debug/pdx spec/run_specs.pdx spec/spec_helper.pdx $specs > "$hosted_all" || hosted_status=$?
+if [ -n "$specs" ]; then
+  ./target/debug/pdx spec/run_specs.pdx spec/spec_helper.pdx $specs > "$hosted_all" || hosted_status=$?
+fi
 
 # One file per spec, in the order the driver ran them, split on its `=== `
 # markers. `read` drops a trailing partial line, which a panic can leave; that

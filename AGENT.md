@@ -43,7 +43,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
-| `script/spec`          | the language spec in `spec/`, on both oracles — seed and compiler                   |
+| `script/spec [path…]`  | the language spec in `spec/`, on both oracles — or only the files and directories named |
 | `script/ruby_spec_dashboard PATH` | the spec dashboard's JSON, from a ruby/spec checkout and `spec/ruby_spec.yml` |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
