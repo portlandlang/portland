@@ -2214,6 +2214,10 @@ def host_group_key(key) = (key in ["__symbol__", *]) ? value_at(key, 1) : key
 # as Ruby's `=~` reads a symbol, anything else as it is.
 def host_text(value) = (value in ["__symbol__", *]) ? value_at(value, 1) : value
 
+# A guest symbol as the host's own symbol, for a host method that wants
+# one; anything else as it is, so the host refuses it in its own words.
+def host_symbol(value) = (value in ["__symbol__", *]) ? value_at(value, 1).to_sym : value
+
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 # `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
 # shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
@@ -3358,6 +3362,12 @@ def evaluate_method_call(node, mutable bindings)
   when "valid_encoding?" then receiver.valid_encoding?
   when "hex" then receiver.hex
   when "oct" then receiver.oct
+  # Unicode's normalization forms (ADR 0087), the host's own; a guest
+  # symbol names the form to the host as a host symbol.
+  when "unicode_normalize"
+    arguments.empty? ? receiver.unicode_normalize : receiver.unicode_normalize(host_symbol(value_at(arguments, 0)))
+  when "unicode_normalized?"
+    arguments.empty? ? receiver.unicode_normalized? : receiver.unicode_normalized?(host_symbol(value_at(arguments, 0)))
   # A symbol may be made from text (ADR 0071): the guest's tagged shape.
   when "to_sym", "intern" then ["__symbol__", receiver]
   when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))

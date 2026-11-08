@@ -14,6 +14,8 @@
 
 **A match's positions count them too** ([ADR 0086](../adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)): `begin`, `pre_match`, and `index(/x/)` answer grapheme indices, translated from the engine's bytes, so a position a match answers is one `slice` takes. Inside a pattern the engine keeps Onigmo's codepoints — `.` matches one scalar, `\X` one grapheme — see [regex.md](regex.md).
 
+**The normalization forms are Ruby's** ([ADR 0087](../adr/0087-2026-11-08-normalization-forms-are-rubys.md)): `unicode_normalize(:nfd)` and the other three forms rewrite the text, and `unicode_normalized?` asks whether it already is in one, Ruby's answers codepoint for codepoint. Equality does not change: a normalized string is `==` to the one it came from, so the forms show only in `bytes` and `codepoints` — which is what a program writing for a filesystem, a database key, or a hash needs to control.
+
 **Equality is canonical** — `==` asks "same text?", not "same bytes?", so the two spellings of `é` are equal, and equal everywhere a string can hide: array membership, hash keys, `uniq`, pattern-match literals. Storage is never normalized; a file round-trip is byte-faithful.
 
 **Casing is Ruby's own** — full Unicode, locale-independent, `"ß".upcase == "SS"` — a non-difference, ratified.
