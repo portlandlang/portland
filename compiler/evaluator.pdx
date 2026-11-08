@@ -2214,6 +2214,43 @@ def host_group_key(key) = (key in ["__symbol__", *]) ? value_at(key, 1) : key
 # as Ruby's `=~` reads a symbol, anything else as it is.
 def host_text(value) = (value in ["__symbol__", *]) ? value_at(value, 1) : value
 
+# A character list for `tr`, `tr_s`, `delete`, or `squeeze` (ADR 0088): a
+# guest string as it is, anything else refused in Ruby's words before the
+# host sees a guest's tagged shape.
+def character_list(value)
+  return value if value in String
+  panic("no implicit conversion of #{value_type_label(value)} into String")
+end
+
+# Several character lists to `delete` or `squeeze` as the one list the
+# host takes (ADR 0088). Each is checked alone first, so a set spelling
+# refuses naming the list as written; then the characters every list holds
+# are joined with a `-` first and a `^` last, where neither reads as set
+# syntax, so the host sees the same characters the lists share.
+def shared_characters(lists, method)
+  checked = lists.map { character_list(it) }
+  return value_at(checked, 0) if checked.length == 1
+  checked.each { |list| method == "delete" ? "".delete(list) : "".squeeze(list) }
+  shared = value_at(checked, 0).chars.select { |character| checked.all? { |list| list.chars.include?(character) } }
+  dash = shared.include?("-") ? "-" : ""
+  caret = shared.include?("^") ? "^" : ""
+  middle = shared.reject { it == "-" || it == "^" }
+  dash + middle.join + caret
+end
+
+# A guest symbol as the host's own symbol, for a host method that wants
+# one; anything else as it is, so the host refuses it in its own words.
+def host_symbol(value) = (value in ["__symbol__", *]) ? value_at(value, 1).to_sym : value
+
+# What a `match` or `match?` argument is for the host: a subject read by its
+# name when the receiver is a pattern, a pattern left as it is otherwise, so
+# a symbol handed to a string refuses there as Ruby's does.
+def pattern_operand(receiver, operand)
+  return host_text(operand) if receiver in Regexp
+  return operand if (operand in Regexp) || (operand in String)
+  panic("wrong argument type #{value_type_label(operand)} (expected Regexp)")
+end
+
 # Guest struct instances are tagged arrays: ["__struct__", name, pairs].
 # `Array.new` and `Integer.sqrt` (ADR 0058), riding the seed's own for the
 # shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
@@ -3356,8 +3393,22 @@ def evaluate_method_call(node, mutable bindings)
   # A string is UTF-8, always (ADR 0069): the host's one answer to each.
   when "encoding" then receiver.encoding
   when "valid_encoding?" then receiver.valid_encoding?
+  # Ruby's character-list methods over literal characters (ADR 0088), the
+  # host's own. Several lists to `delete` or `squeeze` intersect, and the
+  # host takes them one call at a time, so see shared_characters.
+  when "tr" then receiver.tr(character_list(value_at(arguments, 0)), character_list(value_at(arguments, 1)))
+  when "tr_s" then receiver.tr_s(character_list(value_at(arguments, 0)), character_list(value_at(arguments, 1)))
+  when "delete" then receiver.delete(shared_characters(arguments, "delete"))
+  when "squeeze"
+    arguments.empty? ? receiver.squeeze : receiver.squeeze(shared_characters(arguments, "squeeze"))
   when "hex" then receiver.hex
   when "oct" then receiver.oct
+  # Unicode's normalization forms (ADR 0087), the host's own; a guest
+  # symbol names the form to the host as a host symbol.
+  when "unicode_normalize"
+    arguments.empty? ? receiver.unicode_normalize : receiver.unicode_normalize(host_symbol(value_at(arguments, 0)))
+  when "unicode_normalized?"
+    arguments.empty? ? receiver.unicode_normalized? : receiver.unicode_normalized?(host_symbol(value_at(arguments, 0)))
   # A symbol may be made from text (ADR 0071): the guest's tagged shape.
   when "to_sym", "intern" then ["__symbol__", receiver]
   when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))
@@ -3366,11 +3417,13 @@ def evaluate_method_call(node, mutable bindings)
   # pattern itself: the host's own, a match being a host value.
   when "=~" then host_text(receiver) =~ host_text(value_at(arguments, 0))
   when "!~" then host_text(receiver) !~ host_text(value_at(arguments, 0))
+  # A symbol subject reads by its name only beside a pattern receiver;
+  # handed to a string's `match`, a symbol is no pattern, as in Ruby.
   when "match"
-    arguments.length == 2 ? host_text(receiver).match(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match(host_text(value_at(arguments, 0)))
+    arguments.length == 2 ? host_text(receiver).match(pattern_operand(receiver, value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match(pattern_operand(receiver, value_at(arguments, 0)))
   when "match?"
-    arguments.length == 2 ? host_text(receiver).match?(host_text(value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match?(host_text(value_at(arguments, 0)))
-  when "scan" then receiver.scan(value_at(arguments, 0))
+    arguments.length == 2 ? host_text(receiver).match?(pattern_operand(receiver, value_at(arguments, 0)), value_at(arguments, 1)) : host_text(receiver).match?(pattern_operand(receiver, value_at(arguments, 0)))
+  when "scan" then receiver.scan(pattern_operand(receiver, value_at(arguments, 0)))
   when "source" then receiver.source
   when "options" then receiver.options
   when "casefold?" then receiver.casefold?
@@ -4014,7 +4067,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # `scan` with a block (ADR 0086): each match's text — its groups as an
   # array when the pattern has any — to the block, answering the string.
   when "scan"
-    receiver.scan(value_at(arguments, 0)) do |item|
+    receiver.scan(pattern_operand(receiver, value_at(arguments, 0))) do |item|
       step = run_guest_block(block, [item], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"

@@ -74,6 +74,8 @@ candidates = %w[
   append prepend concat replace to_ary to_int to_str to_sym intern
   add delete subset? superset? proper_subset? proper_superset? disjoint? to_set classify add? delete? merge subtract clear keep_if delete_if
   numerator denominator rationalize to_r to_c real imaginary imag real? conj conjugate arg angle phase polar rect rectangular abs2 i integer?
+  tr tr_s squeeze
+  unicode_normalize unicode_normalized?
   =~ !~ match match? scan source options casefold? names captures named_captures pre_match post_match offset regexp string byteoffset match_length
 ].uniq.sort
 
