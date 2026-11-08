@@ -2,6 +2,14 @@
 
 require_relative "../../spec_helper"
 
+struct Wrap
+  actual
+
+  def to(matcher)
+    matcher + actual
+  end
+end
+
 struct Token
   kind
   text
@@ -18,5 +26,12 @@ context "a struct" do
     specify "leaves the original untouched" do
       expect(token.text).to eq("42")
     end
+  end
+end
+
+context "a dot call" do
+  specify "take keywords" do
+    wrap = Wrap.new(actual: 1)
+    expect(wrap.with(actual: 2).actual).to eq(2)
   end
 end

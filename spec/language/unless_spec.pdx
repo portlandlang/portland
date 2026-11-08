@@ -7,24 +7,6 @@ def negated_guard(flag)
   "went on"
 end
 
-context "control flow" do
-  describe "unless" do
-    specify "answers when the condition is false" do
-      quiet = unless false
-        "quiet"
-      end
-      expect(quiet).to eq("quiet")
-    end
-
-    # ADR 0012 — a branch that doesn't happen produces nil.
-    specify "and answers nil when it is true" do
-      loud = unless true
-        "quiet"
-      end
-      expect(loud).to be_nil
-    end
-  end
-end
 # From ruby/spec language/unless_spec.rb. Assignment is a statement here,
 # so the rows bind the whole expression where upstream assigns inside it.
 context "The unless expression" do
@@ -80,5 +62,20 @@ context "The unless expression" do
   specify "take unless too" do
     quiet = unless 1 > 2 then "hushed" else "loud" end
     expect(quiet).to eq("hushed")
+  end
+
+  specify "answers when the condition is false" do
+    quiet = unless false
+      "quiet"
+    end
+    expect(quiet).to eq("quiet")
+  end
+
+  # ADR 0012 — a branch that doesn't happen produces nil.
+  specify "and answers nil when it is true" do
+    loud = unless true
+      "quiet"
+    end
+    expect(loud).to be_nil
   end
 end

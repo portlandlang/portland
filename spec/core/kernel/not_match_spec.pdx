@@ -9,4 +9,11 @@ context "Kernel#!~" do
     found = :cat =~ /a/ or panic("no match")
     expect(:cat !~ /z/).to be_true
   end
+
+  specify "is match?'s negation" do
+    expect("hello" !~ /z/).to be_true
+    expect("hello" !~ /l/).to be_false
+    expect(/z/ !~ "hello").to be_true
+    expect(:hello !~ /h/).to be_false
+  end
 end

@@ -1,0 +1,20 @@
+# From ruby/spec core/module/private_constant_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+module Config
+  LIMIT = 3
+  private_constant :LIMIT
+
+  def limit = LIMIT
+  def doubled = Config::LIMIT * 2
+end
+
+context "Module#private_constant" do
+  specify "leaves the constant readable inside its module, bare or by path" do
+    expect(Config.limit).to eq(3)
+    expect(Config.doubled).to eq(6)
+  end
+end

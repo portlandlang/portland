@@ -78,4 +78,8 @@ context "Enumerable#sum" do
   specify "adds without being spelled out" do
     expect((1..5).sum).to eq(15)
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].sum).to eq(6)
+  end
 end

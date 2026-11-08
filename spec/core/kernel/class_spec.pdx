@@ -23,60 +23,6 @@ struct Counted
     fields(count: count + 1)
   end
 end
-context "value.class" do
-  describe "on a struct" do
-    specify "answers the type, whose name is its qualified spelling" do
-      token = Shop::Token.new(text: "x")
-      expect(token.class.name).to eq("Shop::Token")
-      expect(inspect(token.class)).to eq("Shop::Token")
-      expect("#{token.class}").to eq("Shop::Token")
-    end
-
-    specify "compares by identity with the written name" do
-      token = Shop::Token.new(text: "x")
-      expect(token.class == Shop::Token).to eq(true)
-      expect(token.class == Counted).to eq(false)
-      expect(token.class == token.twin.class).to eq(true)
-    end
-
-    specify "builds another through new, a defined new included" do
-      expect(Shop::Token.new(text: "x").twin).to eq(Shop::Token.new(text: "x"))
-      expect(Counted.new(count: 1).class.new(count: 5)).to eq(Counted.new(count: 5))
-    end
-
-    specify "reaches the type's own functions" do
-      expect(Shop::Token.new(text: "x").class.blank).to eq(Shop::Token.new(text: ""))
-    end
-  end
-
-  describe "on a builtin value" do
-    specify "answers the builtin's type" do
-      expect(1.class.name).to eq("Integer")
-      expect("a".class.name).to eq("String")
-      expect(:s.class.name).to eq("Symbol")
-      expect([1].class.name).to eq("Array")
-      expect({a: 1}.class.name).to eq("Hash")
-      expect(1.5.class.name).to eq("Float")
-      expect(true.class.name).to eq("Boolean")
-      expect((1..2).class.name).to eq("Range")
-    end
-
-    specify "reaches the type functions" do
-      expect([1].class.new(2, 0)).to eq([0, 0])
-      expect(9.class.sqrt(16)).to eq(4)
-      expect(1.class == Integer).to eq(true)
-    end
-  end
-
-  describe "a bare type name" do
-    specify "is the same value" do
-      kind = Counted
-      expect(kind.new(count: 1)).to eq(Counted.new(count: 1))
-      expect(kind == Counted).to eq(true)
-      expect(Integer.name).to eq("Integer")
-    end
-  end
-end
 # From ruby/spec core/kernel/class_spec.rb: the builtins' row. Upstream:
 # Object.new, a class's own class, and the singleton row — nil has no
 # methods, and a type has no class.
@@ -100,5 +46,39 @@ context "Kernel#class" do
 
   specify "answers class and name" do
     expect(Set[1].class).to eq(Set)
+  end
+
+  specify "answers the type, whose name is its qualified spelling" do
+    token = Shop::Token.new(text: "x")
+    expect(token.class.name).to eq("Shop::Token")
+    expect(inspect(token.class)).to eq("Shop::Token")
+    expect("#{token.class}").to eq("Shop::Token")
+  end
+
+  specify "compares by identity with the written name" do
+    token = Shop::Token.new(text: "x")
+    expect(token.class == Shop::Token).to eq(true)
+    expect(token.class == Counted).to eq(false)
+    expect(token.class == token.twin.class).to eq(true)
+  end
+
+  specify "reaches the type's own functions" do
+    expect(Shop::Token.new(text: "x").class.blank).to eq(Shop::Token.new(text: ""))
+  end
+
+  specify "answers the builtin's type" do
+    expect(1.class.name).to eq("Integer")
+    expect("a".class.name).to eq("String")
+    expect(:s.class.name).to eq("Symbol")
+    expect([1].class.name).to eq("Array")
+    expect({a: 1}.class.name).to eq("Hash")
+    expect(1.5.class.name).to eq("Float")
+    expect((1..2).class.name).to eq("Range")
+  end
+
+  specify "reaches the type functions" do
+    expect([1].class.new(2, 0)).to eq([0, 0])
+    expect(9.class.sqrt(16)).to eq(4)
+    expect(1.class == Integer).to eq(true)
   end
 end

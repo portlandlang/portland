@@ -14,8 +14,7 @@ context "Numeric#conjugate" do
     end
     expect((0.0 / 0.0).conjugate.nan?).to be_true
   end
-end
-context "Numeric#conjugate on an integer and a float, and its name conj" do
+
   specify "is the number itself" do
     expect(3.conj).to eq(3)
     expect(1.5.conjugate).to eq(1.5)

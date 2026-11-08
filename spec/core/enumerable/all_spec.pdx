@@ -112,4 +112,8 @@ context "Enumerable#all?" do
   specify "calls the pattern with gathered array when yielded with multiple arguments" do
     expect(YieldsMulti.new.all?([1, 2])).to be_false
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].all? { it > 2 }).to be_false
+  end
 end

@@ -241,7 +241,8 @@ core/array/join_spec.rb:
   reason: "The to_str and to_ary conversions (ADR 0036), $,, the recursive-array rows, the encoding rows, and the refusals stay upstream."
   link: docs/ruby/aliases.md
 core/array/slice_spec.rb:
-  status: skipped
+  pdx: [spec/core/array/slice_spec.pdx]
+  status: partial_intentional
   reason: "slice! removes in place; values never mutate (ADR 0015), and the slice half of the file is the shared rows ported for element_reference."
   link: docs/ruby/mutability.md
 core/array/bsearch_spec.rb:
@@ -883,8 +884,9 @@ core/float/abs_spec.rb:
   reason: "infinite? answers true or false here, so upstream's 1 is asked as a sign."
   link: docs/ruby/truthiness.md
 core/float/angle_spec.rb:
-  status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/core/numeric/arg_spec.pdx."
+  pdx: [spec/core/float/angle_spec.pdx]
+  status: partial_intentional
+  reason: "The one upstream row compares method objects, which a closed runtime has none of; the name itself is specced on a float here."
   link: docs/ruby/metaprogramming.md
 core/float/arg_spec.rb:
   pdx: [spec/core/float/arg_spec.pdx]
@@ -936,8 +938,9 @@ core/float/numerator_spec.rb:
   reason: "Integers are 64-bit, so the numerators of Float::MAX and 999.1 ** 99.928888 refuse as overflows and stay upstream."
   link: docs/ruby/integers.md
 core/float/phase_spec.rb:
-  status: skipped
-  reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/core/numeric/arg_spec.pdx."
+  pdx: [spec/core/float/phase_spec.pdx]
+  status: partial_intentional
+  reason: "The one upstream row compares method objects, which a closed runtime has none of; the name itself is specced on a float here."
   link: docs/ruby/metaprogramming.md
 core/float/positive_spec.rb:
   pdx: [spec/core/float/positive_spec.pdx]
@@ -3934,6 +3937,14 @@ core/module/name_spec.rb:
   pdx: [spec/core/module/name_spec.pdx]
   status: partial_planned
   reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+core/module/private_constant_spec.rb:
+  pdx: [spec/core/module/private_constant_spec.pdx]
+  status: partial_planned
+  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+core/module/protected_spec.rb:
+  pdx: [spec/core/module/protected_spec.pdx]
+  status: partial_planned
+  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
 core/io/buffer/:
   status: skipped
   reason: "IO::Buffer is a region of memory written in place, with a memory map — values never mutate (ADR 0015; #175)."
@@ -4294,9 +4305,8 @@ language/assignments_spec.rb:
   reason: "The compound spellings rebind a mutable (ADR 0001, ADR 0043); &&= is undecided, multiple assignment refuses with its rewrite (#135), and the attribute, index-through-a-method, and frozen rows stay upstream."
   link: docs/ruby/mutability.md
 language/class_spec.rb:
-  pdx: [spec/language/class_spec.pdx]
-  status: partial_intentional
-  reason: "class is a spelling of struct (ADR 0056); reopening, inheritance, metaclasses, class variables, Class.new, and the anonymous-class rows are runtime metaprogramming."
+  status: skipped
+  reason: "class is a spelling of struct (ADR 0056), so what it does is Portland's own, specced in spec/portland/struct/class_spelling_spec.pdx; reopening, inheritance, metaclasses, class variables, Class.new, and the anonymous-class rows are runtime metaprogramming."
   link: docs/ruby/classes.md
 language/constants_spec.rb:
   pdx: [spec/language/constants_spec.pdx]
@@ -4428,8 +4438,7 @@ language/throw_spec.rb:
   reason: "throw and catch are the exception machinery; a fallible call answers a failure (ADR 0027), and control leaves a loop with break (ADR 0012)."
   link: docs/ruby/errors.md
 language/variables_spec.rb:
-  pdx: [spec/language/variables_spec.pdx]
-  status: partial_intentional
+  status: skipped
   reason: "A name is bound once unless mutable (ADR 0001); multiple assignment refuses with its rewrite (#135), and the splat, to_ary, global, instance variable, and attribute rows stay upstream."
   link: docs/ruby/mutability.md
 language/alias_spec.rb:

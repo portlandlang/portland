@@ -62,4 +62,8 @@ context "Enumerable#sort" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.sort { |left, right| left.first <=> right.first }).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
   end
+
+  specify "sort, sort_by, and partition answer arrays" do
+    expect(Set[3, 1, 2].sort).to eq([1, 2, 3])
+  end
 end

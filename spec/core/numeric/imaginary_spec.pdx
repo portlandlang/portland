@@ -16,8 +16,7 @@ context "Numeric#imaginary" do
       expect(number.imaginary).to eq(0)
     end
   end
-end
-context "Numeric#imaginary on an integer, and its name imag" do
+
   specify "is 0" do
     expect(3.imag).to eq(0)
     expect(3.imaginary).to eq(0)

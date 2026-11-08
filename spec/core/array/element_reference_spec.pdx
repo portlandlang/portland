@@ -14,19 +14,6 @@
 
 require_relative "../../spec_helper"
 
-context "Array" do
-  numbers = [3, 1, 2]
-
-  describe "#[]" do
-    specify "answers the element at an index" do
-      expect(numbers[0]).to eq(3)
-    end
-
-    specify "counts negative indices from the end" do
-      expect(numbers[0 - 1]).to eq(2)
-    end
-  end
-end
 # From ruby/spec core/array/element_reference_spec.rb, the one-index rows;
 # the slices with a count or a range are slice_spec.pdx's, and the to_int
 # and subclass rows stay upstream.
@@ -60,17 +47,6 @@ context "Array#[]" do
   end
 end
 
-context "Array" do
-  describe "#slice" do
-    specify "takes a start and a length" do
-      expect([3, 1, 2].slice(0, 2)).to eq([3, 1])
-    end
-
-    specify "stops at the end rather than running past it" do
-      expect([3, 1, 2].slice(1, 99)).to eq([1, 2])
-    end
-  end
-end
 context "Array#[]" do
   specify "returns count elements starting from index with [index, count]" do
     expect(["a", "b", "c", "d", "e"].slice(2, 3)).to eq(["c", "d", "e"])
@@ -278,5 +254,15 @@ context "Array#[]" do
   specify "slices to the end with an endless one" do
     words = %w[a b c d e]
     expect(words[3..]).to eq(["d", "e"])
+  end
+
+  specify "answers the element at an index" do
+    numbers = [3, 1, 2]
+    expect(numbers[0]).to eq(3)
+  end
+
+  specify "counts negative indices from the end" do
+    numbers = [3, 1, 2]
+    expect(numbers[0 - 1]).to eq(2)
   end
 end

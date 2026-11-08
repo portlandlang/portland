@@ -97,4 +97,8 @@ context "Enumerable#max" do
   specify "answers Ruby's names from what each yields" do
     expect(numerous(DEFAULT).max).to eq(6)
   end
+
+  specify "answer as on an array" do
+    expect(Set[3, 1, 2].max).to eq(3)
+  end
 end

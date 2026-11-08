@@ -19,8 +19,7 @@ context "Numeric#abs2" do
   specify "returns NaN when self is NaN" do
     expect((0.0 / 0.0).abs2.nan?).to be_true
   end
-end
-context "Numeric#abs2 on an integer and a float" do
+
   specify "squares" do
     expect(3.abs2).to eq(9)
     expect(1.5.abs2).to eq(2.25)

@@ -50,4 +50,8 @@ context "Comparable#>=" do
     newer = Version.new(major: 1, minor: 10)
     expect(newer >= older).to be_true
   end
+
+  specify "follow <=>" do
+    expect("abcd" >= "abx").to be_false
+  end
 end

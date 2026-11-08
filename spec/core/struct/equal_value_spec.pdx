@@ -20,19 +20,6 @@ struct Truck
   model
   year
 end
-context "a struct" do
-  describe "#==" do
-    token = Token.new(kind: "integer", text: "42")
-
-    specify "is by value" do
-      expect(token).to eq(Token.new(kind: "integer", text: "42"))
-    end
-
-    specify "and any differing field breaks it" do
-      expect(token).not_to eq(token.with(text: "43"))
-    end
-  end
-end
 context "Struct#==" do
   specify "returns true if the other is the same object" do
     car = Car.new(make: "Honda", model: "Accord", year: "1998")
@@ -56,5 +43,15 @@ context "Struct#==" do
     car = Car.new(make: "Honda", model: "Accord", year: "1998")
     truck = Truck.new(make: "Honda", model: "Accord", year: "1998")
     expect(car == truck).to be_false
+  end
+
+  specify "is by value" do
+    token = Token.new(kind: "integer", text: "42")
+    expect(token).to eq(Token.new(kind: "integer", text: "42"))
+  end
+
+  specify "and any differing field breaks it" do
+    token = Token.new(kind: "integer", text: "42")
+    expect(token).not_to eq(token.with(text: "43"))
   end
 end

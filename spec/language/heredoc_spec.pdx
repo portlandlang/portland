@@ -3,45 +3,6 @@
 
 require_relative "../spec_helper"
 
-context "String" do
-  # ADR 0020 — `<<~` strips the common indentation, keeps the line breaks,
-  # and interpolates like any double-quoted string.
-  describe "the heredoc" do
-    city = "portland"
-
-    specify "dedents to the shallowest line" do
-      sql = <<~SQL
-        select *
-          from roses
-      SQL
-      expect(sql).to eq("select *\n  from roses\n")
-    end
-
-    specify "interpolates" do
-      line = <<~LINE
-        hello from #{city}
-      LINE
-      expect(line).to eq("hello from portland\n")
-    end
-
-    specify "takes a method call on the opener" do
-      shouted = <<~TEXT.upcase
-        rose city
-      TEXT
-      expect(shouted).to eq("ROSE CITY\n")
-    end
-  end
-
-  # ADR 0020 — the quoted terminator suppresses interpolation entirely.
-  describe "the heredoc's quoted terminator" do
-    specify "keeps the interpolation spelling as text" do
-      raw = <<~'TEXT'
-        no #{interpolation} here
-      TEXT
-      expect(raw).to contain("\#{interpolation}")
-    end
-  end
-end
 # From ruby/spec language/heredoc_spec.rb, its squiggly rows, with the
 # fixture module's heredocs written inline. The plain and dash openers
 # refuse (ADR 0020); the backslash-continuation row and the line-number row
@@ -110,5 +71,37 @@ context "Heredoc string" do
     HERE
     expect(first).to eq("a\n  b\n    c\n")
     expect(last).to eq("    a\n  b\nc\n")
+  end
+
+  specify "dedents to the shallowest line" do
+    city = "portland"
+    sql = <<~SQL
+      select *
+        from roses
+    SQL
+    expect(sql).to eq("select *\n  from roses\n")
+  end
+
+  specify "interpolates" do
+    city = "portland"
+    line = <<~LINE
+      hello from #{city}
+    LINE
+    expect(line).to eq("hello from portland\n")
+  end
+
+  specify "takes a method call on the opener" do
+    city = "portland"
+    shouted = <<~TEXT.upcase
+      rose city
+    TEXT
+    expect(shouted).to eq("ROSE CITY\n")
+  end
+
+  specify "keeps the interpolation spelling as text" do
+    raw = <<~'TEXT'
+      no #{interpolation} here
+    TEXT
+    expect(raw).to contain("\#{interpolation}")
   end
 end

@@ -2,17 +2,6 @@
 
 require_relative "../../spec_helper"
 
-context "Hash" do
-  describe "#==" do
-    specify "is by value" do
-      expect({name: "pdx"}).to eq({name: "pdx"})
-    end
-
-    specify "and a differing value breaks it" do
-      expect({name: "pdx"}).not_to eq({name: "rose"})
-    end
-  end
-end
 # ruby/spec core/hash/equal_value_spec.rb, through its shared hash_eql
 # groups (#105). The mocks counting their == and eql? calls, recursive
 # hashes (values never mutate), to_hash, subclasses, and Hash.new defaults
@@ -32,5 +21,13 @@ context "Hash#==" do
     expect(table == {"a" => 5}).to eq(false)
     expect(table == {"A" => 5}).to eq(false)
     expect(table == {a: 6}).to eq(false)
+  end
+
+  specify "is by value" do
+    expect({name: "pdx"}).to eq({name: "pdx"})
+  end
+
+  specify "and a differing value breaks it" do
+    expect({name: "pdx"}).not_to eq({name: "rose"})
   end
 end

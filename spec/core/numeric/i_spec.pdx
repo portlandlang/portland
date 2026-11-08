@@ -21,8 +21,7 @@ context "Numeric#i" do
   specify "has the i suffix for literals and the unit constant" do
     expect(3.i).to eq(Complex(0, 3))
   end
-end
-context "Numeric#i on an integer" do
+
   specify "is the complex with it as the imaginary part" do
     expect(3.i).to eq(Complex(0, 3))
   end

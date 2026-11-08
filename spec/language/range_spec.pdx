@@ -2,17 +2,6 @@
 
 require_relative "../spec_helper"
 
-context "Range" do
-  describe "the literal" do
-    specify "two dots keep the end" do
-      expect((1..5).to_a).to eq([1, 2, 3, 4, 5])
-    end
-
-    specify "three dots exclude it" do
-      expect((1...5).to_a).to eq([1, 2, 3, 4])
-    end
-  end
-end
 # From ruby/spec language/range_spec.rb. Range.new has no spelling yet
 # (#111), so the rows compare literals and ask the ends; the identity row
 # stays upstream.
@@ -34,5 +23,13 @@ context "Literal Ranges" do
   specify "creates beginless ranges" do
     expect((..1).begin).to be_nil
     expect((...1).exclude_end?).to be_true
+  end
+
+  specify "two dots keep the end" do
+    expect((1..5).to_a).to eq([1, 2, 3, 4, 5])
+  end
+
+  specify "three dots exclude it" do
+    expect((1...5).to_a).to eq([1, 2, 3, 4])
   end
 end

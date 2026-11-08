@@ -2,18 +2,6 @@
 
 require_relative "../spec_helper"
 
-context "control flow" do
-  describe "next inside a block" do
-    specify "skips just that iteration" do
-      mutable collected = []
-      [1, 2, 3, 4].each do |n|
-        next if n.even?
-        collected << n
-      end
-      expect(collected).to eq([1, 3])
-    end
-  end
-end
 # From ruby/spec language/next_spec.rb. The lambda rows wait on the proc
 # question (#77), the ensure rows have no begin to attach to (errors are
 # values), and `next` carries no value here, as `break` does not (ADR
@@ -36,5 +24,14 @@ context "The next statement from within the block" do
 
   specify "returns to the invoking method" do
     expect(yielding_method { next }).to eq(:method_return_value)
+  end
+
+  specify "skips just that iteration" do
+    mutable collected = []
+    [1, 2, 3, 4].each do |n|
+      next if n.even?
+      collected << n
+    end
+    expect(collected).to eq([1, 3])
   end
 end

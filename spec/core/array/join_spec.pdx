@@ -2,17 +2,6 @@
 
 require_relative "../../spec_helper"
 
-context "Array" do
-  describe "#join" do
-    specify "splices on a separator" do
-      expect([3, 1, 2].join("-")).to eq("3-1-2")
-    end
-
-    specify "renders each element as to_s would" do
-      expect([1, "two", true].join(" ")).to eq("1 two true")
-    end
-  end
-end
 # From ruby/spec core/array/join_spec.rb and its shared rows. The to_str
 # and to_ary conversions (ADR 0036), $,, recursive arrays (values never
 # mutate), encodings, and the refusal rows stay upstream.
@@ -27,6 +16,19 @@ context "Array#join" do
 
   specify "does not separate elements when the passed separator is nil" do
     expect([1, 2, 3].join(nil)).to eq("123")
+  end
+
+  specify "splices on a separator" do
+    expect([3, 1, 2].join("-")).to eq("3-1-2")
+  end
+
+  specify "renders each element as to_s would" do
+    expect([1, "two", true].join(" ")).to eq("1 two true")
+  end
+
+  specify "joins with nothing between when given no separator" do
+    expect(["a", "b"].join).to eq("ab")
+    expect([1, 2].join).to eq("12")
   end
 end
 context "Array#join with default separator" do

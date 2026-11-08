@@ -31,4 +31,8 @@ context "Comparable#<=" do
     expect(rigged(1) <= other).to be_false
     expect(rigged(10000000) <= other).to be_false
   end
+
+  specify "follow <=>" do
+    expect("abc" <= "abc").to be_true
+  end
 end

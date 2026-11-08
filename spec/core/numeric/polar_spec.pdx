@@ -43,8 +43,7 @@ context "Numeric#polar" do
     expect((0.0 / 0.0).polar.first.nan?).to be_true
     expect((0.0 / 0.0).polar.last.nan?).to be_true
   end
-end
-context "Numeric#polar on an integer" do
+
   specify "is the absolute value and 0 or pi" do
     expect(3.polar).to eq([3, 0])
     expect(-3.polar).to eq([3, 3.141592653589793])

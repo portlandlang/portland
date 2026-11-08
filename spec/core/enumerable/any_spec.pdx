@@ -113,4 +113,8 @@ context "Enumerable#any?" do
   specify "returns false if the block never returns other than false or nil" do
     expect(numerous([0, 1, 2, -1]).any?(7..9)).to be_false
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].any? { it > 2 }).to be_true
+  end
 end

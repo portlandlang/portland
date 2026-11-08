@@ -3,20 +3,6 @@
 
 require_relative "../spec_helper"
 
-context "the unwrap toolkit" do
-  describe "the safe-navigation operator" do
-    words = %w[rose city]
-    empty = []
-
-    specify "forwards to a present receiver" do
-      expect(words.first&.upcase).to eq("ROSE")
-    end
-
-    specify "answers nil for an absent one" do
-      expect(empty.first&.upcase).to be_nil
-    end
-  end
-end
 # From ruby/spec language/safe_navigator_spec.rb. There are no assignment
 # methods or operators behind `&.` — a field does not assign — so those rows
 # stay upstream, with the eval row.
@@ -54,5 +40,17 @@ context "Safe navigator" do
 
   specify "takes a block" do
     expect([1, 2]&.map { it * 2 }).to eq([2, 4])
+  end
+
+  specify "forwards to a present receiver" do
+    words = %w[rose city]
+    empty = []
+    expect(words.first&.upcase).to eq("ROSE")
+  end
+
+  specify "answers nil for an absent one" do
+    words = %w[rose city]
+    empty = []
+    expect(empty.first&.upcase).to be_nil
   end
 end

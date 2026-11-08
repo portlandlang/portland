@@ -79,4 +79,8 @@ context "Enumerable#find" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.find { |item| item == [1, 2] }).to eq([1, 2])
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].find { it > 1 }).to eq(2)
+  end
 end

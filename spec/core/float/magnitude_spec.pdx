@@ -14,4 +14,8 @@ context "Float#magnitude" do
   specify "is an alias of Float#abs" do
     expect(-99.1.magnitude).to eq(-99.1.abs)
   end
+
+  specify "magnitude is its twin, floats included (ADR 0036, revised)" do
+    expect((-2.5).magnitude).to eq(2.5)
+  end
 end

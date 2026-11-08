@@ -2,18 +2,6 @@
 
 require_relative "../../spec_helper"
 
-context "Array" do
-  describe "#empty?" do
-    specify "holds for the empty array" do
-      expect([]).to be_empty
-    end
-
-    specify "and for nothing else, an array of nil included" do
-      expect([3, 1, 2]).not_to be_empty
-      expect([nil]).not_to be_empty
-    end
-  end
-end
 # ruby/spec core/array/empty_spec.rb, title for title (#104).
 
 context "Array#empty?" do
@@ -21,5 +9,14 @@ context "Array#empty?" do
     expect([].empty?).to eq(true)
     expect([1].empty?).to eq(false)
     expect([1, 2].empty?).to eq(false)
+  end
+
+  specify "holds for the empty array" do
+    expect([]).to be_empty
+  end
+
+  specify "and for nothing else, an array of nil included" do
+    expect([3, 1, 2]).not_to be_empty
+    expect([nil]).not_to be_empty
   end
 end

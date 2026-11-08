@@ -2,22 +2,6 @@
 
 require_relative "../../spec_helper"
 
-context "Array" do
-  describe "#include?" do
-    specify "finds a member" do
-      expect([3, 1, 2]).to contain(2)
-    end
-
-    specify "and misses a non-member" do
-      expect([3, 1, 2]).not_to contain(9)
-    end
-
-    specify "member? is its twin (ADR 0036)" do
-      expect([3, 1, 2].member?(1)).to be_true
-      expect([3, 1, 2].member?(9)).to be_false
-    end
-  end
-end
 # ruby/spec core/array/include_spec.rb, title for title (#104). The mocks
 # whose own == takes over, and the one counting == calls, stay upstream.
 
@@ -29,5 +13,13 @@ context "Array#include?" do
 
   specify "determines presence by using element == obj" do
     expect([1, 2.0, 3].include?(2)).to eq(true)
+  end
+
+  specify "finds a member" do
+    expect([3, 1, 2]).to contain(2)
+  end
+
+  specify "and misses a non-member" do
+    expect([3, 1, 2]).not_to contain(9)
   end
 end

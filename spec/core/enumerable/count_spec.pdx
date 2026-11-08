@@ -79,4 +79,8 @@ context "Enumerable#count" do
   specify "answers an empty walk as nothing" do
     expect(Empty.new.count).to eq(0)
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].count { it > 1 }).to eq(2)
+  end
 end

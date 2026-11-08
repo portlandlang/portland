@@ -58,51 +58,34 @@ module Config
   def limit = LIMIT
   def doubled = Config::LIMIT * 2
 end
-context "Visibility" do
-  describe "private" do
-    specify "marks the methods after it, callable from the type's own methods" do
-      expect(Box.new(contents: 1).open).to eq(1)
-    end
 
-    specify "allows the call through self" do
-      expect(Box.new(contents: 2).peek).to eq(2)
-    end
-
-    specify "marks one method with private def" do
-      expect(Box.new(contents: 1).loud).to eq("SHH")
-    end
-
-    specify "has no effect on type functions" do
-      expect(Box.public_defs_method).to eq(0)
-    end
-
-    specify "does not reach a type nested in the section" do
-      expect(Box::Lid.new.baz).to eq("baz")
-    end
-
-    specify "travels from a trait into the struct that includes it" do
-      expect(Host.new.greet).to eq("hi friend")
-    end
+context "The private keyword" do
+  specify "marks the methods after it, callable from the type's own methods" do
+    expect(Box.new(contents: 1).open).to eq(1)
   end
 
-  describe "protected" do
-    specify "allows another value of the type from inside its methods" do
-      expect(Box.new(contents: 1).same?(Box.new(contents: 1))).to be_true
-      expect(Box.new(contents: 1).same?(Box.new(contents: 2))).to be_false
-    end
+  specify "allows the call through self" do
+    expect(Box.new(contents: 2).peek).to eq(2)
   end
 
-  describe "public" do
-    specify "ends a section, and methods before any section are public" do
-      expect(Box.new(contents: 1).label).to eq("box")
-      expect(Box.new(contents: 3).contents).to eq(3)
-    end
+  specify "marks one method with private def" do
+    expect(Box.new(contents: 1).loud).to eq("SHH")
   end
 
-  describe "private_constant" do
-    specify "leaves the constant readable inside its module, bare or by path" do
-      expect(Config.limit).to eq(3)
-      expect(Config.doubled).to eq(6)
-    end
+  specify "has no effect on type functions" do
+    expect(Box.public_defs_method).to eq(0)
+  end
+
+  specify "does not reach a type nested in the section" do
+    expect(Box::Lid.new.baz).to eq("baz")
+  end
+
+  specify "travels from a trait into the struct that includes it" do
+    expect(Host.new.greet).to eq("hi friend")
+  end
+
+  specify "ends a section, and methods before any section are public" do
+    expect(Box.new(contents: 1).label).to eq("box")
+    expect(Box.new(contents: 3).contents).to eq(3)
   end
 end

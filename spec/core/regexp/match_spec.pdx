@@ -30,21 +30,6 @@ context "Regexp#=~" do
     expect(found[0]).to eq("abc")
   end
 end
-context "String#=~" do
-  specify "answers the MatchData or nil" do
-    found = "hello" =~ /l+/ or panic("no match")
-    expect(found[0]).to eq("ll")
-    expect(found.begin(0)).to eq(2)
-    expect("hello" =~ /z/).to be_nil
-  end
-
-  specify "narrows like any maybe" do
-    answer = if ("line 12" =~ /\d+/).some? then :digits else :none end
-    expect(answer).to eq(:digits)
-    fallback = ("line" =~ /\d+/) or "none"
-    expect(fallback).to eq("none")
-  end
-end
 context "Regexp#match" do
   specify "returns a MatchData object" do
     found = /(.)(.)(.)/.match("abc") or panic("no match")
@@ -87,23 +72,6 @@ context "Regexp#match" do
     expect(/./.match("abc", 9)).to be_nil
   end
 end
-context "String#match" do
-  specify "answers the MatchData or nil" do
-    found = "hello".match(/l+/) or panic("no match")
-    expect(found[0]).to eq("ll")
-    expect("hello".match(/z/)).to be_nil
-  end
-
-  specify "reads a string argument as a pattern" do
-    found = "hello".match("l+") or panic("no match")
-    expect(found[0]).to eq("ll")
-  end
-
-  specify "matches from a position" do
-    found = "abcabc".match(/b/, 2) or panic("no match")
-    expect(found.begin(0)).to eq(4)
-  end
-end
 context "Regexp#match?" do
   specify "returns true when it matches the given value" do
     expect(/string/i.match?("string")).to be_true
@@ -118,25 +86,5 @@ context "Regexp#match?" do
   specify "matches from a position" do
     expect(/a/.match?("ba", 1)).to be_true
     expect(/b/.match?("ba", 1)).to be_false
-  end
-end
-context "String#match?" do
-  specify "answers whether the pattern matches" do
-    expect("hello".match?(/l+/)).to be_true
-    expect("hello".match?(/z/)).to be_false
-    expect("hello".match?("ell")).to be_true
-  end
-
-  specify "matches from a position" do
-    expect("hello".match?(/h/, 1)).to be_false
-    expect("hello".match?(/e/, 1)).to be_true
-  end
-end
-context "!~" do
-  specify "is match?'s negation" do
-    expect("hello" !~ /z/).to be_true
-    expect("hello" !~ /l/).to be_false
-    expect(/z/ !~ "hello").to be_true
-    expect(:hello !~ /h/).to be_false
   end
 end

@@ -7,6 +7,14 @@
 
 require_relative "../spec_helper"
 
+struct Counted
+  count
+
+  def self.new(count:)
+    fields(count: count + 1)
+  end
+end
+
 module Statistics
   BASE = 10
 
@@ -35,32 +43,6 @@ end
 module Config
   LIMIT = 3
 end
-context "Constant" do
-  describe "a top-level SCREAMING_CASE name" do
-    specify "is read inside a def" do
-      expect(over?(10)).to be_true
-      expect(over?(9)).to be_false
-    end
-
-    specify "is read inside a struct method" do
-      expect(Gauge.new(level: 10).high?).to be_true
-    end
-
-    specify "is read inside a block" do
-      expect([1, 2].map { it + LIMIT }).to eq([10, 11])
-    end
-
-    specify "holds any value" do
-      expect(LABELS.length).to eq(2)
-      expect(LABELS.first).to eq("low")
-    end
-
-    specify "sits beside a module's constant of the same name" do
-      expect(Config::LIMIT).to eq(3)
-      expect(LIMIT).to eq(9)
-    end
-  end
-end
 
 context "Literal (A::X) constant resolution" do
   specify "lives at the top level too" do
@@ -73,5 +55,34 @@ context "Literal (A::X) constant resolution" do
 
   specify ":: names a constant" do
     expect(Statistics::BASE).to eq(10)
+  end
+
+  specify "is the same value" do
+    kind = Counted
+    expect(kind.new(count: 1)).to eq(Counted.new(count: 1))
+    expect(kind == Counted).to eq(true)
+  end
+
+  specify "is read inside a def" do
+    expect(over?(10)).to be_true
+    expect(over?(9)).to be_false
+  end
+
+  specify "is read inside a struct method" do
+    expect(Gauge.new(level: 10).high?).to be_true
+  end
+
+  specify "is read inside a block" do
+    expect([1, 2].map { it + LIMIT }).to eq([10, 11])
+  end
+
+  specify "holds any value" do
+    expect(LABELS.length).to eq(2)
+    expect(LABELS.first).to eq("low")
+  end
+
+  specify "sits beside a module's constant of the same name" do
+    expect(Config::LIMIT).to eq(3)
+    expect(LIMIT).to eq(9)
   end
 end

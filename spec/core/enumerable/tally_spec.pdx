@@ -8,4 +8,8 @@ context "Enumerable#tally" do
   specify "tally counts into a hash, keys in first-seen order" do
     expect(%w[a b a].tally).to eq({"a" => 2, "b" => 1})
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 1, 2].tally).to eq({1 => 1, 2 => 1})
+  end
 end

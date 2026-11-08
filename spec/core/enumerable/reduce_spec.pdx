@@ -54,4 +54,8 @@ context "Enumerable#reduce" do
     numbers = [1, 2, 3, 4]
     expect(numbers.reduce(10) { |total, number| total + number }).to eq(20)
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].reduce(0) { |total, member| total + member }).to eq(6)
+  end
 end

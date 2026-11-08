@@ -37,8 +37,7 @@ context "Numeric#rectangular" do
     end
     expect((0.0 / 0.0).rectangular.last).to eq(0)
   end
-end
-context "Numeric#rectangular on an integer, and its name rect" do
+
   specify "is the number and 0" do
     expect(3.rect).to eq([3, 0])
     expect(3.rectangular).to eq([3, 0])

@@ -78,4 +78,12 @@ context "Enumerable#each_with_index" do
   specify "answers Ruby's names from what each yields" do
     expect(numerous(DEFAULT).each_with_index { |item, index| }).to eq(numerous(DEFAULT))
   end
+
+  specify "with an index answers the set too" do
+    members = Set[:a, :b]
+    mutable pairs = []
+    answer = members.each_with_index { |member, index| pairs << [member, index] }
+    expect(pairs).to eq([[:a, 0], [:b, 1]])
+    expect(answer).to eq(members)
+  end
 end

@@ -90,4 +90,9 @@ context "Enumerable#first" do
       expect(YieldsMulti.new.first(1)).to eq([[1, 2]])
     end
   end
+
+  specify "answer as on an array" do
+    expect(Set[1, 2, 3].first).to eq(1)
+    expect(Set[].first).to be_nil
+  end
 end

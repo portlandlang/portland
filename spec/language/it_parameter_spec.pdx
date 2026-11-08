@@ -4,7 +4,7 @@
 
 require_relative "../spec_helper"
 
-context "it_parameter" do
+context "The `it` parameter" do
   specify "is the single parameter, never declared" do
     words = %w[rose city]
     expect(words.map { it.upcase }).to eq(["ROSE", "CITY"])

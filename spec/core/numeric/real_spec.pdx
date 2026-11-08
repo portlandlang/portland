@@ -17,17 +17,16 @@ context "Numeric#real" do
     end
     expect((0.0 / 0.0).real.nan?).to be_true
   end
+
+  specify "are the number itself, and true" do
+    expect(3.real).to eq(3)
+    expect(3.real?).to be_true
+  end
 end
 context "Numeric#real?" do
   specify "returns true" do
     expect(20.real?).to be_true
     expect(398.72.real?).to be_true
     expect(Rational(3, 4).real?).to be_true
-  end
-end
-context "Numeric#real and #real? on an integer" do
-  specify "are the number itself, and true" do
-    expect(3.real).to eq(3)
-    expect(3.real?).to be_true
   end
 end

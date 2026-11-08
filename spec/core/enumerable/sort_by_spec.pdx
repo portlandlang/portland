@@ -60,4 +60,8 @@ context "Enumerable#sort_by" do
   specify "sort_by sorts by the block's answers" do
     expect(%w[bb a ccc].sort_by { it.length }).to eq(["a", "bb", "ccc"])
   end
+
+  specify "sort, sort_by, and partition answer arrays" do
+    expect(Set["bb", "a"].sort_by { it.length }).to eq(["a", "bb"])
+  end
 end

@@ -11,3 +11,19 @@ context "Symbol with a pattern" do
     expect(found[0]).to eq("a")
   end
 end
+
+context "String#=~" do
+  specify "answers the MatchData or nil" do
+    found = "hello" =~ /l+/ or panic("no match")
+    expect(found[0]).to eq("ll")
+    expect(found.begin(0)).to eq(2)
+    expect("hello" =~ /z/).to be_nil
+  end
+
+  specify "narrows like any maybe" do
+    answer = if ("line 12" =~ /\d+/).some? then :digits else :none end
+    expect(answer).to eq(:digits)
+    fallback = ("line" =~ /\d+/) or "none"
+    expect(fallback).to eq("none")
+  end
+end

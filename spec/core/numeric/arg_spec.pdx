@@ -23,12 +23,9 @@ context "Numeric#arg" do
       expect((0 - number).arg).to eq(Math::PI)
     end
   end
-end
-context "Numeric#arg on an integer and a float, and its names angle and phase" do
+
   specify "is 0 or pi by the sign" do
     expect(3.arg).to eq(0)
     expect(-3.arg).to eq(3.141592653589793)
-    expect(3.0.angle).to eq(0)
-    expect(-3.0.phase).to eq(3.141592653589793)
   end
 end

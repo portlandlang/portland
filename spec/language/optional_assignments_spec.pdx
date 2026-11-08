@@ -29,4 +29,55 @@ context "Optional variable assignments" do
       end
     end
   end
+
+  specify "fills absence with the fallback" do
+    mutable name = [].first
+    name ||= "friend"
+    expect(name).to eq("friend")
+  end
+
+  specify "keeps a present value" do
+    mutable found = [7].first
+    found ||= 0
+    expect(found).to eq(7)
+  end
+
+  specify "narrows — the binding is plain below" do
+    mutable greeting = [].first
+    greeting ||= "hi"
+    expect(greeting.upcase).to eq("HI")
+  end
+
+  specify "never evaluates the right side of a hit" do
+    mutable found = [7].first
+    found ||= panic("unreachable")
+    expect(found).to eq(7)
+  end
+
+  specify "fills a missing hash key and keeps a present one" do
+    mutable counts = {"a" => 1}
+    counts["b"] ||= 0
+    counts["a"] ||= 9
+    expect(counts["b"]).to eq(0)
+    expect(counts["a"]).to eq(1)
+  end
+
+  specify "the index is any expression, evaluated once" do
+    mutable counts = {}
+    key = "a"
+    counts[key.upcase] ||= 1
+    expect(counts["A"]).to eq(1)
+  end
+
+  specify "a present slot never evaluates the right side" do
+    mutable counts = {"a" => 1}
+    counts["a"] ||= panic("unreachable")
+    expect(counts["a"]).to eq(1)
+  end
+
+  specify "is boolean-or, stated as fact" do
+    mutable flag = false
+    flag ||= true
+    expect(flag).to be_true
+  end
 end

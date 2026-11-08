@@ -6,46 +6,6 @@
 
 require_relative "../spec_helper"
 
-context "control flow" do
-  describe "until" do
-    specify "loops while its condition stays false" do
-      mutable count = 0
-      until count > 2
-        count += 1
-      end
-      expect(count).to eq(3)
-    end
-
-    specify "whose condition starts true never runs" do
-      mutable touched = false
-      until true
-        touched = true
-      end
-      expect(touched).to be_false
-    end
-  end
-
-  describe "the postfix loop modifiers" do
-    specify "while repeats the one statement" do
-      mutable index = 0
-      index += 1 while index < 3
-      expect(index).to eq(3)
-    end
-
-    specify "until repeats it toward the condition" do
-      mutable back = 5
-      back -= 1 until back < 3
-      expect(back).to eq(2)
-    end
-
-    specify "are pre-checked, never do-while" do
-      mutable ran = false
-      ran = true while false
-      ran = true until true
-      expect(ran).to be_false
-    end
-  end
-end
 # From ruby/spec language/until_spec.rb, the same way while_spec.pdx takes
 # its file: the value, do-while, redo, and containing-scope rows stay
 # upstream, and the optional `do` waits on #165.
@@ -76,6 +36,35 @@ context "The until expression" do
       seen << index
     end
     expect(seen).to eq([1, 2, 4])
+  end
+
+  specify "loops while its condition stays false" do
+    mutable count = 0
+    until count > 2
+      count += 1
+    end
+    expect(count).to eq(3)
+  end
+
+  specify "whose condition starts true never runs" do
+    mutable touched = false
+    until true
+      touched = true
+    end
+    expect(touched).to be_false
+  end
+
+  specify "until repeats it toward the condition" do
+    mutable back = 5
+    back -= 1 until back < 3
+    expect(back).to eq(2)
+  end
+
+  specify "are pre-checked, never do-while" do
+    mutable ran = false
+    ran = true while false
+    ran = true until true
+    expect(ran).to be_false
   end
 end
 context "The until modifier" do

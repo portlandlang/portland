@@ -13,20 +13,6 @@ end
 def apply
   yield
 end
-context "a method" do
-  describe "yield" do
-    specify "runs a do block handed to a paren-less call" do
-      handed = apply do
-        "from the block"
-      end
-      expect(handed).to eq("from the block")
-    end
-
-    specify "runs a brace block the same way" do
-      expect(apply() { "from braces" }).to eq("from braces")
-    end
-  end
-end
 # From ruby/spec language/yield_spec.rb, the literal-block rows: the
 # lambda rows wait on the proc question (#77), splats are deferred (ADR
 # 0014), a method called without the block it yields to is a compile-time
@@ -84,5 +70,16 @@ context "The yield call" do
       count += 10
     end
     expect(count).to eq(11)
+  end
+
+  specify "runs a do block handed to a paren-less call" do
+    handed = apply do
+      "from the block"
+    end
+    expect(handed).to eq("from the block")
+  end
+
+  specify "runs a brace block the same way" do
+    expect(apply() { "from braces" }).to eq("from braces")
   end
 end

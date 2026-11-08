@@ -7,20 +7,6 @@ def guarded(flag)
   "late"
 end
 
-context "control flow" do
-  describe "if" do
-    specify "answers the taken branch" do
-      greeting = if false
-        "morning"
-      elsif true
-        "afternoon"
-      else
-        "hello"
-      end
-      expect(greeting).to eq("afternoon")
-    end
-  end
-end
 # From ruby/spec language/if_spec.rb. Conditions take booleans only
 # (docs/ruby/truthiness.md), so the nil, zero, and object rows refuse; the
 # multiple-assignment rows go through eval, the `;` spellings are newlines
@@ -261,5 +247,16 @@ context "The if expression" do
       "taken"
     end
     expect(branchless).to be_nil
+  end
+
+  specify "answers the taken branch" do
+    greeting = if false
+      "morning"
+    elsif true
+      "afternoon"
+    else
+      "hello"
+    end
+    expect(greeting).to eq("afternoon")
   end
 end

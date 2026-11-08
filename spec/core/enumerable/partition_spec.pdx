@@ -53,4 +53,8 @@ context "Enumerable#partition" do
   specify "gathers whole arrays as elements when each yields multiple" do
     expect(YieldsMulti.new.partition { |item| item == [3, 4, 5] }).to eq([[[3, 4, 5]], [[1, 2], [6, 7, 8, 9]]])
   end
+
+  specify "sort, sort_by, and partition answer arrays" do
+    expect(Set[1, 2, 3].partition { it > 1 }).to eq([[2, 3], [1]])
+  end
 end

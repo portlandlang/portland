@@ -30,6 +30,33 @@ context "String#=~" do
     expect(MatchData === md).to be_true
     expect(MatchData === "a").to be_false
   end
+
+  specify "answers the MatchData or nil" do
+    found = "hello".match(/l+/) or panic("no match")
+    expect(found[0]).to eq("ll")
+    expect("hello".match(/z/)).to be_nil
+  end
+
+  specify "reads a string argument as a pattern" do
+    found = "hello".match("l+") or panic("no match")
+    expect(found[0]).to eq("ll")
+  end
+
+  specify "matches from a position" do
+    found = "abcabc".match(/b/, 2) or panic("no match")
+    expect(found.begin(0)).to eq(4)
+  end
+
+  specify "answers whether the pattern matches" do
+    expect("hello".match?(/l+/)).to be_true
+    expect("hello".match?(/z/)).to be_false
+    expect("hello".match?("ell")).to be_true
+  end
+
+  specify "matches from a position" do
+    expect("hello".match?(/h/, 1)).to be_false
+    expect("hello".match?(/e/, 1)).to be_true
+  end
 end
 context "String#match" do
   specify "matches the pattern against self" do

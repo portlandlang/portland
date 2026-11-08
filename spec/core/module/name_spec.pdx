@@ -4,8 +4,21 @@
 
 require_relative "../../spec_helper"
 
+struct Counted
+  count
+
+  def self.new(count:)
+    fields(count: count + 1)
+  end
+end
+
 context "Module#name" do
   specify "answers class and name" do
     expect(Set.name).to eq("Set")
+  end
+
+  specify "is the same value" do
+    kind = Counted
+    expect(Integer.name).to eq("Integer")
   end
 end

@@ -1,0 +1,11 @@
+# From ruby/spec core/float/angle_spec.rb.
+#
+# The rows Portland's spec held; the rest of the file is not yet ported.
+
+require_relative "../../spec_helper"
+
+context "Float#angle" do
+  specify "is 0 or pi by the sign" do
+    expect(3.0.angle).to eq(0)
+  end
+end

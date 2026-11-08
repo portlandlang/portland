@@ -7,31 +7,27 @@
 
 require_relative "../../spec_helper"
 
-context "Integer" do
-  # ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's,
-  # which truncates toward zero.
-  describe "#%" do
-    specify "takes the sign of the divisor" do
-      expect((0 - 7) % 2).to eq(1)
-    end
+context "Integer#%" do
+  specify "takes the sign of the divisor" do
+    expect((0 - 7) % 2).to eq(1)
+  end
 
-    specify "answers the modulus of dividing self by the argument" do
-      expect(13 % 4).to eq(1)
-      expect(4 % 13).to eq(4)
-    end
+  specify "answers the modulus of dividing self by the argument" do
+    expect(13 % 4).to eq(1)
+    expect(4 % 13).to eq(4)
+  end
 
-    specify "floors below zero, where truncation would answer differently" do
-      expect((-200) % 256).to eq(56)
-      expect((-1000) % 512).to eq(24)
-    end
+  specify "floors below zero, where truncation would answer differently" do
+    expect((-200) % 256).to eq(56)
+    expect((-1000) % 512).to eq(24)
+  end
 
-    specify "keeps a negative divisor's sign" do
-      expect((-200) % (-256)).to eq(-200)
-      expect(200 % (-256)).to eq(-56)
-    end
+  specify "keeps a negative divisor's sign" do
+    expect((-200) % (-256)).to eq(-200)
+    expect(200 % (-256)).to eq(-56)
+  end
 
-    specify "promotes against a float divisor" do
-      expect(13 % 4.0).to eq(1)
-    end
+  specify "promotes against a float divisor" do
+    expect(13 % 4.0).to eq(1)
   end
 end

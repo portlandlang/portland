@@ -50,4 +50,9 @@ context "Enumerable#member?" do
     expect(numerous(DEFAULT).member?(3)).to eq(numerous(DEFAULT).include?(3))
     expect(numerous(DEFAULT).member?(9)).to eq(numerous(DEFAULT).include?(9))
   end
+
+  specify "member? is its twin (ADR 0036)" do
+    expect([3, 1, 2].member?(1)).to be_true
+    expect([3, 1, 2].member?(9)).to be_false
+  end
 end

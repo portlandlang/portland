@@ -586,4 +586,12 @@ context "Pattern matching" do
     else "other"
     end
   end
+
+  specify "rebinds it, as any assignment would" do
+    mutable found = 0
+    case 5
+    in found then found
+    end
+    expect(found).to eq(5)
+  end
 end

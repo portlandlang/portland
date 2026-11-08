@@ -4,6 +4,23 @@
 
 require_relative "../../spec_helper"
 
+module Shop
+  struct Token
+    text
+
+    def twin = self.class.new(text: text)
+
+    def self.blank = Shop::Token.new(text: "")
+  end
+end
+struct Counted
+  count
+
+  def self.new(count:)
+    fields(count: count + 1)
+  end
+end
+
 struct Badge
   label
 
@@ -26,5 +43,12 @@ context "construction" do
       badge = Badge.new("") or Badge.new("fallback")
       expect(badge.label).to eq("fallback")
     end
+  end
+end
+
+context "value.class" do
+  specify "builds another through new, a defined new included" do
+    expect(Shop::Token.new(text: "x").twin).to eq(Shop::Token.new(text: "x"))
+    expect(Counted.new(count: 1).class.new(count: 5)).to eq(Counted.new(count: 5))
   end
 end

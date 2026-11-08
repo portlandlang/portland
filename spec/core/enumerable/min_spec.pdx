@@ -99,4 +99,8 @@ context "Enumerable#min" do
   specify "answers an empty walk as nothing" do
     expect(Empty.new.min).to be_nil
   end
+
+  specify "answer as on an array" do
+    expect(Set[3, 1, 2].min).to eq(1)
+  end
 end

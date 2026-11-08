@@ -3,38 +3,6 @@
 
 require_relative "../spec_helper"
 
-context "control flow" do
-  describe "case/when" do
-    specify "answers the matching branch" do
-      label = case 2
-      when 1 then "one"
-      when 2 then "two"
-      else
-        "many"
-      end
-      expect(label).to eq("two")
-    end
-
-    specify "falls to else when nothing matches" do
-      label = case 9
-      when 1 then "one"
-      else
-        "else branch"
-      end
-      expect(label).to eq("else branch")
-    end
-
-    # From ruby/spec language/case_spec.rb (#23).
-    specify "takes several values in one when, comma-separated" do
-      label = case 2
-      when 1, 2 then "small"
-      else
-        "large"
-      end
-      expect(label).to eq("small")
-    end
-  end
-end
 # From ruby/spec language/case_spec.rb (#115). `when` asks equality: a type
 # test is an `in` pattern (spec/pattern_matching/), so the class rows stay
 # upstream, with the regex rows (#74), the splat rows (ADR 0014), the
@@ -162,5 +130,34 @@ context "The 'case'-construct" do
     else "plain"
     end
     expect(grade).to eq("plain")
+  end
+
+  specify "answers the matching branch" do
+    label = case 2
+    when 1 then "one"
+    when 2 then "two"
+    else
+      "many"
+    end
+    expect(label).to eq("two")
+  end
+
+  specify "falls to else when nothing matches" do
+    label = case 9
+    when 1 then "one"
+    else
+      "else branch"
+    end
+    expect(label).to eq("else branch")
+  end
+
+  # From ruby/spec language/case_spec.rb (#23).
+  specify "takes several values in one when, comma-separated" do
+    label = case 2
+    when 1, 2 then "small"
+    else
+      "large"
+    end
+    expect(label).to eq("small")
   end
 end

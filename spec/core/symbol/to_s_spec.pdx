@@ -17,18 +17,14 @@
 
 require_relative "../../spec_helper"
 
-context "Symbol" do
-  describe "#to_s" do
-    specify "sheds the colon — the one sanctioned crossing into text" do
-      expect(:paid.to_s).to eq("paid")
-      expect(:"odd key".to_s).to eq("odd key")
-    end
-  end
-end
-
 context "Symbol#to_s" do
   specify "returns the string corresponding to self" do
     expect(:rubinius.to_s).to eq("rubinius")
     expect(:squash.to_s).to eq("squash")
+  end
+
+  specify "sheds the colon — the one sanctioned crossing into text" do
+    expect(:paid.to_s).to eq("paid")
+    expect(:"odd key".to_s).to eq("odd key")
   end
 end
