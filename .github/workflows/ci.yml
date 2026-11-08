@@ -31,8 +31,7 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-
       # The Rust toolchain rust-toolchain.toml pins would otherwise download
       # through rustup on every run; the key is the pin file, so bumping the
-      # version is what refreshes the cache. Ruby is setup-ruby's above, not
-      # rv's: bootstrap skips rv when CI is set.
+      # version is what refreshes the cache.
       - uses: actions/cache@v6
         with:
           path: ~/.rustup
