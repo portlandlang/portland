@@ -181,6 +181,108 @@ def be_close(expected, tolerance)
   CloseMatcher.new(expected: expected, tolerance: tolerance)
 end
 
+# The comparison matchers (#250): `expect(reading).to be_greater_than(0)`
+# rather than `expect(reading > 0).to be_true`, so a failure names both
+# values instead of saying "expected true, got false". One struct for the
+# four, since they differ only by the operator and the words for it.
+#
+# The spelled-out name is the matcher; the shorthand is its twin, a second
+# `def` calling the first, as `context` twins `describe` — aliasing is
+# runtime metaprogramming, which Portland doesn't have. RSpec spells these
+# `be > 0`, `be >= 0`, and has no `be_greater_than`; these names are this
+# harness's own, as `specify` is. `be` below refuses the operator form.
+struct ComparisonMatcher
+  relation
+  expected
+
+  def matches?(actual)
+    case relation
+    when :greater_than             then actual > expected
+    when :greater_than_or_equal_to then actual >= expected
+    when :less_than                then actual < expected
+    when :less_than_or_equal_to    then actual <= expected
+    end
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to be #{words} #{inspect(expected)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be #{words} #{inspect(expected)}"
+  end
+
+  def words
+    relation.to_s.tr("_", " ")
+  end
+end
+
+def be_greater_than(expected)
+  ComparisonMatcher.new(relation: :greater_than, expected: expected)
+end
+
+def be_gt(expected)
+  be_greater_than(expected)
+end
+
+def be_greater_than_or_equal_to(expected)
+  ComparisonMatcher.new(relation: :greater_than_or_equal_to, expected: expected)
+end
+
+def be_gte(expected)
+  be_greater_than_or_equal_to(expected)
+end
+
+def be_less_than(expected)
+  ComparisonMatcher.new(relation: :less_than, expected: expected)
+end
+
+def be_lt(expected)
+  be_less_than(expected)
+end
+
+def be_less_than_or_equal_to(expected)
+  ComparisonMatcher.new(relation: :less_than_or_equal_to, expected: expected)
+end
+
+def be_lte(expected)
+  be_less_than_or_equal_to(expected)
+end
+
+# RSpec's `be_between(min, max)`, inclusive at both ends as RSpec's is by
+# default. RSpec's `.exclusive` modifier waits for a row that wants it.
+struct BetweenMatcher
+  minimum
+  maximum
+
+  def matches?(actual)
+    actual >= minimum && actual <= maximum
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to be between #{inspect(minimum)} and #{inspect(maximum)} (inclusive)"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be between #{inspect(minimum)} and #{inspect(maximum)} (inclusive)"
+  end
+end
+
+def be_between(minimum, maximum)
+  BetweenMatcher.new(minimum: minimum, maximum: maximum)
+end
+
+# `be` exists only to refuse. Someone will reach for RSpec's
+# `expect(x).to be > 5` — future us included — and without this the file
+# dies on "'be' is not defined", which names nothing to write instead. It
+# panics rather than printing a FAIL line because `be > 5` goes on to call
+# `>` on whatever `be` answers, and a mistake in writing a spec should stop
+# the file on its first run, not be counted. Don't delete it as dead code,
+# and don't make it work: the spelled-out matchers are the house spelling.
+def be
+  panic("`be > x` is RSpec's operator form, which this harness does not have. Write be_greater_than(x), be_greater_than_or_equal_to(x), be_less_than(x), be_less_than_or_equal_to(x), or be_between(minimum, maximum).")
+end
+
 struct BooleanMatcher
   wanted
 
