@@ -64,7 +64,7 @@ Comparison is `== != < <= > >=`, and `<=>` answers -1, 0, or 1 ([ADR 0054](adr/0
 
 **Heredocs** are squiggly only — `<<~SQL`, SCREAMING_CAPS terminator (ADR 0020). `<<~'SQL'` suppresses interpolation. Indented terminators, attached method calls, and several per line all work. `<<EOS` and `<<-EOS` do not exist, and that is what lets `<<` stay unambiguously the append operator with no disambiguation rule anywhere.
 
-**Arrays** are `[1, "two", [3]]`. **Hashes** are `{"key" => value}`, insertion-ordered, any type of key. `%w[rose city]` builds a word array and `%i[paid pending]` a symbol array, each opening with `[`, `(`, or `{` ([ADR 0051](adr/0051-2026-09-24-the-percent-literal-family.md)), with Ruby's content rules ([ADR 0030](adr/0030-2026-07-27-word-array-contents.md)): a backslash escapes the delimiter in use, balanced delimiters nest, `rose\ city` keeps its space, and whitespace runs split once. The rest of the `%` family refuses by name; `%r{...}` is a regex literal ([ADR 0086](adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)), decided and not yet built.
+**Arrays** are `[1, "two", [3]]`. **Hashes** are `{"key" => value}`, insertion-ordered, any type of key. `%w[rose city]` builds a word array and `%i[paid pending]` a symbol array, each opening with `[`, `(`, or `{` ([ADR 0051](adr/0051-2026-09-24-the-percent-literal-family.md)), with Ruby's content rules ([ADR 0030](adr/0030-2026-07-27-word-array-contents.md)): a backslash escapes the delimiter in use, balanced delimiters nest, `rose\ city` keeps its space, and whitespace runs split once. The rest of the `%` family refuses by name; `%r{...}` is a regex literal ([ADR 0086](adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)), as `/.../` is.
 
 **Ranges** are `1..5` and `1...5`, with endless and beginless forms (ADR 0019). Integer bounds only. `(1..n)` iterates via `each`/`map`/ `sum`/`to_a`, `include?` answers without walking, and range patterns match by membership.
 
@@ -414,7 +414,7 @@ Tier three — cancellation, timeouts, racing — is future work, rare by design
 
 ## Not yet designed
 
-Compile-time macros (#14), the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), error handling stopped being on this list on 2026-07-27 (ADR 0027), visibility on 2026-11-03 (ADR 0076, built 2026-11-06), and regex on 2026-11-07 (ADR 0086: Ruby's literals, Onigmo's patterns, a match is a `MatchData` or nil; the engine is #212, nothing built yet).
+Compile-time macros (#14), the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), error handling stopped being on this list on 2026-07-27 (ADR 0027), visibility on 2026-11-03 (ADR 0076, built 2026-11-06), and regex on 2026-11-07 (ADR 0086: Ruby's literals, Onigmo's patterns over the seed's own port of Onigmo, a match is a `MatchData` or nil; built on both implementations the same day).
 
 ## Gone, on purpose, forever
 

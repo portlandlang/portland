@@ -13,5 +13,7 @@ pub mod lexer;
 pub mod math;
 pub mod parser;
 pub mod random;
+pub mod regex;
+pub mod regexp;
 pub mod tower;
 pub mod value;

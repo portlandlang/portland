@@ -1,0 +1,148 @@
+# A match is a value (ADR 0086): `=~` and `match` both answer the
+# MatchData or nil, `match?` and `!~` booleans, on a string, a symbol, or
+# the pattern itself, from a position when one is given.
+#
+# From ruby/spec core/regexp/{match,match?}_spec.rb and shared/match.rb,
+# and core/string/{match,match?,=~}_spec.rb's regex rows. Upstream: `=~`
+# answering an index (it answers the match here, since the match globals
+# are gone), `$~` being set or reset, `Regexp.last_match`, the block form
+# of `match`, mocks, `Regexp.allocate`, and the encoding rows.
+
+require_relative "../spec_helper"
+
+context "Regexp#=~" do
+  specify "answers the MatchData when there is a match" do
+    found = /(.)(.)(.)/ =~ "abc" or panic("no match")
+    expect(found.to_a).to eq(["abc", "a", "b", "c"])
+    expect(found.begin(0)).to eq(0)
+  end
+
+  specify "returns nil if there is no match" do
+    expect(/xyz/ =~ "abxyc").to be_nil
+  end
+
+  specify "returns nil if the object is nil" do
+    expect(/\w+/ =~ nil).to be_nil
+  end
+
+  specify "answers the match when the argument is a Symbol" do
+    found = /(.)(.)(.)/ =~ :abc or panic("no match")
+    expect(found[0]).to eq("abc")
+  end
+end
+
+context "String#=~" do
+  specify "answers the MatchData or nil" do
+    found = "hello" =~ /l+/ or panic("no match")
+    expect(found[0]).to eq("ll")
+    expect(found.begin(0)).to eq(2)
+    expect("hello" =~ /z/).to be_nil
+  end
+
+  specify "narrows like any maybe" do
+    answer = if ("line 12" =~ /\d+/).some? then :digits else :none end
+    expect(answer).to eq(:digits)
+    fallback = ("line" =~ /\d+/) or "none"
+    expect(fallback).to eq("none")
+  end
+end
+
+context "Regexp#match" do
+  specify "returns a MatchData object" do
+    found = /(.)(.)(.)/.match("abc") or panic("no match")
+    expect(found.class).to eq(MatchData)
+    expect(found.captures).to eq(["a", "b", "c"])
+  end
+
+  specify "returns a MatchData object when the argument is a Symbol" do
+    found = /(.)(.)(.)/.match(:abc) or panic("no match")
+    expect(found[0]).to eq("abc")
+  end
+
+  specify "returns nil if there is no match" do
+    expect(/xyz/.match("abxyc")).to be_nil
+  end
+
+  specify "returns nil if the object is nil" do
+    expect(/\w+/.match(nil)).to be_nil
+  end
+
+  specify "matches the input at a given position" do
+    found = /(.).(.)/.match("01234", 1) or panic("no match")
+    expect(found.captures).to eq(["1", "3"])
+  end
+
+  specify "uses the start as a character offset" do
+    found = /(.).(.)/.match("零一二三四", 1) or panic("no match")
+    expect(found.captures).to eq(["一", "三"])
+  end
+
+  specify "counts a negative position from the end" do
+    found = /(.).(.)/.match("01234", -4) or panic("no match")
+    expect(found.captures).to eq(["1", "3"])
+    far = /(.).(.)/.match("零一二三四", -4) or panic("no match")
+    expect(far.captures).to eq(["一", "三"])
+  end
+
+  specify "answers nil past the end" do
+    expect(/./.match("abc", 3)).to be_nil
+    expect(/./.match("abc", 9)).to be_nil
+  end
+end
+
+context "String#match" do
+  specify "answers the MatchData or nil" do
+    found = "hello".match(/l+/) or panic("no match")
+    expect(found[0]).to eq("ll")
+    expect("hello".match(/z/)).to be_nil
+  end
+
+  specify "reads a string argument as a pattern" do
+    found = "hello".match("l+") or panic("no match")
+    expect(found[0]).to eq("ll")
+  end
+
+  specify "matches from a position" do
+    found = "abcabc".match(/b/, 2) or panic("no match")
+    expect(found.begin(0)).to eq(4)
+  end
+end
+
+context "Regexp#match?" do
+  specify "returns true when it matches the given value" do
+    expect(/string/i.match?("string")).to be_true
+    expect(/string/i.match?(:STRING)).to be_true
+  end
+
+  specify "returns false when it does not match the given value" do
+    expect(/STRING/.match?("string")).to be_false
+    expect(/x/.match?(nil)).to be_false
+  end
+
+  specify "matches from a position" do
+    expect(/a/.match?("ba", 1)).to be_true
+    expect(/b/.match?("ba", 1)).to be_false
+  end
+end
+
+context "String#match?" do
+  specify "answers whether the pattern matches" do
+    expect("hello".match?(/l+/)).to be_true
+    expect("hello".match?(/z/)).to be_false
+    expect("hello".match?("ell")).to be_true
+  end
+
+  specify "matches from a position" do
+    expect("hello".match?(/h/, 1)).to be_false
+    expect("hello".match?(/e/, 1)).to be_true
+  end
+end
+
+context "!~" do
+  specify "is match?'s negation" do
+    expect("hello" !~ /z/).to be_true
+    expect("hello" !~ /l/).to be_false
+    expect(/z/ !~ "hello").to be_true
+    expect(:hello !~ /h/).to be_false
+  end
+end

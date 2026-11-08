@@ -1,0 +1,30 @@
+found = "today is 2024-01-15" =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/ or panic("no match")
+p(found)
+p(found[:year], found[0], found[-1], found.captures, found.named_captures, found.names, found.pre_match, found.post_match, found.begin(0), found.offset(1), found.to_a, found.values_at(1, 3), found.size)
+p("ab".match(/(a)(b)?(c)?/))
+p(/ab/i, /ab/i.to_s, /ab/.to_s, /ab/mix.to_s, %r{a/b}, %r{a/b}.source, /a/i.options, /a/mix.options)
+p(Regexp.union("a.b", /c/i, "d"), Regexp.union, Regexp.escape("a.b*c?[d] e"))
+p("a1b2c".split(/\d/), "a1b2c".split(/(\d)/), "abc".split(//), "a1b2c3".split(/\d/, 2), "a1b2c3".split(/\d/, -1), "abc".split(/b*/), "aaa".split(/a*/))
+p("a1b22c333".scan(/\d+/), "a1b22".scan(/([a-z])(\d+)/), "abc".scan(/x/))
+p("hello world".gsub(/o/, "0"), "hello".sub(/l+/) { |t| t.upcase }, "2026-11-07".sub(/(\d+)-(\d+)-(\d+)/, '\3/\2/\1'), "ab".gsub(/(?<x>a)/, '<\k<x>>'), "ab".gsub(/b/, '\&\&'), "aaa".gsub(//, "-"), "abc".gsub(/b*/, "X"), "hello".sub("l", '\0\0'))
+p("hello"[/l+/], "hello".slice(/(h)(e)/, 2), "hello".slice(/z/), "hello".index(/l/), "hello".index(/l/, 3), "hello".rindex(/l/), "héllo".index(/l/), "aaa".rindex(/aa/))
+p("hello".start_with?(/h.l/), "hello".start_with?(/l/), "hello".partition(/l+/), "hello".rpartition(/l/), "hello".partition(/z/))
+accented = "héllo".match(/l+/) or panic("no match")
+p("héllo" =~ /l+/, accented.begin(0), ("éx".match(/x/) or panic("no match")).begin(0), ("🇵🇹x".match(/x/) or panic("no match")).begin(0))
+p(/a/ == /a/, /a/ == /a/i, /a/.eql?(/a/), /a/ === "cat", /a/ === 5, /a/ === :cat, "x".match(/x/) == "x".match(/x/))
+p("abc".match(/b/, 2), "abc".match(/b/, 1), "abc".match?(/b/), "abc" !~ /z/, :cat =~ /a/)
+p(Regexp.new("a", "i"), Regexp.new("a", 1), Regexp.new("a", true), Regexp.new("a", 6), /a/.casefold?, /(?<x>a)(?<y>b)/.names, /(a)/.names)
+p("a".sub(/(a)/, '\2'), "ab".sub(/(?<n>a)/, '\k<n>\k<n>'), "Hello World".scan(/\w+/) { |w| puts(w) })
+case "# title"
+when /^#/ then puts("comment")
+when /^\s*$/ then puts("blank")
+end
+mutable count = 0
+"a-b-c".scan(/\w/) { count += 1 }
+p(count)
+mutable seen = []
+p("a1b2".gsub(/\d/) { |digit| seen << digit; (digit.to_i * 2).to_s })
+p(seen)
+p(/a#{"b/c"}d/, /x#{1 + 1}y/i)
+p("a/b" =~ /a\/b/, "a.b"[/a\.b/])
+p(/a/.class, found.class, Regexp === /a/, MatchData === found)

@@ -831,7 +831,7 @@ end
 # A builtin type's name, as a `when` value or a `===` pattern tests for it
 # (#151): a type, not a value, so not a name to find defined.
 def builtin_type_name?(node)
-  (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(node.name)
+  (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(node.name)
 end
 
 def check_case_in(node, scope, mutable found)
@@ -1233,7 +1233,7 @@ def check_defined(name, node, scope, found)
   return found if scope.globals.any? { it[0] == name }
   return found if builtin_function?(name)
   # A builtin type's bare name is the type as a value (ADR 0074).
-  return found if %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
+  return found if %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(name)
   # A removed Ruby spelling names its rewrite instead (#135).
   return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
   noted(found, ["undefined", name], locate(node, scope))

@@ -624,6 +624,20 @@ struct StringNode
   end
 end
 
+# `/pattern/flags` and `%r{pattern}flags` (ADR 0086): the source as a
+# string-valued node, since it may interpolate, and the flag letters.
+struct RegexNode
+  kind
+  flags
+  source
+
+  include Sexp
+
+  def sexp
+    headed_sexp("regex #{flags}", [source])
+  end
+end
+
 # `:name` — a symbol literal (ADR 0023). `value` holds the name without
 # its colon, matching the seed.
 struct SymbolNode
@@ -1392,6 +1406,13 @@ def parse_comparison(tokens, position)
     subject = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
     step = Step.new(node: CaseEqualNode.new(kind: "case_equal", pattern: step.node, subject: subject.node), position: subject.position)
   end
+  # `=~` and `!~` (ADR 0086) sit with `==`: a match is a method call on the
+  # left side, answering the MatchData or nil, or the boolean.
+  while operator_at?(tokens, step.position, %w[=~ !~])
+    operator = tokens[step.position].text
+    right = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
+    step = Step.new(node: method_call_node(step.node, operator, [right.node], nil, line: line_at(tokens, position)), position: right.position)
+  end
   while operator_at?(tokens, step.position, %w[== != < <= > >= <=>])
     operator = tokens[step.position].text
     right = parse_addition(tokens, skip_newlines_at(tokens, step.position + 1))
@@ -1839,7 +1860,7 @@ def parse_yield(tokens, position)
     end
     return Step.new(node: yield_node(arguments.node), position: arguments.position)
   end
-  starts_a_value = token.leading_space && (%w[float identifier integer string symbol symbol_array word_array].include?(token.kind) || (token.keyword? && %w[false nil self true].include?(token.text)))
+  starts_a_value = token.leading_space && (%w[float identifier integer string symbol symbol_array word_array regex].include?(token.kind) || (token.keyword? && %w[false nil self true].include?(token.text)))
   return Step.new(node: yield_node([]), position: position) unless starts_a_value
 
   mutable step = parse_expression(tokens, position)
@@ -2133,6 +2154,7 @@ def parse_primary(tokens, position)
     # A `!` in the name is just the name (ADR 0044).
     parse_identifier_primary(tokens, position, token.text)
   when "string" then Step.new(node: string_expression(token.text, line: token.line), position: after)
+  when "regex" then Step.new(node: regex_expression(token.text, line: token.line), position: after)
   when "word_array" then Step.new(node: word_array_node(token.text), position: after)
   when "symbol_array" then Step.new(node: symbol_array_node(token.text), position: after)
   when "keyword"
@@ -2275,6 +2297,61 @@ def string_expression(lexeme, line: nil)
     index += 1
   end
   chain
+end
+
+# A regex literal (ADR 0086): `/body/flags` or `%r{body}flags`. The body
+# stays raw for the engine — a backslash escape is the pattern's own — and
+# only `#{...}` is read here, as in a string, each piece joined by `+`.
+def regex_expression(lexeme, line: nil)
+  mutable flags_start = lexeme.length
+  while flags_start > 0 && "imxo".include?(lexeme.slice(flags_start - 1, 1))
+    flags_start -= 1
+  end
+  flags = lexeme.slice(flags_start, lexeme.length - flags_start)
+  if flags.include?("o")
+    panic "the 'o' flag interpolates a pattern once, which Portland does not spell — drop the flag; a constant pattern is built once anyway"
+  end
+  slashed = lexeme.slice(0, 1) == "/"
+  body_start = slashed ? 1 : 3
+  characters = lexeme.slice(body_start, flags_start - 1 - body_start).chars
+  mutable parts = []
+  mutable literal = ""
+  mutable index = 0
+  while index < characters.length
+    character = characters[index]
+    # An escaped terminator that means nothing to the engine, `\/`, is the
+    # bare character in the source, as Ruby reads it.
+    if character == "\\"
+      following = index + 1 < characters.length ? characters[index + 1] : ""
+      if slashed && following == "/"
+        literal << "/"
+      else
+        literal << character
+        literal << following
+      end
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      parts << string_node(literal) unless literal.empty?
+      literal = ""
+      inner = read_inner_source(characters, index + 2)
+      inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
+      parts << method_call_node(inner_step.node, "to_s", [], nil)
+      index = inner.position
+      next
+    end
+    literal << character
+    index += 1
+  end
+  parts << string_node(literal) if !literal.empty? || parts.empty?
+  mutable chain = parts.first
+  index = 1
+  while index < parts.length
+    chain = binary_node("+", chain, parts[index])
+    index += 1
+  end
+  RegexNode.new(kind: "regex", flags: flags, source: chain)
 end
 
 # Re-encode a decoded string for sexp display.
@@ -2446,7 +2523,7 @@ def command_start?(tokens, position)
   # "float" earned its place the hard way: its absence meant `p 2.5` never
   # became a command call at all, and the statement boundary reported the
   # leftover token instead (#46).
-  when "float", "integer", "string", "symbol", "symbol_array", "word_array", "identifier" then true
+  when "float", "integer", "string", "symbol", "symbol_array", "word_array", "regex", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   # `p ::Config` — a spaced `::` starts a top-level name (#147).
   when "operator" then token.text == "!" || (token.text == "::" && token.leading_space)

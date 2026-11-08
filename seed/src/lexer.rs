@@ -8,6 +8,8 @@ pub enum TokenKind {
     AmpersandAmpersand,
     AmpersandDot,
     Bang,
+    /// `!~` — no match (ADR 0086), `match?`'s negation.
+    BangTilde,
     Caret,
     /// `===` — case equality (#150), and a name a `def` may take.
     CaseEqual,
@@ -21,6 +23,8 @@ pub enum TokenKind {
     DotDotDot,
     Equal,
     EqualEqual,
+    /// `=~` — a match (ADR 0086), answering the `MatchData` or nil.
+    EqualTilde,
     FatArrow,
     Float,
     Greater,
@@ -32,6 +36,9 @@ pub enum TokenKind {
     Keyword,
     /// `3r`, `1.5r` (ADR 0085): a number with the rational suffix.
     Rational,
+    /// `/pattern/flags` and `%r{pattern}flags` (ADR 0086): the whole
+    /// literal, flags included, raw — the parser reads the body.
+    Regex,
     LeftBrace,
     LeftBracket,
     LeftParen,
@@ -450,9 +457,11 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                 });
             }
             // The `%` literal family (ADR 0051): `%w` and `%i`, with `[]`,
-            // `()`, or `{}`. Every other member refuses by name below, and
-            // a bare `%(` after a space is the string form, refused too.
-            '%' if matches!(source.as_bytes().get(start + 1), Some(b'w' | b'i')) => {
+            // `()`, or `{}`, and `%r` the regex literal (ADR 0086) with the
+            // same delimiters and its flag letters after the closer. Every
+            // other member refuses by name below, and a bare `%(` after a
+            // space is the string form, refused too.
+            '%' if matches!(source.as_bytes().get(start + 1), Some(b'w' | b'i' | b'r')) => {
                 chars.next(); // the `%`
                 let (_, letter) = chars.next().unwrap();
                 let opener = match chars.next() {
@@ -480,6 +489,13 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                                 );
                             }
                         }
+                        // A pattern's interpolation may hold the closer.
+                        Some((_, '#'))
+                            if letter == 'r' && matches!(chars.peek(), Some(&(_, '{'))) =>
+                        {
+                            chars.next(); // the `{`
+                            skip_interpolation(&mut chars, start);
+                        }
                         Some((_, character)) if character == opener => depth += 1,
                         Some((position, character)) if character == closer => {
                             if depth == 0 {
@@ -490,15 +506,63 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         Some(_) => {}
                     }
                 };
+                let mut end = closing;
+                if letter == 'r' {
+                    end = regex_flags_end(source, closing);
+                }
                 tokens.push(Token {
                     leading_space: false,
-                    kind: if letter == 'w' {
-                        TokenKind::WordArray
-                    } else {
-                        TokenKind::SymbolArray
+                    kind: match letter {
+                        'w' => TokenKind::WordArray,
+                        'i' => TokenKind::SymbolArray,
+                        _ => TokenKind::Regex,
                     },
-                    text: &source[start..=closing],
+                    text: &source[start..=end],
                 });
+                for _ in closing..end {
+                    chars.next();
+                }
+            }
+            // A regex literal (ADR 0086) where an operand can begin; `/`
+            // after a value stays division.
+            // `puts /x/` could pass a pattern or divide; `puts(/x/)` and
+            // `puts / x` say which (parentheses.md).
+            '/' if glued_to_a_name(&tokens, source, start) => {
+                let name = tokens.last().expect("a name precedes").text;
+                panic!(
+                    "ambiguous without parens — write {name}(/.../) to pass a pattern or {name} / ... to divide"
+                );
+            }
+            '/' if regex_begins(&tokens) => {
+                chars.next(); // the opening `/`
+                // The body stays raw: a backslash escapes the next character
+                // for the engine's own reading, and an interpolation may hold
+                // a slash. The flags follow the closing `/`.
+                let closing = loop {
+                    match chars.next() {
+                        None => panic!("unterminated regex starting at byte {start}"),
+                        Some((_, '\\')) => {
+                            if chars.next().is_none() {
+                                panic!("unterminated regex starting at byte {start}");
+                            }
+                        }
+                        Some((_, '#')) if matches!(chars.peek(), Some(&(_, '{'))) => {
+                            chars.next(); // the `{`
+                            skip_interpolation(&mut chars, start);
+                        }
+                        Some((position, '/')) => break position,
+                        Some(_) => {}
+                    }
+                };
+                let end = regex_flags_end(source, closing);
+                tokens.push(Token {
+                    leading_space: false,
+                    kind: TokenKind::Regex,
+                    text: &source[start..=end],
+                });
+                for _ in closing..end {
+                    chars.next();
+                }
             }
             '%' if declined_percent_literal(source, start) => {
                 let spelling = &source[start..start + declined_percent_length(source, start)];
@@ -548,6 +612,8 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         (TokenKind::CaseEqual, 3)
                     }
                     ('=', Some('=')) => (TokenKind::EqualEqual, 2),
+                    // `=~` (ADR 0086): a match, answering the MatchData or nil.
+                    ('=', Some('~')) => (TokenKind::EqualTilde, 2),
                     ('=', Some('>')) => (TokenKind::FatArrow, 2),
                     ('=', _) => (TokenKind::Equal, 1),
                     ('>', Some('=')) => (TokenKind::GreaterEqual, 2),
@@ -566,6 +632,8 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     ('<', Some('<')) => (TokenKind::LessLess, 2),
                     ('<', _) => (TokenKind::Less, 1),
                     ('!', Some('=')) => (TokenKind::NotEqual, 2),
+                    // `!~` (ADR 0086): no match.
+                    ('!', Some('~')) => (TokenKind::BangTilde, 2),
                     ('!', _) => (TokenKind::Bang, 1),
                     ('-', Some('=')) => (TokenKind::MinusEqual, 2),
                     // Ruby's lambda arrow (#135): a block is handed to a
@@ -718,6 +786,15 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     start + 1 + length
                 };
                 let spelling = &source[start..end];
+                // The match globals (ADR 0086): the match is a value here,
+                // so the rewrite is to bind it and read it.
+                if matches!(spelling, "$~" | "$&" | "$`" | "$'" | "$+")
+                    || spelling[1..].bytes().all(|byte| byte.is_ascii_digit())
+                {
+                    panic!(
+                        "'{spelling}' is a match global, which Portland does not have — bind the match: found = text =~ /.../, then read found[1], found.pre_match, found.post_match"
+                    );
+                }
                 panic!(
                     "'{spelling}' is a global, which Portland does not have — pass the value in, or name a constant"
                 );
@@ -845,14 +922,68 @@ fn name_length(source: &str, start: usize) -> usize {
 fn declined_percent_literal(source: &str, start: usize) -> bool {
     let bytes = source.as_bytes();
     match bytes.get(start + 1) {
-        Some(b'q' | b'Q' | b's' | b'W' | b'I' | b'r' | b'x') => {
-            bytes.get(start + 2).is_some_and(|byte| {
-                !byte.is_ascii_alphanumeric() && !byte.is_ascii_whitespace() && *byte != b'_'
-            })
-        }
+        Some(b'q' | b'Q' | b's' | b'W' | b'I' | b'x') => bytes.get(start + 2).is_some_and(|byte| {
+            !byte.is_ascii_alphanumeric() && !byte.is_ascii_whitespace() && *byte != b'_'
+        }),
         Some(b'[' | b'(' | b'{') => start == 0 || bytes[start - 1].is_ascii_whitespace(),
         _ => false,
     }
+}
+
+/// Whether a `/` here opens a regex literal (ADR 0086): yes at the start
+/// and after anything an operand cannot follow — an operator, an opener, a
+/// comma, a newline, a keyword like `if` or `when`; no after a value, a
+/// closer, or a name, where it divides.
+fn regex_begins(tokens: &[Token]) -> bool {
+    match tokens.last() {
+        None => true,
+        Some(previous) => match previous.kind {
+            TokenKind::Identifier
+            | TokenKind::Integer
+            | TokenKind::Float
+            | TokenKind::Rational
+            | TokenKind::Imaginary
+            | TokenKind::String
+            | TokenKind::Symbol
+            | TokenKind::WordArray
+            | TokenKind::SymbolArray
+            | TokenKind::Regex
+            | TokenKind::RightParen
+            | TokenKind::RightBracket
+            | TokenKind::RightBrace => false,
+            TokenKind::Keyword => {
+                !matches!(previous.text, "end" | "self" | "nil" | "true" | "false")
+            }
+            _ => true,
+        },
+    }
+}
+
+/// Whether a `/` sits glued to a name's argument, `puts /x/`: a space
+/// before it, none after, and a name just before — the shape Ruby itself
+/// warns about and Portland refuses as ambiguous.
+fn glued_to_a_name(tokens: &[Token], source: &str, start: usize) -> bool {
+    tokens
+        .last()
+        .is_some_and(|previous| previous.kind == TokenKind::Identifier)
+        && start > 0
+        && matches!(source.as_bytes()[start - 1], b' ' | b'\t')
+        && !matches!(
+            source.as_bytes().get(start + 1),
+            None | Some(b' ' | b'\t' | b'=' | b'\n')
+        )
+}
+
+/// Where a regex literal's flag letters end: the byte of the last `i`, `m`,
+/// `x`, or `o` after the closing delimiter at `closing`, or `closing` itself.
+fn regex_flags_end(source: &str, closing: usize) -> usize {
+    let mut end = closing;
+    while let Some(byte) = source.as_bytes().get(end + 1)
+        && matches!(byte, b'i' | b'm' | b'x' | b'o')
+    {
+        end += 1;
+    }
+    end
 }
 
 fn declined_percent_length(source: &str, start: usize) -> usize {
@@ -871,7 +1002,6 @@ pub fn declined_percent_sentence(spelling: &str) -> String {
         b's' => "write :name, or :\"odd name\" for a name with spaces",
         b'W' => "write %w[] when no word interpolates, or [\"#{a}\", \"b\"] when one does",
         b'I' => "write %i[] when no name interpolates, or [:\"#{a}\", :b] when one does",
-        b'r' => "there is no regex yet",
         b'x' => "there is no shell execution",
         _ => "write a quoted string or a heredoc",
     };
@@ -1225,10 +1355,54 @@ mod tests {
         lex("%I[a b]");
     }
 
+    // ADR 0086: `/.../` and `%r{...}` are regex literals, flags included;
+    // a `/` after a value divides, and a `/` glued to a name's argument is
+    // the never-guess refusal.
     #[test]
-    #[should_panic(expected = "'%r{' is not a Portland literal — there is no regex yet")]
-    fn the_regex_form_refuses() {
-        lex("%r{a/b}");
+    fn regex_literals_lex_whole_with_their_flags() {
+        assert_eq!(kinds("%r{a/b}i"), vec![TokenKind::Regex]);
+        assert_eq!(texts("%r{a/b}i"), vec!["%r{a/b}i"]);
+        assert_eq!(texts(r"x = /a\/b/mx"), vec!["x", "=", r"/a\/b/mx"]);
+        assert_eq!(
+            kinds("a / b"),
+            vec![
+                TokenKind::Identifier,
+                TokenKind::Slash,
+                TokenKind::Identifier
+            ]
+        );
+        assert_eq!(
+            kinds("f(/x/, 2) =~ /y/ !~ /z/"),
+            vec![
+                TokenKind::Identifier,
+                TokenKind::LeftParen,
+                TokenKind::Regex,
+                TokenKind::Comma,
+                TokenKind::Integer,
+                TokenKind::RightParen,
+                TokenKind::EqualTilde,
+                TokenKind::Regex,
+                TokenKind::BangTilde,
+                TokenKind::Regex,
+            ]
+        );
+        assert_eq!(texts(r#"/a#{"b/c"}d/"#), vec![r#"/a#{"b/c"}d/"#]);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "ambiguous without parens — write puts(/.../) to pass a pattern or puts / ... to divide"
+    )]
+    fn a_pattern_glued_to_a_names_argument_refuses() {
+        lex("puts /x/");
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "'$1' is a match global, which Portland does not have — bind the match"
+    )]
+    fn a_match_global_names_the_rewrite() {
+        lex("$1");
     }
 
     #[test]
@@ -1239,14 +1413,22 @@ mod tests {
 
     #[test]
     fn lexes_compound_assignment_operators() {
+        // Each after a name, where `/=` is the compound and not a pattern
+        // opening on `=` (ADR 0086).
         assert_eq!(
-            kinds("+= -= *= /= %="),
+            kinds("a += b -= c *= d /= e %= f"),
             vec![
+                TokenKind::Identifier,
                 TokenKind::PlusEqual,
+                TokenKind::Identifier,
                 TokenKind::MinusEqual,
+                TokenKind::Identifier,
                 TokenKind::StarEqual,
+                TokenKind::Identifier,
                 TokenKind::SlashEqual,
+                TokenKind::Identifier,
                 TokenKind::PercentEqual,
+                TokenKind::Identifier,
             ]
         );
     }
@@ -1379,9 +1561,19 @@ mod tests {
 
     #[test]
     fn lexes_arithmetic_operators() {
+        // A `/` after a value divides; at the start it would open a regex
+        // literal (ADR 0086).
         assert_eq!(
-            kinds("- * /"),
-            vec![TokenKind::Minus, TokenKind::Star, TokenKind::Slash]
+            kinds("1 - 2 * 3 / 4"),
+            vec![
+                TokenKind::Integer,
+                TokenKind::Minus,
+                TokenKind::Integer,
+                TokenKind::Star,
+                TokenKind::Integer,
+                TokenKind::Slash,
+                TokenKind::Integer
+            ]
         );
     }
 

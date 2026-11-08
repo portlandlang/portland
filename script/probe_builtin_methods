@@ -42,6 +42,8 @@ receivers = {
   "set" => "Set[1, 2, 3]",
   "rational" => "Rational(1, 3)",
   "complex" => "Complex(1, 2)",
+  "regexp" => "/(?<x>a)/",
+  "matchdata" => '"a".match(/(?<x>a)/)',
 }
 # `script/probe_builtin_methods set` probes one type while its arms are
 # being written; the check script runs the lot.
@@ -72,10 +74,19 @@ candidates = %w[
   append prepend concat replace to_ary to_int to_str to_sym intern
   add delete subset? superset? proper_subset? proper_superset? disjoint? to_set classify add? delete? merge subtract clear keep_if delete_if
   numerator denominator rationalize to_r to_c real imaginary imag real? conj conjugate arg angle phase polar rect rectangular abs2 i integer?
+  =~ !~ match match? scan source options casefold? names captures named_captures pre_match post_match offset regexp string byteoffset match_length
 ].uniq.sort
 
 # [call text, positional count, block?]
 shapes = lambda do |receiver, name|
+  # The match operators (ADR 0086) are spelled between their operands, so
+  # a dot call cannot reach them; one operand is their whole arity.
+  if %w[=~ !~].include?(name)
+    next [
+      ["#{receiver} #{name} /a/", 1, false],
+      ["#{receiver} #{name} \"a\"", 1, false],
+    ]
+  end
   [
     ["#{receiver}.#{name}", 0, false],
     ["#{receiver}.#{name}(1)", 1, false],
@@ -102,6 +113,12 @@ shapes = lambda do |receiver, name|
     ["#{receiver}.#{name}([1]) { it }", 1, true],
     # A string, a flag, and a block, `upto("z", true) { }` (#106).
     ["#{receiver}.#{name}(\"a\", true) { it }", 2, true],
+    # A pattern, alone, with a replacement, with a position, and with a
+    # block (ADR 0086).
+    ["#{receiver}.#{name}(/a/)", 1, false],
+    ["#{receiver}.#{name}(/a/, \"b\")", 2, false],
+    ["#{receiver}.#{name}(/a/, 1)", 2, false],
+    ["#{receiver}.#{name}(/a/) { it }", 1, true],
   ]
 end
 
