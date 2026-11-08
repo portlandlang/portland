@@ -26,14 +26,14 @@ context "Numeric#polar" do
 
   specify "sets the last value to 0 if self is positive" do
     (positive_numbers + [0, 0.0]).each do |number|
-      expect(number >= 0).to be_true
+      expect(number).to be_greater_than_or_equal_to(0)
       expect(number.polar.last).to eq(0)
     end
   end
 
   specify "sets the last value to Pi if self is negative" do
     negative_numbers.each do |number|
-      expect(number < 0).to be_true
+      expect(number).to be_less_than(0)
       expect(number.polar.last).to eq(Math::PI)
     end
   end

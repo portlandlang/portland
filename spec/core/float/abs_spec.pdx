@@ -24,7 +24,7 @@ context "Float#abs" do
   specify "returns Infinity if -Infinity" do
     negative_infinity = -(1.0 / 0.0)
     expect(negative_infinity.abs.infinite?).to eq(true)
-    expect(negative_infinity.abs > 0.0).to eq(true)
+    expect(negative_infinity.abs).to be_greater_than(0.0)
   end
 
   specify "returns NaN if NaN" do

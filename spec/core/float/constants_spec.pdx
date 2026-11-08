@@ -51,7 +51,7 @@ context "Float constant" do
 
   specify "INFINITY is the positive infinity" do
     expect(Float::INFINITY.infinite?).to eq(true)
-    expect(Float::INFINITY > 0.0).to eq(true)
+    expect(Float::INFINITY).to be_greater_than(0.0)
   end
 
   specify "NAN is 'not a number'" do

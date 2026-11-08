@@ -45,7 +45,7 @@ context "Kernel#rand" do
   describe "with a range" do
     specify "returns an Integer between the two Integers" do
       drawn = rand(1..5)
-      expect(drawn >= 1 && drawn <= 5).to be_true
+      expect(drawn).to be_between(1, 5)
     end
   end
 

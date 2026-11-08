@@ -29,13 +29,13 @@ context "Float#-@" do
   specify "returns negative infinity for positive infinity" do
     infinity = 1.0 / 0.0
     expect((-infinity).infinite?).to eq(true)
-    expect(-infinity < 0.0).to eq(true)
+    expect(-infinity).to be_less_than(0.0)
   end
 
   specify "returns positive infinity for negative infinity" do
     negative_infinity = -(1.0 / 0.0)
     expect((-negative_infinity).infinite?).to eq(true)
-    expect(-negative_infinity > 0.0).to eq(true)
+    expect(-negative_infinity).to be_greater_than(0.0)
   end
 
   specify "returns NaN for NaN" do
