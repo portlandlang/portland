@@ -1084,6 +1084,19 @@ fn string_successor(text: &str) -> String {
     characters.into_iter().collect()
 }
 
+/// `unicode_normalize` (ADR 0087): text in one of Unicode's four forms,
+/// named by Ruby's symbols; any other form refuses in Ruby's words.
+fn normalized(text: &str, form: &Value) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    match form {
+        Value::Symbol(name) if name == "nfc" => text.nfc().collect(),
+        Value::Symbol(name) if name == "nfd" => text.nfd().collect(),
+        Value::Symbol(name) if name == "nfkc" => text.nfkc().collect(),
+        Value::Symbol(name) if name == "nfkd" => text.nfkd().collect(),
+        other => panic!("Invalid normalization form {other}."),
+    }
+}
+
 /// `hex` and the prefixed half of `oct` (#106): a sign, an optional
 /// prefix, then digits of the base with underscores between, read as far
 /// as they go; anything else is 0, as Ruby's are.
@@ -7594,6 +7607,20 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(_), "encoding", []) => Value::String("UTF-8".to_string()),
             (Value::String(_), "valid_encoding?", []) => Value::Boolean(true),
             (Value::String(text), "hex", []) => Value::Integer(parsed_in_base(text, 16)),
+            // Unicode's four normalization forms, Ruby's (ADR 0087): the
+            // text rewritten, or whether rewriting would change nothing.
+            (Value::String(text), "unicode_normalize", []) => {
+                Value::String(normalized(text, &Value::Symbol("nfc".to_string())))
+            }
+            (Value::String(text), "unicode_normalize", [form]) => {
+                Value::String(normalized(text, form))
+            }
+            (Value::String(text), "unicode_normalized?", []) => {
+                Value::Boolean(normalized(text, &Value::Symbol("nfc".to_string())) == *text)
+            }
+            (Value::String(text), "unicode_normalized?", [form]) => {
+                Value::Boolean(normalized(text, form) == *text)
+            }
             // The leading number as a rational or a complex (ADR 0085),
             // Ruby's own lenient readers ported (#106).
             (Value::String(text), "to_r", []) => crate::tower::string_to_r(text),

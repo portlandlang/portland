@@ -5749,6 +5749,35 @@ fn regex_refusals_on_both_oracles() {
     );
 }
 
+/// Unicode's normalization forms (ADR 0087): an unknown form, or a form
+/// spelled as a string, refuses in Ruby's words on both oracles, and the
+/// bang form is a mutator, which does not exist (ADR 0015).
+#[test]
+fn unicode_normalization_refusals_on_both_oracles() {
+    assert_both_oracles_refuse(
+        "unicode_normalization_refusals",
+        None,
+        &[
+            (
+                "p(\"a\".unicode_normalize(:bogus))\n",
+                "Invalid normalization form bogus.",
+            ),
+            (
+                "p(\"a\".unicode_normalize(\"nfd\"))\n",
+                "Invalid normalization form nfd.",
+            ),
+            (
+                "p(\"a\".unicode_normalized?(:bogus))\n",
+                "Invalid normalization form bogus.",
+            ),
+            (
+                "p(\"a\".unicode_normalize!)\n",
+                "which has no method 'unicode_normalize!'",
+            ),
+        ],
+    );
+}
+
 /// `String#to_r` and `#to_c` (ADR 0085, #106): a zero denominator refuses
 /// as `1 / 0` does, in Ruby's words, and a part past the 64-bit integers
 /// refuses where Ruby would answer a bignum (ADR 0070), on both oracles.

@@ -98,6 +98,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0084](0084-2026-11-03-data-define-is-a-spelling-of-struct.md) — `Point = Data.define(:x, :y)` is a spelling of `struct Point`
 - [0085](0085-2026-11-03-rational-complex-and-bigdecimal.md) — Rational and Complex are core; BigDecimal is a default tile
 - [0086](0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md) — Regex is Ruby's, and a match is a value
+- [0087](0087-2026-11-08-normalization-forms-are-rubys.md) — Normalization forms are Ruby's
 
 <!-- /generated -->
 

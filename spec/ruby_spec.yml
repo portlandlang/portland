@@ -3412,6 +3412,16 @@ core/string/uminus_spec.rb:
   status: skipped
   reason: "Every string is frozen, so -@ has nothing to freeze or deduplicate (ADR 0015)."
   link: docs/ruby/mutability.md
+core/string/unicode_normalize_spec.rb:
+  pdx: [spec/string/normalization_spec.pdx]
+  status: partial_intentional
+  reason: "The non-Unicode-encoding rows stay upstream, every string being UTF-8 (ADR 0069); unicode_normalize! is a mutator, which does not exist (ADR 0015)."
+  link: docs/ruby/characters.md
+core/string/unicode_normalized_spec.rb:
+  pdx: [spec/string/normalization_spec.pdx]
+  status: partial_intentional
+  reason: "The non-Unicode-encoding row stays upstream, every string being UTF-8 (ADR 0069); the rows that normalize in place ask the normalized copy instead."
+  link: docs/ruby/characters.md
 core/string/upcase_spec.rb:
   pdx: [spec/string/case_spec.pdx]
   status: partial_intentional

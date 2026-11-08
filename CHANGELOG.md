@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`unicode_normalize` and `unicode_normalized?`** ([ADR 0087](docs/adr/0087-2026-11-08-normalization-forms-are-rubys.md), [#106](https://github.com/portlandlang/portland/issues/106)) — on both implementations, Unicode's four normalization forms with Ruby's answers, over the tables canonical equality already uses. An unknown form refuses in Ruby's words, `Invalid normalization form bogus.`. `core/string/unicode_normalize_spec.rb` and `unicode_normalized_spec.rb` port into `spec/string/normalization_spec.pdx`, each row comparing codepoints since `==` cannot tell the forms apart.
+
 - **`String#to_r` and `String#to_c`** ([ADR 0085](docs/adr/0085-2026-11-03-rational-complex-and-bigdecimal.md), [#106](https://github.com/portlandlang/portland/issues/106)) — on both implementations, Ruby's own lenient readers ported from rational.c and complex.c: `"20/3".to_r` is `(20/3)`, `" -19.10/3".to_r` is `(-191/30)`, `"79+4i".to_c` is `(79+4i)`, `"79@4".to_c` is polar, `"Infinity".to_c` is `1i` as Ruby's is, and text with no number answers zero. A zero denominator refuses as `1 / 0` does, and a part past the 64-bit integers refuses (ADR 0070). `core/string/to_r_spec.rb` and `to_c_spec.rb` port into `spec/string/tower_spec.pdx`, agreeing with Ruby 4.0.9 on all 94 rows tried, upstream and edge cases both.
 
 - **`Integer#chr` reads an encoding name as Ruby does** ([#223](https://github.com/portlandlang/portland/issues/223)) — `chr("utf-8")`, `chr("Utf-8")`, and `chr("CP65001")` answer the character, where only the exact `"UTF-8"` did: UTF-8's two names in any case, as `Encoding.find` reads them. Every other encoding still refuses (ADR 0069). The upstream row ports into `spec/number/integer/chr_spec.pdx`.
