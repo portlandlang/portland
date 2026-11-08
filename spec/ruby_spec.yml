@@ -43,11 +43,11 @@ core/array/compact_spec.rb:
   reason: "compact! stays behind: values never mutate."
   link: docs/ruby/mutability.md
 core/array/count_spec.rb:
-  pdx: [spec/portland/array/queries_spec.pdx]
+  pdx: [spec/core/array/count_spec.pdx]
 core/array/find_spec.rb:
   pdx: [spec/portland/block/queries_spec.pdx]
 core/array/first_spec.rb:
-  pdx: [spec/portland/array/queries_spec.pdx, spec/core/array/first_spec.pdx]
+  pdx: [spec/core/array/first_spec.pdx]
   status: partial_intentional
   reason: "Bare first answers a maybe: a partial operation never hands back a silent nil."
   link: docs/ruby/lookups.md
@@ -57,9 +57,9 @@ core/array/flatten_spec.rb:
   reason: "flatten! stays behind: values never mutate."
   link: docs/ruby/mutability.md
 core/array/index_spec.rb:
-  pdx: [spec/portland/array/queries_spec.pdx]
+  pdx: [spec/core/array/index_spec.pdx]
 core/array/last_spec.rb:
-  pdx: [spec/portland/array/queries_spec.pdx, spec/core/array/last_spec.pdx]
+  pdx: [spec/core/array/last_spec.pdx]
   status: partial_intentional
   reason: "Bare last answers a maybe: a partial operation never hands back a silent nil."
   link: docs/ruby/lookups.md

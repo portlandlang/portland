@@ -1,5 +1,5 @@
 # ADR 0019 — a slice is a collection, never a maybe. The past-the-end half
-# of that promise lives in spec/optionals_spec.pdx.
+# of that promise lives in spec/portland/optionals/partial_spec.pdx.
 
 require_relative "../../spec_helper"
 

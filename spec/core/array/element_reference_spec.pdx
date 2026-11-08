@@ -1,5 +1,5 @@
 # ADR 0010 — indexing is a partial operation, so it answers a maybe. The
-# out-of-range half lives in spec/optionals_spec.pdx.
+# out-of-range half lives in spec/portland/optionals/partial_spec.pdx.
 #
 # `slice` takes a start and a length. The range spelling's house examples
 # live in spec/range/slicing_spec.pdx, since there the range is the

@@ -1,0 +1,14 @@
+# `index` answers the first position of a value — a maybe, absent when the
+# value is not there (ADR 0010).
+#
+# From ruby/spec core/array/index_spec.rb, which upstream is only "is an
+# alias of Array#find_index" (spec/core/array/find_index_spec.pdx).
+
+require_relative "../../spec_helper"
+
+context "Array#index" do
+  specify "answers the first position of a value — a maybe" do
+    expect([9, 8, 7].index(8)).to eq(1)
+    expect([9, 8, 7].index(5)).to be_nil
+  end
+end
