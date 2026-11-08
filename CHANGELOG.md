@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`Integer#chr` reads an encoding name as Ruby does** ([#223](https://github.com/portlandlang/portland/issues/223)) — `chr("utf-8")`, `chr("Utf-8")`, and `chr("CP65001")` answer the character, where only the exact `"UTF-8"` did: UTF-8's two names in any case, as `Encoding.find` reads them. Every other encoding still refuses (ADR 0069). The upstream row ports into `spec/number/integer/chr_spec.pdx`.
+
 - **The integer tower, `chr`, `String#match`, and `String#scan` port** ([#106](https://github.com/portlandlang/portland/issues/106), [#107](https://github.com/portlandlang/portland/issues/107)) — `core/integer/{numerator,denominator,rationalize,to_r,chr}_spec.rb` port into `spec/number/integer/`, and `core/string/{match,scan}_spec.rb` into `spec/string/`, each recorded in the manifest with what stays upstream. On the way, both implementations: `scan` takes a string pattern, matched literally, as Ruby's does; a pattern that is neither a Regexp nor a String refuses in Ruby's words, `wrong argument type Integer (expected Regexp)`; and the hosted compiler's `"hello".match(:ell)` refuses as the seed's and Ruby's do, where it had matched by the symbol's name. The refusals are pinned by a two-oracle test.
 
 - **`Array[...]` and `Hash[...]` decided** ([ADR 0058](docs/adr/0058-2026-10-16-builtin-types-carry-type-functions.md), amended) — both welcome, with Ruby's behavior and refusals: `Array[a, b]` is the array of its arguments, and `Hash[...]` takes nothing, a hash to copy, an array of pairs, or an even list of keys and values. Decided, not built; the build is [#218](https://github.com/portlandlang/portland/issues/218).

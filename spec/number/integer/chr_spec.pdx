@@ -10,8 +10,6 @@
 # be, ADR 0069); `Encoding.default_internal`; `equal?`; the bignum rows; and
 # the RangeError rows, which refuse in Ruby's words — `-1 out of char range`,
 # `invalid codepoint 0xD800 in UTF-8` — and are pinned by a two-oracle test.
-# `chr("utf-8")` in another case refuses where Ruby's `Encoding.find` folds
-# case; only `"UTF-8"` is read.
 
 require_relative "../../spec_helper"
 
@@ -39,6 +37,13 @@ context "Integer#chr with an encoding argument" do
 
   specify "accepts the encoding's name as a String" do
     expect(7894.chr("UTF-8").encoding).to eq("UTF-8")
+  end
+
+  specify "converts a String to an Encoding as Encoding.find does" do
+    ["utf-8", "UTF-8", "Utf-8", "CP65001", "cp65001"].each do |name|
+      expect(7894.chr(name).encoding).to eq("UTF-8")
+      expect(7894.chr(name)).to eq(7894.chr(Encoding::UTF_8))
+    end
   end
 
   specify "returns a String with the specified encoding" do
