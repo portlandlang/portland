@@ -192,7 +192,9 @@ pub fn case_fold_items(chars: &[char], index: usize) -> Vec<FoldItem> {
         }
     }
     if multi_char && index + 1 < chars.len() {
-        let mut codes = [code, 0, 0];
+        // The head enters the lookup folded, as the rest do: `ſſ` is
+        // looked up as `ss` and offers `ß`.
+        let mut codes = [single_fold(code), 0, 0];
         codes[1] = single_fold(chars[index + 1] as u32);
         if let Some(others) = unicode::unfold_two([codes[0], codes[1]]) {
             for other in others {
@@ -244,6 +246,15 @@ fn plain_str(codes: &[u32]) -> Node {
             .collect(),
         false,
     )
+}
+
+/// `expand_case_fold_make_rem_string`: the rest of the string, folded,
+/// marked for the optimizer to leave alone.
+fn folded_remainder_run(chars: &[char]) -> Node {
+    let Node::Str { chars, .. } = folded_run(chars) else {
+        unreachable!("a folded run is a string")
+    };
+    Node::folded_remainder(chars)
 }
 
 /// `is_case_fold_variable_len`: an alternative that covers more pattern
@@ -311,7 +322,10 @@ fn expand_from(
             } else {
                 let after = index + item.char_count;
                 if after < chars.len() {
-                    further.push(Node::List(vec![spelled, folded_run(&chars[after..])]));
+                    further.push(Node::List(vec![
+                        spelled,
+                        folded_remainder_run(&chars[after..]),
+                    ]));
                 } else {
                     further.push(spelled);
                 }
@@ -336,7 +350,7 @@ fn expand_from(
     }
     if index < chars.len() {
         // Past the threshold: the remainder as one folded string.
-        nodes.push(folded_run(&chars[index..]));
+        nodes.push(folded_remainder_run(&chars[index..]));
     }
     nodes
 }

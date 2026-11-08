@@ -961,6 +961,7 @@ fn setup_tree(node: &mut Node, state: &mut SetupState, context: Context) -> Resu
             chars,
             ignore_case: true,
             folded: false,
+            ..
         } => {
             let chars = std::mem::take(chars);
             *node = casefold::expand_string(&chars, context.in_lookbehind);
@@ -1267,6 +1268,7 @@ fn expand_repeated_string(quantifier: &QuantifierNode) -> Option<Node> {
         chars,
         ignore_case,
         folded,
+        remainder,
     } = quantifier.target.as_ref()
     else {
         return None;
@@ -1285,6 +1287,7 @@ fn expand_repeated_string(quantifier: &QuantifierNode) -> Option<Node> {
         chars: repeated,
         ignore_case: *ignore_case,
         folded: *folded,
+        remainder: *remainder,
     };
     let more = match quantifier.upper {
         None => true,

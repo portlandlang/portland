@@ -156,6 +156,10 @@ pub enum Node {
         chars: Vec<char>,
         ignore_case: bool,
         folded: bool,
+        /// The remainder of a string under `i` past its expansion, compared
+        /// folded against text of unknown length, which the optimizer
+        /// leaves alone (Onigmo's `NSTR_DONT_GET_OPT_INFO`).
+        remainder: bool,
     },
     Class(ClassNode),
     /// `\w` and `\W`, kept apart from classes as Onigmo does.
@@ -182,6 +186,7 @@ impl Node {
             chars,
             ignore_case,
             folded: false,
+            remainder: false,
         }
     }
 
@@ -191,6 +196,18 @@ impl Node {
             chars,
             ignore_case: true,
             folded: true,
+            remainder: false,
+        }
+    }
+
+    /// `expand_case_fold_make_rem_string`: the rest of a string under `i`,
+    /// folded, that the optimizer reads no literal from.
+    pub fn folded_remainder(chars: Vec<char>) -> Node {
+        Node::Str {
+            chars,
+            ignore_case: true,
+            folded: true,
+            remainder: true,
         }
     }
 

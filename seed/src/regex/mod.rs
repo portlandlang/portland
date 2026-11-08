@@ -9,7 +9,9 @@
 //! The layers follow Onigmo's own: `preprocess` is CRuby's `re.c` pass that
 //! rewrites `\u`, `\x`, and the control and meta escapes before the engine
 //! sees the pattern; `parser` is `regparse.c`, pattern to tree; `setup` and
-//! `compile` are `regcomp.c`, tree to a program; `vm` is `regexec.c`, a
+//! `compile` are `regcomp.c`, tree to a program, and `optimize` its
+//! reading of what a search can skip; `search` is `onig_search`, which
+//! picks the positions to try; `vm` is `regexec.c`'s `match_at`, a
 //! backtracking matcher over the program, and `cache` its match cache, the
 //! memoization that keeps Ruby's backtracking linear; `unicode` and
 //! `casefold` are `enc/unicode.c` over tables generated from Ruby's own
@@ -22,17 +24,16 @@ pub mod cclass;
 pub mod compile;
 pub mod error;
 pub mod length;
+pub mod optimize;
 pub mod parser;
 pub mod preprocess;
+pub mod search;
 pub mod setup;
 pub mod unicode;
 pub mod unicode_tables;
 pub mod vm;
 
 pub use error::RegexError;
-
-/// From this many bytes on, a literal prefix is searched by Boyer-Moore.
-const BM_PREFIX_LENGTH: usize = 8;
 
 /// The compile-time options a Ruby literal's flags set: `i`, `x`, `m`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -140,58 +141,6 @@ impl Regex {
         while !text.is_char_boundary(start) {
             start += 1;
         }
-        // A literal every match must contain, missing from the text, ends
-        // the search before it starts; a pattern opening with a literal
-        // looks for that one on its first attempt instead.
-        if self.program.prefix.is_none() {
-            for required in &self.program.required {
-                if !text[start..].contains(required.as_str()) {
-                    return Ok(None);
-                }
-            }
-        }
-        let mut matcher = vm::Matcher::new(&self.program, text, budget);
-        let mut attempt = start;
-        while attempt <= text.len() {
-            // A pattern pinned to the text's start has one place to try;
-            // one opening with a literal can jump to its next occurrence.
-            if self.program.anchored && attempt > 0 {
-                return Ok(None);
-            }
-            if let Some(prefix) = &self.program.prefix {
-                // A long literal moves by Onigmo's Boyer-Moore skips; a
-                // short one by the standard library's search, which hunts
-                // its rarest byte and is the faster of the two there.
-                let found = if prefix.len() >= BM_PREFIX_LENGTH {
-                    let haystack = &text.as_bytes()[attempt..];
-                    compile::bm_search(haystack, prefix.as_bytes(), &self.program.prefix_skip)
-                } else {
-                    text[attempt..].find(prefix.as_str())
-                };
-                let Some(found) = found else {
-                    return Ok(None);
-                };
-                attempt += found;
-            }
-            if let Some(head) = &self.program.head_bytes {
-                // Skip to the next byte a match can begin with; such a
-                // pattern cannot match empty, so the end is no place.
-                let bytes = text.as_bytes();
-                while attempt < bytes.len() && !head[bytes[attempt] as usize] {
-                    attempt += 1;
-                }
-                if attempt >= bytes.len() {
-                    return Ok(None);
-                }
-            }
-            if let Some(groups) = matcher.match_at(attempt, start)? {
-                return Ok(Some(Captures { groups }));
-            }
-            if attempt == text.len() {
-                break;
-            }
-            attempt += matcher.char_len_at(attempt);
-        }
-        Ok(None)
+        search::search(&self.program, text, start, budget)
     }
 }
