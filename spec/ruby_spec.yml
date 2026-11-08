@@ -883,7 +883,7 @@ core/float/angle_spec.rb:
   reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/number/tower_spec.pdx."
   link: docs/ruby/metaprogramming.md
 core/float/arg_spec.rb:
-  pdx: [spec/number/float/tower_spec.pdx]
+  pdx: [spec/number/float/arg_spec.pdx]
 core/float/case_compare_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
   status: partial_intentional
@@ -894,7 +894,7 @@ core/float/coerce_spec.rb:
   reason: "There is no coercion protocol yet (#155): a float does not answer coerce, and the bignum rows stay upstream, integers being 64-bit."
   link: docs/ruby/numbers.md
 core/float/denominator_spec.rb:
-  pdx: [spec/number/float/tower_spec.pdx]
+  pdx: [spec/number/float/denominator_spec.pdx]
 core/float/dup_spec.rb:
   status: skipped
   reason: "Values never mutate, so dup has nothing to copy and refuses (ADR 0015)."
@@ -927,7 +927,7 @@ core/float/magnitude_spec.rb:
 core/float/negative_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
 core/float/numerator_spec.rb:
-  pdx: [spec/number/float/tower_spec.pdx]
+  pdx: [spec/number/float/numerator_spec.pdx]
   status: partial_intentional
   reason: "Integers are 64-bit, so the numerators of Float::MAX and 999.1 ** 99.928888 refuse as overflows and stay upstream."
   link: docs/ruby/integers.md
@@ -938,7 +938,7 @@ core/float/phase_spec.rb:
 core/float/positive_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
 core/float/rationalize_spec.rb:
-  pdx: [spec/number/float/tower_spec.pdx]
+  pdx: [spec/number/float/rationalize_spec.pdx]
   status: partial_intentional
   reason: "NaN, infinity, and a second argument refuse where Ruby raises FloatDomainError or ArgumentError; failures are values, so the rows are pinned by the two-oracle test instead."
   link: docs/ruby/errors.md
@@ -954,7 +954,7 @@ core/float/to_int_spec.rb:
   reason: "to_int is Ruby's implicit-conversion protocol, a false alias that refuses naming to_i (ADR 0036)."
   link: docs/ruby/aliases.md
 core/float/to_r_spec.rb:
-  pdx: [spec/number/float/tower_spec.pdx, spec/number/rational_spec.pdx]
+  pdx: [spec/number/float/to_r_spec.pdx, spec/number/rational_spec.pdx]
 core/float/uminus_spec.rb:
   pdx: [spec/number/float/sign_spec.pdx]
   status: partial_intentional
