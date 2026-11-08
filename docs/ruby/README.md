@@ -13,7 +13,7 @@ Smooth Ruby → Portland migration is a standing design criterion. Two promises 
 
 - **Kept — the surface.** Blocks as prose (`.map`/`.each`/`yield`), everything-is-an-expression, implicit returns, `?`/`!` method suffixes, postfix guards, keyword arguments, Enumerable as one protocol, pattern matching (promoted to load-bearing). ~90% of Ruby's felt joy is this surface, and it survives static compilation.
 - **Cut — the runtime.** Monkeypatching, `method_missing`, runtime `define_method`, `eval`, globals, truthiness, ambient nil, the GIL. The cut-list and the "blocks static safety and speed" list are nearly the same set.
-- **Changed — the ground it stands on.** Portland is ahead-of-time compiled (MLIR/LLVM), statically typed with inferred-not-written types, and runs only on Apple silicon (macOS 26+). Ruby is a portable interpreted VM; Portland is a native binary for one vendor's hardware, on purpose.
+- **Changed — the ground it stands on.** Portland is ahead-of-time compiled (MLIR/LLVM), statically typed with inferred-not-written types, and runs only on Apple silicon (macOS 27+). Ruby is a portable interpreted VM; Portland is a native binary for one vendor's hardware, on purpose.
 
 `../adr/` records the decisions behind these; [`../language.md`](../language.md) records what Portland speaks today. Where a difference is **Tentative** or merely **Sketched**, its file says so — check the Status line at its top before relying on it.
 

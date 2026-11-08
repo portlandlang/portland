@@ -8,8 +8,9 @@ on:
 
 jobs:
   cibuild:
-    # Apple-silicon language, Apple-silicon runner. macOS 26+ only.
-    runs-on: macos-26
+    # Apple-silicon language, Apple-silicon runner. macOS 27+ only. GitHub's
+    # macOS 27 image is labelled for its Xcode, `xcode-27`, while in preview.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
         with:

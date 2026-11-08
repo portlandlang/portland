@@ -116,7 +116,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ## Dropped ❌ — on purpose, forever
 
-- Portability — Apple silicon and macOS 26+ only; the lock-in is the feature
+- Portability — Apple silicon and macOS 27+ only; the lock-in is the feature
 - Runtime metaprogramming — monkeypatching, `method_missing`, runtime `define_method`, `eval`
 - Ambient nil, `NilClass`, truthiness
 - Globals and the perlisms — `for`, `$specials`, `BEGIN`/`END`, flip-flops, the `and`/`or` precedence trick
