@@ -11,7 +11,7 @@
 
 require_relative "../../spec_helper"
 
-require_relative "fixtures/many_methods"
+require_relative "../../fixtures/code/methods_fixture"
 
 context "Kernel#require_relative with a relative path" do
   specify "loads a path relative to the current file" do
