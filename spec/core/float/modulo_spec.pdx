@@ -39,11 +39,11 @@ context "Float#%" do
   specify "returns -0.0 when called on -0.0 with a non zero modulus" do
     remainder = -0.0 % 42
     expect(remainder).to eq(0)
-    expect(1 / remainder < 0).to eq(true)
+    expect(1 / remainder).to be_less_than(0)
 
     infinite_remainder = -0.0 % Float::INFINITY
     expect(infinite_remainder).to eq(0)
-    expect(1 / infinite_remainder < 0).to eq(true)
+    expect(1 / infinite_remainder).to be_less_than(0)
   end
 
   specify "takes the sign of the divisor" do

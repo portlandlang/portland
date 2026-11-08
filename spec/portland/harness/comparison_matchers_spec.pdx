@@ -1,0 +1,75 @@
+# The spec harness's comparison matchers (#250), in spec/spec_helper.pdx:
+# `be_greater_than`, `be_greater_than_or_equal_to`, `be_less_than`,
+# `be_less_than_or_equal_to`, each with a shorthand twin, and `be_between`.
+# The harness is Portland's own, so its specs live here. A failure message
+# is checked by asking the matcher for it directly, since an `expect` that
+# fails prints a FAIL line the runner would count.
+
+require_relative "../../spec_helper"
+
+context "be_greater_than" do
+  specify "passes when the actual is greater" do
+    expect(5).to be_greater_than(3)
+    expect(3).not_to be_greater_than(3)
+    expect(2.5).to be_gt(2)
+  end
+
+  specify "names both values when it fails" do
+    expect(be_greater_than(5).failure_message(3)).to eq("expected 3 to be greater than 5")
+    expect(be_greater_than(3).negated_failure_message(5)).to eq("expected 5 not to be greater than 3")
+  end
+end
+
+context "be_greater_than_or_equal_to" do
+  specify "passes when the actual is greater or equal" do
+    expect(3).to be_greater_than_or_equal_to(3)
+    expect(2).not_to be_greater_than_or_equal_to(3)
+    expect(4).to be_gte(3)
+  end
+
+  specify "names both values when it fails" do
+    expect(be_greater_than_or_equal_to(5).failure_message(3)).to eq("expected 3 to be greater than or equal to 5")
+    expect(be_gte(3).negated_failure_message(5)).to eq("expected 5 not to be greater than or equal to 3")
+  end
+end
+
+context "be_less_than" do
+  specify "passes when the actual is less" do
+    expect(3).to be_less_than(5)
+    expect(3).not_to be_less_than(3)
+    expect("apple").to be_lt("banana")
+  end
+
+  specify "names both values when it fails" do
+    expect(be_less_than(3).failure_message(5)).to eq("expected 5 to be less than 3")
+    expect(be_lt(5).negated_failure_message(3)).to eq("expected 3 not to be less than 5")
+  end
+end
+
+context "be_less_than_or_equal_to" do
+  specify "passes when the actual is less or equal" do
+    expect(3).to be_less_than_or_equal_to(3)
+    expect(4).not_to be_less_than_or_equal_to(3)
+    expect(2).to be_lte(3)
+  end
+
+  specify "names both values when it fails" do
+    expect(be_less_than_or_equal_to(3).failure_message(5)).to eq("expected 5 to be less than or equal to 3")
+    expect(be_lte(5).negated_failure_message(3)).to eq("expected 3 not to be less than or equal to 5")
+  end
+end
+
+context "be_between" do
+  specify "passes when the actual is between the two, inclusive at both ends" do
+    expect(1).to be_between(1, 6)
+    expect(6).to be_between(1, 6)
+    expect(3.5).to be_between(1, 6)
+    expect(0).not_to be_between(1, 6)
+    expect(7).not_to be_between(1, 6)
+  end
+
+  specify "names all three values when it fails" do
+    expect(be_between(1, 6).failure_message(7)).to eq("expected 7 to be between 1 and 6 (inclusive)")
+    expect(be_between(1, 6).negated_failure_message(3)).to eq("expected 3 not to be between 1 and 6 (inclusive)")
+  end
+end

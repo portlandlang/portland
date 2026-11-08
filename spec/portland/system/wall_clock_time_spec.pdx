@@ -11,6 +11,6 @@ context "System.wall_clock_time" do
     now = System.wall_clock_time
     expect(now in Integer).to eq(true)
     # 2023-11-14 in nanoseconds: any clock set to the present is past it.
-    expect(now > 1700000000000000000).to eq(true)
+    expect(now).to be_greater_than(1700000000000000000)
   end
 end

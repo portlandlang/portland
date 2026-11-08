@@ -11,8 +11,8 @@ context "Float#prev_float" do
     barely_negative = 0.0.prev_float
     expect(barely_negative).to eq(0.0.prev_float)
 
-    expect(barely_negative < 0.0).to eq(true)
-    expect(barely_negative > barely_negative.prev_float).to eq(true)
+    expect(barely_negative).to be_less_than(0.0)
+    expect(barely_negative).to be_greater_than(barely_negative.prev_float)
 
     midpoint = barely_negative / 2
     expect([0.0, barely_negative].include?(midpoint)).to eq(true)

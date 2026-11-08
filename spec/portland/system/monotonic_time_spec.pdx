@@ -11,12 +11,12 @@ context "System.monotonic_time" do
   specify "never steps backwards between two readings" do
     before = System.monotonic_time
     after = System.monotonic_time
-    expect(after >= before).to eq(true)
+    expect(after).to be_greater_than_or_equal_to(before)
   end
 
   specify "is positive and an integer" do
     reading = System.monotonic_time
     expect(reading in Integer).to eq(true)
-    expect(reading > 0).to eq(true)
+    expect(reading).to be_greater_than(0)
   end
 end
