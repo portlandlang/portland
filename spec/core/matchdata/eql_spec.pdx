@@ -1,0 +1,26 @@
+# From ruby/spec core/matchdata/eql_spec.rb.
+#
+# Upstream asks that `eql?` be the same method as `==`, comparing method
+# objects, which Portland has no reflection for (#236). These rows ask
+# `eql?` the questions core/matchdata/equal_value_spec.rb asks `==`, so
+# the two answer alike.
+
+require_relative "../../spec_helper"
+
+context "MatchData#eql?" do
+  specify "returns true if both operands have equal target strings, patterns, and match positions" do
+    expect("haystack".match(/hay/).eql?("haystack".match(/hay/))).to be_true
+  end
+
+  specify "returns false if the operands have different target strings" do
+    expect("hay".match(/hay/).eql?("haystack".match(/hay/))).to be_false
+  end
+
+  specify "returns false if the operands have different patterns" do
+    expect("haystack".match(/h.y/).eql?("haystack".match(/hay/))).to be_false
+  end
+
+  specify "returns false if the argument is not a MatchData object" do
+    expect("haystack".match(/hay/).eql?("hay")).to be_false
+  end
+end
