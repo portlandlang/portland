@@ -1,0 +1,15 @@
+# A hash's pairs by lookup and as a list, and the subset comparisons
+# (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
+# the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method
+# objects. Staying upstream: instance_of? checks, compare_by_identity,
+# Hash.new defaults, to_hash conversion and the TypeError rows (Portland
+# refuses a non-hash operand), and []='s rows about dup, freeze, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#filter" do
+  specify "is an alias of Hash#select" do
+    table = {a: 1, b: 2, c: 3}
+    expect(table.filter { |key, value| value > 1 }).to eq(table.select { |key, value| value > 1 })
+  end
+end

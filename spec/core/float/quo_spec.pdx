@@ -1,0 +1,19 @@
+# A float's named division and its power (#108), from ruby/spec core/float:
+# divmod, % and modulo, fdiv, quo, and **. Upstream's be_close is close_to? here, at mspec's
+# own TOLERANCE. Where Ruby raises — ZeroDivisionError, FloatDomainError,
+# TypeError — Portland refuses, and a refusal ends a run rather than
+# answering an example, so those examples stay upstream; so do the ones
+# that need a bignum, a Rational, a Complex, or a coercing mock. `infinite?`
+# answers true or false here, so upstream's 1 and -1 are asked as a sign.
+# Alias checks compare the two answers rather than method objects.
+
+require_relative "../../spec_helper"
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Float#quo" do
+  specify "is an alias of Float#fdiv" do
+    expect(8.9.quo(7)).to eq(8.9.fdiv(7))
+    expect(2827.22.quo(0.0)).to eq(2827.22.fdiv(0.0))
+  end
+end

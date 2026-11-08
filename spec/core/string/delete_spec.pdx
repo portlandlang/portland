@@ -1,0 +1,36 @@
+# `delete` reads its arguments as lists of literal characters (ADR 0088),
+# several lists intersecting as Ruby's do.
+#
+# From ruby/spec core/string/delete_spec.rb. Upstream: the range,
+# negation, and escape rows, which refuse naming the `gsub` that says the
+# same (pinned by a two-oracle test); `delete!` (ADR 0015); `to_str`
+# mocks; the subclass, broken encoding, and US-ASCII or UTF-16 rows (one
+# UTF-8 String type, ADR 0069).
+
+require_relative "../../spec_helper"
+
+context "String#delete" do
+  specify "returns a new string with the chars from the intersection of sets removed" do
+    text = "hello"
+    expect(text.delete("lo")).to eq("he")
+    expect(text).to eq("hello")
+    expect("hello".delete("l", "lo")).to eq("heo")
+    expect("hell yeah".delete("")).to eq("hell yeah")
+  end
+
+  specify "reads a lone ^ and a - at either end as themselves" do
+    expect("hello".delete("^")).to eq("hello")
+    expect("oa^_^o".delete("a^")).to eq("o_o")
+    expect("hel-lo".delete("e-")).to eq("hllo")
+    expect("hel-lo".delete("-h")).to eq("ello")
+  end
+
+  specify "deletes multibyte characters" do
+    expect("四月".delete("月")).to eq("四")
+    expect("哥哥我倒".delete("哥")).to eq("我倒")
+  end
+
+  specify "deletes the intersection of several lists" do
+    expect("hello world".delete("lo", "o")).to eq("hell wrld")
+  end
+end

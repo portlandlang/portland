@@ -1,0 +1,76 @@
+# ADR 0010 — `min` and `max` are partial too, and answer maybes.
+
+require_relative "../../spec_helper"
+
+context "Array#max" do
+  numbers = [3, 1, 2]
+  specify "answers the largest" do
+    expect(numbers.max).to eq(3)
+  end
+end
+
+# ruby/spec core/array/max_spec.rb and min_spec.rb, title for title
+# (#104), with the Enumerable examples upstream copies in. Staying
+# upstream: the method-owner check (reflection), the one-parameter block
+# (a comparator here takes two), the nil-holding array ordered through
+# truthiness, and the refusals where Ruby raises.
+
+context "Array#max" do
+  strings = ["333", "22", "666666", "1", "55555", "1010101010"]
+  integers = [333, 22, 666666, 55555, 1010101010]
+
+  specify "returns nil with no values" do
+    expect([].max).to eq(nil)
+  end
+
+  specify "returns only element in one element array" do
+    expect([1].max).to eq(1)
+  end
+
+  specify "returns largest value with multiple elements" do
+    expect([1, 2].max).to eq(2)
+    expect([2, 1].max).to eq(2)
+  end
+
+  specify "max should return the maximum element" do
+    expect([18, 42].max).to eq(42)
+    expect([2, 5, 3, 6, 1, 4].max).to eq(6)
+  end
+
+  specify "returns the maximum element (basics cases)" do
+    expect([55].max).to eq(55)
+    expect([11, 99].max).to eq(99)
+    expect([99, 11].max).to eq(99)
+    expect([2, 33, 4, 11].max).to eq(33)
+    expect([1, 2, 3, 4, 5].max).to eq(5)
+    expect([5, 4, 3, 2, 1].max).to eq(5)
+    expect([1, 4, 3, 5, 2].max).to eq(5)
+    expect([5, 5, 5, 5, 5].max).to eq(5)
+    expect(["aa", "tt"].max).to eq("tt")
+    expect(["tt", "aa"].max).to eq("tt")
+    expect(["2", "33", "4", "11"].max).to eq("4")
+    expect(strings.max).to eq("666666")
+    expect(integers.max).to eq(1010101010)
+  end
+
+  specify "returns nil for an empty Enumerable" do
+    expect([].max).to eq(nil)
+  end
+
+  specify "returns the maximum element (with block)" do
+    expect(["2", "33", "4", "11"].max { |left, right| left <=> right }).to eq("4")
+    expect([2, 33, 4, 11].max { |left, right| left <=> right }).to eq(33)
+    expect(["2", "33", "4", "11"].max { |left, right| right <=> left }).to eq("11")
+    expect([2, 33, 4, 11].max { |left, right| right <=> left }).to eq(2)
+    expect(strings.max { |left, right| left.length <=> right.length }).to eq("1010101010")
+    expect(strings.max { |left, right| left <=> right }).to eq("666666")
+    expect(strings.max { |left, right| left.to_i <=> right.to_i }).to eq("1010101010")
+    expect(integers.max { |left, right| left <=> right }).to eq(1010101010)
+    expect(integers.max { |left, right| left.to_s <=> right.to_s }).to eq(666666)
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    multi = [[1, 2], [3, 4, 5], [6, 7, 8, 9]]
+    expect(multi.max).to eq([6, 7, 8, 9])
+  end
+end

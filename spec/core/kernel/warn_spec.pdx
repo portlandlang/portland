@@ -1,0 +1,28 @@
+# Ruby's output wrappers over the two standard streams (ADR 0068, #185):
+# `puts`, `p`, `pp`, `print`, `putc`, `printf` on standard output and `warn`
+# on standard error. Each spec asserts what the call answers; what it writes
+# is pinned by the two-oracle test, since nothing here can capture a stream.
+# A line written here passes through the harness harmlessly, so every write
+# ends in a newline.
+#
+# From ruby/spec core/kernel/{p,pp,print,putc,printf,warn,puts}_spec.rb.
+# Upstream: the privacy and reflection rows, `$stdout` and `$VERBOSE`
+# reassignment, the mocks, `$_`, the IO-first-argument forms of printf, and
+# warn's uplevel and category keywords. `puts` answers no value (ADR 0012),
+# so its one row is the two-oracle test's.
+
+require_relative "../../spec_helper"
+
+context "Kernel#warn" do
+  specify "accepts multiple arguments" do
+    expect(warn("warn wrote this line to standard error", "and this one")).to be_nil
+  end
+
+  specify "does not write strings when passed no arguments" do
+    expect(warn).to be_nil
+  end
+
+  specify "writes each array element on a line when passes an array" do
+    expect(warn(["warn wrote this line to standard error", "and this one"])).to be_nil
+  end
+end

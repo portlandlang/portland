@@ -1,0 +1,29 @@
+# Array's set arithmetic (#104), from ruby/spec core/array: - and
+# difference (through upstream's shared array_binary_difference), union
+# (array_binary_union), intersection (array_intersection), and intersect?.
+# Elements match by eql?, as Ruby's do. Staying upstream: the Array#| and
+# Array#& groups (ADR 0003 keeps both operators out of the grammar; union
+# and intersection are their spelling), mocks stubbing hash and eql?,
+# to_ary conversion (ADR 0036), recursive arrays and identity checks
+# (values never mutate), and subclasses. Upstream's uniq! check asks
+# whether uniq changes the answer.
+
+require_relative "../../spec_helper"
+
+context "Array#intersect?" do
+  describe "when at least one element in two Arrays is the same" do
+    specify "returns true" do
+      expect([1, 2].intersect?([2, 3, 4])).to eq(true)
+      expect([2, 3, 4].intersect?([1, 2])).to eq(true)
+    end
+  end
+
+  describe "when there are no elements in common between two Arrays" do
+    specify "returns false" do
+      expect([0, 1, 2].intersect?([3, 4])).to eq(false)
+      expect([3, 4].intersect?([0, 1, 2])).to eq(false)
+      expect([3, 4].intersect?([])).to eq(false)
+      expect([].intersect?([0, 1, 2])).to eq(false)
+    end
+  end
+end

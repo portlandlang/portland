@@ -1,0 +1,26 @@
+# `gcd` — Euclid on magnitudes: the answer never carries a sign, and a zero
+# yields the other side's magnitude.
+#
+# From ruby/spec core/integer/gcd_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+context "Integer#gcd" do
+  specify "answers the greatest common divisor" do
+    expect(12.gcd(8)).to eq(4)
+    expect(100.gcd(17)).to eq(1)
+  end
+
+  specify "of zero is the other magnitude" do
+    expect(0.gcd(5)).to eq(5)
+    expect(5.gcd(0)).to eq(5)
+  end
+
+  specify "never carries a sign" do
+    expect((-12).gcd(8)).to eq(4)
+    expect(12.gcd(-8)).to eq(4)
+  end
+end

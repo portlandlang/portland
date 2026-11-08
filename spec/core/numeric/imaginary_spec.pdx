@@ -1,0 +1,25 @@
+# `imaginary`, and its name `imag`, on every real (ADR 0085): 0. NaN is
+# 0.0 / 0.0 and infinity 1.0 / 0.0.
+#
+# From ruby/spec core/numeric/imaginary_spec.rb; imag_spec.rb compares
+# method objects, so its name is specced here. Upstream: the bignums,
+# integers being 64-bit, and the rows that hand an argument to a name
+# taking none, which refuse.
+
+require_relative "../../spec_helper"
+
+context "Numeric#imaginary" do
+  numbers = [20, 398.72, Rational(3, 4), 1.0 / 0.0, 0.0 / 0.0].map { |number| [number, -number] }.flatten
+
+  specify "returns 0" do
+    numbers.each do |number|
+      expect(number.imaginary).to eq(0)
+    end
+  end
+end
+context "Numeric#imaginary on an integer, and its name imag" do
+  specify "is 0" do
+    expect(3.imag).to eq(0)
+    expect(3.imaginary).to eq(0)
+  end
+end

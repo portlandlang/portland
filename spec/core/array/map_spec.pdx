@@ -1,0 +1,23 @@
+# Walking an array with a block (#104), from ruby/spec core/array: map and
+# collect, select and filter, reject, each, and detect. Alias checks
+# compare the two answers rather than method objects. Blocks answer true
+# or false where they choose, so reject's rows where nil or 5 stands for a
+# truth stay upstream; so do identity checks, recursive arrays, and
+# mid-walk mutation (values never mutate), the bang forms, subclasses,
+# break with a value (ADR 0012), blockless Enumerators, and each's
+# multi-parameter row, which waits on #158.
+
+require_relative "../../spec_helper"
+
+context "Array#map" do
+  specify "returns a copy of array with each element replaced by the value returned by block" do
+    letters = ["a", "b", "c", "d"]
+    expect(letters.map { |letter| letter + "!" }).to eq(["a!", "b!", "c!", "d!"])
+  end
+
+  specify "does not change self" do
+    letters = ["a", "b", "c", "d"]
+    letters.map { |letter| letter + "!" }
+    expect(letters).to eq(["a", "b", "c", "d"])
+  end
+end

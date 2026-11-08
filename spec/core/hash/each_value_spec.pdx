@@ -1,0 +1,27 @@
+# A hash's own lookups and walks (#105), from ruby/spec core/hash: keys,
+# values, key, value? and has_value?, invert, compact, slice, each and
+# each_pair, each_key, each_value, sort, size and length, empty?, and to_a.
+# Alias checks compare the two answers rather than method objects. Values
+# never mutate (ADR 0015), so upstream's `r[k] = v` inside a block is the
+# accumulator pattern on a mutable, and the rows about defaults,
+# default_proc, compare_by_identity, frozen hashes, subclasses, and
+# identity stay upstream; so do `|k,|` (a trailing comma does not parse),
+# blockless Enumerators (ADR 0055), is_a? checks, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#each_value" do
+  specify "calls block once for each key, passing value" do
+    mutable seen = []
+    table = {a: -5, b: -3, c: -2, d: -1, e: -1}
+    expect(table.each_value { |value| seen = seen + [value] }).to eq(table)
+    expect(seen.sort).to eq([-5, -3, -2, -1, -1])
+  end
+
+  specify "processes values in the same order as values()" do
+    mutable values = []
+    table = {a: -5, b: -3, c: -2, d: -1, e: -1}
+    table.each_value { |value| values = values + [value] }
+    expect(values).to eq(table.values)
+  end
+end

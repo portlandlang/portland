@@ -1,0 +1,52 @@
+# Reading a string as a number in another base (#106), from ruby/spec
+# core/string/{hex,oct}_spec.rb. Ruby's octal literals (077) are written
+# with Portland's 0o prefix (docs/ruby/integer-literals.md); `oct` still
+# reads a 0d prefix in the text, as Ruby's does.
+
+require_relative "../../spec_helper"
+
+context "String#hex" do
+  specify "treats leading characters of self as a string of hex digits" do
+    expect("0a".hex).to eq(10)
+    expect("0o".hex).to eq(0)
+    expect("0x".hex).to eq(0)
+    expect("A_BAD_BABE".hex).to eq(0xABADBABE)
+    expect("0b1010".hex).to eq("b1010".hex)
+    expect("0d500".hex).to eq("d500".hex)
+    expect("abcdefG".hex).to eq(0xabcdef)
+  end
+
+  specify "does not accept a sequence of underscores as part of a number" do
+    expect("a__b".hex).to eq(0xa)
+    expect("a____b".hex).to eq(0xa)
+    expect("a___f".hex).to eq(0xa)
+  end
+
+  specify "takes an optional sign" do
+    expect("-1234".hex).to eq(-4660)
+    expect("+1234".hex).to eq(4660)
+  end
+
+  specify "takes an optional 0x" do
+    expect("0x0a".hex).to eq(10)
+    expect("0a".hex).to eq(10)
+  end
+
+  specify "requires that the sign is in front of the 0x if present" do
+    expect("-0x1".hex).to eq(-1)
+    expect("0x-1".hex).to eq(0)
+  end
+
+  specify "returns 0 on error" do
+    expect("".hex).to eq(0)
+    expect("+-5".hex).to eq(0)
+    expect("wombat".hex).to eq(0)
+    expect("0x0x42".hex).to eq(0)
+  end
+
+  specify "returns 0 if sequence begins with underscore" do
+    expect("_a".hex).to eq(0)
+    expect("___b".hex).to eq(0)
+    expect("___0xc".hex).to eq(0)
+  end
+end

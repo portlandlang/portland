@@ -1,0 +1,24 @@
+# Rewriting and reading a hash (#105), from ruby/spec core/hash:
+# transform_values, transform_keys, to_h with a block, [], and inspect.
+# Upstream's `&:succ` is a block here, and its ScratchPad a mutable. Staying
+# upstream: the bang forms (values never mutate), identity and instance_of?
+# checks, defaults, default_proc, compare_by_identity, subclasses, frozen
+# hashes, a hash argument to transform_keys and `|*args|` (no splats, ADR
+# 0014), mocks, recursive hashes, a nil key, blockless Enumerators (ADR
+# 0055), and the refusals where Ruby raises.
+
+require_relative "../../spec_helper"
+
+context "Hash#transform_values" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "sets the result as transformed values with the given block" do
+    expect(table.transform_values { |value| value.succ }).to eq({a: 2, b: 3, c: 4})
+  end
+
+  specify "makes both hashes to share keys" do
+    key = [1, 2, 3]
+    new_table = {key => 1}.transform_values { |value| value.succ }
+    expect(new_table[key]).to eq(2)
+  end
+end

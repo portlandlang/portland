@@ -1,0 +1,62 @@
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../../spec_helper"
+
+context "Array#sample" do
+  specify "returns nil for an empty Array" do
+    expect([].sample).to be_nil
+  end
+
+  specify "returns nil for an empty array when called without n and a Random is given" do
+    expect([].sample(random: Random.new(42))).to be_nil
+  end
+
+  specify "returns a single value when not passed a count" do
+    expect([4].sample).to eq(4)
+  end
+
+  specify "returns a single value when not passed a count and a Random is given" do
+    expect([4].sample(random: Random.new(42))).to eq(4)
+  end
+
+  specify "returns an empty Array when passed zero" do
+    expect([4].sample(0)).to eq([])
+  end
+
+  specify "returns elements from the Array" do
+    list = [1, 2, 3, 4]
+    expect(list.sample(3).all? { |drawn| list.include?(drawn) }).to be_true
+  end
+
+  specify "returns at most the number of elements in the Array" do
+    expect([1, 2, 3, 4].sample(20).size).to eq(4)
+  end
+
+  specify "does not return the same value if the Array has unique values" do
+    expect([1, 2, 3, 4].sample(20).sort).to eq([1, 2, 3, 4])
+  end
+
+  specify "may return the same value if the array is not unique" do
+    expect([4, 4].sample(2)).to eq([4, 4])
+  end
+
+  specify "matches CRuby with random:" do
+    expect([1, 2, 3, 4, 5].sample(random: Random.new(42))).to eq(4)
+    expect([1, 2, 3, 4, 5].sample(2, random: Random.new(42))).to eq([4, 1])
+    expect([1, 2, 3, 4, 5].sample(3, random: Random.new(42))).to eq([4, 1, 5])
+    expect([1, 2, 3, 4, 5].sample(5, random: Random.new(42))).to eq([4, 1, 5, 2, 3])
+    expect([1, 2, 3, 4].sample(4, random: Random.new(7))).to eq([4, 1, 3, 2])
+    twelve = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    expect(twelve.sample(11, random: Random.new(42))).to eq([70, 50, 100, 80, 110, 10, 90, 30, 20, 40, 120])
+  end
+end

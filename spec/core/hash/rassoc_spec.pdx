@@ -1,0 +1,36 @@
+# A hash's pairs by lookup and as a list, and the subset comparisons
+# (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
+# the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method
+# objects. Staying upstream: instance_of? checks, compare_by_identity,
+# Hash.new defaults, to_hash conversion and the TypeError rows (Portland
+# refuses a non-hash operand), and []='s rows about dup, freeze, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#rassoc" do
+  table = {apple: :green, orange: :orange, grape: :green, banana: :yellow}
+
+  specify "returns a 2-element Array if the argument is a value of the Hash" do
+    expect(table.rassoc(:orange).size).to eq(2)
+  end
+
+  specify "sets the first element of the Array to the key of the located value" do
+    expect(table.rassoc(:yellow).first).to eq(:banana)
+  end
+
+  specify "sets the last element of the Array to the located value" do
+    expect(table.rassoc(:yellow).last).to eq(:yellow)
+  end
+
+  specify "only returns the first matching key-value pair" do
+    expect(table.rassoc(:green)).to eq([:apple, :green])
+  end
+
+  specify "uses #== to compare the argument to the values" do
+    expect(table.merge({key: 1.0}).rassoc(1)).to eq([:key, 1.0])
+  end
+
+  specify "returns nil if the argument is not a value of the Hash" do
+    expect(table.rassoc(:banana)).to eq(nil)
+  end
+end

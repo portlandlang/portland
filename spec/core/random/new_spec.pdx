@@ -1,0 +1,35 @@
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../../spec_helper"
+
+context "Random.new" do
+  specify "returns a new instance of Random" do
+    expect((Random.new in Random)).to be_true
+  end
+
+  specify "uses a random seed value if none is supplied" do
+    expect((Random.new.seed in Integer)).to be_true
+  end
+
+  specify "returns Random instances initialized with different seeds" do
+    expect(Random.new.seed == Random.new.seed).to be_false
+  end
+
+  specify "accepts an Integer seed value as an argument" do
+    expect(Random.new(2).seed).to eq(2)
+  end
+
+  specify "accepts (and truncates) a Float seed value as an argument" do
+    expect(Random.new(3.4).seed).to eq(3)
+  end
+end

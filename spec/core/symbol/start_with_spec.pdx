@@ -1,0 +1,27 @@
+# A symbol's text (#112), from ruby/spec core/symbol: length, size, empty?,
+# start_with?, end_with?, name, id2name, to_s, encoding, ==, and ===. A
+# symbol answers questions about its name here, as in Ruby; making one from
+# text is from_text_spec's (ADR 0071). Upstream's alias checks compare
+# method objects, which a closed runtime has none of; they ask the same
+# question of the two answers instead. A symbol's text is UTF-8 like every
+# string's (ADR 0069), so the US-ASCII answers upstream expects of an ASCII
+# name are UTF-8 here, and a non-ASCII name does not lex (#139).
+
+require_relative "../../spec_helper"
+
+context "Symbol#start_with?" do
+  specify "returns true only if beginning match" do
+    expect(:hello.start_with?("h")).to eq(true)
+    expect(:hello.start_with?("hel")).to eq(true)
+    expect(:hello.start_with?("el")).to eq(false)
+  end
+
+  specify "returns true if the search string is empty" do
+    expect(:hello.start_with?("")).to eq(true)
+    expect(:"".start_with?("")).to eq(true)
+  end
+
+  specify "works for multibyte strings" do
+    expect(:"céréale".start_with?("cér")).to eq(true)
+  end
+end

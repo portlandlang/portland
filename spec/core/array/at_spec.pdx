@@ -1,0 +1,45 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../../spec_helper"
+
+context "Array#at" do
+  numbers = [1, 2, 3, 4, 5, 6]
+
+  specify "returns the (n+1)'th element for the passed index n" do
+    expect(numbers.at(0)).to eq(1)
+    expect(numbers.at(1)).to eq(2)
+    expect(numbers.at(5)).to eq(6)
+  end
+
+  specify "returns nil if the given index is greater than or equal to the array's length" do
+    expect(numbers.at(6)).to eq(nil)
+    expect(numbers.at(7)).to eq(nil)
+  end
+
+  specify "returns the (-n)'th element from the last, for the given negative index n" do
+    expect(numbers.at(-1)).to eq(6)
+    expect(numbers.at(-2)).to eq(5)
+    expect(numbers.at(-6)).to eq(1)
+  end
+
+  specify "returns nil if the given index is less than -len, where len is length of the array" do
+    expect(numbers.at(-7)).to eq(nil)
+    expect(numbers.at(-8)).to eq(nil)
+  end
+
+  specify "does not extend the array unless the given index is out of range" do
+    expect(numbers.length).to eq(6)
+    numbers.at(100)
+    expect(numbers.length).to eq(6)
+    numbers.at(-100)
+    expect(numbers.length).to eq(6)
+  end
+end

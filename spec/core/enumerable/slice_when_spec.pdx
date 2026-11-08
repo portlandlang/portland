@@ -1,0 +1,75 @@
+# Ruby's Enumerable walks, runs, and groups on an Enumerable struct
+# (#110): `each_with_index`, `each_slice`, `each_cons`, `take_while`,
+# `drop`, `drop_while`, `inject`, `cycle`, `to_h`, `uniq`, `zip`,
+# `group_by`, `filter_map`, `chunk`, `chunk_while`, `slice_when`,
+# `slice_before`, and `slice_after`. A method Ruby answers with an
+# enumerator answers the finished array here (ADR 0055), so `each_cons(2)`
+# is its runs and `.to_a` on it is the identity.
+#
+# From ruby/spec core/enumerable/{each_with_index,each_cons,take_while,
+# drop,drop_while,inject,cycle,to_h,uniq,zip,group_by,filter_map,chunk,
+# chunk_while,slice_when,slice_before,slice_after}_spec.rb. What stays
+# behind: the blockless enumerators and their sizes, `each` taking
+# arguments, to_int and to_ary conversions (ADR 0036), the pattern
+# argument to `slice_before` and `slice_after` (asking `===`), a seedless
+# `inject` and `inject(:+)`, a block answering 1 or nil for a verdict, the
+# splat block parameter, `break` with a value out of a builtin's block,
+# and mocks of `hash` and `eql?`.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#slice_when" do
+  elements = numerous([10, 9, 7, 6, 4, 3, 2, 1])
+
+  describe "when given a block" do
+    specify "splits chunks between adjacent elements i and j where the block returns true" do
+      expect(elements.slice_when { |left, right| left - 1 != right }).to eq([[10, 9], [7, 6], [4, 3, 2, 1]])
+    end
+
+    specify "calls the block for length of the receiver enumerable minus one times" do
+      mutable times_called = 0
+      elements.slice_when do |left, right|
+        times_called += 1
+        left - 1 != right
+      end
+      expect(times_called).to eq(7)
+    end
+
+    specify "doesn't yield an empty array if the block matches the first or the last time" do
+      expect(elements.slice_when { true }).to eq([[10], [9], [7], [6], [4], [3], [2], [1]])
+    end
+
+    specify "doesn't yield an empty array on a small enumerable" do
+      expect(Empty.new.slice_when { true }).to eq([])
+      expect(numerous([42]).slice_when { true }).to eq([[42]])
+    end
+  end
+end

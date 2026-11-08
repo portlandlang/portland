@@ -1,0 +1,20 @@
+# A float's sign and its conversions (#108), from ruby/spec core/float:
+# abs and magnitude (through upstream's shared float_abs), positive?,
+# negative?, unary minus and plus, to_f, to_i (through float_to_i), inspect, ==, and
+# ===. NaN is 0.0 / 0.0 and infinity 1.0 / 0.0; a positive zero is one that
+# 1.0 divides into positive infinity. `infinite?` answers true or false
+# here, so upstream's 1 and -1 are asked as a sign. Alias checks compare the
+# two answers rather than method objects.
+
+require_relative "../../spec_helper"
+
+def positive_zero?(value) = value == 0.0 && (1.0 / value) > 0.0
+
+context "Float#to_i" do
+  specify "returns self truncated to an Integer" do
+    expect(899.2.to_i.to_s).to eq("899")
+    expect(-1.122256e-45.to_i).to eq(0)
+    expect(5_213_451.9201.to_i).to eq(5213451)
+    expect(1.233450999123389e+12.to_i).to eq(1233450999123)
+  end
+end

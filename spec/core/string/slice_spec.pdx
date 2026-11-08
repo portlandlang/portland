@@ -1,0 +1,22 @@
+# `slice` takes a start and a length. The range spelling's house examples
+# live in spec/range/slicing_spec.pdx, since there the range is the subject;
+# its ruby/spec rows are below.
+#
+# From ruby/spec core/string/{slice,element_reference}_spec.rb and the
+# shared slice rows. A slice is a collection, never a maybe (ADR 0019): where
+# Ruby answers nil for a start outside the string, Portland answers the
+# empty string, and those rows are reworded. A negative length refuses. The
+# to_int conversions (ADR 0036), the bignum rows, subclasses, encodings,
+# slice! (ADR 0015), and the regex and string-pattern rows stay upstream.
+
+require_relative "../../spec_helper"
+
+context "String#slice" do
+  specify "takes a start and a length" do
+    expect("portland".slice(0, 4)).to eq("port")
+  end
+
+  specify "stops at the end rather than running past it" do
+    expect("portland".slice(5, 99)).to eq("and")
+  end
+end

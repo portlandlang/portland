@@ -1,0 +1,68 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp literals" do
+  specify "take the i, m, and x flags" do
+    expect(/foo/i.casefold?).to be_true
+    expect(/foo/mx.options).to eq(6)
+    expect(/foo/imx.options).to eq(7)
+  end
+
+  specify "spell %r with the family's delimiters, slashes unescaped" do
+    expect(%r{a/b}).to eq(/a\/b/)
+    expect(%r[a/b].source).to eq("a/b")
+    expect(%r(a/b)i.casefold?).to be_true
+    expect(%r{ () [c]{1} }).to eq(/ () [c]{1} /)
+    expect(%r[/].to_s).to eq(/\//.to_s)
+  end
+
+  specify "class is Regexp" do
+    expect(/a/.class).to eq(Regexp)
+    expect(Regexp.name).to eq("Regexp")
+  end
+
+  specify "allow interpolation of strings" do
+    text = "foo|bar"
+    expect(/#{text}/).to eq(/foo|bar/)
+  end
+
+  specify "allow interpolation of literal regexps" do
+    inner = /foo|bar/
+    expect(/#{inner}/).to eq(/(?-mix:foo|bar)/)
+  end
+
+  specify "allow interpolation which mixes modifiers" do
+    inner = /foo/i
+    expect(/#{inner} bar/m).to eq(/(?i-mx:foo) bar/m)
+  end
+
+  specify "allow interpolation to interact with other Regexp constructs" do
+    parts = "foo)|(bar"
+    expect(/(#{parts})/).to eq(/(foo)|(bar)/)
+    low = "a"
+    expect(/[#{low}-z]/).to eq(/[a-z]/)
+  end
+
+  specify "allow interpolation in extended mode" do
+    body = "#comment\n  foo  #comment\n  |  bar"
+    expect((/#{body}/x =~ "foo").nil?).to be_false
+  end
+
+  specify "interpolate a number through to_s" do
+    expect(/x#{1 + 1}y/).to eq(/x2y/)
+  end
+end

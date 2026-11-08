@@ -1,0 +1,34 @@
+# Finding, counting, and replacing inside a string.
+#
+# From ruby/spec core/string/{index,rindex,count,lines,each_line,sub,gsub}_spec.rb.
+# `sub` and `gsub` take a string pattern and a string replacement or a
+# block; the regex patterns, the hash replacement, and Ruby's backslash
+# escapes in a replacement (#161) wait on the regex decision (#74), and the
+# to_str conversions (ADR 0036), subclasses, encodings, and the $~ rows
+# stay upstream. `count` takes a single character only: Ruby's
+# multi-character count is a character-set count, not a substring count,
+# and following it quietly would be principle 5's exact shape — so more
+# than one character refuses, naming the trap. `each_line` takes no
+# separator yet (#106).
+
+require_relative "../../spec_helper"
+
+context "String#each_line" do
+  specify "splits using default newline separator when none is specified" do
+    mutable first = []
+    "one\ntwo\r\nthree".each_line { |line| first << line }
+    expect(first).to eq(["one\n", "two\r\n", "three"])
+
+    mutable second = []
+    "hello\n\n\nworld".each_line { |line| second << line }
+    expect(second).to eq(["hello\n", "\n", "\n", "world"])
+
+    mutable third = []
+    "\n\n\n\n\n".each_line { |line| third << line }
+    expect(third).to eq(["\n", "\n", "\n", "\n", "\n"])
+  end
+
+  specify "returns self" do
+    expect("hello\nworld".each_line { }).to eq("hello\nworld")
+  end
+end

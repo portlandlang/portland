@@ -1,0 +1,20 @@
+# Rewriting and reading a hash (#105), from ruby/spec core/hash:
+# transform_values, transform_keys, to_h with a block, [], and inspect.
+# Upstream's `&:succ` is a block here, and its ScratchPad a mutable. Staying
+# upstream: the bang forms (values never mutate), identity and instance_of?
+# checks, defaults, default_proc, compare_by_identity, subclasses, frozen
+# hashes, a hash argument to transform_keys and `|*args|` (no splats, ADR
+# 0014), mocks, recursive hashes, a nil key, blockless Enumerators (ADR
+# 0055), and the refusals where Ruby raises.
+
+require_relative "../../spec_helper"
+
+context "Hash#inspect" do
+  specify "returns a string representation with same order as each()" do
+    expect(inspect({a: [1, 2], b: -2, d: -6})).to eq("{a: [1, 2], b: -2, d: -6}")
+  end
+
+  specify "does not call #to_s on a String returned from #inspect" do
+    expect(inspect({a: "abc"})).to eq('{a: "abc"}')
+  end
+end

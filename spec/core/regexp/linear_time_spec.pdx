@@ -1,0 +1,49 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp.linear_time?" do
+  specify "returns true if matching can be done in linear time" do
+    expect(Regexp.linear_time?(/a/)).to be_true
+    expect(Regexp.linear_time?("a")).to be_true
+  end
+
+  specify "returns false if matching can't be done in linear time" do
+    expect(Regexp.linear_time?(/(a)\1/)).to be_false
+    expect(Regexp.linear_time?("(a)\\1")).to be_false
+  end
+
+  specify "accepts flags for a string argument" do
+    expect(Regexp.linear_time?("a", 1)).to be_true
+    expect(Regexp.linear_time?("a", "i")).to be_true
+  end
+
+  specify "returns true for lookahead and lookbehind" do
+    expect(Regexp.linear_time?(/a*(?:(?=a*)a)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?<=a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?<!a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?!a*)a*)*b/)).to be_true
+  end
+
+  specify "returns true for atomic groups and possessive quantifiers" do
+    expect(Regexp.linear_time?(/a*(?:(?>a)a*)*b/)).to be_true
+    expect(Regexp.linear_time?(/a*(?:(?:a)?+a*)*b/)).to be_true
+  end
+
+  specify "returns true for positive lookbehind with a capture group" do
+    expect(Regexp.linear_time?(/.(?<=(a))/)).to be_true
+  end
+end

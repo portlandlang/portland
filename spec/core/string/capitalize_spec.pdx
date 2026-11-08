@@ -1,0 +1,40 @@
+# `upcase` and `downcase` answer new strings; the receiver is untouched.
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{upcase,downcase,capitalize,swapcase}_spec.rb. Casing is full
+# Unicode, locale-independent (ADR 0038), so the :ascii, :turkic,
+# :lithuanian, and :fold options are decided out (fold lives in casecmp?);
+# the bang forms (ADR 0015), subclasses, encodings, and ascii_only? stay
+# upstream. downcase's Kelvin-sign row spells it with a \u escape Portland
+# does not have.
+
+require_relative "../../spec_helper"
+
+context "String#capitalize" do
+  specify "returns a copy of self with the first character converted to uppercase and the remainder to lowercase" do
+    expect("".capitalize).to eq("")
+    expect("h".capitalize).to eq("H")
+    expect("H".capitalize).to eq("H")
+    expect("hello".capitalize).to eq("Hello")
+    expect("HELLO".capitalize).to eq("Hello")
+    expect("123ABC".capitalize).to eq("123abc")
+    expect("abcdef"[1...-1].capitalize).to eq("Bcde")
+  end
+
+  describe "full Unicode case mapping" do
+    specify "works for all of Unicode with no option" do
+      expect("äöÜ".capitalize).to eq("Äöü")
+    end
+
+    specify "only capitalizes the first resulting character when upcasing a character produces a multi-character sequence" do
+      expect("ß".capitalize).to eq("Ss")
+    end
+
+    specify "updates string metadata" do
+      capitalized = "ßeT".capitalize
+      expect(capitalized).to eq("Sset")
+      expect(capitalized.size).to eq(4)
+      expect(capitalized.bytesize).to eq(4)
+    end
+  end
+end

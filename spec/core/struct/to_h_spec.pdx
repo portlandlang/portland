@@ -1,0 +1,49 @@
+# Ruby's Struct as a walk over its fields (#114), from ruby/spec
+# core/struct/{to_a,values,to_h,members,size,length,each,each_pair,select,filter}_spec.rb.
+# The fixtures are struct declarations, not Struct.new, and a Portland
+# struct takes every field by keyword, so Ruby's nil-filled trailing
+# fields are written nil. A field named for one of these views wins, as
+# Ruby's accessor does (the last context). The blockless enumerators, the
+# to_ary coercion (ADR 0036), the class-side members, and the subclass
+# rows stay upstream; the to_h row that interpolates a nil field is
+# written with a year, since nil has no to_s (ADR 0006).
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+struct Ruby
+  version
+  platform
+end
+struct Sized
+  size
+end
+
+context "Struct#to_h" do
+  specify "returns a Hash with members as keys" do
+    car = Car.new(make: "Ford", model: "Ranger", year: nil)
+    expect(car.to_h).to eq({make: "Ford", model: "Ranger", year: nil})
+  end
+
+  describe "with block" do
+    specify "converts [key, value] pairs returned by the block to a hash" do
+      car = Car.new(make: "Ford", model: "Ranger", year: "2001")
+      converted = car.to_h { |key, value| [key.to_s, "#{value}".downcase] }
+      expect(converted).to eq({"make" => "ford", "model" => "ranger", "year" => "2001"})
+    end
+
+    specify "passes to a block each pair's key and value as separate arguments" do
+      ruby = Ruby.new(version: "3.2.4", platform: "macos")
+      mutable seen = []
+      ruby.to_h do |key, value|
+        seen << [key, value]
+        [key, value]
+      end
+      expect(seen.sort).to eq([[:platform, "macos"], [:version, "3.2.4"]])
+    end
+  end
+end

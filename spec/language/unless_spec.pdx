@@ -1,0 +1,69 @@
+# `unless` is `if` with the test inverted, and an expression like everything.
+
+require_relative "../spec_helper"
+
+context "control flow" do
+  describe "unless" do
+    specify "answers when the condition is false" do
+      quiet = unless false
+        "quiet"
+      end
+      expect(quiet).to eq("quiet")
+    end
+
+    # ADR 0012 — a branch that doesn't happen produces nil.
+    specify "and answers nil when it is true" do
+      loud = unless true
+        "quiet"
+      end
+      expect(loud).to be_nil
+    end
+  end
+end
+# From ruby/spec language/unless_spec.rb. Assignment is a statement here,
+# so the rows bind the whole expression where upstream assigns inside it.
+context "The unless expression" do
+  specify "evaluates the unless body when the expression is false" do
+    taken = unless false
+      true
+    else
+      false
+    end
+    expect(taken).to be_true
+  end
+
+  specify "returns the last statement in the body" do
+    last = unless false
+      "foo"
+      "bar"
+      "baz"
+    end
+    expect(last).to eq("baz")
+  end
+
+  specify "evaluates the else body when the expression is true" do
+    other = unless true
+      "foo"
+    else
+      "bar"
+    end
+    expect(other).to eq("bar")
+  end
+
+  specify "takes an optional then after the expression" do
+    taken = unless false then
+      "baz"
+    end
+    expect(taken).to eq("baz")
+  end
+
+  specify "does not return a value when the expression is true" do
+    empty = unless true then "foo" end
+    expect(empty).to be_nil
+  end
+
+  specify "allows expression and body to be on one line (using 'then')" do
+    one_liner = unless false then "foo" else "bar" end
+    expect(one_liner).to eq("foo")
+  end
+end

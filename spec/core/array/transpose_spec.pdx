@@ -1,0 +1,23 @@
+# Looking into an array and reshaping it (#104), from ruby/spec core/array:
+# at, dig, assoc, rassoc, transpose, to_h, rfind, and reverse_each. Each
+# lookup answers a maybe (ADR 0010). Staying upstream: identity checks and
+# recursive arrays (values never mutate), mocks whose own == or dig takes
+# over, to_ary and to_int conversion (ADR 0036), the refusals where Ruby
+# raises, rfind's ifnone proc (#77, whether a block is a value), blockless
+# Enumerators, mid-walk mutation, and subclasses. Upstream's
+# `s_nil.first` is written `nil`: here `[nil, nil].first` is a present
+# nil, the nested maybe ADR 0005 keeps distinct from absence.
+
+require_relative "../../spec_helper"
+
+context "Array#transpose" do
+  specify "assumes an array of arrays and returns the result of transposing rows and columns" do
+    expect([[1, "a"], [2, "b"], [3, "c"]].transpose).to eq([[1, 2, 3], ["a", "b", "c"]])
+    expect([[1, 2, 3], ["a", "b", "c"]].transpose).to eq([[1, "a"], [2, "b"], [3, "c"]])
+    expect([].transpose).to eq([])
+    expect([[]].transpose).to eq([])
+    expect([[], []].transpose).to eq([])
+    expect([[0]].transpose).to eq([[0]])
+    expect([[0], [1]].transpose).to eq([[0, 1]])
+  end
+end

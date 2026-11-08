@@ -1,0 +1,26 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#minmax" do
+  describe "on an inclusive range" do
+    specify "should return the minimum and maximum values for a numeric range" do
+      expect((1..3).minmax).to eq([1, 3])
+    end
+  end
+
+  describe "on an exclusive range" do
+    specify "should return the minimum and maximum values for a numeric range" do
+      expect((1...3).minmax).to eq([1, 2])
+    end
+  end
+end

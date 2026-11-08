@@ -1,0 +1,37 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp#inspect" do
+  specify "returns a formatted string that would read as the same regexp" do
+    expect(inspect(/ab+c/ix)).to eq("/ab+c/ix")
+    expect(inspect(/a(.)+s/m)).to eq("/a(.)+s/m")
+  end
+
+  specify "returns options in the order 'mix'" do
+    expect(inspect(//xim)).to eq("//mix")
+  end
+
+  specify "correctly escapes forward slashes" do
+    expect(inspect(Regexp.new("/foo/bar"))).to eq('/\/foo\/bar/')
+    expect(inspect(Regexp.new("/foo/bar[/]"))).to eq('/\/foo\/bar[\/]/')
+    expect(inspect(Regexp.new("//"))).to eq('/\/\//')
+  end
+
+  specify "does not over escape forward slashes" do
+    expect(inspect(/\/foo\/bar/)).to eq('/\/foo\/bar/')
+  end
+end

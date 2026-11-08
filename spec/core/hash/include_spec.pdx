@@ -1,0 +1,29 @@
+# Asking a hash which pairs it holds (#105), from ruby/spec core/hash:
+# include? and its twins member? and has_key?, any?, select, reject,
+# except, and values_at. Alias checks compare the two answers rather than
+# method objects. Staying upstream: `|*args|` and `|*pair|` (no splats, ADR
+# 0014), the bang mutators and delete_if (values never mutate), defaults,
+# default_proc, compare_by_identity, subclasses, identity, mocks stubbing
+# hash and eql?, is_a? checks, and blockless Enumerators (ADR 0055).
+
+require_relative "../../spec_helper"
+
+context "Hash#include?" do
+  specify "returns true if argument is a key" do
+    table = {a: 1, b: 2, c: 3, 4 => 0}
+    expect(table.include?(:a)).to eq(true)
+    expect(table.include?(:b)).to eq(true)
+    expect(table.include?(2)).to eq(false)
+    expect(table.include?(4)).to eq(true)
+    expect(table.include?("b")).to eq(false)
+    expect(table.include?(4.0)).to eq(false)
+  end
+
+  specify "returns true if the key's matching value was nil" do
+    expect({xyz: nil}.include?(:xyz)).to eq(true)
+  end
+
+  specify "returns true if the key's matching value was false" do
+    expect({xyz: false}.include?(:xyz)).to eq(true)
+  end
+end

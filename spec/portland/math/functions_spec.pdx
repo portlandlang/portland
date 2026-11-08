@@ -1,0 +1,309 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+def infinity_value = 1.0 / 0.0
+
+context "Math::PI and Math::E" do
+  specify "approximate pi and Napier's constant" do
+    expect(Math::PI).to be_close(3.14159265358979323846, MATH_TOLERANCE)
+    expect(Math::E).to be_close(2.71828182845904523536, MATH_TOLERANCE)
+  end
+end
+
+context "Math.sin, Math.cos, Math.tan" do
+  specify "answer the sine of the argument expressed in radians" do
+    expect(Math.sin(Math::PI)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.sin(0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.sin(Math::PI / 2)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.sin(3 * Math::PI / 2)).to be_close(-1.0, MATH_TOLERANCE)
+    expect(Math.sin(2 * Math::PI)).to be_close(0.0, MATH_TOLERANCE)
+  end
+
+  specify "answer the cosine of the argument expressed in radians" do
+    expect(Math.cos(Math::PI)).to be_close(-1.0, MATH_TOLERANCE)
+    expect(Math.cos(0)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.cos(Math::PI / 2)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.cos(3 * Math::PI / 2)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.cos(2 * Math::PI)).to be_close(1.0, MATH_TOLERANCE)
+  end
+
+  specify "answer the tangent of the argument" do
+    expect(Math.tan(0.0)).to eq(0.0)
+    expect(Math.tan(-0.0)).to eq(-0.0)
+    expect(Math.tan(4.22)).to be_close(1.86406937682395, MATH_TOLERANCE)
+    expect(Math.tan(-9.65)).to be_close(-0.229109052606441, MATH_TOLERANCE)
+    expect(Math.tan(infinity_value).nan?).to eq(true)
+    expect(Math.tan(-infinity_value).nan?).to eq(true)
+  end
+
+  specify "return NaN given NaN" do
+    expect(Math.sin(nan_value).nan?).to eq(true)
+    expect(Math.cos(nan_value).nan?).to eq(true)
+    expect(Math.tan(nan_value).nan?).to eq(true)
+  end
+end
+
+context "Math.asin, Math.acos, Math.atan, Math.atan2" do
+  specify "answer the arcsine of the argument" do
+    expect(Math.asin(1)).to be_close(Math::PI / 2, MATH_TOLERANCE)
+    expect(Math.asin(0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.asin(-1)).to be_close(-Math::PI / 2, MATH_TOLERANCE)
+    expect(Math.asin(0.25)).to be_close(0.252680255142079, MATH_TOLERANCE)
+    expect(Math.asin(0.50)).to be_close(0.523598775598299, MATH_TOLERANCE)
+    expect(Math.asin(0.75)).to be_close(0.8480620789814816, MATH_TOLERANCE)
+    expect(inspect(Math.asin(1.0001))).to eq('failure("Numerical argument is out of domain - asin")')
+    expect(inspect(Math.asin(-1.0001))).to eq('failure("Numerical argument is out of domain - asin")')
+    expect(Math.asin(nan_value).nan?).to eq(true)
+  end
+
+  specify "answer the arccosine of the argument" do
+    expect(Math.acos(1)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.acos(0)).to be_close(1.5707963267949, MATH_TOLERANCE)
+    expect(Math.acos(-1)).to be_close(Math::PI, MATH_TOLERANCE)
+    expect(Math.acos(0.25)).to be_close(1.31811607165282, MATH_TOLERANCE)
+    expect(Math.acos(0.50)).to be_close(1.0471975511966, MATH_TOLERANCE)
+    expect(Math.acos(0.75)).to be_close(0.722734247813416, MATH_TOLERANCE)
+    expect(inspect(Math.acos(1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
+    expect(inspect(Math.acos(-1.0001))).to eq('failure("Numerical argument is out of domain - acos")')
+    expect(Math.acos(nan_value).nan?).to eq(true)
+  end
+
+  specify "answer the arctangent of the argument" do
+    expect(Math.atan(1)).to be_close(Math::PI / 4, MATH_TOLERANCE)
+    expect(Math.atan(0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.atan(-1)).to be_close(-Math::PI / 4, MATH_TOLERANCE)
+    expect(Math.atan(0.25)).to be_close(0.244978663126864, MATH_TOLERANCE)
+    expect(Math.atan(0.50)).to be_close(0.463647609000806, MATH_TOLERANCE)
+    expect(Math.atan(0.75)).to be_close(0.643501108793284, MATH_TOLERANCE)
+    expect(Math.atan(nan_value).nan?).to eq(true)
+  end
+
+  specify "answer the arc tangent of y, x" do
+    expect(Math.atan2(4.2, 0.3)).to be_close(1.49948886200961, MATH_TOLERANCE)
+    expect(Math.atan2(0.0, 1.0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.atan2(-9.1, 3.2)).to be_close(-1.23265379809025, MATH_TOLERANCE)
+    expect(Math.atan2(7.22, -3.3)).to be_close(1.99950888779256, MATH_TOLERANCE)
+    expect(Math.atan2(0.0, 0.0)).to eq(0.0)
+    expect(Math.atan2(-0.0, 0.0)).to eq(-0.0)
+    expect(Math.atan2(0.0, -0.0)).to eq(Math::PI)
+    expect(Math.atan2(-0.0, -0.0)).to eq(-Math::PI)
+  end
+end
+
+context "the hyperbolic functions" do
+  specify "sinh" do
+    expect(Math.sinh(0.0)).to eq(0.0)
+    expect(Math.sinh(-0.0)).to eq(0.0)
+    expect(Math.sinh(1.5)).to be_close(2.12927945509482, MATH_TOLERANCE)
+    expect(Math.sinh(-2.8)).to be_close(-8.19191835423591, MATH_TOLERANCE)
+    expect(Math.sinh(nan_value).nan?).to eq(true)
+  end
+
+  specify "cosh" do
+    expect(Math.cosh(0.0)).to eq(1.0)
+    expect(Math.cosh(-0.0)).to eq(1.0)
+    expect(Math.cosh(1.5)).to be_close(2.35240961524325, MATH_TOLERANCE)
+    expect(Math.cosh(-2.99)).to be_close(9.96798496414416, MATH_TOLERANCE)
+    expect(Math.cosh(nan_value).nan?).to eq(true)
+  end
+
+  specify "tanh" do
+    expect(Math.tanh(0.0)).to eq(0.0)
+    expect(Math.tanh(-0.0)).to eq(-0.0)
+    expect(Math.tanh(infinity_value)).to eq(1.0)
+    expect(Math.tanh(-infinity_value)).to eq(-1.0)
+    expect(Math.tanh(2.5)).to be_close(0.98661429815143, MATH_TOLERANCE)
+    expect(Math.tanh(-4.892)).to be_close(-0.999887314427707, MATH_TOLERANCE)
+    expect(Math.tanh(nan_value).nan?).to eq(true)
+  end
+
+  specify "asinh" do
+    expect(Math.asinh(1.5)).to be_close(1.19476321728711, MATH_TOLERANCE)
+    expect(Math.asinh(-2.97)).to be_close(-1.8089166921397, MATH_TOLERANCE)
+    expect(Math.asinh(0.0)).to eq(0.0)
+    expect(Math.asinh(-0.0)).to eq(-0.0)
+    expect(Math.asinh(1.05367e-08)).to be_close(1.05367e-08, MATH_TOLERANCE)
+    expect(Math.asinh(-1.05367e-08)).to be_close(-1.05367e-08, MATH_TOLERANCE)
+    expect(Math.asinh(nan_value).nan?).to eq(true)
+  end
+
+  specify "acosh" do
+    expect(Math.acosh(14.2)).to be_close(3.345146999647, MATH_TOLERANCE)
+    expect(Math.acosh(1.0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(inspect(Math.acosh(1.0 - MATH_TOLERANCE))).to eq('failure("Numerical argument is out of domain - acosh")')
+    expect(inspect(Math.acosh(0))).to eq('failure("Numerical argument is out of domain - acosh")')
+    expect(inspect(Math.acosh(-1.0))).to eq('failure("Numerical argument is out of domain - acosh")')
+    expect(Math.acosh(nan_value).nan?).to eq(true)
+  end
+
+  specify "atanh" do
+    expect(Math.atanh(0.0)).to eq(0.0)
+    expect(Math.atanh(-0.0)).to eq(-0.0)
+    expect(Math.atanh(0.5)).to be_close(0.549306144334055, MATH_TOLERANCE)
+    expect(Math.atanh(-0.2)).to be_close(-0.202732554054082, MATH_TOLERANCE)
+    expect(Math.atanh(1.0)).to eq(Float::INFINITY)
+    expect(Math.atanh(-1.0)).to eq(-Float::INFINITY)
+    expect(inspect(Math.atanh(1.0 + Float::EPSILON))).to eq('failure("Numerical argument is out of domain - atanh")')
+    expect(inspect(Math.atanh(-1.0 - Float::EPSILON))).to eq('failure("Numerical argument is out of domain - atanh")')
+  end
+end
+
+context "Math.exp and Math.expm1" do
+  specify "exp returns the base-e exponential of the argument" do
+    expect(Math.exp(0.0)).to eq(1.0)
+    expect(Math.exp(-0.0)).to eq(1.0)
+    expect(Math.exp(-1.8)).to be_close(0.165298888221587, MATH_TOLERANCE)
+    expect(Math.exp(1.25)).to be_close(3.49034295746184, MATH_TOLERANCE)
+    expect(Math.exp(nan_value).nan?).to eq(true)
+  end
+
+  specify "expm1 calculates Math.exp(arg) - 1, keeping the precision" do
+    expect(Math.expm1(3)).to eq(Math.exp(3) - 1)
+    expect(Math.expm1(1.0e-16)).to be_close(1.0e-16, MATH_TOLERANCE)
+    expect(Math.expm1(1.0e-16) != 0.0).to eq(true)
+    expect(Math.expm1(nan_value).nan?).to eq(true)
+  end
+end
+
+context "the logarithms" do
+  specify "log returns the natural logarithm of the argument" do
+    expect(Math.log(0.0001)).to be_close(-9.21034037197618, MATH_TOLERANCE)
+    expect(Math.log(0.000000000001e-15)).to be_close(-62.1697975108392, MATH_TOLERANCE)
+    expect(Math.log(1)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.log(10)).to be_close(2.30258509299405, MATH_TOLERANCE)
+    expect(Math.log(10e15)).to be_close(36.8413614879047, MATH_TOLERANCE)
+    expect(Math.log(nan_value).nan?).to eq(true)
+    expect(inspect(Math.log(-1e-15))).to eq('failure("Numerical argument is out of domain - log")')
+  end
+
+  specify "log accepts a second argument for the base" do
+    expect(Math.log(9, 3)).to be_close(2, MATH_TOLERANCE)
+    expect(Math.log(8, 1.4142135623730951)).to be_close(6, MATH_TOLERANCE)
+    expect(Math.log(0, 2)).to eq(-Float::INFINITY)
+    expect(Math.log(8, 1).nan?).to eq(true)
+  end
+
+  specify "log10 returns the base-10 logarithm of the argument" do
+    expect(Math.log10(0.0001)).to be_close(-4.0, MATH_TOLERANCE)
+    expect(Math.log10(0.000000000001e-15)).to be_close(-27.0, MATH_TOLERANCE)
+    expect(Math.log10(1)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.log10(10)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.log10(10e15)).to be_close(16.0, MATH_TOLERANCE)
+    expect(Math.log10(nan_value).nan?).to eq(true)
+    expect(inspect(Math.log10(-1e-15))).to eq('failure("Numerical argument is out of domain - log10")')
+  end
+
+  specify "log2 returns the base-2 logarithm of the argument" do
+    expect(Math.log2(5.79)).to be_close(2.53356334821451, MATH_TOLERANCE)
+    expect(Math.log2(1.1)).to be_close(0.137503523749935, MATH_TOLERANCE)
+    expect(Math.log2(3.14)).to be_close(1.6507645591169, MATH_TOLERANCE)
+    expect(Math.log2(nan_value).nan?).to eq(true)
+    expect(inspect(Math.log2(-1e-15))).to eq('failure("Numerical argument is out of domain - log2")')
+  end
+
+  specify "log1p calculates Math.log(1 + arg), keeping the precision" do
+    expect(Math.log1p(3)).to eq(Math.log(1 + 3))
+    expect(Math.log1p(1e-16)).to be_close(1.0e-16, MATH_TOLERANCE)
+    expect(Math.log1p(1e-16) != 0.0).to eq(true)
+    expect(Math.log1p(nan_value).nan?).to eq(true)
+    expect(inspect(Math.log1p(-1 - 1e-15))).to eq('failure("Numerical argument is out of domain - log1p")')
+  end
+end
+
+context "Math.erf and Math.erfc" do
+  specify "erf returns the error function of the argument" do
+    expect(Math.erf(0)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.erf(1)).to be_close(0.842700792949715, MATH_TOLERANCE)
+    expect(Math.erf(-1)).to be_close(-0.842700792949715, MATH_TOLERANCE)
+    expect(Math.erf(0.5)).to be_close(0.520499877813047, MATH_TOLERANCE)
+    expect(Math.erf(-0.5)).to be_close(-0.520499877813047, MATH_TOLERANCE)
+    expect(Math.erf(10000)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.erf(-10000)).to be_close(-1.0, MATH_TOLERANCE)
+    expect(Math.erf(0.00000000000001)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.erf(nan_value).nan?).to eq(true)
+  end
+
+  specify "erfc returns the complementary error function of the argument" do
+    expect(Math.erfc(0)).to be_close(1.0, MATH_TOLERANCE)
+    expect(Math.erfc(1)).to be_close(0.157299207050285, MATH_TOLERANCE)
+    expect(Math.erfc(-1)).to be_close(1.84270079294971, MATH_TOLERANCE)
+    expect(Math.erfc(0.5)).to be_close(0.479500122186953, MATH_TOLERANCE)
+    expect(Math.erfc(-0.5)).to be_close(1.52049987781305, MATH_TOLERANCE)
+    expect(Math.erfc(10000)).to be_close(0.0, MATH_TOLERANCE)
+    expect(Math.erfc(-10000)).to be_close(2.0, MATH_TOLERANCE)
+    expect(Math.erfc(0.00000000000001)).to be_close(0.999999999999989, MATH_TOLERANCE)
+    expect(Math.erfc(nan_value).nan?).to eq(true)
+  end
+end
+
+context "Math.gamma and Math.lgamma" do
+  specify "gamma at the edges" do
+    expect(Math.gamma(0)).to eq(Float::INFINITY)
+    expect(Math.gamma(-0.0)).to eq(-Float::INFINITY)
+    expect(Math.gamma(0.5)).to be_close(Math.sqrt(Math::PI), MATH_TOLERANCE)
+    expect(Math.gamma(infinity_value).infinite?).to eq(true)
+    expect(Math.gamma(nan_value).nan?).to eq(true)
+    expect(inspect(Math.gamma(-1))).to eq('failure("Numerical argument is out of domain - gamma")')
+    expect(inspect(Math.gamma(-Float::INFINITY))).to eq('failure("Numerical argument is out of domain - gamma")')
+  end
+
+  # Accumulated as a float: every factorial through 22! is a double exactly,
+  # and 21! is already past the 64-bit integers (ADR 0070).
+  specify "gamma returns exactly (n-1)! given n for n between 2 and 23" do
+    mutable fact = 1.0
+    2.upto(23) do |n|
+      fact *= n - 1
+      expect(Math.gamma(n)).to eq(fact)
+    end
+  end
+
+  specify "gamma gives good numerical approximations" do
+    expect(Math.gamma(3.2)).to be_close(2.423965, MATH_TOLERANCE)
+    expect(Math.gamma(-2.15)).to be_close(-2.999619, MATH_TOLERANCE)
+    expect(Math.gamma(0.00001)).to be_close(99999.422794, MATH_TOLERANCE)
+    expect(Math.gamma(-0.00001)).to be_close(-100000.577225, MATH_TOLERANCE)
+  end
+
+  specify "lgamma answers the log of the absolute gamma and its sign" do
+    expect(Math.lgamma(0)).to eq([infinity_value, 1])
+    expect(Math.lgamma(-0.0)).to eq([infinity_value, -1])
+    expect(Math.lgamma(-1)[0]).to eq(some(infinity_value))
+    expect(Math.lgamma(infinity_value)).to eq([infinity_value, 1])
+    expect(Math.lgamma(0.5)[0] or 0.0).to be_close(Math.log(Math.sqrt(Math::PI)), MATH_TOLERANCE)
+    expect(Math.lgamma(0.5)[1]).to eq(some(1))
+    expect(Math.lgamma(6.0)[0] or 0.0).to be_close(Math.log(120.0), MATH_TOLERANCE)
+    expect(Math.lgamma(-0.5)[0] or 0.0).to be_close(1.2655121, MATH_TOLERANCE)
+    expect(Math.lgamma(-0.5)[1]).to eq(some(-1))
+    expect(Math.lgamma(-1.5)[0] or 0.0).to be_close(0.8600470, MATH_TOLERANCE)
+    expect(Math.lgamma(-1.5)[1]).to eq(some(1))
+    expect(inspect(Math.lgamma(-infinity_value))).to eq('failure("Numerical argument is out of domain - lgamma")')
+  end
+end
+
+context "Math.frexp and Math.ldexp" do
+  specify "frexp returns the normalized fraction and exponent" do
+    parts = Math.frexp(102.83)
+    expect(parts[0] or 0.0).to be_close(0.803359375, MATH_TOLERANCE)
+    expect(parts[1]).to eq(some(7))
+    expect(Math.frexp(1234)).to eq([0.6025390625, 11])
+  end
+
+  specify "ldexp returns the argument multiplied by 2**n" do
+    expect(Math.ldexp(0.0, 0.0)).to eq(0.0)
+    expect(Math.ldexp(0.0, 1.0)).to eq(0.0)
+    expect(Math.ldexp(-1.25, 2)).to be_close(-5.0, MATH_TOLERANCE)
+    expect(Math.ldexp(2.1, -3)).to be_close(0.2625, MATH_TOLERANCE)
+    expect(Math.ldexp(5.7, 4)).to be_close(91.2, MATH_TOLERANCE)
+    expect(Math.ldexp(nan_value, 0).nan?).to eq(true)
+    expect(Math.ldexp(0.5122058490966879, 1024)).to eq(9.207889385574391e+307)
+    expect(Math.ldexp(0.9999999999999999, 1024)).to eq(1.7976931348623157e+308)
+  end
+end

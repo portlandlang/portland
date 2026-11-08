@@ -1,0 +1,43 @@
+# Binary search (#104), from ruby/spec core/array/{bsearch,bsearch_index}_spec.rb:
+# Ruby's two modes by what the block answers — true, false, or nil find the
+# first element the block accepts; a number finds any element the block
+# calls zero. Without a block there are no enumerators (ADR 0055), so those
+# rows stay upstream, with the bignum, coerce, and break-with-a-value rows
+# (break carries no value, ADR 0012); the refusal for a String answer is
+# pinned in the seed's tests.
+
+require_relative "../../spec_helper"
+
+context "Array#bsearch_index" do
+  specify "returns nil when block is empty" do
+    expect([1, 2, 3].bsearch_index { }).to be_nil
+  end
+
+  describe "minimum mode" do
+    specify "returns index of first element which satisfies the block" do
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| x >= 4 }).to eq(1)
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| x >= 6 }).to eq(2)
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| x >= -1 }).to eq(0)
+    end
+
+    specify "returns nil when block condition is never satisfied" do
+      expect([0, 4, 7, 10, 12].bsearch_index { false }).to be_nil
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| x >= 100 }).to be_nil
+    end
+  end
+
+  describe "find any mode" do
+    specify "returns the index of any matched elements where element is between 4 <= x < 8" do
+      expect([1, 2].include?([0, 4, 7, 10, 12].bsearch_index { |x| 1 - x / 4 })).to be_true
+    end
+
+    specify "returns the index of any matched elements where element is between 8 <= x < 10" do
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| 4 - x / 2 }).to be_nil
+    end
+
+    specify "returns nil when block never returns 0" do
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| 1 }).to be_nil
+      expect([0, 4, 7, 10, 12].bsearch_index { |x| -1 }).to be_nil
+    end
+  end
+end

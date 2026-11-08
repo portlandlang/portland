@@ -1,0 +1,44 @@
+# Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/divide_spec.rb (#23); the
+# divide-by-zero half stays behind — the panic is the seed's whole error
+# story today, and a panic ends the file.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+# The named division family (#107), from ruby/spec core/integer: divmod,
+# div, remainder, ceildiv, and fdiv, fixnum halves. Upstream's be_close is
+# close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
+# infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
+# (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
+# ends a run, so those examples stay upstream with the bignum, Rational,
+# and coercion ones.
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+# ADR 0018 — division and modulo are floored, Ruby's rule, not Rust's,
+# which truncates toward zero.
+context "Integer#/" do
+  specify "floors toward negative infinity" do
+    expect((0 - 7) / 2).to eq(-4)
+  end
+
+  specify "answers self divided by the argument" do
+    expect(2 / 2).to eq(1)
+    expect(3 / 2).to eq(1)
+  end
+
+  specify "floors a small negative all the way down" do
+    expect((-1) / 10).to eq(-1)
+  end
+
+  specify "preserves sign across the four corners" do
+    expect(8 / 2).to eq(4)
+    expect(8 / (-2)).to eq(-4)
+    expect((-8) / 2).to eq(-4)
+    expect((-8) / (-2)).to eq(4)
+  end
+end

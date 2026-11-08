@@ -1,0 +1,35 @@
+# How long a string is.
+
+require_relative "../../spec_helper"
+
+context "String#length" do
+  specify "counts the characters" do
+    expect("portland").to have_length(8)
+  end
+
+  specify "answers zero for the empty string" do
+    expect("").to have_length(0)
+  end
+
+  specify "size is its twin (ADR 0036)" do
+    expect("portland".size).to eq(8)
+  end
+end
+
+# From ruby/spec core/string/{length,size}_spec.rb; the encoding and
+# broken-byte rows stay upstream, and size's method-object row is written
+# as the twin's answer.
+context "String#length" do
+  specify "returns the length of self" do
+    expect("".length).to eq(0)
+    expect("one".length).to eq(3)
+    expect("two".length).to eq(3)
+    expect("three".length).to eq(5)
+    expect("four".length).to eq(4)
+  end
+
+  specify "returns the length of a string in different encodings" do
+    utf8_str = "こにちわ" * 100
+    expect(utf8_str.length).to eq(400)
+  end
+end

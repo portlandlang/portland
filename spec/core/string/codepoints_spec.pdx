@@ -1,0 +1,30 @@
+# A string's codepoints and bytes (#106), from ruby/spec
+# core/string/{ord,bytes,bytesize,codepoints}_spec.rb. `bytes` and
+# `codepoints` answer arrays and take no block — the block form is each_byte's
+# job in Ruby, and a walk's here; `ord` of an empty string refuses. The
+# broken-encoding rows, force_encoding, unpack, getbyte, Integer#chr, and
+# the type checks stay upstream; so does ord's row over two combining marks,
+# which is one character here (ADR 0038).
+
+require_relative "../../spec_helper"
+
+context "String#codepoints" do
+  specify "returns an Array when no block is given" do
+    expect("abc".codepoints).to eq([97, 98, 99])
+  end
+
+  specify "yields one codepoint for each character" do
+    s = "顶(ᦇ"
+    expect(s.codepoints.to_a.size).to eq(s.chars.to_a.size)
+  end
+
+  specify "works for multibyte characters" do
+    s = "頙"
+    expect(s.bytesize).to eq(3)
+    expect(s.codepoints.to_a).to eq([38937])
+  end
+
+  specify "yields the codepoints corresponding to the character's position in the String's encoding" do
+    expect("އ".codepoints.to_a).to eq([1927])
+  end
+end

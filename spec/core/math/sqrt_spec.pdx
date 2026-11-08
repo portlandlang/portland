@@ -1,0 +1,32 @@
+# `Math` (ADR 0083): Ruby's module functions as builtins, spelled as Ruby
+# spells them, answering what Ruby 4.0.9 answers; a domain error is a
+# failure in Ruby's own sentence. From ruby/spec core/math, the whole
+# directory: the `Float()` coercion rows and the private-instance-method
+# rows (`include Math`) stay upstream, since a namespace is not a mixin and
+# a non-number refuses at the call; the `is_a?(Float)` rows ask `in Float`.
+
+require_relative "../../spec_helper"
+
+MATH_TOLERANCE = 0.00003
+def nan_value = 0.0 / 0.0
+def infinity_value = 1.0 / 0.0
+
+context "Math.sqrt" do
+  specify "returns a float" do
+    expect(Math.sqrt(1) in Float).to eq(true)
+  end
+
+  specify "returns the square root of the argument" do
+    expect(Math.sqrt(1)).to eq(1.0)
+    expect(Math.sqrt(4.0)).to eq(2.0)
+    expect(Math.sqrt(15241578780673814.441547445)).to be_close(123456789.123457, MATH_TOLERANCE)
+  end
+
+  specify "returns NaN given NaN" do
+    expect(Math.sqrt(nan_value).nan?).to eq(true)
+  end
+
+  specify "fails with Ruby's sentence given a negative number" do
+    expect(inspect(Math.sqrt(-1))).to eq('failure("Numerical argument is out of domain - sqrt")')
+  end
+end

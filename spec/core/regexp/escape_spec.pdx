@@ -1,0 +1,36 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp.escape" do
+  specify "escapes any characters with special meaning in a regular expression" do
+    expect(Regexp.escape('\*?{}.+^[]()- ')).to eq('\\\\\*\?\{\}\.\+\^\[\]\(\)\-\ ')
+    expect(Regexp.escape("\n\r\t")).to eq('\n\r\t')
+    expect(Regexp.escape("a#b")).to eq('a\#b')
+  end
+
+  specify "works with symbols" do
+    expect(Regexp.escape(:"a.b")).to eq('a\.b')
+  end
+
+  specify "leaves plain text alone" do
+    expect(Regexp.escape("abc_123/")).to eq("abc_123/")
+  end
+
+  specify "quote is the same" do
+    expect(Regexp.quote("a.b")).to eq('a\.b')
+  end
+end

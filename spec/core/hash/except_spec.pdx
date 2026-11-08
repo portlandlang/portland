@@ -1,0 +1,25 @@
+# Asking a hash which pairs it holds (#105), from ruby/spec core/hash:
+# include? and its twins member? and has_key?, any?, select, reject,
+# except, and values_at. Alias checks compare the two answers rather than
+# method objects. Staying upstream: `|*args|` and `|*pair|` (no splats, ADR
+# 0014), the bang mutators and delete_if (values never mutate), defaults,
+# default_proc, compare_by_identity, subclasses, identity, mocks stubbing
+# hash and eql?, is_a? checks, and blockless Enumerators (ADR 0055).
+
+require_relative "../../spec_helper"
+
+context "Hash#except" do
+  table = {a: 1, b: 2, c: 3}
+
+  specify "returns a new duplicate hash without arguments" do
+    expect(table.except).to eq(table)
+  end
+
+  specify "returns a hash without the requested subset" do
+    expect(table.except(:c, :a)).to eq({b: 2})
+  end
+
+  specify "ignores keys not present in the original hash" do
+    expect(table.except(:a, :chunky_bacon)).to eq({b: 2, c: 3})
+  end
+end

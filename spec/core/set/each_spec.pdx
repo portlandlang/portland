@@ -1,0 +1,66 @@
+# Ruby's Enumerable on a set (ADR 0082), answering what it answers on an
+# array of the members: `each` and `each_with_index` answer the set,
+# `select` and `reject` a set of what they kept, `map` and `sort` arrays,
+# and the rest their own values.
+#
+# From ruby/spec core/set/each_spec.rb; the other walks are Enumerable's
+# own, specified under core/enumerable. Upstream: the Enumerator row.
+
+require_relative "../../spec_helper"
+
+context "Set" do
+  describe "#each" do
+    specify "yields every member" do
+      mutable seen = []
+      Set[1, 2, 3].each { seen << it }
+      expect(seen.sort).to eq([1, 2, 3])
+    end
+
+    specify "answers the set" do
+      members = Set[1, 2, 3]
+      expect(members.each { it }).to eq(members)
+    end
+
+    specify "with an index answers the set too" do
+      members = Set[:a, :b]
+      mutable pairs = []
+      answer = members.each_with_index { |member, index| pairs << [member, index] }
+      expect(pairs).to eq([[:a, 0], [:b, 1]])
+      expect(answer).to eq(members)
+    end
+  end
+
+  describe "the walks that build" do
+    specify "map answers an array" do
+      expect(Set[1, 2, 3].map { it * 2 }).to eq([2, 4, 6])
+    end
+
+    specify "select and reject answer sets" do
+      expect(Set[1, 2, 3, 4].select { it.even? }).to eq(Set[2, 4])
+      expect(Set[1, 2, 3, 4].reject { it.even? }).to eq(Set[1, 3])
+      expect(Set[1, 2, 3, 4].filter { it > 2 }).to eq(Set[3, 4])
+    end
+
+    specify "sort, sort_by, and partition answer arrays" do
+      expect(Set[3, 1, 2].sort).to eq([1, 2, 3])
+      expect(Set["bb", "a"].sort_by { it.length }).to eq(["a", "bb"])
+      expect(Set[1, 2, 3].partition { it > 1 }).to eq([[2, 3], [1]])
+    end
+  end
+
+  describe "the queries" do
+    specify "answer as on an array" do
+      expect(Set[1, 2, 3].sum).to eq(6)
+      expect(Set[3, 1, 2].min).to eq(1)
+      expect(Set[3, 1, 2].max).to eq(3)
+      expect(Set[1, 2, 3].count { it > 1 }).to eq(2)
+      expect(Set[1, 2, 3].first).to eq(1)
+      expect(Set[].first).to be_nil
+      expect(Set[1, 2, 3].any? { it > 2 }).to be_true
+      expect(Set[1, 2, 3].all? { it > 2 }).to be_false
+      expect(Set[1, 2, 3].find { it > 1 }).to eq(2)
+      expect(Set[1, 2, 3].reduce(0) { |total, member| total + member }).to eq(6)
+      expect(Set[1, 1, 2].tally).to eq({1 => 1, 2 => 1})
+    end
+  end
+end

@@ -1,0 +1,18 @@
+# Two sets are equal when each holds the other's members (ADR 0082): order
+# is not a set's identity, members match by `eql?` so `1` and `1.0` differ,
+# and `==` and `eql?` agree, as Ruby 4's do — which makes a set a usable
+# hash key.
+#
+# From ruby/spec core/set/{equal_value,eql}_spec.rb. Upstream: the Set-like
+# object and the alias check.
+
+require_relative "../../spec_helper"
+
+context "Set" do
+  describe "as a hash key" do
+    specify "is found by an equal set" do
+      labels = {Set[1, 2] => "pair"}
+      expect(labels[Set[1, 2]]).to eq("pair")
+    end
+  end
+end

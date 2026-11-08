@@ -1,0 +1,37 @@
+# Two sets are equal when each holds the other's members (ADR 0082): order
+# is not a set's identity, members match by `eql?` so `1` and `1.0` differ,
+# and `==` and `eql?` agree, as Ruby 4's do — which makes a set a usable
+# hash key.
+#
+# From ruby/spec core/set/{equal_value,eql}_spec.rb. Upstream: the Set-like
+# object and the alias check.
+
+require_relative "../../spec_helper"
+
+context "Set#==" do
+  specify "is true for sets holding the same members" do
+    expect(Set[] == Set[]).to be_true
+    expect(Set[1, 2, 3] == Set[1, 2, 3]).to be_true
+    expect(Set["1", "2", "3"] == Set["1", "2", "3"]).to be_true
+    expect(Set[1, 2, 3] == Set[1.0, 2, 3]).to be_false
+    expect(Set[1, 2, 3] == [1, 2, 3]).to be_false
+    expect(Set[1, 2, 3] == Set[2, 3]).to be_false
+  end
+
+  specify "does not depend on the order of the members" do
+    expect(Set[1, 2, 3]).to eq(Set[3, 2, 1])
+    expect(Set[:a, "b", "c"]).to eq(Set["c", "b", :a])
+  end
+
+  specify "does not depend on the order of nested sets" do
+    expect(Set[Set[1], Set[2], Set[3]]).to eq(Set[Set[3], Set[2], Set[1]])
+    first = Set[Set["a", "b"], Set["c", "d"], Set["e", "f"]]
+    second = Set[Set["c", "d"], Set["a", "b"], Set["e", "f"]]
+    expect(first).to eq(second)
+  end
+
+  specify "compares inside an array" do
+    expect([Set[1, 2]] == [Set[2, 1]]).to be_true
+    expect([Set[1, 2]] != [Set[2, 1]]).to be_false
+  end
+end

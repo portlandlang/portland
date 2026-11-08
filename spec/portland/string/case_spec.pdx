@@ -1,0 +1,25 @@
+# `upcase` and `downcase` answer new strings; the receiver is untouched.
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{upcase,downcase,capitalize,swapcase}_spec.rb. Casing is full
+# Unicode, locale-independent (ADR 0038), so the :ascii, :turkic,
+# :lithuanian, and :fold options are decided out (fold lives in casecmp?);
+# the bang forms (ADR 0015), subclasses, encodings, and ascii_only? stay
+# upstream. downcase's Kelvin-sign row spells it with a \u escape Portland
+# does not have.
+
+require_relative "../../spec_helper"
+
+context "String" do
+  city = "portland"
+  describe "the other case moves" do
+    specify "String#capitalize moves both ways — first up, the rest down" do
+      expect("portland".capitalize).to eq("Portland")
+      expect("PDX".capitalize).to eq("Pdx")
+    end
+
+    specify "String#swapcase flips every letter" do
+      expect("PdX".swapcase).to eq("pDx")
+    end
+  end
+end

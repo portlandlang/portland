@@ -1,0 +1,35 @@
+# Finding, counting, and replacing inside a string.
+#
+# From ruby/spec core/string/{index,rindex,count,lines,each_line,sub,gsub}_spec.rb.
+# `sub` and `gsub` take a string pattern and a string replacement or a
+# block; the regex patterns, the hash replacement, and Ruby's backslash
+# escapes in a replacement (#161) wait on the regex decision (#74), and the
+# to_str conversions (ADR 0036), subclasses, encodings, and the $~ rows
+# stay upstream. `count` takes a single character only: Ruby's
+# multi-character count is a character-set count, not a substring count,
+# and following it quietly would be principle 5's exact shape — so more
+# than one character refuses, naming the trap. `each_line` takes no
+# separator yet (#106).
+
+require_relative "../../spec_helper"
+
+context "String#gsub with pattern and replacement" do
+  specify "doesn't interpret regexp metacharacters if pattern is a string" do
+    expect("12345".gsub('\d', "a")).to eq("12345")
+    expect('\d'.gsub('\d', "a")).to eq("a")
+  end
+end
+
+context "String#gsub with pattern and block" do
+  specify "returns a copy of self with all occurrences of pattern replaced with the block's return value" do
+    expect("hello".gsub("l") { "x" }).to eq("hexxo")
+  end
+end
+
+context "String#gsub with a string pattern" do
+  specify "handles multibyte characters" do
+    expect("é".gsub("é", "â")).to eq("â")
+    expect("aé".gsub("é", "â")).to eq("aâ")
+    expect("éa".gsub("é", "â")).to eq("âa")
+  end
+end

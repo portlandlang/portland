@@ -1,0 +1,49 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp.new" do
+  specify "uses the String argument as an unescaped literal to construct a Regexp object" do
+    expect(Regexp.new("^hi{2,3}fo.o$")).to eq(/^hi{2,3}fo.o$/)
+  end
+
+  specify "answers the pattern itself for a Regexp argument" do
+    expect(Regexp.new(/ab/i)).to eq(/ab/i)
+  end
+
+  specify "does not set Regexp options if only given one argument, or nil or false" do
+    expect(Regexp.new("Hi").options).to eq(0)
+    expect(Regexp.new("Hi", nil).options).to eq(0)
+    expect(Regexp.new("Hi", false).options).to eq(0)
+  end
+
+  specify "sets options from second argument if it is true" do
+    expect(Regexp.new("Hi", true).options).to eq(1)
+  end
+
+  specify "sets options from second argument if it is one of the option bits" do
+    expect(Regexp.new("Hi", 1).casefold?).to be_true
+    expect(Regexp.new("Hi", 4).options).to eq(4)
+    expect(Regexp.new("Hi", 2).options).to eq(2)
+    expect(Regexp.new("Hi", 7)).to eq(/Hi/mix)
+  end
+
+  specify "sets options from a string of flag letters" do
+    expect(Regexp.new("Hi", "i")).to eq(/Hi/i)
+    expect(Regexp.new("Hi", "mx")).to eq(/Hi/mx)
+    expect(Regexp.new("Hi", "")).to eq(/Hi/)
+  end
+end

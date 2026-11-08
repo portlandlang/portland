@@ -1,0 +1,30 @@
+# The logical operators on booleans (#115), from ruby/spec
+# language/{and,or,not}_spec.rb. Conditions and the logical operators take
+# booleans and nothing else (docs/ruby/truthiness.md), so the rows with
+# strings, integers, nil, or () as operands refuse; `and` and `or` are
+# dead-identical to `&&` and `||` (docs/ruby/word-operators.md), so the
+# precedence rows that lean on Ruby's secret low precedence diverge on
+# purpose; assignment is a statement, so the assignment-in-expression rows
+# stay upstream, as do the lambda rows.
+
+require_relative "../spec_helper"
+
+context "The '&&' statement" do
+  specify "short-circuits evaluation at the first condition to be false" do
+    expect(false && (1 / 0) == 0).to be_false
+  end
+
+  specify "evaluates to the last condition if all are true" do
+    expect(true && true).to be_true
+  end
+end
+
+context "The 'and' statement" do
+  specify "short-circuits evaluation at the first condition to be false" do
+    expect((false and (1 / 0) == 0)).to be_false
+  end
+
+  specify "evaluates to the last condition if all are true" do
+    expect((true and true)).to be_true
+  end
+end

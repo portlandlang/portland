@@ -1,0 +1,46 @@
+# `eql?` on every value (ADR 0059): the equality a hash key matches by —
+# same kind and same value, no promotion between numbers, element by
+# element through arrays, hashes, ranges, and structs. `hash` is not
+# exposed; `value.hash` refuses, pinned by a two-oracle test.
+#
+# From ruby/spec core/{array,hash,range,struct,integer,float,string}/
+# eql_spec.rb and their shared files. What stays behind: the mocks counting
+# their calls, the recursive arrays and hashes (values never mutate, so
+# none can hold itself), to_ary and to_hash, subclasses, Hash.new defaults,
+# bignums, rationals, encodings, and the String rows Ruby's `<=>` answers.
+
+require_relative "../../spec_helper"
+
+struct Car
+  make
+  model
+  year
+end
+
+context "Array#eql?" do
+  specify "returns true if other is the same array" do
+    list = [1]
+    expect(list.eql?(list)).to be_true
+  end
+
+  specify "returns true if corresponding elements are #eql?" do
+    expect([].eql?([])).to be_true
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4])).to be_true
+  end
+
+  specify "returns false if other is shorter than self" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3])).to be_false
+  end
+
+  specify "returns false if other is longer than self" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4, 5])).to be_false
+  end
+
+  specify "returns false if any corresponding elements are not #eql?" do
+    expect([1, 2, 3, 4].eql?([1, 2, 3, 4.0])).to be_false
+  end
+
+  specify "returns false if other is not a kind of Array" do
+    expect([1, 2, 3].eql?(123)).to be_false
+  end
+end

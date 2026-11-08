@@ -1,0 +1,108 @@
+# Visibility (ADR 0076): `private`, `protected`, and `public` open sections
+# in a type body, `private def` marks one method, and a trait's sections
+# travel into the struct that includes it; `private_constant` hides a
+# module's constant. The checks are the build's, so what runs here is the
+# surface a program keeps — the refusals are pinned by the two-oracle test.
+#
+# From ruby/spec language/private_spec.rb, the rows that run: a private
+# method called from its own type, a type function staying public under a
+# `private` section, a nested type's methods staying public, and a method
+# before the section staying public. Upstream: the `methods` reflection,
+# `class_eval`, and the class-reopening and subclass rows.
+
+require_relative "../spec_helper"
+
+struct Box
+  contents
+
+  def open = reveal
+  def peek = self.reveal
+  def same?(other) = secret_code == other.secret_code
+
+  private
+
+  def reveal = contents
+
+  protected
+
+  def secret_code = contents * 7
+
+  public
+
+  def label = "box"
+
+  private def quiet = "shh"
+
+  def loud = quiet.upcase
+
+  def self.public_defs_method = 0
+
+  struct Lid
+    def baz = "baz"
+  end
+end
+trait Greeting
+  def greet = "hi #{salute}"
+
+  private
+
+  def salute = "friend"
+end
+struct Host
+  include Greeting
+end
+module Config
+  LIMIT = 3
+  private_constant :LIMIT
+
+  def limit = LIMIT
+  def doubled = Config::LIMIT * 2
+end
+context "Visibility" do
+  describe "private" do
+    specify "marks the methods after it, callable from the type's own methods" do
+      expect(Box.new(contents: 1).open).to eq(1)
+    end
+
+    specify "allows the call through self" do
+      expect(Box.new(contents: 2).peek).to eq(2)
+    end
+
+    specify "marks one method with private def" do
+      expect(Box.new(contents: 1).loud).to eq("SHH")
+    end
+
+    specify "has no effect on type functions" do
+      expect(Box.public_defs_method).to eq(0)
+    end
+
+    specify "does not reach a type nested in the section" do
+      expect(Box::Lid.new.baz).to eq("baz")
+    end
+
+    specify "travels from a trait into the struct that includes it" do
+      expect(Host.new.greet).to eq("hi friend")
+    end
+  end
+
+  describe "protected" do
+    specify "allows another value of the type from inside its methods" do
+      expect(Box.new(contents: 1).same?(Box.new(contents: 1))).to be_true
+      expect(Box.new(contents: 1).same?(Box.new(contents: 2))).to be_false
+    end
+  end
+
+  describe "public" do
+    specify "ends a section, and methods before any section are public" do
+      expect(Box.new(contents: 1).label).to eq("box")
+      expect(Box.new(contents: 3).contents).to eq(3)
+    end
+  end
+
+  describe "private_constant" do
+    specify "leaves the constant readable inside its module, bare or by path" do
+      expect(Config.limit).to eq(3)
+      expect(Config.doubled).to eq(6)
+    end
+  end
+end

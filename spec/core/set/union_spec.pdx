@@ -1,0 +1,30 @@
+# A set's algebra (ADR 0082) under Ruby's word names — `union`,
+# `intersection`, `difference` — and the two operators the grammar has, `+`
+# for union and `-` for difference; each takes any enumerable and answers a
+# new set. `|`, `&`, and `^` are out of the grammar (ADR 0003); #207 holds
+# that question. Ruby 4's `flatten`, `classify`, `join`, and `to_a` beside.
+#
+# From ruby/spec core/set/{union,plus,intersection,minus,difference,flatten,
+# classify,join,to_a}_spec.rb. Upstream: the alias checks, the
+# compare_by_identity rows, the recursive set, the Enumerator rows, the
+# Set-like objects, and flatten!, which mutates (ADR 0015).
+
+require_relative "../../spec_helper"
+
+context "Set#union" do
+  specify "holds every member of self and the passed enumerable" do
+    members = Set[:a, :b, :c]
+    expect(members.union(Set[:b, :d, :e])).to eq(Set[:a, :b, :c, :d, :e])
+    expect(members.union([:b, :e])).to eq(Set[:a, :b, :c, :e])
+    expect(members.union(1..2)).to eq(Set[:a, :b, :c, 1, 2])
+  end
+
+  specify "is also +" do
+    expect(Set[:a, :b] + Set[:b, :c]).to eq(Set[:a, :b, :c])
+    expect(Set[1, 2] + [3, 4]).to eq(Set[1, 2, 3, 4])
+  end
+
+  specify "keeps insertion order" do
+    expect((Set[3, 1] + [2, 1]).to_a).to eq([3, 1, 2])
+  end
+end

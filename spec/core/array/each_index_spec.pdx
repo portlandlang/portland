@@ -1,0 +1,20 @@
+# An array by its positions (#104), from ruby/spec core/array: rotate,
+# values_at, and each_index. Values never mutate, so the frozen, identity,
+# recursive-array, and mid-walk-shift examples stay upstream, with rotate!
+# and the subclass ones; so do the to_int rows (ADR 0036), where a Float
+# or a mock would stand in for an integer, and the blockless Enumerator.
+
+require_relative "../../spec_helper"
+
+context "Array#each_index" do
+  specify "passes the index of each element to the block" do
+    mutable seen = []
+    ["a", "b", "c", "d"].each_index { |index| seen = seen + [index] }
+    expect(seen).to eq([0, 1, 2, 3])
+  end
+
+  specify "returns self" do
+    symbols = [:a, :b, :c]
+    expect(symbols.each_index { |index| index }).to eq(symbols)
+  end
+end

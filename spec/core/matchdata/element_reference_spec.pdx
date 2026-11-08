@@ -1,0 +1,42 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#[]" do
+  specify "acts as normal array indexing [index]" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[0]).to eq("HX1138")
+    expect(md[1]).to eq("H")
+    expect(md[2]).to eq("X")
+    expect(md[-3]).to eq("X")
+    expect(md[10000]).to be_nil
+    expect(md[-10000]).to be_nil
+  end
+
+  specify "returns the corresponding named match when given a Symbol" do
+    md = "haystack".match(/(?<t>t(?<a>ack))/) or panic("no match")
+    expect(md[:a]).to eq("ack")
+    expect(md[:t]).to eq("tack")
+  end
+
+  specify "returns the corresponding named match when given a String" do
+    md = "haystack".match(/(?<t>t(?<a>ack))/) or panic("no match")
+    expect(md["a"]).to eq("ack")
+    expect(md["t"]).to eq("tack")
+  end
+
+  specify "answers nil for a group that took no part" do
+    md = /(a)(b)?/.match("a") or panic("no match")
+    expect(md[2]).to be_nil
+  end
+end

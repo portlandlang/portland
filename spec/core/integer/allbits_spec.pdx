@@ -1,0 +1,30 @@
+# Ruby's bit math as named methods (ADR 0003, locked by #157): the
+# operators are out of the grammar, the capability is here under names —
+# `bit_and`, `bit_or`, `bit_xor`, `bit_not`, `shift_left`, `shift_right` —
+# beside Ruby's own `allbits?`, `anybits?`, `nobits?`, `bit_length`,
+# `bit_count`, and the bit read `n[i]`. Every answer here is Ruby's.
+#
+# From ruby/spec core/integer/{bit_and,bit_or,bit_xor,complement,
+# left_shift,right_shift,allbits,anybits,nobits,bit_length,bit_count,
+# element_reference}_spec.rb, the fixnum rows. What stays behind: the
+# bignum rows (integers are 64-bit, #156), coerce and to_int (ADR 0036), a
+# Float operand (refuses here where Ruby raises TypeError), and the
+# two-argument and range forms of `n[i]`.
+
+require_relative "../../spec_helper"
+
+context "Integer#allbits?" do
+  specify "returns true if and only if all the bits of the argument are set in the receiver" do
+    expect(42.allbits?(42)).to be_true
+    expect(0b1010_1010.allbits?(0b1000_0010)).to be_true
+    expect(0b1010_1010.allbits?(0b1000_0001)).to be_false
+    expect(0b1000_0010.allbits?(0b1010_1010)).to be_false
+  end
+
+  specify "handles negative values using two's complement notation" do
+    expect(0b1.bit_not.allbits?(42)).to be_true
+    expect(-42.allbits?(-42)).to be_true
+    expect(0b1010_1010.bit_not.allbits?(0b1110_1011.bit_not)).to be_true
+    expect(0b1010_1010.bit_not.allbits?(0b1000_0010.bit_not)).to be_false
+  end
+end

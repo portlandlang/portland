@@ -1,0 +1,16 @@
+# Stepping a string forward (#106), from ruby/spec core/string/{succ,next,upto}_spec.rb.
+# `succ` follows Ruby's own carry rule, so its rows are Ruby's rows; the
+# binary \xFF rows, the bang forms (ADR 0015), subclasses, encodings, and
+# the to_str conversion (ADR 0036) stay upstream. `upto` without a block is
+# an enumerator in Ruby and nothing here (ADR 0055), so its blockless rows
+# stay upstream too, and the Integer#upto row collects through a range.
+
+require_relative "../../spec_helper"
+
+context "String#next" do
+  specify "answers as String#succ does" do
+    expect("abcd".next).to eq("abcd".succ)
+    expect("1999zzz".next).to eq("1999zzz".succ)
+    expect("Z/[]ZZZ9999".next).to eq("Z/[]ZZZ9999".succ)
+  end
+end

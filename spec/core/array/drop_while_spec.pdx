@@ -1,0 +1,14 @@
+# The ends of an array by count or by a block (#104), from ruby/spec
+# core/array: take, drop, take_while, and drop_while. Staying upstream: a
+# negative count (Portland refuses where Ruby raises ArgumentError), the
+# to_int and TypeError rows (ADR 0036), subclasses, the shift corner
+# (values never mutate), and the rows where a block answers an element as
+# its truthiness — here the block answers true or false, as select's does.
+
+require_relative "../../spec_helper"
+
+context "Array#drop_while" do
+  specify "removes elements from the start of the array while the block evaluates to true" do
+    expect([1, 2, 3, 4].drop_while { |number| number < 4 }).to eq([4])
+  end
+end

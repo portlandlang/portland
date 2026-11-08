@@ -1,0 +1,24 @@
+# `require_relative` resolves against the requiring file (ADR 0049) and
+# `require "name"` searches a load path (ADR 0077), both at a file's top
+# level, so a program is its require closure, known at build.
+#
+# From ruby/spec core/kernel/{require,require_relative}_spec.rb (#185): the
+# rows a closed program can carry. Upstream: $LOADED_FEATURES and
+# $LOAD_PATH, .so and C extensions, symlinks, instance_eval, the to_str and
+# to_path mocks, and the LoadError rows — a missing file refuses at build.
+# The load path itself is pinned by the seed's fixtures under
+# seed/tests/fixtures/lib.
+
+require_relative "../../spec_helper"
+
+require_relative "fixtures/many_methods"
+
+context "Kernel#require_relative with a relative path" do
+  specify "loads a path relative to the current file" do
+    expect(required_greeting("spec")).to eq("hello, spec")
+  end
+
+  specify "loads a file defining many methods" do
+    expect(required_one + required_two).to eq(3)
+  end
+end

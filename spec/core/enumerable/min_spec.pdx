@@ -1,0 +1,94 @@
+# Ruby's Enumerable extremes and sums on an Enumerable struct (#110):
+# `min`, `max`, `minmax_by`, `min_by`, `max_by`, `sort_by`, and `sum`,
+# ordering by `<=>` (ADR 0054) or by the block's answers.
+#
+# From ruby/spec core/enumerable/{min,max,min_by,max_by,minmax_by,sort_by,
+# sum}_spec.rb. Upstream's EachDefiner is a loop over an array; here it
+# is the same struct as Numerous. What stays behind: `min(n)` and `max(n)`
+# with a count, the blockless enumerators (ADR 0055), elements without
+# `<=>` and incompatible pairs (which refuse where Ruby raises), the rows
+# that order nils through truthiness or find a nil (`min_by` answers a
+# maybe, so a found nil is a present nil), the comparator block answering
+# something other than -1, 0, or 1, mocks of `each`, and rationals.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+STRINGS = ["333", "22", "666666", "1", "55555", "1010101010"]
+INTEGERS = [333, 22, 666666, 55555, 1010101010]
+
+context "Enumerable#min" do
+  specify "min should return the minimum element" do
+    expect(numerous(DEFAULT).min).to eq(1)
+  end
+
+  specify "returns the minimum (basic cases)" do
+    expect(numerous([55]).min).to eq(55)
+
+    expect(numerous([11, 99]).min).to eq(11)
+    expect(numerous([99, 11]).min).to eq(11)
+    expect(numerous([2, 33, 4, 11]).min).to eq(2)
+
+    expect(numerous([1, 2, 3, 4, 5]).min).to eq(1)
+    expect(numerous([5, 4, 3, 2, 1]).min).to eq(1)
+    expect(numerous([4, 1, 3, 5, 2]).min).to eq(1)
+    expect(numerous([5, 5, 5, 5, 5]).min).to eq(5)
+
+    expect(numerous(["aa", "tt"]).min).to eq("aa")
+    expect(numerous(["tt", "aa"]).min).to eq("aa")
+    expect(numerous(["2", "33", "4", "11"]).min).to eq("11")
+
+    expect(numerous(STRINGS).min).to eq("1")
+    expect(numerous(INTEGERS).min).to eq(22)
+  end
+
+  specify "returns nil for an empty Enumerable" do
+    expect(Empty.new.min).to be_nil
+  end
+
+  specify "returns the minimum when using a block rule" do
+    expect(numerous(["2", "33", "4", "11"]).min { |left, right| left <=> right }).to eq("11")
+    expect(numerous([2, 33, 4, 11]).min { |left, right| left <=> right }).to eq(2)
+
+    expect(numerous(["2", "33", "4", "11"]).min { |left, right| right <=> left }).to eq("4")
+    expect(numerous([2, 33, 4, 11]).min { |left, right| right <=> left }).to eq(33)
+
+    expect(numerous(STRINGS).min { |left, right| left.length <=> right.length }).to eq("1")
+
+    expect(numerous(STRINGS).min { |left, right| left <=> right }).to eq("1")
+    expect(numerous(STRINGS).min { |left, right| left.to_i <=> right.to_i }).to eq("1")
+
+    expect(numerous(INTEGERS).min { |left, right| left <=> right }).to eq(22)
+    expect(numerous(INTEGERS).min { |left, right| left.to_s <=> right.to_s }).to eq(1010101010)
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    expect(YieldsMulti.new.min).to eq([1, 2])
+  end
+end

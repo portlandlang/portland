@@ -1,0 +1,77 @@
+# Randomness (ADR 0065): Ruby's both — the ambient `rand`, `srand`,
+# `sample`, and `shuffle`, and the explicit `Random.new(seed)` — with
+# Ruby's generator step for step, so every seeded number here is the one
+# CRuby draws.
+#
+# From ruby/spec core/random/{new,rand,seed,equal_value,srand}_spec.rb,
+# core/kernel/{rand,srand}_spec.rb, and core/array/{sample,shuffle}_spec.rb. What stays behind: the fairness
+# measurement, mocks of `rand` and `to_int`, `random: Random` the class
+# (a type is not a value), bignum bounds (#156), the
+# Formatter and bytes (#119), and `Random.srand`/`Random.rand` as class
+# methods, which are the bare functions here.
+
+require_relative "../../spec_helper"
+
+context "Random#rand with Range" do
+  specify "returns a Float >= 0 and < 1 if no max argument is passed" do
+    generator = Random.new
+    floats = (1..50).map { generator.rand }
+    expect(floats.all? { |drawn| drawn >= 0.0 && drawn < 1.0 }).to be_true
+  end
+  specify "returns an Integer >= 0 and < the max argument if an Integer argument is passed" do
+    generator = Random.new
+    integers = (1..50).map { generator.rand(34) }
+    expect(integers.all? { |drawn| drawn >= 0 && drawn < 34 }).to be_true
+  end
+  specify "returns the same sequence for a given seed" do
+    first = Random.new(33)
+    second = Random.new(33)
+    expect((1..10).map { first.rand(90) }).to eq((1..10).map { second.rand(90) })
+    expect((1..10).map { first.rand }).to eq((1..10).map { second.rand })
+  end
+  specify "draws CRuby's numbers for a given seed" do
+    generator = Random.new(42)
+    expect((1..5).map { generator.rand(10) }).to eq([6, 3, 7, 4, 6])
+    expect(Random.new(42).rand).to eq(0.3745401188473625)
+    expect(Random.new(42).rand(1.5)).to eq(0.5618101782710437)
+    expect(Random.new(1234).rand(1000000)).to eq(486191)
+    expect(Random.new(42).rand(1099511627776)).to eq(441507790259)
+  end
+  specify "eventually returns all possible values" do
+    generator = Random.new(33)
+    expect((1..200).map { generator.rand(10) }.uniq.sort).to eq((0..9).to_a)
+  end
+  specify "returns an element from the Range" do
+    expect((Random.new.rand(20..43) in Integer)).to be_true
+  end
+
+  specify "works with inclusive ranges" do
+    generator = Random.new(33)
+    expect((1..40).map { generator.rand(3..5) }.uniq.sort).to eq([3, 4, 5])
+  end
+
+  specify "works with exclusive ranges" do
+    generator = Random.new(33)
+    expect((1..20).map { generator.rand(3...5) }.uniq.sort).to eq([3, 4])
+  end
+
+  specify "draws a float when either end is a float (ADR 0081), CRuby's number" do
+    expect((Random.new(42).rand(0.0..1) in Float)).to be_true
+    expect((Random.new(42).rand(0..1.0) in Float)).to be_true
+    expect(Random.new(42).rand(0.0...100.0)).to eq(37.454011884736246)
+    expect(Random.new(42).rand(-100.0...0.0)).to eq(-62.545988115263754)
+    expect(Random.new(42).rand(0.0..1.0)).to eq(0.3745401144950984)
+    expect(Random.new(7).rand(1.5..2.5)).to eq(1.5763082912255402)
+  end
+
+  specify "draws the same float sequence for a given seed" do
+    first = Random.new(33)
+    second = Random.new(33)
+    expect((1..20).map { first.rand(76890.028..800000.00) }).to eq((1..20).map { second.rand(76890.028..800000.00) })
+  end
+
+  specify "draws CRuby's number for a given seed" do
+    expect(Random.new(42).rand(1..6)).to eq(4)
+    expect(Random.new(42).rand(5...6)).to eq(5)
+  end
+end

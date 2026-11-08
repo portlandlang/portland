@@ -1,0 +1,29 @@
+# A range's ends and its printed, listed, compared, and walked forms
+# (#111), from ruby/spec core/range: begin, end, first, last, exclude_end?,
+# to_s, inspect, ==, to_a, entries, include?, cover?, member?, size, each,
+# reverse_each, and minmax — the integer rows; the string and float rows
+# are in spec/range/orderable_spec.pdx (ADR 0081). The symbol, non-ASCII,
+# Time, and mock rows stay upstream, with to_int and Float counts (ADR
+# 0036), the refusals where Ruby raises, Range.new, subclasses, identity
+# checks, and blockless Enumerators (ADR 0055). `inspect` is a function
+# here (ADR 0026), and alias checks compare the two answers. Upstream's
+# `a << i` is the accumulator pattern on a mutable.
+
+require_relative "../../spec_helper"
+
+context "Range#to_a" do
+  specify "converts self to an array" do
+    expect((-5..5).to_a).to eq([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5])
+    expect((0xfffd...0xffff).to_a).to eq([0xfffd, 0xfffe])
+  end
+
+  specify "returns empty array for descending-ordered" do
+    expect((5..-5).to_a).to eq([])
+    expect((0xffff...0xfffd).to_a).to eq([])
+  end
+
+  specify "works with Ranges of 64-bit integers" do
+    large = 1099511627776
+    expect((large..large + 1).to_a).to eq([1099511627776, 1099511627777])
+  end
+end

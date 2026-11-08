@@ -1,0 +1,52 @@
+# A hash's pairs by lookup and as a list, and the subset comparisons
+# (#105), from ruby/spec core/hash: assoc, rassoc, flatten, <, <=, >, >=,
+# the alias filter, and []=, which is the rebinding sugar here (ADR 0015). Alias checks compare the two answers rather than method
+# objects. Staying upstream: instance_of? checks, compare_by_identity,
+# Hash.new defaults, to_hash conversion and the TypeError rows (Portland
+# refuses a non-hash operand), and []='s rows about dup, freeze, and mocks.
+
+require_relative "../../spec_helper"
+
+context "Hash#<" do
+  table = {a: 1, b: 2}
+  bigger = {a: 1, b: 2, c: 3}
+  unrelated = {c: 3, d: 4}
+  similar = {a: 2, b: 3}
+
+  specify "returns true if self is a subset of the other hash" do
+    expect(table < bigger).to eq(true)
+  end
+
+  specify "returns false if self is not a subset of the other hash" do
+    expect(bigger < table).to eq(false)
+  end
+
+  specify "returns false if both hashes have the same keys but different values" do
+    expect({a: 1} < {a: 2}).to eq(false)
+    expect({a: 2} < {a: 1}).to eq(false)
+  end
+
+  specify "returns false if both hashes are identical" do
+    expect(table < table).to eq(false)
+  end
+
+  specify "returns false when receiver size is larger than argument" do
+    expect(bigger < table).to eq(false)
+    expect(bigger < unrelated).to eq(false)
+  end
+
+  specify "returns false when receiver size is the same as argument" do
+    expect(table < table).to eq(false)
+    expect(table < unrelated).to eq(false)
+    expect(unrelated < table).to eq(false)
+  end
+
+  specify "returns true when receiver is a subset of argument" do
+    expect(table < bigger).to eq(true)
+  end
+
+  specify "returns false when keys match but values don't" do
+    expect(table < similar).to eq(false)
+    expect(similar < table).to eq(false)
+  end
+end

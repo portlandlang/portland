@@ -1,0 +1,46 @@
+# What a match answers (ADR 0086): Ruby's MatchData reading API —
+# `[]`, `captures`, `named_captures`, `names`, `pre_match`, `post_match`,
+# `begin`, `end`, `offset`, `match`, `match_length`, `to_a`, `to_s`,
+# `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
+# positions counted in graphemes (ADR 0038).
+#
+# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
+# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
+# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
+# coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
+
+require_relative "../../spec_helper"
+
+context "MatchData#offset" do
+  specify "returns beginning and ending character offset of the whole match for 0" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md.offset(0)).to eq([1, 7])
+  end
+
+  specify "returns the offsets of the nth group" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md.offset(2)).to eq([2, 3])
+    expect(md.offset(3)).to eq([3, 6])
+    expect(md.offset(4)).to eq([6, 7])
+  end
+
+  specify "accepts a String or a Symbol as a reference to a named capture" do
+    md = /(?<f>foo)(?<b>bar)/.match("foobar") or panic("no match")
+    expect(md.offset("f")).to eq([0, 3])
+    expect(md.offset(:b)).to eq([3, 6])
+  end
+
+  specify "returns [nil, nil] if a capturing group is optional and doesn't match" do
+    md = /(?<x>q..)?/.match("foobarbaz") or panic("no match")
+    expect(md.offset("x")).to eq([nil, nil])
+    expect(md.offset(1)).to eq([nil, nil])
+  end
+
+  specify "returns correct offsets for multi-byte strings" do
+    md = /\Aあ(.)(.)?(.)\z/.match("あいう") or panic("no match")
+    expect(md.offset(1)).to eq([1, 2])
+    expect(md.offset(3)).to eq([2, 3])
+    expect(md.offset(2)).to eq([nil, nil])
+  end
+end

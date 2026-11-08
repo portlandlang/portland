@@ -1,0 +1,18 @@
+# Case equality on `true`, `false`, and `nil` (#150), from ruby/spec
+# core/true/case_compare_spec.rb, core/false/, and core/nil/. Upstream also
+# asks each whether it matches `Object`, a class object Portland doesn't
+# have; every other row ports as written.
+
+require_relative "../../spec_helper"
+
+context "FalseClass#===" do
+  specify "returns true for false" do
+    expect(false === false).to eq(true)
+  end
+
+  specify "returns false for non-false object" do
+    expect(false === 0).to eq(false)
+    expect(false === "").to eq(false)
+    expect(false === nil).to eq(false)
+  end
+end

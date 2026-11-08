@@ -1,0 +1,15 @@
+# `==` and `===` on strings (#106), from ruby/spec
+# core/string/{equal_value,case_compare}_spec.rb and the shared eql rows. A
+# string equals another with the same text — canonical equivalence (ADR
+# 0038) — and nothing of another type; `===` asks `==`. The to_str protocol
+# (ADR 0036), subclasses, encodings, and the NUL row (no \0 escape) stay
+# upstream; `eql?` and `hash` wait on #154.
+
+require_relative "../../spec_helper"
+
+context "String#===" do
+  specify "is an alias of String#==" do
+    expect("hello" === "hello").to be_true
+    expect("hello" === "HELLO").to be_false
+  end
+end

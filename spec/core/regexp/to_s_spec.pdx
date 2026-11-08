@@ -1,0 +1,48 @@
+# A regex is a value (ADR 0086): Ruby's literals with `i`, `m`, and `x`,
+# `%r{}` with the family's delimiters, interpolation, and what a pattern
+# answers about itself — `source`, `inspect`, `to_s`, `options`,
+# `casefold?`, `names`, `named_captures`, `==`, `===` — plus the type
+# functions `Regexp.new`, `Regexp.escape`, `Regexp.quote`, and
+# `Regexp.union`.
+#
+# From ruby/spec core/regexp/{source,inspect,to_s,options,casefold,names,
+# named_captures,equal_value,eql,case_compare,new,compile,escape,quote,
+# union}_spec.rb, shared/new.rb, shared/quote.rb, and language/regexp/
+# interpolation_spec.rb. Upstream: the encoding rows (every string is UTF-8
+# here, ADR 0069; the `n`, `u`, `e`, and `s` modifiers do not exist), the
+# `o` flag, `Regexp.allocate`, subclasses, `to_str` coercion, mocks, and
+# `frozen?`, which has no meaning for a value.
+
+require_relative "../../spec_helper"
+
+context "Regexp#to_s" do
+  specify "displays options if included" do
+    expect(/abc/mxi.to_s).to eq("(?mix:abc)")
+  end
+
+  specify "shows non-included options after a - sign" do
+    expect(/abc/i.to_s).to eq("(?i-mx:abc)")
+  end
+
+  specify "shows all options as excluded if none are selected" do
+    expect(/abc/.to_s).to eq("(?-mix:abc)")
+  end
+
+  specify "shows the pattern after the options" do
+    expect(/ab+c/mix.to_s).to eq("(?mix:ab+c)")
+    expect(/xyz/.to_s).to eq("(?-mix:xyz)")
+  end
+
+  specify "returns a string in (?xxx:yyy) notation" do
+    expect(/ab+c/ix.to_s).to eq("(?ix-m:ab+c)")
+    expect(/(?:.)/.to_s).to eq("(?-mix:(?:.))")
+    expect(/(?=5)/.to_s).to eq("(?-mix:(?=5))")
+    expect(/(?!5)/.to_s).to eq("(?-mix:(?!5))")
+  end
+
+  specify "displays groups with options as written" do
+    expect(/(?ix:foo)(?m:bar)/.to_s).to eq("(?-mix:(?ix:foo)(?m:bar))")
+    expect(/(?ix:foo)bar/m.to_s).to eq("(?m-ix:(?ix:foo)bar)")
+    expect(/whatever(?:0d)/ix.to_s).to eq("(?ix-m:whatever(?:0d))")
+  end
+end

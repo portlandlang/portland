@@ -1,0 +1,22 @@
+# A set's algebra (ADR 0082) under Ruby's word names — `union`,
+# `intersection`, `difference` — and the two operators the grammar has, `+`
+# for union and `-` for difference; each takes any enumerable and answers a
+# new set. `|`, `&`, and `^` are out of the grammar (ADR 0003); #207 holds
+# that question. Ruby 4's `flatten`, `classify`, `join`, and `to_a` beside.
+#
+# From ruby/spec core/set/{union,plus,intersection,minus,difference,flatten,
+# classify,join,to_a}_spec.rb. Upstream: the alias checks, the
+# compare_by_identity rows, the recursive set, the Enumerator rows, the
+# Set-like objects, and flatten!, which mutates (ADR 0015).
+
+require_relative "../../spec_helper"
+
+context "Set" do
+  describe "the symmetric difference" do
+    specify "is spelled from union and intersection" do
+      left = Set[1, 2, 3, 4]
+      right = Set[3, 4, 5]
+      expect((left + right) - left.intersection(right)).to eq(Set[1, 2, 5])
+    end
+  end
+end

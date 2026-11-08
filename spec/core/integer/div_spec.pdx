@@ -1,0 +1,51 @@
+# Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/divide_spec.rb (#23); the
+# divide-by-zero half stays behind — the panic is the seed's whole error
+# story today, and a panic ends the file.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+# The named division family (#107), from ruby/spec core/integer: divmod,
+# div, remainder, ceildiv, and fdiv, fixnum halves. Upstream's be_close is
+# close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
+# infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
+# (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
+# ends a run, so those examples stay upstream with the bignum, Rational,
+# and coercion ones.
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Integer#div" do
+  specify "returns self divided by the given argument as an Integer" do
+    expect(2.div(2)).to eq(1)
+    expect(1.div(2)).to eq(0)
+    expect(5.div(2)).to eq(2)
+  end
+
+  specify "rounds towards -inf" do
+    expect(8192.div(10)).to eq(819)
+    expect(8192.div(-10)).to eq(-820)
+    expect((-8192).div(10)).to eq(-820)
+    expect((-8192).div(-10)).to eq(819)
+  end
+
+  specify "means (x / y).floor" do
+    expect(5.div(2)).to eq((5 / 2).floor)
+    expect(5.div(2.0)).to eq((5 / 2.0).floor)
+    expect(5.div(-2)).to eq((5 / -2).floor)
+    expect(5.div(100)).to eq((5 / 100).floor)
+    expect(5.div(100.0)).to eq((5 / 100.0).floor)
+    expect(5.div(-100)).to eq((5 / -100).floor)
+  end
+
+  specify "coerces self and the given argument to Floats and returns self divided by other as Integer" do
+    expect(1.div(0.2)).to eq(5)
+    expect(1.div(0.16)).to eq(6)
+    expect(1.div(0.169)).to eq(5)
+    expect(-1.div(50.4)).to eq(-1)
+  end
+end

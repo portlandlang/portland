@@ -1,0 +1,32 @@
+# The float predicates. `infinite?` is a predicate proper — true or false —
+# not Ruby's nil/1/-1, which is unusable here where nil is not falsy
+# (recorded in the ledger).
+#
+# From ruby/spec core/float/{zero,finite,infinite,nan}_spec.rb.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../../spec_helper"
+
+context "Float" do
+  describe "the predicates" do
+    specify "Float#zero? answers whether the value is exactly zero" do
+      expect(0.0.zero?).to be_true
+      expect(0.1.zero?).to be_false
+    end
+
+    specify "Float#nan? knows the not-a-number" do
+      expect((0.0 / 0.0).nan?).to be_true
+      expect(1.0.nan?).to be_false
+    end
+
+    specify "Float#finite? and #infinite? split the line's ends off" do
+      expect(1.0.finite?).to be_true
+      expect((1.0 / 0.0).finite?).to be_false
+      expect((1.0 / 0.0).infinite?).to be_true
+      expect((-1.0 / 0.0).infinite?).to be_true
+      expect(1.0.infinite?).to be_false
+    end
+  end
+end

@@ -1,0 +1,100 @@
+# Ruby's Enumerable predicates and counts on an Enumerable struct (#110):
+# `all?`, `any?`, `none?`, and `one?` take a block that answers true or
+# false — the blockless forms ask an element's own truthiness, which is a
+# refusal here, as is a block answering 5 or nil — and `count`, `include?`,
+# and `find_index` ask `==`.
+#
+# From ruby/spec core/enumerable/{all,any,none,one,count,find_index}_spec.rb.
+# What stays behind: the pattern argument (`all?(Integer)`, asking `===`),
+# exceptions out of `each` or the block, the extra-argument arity rows
+# (checked statically here), the ignored block beside an argument, the
+# splat block parameter, and the row where a one-parameter block takes
+# the first of several yielded values — here it sees the packed array.
+
+require_relative "../../spec_helper"
+
+struct Numerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+struct Empty
+  include Enumerable
+
+  def each
+    self
+  end
+end
+struct YieldsMulti
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+def numerous(list) = Numerous.new(list: list)
+DEFAULT = [2, 5, 3, 6, 1, 4]
+
+context "Enumerable#any?" do
+  specify "always returns false on empty enumeration" do
+    expect(Empty.new.any? { true }).to be_false
+    expect([].any? { true }).to be_false
+    expect({}.any? { true }).to be_false
+  end
+
+  describe "with block" do
+    specify "returns true if the block ever returns other than false or nil" do
+      expect(numerous(DEFAULT).any? { true }).to be_true
+      expect(numerous([0, 1, 2, -1]).any? { |item| item < 1 }).to be_true
+      expect(numerous([nil, false, true]).any? { |item| item == nil }).to be_true
+    end
+
+    specify "returns false if the block never returns other than false or nil" do
+      expect(numerous(DEFAULT).any? { false }).to be_false
+      expect(numerous([0, 1, 2, -1]).any? { |item| item < -10 }).to be_false
+      expect(numerous([nil, false, true]).any? { |item| item == :stuff }).to be_false
+    end
+
+    specify "stops iterating once the return value is determined" do
+      mutable yielded = []
+      first_answer = numerous([:one, :two, :three]).any? do |item|
+        yielded << item
+        false
+      end
+      expect(first_answer).to be_false
+      expect(yielded).to eq([:one, :two, :three])
+
+      yielded = []
+      second_answer = numerous([true, true, false, true]).any? do |item|
+        yielded << item
+        item
+      end
+      expect(second_answer).to be_true
+      expect(yielded).to eq([true])
+
+      yielded = []
+      third_answer = numerous([false, false, false, true, false]).any? do |item|
+        yielded << item
+        item
+      end
+      expect(third_answer).to be_true
+      expect(yielded).to eq([false, false, false, true])
+    end
+
+    specify "gathers whole arrays as elements when each yields multiple" do
+      mutable yielded = []
+      answer = YieldsMulti.new.any? do |item|
+        yielded << item
+        false
+      end
+      expect(answer).to be_false
+      expect(yielded).to eq([[1, 2], [3, 4, 5], [6, 7, 8, 9]])
+    end
+  end
+end

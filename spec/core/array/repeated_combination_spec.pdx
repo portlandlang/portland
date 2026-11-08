@@ -1,0 +1,41 @@
+# Ruby's combinatorics and cycle (#104), from ruby/spec
+# core/array/{combination,repeated_combination,permutation,repeated_permutation,product,cycle}_spec.rb.
+# Without a block each answers its arrangements as an array — there are no
+# enumerators (ADR 0055), so the enumerator-size rows stay upstream — and
+# with one hands them over in turn and answers the array; `cycle` takes a
+# count, since a cycle with no count never ends, so the unbounded rows stay
+# upstream with the StopIteration, to_int, and to_ary rows and the
+# mid-walk mutation rows (values never mutate).
+
+require_relative "../../spec_helper"
+
+context "Array#repeated_combination" do
+  specify "returns self when a block is given" do
+    numbers = [10, 11, 12]
+    expect(numbers.repeated_combination(2) { }).to eq(numbers)
+  end
+
+  specify "yields nothing for negative length and return self" do
+    numbers = [10, 11, 12]
+    expect(numbers.repeated_combination(-1) { }).to eq(numbers)
+    expect(numbers.repeated_combination(-1)).to eq([])
+  end
+
+  specify "yields the expected repeated_combinations" do
+    expect([10, 11, 12].repeated_combination(2).sort).to eq([[10, 10], [10, 11], [10, 12], [11, 11], [11, 12], [12, 12]])
+    expect([10, 11, 12].repeated_combination(3).sort).to eq([[10, 10, 10], [10, 10, 11], [10, 10, 12], [10, 11, 11], [10, 11, 12], [10, 12, 12], [11, 11, 11], [11, 11, 12], [11, 12, 12], [12, 12, 12]])
+  end
+
+  specify "yields [] when length is 0" do
+    expect([10, 11, 12].repeated_combination(0)).to eq([[]])
+    expect([].repeated_combination(0)).to eq([[]])
+  end
+
+  specify "yields nothing when the array is empty and num is non zero" do
+    expect([].repeated_combination(5)).to eq([])
+  end
+
+  specify "yields a partition consisting of only singletons" do
+    expect([10, 11, 12].repeated_combination(1).sort).to eq([[10], [11], [12]])
+  end
+end

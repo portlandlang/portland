@@ -1,0 +1,32 @@
+# `upcase` and `downcase` answer new strings; the receiver is untouched.
+#
+# The rows below the house examples are from ruby/spec
+# core/string/{upcase,downcase,capitalize,swapcase}_spec.rb. Casing is full
+# Unicode, locale-independent (ADR 0038), so the :ascii, :turkic,
+# :lithuanian, and :fold options are decided out (fold lives in casecmp?);
+# the bang forms (ADR 0015), subclasses, encodings, and ascii_only? stay
+# upstream. downcase's Kelvin-sign row spells it with a \u escape Portland
+# does not have.
+
+require_relative "../../spec_helper"
+
+context "String#swapcase" do
+  specify "returns a new string with all uppercase chars from self converted to lowercase and vice versa" do
+    expect("Hello".swapcase).to eq("hELLO")
+    expect("cYbEr_PuNk11".swapcase).to eq("CyBeR_pUnK11")
+    expect("+++---111222???".swapcase).to eq("+++---111222???")
+  end
+
+  describe "full Unicode case mapping" do
+    specify "works for all of Unicode with no option" do
+      expect("äÖü".swapcase).to eq("ÄöÜ")
+    end
+
+    specify "updates string metadata" do
+      swapcased = "Aßet".swapcase
+      expect(swapcased).to eq("aSSET")
+      expect(swapcased.size).to eq(5)
+      expect(swapcased.bytesize).to eq(5)
+    end
+  end
+end

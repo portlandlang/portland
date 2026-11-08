@@ -1,0 +1,30 @@
+# Arithmetic that follows Ruby rather than the Rust floor it is built on.
+#
+# Grown from ruby/spec core/integer/divide_spec.rb (#23); the
+# divide-by-zero half stays behind — the panic is the seed's whole error
+# story today, and a panic ends the file.
+
+# Up two, because `require_relative` resolves against this file's own directory
+# (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../spec_helper"
+
+# The named division family (#107), from ruby/spec core/integer: divmod,
+# div, remainder, ceildiv, and fdiv, fixnum halves. Upstream's be_close is
+# close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
+# infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
+# (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
+# ends a run, so those examples stay upstream with the bignum, Rational,
+# and coercion ones.
+
+def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
+
+context "Integer#divmod" do
+  specify "returns an Array containing quotient and modulus obtained from dividing self by the given argument" do
+    expect(13.divmod(4)).to eq([3, 1])
+    expect(4.divmod(13)).to eq([0, 4])
+    expect(13.divmod(4.0)).to eq([3, 1])
+    expect(4.divmod(13.0)).to eq([0, 4])
+    expect(1.divmod(2.0)).to eq([0, 1.0])
+  end
+end

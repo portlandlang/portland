@@ -1,0 +1,18 @@
+# An integer's places and what it is as a character code and in memory
+# (#107), from ruby/spec core/integer: digits, ord, and size. Upstream's
+# eql? type checks ask inspect's answer. Its `?a.ord` rows are String#ord,
+# which waits on core/string (#106): Ruby's answers the first codepoint,
+# and a Portland character is a grapheme cluster (ADR 0038).
+# Where Ruby raises (ArgumentError, Math::DomainError) Portland refuses in
+# the same words, which ends a run, so those examples stay upstream with
+# the bignum and to_int ones.
+
+require_relative "../../spec_helper"
+
+context "Integer#size" do
+  specify "returns the number of bytes in the machine representation of self" do
+    expect(-1.size).to eq(8)
+    expect(0.size).to eq(8)
+    expect(4091.size).to eq(8)
+  end
+end

@@ -1,0 +1,30 @@
+# Ruby's combinatorics and cycle (#104), from ruby/spec
+# core/array/{combination,repeated_combination,permutation,repeated_permutation,product,cycle}_spec.rb.
+# Without a block each answers its arrangements as an array — there are no
+# enumerators (ADR 0055), so the enumerator-size rows stay upstream — and
+# with one hands them over in turn and answers the array; `cycle` takes a
+# count, since a cycle with no count never ends, so the unbounded rows stay
+# upstream with the StopIteration, to_int, and to_ary rows and the
+# mid-walk mutation rows (values never mutate).
+
+require_relative "../../spec_helper"
+
+context "Array#cycle" do
+  specify "does not yield and returns nil when the array is empty and passed value is an integer" do
+    mutable seen = []
+    expect([].cycle(6) { |element| seen << element }).to be_nil
+    expect(seen).to eq([])
+  end
+
+  specify "does not yield and returns nil when passed 0" do
+    mutable seen = []
+    expect([1, 2, 3].cycle(0) { |element| seen << element }).to be_nil
+    expect(seen).to eq([])
+  end
+
+  specify "iterates the array 'count' times yielding each item to the block" do
+    mutable seen = []
+    [1, 2, 3].cycle(2) { |element| seen << element }
+    expect(seen).to eq([1, 2, 3, 1, 2, 3])
+  end
+end

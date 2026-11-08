@@ -1,0 +1,37 @@
+# Two ranges against each other, and a range against a value (#111), from
+# ruby/spec core/range: overlap? and === (through upstream's shared
+# cover_and_include). Ranges hold integers here, so the string, float, and
+# mock rows stay upstream, with nil..nil (no spelling), and a non-range
+# argument, which refuses where Ruby raises TypeError.
+
+require_relative "../../spec_helper"
+
+context "Range#===" do
+  specify "returns true if other is an element of self" do
+    expect((0..5) === 2).to eq(true)
+    expect((-5..5) === 0).to eq(true)
+    expect((0xffff..0xfffff) === 0xffffd).to eq(true)
+    expect((0xffff..0xfffff) === 0xfffd).to eq(false)
+  end
+
+  specify "returns true if argument is equal to the first value of the range" do
+    expect((0..5) === 0).to eq(true)
+  end
+
+  specify "returns true if argument is equal to the last value of the range" do
+    expect((0..5) === 5).to eq(true)
+    expect((0...5) === 4).to eq(true)
+  end
+
+  specify "returns true if argument is less than the last value of the range and greater than the first value" do
+    expect((20..30) === 28).to eq(true)
+  end
+
+  specify "returns true if argument is sole element in the range" do
+    expect((30..30) === 30).to eq(true)
+  end
+
+  specify "returns false if range is empty" do
+    expect((30...30) === 30).to eq(false)
+  end
+end
