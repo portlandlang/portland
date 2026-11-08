@@ -4,6 +4,14 @@
 
 require_relative "../../spec_helper"
 
+struct Landing
+  name
+end
+
+def instance_of_kind(kind, value)
+  kind === value
+end
+
 context "Module#===" do
   specify "matches the type pattern and the when value" do
     answer = case Set[1]
@@ -11,5 +19,39 @@ context "Module#===" do
     else "other"
     end
     expect(answer).to eq("set")
+  end
+
+  specify "returns true when the given Object is an instance of self" do
+    expect(Integer === 3).to eq(true)
+    expect(Float === 3).to eq(false)
+  end
+
+  # A type held in a local, a parameter, or a field is the same type (#255):
+  # it type-tests, rather than comparing the type to the value by equality.
+  specify "type-tests with a type held in a local" do
+    kind = Integer
+    expect(kind === 3).to eq(true)
+    expect(kind === 3.0).to eq(false)
+    expect(kind === nil).to eq(false)
+  end
+
+  specify "type-tests with a type a method was handed" do
+    expect(instance_of_kind(String, "rose")).to eq(true)
+    expect(instance_of_kind(String, :rose)).to eq(false)
+  end
+
+  specify "type-tests a struct with the struct held in a local" do
+    kind = Landing
+    expect(kind === Landing.new(name: "Swan Island")).to eq(true)
+    expect(kind === "Swan Island").to eq(false)
+  end
+
+  specify "type-tests in a when with the type held in a local" do
+    kind = Symbol
+    answer = case :rose
+    when kind then "symbol"
+    else "other"
+    end
+    expect(answer).to eq("symbol")
   end
 end
