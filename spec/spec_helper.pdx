@@ -284,6 +284,27 @@ def end_with(suffix)
   EndMatcher.new(suffix: suffix)
 end
 
+# `cover(value)` is `Range#cover?` (#252).
+struct CoverMatcher
+  value
+
+  def matches?(actual)
+    actual.cover?(value)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to cover #{inspect(value)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to cover #{inspect(value)}"
+  end
+end
+
+def cover(value)
+  CoverMatcher.new(value: value)
+end
+
 # ruby/spec's `be_close(expected, tolerance)`: within the tolerance, strictly.
 struct CloseMatcher
   expected
@@ -436,7 +457,7 @@ end
 # one method call. This is what rspec's `be_empty` / `be_nil` / `be_whatever`
 # buys with `method_missing`, written out — the repetition is the honest cost
 # of having no runtime dynamism, and the shape a compile-time macro (#14)
-# would generate. Four of them is tolerable; forty would not be, which is the
+# would generate. Five of them is tolerable; forty would not be, which is the
 # argument for the macro when a real file asks.
 struct EmptyMatcher
   word
@@ -496,6 +517,28 @@ end
 
 def be_some
   SomeMatcher.new(word: "some")
+end
+
+# `be_nan` (#252): a NaN equals nothing, itself included, so `eq` can never
+# check for one. The fifth predicate matcher.
+struct NanMatcher
+  word
+
+  def matches?(actual)
+    actual.nan?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_nan
+  NanMatcher.new(word: "NaN")
 end
 
 struct FailureMatcher
