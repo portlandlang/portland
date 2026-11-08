@@ -1,7 +1,7 @@
 # The spec harness's type matchers (#252): `be_an_instance_of`, `be_a`, and
-# `be_an`, `be_a`'s twin. All three ask `actual.class == type`, since a type
-# held in a variable does not type-test with `===` (#255). With no class
-# hierarchy, the two names answer the same today.
+# `be_an`, `be_a`'s twin. All three are `type === actual`, a type held in a
+# field type-testing as a written one does (#255). With no class hierarchy,
+# the two names answer the same today.
 
 require_relative "../../spec_helper"
 
