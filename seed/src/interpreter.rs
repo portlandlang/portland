@@ -5278,6 +5278,63 @@ impl<W: std::io::Write> Interpreter<W> {
         {
             return Some(answer);
         }
+        // `match` with a block (#215), Ruby's: the block runs only on a
+        // match, given it, and the call answers the block's result — a maybe,
+        // nil when nothing matched and the block never ran.
+        // Arguments `match` does not take fall through to the general
+        // refusals, as they do without a block.
+        if let Some(block) = block
+            && matches!(receiver, Value::Regex(_))
+            && name == "match"
+            && let Some(found) = crate::regexp::method(&receiver, name, &arguments)
+        {
+            if matches!(found, Value::Nil) {
+                return Some(Value::Nil);
+            }
+            let result = self.run_block(block, vec![found]);
+            if let Some(interrupted) = self.block_interrupt() {
+                return interrupted;
+            }
+            return Some(Value::present(result.unwrap_or(Value::Nil)));
+        }
+        // `named_captures(symbolize_names:)` (#215): symbol keys, made from
+        // the group names as ADR 0071 allows. The flag is a Boolean, as
+        // JSON.parse's is — no truthiness to read "truly" or nil by.
+        if let Value::MatchData(_) = &receiver
+            && name == "named_captures"
+            && !keyword_arguments.is_empty()
+        {
+            let mut symbolize_names = false;
+            for (label, value) in &keyword_arguments {
+                match (label.as_str(), value) {
+                    ("symbolize_names", Value::Boolean(flag)) => symbolize_names = *flag,
+                    ("symbolize_names", other) => panic!(
+                        "named_captures takes true or false for symbolize_names:, got {}",
+                        other.shown()
+                    ),
+                    (other, _) => panic!(
+                        "named_captures does not take {other}: — symbolize_names: is its one keyword"
+                    ),
+                }
+            }
+            let captures = crate::regexp::method(&receiver, name, &arguments)
+                .unwrap_or_else(|| panic!("named_captures takes 0 arguments"));
+            if !symbolize_names {
+                return Some(captures);
+            }
+            let Value::Hash(pairs) = captures else {
+                unreachable!("named_captures answers a hash")
+            };
+            return Some(Value::hash(
+                pairs
+                    .iter()
+                    .map(|(key, value)| match key {
+                        Value::String(text) => (Value::Symbol(text.clone()), value.clone()),
+                        other => (other.clone(), value.clone()),
+                    })
+                    .collect(),
+            ));
+        }
         // A pattern's, a match's, and a string's regex-taking names (ADR
         // 0086), before the string arms so a pattern argument is never
         // mistaken for a missing string.

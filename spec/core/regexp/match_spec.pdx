@@ -5,8 +5,9 @@
 # From ruby/spec core/regexp/{match,match?}_spec.rb and shared/match.rb,
 # and core/string/{match,match?,=~}_spec.rb's regex rows. Upstream: `=~`
 # answering an index (it answers the match here, since the match globals
-# are gone), `$~` being set or reset, `Regexp.last_match`, the block form
-# of `match`, mocks, `Regexp.allocate`, and the encoding rows.
+# are gone), `$~` being set or reset, `Regexp.last_match`, mocks,
+# `Regexp.allocate`, and the encoding rows. The block form of `match`
+# answers the block's result, a maybe (#215).
 
 require_relative "../../spec_helper"
 
@@ -70,6 +71,29 @@ context "Regexp#match" do
   specify "answers nil past the end" do
     expect(/./.match("abc", 3)).to be_nil
     expect(/./.match("abc", 9)).to be_nil
+  end
+
+  describe "when passed a block" do
+    specify "yields the MatchData" do
+      mutable recorded = nil
+      /./.match("abc") { |found| recorded = found }
+      expect(recorded).to be_a(MatchData)
+    end
+
+    specify "returns the block result" do
+      expect(/./.match("abc") { :result }).to eq(:result)
+    end
+
+    specify "does not yield if there is no match" do
+      mutable recorded = []
+      /a/.match("b") { |found| recorded = recorded + [found] }
+      expect(recorded).to eq([])
+    end
+
+    # The block's answer is a maybe (#215): nil when nothing matched.
+    specify "answers nil when there is no match" do
+      expect(/x/.match("a") { :never }).to be_nil
+    end
   end
 end
 context "Regexp#match?" do
