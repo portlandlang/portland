@@ -1573,6 +1573,45 @@ fn hash_walks_as_pairs(name: &str, with_block: bool) -> bool {
 /// `Integer.sqrt` (ADR 0058): the integer square root, exact to the 64-bit
 /// edge, where a float's root would round past 2^53. A negative radicand
 /// refuses in Ruby's words.
+/// `Hash[...]` (ADR 0058, amended, #218), Ruby's `rb_hash_s_create`: no
+/// members is `{}`; one hash is a copy; one array is its pairs, a
+/// one-element pair taking nil; otherwise keys and values alternate. A
+/// repeated key keeps its first position and its last value, as a
+/// literal's does. The refusals are Ruby's words.
+fn hash_from_brackets(arguments: Vec<Value>) -> Value {
+    let mut pairs: Vec<(Value, Value)> = Vec::new();
+    let mut insert =
+        |key: Value, value: Value| match pairs.iter_mut().find(|(existing, _)| *existing == key) {
+            Some(pair) => pair.1 = value,
+            None => pairs.push((key, value)),
+        };
+    match arguments.as_slice() {
+        [Value::Hash(existing)] => return Value::hash(existing.as_ref().clone()),
+        [Value::Array(elements)] => {
+            for (index, element) in elements.iter().enumerate() {
+                let Value::Array(pair) = element else {
+                    panic!(
+                        "wrong element type {} at {index} (expected array)",
+                        element.type_name()
+                    );
+                };
+                match pair.as_slice() {
+                    [key] => insert(key.clone(), Value::Nil),
+                    [key, value] => insert(key.clone(), value.clone()),
+                    other => panic!("invalid number of elements ({} for 1..2)", other.len()),
+                }
+            }
+        }
+        _ if arguments.len() % 2 == 1 => panic!("odd number of arguments for Hash"),
+        _ => {
+            for pair in arguments.chunks(2) {
+                insert(pair[0].clone(), pair[1].clone());
+            }
+        }
+    }
+    Value::hash(pairs)
+}
+
 /// `Range.new(first, last)` and `Range.new(first, last, true)` (#111, ADR
 /// 0058): the literal's two spellings as a function. Either end may be
 /// nil, as the literal's may; the third argument is a Boolean, true
@@ -4280,6 +4319,9 @@ impl<W: std::io::Write> Interpreter<W> {
             // Ruby's does.
             ("Set", "new") => self.set_new(arguments, block),
             ("Set", "[]") => Some(Value::set(arguments)),
+            // `Array[a, b]` and `Hash[...]` (ADR 0058, amended, #218).
+            ("Array", "[]") => Some(Value::array(arguments)),
+            ("Hash", "[]") => Some(hash_from_brackets(arguments)),
             ("Range", "new") => Some(range_new(&arguments)),
             ("System", "arguments") => {
                 if !arguments.is_empty() {

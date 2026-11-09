@@ -2286,6 +2286,33 @@ end
 # shapes it answers: `Integer.sqrt` whole, so its wordings reach here, and
 # `Array.new` by count, count and fill, or array. The block form counts on
 # the host and hands each index to the guest block.
+# `Hash[...]`, the seed's hash_from_brackets (Ruby's `rb_hash_s_create`):
+# no members is `{}`; one hash is a copy; one array is its pairs, a
+# one-element pair taking nil; otherwise keys and values alternate. A guest
+# symbol or struct is a tagged host array, so a pair is a plain array.
+def guest_hash_from_brackets(arguments)
+  return {} if arguments.empty?
+  first = value_at(arguments, 0)
+  return first.to_h { |key, value| [key, value] } if arguments.length == 1 && (first in Hash)
+  if arguments.length == 1 && plain_array?(first)
+    mutable built = {}
+    first.each_with_index do |pair, index|
+      panic("wrong element type #{value_type_label(pair)} at #{index} (expected array)") unless plain_array?(pair)
+      panic("invalid number of elements (#{pair.length} for 1..2)") unless pair.length == 1 || pair.length == 2
+      built = built.merge({value_at(pair, 0) => value_at(pair, 1)})
+    end
+    return built
+  end
+  panic("odd number of arguments for Hash") if arguments.length.odd?
+  mutable built = {}
+  mutable index = 0
+  while index < arguments.length
+    built = built.merge({value_at(arguments, index) => value_at(arguments, index + 1)})
+    index += 2
+  end
+  built
+end
+
 def evaluate_builtin_type_function(node, mutable bindings)
   return evaluate_json(node, bindings) if node.receiver.name == "JSON"
   # A type's `name` is its spelling (ADR 0074); `System` and `Math` are
@@ -2424,6 +2451,9 @@ def evaluate_builtin_type_function(node, mutable bindings)
     return mapped_guest_set(node, candidates, bindings)
   end
   return outcome([guest_set(arguments)], bindings) if type_name == "Set" && node.name == "[]"
+  # `Array[a, b]` and `Hash[...]` (ADR 0058, amended, #218).
+  return outcome([arguments], bindings) if type_name == "Array" && node.name == "[]"
+  return outcome([guest_hash_from_brackets(arguments)], bindings) if type_name == "Hash" && node.name == "[]"
   # `Complex.polar` and `Complex.rectangular` (ADR 0085), the host's own.
   if type_name == "Complex" && %w[polar rect rectangular].include?(node.name)
     panic("Complex.#{node.name} takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2

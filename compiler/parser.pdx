@@ -1528,9 +1528,11 @@ def postfix_from(tokens, mutable step)
       next
     end
     if operator_at?(tokens, position, ["["])
-      # `Set[1, 2, 3]` (ADR 0082): the type function `[]` with the members
-      # between the brackets — not an index.
-      if (step.node in IdentifierNode) && step.node.name == "Set" && !tokens[position].leading_space
+      # `Set[1, 2, 3]` (ADR 0082), `Array[1, 2]`, and `Hash["a", 1]` (ADR
+      # 0058, amended, #218): the type function `[]` with the members
+      # between the brackets — not an index — when the bracket touches the
+      # name.
+      if (step.node in IdentifierNode) && %w[Array Hash Set].include?(step.node.name) && !tokens[position].leading_space
         members = parse_bracket_arguments(tokens, position + 1)
         step = Step.new(node: method_call_node(step.node, "[]", members.node, nil, line: line_at(tokens, position)), position: members.position)
         next
@@ -1818,21 +1820,36 @@ end
 
 # The members of `Set[...]`, up to the closing bracket: expressions, with
 # newlines and a trailing comma ending nothing, as inside a call's parens.
+# The members of `Set[...]`, `Array[...]`, and `Hash[...]`, the seed's
+# bracket_arguments: labels after the positional members are one hash, the
+# last member, as Ruby reads `Hash[a: 1, b: 2]` (#218).
 def parse_bracket_arguments(tokens, mutable position)
   mutable members = []
+  mutable labeled = []
   position = skip_newlines_at(tokens, position)
   while true
-    return Step.new(node: members, position: position + 1) if operator_at?(tokens, position, ["]"])
-    if position >= tokens.length
-      return Step.new(node: [error_node("expected closing bracket after Set's members")], position: position)
+    if operator_at?(tokens, position, ["]"])
+      members << hash_node(labeled) unless labeled.empty?
+      return Step.new(node: members, position: position + 1)
     end
-    step = parse_expression(tokens, position)
-    members << step.node
+    if position >= tokens.length
+      return Step.new(node: [error_node("expected closing bracket after the members")], position: position)
+    end
+    label = tokens[position].identifier? && operator_at?(tokens, position + 1, %w[:])
+    if !label && !labeled.empty?
+      return Step.new(node: [error_node("a positional member after labels — put the labels last")], position: position)
+    end
+    step = parse_expression(tokens, label ? skip_newlines_at(tokens, position + 2) : position)
+    if label
+      labeled << pair_node(symbol_node(tokens[position].text), step.node)
+    else
+      members << step.node
+    end
     position = skip_newlines_at(tokens, step.position)
     if operator_at?(tokens, position, %w[,])
       position = skip_newlines_at(tokens, position + 1)
     elsif !operator_at?(tokens, position, ["]"])
-      return Step.new(node: [error_node("expected closing bracket after Set's members")], position: position)
+      return Step.new(node: [error_node("expected closing bracket after the members")], position: position)
     end
   end
 end
