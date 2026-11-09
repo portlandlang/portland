@@ -1261,9 +1261,13 @@ def check_condition(construct, node, scope, found)
 end
 
 # The logical operators' operands. `&&` takes booleans on both sides. `||`
-# takes any left — it is the or-guard on a maybe, and a plain value on the
-# left is the dead guard ADR 0040 §3 deliberately left unrefused — but once
-# the left is a boolean the right must be one too.
+# is logical or on a boolean, whose right must be one too, and the or-guard
+# on a maybe. ADR 0007's two never-guess refusals (#219), held until
+# narrowing proved itself (ADR 0040), fire where the left is fully known
+# and can be spelled: a `Boolean?` left, whose nil and false are two
+# different noes `||` cannot tell apart, and a left that can never be
+# absent, whose right side never runs. A nil left is always absent, so it
+# is neither.
 def check_operands(node, scope, mutable found)
   types = known_types(scope)
   left = synthesize(node.left, types)
@@ -1273,9 +1277,16 @@ def check_operands(node, scope, mutable found)
     found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
   end
   return found unless node.operator == "||"
-  return found unless left == ["boolean"]
-  found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
-  found
+  if left == ["boolean"]
+    found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+    return found
+  end
+  return found unless known?(left)
+  spelling = spell_node(node.left)
+  return found if spelling.nil?
+  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == ["maybe", ["boolean"]]
+  return found if (left in ["maybe", *]) || left == ["nil"]
+  noted(found, ["dead_or", spelling, left], locate(node, scope))
 end
 
 # ADR 0048's call-site refusal — a call handing a def something its body

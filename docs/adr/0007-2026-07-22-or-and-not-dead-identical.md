@@ -1,6 +1,6 @@
 # 0007 — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical; `or` is typed
 
-- **Status:** Accepted
+- **Status:** Accepted (the two never-guess refusals built in the checker 2026-11-08, [#219](https://github.com/portlandlang/portland/issues/219))
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4) (unwrap ergonomics thread)
 

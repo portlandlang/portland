@@ -16,14 +16,17 @@ context "Optional variable assignments" do
         expect(value).to eq(10)
       end
 
+      # A plain 10 is never absent, so `||=` on it is a dead guard the
+      # checker refuses (ADR 0007, #219); a present maybe asks upstream's
+      # question.
       specify "does not re-assign a variable with a truthy value" do
-        mutable value = 10
+        mutable value = [10].first
         value ||= 20
         expect(value).to eq(10)
       end
 
       specify "does not evaluate the right side when not needed" do
-        mutable value = 10
+        mutable value = [10].first
         value ||= 1 / 0
         expect(value).to eq(10)
       end
