@@ -12,8 +12,6 @@ Inside `together` blocks, each concurrent task line carries a per-line marker (w
 
 **`~`** marks a task line:
 
-<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
-
 ```ruby
 together do
   ~ user = fetch_user(id)
@@ -28,4 +26,4 @@ Why `~`: it arrives clean to Ruby hands — unary bitwise NOT is rare, `=~` is f
 
 - Depends on ADR 0003 (bitwise operators out), which frees `~` entirely.
 - Still open on #3: the word form (`spawn` is an unconfirmed placeholder) and whether the terse positional register (`a, b = together do ... end`) earns its existence.
-- Not yet implemented; `together` itself is future work (#11).
+- Built serially on both implementations with `together`'s semantics ([ADR 0029](0029-2026-07-27-together-semantics.md), 2026-07-27).

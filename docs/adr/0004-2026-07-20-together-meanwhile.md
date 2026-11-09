@@ -12,8 +12,6 @@ The pair must also read as one thought, the way "async/await" does.
 
 ## Decision
 
-<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
-
 ```ruby
 together do
   meanwhile user = fetch_user(id)
@@ -34,4 +32,4 @@ No computer words anywhere in the concurrency story.
 
 - Rejected along the way: `spawn` (machinery), `launch` (app-launcher collision), `task`/`start`/`all` (identifier theft), `gather` (join-only emphasis), register-mismatched pairs generally.
 - Still open on #3: whether the terse positional register (`a, b = together do ... end`) earns its existence.
-- Nothing implemented yet; `together` semantics are #11.
+- Built serially on both implementations with `together`'s semantics ([ADR 0029](0029-2026-07-27-together-semantics.md), 2026-07-27), which settled #11.

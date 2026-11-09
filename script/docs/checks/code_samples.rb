@@ -22,14 +22,14 @@
 #
 # The reason is required. Three kinds are legitimate and all appear in this
 # repo: Ruby quoted for comparison (the whole `docs/ruby/` ledger), Portland
-# that is decided but not yet built (`together`, symbols), and deliberately
-# invalid Portland (the never-guess errors, which exist to be refused).
-# Requiring the reason keeps an exemption from being a silent shrug.
+# that is decided but not yet built (an ADR's proposed syntax), and
+# deliberately invalid Portland (the never-guess errors, which exist to be
+# refused). Requiring the reason keeps an exemption from being a silent shrug.
 #
 # Deliberately absent: flagging a *stale* exemption — a marked block that has
-# since started parsing, which is what will happen to the six `together`
-# blocks the day concurrency ships. It looks free but it is not: a block
-# marked "Ruby, shown for contrast" may be valid Portland syntax by
+# since started parsing, which is what happened to the `together` blocks:
+# built in July, their markers stayed until #279. It looks free but it is
+# not: a block marked "Ruby, shown for contrast" may be valid Portland syntax by
 # coincidence, since Portland is Ruby-shaped on purpose, and the check would
 # call that a stale exemption every time. A check that cries wolf is worse
 # than no check. Removing the markers belongs to whoever builds the feature.

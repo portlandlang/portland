@@ -8,7 +8,7 @@
 
 ADR 0004 locked the named-at-site form and left open whether a terse positional register also exists:
 
-<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
+<!-- not-portland: the positional register this ADR declines; it does not parse -->
 
 ```ruby
 user, orders = together do
@@ -20,8 +20,6 @@ end
 ## Decision
 
 **No positional register.** Named-at-site is the only form:
-
-<!-- not-portland: `together` is decided but unbuilt (ADRs 0002/0004/0011) -->
 
 ```ruby
 together do
@@ -37,4 +35,4 @@ The positional form recouples results to task _order_ — reorder the lines, sil
 - One way to write a `together` block; nothing to choose between at the call site.
 - Destructuring assignment remains undecided and unentangled.
 - Everything on #3 is now resolved (sigil: 0002, bitwise: 0003, vocabulary: 0004, register: here).
-- Nothing implemented yet; `together` semantics remain #11.
+- Built serially on both implementations with `together`'s semantics ([ADR 0029](0029-2026-07-27-together-semantics.md), 2026-07-27), which settled #11.
