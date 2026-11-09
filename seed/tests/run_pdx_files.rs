@@ -1706,6 +1706,33 @@ fn hash_brackets_refuse_in_rubys_words() {
     assert_both_oracles_refuse("hash_brackets_refusal.pdx", None, &cases);
 }
 
+/// A `return` or `break` leaving a block through a `yield` whose value is
+/// consumed in place unwinds as Ruby's does (#208): an argument, a binary
+/// operand, `<<`, an array element, a condition, a receiver. The seed had
+/// refused `produced no value`; the hosted evaluator ran on past it.
+#[test]
+fn unwinding_through_a_yield_used_as_an_operand() {
+    assert_both_print(
+        "unwind_operands.pdx",
+        "def note(value)\n  value\nend\n\
+         def pushes\n  note(yield)\n  :pushes_done\nend\n\
+         def adds\n  x = 1 + yield\n  :adds_done\nend\n\
+         def appends\n  mutable notes = []\n  notes << yield\n  :appends_done\nend\n\
+         def listed\n  x = [yield, :never]\n  :listed_done\nend\n\
+         def tested\n  if yield then :yes else :no end\n  :tested_done\nend\n\
+         def received\n  x = yield.to_s\n  :received_done\nend\n\
+         def ret_arg = pushes { return 9 }\n\
+         def ret_binary = adds { return 8 }\n\
+         def ret_append = appends { return 7 }\n\
+         def ret_listed = listed { return 6 }\n\
+         def ret_tested = tested { return 5 }\n\
+         def ret_received = received { return 4 }\n\
+         p(ret_arg)\np(ret_binary)\np(ret_append)\np(ret_listed)\np(ret_tested)\np(ret_received)\n\
+         p(pushes { break })\n",
+        "9\n8\n7\n6\n5\n4\nnil\n",
+    );
+}
+
 /// A float with no integer to give refuses where Ruby raises
 /// FloatDomainError, and one past the 64-bit integers refuses where Ruby
 /// would reach for a bignum — never a silent 0 or i64::MAX (#108).
