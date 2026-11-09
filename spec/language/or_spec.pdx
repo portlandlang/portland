@@ -31,7 +31,7 @@ context "The || operator" do
   end
 
   specify "and keeps a present value" do
-    expect(("present" or "unused")).to eq("present")
+    expect((["present"].first or "unused")).to eq("present")
   end
 
   specify "returns early on an absent maybe" do
@@ -60,14 +60,15 @@ context "The || operator" do
   end
 
   specify "on a present maybe keeps the value" do
-    expect(("found" or "unused")).to eq("found")
+    expect((["found"].first or "unused")).to eq("found")
   end
 
   # `or panic` is the only crash you can write (ADR 0008), which makes it
   # the sharpest probe of laziness there is: if the right side ran eagerly,
   # this example would not fail — it would take the whole file down with it.
+  # A present maybe, since a plain value is a dead guard (ADR 0007, #219).
   specify "never evaluates the right side of a hit" do
-    expect(("present" or panic("the right side ran"))).to eq("present")
+    expect((["present"].first or panic("the right side ran"))).to eq("present")
   end
 end
 

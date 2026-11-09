@@ -10,6 +10,8 @@
 #
 #   ["condition", construct, type, spelling]  — a non-boolean condition
 #   ["operand", operator, type]               — a non-boolean && or || side
+#   ["boolean_maybe_or", spelling]            — || on a Boolean? (ADR 0007, #219)
+#   ["dead_or", spelling, type]               — || whose left is never absent (ADR 0007, #219)
 #   ["no_method", spelling, type, name]       — a method the type lacks
 #   ["unhandled_maybe", spelling, type, name] — a maybe used as plain
 #   ["operator", operator, left, right]       — mismatched binary operands
@@ -81,6 +83,10 @@ def render_refusal(refusal)
   case refusal
   in ["condition", construct, type, spelling] then render_condition(construct, type, spelling)
   in ["operand", operator, type] then "#{spelled(operator)} needs true or false, got #{render_type(type)}"
+  # ADR 0007's never-guess pair (#219): the three states named, then the
+  # two spellings that each say one thing.
+  in ["boolean_maybe_or", spelling] then sentence("#{spelled(spelling)} is Boolean?, which is true, false, or nil, so 'or' cannot tell which no it means", "test #{spelled(spelling + ".nil?")} for absence, or #{spelled(spelling + " == true")}")
+  in ["dead_or", spelling, type] then sentence("#{spelled(spelling)} is #{a_type(type)}, never absent, so the right side of 'or' never runs", "drop it")
   in ["no_method", spelling, type, name] then "#{spelled(spelling)} is #{a_type(type)}, which has no method #{spelled(name)}"
   in ["unhandled_maybe", spelling, type, name] then sentence("#{spelled(spelling)} is #{a_type(type)}", "handle the nil case before #{spelled("." + name)}")
   in ["operator", operator, left, right] then "cannot apply #{spelled(operator)} to #{render_type(left)} and #{render_type(right)}"

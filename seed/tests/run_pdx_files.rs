@@ -523,7 +523,7 @@ fn assert_both_print(name: &str, source: &str, expected: &str) {
 fn portland_evaluator_matches_the_seed_on_optionals() {
     assert_evaluator_matches_seed(
         "evaluator_optionals.pdx",
-        "p nil\np nil == nil\np nil.nil?\np 5.some?\nx = nil or 7\nputs x\ndef bump(value)\n  found = value or return 0\n  found + 1\nend\nputs bump(41)\nputs bump(nil)\np([].first)\np([nil].first)\np([1, 2][9])\np([1, 2][-1])\np([].min)\ntheme = [].first or \"grey\"\nputs theme\nname = [].first&.upcase or \"FRIEND\"\nputs name\np some(nil)\np some(5)\nkept = 5 or panic \"unreachable\"\nputs kept\n",
+        "p nil\np nil == nil\np nil.nil?\np 5.some?\nx = nil or 7\nputs x\ndef bump(value)\n  found = value or return 0\n  found + 1\nend\nputs bump(41)\nputs bump(nil)\np([].first)\np([nil].first)\np([1, 2][9])\np([1, 2][-1])\np([].min)\ntheme = [].first or \"grey\"\nputs theme\nname = [].first&.upcase or \"FRIEND\"\nputs name\np some(nil)\np some(5)\nkept = [5].first or panic \"unreachable\"\nputs kept\n",
     );
 }
 
@@ -805,8 +805,9 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
         ("x = 5.to_int\n", "to_int is spelled to_i here"),
         ("x = \"5\".to_str\n", "to_str is spelled to_s here"),
         // `||=` is a compound like any other (ADR 0043): mutable required.
+        // A maybe on the left, since a plain one is a dead guard (#219).
         (
-            "name = \"set\"\nname ||= \"other\"\n",
+            "name = [\"set\"].first\nname ||= \"other\"\n",
             "name is immutable — declare it `mutable name = ...` if it needs to change",
         ),
         // The ternary (#83): declared spacing, nesting refuses toward parens.
@@ -2920,6 +2921,29 @@ fn assert_checker_refuses(name: &str, source: &str, expected: &str) {
     );
 }
 
+/// ADR 0007's never-guess refusals (#219), the checker's alone: `||` on a
+/// `Boolean?` names the three states and the two spellings that each say
+/// one thing, and `||` on a left that is never absent names the right side
+/// as dead, `||=` too. The seed runs each with Ruby's answer.
+#[test]
+fn the_checker_refuses_or_where_it_would_guess() {
+    assert_checker_refuses(
+        "or_boolean_maybe.pdx",
+        "flags = [true, false]\nready = flags.first\np(ready || false)\n",
+        "'ready' is Boolean?, which is true, false, or nil, so 'or' cannot tell which no it means — test 'ready.nil?' for absence, or 'ready == true'",
+    );
+    assert_checker_refuses(
+        "or_dead_right_side.pdx",
+        "name = \"pdx\"\np(name or \"anon\")\n",
+        "'name' is a String, never absent, so the right side of 'or' never runs — drop it",
+    );
+    assert_checker_refuses(
+        "or_assign_dead_right_side.pdx",
+        "mutable count = 10\ncount ||= 20\np(count)\n",
+        "'count' is an Integer, never absent, so the right side of 'or' never runs — drop it",
+    );
+}
+
 /// Visibility on both oracles (ADR 0076, #189): `private`, `protected`,
 /// and `public` sections, `private def`, a trait's sections carried into
 /// its struct, and `private_constant` all run the same; the calls that
@@ -4808,7 +4832,7 @@ fn portland_evaluator_matches_the_seed_on_traits() {
 fn portland_evaluator_matches_the_seed_on_failures() {
     assert_evaluator_matches_seed(
         "evaluator_failures.pdx",
-        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs(\"present\" or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky(flag)\n  return value if value.failure?\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky(flag)\n    return checked if checked.failure?\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = System.read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs System.read_file(\"/tmp/portland-definitely-missing\").failure?\n",
+        "sad = failure(\"out of roses\")\np sad\nputs sad.failure?\nputs 5.failure?\nputs nil.failure?\nputs sad.some?\nputs sad.nil?\nputs(sad or \"fallback\")\nputs([\"present\"].first or \"unused\")\nanswer = case sad\nin reason then \"reason was #{reason}\"\nend\nputs answer\nstruct ParseFailed\n  line\nend\ntyped = failure(ParseFailed.new(line: 7))\nshaped = case typed\nin ParseFailed(line:) then \"failed on line #{line}\"\nin content then \"parsed #{content}\"\nend\nputs shaped\np inspect(typed)\ndef risky(flag)\n  return failure(\"flagged\") if flag\n  \"fine\"\nend\ndef guarded(flag)\n  value = risky(flag)\n  return value if value.failure?\n  \"got #{value}\"\nend\nputs guarded(false)\np guarded(true)\ndef through_a_block(flag)\n  [1, 2].each do |n|\n    checked = risky(flag)\n    return checked if checked.failure?\n    puts checked\n  end\n  \"walked\"\nend\nputs through_a_block(false)\np through_a_block(true)\nmissing = System.read_file(\"/tmp/portland-definitely-missing\") or \"default config\"\nputs missing\nputs System.read_file(\"/tmp/portland-definitely-missing\").failure?\n",
     );
 }
 
