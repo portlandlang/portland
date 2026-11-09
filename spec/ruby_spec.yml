@@ -198,9 +198,10 @@ core/array/detect_spec.rb:
   reason: "Compares the two answers rather than method objects, which a closed runtime has none of."
   link: docs/ruby/metaprogramming.md
 core/array/constructor_spec.rb:
-  status: skipped
-  reason: "Array[...] is decided with Ruby's behavior (ADR 0058, amended) and not yet built; the subclass rows and the dotted Array.[] spelling stay upstream."
-  link: https://github.com/portlandlang/portland/issues/218
+  pdx: [spec/core/array/constructor_spec.pdx]
+  status: partial_intentional
+  reason: "The subclass rows and the dotted Array.[] spelling stay upstream."
+  link: docs/ruby/metaprogramming.md
 core/array/element_reference_spec.rb:
   pdx: [spec/core/array/element_reference_spec.pdx]
   status: partial_intentional
@@ -1062,6 +1063,11 @@ core/float/zero_spec.rb:
 
 # — core/hash —
 
+core/hash/constructor_spec.rb:
+  pdx: [spec/core/hash/constructor_spec.pdx]
+  status: partial_intentional
+  reason: "The to_ary and to_hash coercion rows and their mocks, the subclass rows, defaults (ADR 0063), and compare_by_identity stay upstream."
+  link: docs/ruby/metaprogramming.md
 core/hash/new_spec.rb:
   pdx: [spec/core/hash/new_spec.pdx]
   status: partial_intentional

@@ -1,0 +1,18 @@
+# From ruby/spec core/array/constructor_spec.rb.
+#
+# `Array[...]` (ADR 0058, amended, #218): the type function `[]`, its
+# members between the brackets when the bracket touches the name.
+# Upstream: the subclass rows, and `Array.[](...)`, the method spelled with
+# a dot.
+
+require_relative "../../spec_helper"
+
+context "Array[]" do
+  specify "returns a new array populated with the given elements" do
+    expect(Array[5, true, nil, "a", "Ruby", :sym]).to eq([5, true, nil, "a", "Ruby", :sym])
+  end
+
+  specify "is empty with no elements" do
+    expect(Array[]).to eq([])
+  end
+end

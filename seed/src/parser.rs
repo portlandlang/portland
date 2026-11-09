@@ -3350,9 +3350,11 @@ impl<'source> Parser<'source> {
                     };
                 }
                 Some(TokenKind::LeftBracket) => {
-                    // `Set[1, 2, 3]` (ADR 0082): the type function `[]` with
-                    // the members between the brackets — not an index.
-                    if matches!(&expression, Expression::Variable(name) if name == "Set")
+                    // `Set[1, 2, 3]` (ADR 0082), `Array[1, 2]`, and
+                    // `Hash["a", 1]` (ADR 0058, amended, #218): the type
+                    // function `[]` with the members between the brackets —
+                    // not an index — when the bracket touches the name.
+                    if matches!(&expression, Expression::Variable(name) if matches!(name.as_str(), "Array" | "Hash" | "Set"))
                         && self
                             .tokens
                             .get(self.position)
@@ -3749,14 +3751,31 @@ impl<'source> Parser<'source> {
 
     /// Parse a comma-separated argument list, consuming the closing paren.
     /// Keyword arguments (`label: value`) may only follow positional ones.
-    /// The members of `Set[...]`, up to the closing bracket: positional
-    /// expressions, newlines and a trailing comma ending nothing, as inside
-    /// a call's parens.
+    /// The members of `Set[...]`, `Array[...]`, and `Hash[...]`, up to the
+    /// closing bracket: positional expressions, newlines and a trailing
+    /// comma ending nothing, as inside a call's parens. Labels after them
+    /// are one hash, the last member, as Ruby reads `Hash[a: 1, b: 2]`
+    /// (#218).
     fn bracket_arguments(&mut self) -> Vec<Expression> {
         let mut members = Vec::new();
+        let mut labeled = Vec::new();
         self.skip_newlines();
         while self.peek_kind() != Some(TokenKind::RightBracket) {
-            members.push(self.expression());
+            if self.peek_kind() == Some(TokenKind::Identifier)
+                && self.peek_kind_at(1) == Some(TokenKind::Colon)
+            {
+                let label = self.advance().text.to_string();
+                self.position += 1; // the `:`
+                self.skip_newlines();
+                labeled.push((Expression::Symbol(label), self.expression()));
+            } else if labeled.is_empty() {
+                members.push(self.expression());
+            } else {
+                panic!(
+                    "a positional member after labels — put the labels last, got {:?}",
+                    self.tokens.get(self.position)
+                );
+            }
             self.skip_newlines();
             match self.peek_kind() {
                 Some(TokenKind::Comma) => {
@@ -3765,12 +3784,15 @@ impl<'source> Parser<'source> {
                 }
                 Some(TokenKind::RightBracket) => {}
                 _ => panic!(
-                    "expected closing bracket after Set's members, got {:?}",
+                    "expected closing bracket after the members, got {:?}",
                     self.tokens.get(self.position)
                 ),
             }
         }
         self.position += 1; // the `]`
+        if !labeled.is_empty() {
+            members.push(Expression::HashLiteral(labeled));
+        }
         members
     }
 

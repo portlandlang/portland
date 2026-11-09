@@ -462,8 +462,15 @@ def type_function_answer_for(type_name, name)
   # `JSON.parse` answers the document's shape, which is unknown; the two
   # writers answer text (ADR 0072).
   when "generate", "pretty_generate"       then ["string"]
-  # `Set[a, b]` is the one bracketed type function (ADR 0082).
-  when "[]"                                then if type_name == "Set" then ["set"] else ["unknown"] end
+  # The bracketed type functions: `Set[a, b]` (ADR 0082), and `Array[a, b]`
+  # and `Hash[...]` (ADR 0058, amended, #218).
+  when "[]"
+    case type_name
+    when "Set"   then ["set"]
+    when "Array" then ["array", ["unknown"]]
+    when "Hash"  then ["hash", ["unknown"], ["unknown"]]
+    else ["unknown"]
+    end
   # `Complex.polar` and `Complex.rectangular` (ADR 0085).
   when "polar", "rect", "rectangular"     then if type_name == "Complex" then ["complex"] else ["unknown"] end
   # `Regexp.escape` answers text, `Regexp.union` a pattern (ADR 0086).

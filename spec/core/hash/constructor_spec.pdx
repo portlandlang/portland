@@ -1,0 +1,50 @@
+# From ruby/spec core/hash/constructor_spec.rb.
+#
+# `Hash[...]` (ADR 0058, amended, #218), Ruby's: no members is `{}`, one
+# hash is a copy, one array is its pairs, and otherwise keys and values
+# alternate. Its refusals, in Ruby's words, are pinned on both oracles by
+# seed/tests/run_pdx_files.rs. Upstream: the `to_ary` and `to_hash`
+# coercions and their mocks, the subclass rows, defaults, and
+# `compare_by_identity`.
+
+require_relative "../../spec_helper"
+
+context "Hash.[]" do
+  describe "passed zero arguments" do
+    specify "returns an empty hash" do
+      expect(Hash[]).to eq({})
+    end
+  end
+
+  specify "creates a Hash; values can be provided as the argument list" do
+    expect(Hash[:a, 1, :b, 2]).to eq({a: 1, b: 2})
+    expect(Hash[]).to eq({})
+    expect(Hash[:a, 1, :b, {c: 2}]).to eq({a: 1, b: {c: 2}})
+  end
+
+  specify "creates a Hash; values can be provided as one single hash" do
+    expect(Hash[a: 1, b: 2]).to eq({a: 1, b: 2})
+    expect(Hash[{1 => 2, 3 => 4}]).to eq({1 => 2, 3 => 4})
+    expect(Hash[{}]).to eq({})
+  end
+
+  describe "passed an array" do
+    specify "treats elements that are 2 element arrays as key and value" do
+      expect(Hash[[[:a, :b], [:c, :d]]]).to eq({a: :b, c: :d})
+    end
+
+    specify "treats elements that are 1 element arrays as keys with value nil" do
+      expect(Hash[[[:a]]]).to eq({a: nil})
+    end
+  end
+
+  specify "creates a Hash; values can be provided as a list of value-pairs in an array" do
+    expect(Hash[[[:a, 1], [:b, 2]]]).to eq({a: 1, b: 2})
+  end
+
+  # A repeated key keeps its first position and its last value, as a
+  # literal's does.
+  specify "keeps the last value of a repeated key" do
+    expect(Hash["a", 1, "b", 2, "a", 3]).to eq({"a" => 3, "b" => 2})
+  end
+end

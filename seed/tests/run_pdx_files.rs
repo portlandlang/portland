@@ -1639,9 +1639,6 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
-/// A float with no integer to give refuses where Ruby raises
-/// FloatDomainError, and one past the 64-bit integers refuses where Ruby
-/// would reach for a bignum — never a silent 0 or i64::MAX (#108).
 /// A keyword a builtin does not take refuses on both oracles rather than
 /// being dropped (#264), on any receiver and on the builtin functions; the
 /// builtins that take one still read it, `printf` among them.
@@ -1678,6 +1675,39 @@ fn builtins_refuse_keywords_they_do_not_take() {
     );
 }
 
+/// `Hash[...]` (ADR 0058, amended, #218) refuses as Ruby's
+/// `rb_hash_s_create` raises, in its words, on both oracles.
+#[test]
+fn hash_brackets_refuse_in_rubys_words() {
+    let cases = [
+        ("p(Hash[1, 2, 3])\n", "odd number of arguments for Hash"),
+        (
+            "p(Hash[1, 2, {3 => 4}])\n",
+            "odd number of arguments for Hash",
+        ),
+        (
+            "p(Hash[[:a]])\n",
+            "wrong element type Symbol at 0 (expected array)",
+        ),
+        (
+            "p(Hash[[nil]])\n",
+            "wrong element type nil at 0 (expected array)",
+        ),
+        (
+            "p(Hash[[[:a, :b, :c]]])\n",
+            "invalid number of elements (3 for 1..2)",
+        ),
+        (
+            "p(Hash[[[:a, 1], [:b], 42, [:d, 2], [:e, 2, 3], []]])\n",
+            "wrong element type Integer at 2 (expected array)",
+        ),
+    ];
+    assert_both_oracles_refuse("hash_brackets_refusal.pdx", None, &cases);
+}
+
+/// A float with no integer to give refuses where Ruby raises
+/// FloatDomainError, and one past the 64-bit integers refuses where Ruby
+/// would reach for a bignum — never a silent 0 or i64::MAX (#108).
 #[test]
 fn float_to_integer_refuses_what_has_no_integer() {
     assert_evaluator_matches_seed(
