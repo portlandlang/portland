@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The decomposed café is decomposed** ([#237](https://github.com/portlandlang/portland/issues/237)) — `spec/portland/string/unicode_spec.pdx` meant to pin ADR 0038 with two spellings of `é`, but an editor had normalized the decomposed one away, so its rows compared the composed spelling with itself. Both spellings are now built from codepoints, a row pins that they differ, and the length, equality, and `count` rows ask each against the other, passing on both oracles.
+
 - **`and` assignment has a precedence row** ([#239](https://github.com/portlandlang/portland/issues/239)) — `spec/portland/word_operators/precedence_spec.pdx` pins `held = true and false` assigning false, where Ruby assigns true, beside the `or` rows; the `or` row that sat in the ruby/spec mirror at `spec/language/or_spec.pdx` moves there too. The manifest names both upstream rows as intentional divergences.
 
 - **Manifest reasons name specs that exist** ([#240](https://github.com/portlandlang/portland/issues/240)) — two reasons in `spec/ruby_spec.yml` cited `spec/portland/number/` files that #235 moved into the mirror; `core/float/exponent_spec.rb`'s now cites `spec/core/float/exponent_spec.pdx`. `core/enumerable/sum_spec.rb`'s rational rows, which had been written with integers, now port as upstream has them, `2/3r` as `Rational(2, 3)`, summing exactly on both oracles. The `ruby_spec_manifest` docs check fails on a reason that cites a spec path that does not exist.
