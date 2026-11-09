@@ -1593,10 +1593,14 @@ def parse_dot(tokens, receiver, mutable position, safe)
     mutable step = parse_command_argument(argument_tokens, position)
     arguments << step.node
     position = step.position
+    nested = nested_command_sentence(tokens, name, step.node, position)
+    return Step.new(node: error_node(nested), position: skip_line_at(tokens, position)) unless nested.nil?
     while operator_at?(argument_tokens, position, %w[,])
       step = parse_command_argument(argument_tokens, position + 1)
       arguments << step.node
       position = step.position
+      nested_later = nested_command_sentence(tokens, name, step.node, position)
+      return Step.new(node: error_node(nested_later), position: skip_line_at(tokens, position)) unless nested_later.nil?
     end
     unless opener < 0
       if keyword_at?(tokens, opener, %w[do])
@@ -2036,6 +2040,25 @@ def omitted_value_sentence(name) = "'#{name}:' at the end of a line is ambiguous
 # label with nothing after it on the line is the ambiguous case (ADR 0078)
 # — Ruby would read the next line as the value, or omit it at the end of
 # the file; Portland asks.
+# `p pair 1, 2` (#173), the seed's refuse_nested_command: a bare name among
+# a command's arguments with another argument after it on the line is a
+# second paren-less call nested in the first. Ruby reads `p(pair(1, 2))`; a
+# reader could see two arguments to `p`, so the sentence parenthesizes the
+# inner call rather than guessing. Nil when the argument is not that shape.
+def nested_command_sentence(tokens, name, argument, position)
+  return nil unless argument in IdentifierNode
+  return nil unless command_start?(tokens, position) && tokens[position].leading_space
+  return nil if tokens[position].operator?
+  mutable rest = ""
+  mutable index = position
+  while index < tokens.length && tokens[index].kind != "newline"
+    rest += " " if tokens[index].leading_space && !rest.empty?
+    rest += tokens[index].text
+    index += 1
+  end
+  "'#{name} #{argument.name} #{rest}' nests one paren-less call in another — parenthesize the inner one, '#{name} #{argument.name}(#{rest})'"
+end
+
 def parse_command_argument(tokens, position)
   token = tokens[position]
   if token.identifier? && operator_at?(tokens, position + 1, %w[:]) && (position + 2 >= tokens.length || tokens[position + 2].kind == "newline")
@@ -2675,10 +2698,14 @@ def parse_command(tokens, mutable position)
   mutable step = parse_command_argument(argument_tokens, position + 1)
   mutable arguments = [step.node]
   position = step.position
+  nested = nested_command_sentence(tokens, name, step.node, position)
+  return Step.new(node: error_node(nested), position: skip_line_at(tokens, position)) unless nested.nil?
   while operator_at?(argument_tokens, position, %w[,])
     step = parse_command_argument(argument_tokens, position + 1)
     arguments << step.node
     position = step.position
+    nested_later = nested_command_sentence(tokens, name, step.node, position)
+    return Step.new(node: error_node(nested_later), position: skip_line_at(tokens, position)) unless nested_later.nil?
   end
   unless opener < 0
     if keyword_at?(tokens, opener, %w[do])

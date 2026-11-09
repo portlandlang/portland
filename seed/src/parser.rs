@@ -900,7 +900,11 @@ impl<'source> Parser<'source> {
                     panic!("positional arguments cannot follow keyword arguments");
                 }
                 self.refuse_bare_hash_argument();
-                arguments.push(self.expression());
+                let argument = self.expression();
+                if let Expression::Variable(inner) = &argument {
+                    self.refuse_nested_command(&name, inner);
+                }
+                arguments.push(argument);
             }
             if self.peek_kind() != Some(TokenKind::Comma) {
                 break;
@@ -1038,7 +1042,11 @@ impl<'source> Parser<'source> {
                     panic!("positional arguments cannot follow keyword arguments");
                 }
                 self.refuse_bare_hash_argument();
-                arguments.push(self.expression());
+                let argument = self.expression();
+                if let Expression::Variable(inner) = &argument {
+                    self.refuse_nested_command(name, inner);
+                }
+                arguments.push(argument);
             }
             if self.peek_kind() != Some(TokenKind::Comma) {
                 break;
@@ -2770,6 +2778,45 @@ impl<'source> Parser<'source> {
         while self.peek_kind() == Some(TokenKind::Newline) {
             self.position += 1;
         }
+    }
+
+    /// `p pair 1, 2` (#173): a bare name among a command's arguments with
+    /// another argument after it on the line is a second paren-less call
+    /// nested in the first. Ruby reads `p(pair(1, 2))`; a reader could see
+    /// two arguments to `p`, so it refuses with the inner call
+    /// parenthesized rather than guessing.
+    fn refuse_nested_command(&self, name: &str, inner: &str) {
+        let Some(next) = self.tokens.get(self.position) else {
+            return;
+        };
+        let starts_argument = match next.kind {
+            TokenKind::Float
+            | TokenKind::Identifier
+            | TokenKind::Integer
+            | TokenKind::String
+            | TokenKind::Symbol
+            | TokenKind::SymbolArray
+            | TokenKind::WordArray
+            | TokenKind::Regex => true,
+            TokenKind::Keyword => matches!(next.text, "false" | "nil" | "true"),
+            _ => false,
+        };
+        if !next.leading_space || !starts_argument {
+            return;
+        }
+        let mut rest = String::new();
+        for token in self.tokens[self.position..]
+            .iter()
+            .take_while(|token| token.kind != TokenKind::Newline)
+        {
+            if token.leading_space && !rest.is_empty() {
+                rest.push(' ');
+            }
+            rest.push_str(token.text);
+        }
+        panic!(
+            "'{name} {inner} {rest}' nests one paren-less call in another — parenthesize the inner one, '{name} {inner}({rest})'"
+        );
     }
 
     fn expect_statement_boundary(&self) {
