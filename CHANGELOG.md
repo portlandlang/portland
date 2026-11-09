@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The spec harness, one piece per file** ([#277](https://github.com/portlandlang/portland/issues/277)) — `spec/spec_helper.pdx` is now only its header notes and `require_relative`s.
+  - `spec/dsl/` holds `describe`, `context`, `specify`, and `pending`, one per file.
+  - `spec/expectations/expectation.pdx` holds `Expectation` and `expect`.
+  - `spec/matchers/<name>_matcher.pdx` holds the 21 matchers, each with the `def`s that build it (`eq`, `be_a`, `be_gt`, …). `be`'s refusal goes with the comparison matchers.
+  - Each file carries its doc comments; one that shared a comment points to the file holding it. The matcher protocol's notes stay in the helper above the matchers' requires. No example's output changes. This is a step toward a spec tile of its own, to be extracted later.
+
 - **The spec dashboard lists Portland's own specs** ([#241](https://github.com/portlandlang/portland/issues/241)) — `script/ruby_spec_dashboard` writes a `portland` section beside the upstream areas: every spec under `spec/portland/`, by directory, each passing or failing on both oracles, with the number of examples the seed ran. Only the handful a manifest row happened to name had appeared before. 68 files today, all passing.
 
 - **A `return` or `break` unwinds through a `yield` used as an operand** ([#208](https://github.com/portlandlang/portland/issues/208)) — on both implementations, `note(yield)`, `1 + yield`, `notes << yield`, `[yield, x]`, `if yield`, and `yield.to_s` stop where Ruby's do when the block returns or breaks, and the method the block was written in answers the returned value. The seed had refused `Yield([]) produced no value`, and the hosted evaluator ran the yielding method on past the `return`. An operand, argument, receiver, element, or condition that comes back with a signal pending now stops the expression, and later arguments never run. Pinned by a two-oracle test with Ruby 4.0.9's answers.

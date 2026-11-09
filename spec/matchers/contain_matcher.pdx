@@ -1,0 +1,22 @@
+# `include` is a keyword (ADR 0028 spends it on traits), so rspec's
+# `expect(list).to include(3)` is unspellable and `contain` is the Portland
+# word for it.
+struct ContainMatcher
+  wanted
+
+  def matches?(actual)
+    actual.include?(wanted)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to contain #{inspect(wanted)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to contain #{inspect(wanted)}"
+  end
+end
+
+def contain(wanted)
+  ContainMatcher.new(wanted: wanted)
+end

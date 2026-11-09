@@ -1,0 +1,23 @@
+# The string matchers (#252): `match(/l+/)`, `start_with("rose")`, and
+# `end_with("city")`. One struct apiece, each one method call apart, as the
+# predicate matchers are. RSpec's `start_with` and `end_with` also take an
+# array's leading elements; that waits for a row that wants it.
+struct PatternMatcher
+  pattern
+
+  def matches?(actual)
+    actual.match?(pattern)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to match #{inspect(pattern)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to match #{inspect(pattern)}"
+  end
+end
+
+def match(pattern)
+  PatternMatcher.new(pattern: pattern)
+end

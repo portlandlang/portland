@@ -1,0 +1,22 @@
+# `eql` is `eql?` (#252), which tells `1` from `1.0` where `eq`'s `==` does
+# not: `expect(1.0).to eq(1)` passes and `expect(1.0).to eql(1)` fails.
+# ruby/spec writes `should eql(...)` wherever the type of a number matters.
+struct EqlMatcher
+  expected
+
+  def matches?(actual)
+    actual.eql?(expected)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to be eql? to #{inspect(expected)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be eql? to #{inspect(expected)}"
+  end
+end
+
+def eql(expected)
+  EqlMatcher.new(expected: expected)
+end

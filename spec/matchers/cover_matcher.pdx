@@ -1,0 +1,20 @@
+# `cover(value)` is `Range#cover?` (#252).
+struct CoverMatcher
+  value
+
+  def matches?(actual)
+    actual.cover?(value)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to cover #{inspect(value)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to cover #{inspect(value)}"
+  end
+end
+
+def cover(value)
+  CoverMatcher.new(value: value)
+end

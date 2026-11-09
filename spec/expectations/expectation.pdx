@@ -1,0 +1,76 @@
+# One countable line per failure, indented under the example it belongs to, so
+# the runner can find it and a reader can see which example it came from
+# without the message having to repeat the description.
+#
+# `inspect` rather than interpolation ([#38]): a failure message must tell
+# `"ROSE"` from `:ROSE` from `ROSE`-the-output-of-something, and it must
+# survive an expected nil — which interpolation cannot render at all, since
+# absence has no methods, `to_s` included (ADR 0005/0006). A `shown` helper
+# used to paper over exactly that, and this is the deletion its comment
+# asked for.
+#
+# The chain is the sentence grammar. `expect(x).to(eq(y))` reads
+# subject-verb-preposition-complement, where `expect(x, y)` — and every xUnit
+# `assert_equal x, y` — is verb-object-object with nothing joining the two.
+# `.to` is doing a preposition's job, the same instinct that puts `.of` and
+# `.from` on constructor entry points (ADR 0031). The parens around the
+# matcher are the one piece of ceremony left, and [#68] is the parse that
+# would drop them: `expect(x).to eq(y)`.
+struct Expectation
+  actual
+
+  def to(matcher)
+    return if matcher.matches?(actual)
+
+    puts "  FAIL #{matcher.failure_message(actual)}"
+  end
+
+  def not_to(matcher)
+    return unless matcher.matches?(actual)
+
+    puts "  FAIL #{matcher.negated_failure_message(actual)}"
+  end
+
+  # `to_satisfy` (#252) passes when its block answers true for the actual:
+  #
+  #   expect(9).to_satisfy("be a multiple of 3") { it % 3 == 0 }
+  #   # FAIL expected 9 to be a multiple of 3
+  #
+  # This diverges from RSpec, whose `satisfy` is a matcher:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { |n| n % 3 == 0 }
+  #
+  # RSpec's matcher keeps the block until `to` hands it the value. Portland
+  # can't keep a block: `&block` parameters and `->` lambdas both refuse, so
+  # a block can only be yielded while the method it was handed to is still
+  # running. So the block goes to the expectation, which already holds the
+  # value, and yields at once. The description is required, because RSpec's
+  # fallback, which reads the block's own source, isn't possible here either.
+  #
+  # Once a block can be kept as a value, this can take RSpec's spelling:
+  #
+  #   expect(9).to satisfy("be a multiple of 3") { it % 3 == 0 }
+  def to_satisfy(description)
+    return if yield(actual)
+
+    puts "  FAIL #{satisfy_failure_message(description)}"
+  end
+
+  def not_to_satisfy(description)
+    return unless yield(actual)
+
+    puts "  FAIL #{satisfy_negated_failure_message(description)}"
+  end
+
+  def satisfy_failure_message(description)
+    "expected #{inspect(actual)} to #{description}"
+  end
+
+  def satisfy_negated_failure_message(description)
+    "expected #{inspect(actual)} not to #{description}"
+  end
+end
+
+def expect(actual)
+  Expectation.new(actual: actual)
+end

@@ -1,0 +1,19 @@
+struct EqualMatcher
+  expected
+
+  def matches?(actual)
+    actual == expected
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(expected)}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected anything but #{inspect(expected)}"
+  end
+end
+
+def eq(expected)
+  EqualMatcher.new(expected: expected)
+end

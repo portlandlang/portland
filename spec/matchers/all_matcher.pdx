@@ -1,0 +1,25 @@
+# `all(matcher)` (#252) applies a matcher to every element, as in
+# `expect(values).to all(be_greater_than(0))`. Its failure names the first
+# element that missed and carries that matcher's own message, where
+# `expect(values.all? { … }).to be_true` could say only false.
+struct AllMatcher
+  matcher
+
+  def matches?(actual)
+    actual.all? { matcher.matches?(it) }
+  end
+
+  def failure_message(actual)
+    elements = actual.to_a
+    index = elements.find_index { !matcher.matches?(it) } or panic("all: every element passed")
+    "expected all of #{inspect(actual)} to pass, but the element at index #{index} did not: #{matcher.failure_message(elements[index])}"
+  end
+
+  def negated_failure_message(actual)
+    "expected some element of #{inspect(actual)} to fail: #{matcher.negated_failure_message(actual.to_a.first)}"
+  end
+end
+
+def all(matcher)
+  AllMatcher.new(matcher: matcher)
+end

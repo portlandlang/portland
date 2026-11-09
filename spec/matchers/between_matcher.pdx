@@ -1,0 +1,22 @@
+# RSpec's `be_between(min, max)`, inclusive at both ends as RSpec's is by
+# default. RSpec's `.exclusive` modifier waits for a row that wants it.
+struct BetweenMatcher
+  minimum
+  maximum
+
+  def matches?(actual)
+    actual >= minimum && actual <= maximum
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to be between #{inspect(minimum)} and #{inspect(maximum)} (inclusive)"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be between #{inspect(minimum)} and #{inspect(maximum)} (inclusive)"
+  end
+end
+
+def be_between(minimum, maximum)
+  BetweenMatcher.new(minimum: minimum, maximum: maximum)
+end

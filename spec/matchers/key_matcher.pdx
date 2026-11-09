@@ -1,0 +1,19 @@
+struct KeyMatcher
+  key
+
+  def matches?(actual)
+    actual.key?(key)
+  end
+
+  def failure_message(actual)
+    "expected a key #{inspect(key)} in #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected no key #{inspect(key)} in #{inspect(actual)}"
+  end
+end
+
+def have_key(wanted)
+  KeyMatcher.new(key: wanted)
+end

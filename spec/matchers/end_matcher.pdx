@@ -1,0 +1,20 @@
+# One of the string matchers; see pattern_matcher.pdx.
+struct EndMatcher
+  suffix
+
+  def matches?(actual)
+    actual.end_with?(suffix)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to end with #{inspect(suffix)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to end with #{inspect(suffix)}"
+  end
+end
+
+def end_with(suffix)
+  EndMatcher.new(suffix: suffix)
+end

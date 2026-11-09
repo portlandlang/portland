@@ -1,0 +1,23 @@
+struct BooleanMatcher
+  wanted
+
+  def matches?(actual)
+    actual == wanted
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(wanted)}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected anything but #{inspect(wanted)}"
+  end
+end
+
+def be_true
+  BooleanMatcher.new(wanted: true)
+end
+
+def be_false
+  BooleanMatcher.new(wanted: false)
+end

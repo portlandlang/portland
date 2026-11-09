@@ -1,0 +1,23 @@
+# A hole we owe, held in place: the example stays written where it belongs,
+# prints one countable `* PENDING` line, and its block never runs — which is
+# the only semantics available, not a taste choice. rspec's true `pending`
+# runs the block and alerts when it starts passing; that needs a failure to
+# be caught, and here `expect` prints rather than raises while a missing
+# builtin panics the whole file. mspec's guards skip the same way.
+#
+# The body still has to *parse* on both oracles, since blocks parse whether
+# or not they run. Three tiers, and the block is what tells them apart:
+#
+# - will build, body writable — `pending "desc" do ... end`: the example is
+#   already written, and landing the feature means deleting one word.
+# - will build, body unparseable (missing syntax) — `pending` with no block,
+#   the unwritable spelling and its issue number carried in the string:
+#   `pending "5_280 — underscored literals do not lex (#71)"`.
+# - decided out, forever — a comment, never a `pending`: the inventory is a
+#   to-do list, and a won't-fix inside it would rot its trustworthiness.
+#
+# `script/spec | grep PENDING` is the standing inventory of what is owed
+# (#23).
+def pending(behavior)
+  puts "* PENDING #{behavior}"
+end
