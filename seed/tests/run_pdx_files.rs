@@ -1640,6 +1640,27 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A capture with no block, or with an argument, refuses on both oracles
+/// (#251): there is nothing to capture without the block's writes.
+#[test]
+fn a_capture_refuses_without_its_block() {
+    let cases = [
+        (
+            "System.capture_standard_output\n",
+            "System.capture_standard_output takes a block — the writes to capture go inside it",
+        ),
+        (
+            "System.capture_standard_error\n",
+            "System.capture_standard_error takes a block — the writes to capture go inside it",
+        ),
+        (
+            "System.capture_standard_output(1) { puts \"x\" }\n",
+            "System.capture_standard_output takes 0 arguments, got 1",
+        ),
+    ];
+    assert_both_oracles_refuse("capture_refusal.pdx", None, &cases);
+}
+
 /// A keyword a builtin does not take refuses on both oracles rather than
 /// being dropped (#264), on any receiver and on the builtin functions; the
 /// builtins that take one still read it, `printf` among them.

@@ -1,0 +1,141 @@
+# `System.capture_standard_output { … }` and `System.capture_standard_error
+# { … }` (ADR 0068, amended for #251): run the block, and answer the text it
+# wrote to that stream instead of writing it. The capture is the
+# interpreter's write path, not the OS file descriptor, as mspec's `output`
+# swaps `$stdout`: `puts`, `print`, `p`, `pp`, `putc`, `printf`, `warn`, and
+# the two `System.write_standard_*` crossings. The block's own value is
+# dropped. Captures nest, the innermost taking the text.
+#
+# Under `together` (ADR 0029) a capture covers everything that runs inside
+# its block: a capture around a `together` takes every task's writes, and a
+# capture inside a task line takes that task's only. Cross-task order is not
+# promised, so no row here pins two tasks' text against each other.
+
+require_relative "../../spec_helper"
+
+def returns_from_inside_a_capture
+  System.capture_standard_output do
+    print "dropped"
+    return "early"
+  end
+  "late"
+end
+
+context "System.capture_standard_output" do
+  specify "answers what puts wrote" do
+    expect(System.capture_standard_output { puts "rose" }).to eq("rose\n")
+  end
+
+  specify "answers print's text without a newline" do
+    expect(System.capture_standard_output { print "rose" }).to eq("rose")
+  end
+
+  specify "answers p's and pp's inspected lines" do
+    captured = System.capture_standard_output do
+      p "rose"
+      pp :city
+    end
+    expect(captured).to eq("\"rose\"\n:city\n")
+  end
+
+  specify "answers putc's and printf's text" do
+    captured = System.capture_standard_output do
+      putc "r"
+      printf("%d roses", 3)
+    end
+    expect(captured).to eq("r3 roses")
+  end
+
+  specify "answers System.write_standard_output's text, which still answers its bytes" do
+    mutable written = 0
+    captured = System.capture_standard_output do
+      written = System.write_standard_output("é")
+    end
+    expect(captured).to eq("é")
+    expect(written).to eq(2)
+  end
+
+  specify "answers an empty string when nothing was written" do
+    expect(System.capture_standard_output { 1 + 1 }).to eq("")
+  end
+
+  specify "drops the block's own value" do
+    expect(System.capture_standard_output { "the block's value" }).to eq("")
+  end
+
+  specify "leaves standard error alone" do
+    expect(System.capture_standard_output { System.write_standard_error("") }).to eq("")
+  end
+
+  specify "nests, the innermost capture taking the text" do
+    mutable inner = ""
+    outer = System.capture_standard_output do
+      print "outer "
+      inner = System.capture_standard_output { print "inner" }
+      print "again"
+    end
+    expect(inner).to eq("inner")
+    expect(outer).to eq("outer again")
+  end
+
+  specify "ends when a return leaves the block, dropping what it held" do
+    mutable answered = ""
+    outer = System.capture_standard_output do
+      answered = returns_from_inside_a_capture
+      print "after"
+    end
+    expect(answered).to eq("early")
+    expect(outer).to eq("after")
+  end
+
+  # A `break` ends the capture's own block, as Ruby's ends the method that
+  # yielded, so the loop around it goes on.
+  specify "ends when a break leaves the block, dropping what it held" do
+    outer = System.capture_standard_output do
+      [1, 2].each do |number|
+        System.capture_standard_output do
+          print "dropped"
+          break
+        end
+        print number
+      end
+    end
+    expect(outer).to eq("12")
+  end
+
+  specify "takes every task's writes around a together" do
+    captured = System.capture_standard_output do
+      together do
+        ~ rose = System.write_standard_output("rose")
+      end
+      print rose
+    end
+    expect(captured).to eq("rose4")
+  end
+
+  specify "takes only its own task's writes inside a task line" do
+    together do
+      ~ captured = System.capture_standard_output { print "rose" }
+    end
+    expect(captured).to eq("rose")
+  end
+end
+
+context "System.capture_standard_error" do
+  specify "answers what warn wrote" do
+    expect(System.capture_standard_error { warn "rose" }).to eq("rose\n")
+  end
+
+  specify "answers System.write_standard_error's text" do
+    expect(System.capture_standard_error { System.write_standard_error("city") }).to eq("city")
+  end
+
+  specify "leaves standard output alone" do
+    mutable written = ""
+    captured = System.capture_standard_error do
+      written = System.capture_standard_output { print "rose" }
+    end
+    expect(captured).to eq("")
+    expect(written).to eq("rose")
+  end
+end
