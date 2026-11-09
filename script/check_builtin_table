@@ -5,7 +5,8 @@
 # — `include?/1`, `each/0&` — so a builtin added, removed, renamed, or
 # given a new arity in the seed cannot leave the checker, or the seed's
 # own wordings (which read the same table at build), with a stale set.
-# About five minutes; CI runs it when the seed, the table, or the probe
+# About two and a half minutes on eight cores, the probe's shapes running
+# in parallel; CI runs it when the seed, the table, or the probe
 # changed, and AGENT.md's recipe says when to run it by hand.
 #
 # Usage: script/check_builtin_table            (needs target/debug/pdx)

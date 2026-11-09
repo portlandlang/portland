@@ -37,7 +37,7 @@ jobs:
       - run: script/cibuild
 
   # The builtin method table (#88) in compiler/inference.pdx is derived from
-  # the seed's behavior: re-derive it and diff, about five minutes, only when
+  # the seed's behavior: re-derive it and diff, about four minutes, only when
   # the seed, the table, the probe, or this workflow changed against the
   # base. A manual run, or a base this checkout cannot see, always checks.
   # It uses nothing cibuild produces, so it is its own job and runs beside

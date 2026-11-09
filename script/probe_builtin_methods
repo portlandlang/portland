@@ -22,6 +22,7 @@
 # names the seed's dispatch arms mention plus the Ruby names a migrating
 # reader might reach for; add to the list to widen the probe.
 
+require "etc"
 require "open3"
 require "tmpdir"
 
@@ -136,29 +137,69 @@ Dir.mktmpdir do |directory|
   abort "probe_builtin_methods: the seed did not mark its refusal (`refusal: missing`) — rebuild it" unless err.lines.any? { |line| line.strip == "refusal: missing" }
 end
 
+# A shape's verdict: "ran" (exit zero), "reached" (a refusal with no marker
+# — the seed's own arm took the call and refused it on its merits, so the
+# count reached the method), or the marked kind. Each shape is its own
+# process, killed if it outlives the timeout, so a runaway case can neither
+# hang the probe nor take the rest down with it; a killed shape is "timeout".
+def verdict(pdx:, path:, call:, timeout:)
+  File.write(path, "x = #{call}\n")
+  Open3.popen3(pdx, path) do |stdin, stdout, stderr, wait_thread|
+    stdin.close
+    output = Thread.new { stdout.read }
+    errors = Thread.new { stderr.read }
+    if wait_thread.join(timeout).nil?
+      Process.kill(:KILL, wait_thread.pid)
+      wait_thread.join
+      next "timeout"
+    end
+    output.value
+    marker = errors.value.lines.find { |line| line.start_with?("refusal: ") }
+    if wait_thread.value.success?
+      "ran"
+    elsif marker.nil?
+      "reached"
+    else
+      marker.delete_prefix("refusal: ").strip
+    end
+  end
+end
+
+# The shapes are independent, so a pool of workers, one per core, takes them
+# from a queue, each writing its own scratch file. Verdicts land by index,
+# so the table reads exactly as a serial run's does (#260).
+workers = Etc.nprocessors
+timeout = 30
+timed_out = []
+
 # Progress goes to stderr so a caller reading the table off stdout — the
-# check script — still sees a type land every fifteen seconds or so.
+# check script — still sees a type land every few seconds.
 Dir.mktmpdir do |directory|
   receivers.each do |type, receiver|
     warn "probing #{type} (#{candidates.length} names)…"
-    entries = candidates.filter_map do |name|
-      # Each shape's verdict: :ran (exit zero), :reached (a refusal with no
-      # marker — the seed's own arm took the call and refused it on its
-      # merits, so the count reached the method), a marked kind, or nil.
-      verdicts = shapes.call(receiver, name).map do |call, count, block|
-        path = File.join(directory, "probe.pdx")
-        File.write(path, "x = #{call}\n")
-        _out, err, status = Open3.capture3(pdx, path)
-        marker = err.lines.find { |line| line.start_with?("refusal: ") }
-        kind = if status.success?
-          "ran"
-        elsif marker.nil?
-          "reached"
-        else
-          marker.delete_prefix("refusal: ").strip
+    cases = candidates.flat_map do |name|
+      shapes.call(receiver, name).map { |call, count, block| [name, call, count, block] }
+    end
+    queue = Queue.new
+    cases.each_index { |index| queue << index }
+    queue.close
+    kinds = Array.new(cases.length)
+    threads = Array.new(workers) do |worker|
+      Thread.new do
+        path = File.join(directory, "probe_#{worker}.pdx")
+        while (index = queue.pop)
+          kinds[index] = verdict(pdx:, path:, call: cases[index][1], timeout:)
         end
-        [kind, count, block]
       end
+    end
+    threads.each(&:join)
+    by_name = Hash.new { |hash, name| hash[name] = [] }
+    cases.each_with_index do |(name, call, count, block), index|
+      timed_out << call if kinds[index] == "timeout"
+      by_name[name] << [kinds[index], count, block]
+    end
+    entries = candidates.filter_map do |name|
+      verdicts = by_name[name]
       # A name exists when any shape was not refused as missing, alias, or
       # parse — a wrong count or wrong arguments still proves it exists.
       next if verdicts.all? { |kind, _count, _block| not_answered.include?(kind) }
@@ -180,3 +221,6 @@ Dir.mktmpdir do |directory|
     puts "#{type}: #{entries.join(" ")}"
   end
 end
+
+# A shape that ran past the timeout is a seed that hangs, never a verdict.
+abort "probe_builtin_methods: killed after #{timeout}s — #{timed_out.join(", ")}" unless timed_out.empty?
