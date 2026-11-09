@@ -231,22 +231,77 @@ impl Pattern {
     /// `(?mix-mix:source)`: the flags on, a dash, the flags off, as Ruby
     /// spells a pattern for embedding in another.
     pub fn to_s(&self) -> String {
-        let on = self.flag_letters();
+        let (options, source) = self.folded();
+        let mut on = String::new();
         let mut off = String::new();
-        if !self.multiline {
-            off.push('m');
-        }
-        if !self.ignore_case {
-            off.push('i');
-        }
-        if !self.extended {
-            off.push('x');
+        for (letter, set) in [
+            ('m', options.multiline),
+            ('i', options.ignore_case),
+            ('x', options.extend),
+        ] {
+            if set {
+                on.push(letter);
+            } else {
+                off.push(letter);
+            }
         }
         if off.is_empty() {
-            format!("(?{on}:{})", self.source)
+            format!("(?{on}:{source})")
         } else {
-            format!("(?{on}-{off}:{})", self.source)
+            format!("(?{on}-{off}:{source})")
         }
+    }
+
+    /// The options and source `to_s` wraps, simplified as Ruby's
+    /// `rb_reg_str_with_term` in re.c simplifies them (#217): a leading
+    /// `(?flags-flags)` folds its options into the pattern's and is
+    /// dropped, as many times as one follows another, and a leading
+    /// `(?flags-flags:inner)` that is the whole pattern folds too —
+    /// whole when `inner` compiles alone under the folded options. Any
+    /// other shape keeps the pattern as written.
+    fn folded(&self) -> (Options, &str) {
+        let written = Options {
+            ignore_case: self.ignore_case,
+            extend: self.extended,
+            multiline: self.multiline,
+        };
+        let bytes = self.source.as_bytes();
+        let end = bytes.len();
+        let mut options = written;
+        let mut start = 0;
+        let set = |options: &mut Options, letter: u8, on: bool| match letter {
+            b'i' => options.ignore_case = on,
+            b'm' => options.multiline = on,
+            b'x' => options.extend = on,
+            _ => unreachable!("only option letters are set"),
+        };
+        let is_option = |letter: u8| matches!(letter, b'i' | b'm' | b'x');
+        while end - start >= 4 && bytes[start] == b'(' && bytes[start + 1] == b'?' {
+            let mut position = start + 2;
+            while position < end && is_option(bytes[position]) {
+                set(&mut options, bytes[position], true);
+                position += 1;
+            }
+            if end - position > 1 && bytes[position] == b'-' {
+                position += 1;
+                while position < end && is_option(bytes[position]) {
+                    set(&mut options, bytes[position], false);
+                    position += 1;
+                }
+            }
+            if position < end && bytes[position] == b')' {
+                start = position + 1;
+                continue;
+            }
+            if end - position >= 2 && bytes[position] == b':' && bytes[end - 1] == b')' {
+                let inner = &self.source[position + 1..end - 1];
+                if Regex::with_options(inner, options).is_ok() {
+                    return (options, inner);
+                }
+            }
+            return (written, &self.source);
+        }
+        (options, &self.source[start..])
     }
 
     /// The first match in `text`, as a value.

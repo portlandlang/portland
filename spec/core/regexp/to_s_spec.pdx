@@ -33,16 +33,40 @@ context "Regexp#to_s" do
     expect(/xyz/.to_s).to eq("(?-mix:xyz)")
   end
 
-  specify "returns a string in (?xxx:yyy) notation" do
-    expect(/ab+c/ix.to_s).to eq("(?ix-m:ab+c)")
-    expect(/(?:.)/.to_s).to eq("(?-mix:(?:.))")
+  specify "displays groups with options" do
+    expect(/(?ix:foo)(?m:bar)/.to_s).to eq("(?-mix:(?ix:foo)(?m:bar))")
+    expect(/(?ix:foo)bar/m.to_s).to eq("(?m-ix:(?ix:foo)bar)")
+  end
+
+  # A lone leading group folds into the wrapper (#217), as rb_reg_to_s in
+  # Ruby's re.c folds it.
+  specify "displays single group with same options as main regex as the main regex" do
+    expect(/(?i:nothing outside this group)/.to_s).to eq("(?i-mx:nothing outside this group)")
+  end
+
+  specify "deals properly with uncaptured groups" do
+    expect(/whatever(?:0d)/ix.to_s).to eq("(?ix-m:whatever(?:0d))")
+  end
+
+  specify "deals properly with the two types of lookahead groups" do
     expect(/(?=5)/.to_s).to eq("(?-mix:(?=5))")
     expect(/(?!5)/.to_s).to eq("(?-mix:(?!5))")
   end
 
-  specify "displays groups with options as written" do
-    expect(/(?ix:foo)(?m:bar)/.to_s).to eq("(?-mix:(?ix:foo)(?m:bar))")
-    expect(/(?ix:foo)bar/m.to_s).to eq("(?m-ix:(?ix:foo)bar)")
-    expect(/whatever(?:0d)/ix.to_s).to eq("(?ix-m:whatever(?:0d))")
+  specify "returns a string in (?xxx:yyy) notation" do
+    expect(/ab+c/ix.to_s).to eq("(?ix-m:ab+c)")
+    expect(/(?i:.)/.to_s).to eq("(?i-mx:.)")
+    expect(/(?:.)/.to_s).to eq("(?-mix:.)")
+  end
+
+  specify "handles abusive option groups" do
+    expect(/(?mmmmix-miiiix:)/.to_s).to eq("(?-mix:)")
+  end
+
+  # Ruby's same walk drops a leading `(?flags)` with no group, folding its
+  # options in, as many as lead.
+  specify "folds a leading option switch into the wrapper" do
+    expect(/(?i)abc/.to_s).to eq("(?i-mx:abc)")
+    expect(/(?i)(?m)abc/.to_s).to eq("(?mi-x:abc)")
   end
 end

@@ -2620,9 +2620,9 @@ core/regexp/timeout_spec.rb:
   link: https://github.com/portlandlang/portland/issues/212
 core/regexp/to_s_spec.rb:
   pdx: [spec/core/regexp/to_s_spec.pdx]
-  status: partial_planned
-  reason: "A single leading group's options fold into the wrapper in Ruby's to_s; here the group is written as it is."
-  link: https://github.com/portlandlang/portland/issues/217
+  status: partial_intentional
+  reason: "The /jis/s row stays upstream: the n, u, e, and s encoding modifiers do not exist, every string being UTF-8."
+  link: docs/ruby/encodings.md
 core/regexp/try_convert_spec.rb:
   status: skipped
   reason: "There is no to_regexp protocol; a value is a pattern or it is not."
