@@ -4447,9 +4447,9 @@ language/alias_spec.rb:
   reason: "alias takes two bare names (ADR 0039), so the symbol-spelling rows refuse; there is no redefinition to reverse, no metaclass, eval, attr, splat, or superclass, and no globals to alias."
   link: docs/ruby/aliases.md
 language/and_spec.rb:
-  pdx: [spec/language/and_spec.pdx]
+  pdx: [spec/language/and_spec.pdx, spec/portland/word_operators/precedence_spec.pdx]
   status: partial_intentional
-  reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; assignment is a statement, so the assignment-in-expression rows stay upstream."
+  reason: "The logical operators take booleans only, so the rows with strings, integers, nil, or () as operands refuse; and binds as && does, so x = true and false assigns false where Ruby assigns true (spec/portland/word_operators/precedence_spec.pdx); assignment is a statement, so the assignment-in-expression rows stay upstream."
   link: docs/ruby/truthiness.md
 language/block_spec.rb:
   pdx: [spec/language/block_spec.pdx]
@@ -4538,9 +4538,9 @@ language/optional_assignments_spec.rb:
   reason: "||= is the or-guard as a rebind: a declared maybe or boolean takes it, a false non-boolean refuses, an undeclared name refuses; the accessor, constant, and index forms, the value-of-assignment rows, and the undecided &&= stay upstream."
   link: docs/adr/0043-2026-08-19-or-equals.md
 language/or_spec.rb:
-  pdx: [spec/language/or_spec.pdx]
+  pdx: [spec/language/or_spec.pdx, spec/portland/word_operators/precedence_spec.pdx]
   status: partial_intentional
-  reason: "or and || are dead-identical, so the precedence rows diverge on purpose; the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
+  reason: "or and || are dead-identical, so the precedence rows diverge on purpose — x = nil or true assigns true where Ruby assigns nil (spec/portland/word_operators/precedence_spec.pdx); the rows with nil, integers, or () as operands refuse, and break, next, and return carry no value out of a lambda."
   link: docs/ruby/word-operators.md
 language/pattern_matching_spec.rb:
   pdx: [spec/language/pattern_matching_spec.pdx]

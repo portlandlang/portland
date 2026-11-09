@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`and` assignment has a precedence row** ([#239](https://github.com/portlandlang/portland/issues/239)) — `spec/portland/word_operators/precedence_spec.pdx` pins `held = true and false` assigning false, where Ruby assigns true, beside the `or` rows; the `or` row that sat in the ruby/spec mirror at `spec/language/or_spec.pdx` moves there too. The manifest names both upstream rows as intentional divergences.
+
 - **Manifest reasons name specs that exist** ([#240](https://github.com/portlandlang/portland/issues/240)) — two reasons in `spec/ruby_spec.yml` cited `spec/portland/number/` files that #235 moved into the mirror; `core/float/exponent_spec.rb`'s now cites `spec/core/float/exponent_spec.pdx`. `core/enumerable/sum_spec.rb`'s rational rows, which had been written with integers, now port as upstream has them, `2/3r` as `Rational(2, 3)`, summing exactly on both oracles. The `ruby_spec_manifest` docs check fails on a reason that cites a spec path that does not exist.
 
 - **`MatchData#eql?` has spec rows** ([#236](https://github.com/portlandlang/portland/issues/236)) — `spec/core/matchdata/eql_spec.pdx` asks `eql?` the four questions `equal_value_spec.pdx` asks `==`, on both oracles, where the manifest claimed a row no spec had. Upstream's own row compares method objects and stays there.
