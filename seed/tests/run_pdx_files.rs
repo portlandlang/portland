@@ -1706,9 +1706,6 @@ fn hash_brackets_refuse_in_rubys_words() {
     assert_both_oracles_refuse("hash_brackets_refusal.pdx", None, &cases);
 }
 
-/// A float with no integer to give refuses where Ruby raises
-/// FloatDomainError, and one past the 64-bit integers refuses where Ruby
-/// would reach for a bignum — never a silent 0 or i64::MAX (#108).
 /// A `return` or `break` leaving a block through a `yield` whose value is
 /// consumed in place unwinds as Ruby's does (#208): an argument, a binary
 /// operand, `<<`, an array element, a condition, a receiver. The seed had
@@ -1736,6 +1733,9 @@ fn unwinding_through_a_yield_used_as_an_operand() {
     );
 }
 
+/// A float with no integer to give refuses where Ruby raises
+/// FloatDomainError, and one past the 64-bit integers refuses where Ruby
+/// would reach for a bignum — never a silent 0 or i64::MAX (#108).
 #[test]
 fn float_to_integer_refuses_what_has_no_integer() {
     assert_evaluator_matches_seed(
