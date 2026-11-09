@@ -76,9 +76,4 @@ context "The or operator" do
     taken = if false or true then true else false end
     expect(taken).to be_true
   end
-
-  specify "is evaluated before variables are assigned, as || is — the two are one operator here" do
-    flag = nil or true
-    expect(flag).to be_true
-  end
 end

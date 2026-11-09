@@ -1,6 +1,13 @@
-# ADR 0007 — one precedence means `x = nil or 7` binds the `or` first, so
-# the name gets 7. In Ruby this assigns nil and the 7 vanishes — the exact
-# trap whose removal this example pins.
+# ADR 0007 — `and` and `or` bind as `&&` and `||` do, tighter than `=`, so
+# `x = nil or 7` binds the `or` first and the name gets 7. In Ruby this
+# assigns nil and the 7 vanishes — the exact trap whose removal these
+# examples pin. `and` is the same trap the other way: Ruby's
+# `x = true and false` assigns true and drops the false.
+#
+# Upstream's rows, which pin Ruby's order, are language/and_spec.rb's
+# "when used in assignment, evaluates and assigns expressions individually"
+# and language/or_spec.rb's "is evaluated after variables are assigned"
+# (#239).
 
 require_relative "../../spec_helper"
 
@@ -10,6 +17,18 @@ context "the word operators" do
 
     specify "binds the whole or expression, not the nil" do
       expect(bound).to eq(7)
+    end
+
+    specify "is evaluated before variables are assigned, as || is — the two are one operator here" do
+      flag = nil or true
+      expect(flag).to be_true
+    end
+  end
+
+  describe "assignment through and" do
+    specify "binds the whole and expression, not its left side" do
+      held = true and false
+      expect(held).to be_false
     end
   end
 end
