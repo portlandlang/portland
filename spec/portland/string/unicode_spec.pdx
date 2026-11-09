@@ -8,14 +8,28 @@
 # Invisible ink, made visible: the two spellings of café below render
 # identically, but the first é is one composed scalar (U+00E9) and the
 # second is e plus a combining accent (U+0065 U+0301). The whole point
-# of the ADR is that the difference stops being observable.
+# of the ADR is that the difference stops being observable. Both are
+# built from codepoints, since an editor that normalizes on save turns a
+# typed decomposed é into the composed one, as it did to this file's
+# first version (#237).
 
 require_relative "../../spec_helper"
 
+COMPOSED_E = 0xe9.chr(Encoding::UTF_8)
+DECOMPOSED_E = [0x65, 0x301].map { it.chr(Encoding::UTF_8) }.join
+COMPOSED_CAFE = "caf" + COMPOSED_E
+DECOMPOSED_CAFE = "caf" + DECOMPOSED_E
+
 context "String" do
   describe "what a character is" do
+    specify "the two spellings of café are different scalars" do
+      expect(COMPOSED_CAFE.codepoints).to eq([0x63, 0x61, 0x66, 0xe9])
+      expect(DECOMPOSED_CAFE.codepoints).to eq([0x63, 0x61, 0x66, 0x65, 0x301])
+    end
+
     specify "a character is what a human sees, however encoded" do
-      expect("café".length).to eq(4)
+      expect(COMPOSED_CAFE.length).to eq(4)
+      expect(DECOMPOSED_CAFE.length).to eq(4)
     end
 
     specify "a flag is one character, not two scalars" do
@@ -27,11 +41,12 @@ context "String" do
 
   describe "when two strings are equal" do
     specify "composed and decomposed é are the same text" do
-      expect("café" == "café").to be_true
+      expect(COMPOSED_CAFE == DECOMPOSED_CAFE).to be_true
     end
 
     specify "count sees through the encodings too" do
-      expect("café".count("é")).to eq(1)
+      expect(DECOMPOSED_CAFE.count(COMPOSED_E)).to eq(1)
+      expect(COMPOSED_CAFE.count(DECOMPOSED_E)).to eq(1)
     end
   end
 
