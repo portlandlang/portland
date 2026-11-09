@@ -1642,6 +1642,42 @@ fn exponent_literals_on_both_oracles() {
 /// A float with no integer to give refuses where Ruby raises
 /// FloatDomainError, and one past the 64-bit integers refuses where Ruby
 /// would reach for a bignum — never a silent 0 or i64::MAX (#108).
+/// A keyword a builtin does not take refuses on both oracles rather than
+/// being dropped (#264), on any receiver and on the builtin functions; the
+/// builtins that take one still read it, `printf` among them.
+#[test]
+fn builtins_refuse_keywords_they_do_not_take() {
+    let cases = [
+        (
+            "p([1, 2].first(bogus: 1))\n",
+            "'first' takes no keyword arguments, got bogus:",
+        ),
+        (
+            "p(\"ab\".upcase(bogus: 1))\n",
+            "'upcase' takes no keyword arguments, got bogus:",
+        ),
+        (
+            "p(Rational(1, 2).numerator(bogus: 1))\n",
+            "'numerator' takes no keyword arguments, got bogus:",
+        ),
+        (
+            "p(Set[1].size(bogus: 1))\n",
+            "'size' takes no keyword arguments, got bogus:",
+        ),
+        (
+            "p(/a/.match(\"a\", bogus: 1))\n",
+            "'match' takes no keyword arguments, got bogus:",
+        ),
+        ("puts(\"a\", bogus: 1)\n", "puts takes no keyword arguments"),
+    ];
+    assert_both_oracles_refuse("keyword_refusal.pdx", None, &cases);
+    assert_both_print(
+        "keyword_taken.pdx",
+        "printf(\"%<name>s\\n\", name: \"pdx\")\np([1, 2, 3].shuffle(random: Random.new(1)))\n",
+        "pdx\n[1, 3, 2]\n",
+    );
+}
+
 #[test]
 fn float_to_integer_refuses_what_has_no_integer() {
     assert_evaluator_matches_seed(

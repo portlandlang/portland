@@ -3223,6 +3223,13 @@ def evaluate_method_call(node, mutable bindings)
       arguments += argument_step.value
     end
   end
+  # A keyword a builtin does not take refuses before any arm can answer
+  # without reading it (#264), the seed's guard: a struct's own methods and
+  # `with`, and the builtins that take one, read their own.
+  unless keyword_values.empty? || (receiver in ["__struct__", *])
+    takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures")
+    panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
+  end
   # A set (ADR 0082): its own names answer here, a mutator names the
   # spelling that answers a new set, and Ruby's Enumerable walks the members
   # as an array's — the walks that answer their receiver answering the set
@@ -5136,6 +5143,9 @@ def evaluate_call(node, mutable bindings)
     check_call_count(node.name, value_at(slot.first[2], 0), arguments.length)
     return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings)
   end
+  # The seed's rule (#264): of the builtin functions, only the formatters
+  # read keywords; every other refuses rather than dropping them.
+  panic("#{node.name} takes no keyword arguments") unless keyword_values.empty? || %w[format printf sprintf].include?(node.name)
   case node.name
   # `puts` and `p` are a rendering and a newline over the floor's one
   # crossing to standard output (ADR 0068).

@@ -5241,6 +5241,18 @@ impl<W: std::io::Write> Interpreter<W> {
         keyword_arguments: Vec<(String, Value)>,
         block: Option<&Block>,
     ) -> Option<Value> {
+        // A keyword a builtin does not take refuses before any arm can
+        // answer without reading it (#264). A struct's own methods and
+        // `with`, a type's functions, and the builtins that take one —
+        // `sample(random:)`, `shuffle(random:)`,
+        // `named_captures(symbolize_names:)` — read their own.
+        if let Some((label, _)) = keyword_arguments.first()
+            && !matches!(receiver, Value::Struct { .. } | Value::Type(_))
+            && !(matches!(receiver, Value::Array(_)) && matches!(name, "sample" | "shuffle"))
+            && !(matches!(receiver, Value::MatchData(_)) && name == "named_captures")
+        {
+            panic!("'{name}' takes no keyword arguments, got {label}:");
+        }
         // `minmax` is `min` and `max` together (#104), each a maybe, and a
         // comparator block goes to both.
         if name == "minmax"
@@ -9130,7 +9142,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 crate::format::format_values(template, &arguments[1..], &keyword_arguments);
             return Some(Value::String(formatted));
         }
-        if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() {
+        // `printf` is `format` then `print`, so it reads `format`'s keywords
+        // (#264); every other builtin function takes none.
+        if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() && name != "printf" {
             panic!("{name} takes no keyword arguments");
         }
         if self.lookup_method(name).is_none() && name == "puts" {
