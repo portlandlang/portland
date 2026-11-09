@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The `together` docs say it is built** ([#279](https://github.com/portlandlang/portland/issues/279)) — ADRs 0002, 0004, and 0011 said `together` was unbuilt, though ADR 0029 built it serially on both implementations in July. Their "not yet implemented" consequences now point to ADR 0029. The `not-portland` markers come off the four `together` samples that parse (the three ADRs and `docs/ruby/concurrency.md`), so the docs check now parses them. ADR 0011's positional `a, b = together do … end` sample keeps a marker, with the reason rewritten: it is the form the ADR declines, and it doesn't parse. The code-sample check's header no longer names `together` as unbuilt.
+
 - **The spec harness, one piece per file** ([#277](https://github.com/portlandlang/portland/issues/277)) — `spec/spec_helper.pdx` is now only its header notes and `require_relative`s.
   - `spec/dsl/` holds `describe`, `context`, `specify`, and `pending`, one per file.
   - `spec/expectations/expectation.pdx` holds `Expectation` and `expect`.
