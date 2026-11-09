@@ -14,6 +14,11 @@
 # Resolution, per upstream file: a skip wins; then a failing run; then the
 # manifest's partial status; then passing. A file-level key wins over the
 # directory key it sits under.
+#
+# Beside the upstream areas, `portland` lists every spec under
+# spec/portland/ — Portland's own, which no upstream file maps to — by
+# directory, each passing or failing on both oracles, with the examples the
+# seed ran (#241).
 
 require "json"
 require "open3"
@@ -77,30 +82,39 @@ class Manifest
   def keys = @entries.keys
 end
 
-# Runs each pdx spec on the seed and hosted, and remembers which pass. A spec
-# passes when both runs exit cleanly, print at least one example, and print
-# no failure.
+# Runs each pdx spec on the seed and hosted, and remembers which pass and
+# how many examples the seed ran. A spec passes when both runs exit cleanly,
+# print at least one example, and print no failure. The harness prints each
+# example it runs as a `- title` line.
 class SpecRun
   def initialize(files:, binary:)
-    @results = files.to_h { [it, passes?(it, binary:)] }
+    @results = files.to_h { [it, outcome(it, binary:)] }
   end
 
-  def passing?(file) = @results.fetch(file)
+  def passing?(file) = @results.fetch(file).fetch(:passing)
+
+  def examples(file) = @results.fetch(file).fetch(:examples)
 
   private
 
-  def passes?(file, binary:)
+  def outcome(file, binary:)
     seed = Open3.capture2e(binary, file, chdir: REPO)
     hosted = Open3.capture2e(binary, "spec/run_specs.pdx", "spec/spec_helper.pdx", file, chdir: REPO)
-    [seed, hosted].all? { |output, status| status.success? && output.include?("\n- ") && !output.include?("  FAIL ") }
+    passing = [seed, hosted].all? { |output, status| status.success? && output.include?("\n- ") && !output.include?("  FAIL ") }
+    { passing:, examples: seed.first.lines.count { it.start_with?("- ") } }
   end
 end
 
+# The specs under spec/portland/ (#241): what is Portland's own, or
+# deliberately not Ruby's, which no upstream file maps to.
+def portland_spec_files = Dir.chdir(REPO) { Dir.glob("spec/portland/**/*_spec.pdx") }.sort
+
 # The whole dashboard: statuses resolved, grouped by area and directory.
 class Dashboard
-  def initialize(checkout:, manifest:, run:)
+  def initialize(checkout:, manifest:, portland_files:, run:)
     @checkout = checkout
     @manifest = manifest
+    @portland_files = portland_files
     @run = run
   end
 
@@ -114,11 +128,29 @@ class Dashboard
       ruby_spec_date: git(@checkout, "log", "-1", "--format=%cs"),
       totals: totals(rows),
       progress: progress(rows),
-      areas: rows.group_by { it[:area] }.map { |area, area_rows| area_for(area, area_rows) }
+      areas: rows.group_by { it[:area] }.map { |area, area_rows| area_for(area, area_rows) },
+      portland: portland_area
     }
   end
 
   private
+
+  # spec/portland/ shaped as an area (#241), so the site draws it as it
+  # draws `core`: by directory, each file passing or failing on both
+  # oracles, with the examples the seed ran.
+  def portland_area
+    rows = @portland_files.map do |path|
+      {
+        directory: File.dirname(path).delete_prefix("spec/"),
+        name: File.basename(path, "_spec.pdx"),
+        path:,
+        url: "#{PORTLAND_BLOB}/#{path}",
+        examples: @run.examples(path),
+        status: @run.passing?(path) ? "passing" : "failing"
+      }
+    end
+    area_for("portland", rows)
+  end
 
   # The thermometer's numbers (#130), by upstream example rather than file,
   # since a file can hold 2 examples or 200. A skipped file is decided out,
@@ -226,5 +258,6 @@ unknown = manifest.keys.reject { File.exist?(File.join(checkout, it)) }
 abort "spec/ruby_spec.yml names paths this checkout does not have:\n  #{unknown.join("\n  ")}" if unknown.any?
 
 system("cargo", "build", "--quiet", "--manifest-path", File.join(REPO, "seed/Cargo.toml"), exception: true)
-run = SpecRun.new(files: manifest.pdx_files, binary: File.join(REPO, "target/debug/pdx"))
-puts JSON.pretty_generate(Dashboard.new(checkout:, manifest:, run:).to_h)
+portland_files = portland_spec_files
+run = SpecRun.new(files: (manifest.pdx_files + portland_files).uniq, binary: File.join(REPO, "target/debug/pdx"))
+puts JSON.pretty_generate(Dashboard.new(checkout:, manifest:, portland_files:, run:).to_h)

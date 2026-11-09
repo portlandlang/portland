@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The spec dashboard lists Portland's own specs** ([#241](https://github.com/portlandlang/portland/issues/241)) — `script/ruby_spec_dashboard` writes a `portland` section beside the upstream areas: every spec under `spec/portland/`, by directory, each passing or failing on both oracles, with the number of examples the seed ran. Only the handful a manifest row happened to name had appeared before. 68 files today, all passing.
+
 - **A `return` or `break` unwinds through a `yield` used as an operand** ([#208](https://github.com/portlandlang/portland/issues/208)) — on both implementations, `note(yield)`, `1 + yield`, `notes << yield`, `[yield, x]`, `if yield`, and `yield.to_s` stop where Ruby's do when the block returns or breaks, and the method the block was written in answers the returned value. The seed had refused `Yield([]) produced no value`, and the hosted evaluator ran the yielding method on past the `return`. An operand, argument, receiver, element, or condition that comes back with a signal pending now stops the expression, and later arguments never run. Pinned by a two-oracle test with Ruby 4.0.9's answers.
 
 - **A paren-less call nested in another refuses with the rewrite** ([#173](https://github.com/portlandlang/portland/issues/173)) — `p pair 1, 2` says `'p pair 1, 2' nests one paren-less call in another — parenthesize the inner one, 'p pair(1, 2)'` on both implementations, after a bare command or a dotted one, at any argument. The seed had said `expected a newline after statement` in its parser's words, and the hosted compiler read `pair` as a bare argument, so its checker said `pair expects 2 arguments, got 0`.
