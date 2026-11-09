@@ -1960,6 +1960,38 @@ fn combinatorics_and_binary_search_match_ruby() {
 /// parameters; a name nothing defines and a method no value has answer the
 /// rewrite before the seventh wording. Where the ledger names no rewrite,
 /// the fact stands alone.
+/// A paren-less call nested in another (#173): Ruby reads `p pair 1, 2`
+/// as `p(pair(1, 2))`, a reader could see two arguments to `p`, so both
+/// oracles refuse with the inner call parenthesized — the first argument
+/// or a later one, after a bare name or a dot.
+#[test]
+fn nested_paren_less_calls_refuse_with_the_rewrite_on_both_oracles() {
+    let pair = "def pair(a, b)\n  [a, b]\nend\n";
+    let first = format!("{pair}p pair 1, 2\n");
+    let strings = format!("{pair}puts pair \"a\", :b\n");
+    let later = format!("{pair}p 0, pair 1, 2\n");
+    let dotted = "x = [1]\nx.push pair 1\n".to_string();
+    let cases = [
+        (
+            first.as_str(),
+            "'p pair 1, 2' nests one paren-less call in another — parenthesize the inner one, 'p pair(1, 2)'",
+        ),
+        (
+            strings.as_str(),
+            "'puts pair \"a\", :b' nests one paren-less call in another — parenthesize the inner one, 'puts pair(\"a\", :b)'",
+        ),
+        (
+            later.as_str(),
+            "'p pair 1, 2' nests one paren-less call in another — parenthesize the inner one, 'p pair(1, 2)'",
+        ),
+        (
+            dotted.as_str(),
+            "'push pair 1' nests one paren-less call in another — parenthesize the inner one, 'push pair(1)'",
+        ),
+    ];
+    assert_both_oracles_refuse("nested_command.pdx", None, &cases);
+}
+
 #[test]
 fn removed_spellings_refuse_with_their_rewrites_on_both_oracles() {
     let cases = [
