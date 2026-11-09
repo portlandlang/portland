@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`System.capture_standard_output` and `System.capture_standard_error`** ([#251](https://github.com/portlandlang/portland/issues/251)) — on both implementations, each runs its block and answers the text written to that stream, in place of writing it, so a spec can check what a call wrote: `expect(System.capture_standard_output { print "x" }).to eq("x")`.
+  - It captures the interpreter's write path: `puts`, `print`, `p`, `pp`, `putc`, `printf`, `warn`, and `System.write_standard_output`/`_error`. It is not the OS file descriptor.
+  - Captures nest, the innermost taking the text. The block's own value is dropped.
+  - A `break` or `return` out of the block closes the capture and drops its text.
+  - With no block, or with an argument, it refuses on both implementations.
+  - Under `together`, a capture covers everything inside its block. Around a `together`, that is every task's writes; inside a task line, only that task's.
+  - The seed routes every write through one function per stream, which a capture intercepts. The hosted evaluator runs the guest's block inside the host's own capture, since every guest write is already a host `System.write_standard_*` call.
+  - ADR 0068 is amended with the members and their rulings. `docs/ruby/system.md`, `language.md`, and `standard-library.md` name them.
+  - New spec: `spec/portland/system/capture_spec.pdx`.
+
 - **The `together` docs say it is built** ([#279](https://github.com/portlandlang/portland/issues/279)) — ADRs 0002, 0004, and 0011 said `together` was unbuilt, though ADR 0029 built it serially on both implementations in July. Their "not yet implemented" consequences now point to ADR 0029. The `not-portland` markers come off the four `together` samples that parse (the three ADRs and `docs/ruby/concurrency.md`), so the docs check now parses them. ADR 0011's positional `a, b = together do … end` sample keeps a marker, with the reason rewritten: it is the form the ADR declines, and it doesn't parse. The code-sample check's header no longer names `together` as unbuilt.
 
 - **The spec harness, one piece per file** ([#277](https://github.com/portlandlang/portland/issues/277)) — `spec/spec_helper.pdx` is now only its header notes and `require_relative`s.

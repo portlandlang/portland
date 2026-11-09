@@ -459,6 +459,8 @@ def type_function_answer_for(type_name, name)
   when "arguments"                         then ["array", ["string"]]
   when "wall_clock_time", "monotonic_time" then ["integer"]
   when "entropy"                           then ["array", ["integer"]]
+  # The two captures answer the text the block wrote (#251).
+  when "capture_standard_output", "capture_standard_error" then if type_name == "System" then ["string"] else ["unknown"] end
   # `JSON.parse` answers the document's shape, which is unknown; the two
   # writers answer text (ADR 0072).
   when "generate", "pretty_generate"       then ["string"]

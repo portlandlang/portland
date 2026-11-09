@@ -2369,6 +2369,25 @@ def evaluate_builtin_type_function(node, mutable bindings)
     end
     return outcome([System.write_file(path, content)], bindings)
   end
+  # The two captures (ADR 0068, amended for #251): the guest's block runs
+  # inside the host's own capture, which takes every guest write, since each
+  # one is a host `System.write_standard_*` crossing below. The guest block's
+  # step rides out in a `mutable`, the block's value being dropped; a
+  # `break` or `return` out of it unwinds as any block's does.
+  if type_name == "System" && (node.name == "capture_standard_output" || node.name == "capture_standard_error")
+    panic("System.#{node.name} takes 0 arguments, got #{arguments.length}") unless arguments.empty?
+    panic("System.#{node.name} takes a block — the writes to capture go inside it") if node.block.nil?
+    mutable step = nil
+    captured = if node.name == "capture_standard_output"
+      System.capture_standard_output { step = run_guest_block(node.block, [], bindings) }
+    else
+      System.capture_standard_error { step = run_guest_block(node.block, [], bindings) }
+    end
+    finished = step or panic("System.#{node.name}: the block never ran")
+    scope = compacted_since(bindings, finished.bindings)
+    return block_interrupted(finished, scope) if finished.signal != "none"
+    return outcome([captured], scope)
+  end
   # The two standard streams, text as given, answering the bytes written —
   # the host's own crossings, so a guest's stdout is the host's stdout.
   if type_name == "System" && (node.name == "write_standard_output" || node.name == "write_standard_error")

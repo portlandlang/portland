@@ -2644,6 +2644,12 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// The REPL redefines on purpose; a program never does (ADR 0052).
     redefinable: bool,
     output: W,
+    /// The open `System.capture_standard_output` and
+    /// `System.capture_standard_error` blocks (#251), innermost last: a write
+    /// to a stream lands in its innermost capture, or on the stream when
+    /// there is none.
+    standard_output_captures: Vec<String>,
+    standard_error_captures: Vec<String>,
     pending: Option<Pending>,
     /// The receiver while a struct method runs: `(struct name, instance)`.
     self_receiver: Option<(String, Value)>,
@@ -2752,6 +2758,8 @@ impl<W: std::io::Write> Interpreter<W> {
             constants: builtin_constants(),
             redefinable: false,
             output,
+            standard_output_captures: Vec::new(),
+            standard_error_captures: Vec::new(),
             pending: None,
             self_receiver: None,
             current_block: None,
@@ -4400,7 +4408,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
             },
             ("System", "write_standard_error") => match arguments.as_slice() {
-                [Value::String(text)] => Some(write_standard_error(text)),
+                [Value::String(text)] => Some(self.emit_standard_error(text)),
                 [other] => panic!(
                     "System.write_standard_error takes a String, got {}",
                     other.shown()
@@ -4410,6 +4418,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     arguments.len()
                 ),
             },
+            ("System", "capture_standard_output" | "capture_standard_error") => {
+                self.capture_stream(name, &arguments, block)
+            }
             ("System", "wall_clock_time") => {
                 if !arguments.is_empty() {
                     panic!(
@@ -4464,12 +4475,74 @@ impl<W: std::io::Write> Interpreter<W> {
     /// buffer under test — answering the bytes written. `puts` and `p` are
     /// this crossing with a rendering and a newline in front of it.
     fn write_standard_output(&mut self, text: &str) -> Value {
-        match self.output.write_all(text.as_bytes()) {
+        match self.emit_standard_output(text) {
             Ok(()) => Value::Integer(text.len() as i64),
             Err(error) => Value::Failure(Box::new(Value::String(format!(
                 "System.write_standard_output: {error}"
             )))),
         }
+    }
+
+    /// Every write to standard output goes through here — `puts`, `print`,
+    /// `p`, `pp`, `putc`, `printf`, and `System.write_standard_output` — so
+    /// an open capture takes it (#251).
+    fn emit_standard_output(&mut self, text: &str) -> std::io::Result<()> {
+        match self.standard_output_captures.last_mut() {
+            Some(captured) => {
+                captured.push_str(text);
+                Ok(())
+            }
+            None => self.output.write_all(text.as_bytes()),
+        }
+    }
+
+    /// Every write to standard error goes through here — `warn` and
+    /// `System.write_standard_error` — so an open capture takes it (#251).
+    fn emit_standard_error(&mut self, text: &str) -> Value {
+        match self.standard_error_captures.last_mut() {
+            Some(captured) => {
+                captured.push_str(text);
+                Value::Integer(text.len() as i64)
+            }
+            None => write_standard_error(text),
+        }
+    }
+
+    /// `System.capture_standard_output { … }` and
+    /// `System.capture_standard_error { … }` (ADR 0068, amended for #251):
+    /// run the block with a capture open on the stream, and answer the text
+    /// it took. The block's own value is dropped. A `break` or `return` out
+    /// of the block closes the capture and drops its text, so the writes
+    /// after it reach the capture outside, or the stream.
+    fn capture_stream(
+        &mut self,
+        name: &str,
+        arguments: &[Value],
+        block: Option<&Block>,
+    ) -> Option<Value> {
+        if !arguments.is_empty() {
+            panic!("System.{name} takes 0 arguments, got {}", arguments.len());
+        }
+        let Some(block) = block else {
+            panic!("System.{name} takes a block — the writes to capture go inside it");
+        };
+        let error = name == "capture_standard_error";
+        if error {
+            self.standard_error_captures.push(String::new());
+        } else {
+            self.standard_output_captures.push(String::new());
+        }
+        self.run_block(block, Vec::new());
+        let captured = if error {
+            self.standard_error_captures.pop()
+        } else {
+            self.standard_output_captures.pop()
+        }
+        .expect("a capture closes only the capture it opened");
+        if let Some(interrupted) = self.block_interrupt() {
+            return interrupted;
+        }
+        Some(Value::String(captured))
     }
 
     /// The process's arguments as an array of strings — what `System.arguments`
@@ -9246,7 +9319,8 @@ impl<W: std::io::Write> Interpreter<W> {
         if self.lookup_method(name).is_none() && name == "puts" {
             // Like Ruby: bare puts() prints a blank line.
             if arguments.is_empty() {
-                writeln!(self.output).expect("failed to write output");
+                self.emit_standard_output("\n")
+                    .expect("failed to write output");
             }
             for argument in &arguments {
                 // Crude preview of the compile error: nil has no rendering.
@@ -9265,7 +9339,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 // second one.
                 let text = argument.to_string();
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
-                write!(self.output, "{text}{newline}").expect("failed to write output");
+                self.emit_standard_output(&format!("{text}{newline}"))
+                    .expect("failed to write output");
             }
             return None;
         }
@@ -9283,7 +9358,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         "print got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                write!(self.output, "{argument}").expect("failed to write output");
+                self.emit_standard_output(&argument.to_string())
+                    .expect("failed to write output");
             }
             return Some(Value::Nil);
         }
@@ -9293,11 +9369,13 @@ impl<W: std::io::Write> Interpreter<W> {
             match arguments.as_slice() {
                 [Value::Integer(code)] => {
                     let character = char::from((code & 0xff) as u8);
-                    write!(self.output, "{character}").expect("failed to write output");
+                    self.emit_standard_output(&character.to_string())
+                        .expect("failed to write output");
                 }
                 [Value::String(text)] => {
                     if let Some(character) = text.chars().next() {
-                        write!(self.output, "{character}").expect("failed to write output");
+                        self.emit_standard_output(&character.to_string())
+                            .expect("failed to write output");
                     }
                 }
                 [other] => panic!("putc takes an integer or a string, got {}", other.inspect()),
@@ -9318,7 +9396,8 @@ impl<W: std::io::Write> Interpreter<W> {
             };
             let formatted =
                 crate::format::format_values(template, &arguments[1..], &keyword_arguments);
-            write!(self.output, "{formatted}").expect("failed to write output");
+            self.emit_standard_output(&formatted)
+                .expect("failed to write output");
             return Some(Value::Nil);
         }
         // `warn` is `puts` to standard error, answering nil (#185): each
@@ -9344,7 +9423,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 let text = line.to_string();
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
-                write_standard_error(&format!("{text}{newline}"));
+                self.emit_standard_error(&format!("{text}{newline}"));
             }
             return Some(Value::Nil);
         }
@@ -9375,7 +9454,8 @@ impl<W: std::io::Write> Interpreter<W> {
         if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
                 let inspected = argument.inspect();
-                writeln!(self.output, "{inspected}").expect("failed to write output");
+                self.emit_standard_output(&format!("{inspected}\n"))
+                    .expect("failed to write output");
             }
             // Like Ruby: p returns its argument, so it drops into any
             // expression — and nil with nothing to show (ADR 0012).
