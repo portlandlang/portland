@@ -8639,16 +8639,11 @@ impl<W: std::io::Write> Interpreter<W> {
                             .value
                             .clone()
                     });
-                // A pinned type type-tests (#255), as `Integer` written in
-                // the pattern does.
-                if let Value::Type(name) = &value {
-                    return Self::held_type_matches(name, subject).then(Vec::new);
-                }
-                if value == *subject {
-                    Some(Vec::new())
-                } else {
-                    None
-                }
+                // A pin tests by `===`, as Ruby's does (#257): a type
+                // type-tests (#255), a range covers, a pattern matches, a
+                // set holds, a struct answers its own `===`, and anything
+                // else compares by `==`.
+                self.case_equal(&value, subject).then(Vec::new)
             }
             Pattern::Literal(expression) => {
                 if self.value_of(expression) == *subject {
@@ -8750,12 +8745,18 @@ impl<W: std::io::Write> Interpreter<W> {
             return matched;
         }
         let pattern = self.value_of(pattern);
-        match (&pattern, subject) {
+        self.case_equal(&pattern, subject)
+    }
+
+    /// Case equality on a pattern already evaluated: what `when` asks of
+    /// its value, and what a `^` pin asks of the value it reads (#257).
+    fn case_equal(&mut self, pattern: &Value, subject: &Value) -> bool {
+        match (pattern, subject) {
             // A type held in a local, a parameter, or a field type-tests as
             // the written name does (#255).
             (Value::Type(name), _) => Self::held_type_matches(name, subject),
             // A range's `===` is `cover?` (ADR 0081), over any ends.
-            (Value::Range { .. }, _) => self.range_covers(&pattern, subject),
+            (Value::Range { .. }, _) => self.range_covers(pattern, subject),
             (Value::Struct { name, .. }, _) if self.struct_defines(name, "===") => {
                 let method = Self::resolve(&self.module_path, name, &self.structs)
                     .and_then(|(_, info)| info.methods.get("===").cloned())
