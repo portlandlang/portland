@@ -9,7 +9,8 @@
 # `<=>` and incompatible pairs (which refuse where Ruby raises), the rows
 # that order nils through truthiness or find a nil (`min_by` answers a
 # maybe, so a found nil is a present nil), the comparator block answering
-# something other than -1, 0, or 1, mocks of `each`, and rationals.
+# something other than -1, 0, or 1, and mocks of `each`. Upstream's `2/3r`
+# is `Rational(2, 3)` (ADR 0085), and the sums stay exact as Ruby's do.
 
 require_relative "../../spec_helper"
 
@@ -44,19 +45,19 @@ STRINGS = ["333", "22", "666666", "1", "55555", "1010101010"]
 INTEGERS = [333, 22, 666666, 55555, 1010101010]
 
 context "Enumerable#sum" do
-  elements = numerous([0, -1, 2, 3])
+  elements = numerous([0, -1, 2, Rational(2, 3)])
 
   specify "returns amount of the elements with taking an argument as the initial value" do
-    expect(elements.sum(10)).to eq(14)
+    expect(elements.sum(10)).to eq(Rational(35, 3))
   end
 
   specify "gives 0 as a default argument" do
-    expect(elements.sum).to eq(4)
+    expect(elements.sum).to eq(Rational(5, 3))
   end
 
   describe "with a block" do
     specify "transforms the elements" do
-      expect(elements.sum { |element| element * 2 }).to eq(8)
+      expect(elements.sum { |element| element * 2 }).to eq(Rational(10, 3))
     end
 
     specify "does not destructure array elements" do

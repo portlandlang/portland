@@ -6,6 +6,7 @@
 # - every status is one a human may write (failing and missing are computed)
 # - an imported entry names pdx specs that exist; a skip names none
 # - a partial or a skip says why, and any link it gives resolves
+# - a spec path cited in a reason exists
 # - a directory key is a skip, since a directory is never imported whole
 
 require "yaml"
@@ -31,6 +32,12 @@ manifest.each do |key, entry|
 
   pdx.each do |file|
     failures << "#{where}\n\n  #{file} does not exist.\n" unless File.exist?("#{REPO}/#{file}")
+  end
+
+  # A reason that cites a spec by path is shown on the dashboard, so a spec
+  # that has since moved leaves it pointing nowhere (#240).
+  entry["reason"].to_s.scan(%r{spec/[\w/.-]+\.pdx}).each do |file|
+    failures << "#{where}\n\n  its reason cites #{file}, which does not exist.\n" unless File.exist?("#{REPO}/#{file}")
   end
 
   link = entry["link"]
