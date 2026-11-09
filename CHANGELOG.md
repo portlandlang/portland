@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`MatchData#eql?` has spec rows** ([#236](https://github.com/portlandlang/portland/issues/236)) — `spec/core/matchdata/eql_spec.pdx` asks `eql?` the four questions `equal_value_spec.pdx` asks `==`, on both oracles, where the manifest claimed a row no spec had. Upstream's own row compares method objects and stays there.
+
 - **`script/probe_builtin_methods` runs its shapes in parallel** ([#260](https://github.com/portlandlang/portland/issues/260)) — a pool of workers, one per core, each with its own scratch file, takes the probe's thousands of one-line `pdx` runs from a queue; the table it prints is byte-for-byte the serial run's, and the whole probe takes 142 seconds on an eight-core M-series Mac where it took 360. Each run is still its own process, now killed after 30 seconds, and a killed run fails the probe naming its call rather than hanging it.
 
 - **CI checks the builtin method table beside cibuild** ([#259](https://github.com/portlandlang/portland/issues/259)) — the check is its own job, `builtin-method-table`, started with `cibuild` rather than after it, so a run that touches the seed takes about as long as the slower of the two instead of their sum. It keeps its changed-paths gate, now including the workflow itself, and a skipped check sets up nothing, finishing in seconds.

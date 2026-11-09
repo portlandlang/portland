@@ -1727,9 +1727,9 @@ core/matchdata/end_spec.rb:
   reason: "The mock and to_int coercion rows stay upstream; a closed runtime has no coercion protocol."
   link: docs/ruby/metaprogramming.md
 core/matchdata/eql_spec.rb:
-  pdx: [spec/core/matchdata/equal_value_spec.pdx]
+  pdx: [spec/core/matchdata/eql_spec.pdx]
   status: partial_intentional
-  reason: "Upstream compares method objects; the spec asks eql? and == the same question."
+  reason: "Upstream compares method objects; the spec asks eql? the questions equal_value_spec asks ==."
   link: docs/ruby/metaprogramming.md
 core/matchdata/equal_value_spec.rb:
   pdx: [spec/core/matchdata/equal_value_spec.pdx]
