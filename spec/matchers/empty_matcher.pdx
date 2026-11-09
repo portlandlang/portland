@@ -1,0 +1,27 @@
+# The predicate matchers are one struct apiece, and they differ by exactly
+# one method call. This is what rspec's `be_empty` / `be_nil` / `be_whatever`
+# buys with `method_missing`, written out — the repetition is the honest cost
+# of having no runtime dynamism, and the shape a compile-time macro (#14)
+# would generate. Five of them is tolerable; forty would not be, which is the
+# argument for the macro when a real file asks.
+#
+# The five: empty, nil, some, nan, and failure, each in its own file here.
+struct EmptyMatcher
+  word
+
+  def matches?(actual)
+    actual.empty?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_empty
+  EmptyMatcher.new(word: "empty")
+end

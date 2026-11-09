@@ -1,0 +1,21 @@
+# `be_nan` (#252): a NaN equals nothing, itself included, so `eq` can never
+# check for one. One of the predicate matchers; see empty_matcher.pdx.
+struct NanMatcher
+  word
+
+  def matches?(actual)
+    actual.nan?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_nan
+  NanMatcher.new(word: "NaN")
+end

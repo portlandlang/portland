@@ -1,0 +1,19 @@
+struct LengthMatcher
+  expected
+
+  def matches?(actual)
+    actual.length == expected
+  end
+
+  def failure_message(actual)
+    "expected length #{inspect(expected)}, got #{inspect(actual.length)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected any length but #{inspect(expected)}"
+  end
+end
+
+def have_length(count)
+  LengthMatcher.new(expected: count)
+end

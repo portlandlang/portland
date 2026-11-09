@@ -1,0 +1,22 @@
+# `match_array(items)` (#252): the same elements, each as many times, in any
+# order — a Set's elements included. RSpec's `contain_exactly(1, 2, 3)` is
+# the same check with the items spread out, which waits on splats (ADR 0014).
+struct ArrayMatcher
+  items
+
+  def matches?(actual)
+    actual.to_a.tally == items.tally
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to hold exactly #{inspect(items)}, in any order"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to hold exactly #{inspect(items)}, in any order"
+  end
+end
+
+def match_array(items)
+  ArrayMatcher.new(items: items)
+end

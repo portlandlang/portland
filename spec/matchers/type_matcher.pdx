@@ -1,0 +1,35 @@
+# The type matchers (#252): `be_an_instance_of(Integer)`, `be_a(String)`,
+# and `be_an`, `be_a`'s twin. The test is Ruby's, `type === actual`, which
+# type-tests a type held in a field as it does a type written by name
+# (#255); `is_a?` and `instance_of?` are not defined. In Ruby `be_a` admits
+# subclasses and `be_an_instance_of` does not; with no class hierarchy here
+# the two answer the same, and only the words differ.
+struct TypeMatcher
+  type
+  words
+
+  def matches?(actual)
+    type === actual
+  end
+
+  def failure_message(actual)
+    found = if actual.nil? then "nil" else "a #{inspect(actual.class)}" end
+    "expected #{inspect(actual)} to be #{words} #{inspect(type)}, but it is #{found}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to be #{words} #{inspect(type)}"
+  end
+end
+
+def be_an_instance_of(type)
+  TypeMatcher.new(type: type, words: "an instance of")
+end
+
+def be_a(type)
+  TypeMatcher.new(type: type, words: "a")
+end
+
+def be_an(type)
+  TypeMatcher.new(type: type, words: "an")
+end

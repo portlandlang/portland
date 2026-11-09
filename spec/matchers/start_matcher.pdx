@@ -1,0 +1,20 @@
+# One of the string matchers; see pattern_matcher.pdx.
+struct StartMatcher
+  prefix
+
+  def matches?(actual)
+    actual.start_with?(prefix)
+  end
+
+  def failure_message(actual)
+    "expected #{inspect(actual)} to start with #{inspect(prefix)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected #{inspect(actual)} not to start with #{inspect(prefix)}"
+  end
+end
+
+def start_with(prefix)
+  StartMatcher.new(prefix: prefix)
+end

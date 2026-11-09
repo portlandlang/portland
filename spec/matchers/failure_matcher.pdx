@@ -1,0 +1,20 @@
+# One of the predicate matchers; see empty_matcher.pdx.
+struct FailureMatcher
+  word
+
+  def matches?(actual)
+    actual.failure?
+  end
+
+  def failure_message(actual)
+    "expected #{word}, got #{inspect(actual)}"
+  end
+
+  def negated_failure_message(actual)
+    "expected not #{word}, got #{inspect(actual)}"
+  end
+end
+
+def be_failure
+  FailureMatcher.new(word: "a failure")
+end
