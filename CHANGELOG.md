@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A pin tests by `===`** ([#257](https://github.com/portlandlang/portland/issues/257)) — on both implementations, `^name` in a pattern asks the case equality `when` asks, as Ruby's pin does: a pinned range covers (`2 in ^span`), a Regexp matches, a set holds its members, a struct answers its own `===`, and a number compares by `==`, so `1.0 in ^one` matches. Each had compared by equality and missed. Rows pin it in `spec/language/pattern_matching_spec.pdx`, upstream's instance, class, global, and expression pins written as locals.
+
 - **The decomposed café is decomposed** ([#237](https://github.com/portlandlang/portland/issues/237)) — `spec/portland/string/unicode_spec.pdx` meant to pin ADR 0038 with two spellings of `é`, but an editor had normalized the decomposed one away, so its rows compared the composed spelling with itself. Both spellings are now built from codepoints, a row pins that they differ, and the length, equality, and `count` rows ask each against the other, passing on both oracles.
 
 - **`and` assignment has a precedence row** ([#239](https://github.com/portlandlang/portland/issues/239)) — `spec/portland/word_operators/precedence_spec.pdx` pins `held = true and false` assigning false, where Ruby assigns true, beside the `or` rows; the `or` row that sat in the ruby/spec mirror at `spec/language/or_spec.pdx` moves there too. The manifest names both upstream rows as intentional divergences.

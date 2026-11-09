@@ -15,6 +15,9 @@ struct Node
   kind
   text
 end
+struct Evenness
+  def ===(other) = other % 2 == 0
+end
 
 context "Pattern matching" do
   describe "Rightward assignment (`=>`) that can be standalone assoc operator that" do
@@ -324,6 +327,52 @@ context "Pattern matching" do
       else "other"
       end
       expect(answer).to eq("other")
+    end
+
+    # The rest of `===` (#257): upstream pins a Regexp and a range through
+    # an instance, class, or global variable, or a parenthesized
+    # expression; here the same values are pinned from locals.
+    specify "matches a pinned Regexp by matching" do
+      pattern = /a/
+      answer = case "abc"
+      in ^pattern then true
+      end
+      expect(answer).to be_true
+      expect(("xyz" in ^pattern)).to be_false
+    end
+
+    specify "matches a pinned range by covering" do
+      span = 0..10
+      answer = case 2
+      in ^span then true
+      end
+      expect(answer).to be_true
+      expect((11 in ^span)).to be_false
+    end
+
+    specify "matches a pinned set by membership" do
+      members = Set[1, 2]
+      expect((1 in ^members)).to be_true
+      expect((3 in ^members)).to be_false
+    end
+
+    specify "matches a pinned number by ==, across integer and float" do
+      one = 1
+      expect((1.0 in ^one)).to be_true
+    end
+
+    specify "matches a pinned struct by its own ===" do
+      even = Evenness.new
+      expect((4 in ^even)).to be_true
+      expect((3 in ^even)).to be_false
+    end
+
+    specify "matches a pinned range bound earlier in the pattern" do
+      answer = case [1..3, 2]
+      in [span, ^span] then true
+      else false
+      end
+      expect(answer).to be_true
     end
   end
 

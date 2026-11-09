@@ -285,26 +285,32 @@ def guest_case_matches(pattern_node, subject, bindings)
     return outcome([typed], bindings) unless typed.nil?
   end
   step = evaluate_expression(pattern_node, bindings)
-  pattern = slot_value(step.value)
+  guest_case_equal(slot_value(step.value), subject, step.bindings)
+end
+
+# Case equality on a pattern already evaluated, the seed's `case_equal`:
+# what `when` asks of its value, and what a `^` pin asks of the value it
+# reads (#257). An outcome whose value is the verdict.
+def guest_case_equal(pattern, subject, bindings)
   # A type held in a local, a parameter, or a field type-tests as the
   # written name does (#255).
-  return outcome([guest_held_type_matches(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__type__", *]
+  return outcome([guest_held_type_matches(value_at(pattern, 1), subject)], bindings) if pattern in ["__type__", *]
   if pattern in ["__struct__", *]
-    method = struct_method_for(pattern, "===", step.bindings)
+    method = struct_method_for(pattern, "===", bindings)
     unless method.nil?
-      result = invoke_struct_method(pattern, method, [subject], [], step.bindings)
+      result = invoke_struct_method(pattern, method, [subject], [], bindings)
       answer = slot_value(result.value)
       panic("'===' answers true or false, got #{shorten(render_inspect(answer))}") unless answer == true || answer == false
       return outcome([answer], result.bindings)
     end
   end
   # A set's `===` is membership (ADR 0082), as Ruby's.
-  return outcome([set_member?(value_at(pattern, 1), subject)], step.bindings) if pattern in ["__set__", *]
+  return outcome([set_member?(value_at(pattern, 1), subject)], bindings) if pattern in ["__set__", *]
   # A range of structs covers by the structs' own `<=>` (ADR 0081).
-  return outcome([guest_range_covers?(pattern, subject, step.bindings)], step.bindings) if (pattern in Range) && struct_range?(pattern)
+  return outcome([guest_range_covers?(pattern, subject, bindings)], bindings) if (pattern in Range) && struct_range?(pattern)
   # A pattern's `===` on a guest symbol reads its name (ADR 0086).
-  return outcome([pattern === host_text(subject)], step.bindings) if pattern in Regexp
-  outcome([pattern === subject], step.bindings)
+  return outcome([pattern === host_text(subject)], bindings) if pattern in Regexp
+  outcome([pattern === subject], bindings)
 end
 
 # — ranges over structs (ADR 0081) —
@@ -638,13 +644,10 @@ def match_pin(pattern, subject, bindings, earlier)
   else
     value_at(bound, 1)
   end
-  # A pinned type type-tests (#255), as `Integer` written in the pattern does.
-  matched = if pinned in ["__type__", *]
-    guest_held_type_matches(value_at(pinned, 1), subject)
-  else
-    pinned == subject
-  end
-  return [] if matched
+  # A pin tests by `===`, as Ruby's does (#257): a type type-tests (#255), a
+  # range covers, a pattern matches, a set holds, a struct answers its own
+  # `===`, and anything else compares by `==`.
+  return [] if slot_value(guest_case_equal(pinned, subject, bindings).value)
   nil
 end
 
