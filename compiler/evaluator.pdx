@@ -3326,6 +3326,21 @@ def evaluate_method_call(node, mutable bindings)
   # A match's own names (ADR 0086), the host's: `begin`, `end`, and
   # `offset` take a group here, where a range's take none, so they answer
   # before the shared arms.
+  # `named_captures(symbolize_names:)` (#215), the seed's arm: symbol keys
+  # from the group names (ADR 0071), the flag a Boolean as JSON.parse's is.
+  if (receiver in MatchData) && node.name == "named_captures" && !keyword_values.empty?
+    check_builtin_count(receiver, node.name, arguments.length)
+    mutable symbolize_names = false
+    keyword_values.each do |pair|
+      panic("named_captures does not take #{pair[0]}: — symbolize_names: is its one keyword") unless pair[0] == "symbolize_names"
+      flag = value_at(pair, 1)
+      panic("named_captures takes true or false for symbolize_names:, got #{render_inspect(flag)}") unless flag == true || flag == false
+      symbolize_names = flag
+    end
+    captures = receiver.named_captures
+    return outcome([captures], bindings) unless symbolize_names
+    return outcome([captures.to_h { |name, value| [["__symbol__", name], value] }], bindings)
+  end
   if (receiver in MatchData) && %w[captures named_captures names pre_match post_match string regexp to_a size length begin end offset values_at match match_length].include?(node.name)
     check_builtin_count(receiver, node.name, arguments.length)
     return outcome([matchdata_answer(receiver, node.name, arguments)], bindings)
@@ -3875,6 +3890,20 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # silently win — the seed's sentence.
   if %w[all? any? none? one? slice_before slice_after].include?(node.name) && !arguments.empty? && (plain_array?(receiver) || (receiver in Hash) || (receiver in Range))
     panic("'#{node.name}' takes a pattern or a block, not both")
+  end
+  # `match` with a block (#215), the seed's arm: the block runs only on a
+  # match, given it, and the call answers the block's result as a maybe —
+  # the host's `first` lifts a nil result to the present nil — or nil when
+  # nothing matched and the block never ran.
+  if (receiver in Regexp) && node.name == "match"
+    check_builtin_count(receiver, node.name, arguments.length)
+    subject = pattern_operand(receiver, value_at(arguments, 0))
+    found = arguments.length == 2 ? receiver.match(subject, value_at(arguments, 1)) : receiver.match(subject)
+    return outcome([nil], scope) if found.nil?
+    step = run_guest_block(block, [found], scope)
+    scope = compacted_since(entry, step.bindings)
+    return block_interrupted(step, scope) if step.signal != "none"
+    return outcome([[slot_value(step.value)].first], scope)
   end
   # A struct's own method takes the block first (#110), as the seed's
   # dispatch order has it; its `yield` reaches the block.

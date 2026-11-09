@@ -1758,8 +1758,8 @@ core/matchdata/match_spec.rb:
 core/matchdata/named_captures_spec.rb:
   pdx: [spec/core/matchdata/named_captures_spec.pdx]
   status: partial_intentional
-  reason: "The symbolize_names keyword waits for a pull; a key is a string."
-  link: https://github.com/portlandlang/portland/issues/215
+  reason: "symbolize_names takes true or false, so the rows passing \"truly\" and nil stay upstream."
+  link: docs/ruby/truthiness.md
 core/matchdata/names_spec.rb:
   pdx: [spec/core/matchdata/names_spec.pdx]
 core/matchdata/offset_spec.rb:
@@ -2588,7 +2588,7 @@ core/regexp/linear_time_spec.rb:
 core/regexp/match_spec.rb:
   pdx: [spec/core/regexp/match_spec.pdx]
   status: partial_intentional
-  reason: "=~ answers the MatchData here, not an index, since the match globals are gone; the $~ reset, block, allocate, and invalid-encoding rows stay upstream."
+  reason: "=~ answers the MatchData here, not an index, since the match globals are gone; the $~ reset, allocate, and invalid-encoding rows stay upstream."
   link: docs/ruby/regex.md
 core/regexp/named_captures_spec.rb:
   pdx: [spec/core/regexp/named_captures_spec.pdx]

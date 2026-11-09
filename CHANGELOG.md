@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`Regexp#match` with a block, and `named_captures(symbolize_names:)`** ([#215](https://github.com/portlandlang/portland/issues/215)) — on both implementations, `/(\d+)/.match("a12") { |found| found[1] }` runs the block only on a match and answers its result, a maybe that is nil when nothing matched, as Ruby's answers nil; `named_captures(symbolize_names: true)` answers symbol keys, where the keyword had been silently ignored (#264 tracks keywords dropped elsewhere). The flag takes true or false, as `JSON.parse`'s does. The builtin table marks `match` block-taking. Upstream's block rows port into `spec/core/regexp/match_spec.pdx` and its `symbolize_names` rows into `spec/core/matchdata/named_captures_spec.pdx`.
+
 - **A pin tests by `===`** ([#257](https://github.com/portlandlang/portland/issues/257)) — on both implementations, `^name` in a pattern asks the case equality `when` asks, as Ruby's pin does: a pinned range covers (`2 in ^span`), a Regexp matches, a set holds its members, a struct answers its own `===`, and a number compares by `==`, so `1.0 in ^one` matches. Each had compared by equality and missed. Rows pin it in `spec/language/pattern_matching_spec.pdx`, upstream's instance, class, global, and expression pins written as locals.
 
 - **The decomposed café is decomposed** ([#237](https://github.com/portlandlang/portland/issues/237)) — `spec/portland/string/unicode_spec.pdx` meant to pin ADR 0038 with two spellings of `é`, but an editor had normalized the decomposed one away, so its rows compared the composed spelling with itself. Both spellings are now built from codepoints, a row pins that they differ, and the length, equality, and `count` rows ask each against the other, passing on both oracles.

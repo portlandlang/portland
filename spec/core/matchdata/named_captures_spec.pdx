@@ -27,4 +27,15 @@ context "MatchData#named_captures" do
     md = /\A(?<a>.)(?<b>.)(?<b>.)(?<a>.)?\z/.match("012") or panic("no match")
     expect(md.named_captures).to eq({"a" => "0", "b" => "2"})
   end
+
+  # The flag is a Boolean (#215), so upstream's "truly" and nil stay there.
+  specify "returns a Hash with Symbol keys when symbolize_names is provided a true value" do
+    md = /(?<a>.)(?<b>.)?/.match("0") or panic("no match")
+    expect(md.named_captures(symbolize_names: true)).to eq({a: "0", b: nil})
+  end
+
+  specify "returns a Hash with String keys when symbolize_names is provided a false value" do
+    md = /(?<a>.)(?<b>.)?/.match("02") or panic("no match")
+    expect(md.named_captures(symbolize_names: false)).to eq({"a" => "0", "b" => "2"})
+  end
 end
