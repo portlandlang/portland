@@ -1,0 +1,5 @@
+# Why `specify` and not `it`, and where fixtures go: see describe.pdx.
+def specify(behavior)
+  puts "- #{behavior}"
+  yield
+end
