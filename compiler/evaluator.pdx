@@ -244,6 +244,7 @@ end
 
 def evaluate_if(node, bindings)
   condition = evaluate_expression(node.condition, bindings)
+  return condition if condition.signal != "none"
   body = if slot_value(condition.value)
     node.then_body
   else
@@ -1099,8 +1100,12 @@ end
 # Guest operands are host values, so host operators do the arithmetic and
 # host strictness (type panics, divide by zero) is the guest error story.
 def evaluate_binary(node, bindings)
+  # An operand that left a `return` or `break` pending stops the
+  # expression (#208), the seed's operand: the signal travels on.
   left_step = evaluate_expression(node.left, bindings)
+  return left_step if left_step.signal != "none"
   right_step = evaluate_expression(node.right, left_step.bindings)
+  return right_step if right_step.signal != "none"
   left = slot_value(left_step.value)
   right = slot_value(right_step.value)
   # A struct orders by its own `<=>` (ADR 0054), which is a call, so it
@@ -1501,6 +1506,7 @@ end
 # logical; a present wrapped value unwraps one layer via host `or`.
 def evaluate_logical(node, bindings)
   left_step = evaluate_expression(node.left, bindings)
+  return left_step if left_step.signal != "none"
   left = slot_value(left_step.value)
   if node.operator == "&&"
     # Both sides must be booleans — the seed's rule and sentence (#87);
@@ -1536,6 +1542,7 @@ end
 
 def evaluate_unary(node, bindings)
   step = evaluate_expression(node.operand, bindings)
+  return step if step.signal != "none"
   operand = slot_value(step.value)
   result = if node.operator == "!"
     !operand
@@ -1553,6 +1560,7 @@ def evaluate_array(node, mutable bindings)
   mutable elements = []
   node.elements.each do |element|
     step = evaluate_expression(element, bindings)
+    return step if step.signal != "none"
     bindings = step.bindings
     elements += step.value
   end
@@ -1565,8 +1573,10 @@ def evaluate_hash(node, mutable bindings)
   mutable built = {}
   node.pairs.each do |pair|
     key_step = evaluate_expression(pair.key, bindings)
+    return key_step if key_step.signal != "none"
     bindings = key_step.bindings
     value_step = evaluate_expression(pair.value, bindings)
+    return value_step if value_step.signal != "none"
     bindings = value_step.bindings
     built[slot_value(key_step.value)] = slot_value(value_step.value)
   end
@@ -1578,6 +1588,9 @@ def evaluate_append(node, mutable bindings)
   # block that rebinds the very name being appended to (`notes << yielding
   # { notes << :b }`), and the name is read after it has.
   value_step = evaluate_expression(node.value, bindings)
+  # A right side that left a `return` or `break` pending appends nothing
+  # (#208); the signal travels on.
+  return value_step if value_step.signal != "none"
   bindings = value_step.bindings
   value = slot_value(value_step.value)
   slot = lookup(bindings, node.name)
@@ -2211,7 +2224,9 @@ def symbol_array_elements(lexeme) = word_array_elements(lexeme).map { ["__symbol
 
 def evaluate_index(node, bindings)
   receiver_step = evaluate_expression(node.receiver, bindings)
+  return receiver_step if receiver_step.signal != "none"
   index_step = evaluate_expression(node.index, receiver_step.bindings)
+  return index_step if index_step.signal != "none"
   receiver = slot_value(receiver_step.value)
   # A symbol indexes its name, answering text (#112), the seed's arm.
   return outcome([value_at(receiver, 1)[slot_value(index_step.value)]], index_step.bindings) if receiver in ["__symbol__", *]
@@ -3224,6 +3239,9 @@ def evaluate_method_call(node, mutable bindings)
     end
   end
   step = evaluate_expression(node.receiver, bindings)
+  # A receiver or an argument that left a `return` or `break` pending
+  # stops the call (#208), the seed's operand.
+  return step if step.signal != "none"
   mutable receiver = slot_value(step.value)
   bindings = step.bindings
   # `&.`: an absent receiver short-circuits; arguments never run.
@@ -3245,10 +3263,12 @@ def evaluate_method_call(node, mutable bindings)
   node.arguments.each do |argument|
     if argument in KeywordArgumentNode
       argument_step = evaluate_expression(argument.value, bindings)
+      return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
       keyword_values << [argument.label, slot_value(argument_step.value)]
     else
       argument_step = evaluate_expression(argument, bindings)
+      return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
       arguments += argument_step.value
     end
@@ -5123,13 +5143,17 @@ def evaluate_call(node, mutable bindings)
   end
   mutable arguments = []
   mutable keyword_values = []
+  # An argument that left a `return` or `break` pending stops the call
+  # (#208): the signal travels on, and the later arguments never run.
   node.arguments.each do |argument|
     if argument in KeywordArgumentNode
       step = evaluate_expression(argument.value, bindings)
+      return step if step.signal != "none"
       bindings = step.bindings
       keyword_values << [argument.label, slot_value(step.value)]
     else
       step = evaluate_expression(argument, bindings)
+      return step if step.signal != "none"
       bindings = step.bindings
       arguments += step.value
     end

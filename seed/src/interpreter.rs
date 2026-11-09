@@ -3514,12 +3514,16 @@ impl<W: std::io::Write> Interpreter<W> {
 
     fn expression_inner(&mut self, expression: &Expression) -> Option<Value> {
         match expression {
-            Expression::ArrayLiteral(elements) => Some(Value::array(
-                elements
+            Expression::ArrayLiteral(elements) => {
+                let values: Vec<Value> = elements
                     .iter()
-                    .map(|element| self.value_of(element))
-                    .collect(),
-            )),
+                    .map_while(|element| self.operand(element))
+                    .collect();
+                if self.pending.is_some() {
+                    return None;
+                }
+                Some(Value::array(values))
+            }
             Expression::Boolean(value) => Some(Value::Boolean(*value)),
             Expression::Float(value) => Some(Value::Float(*value)),
             // `Foo::BAR` names a constant; `Foo::Bar` names a type, which as
@@ -3559,7 +3563,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // The right side runs first: it may read the name being
                 // appended to (`line << line.length`), and taking the binding
                 // below leaves nil in its place.
-                let value = self.value_of(value);
+                let value = self.operand(value)?;
                 let current = self.take_for_update(name);
                 match (current, value) {
                     (Value::String(mut base), Value::String(suffix)) => {
@@ -3738,8 +3742,8 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::HashLiteral(entries) => {
                 let mut pairs: Vec<(Value, Value)> = Vec::new();
                 for (key_expression, value_expression) in entries {
-                    let key = self.value_of(key_expression);
-                    let value = self.value_of(value_expression);
+                    let key = self.operand(key_expression)?;
+                    let value = self.operand(value_expression)?;
                     // Ruby rule: a duplicate key keeps its position, last value wins.
                     match pairs.iter_mut().find(|(existing, _)| *existing == key) {
                         Some(pair) => pair.1 = value,
@@ -3749,8 +3753,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 Some(Value::hash(pairs))
             }
             Expression::Index { index, receiver } => {
-                let receiver = self.value_of(receiver);
-                let index = self.value_of(index);
+                let receiver = self.operand(receiver)?;
+                let index = self.operand(index)?;
                 Some(index_read(&receiver, &index))
             }
             Expression::If {
@@ -3758,7 +3762,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 else_body,
                 then_body,
             } => {
-                let condition = self.value_of(condition);
+                let condition = self.operand(condition)?;
                 // Strict booleans, no truthiness — Portland has no nil to be falsy.
                 let Value::Boolean(condition) = condition else {
                     panic!(
@@ -3802,8 +3806,13 @@ impl<W: std::io::Write> Interpreter<W> {
             Expression::EnumCase { name, payload } => {
                 let values: Vec<(String, Value)> = payload
                     .iter()
-                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                    .map_while(|(label, expression)| {
+                        Some((label.clone(), self.operand(expression)?))
+                    })
                     .collect();
+                if self.pending.is_some() {
+                    return None;
+                }
                 self.check_payload_labels(name, &values);
                 Some(Value::EnumCase {
                     name: name.clone(),
@@ -3815,8 +3824,8 @@ impl<W: std::io::Write> Interpreter<W> {
                 operator,
                 right,
             } => {
-                let left = self.value_of(left);
-                let right = self.value_of(right);
+                let left = self.operand(left)?;
+                let right = self.operand(right)?;
                 // A struct orders by its own `<=>` (ADR 0054), which is a
                 // call, so it cannot ride the value-only table below.
                 if matches!(left, Value::Struct { .. }) && ordering_operator(*operator) {
@@ -3876,12 +3885,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 {
                     let arguments: Vec<Value> = arguments
                         .iter()
-                        .map(|argument| self.value_of(argument))
+                        .map_while(|argument| self.operand(argument))
                         .collect();
                     let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                         .iter()
-                        .map(|(label, value)| (label.clone(), self.value_of(value)))
+                        .map_while(|(label, value)| Some((label.clone(), self.operand(value)?)))
                         .collect();
+                    if self.pending.is_some() {
+                        return None;
+                    }
                     return self.builtin_type_function(
                         type_name,
                         name,
@@ -3906,12 +3918,17 @@ impl<W: std::io::Write> Interpreter<W> {
                     if let Some((struct_name, qualified_new)) = self.defined_new(receiver) {
                         let arguments: Vec<Value> = arguments
                             .iter()
-                            .map(|argument| self.value_of(argument))
+                            .map_while(|argument| self.operand(argument))
                             .collect();
                         let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                             .iter()
-                            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                            .map_while(|(label, expression)| {
+                                Some((label.clone(), self.operand(expression)?))
+                            })
                             .collect();
+                        if self.pending.is_some() {
+                            return None;
+                        }
                         self.pending_fields = Some(struct_name);
                         return self.call(&qualified_new, arguments, keyword_arguments);
                     }
@@ -3925,29 +3942,39 @@ impl<W: std::io::Write> Interpreter<W> {
                     if self.methods.contains_key(&qualified) {
                         let arguments: Vec<Value> = arguments
                             .iter()
-                            .map(|argument| self.value_of(argument))
+                            .map_while(|argument| self.operand(argument))
                             .collect();
                         let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                             .iter()
-                            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                            .map_while(|(label, expression)| {
+                                Some((label.clone(), self.operand(expression)?))
+                            })
                             .collect();
+                        if self.pending.is_some() {
+                            return None;
+                        }
                         return self.call(&qualified, arguments, keyword_arguments);
                     }
                     panic!("{namespace} has no {name}");
                 }
-                let receiver = self.value_of(receiver);
+                let receiver = self.operand(receiver)?;
                 // `&.`: an absent receiver short-circuits — arguments never run.
                 if *safe && matches!(receiver, Value::Nil) {
                     return Some(Value::Nil);
                 }
                 let arguments: Vec<Value> = arguments
                     .iter()
-                    .map(|argument| self.value_of(argument))
+                    .map_while(|argument| self.operand(argument))
                     .collect();
                 let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                     .iter()
-                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                    .map_while(|(label, expression)| {
+                        Some((label.clone(), self.operand(expression)?))
+                    })
                     .collect();
+                if self.pending.is_some() {
+                    return None;
+                }
                 self.method_call(receiver, name, arguments, keyword_arguments, block.as_ref())
             }
             Expression::Logical {
@@ -3959,7 +3986,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // unwrap-or-else. Short-circuit either way — the right side
                 // only runs when it can matter. The static halves (dead right
                 // sides, the Boolean? never-guess) are out of the seed's reach.
-                let left = self.value_of(left);
+                let left = self.operand(left)?;
                 match (operator, left) {
                     (LogicalOperator::Or, Value::Nil) => self.expression(right),
                     // A failure takes the fallback too (ADR 0027): failure is
@@ -3983,7 +4010,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             Expression::Unary { operand, operator } => {
-                let operand = self.value_of(operand);
+                let operand = self.operand(operand)?;
                 match (operator, operand) {
                     (UnaryOperator::Negate, Value::Integer(value)) => {
                         Some(checked_integer(value.checked_neg(), || {
@@ -4088,12 +4115,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 let arguments: Vec<Value> = arguments
                     .iter()
-                    .map(|argument| self.value_of(argument))
+                    .map_while(|argument| self.operand(argument))
                     .collect();
                 let keyword_arguments: Vec<(String, Value)> = keyword_arguments
                     .iter()
-                    .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+                    .map_while(|(label, expression)| {
+                        Some((label.clone(), self.operand(expression)?))
+                    })
                     .collect();
+                if self.pending.is_some() {
+                    return None;
+                }
                 // The block belongs to the call being made, so it is swapped
                 // in for the duration and put back after — the same shape as
                 // `self_receiver`, and for the same reason: a nested call
@@ -4133,8 +4165,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 };
                 // The values are the yielding method's, evaluated in its
                 // scope before the block's scope takes over (#144).
-                let arguments: Vec<Value> =
-                    values.iter().map(|value| self.value_of(value)).collect();
+                let arguments: Vec<Value> = values
+                    .iter()
+                    .map_while(|value| self.operand(value))
+                    .collect();
+                if self.pending.is_some() {
+                    return None;
+                }
                 // A gathering block (#110) keeps what it is handed — one value
                 // as itself, several as an array, as Ruby's Enumerable packs
                 // them — and answers nil.
@@ -5142,8 +5179,12 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         let provided: Vec<(String, Value)> = keyword_arguments
             .iter()
-            .map(|(label, expression)| (label.clone(), self.value_of(expression)))
+            .map_while(|(label, expression)| Some((label.clone(), self.operand(expression)?)))
             .collect();
+        // An argument that unwound (#208): the caller sees the pending signal.
+        if self.pending.is_some() {
+            return Value::Nil;
+        }
         Self::fill_fields(struct_name, &fields, provided)
     }
 
@@ -8948,6 +8989,19 @@ impl<W: std::io::Write> Interpreter<W> {
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
             .unwrap_or_else(|| panic!("{expression:?} produced no value"))
+    }
+
+    /// An operand or an argument: its value, or `None` when evaluating it
+    /// left a `return` or `break` pending (#208) — a `yield` whose block
+    /// unwound — so the enclosing expression stops where Ruby's does
+    /// rather than reading a value that never came. Anything else that
+    /// produces no value is the bug `value_of` names.
+    fn operand(&mut self, expression: &Expression) -> Option<Value> {
+        let value = self.expression(expression);
+        if value.is_none() && self.pending.is_none() {
+            panic!("{expression:?} produced no value");
+        }
+        value
     }
 
     /// Evaluate an expression that must be a strict boolean — the right
