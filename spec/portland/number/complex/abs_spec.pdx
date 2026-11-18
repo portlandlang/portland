@@ -1,0 +1,15 @@
+# A complex's `abs` is a real — a float off the axes, the part's own kind
+# on them — so it orders against a float, as Ruby's does. The checker once
+# typed it as a complex and refused the comparison at build.
+
+# Up three, because `require_relative` resolves against this file's own
+# directory (the seed's rule, matched by the compiler) — not against `spec/`.
+
+require_relative "../../../spec_helper"
+
+context "Complex#abs" do
+  specify "answers a real that compares with a float" do
+    expect(Complex(3, 4).abs <= 6.0).to eq(true)
+    expect(Complex(3, 0).abs < 3.5).to eq(true)
+  end
+end
