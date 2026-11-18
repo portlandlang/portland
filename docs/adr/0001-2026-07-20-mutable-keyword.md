@@ -2,7 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
-> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [architecture.md: Where the compiler falls short, on purpose](../../docs/architecture.md#where-the-compiler-falls-short-on-purpose) · [docs/ruby/mutability.md](../../docs/ruby/mutability.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [architecture.md: Where the compiler falls short, on purpose](../../docs/architecture.md#where-the-compiler-falls-short-on-purpose) · [docs/ruby/mutability.md](../../docs/ruby/mutability.md).
 
 <!-- /generated -->
 

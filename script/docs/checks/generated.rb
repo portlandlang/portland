@@ -19,8 +19,7 @@ SECTIONS.each do |section|
     failures << <<~REPORT
       #{relative(path)}
 
-        No generated section yet. Run script/docs/generate, which places it
-        under the heading.
+        No generated section yet. Run script/docs/generate, which places it under the heading.
     REPORT
     next
   end

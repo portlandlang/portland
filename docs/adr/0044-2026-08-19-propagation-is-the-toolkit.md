@@ -2,7 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
-> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [language.md: Names and binding](../../docs/language.md#names-and-binding) · [language.md: Absence](../../docs/language.md#absence) · [docs/ruby/errors.md](../../docs/ruby/errors.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Values](../../docs/language.md#values) · [language.md: Names and binding](../../docs/language.md#names-and-binding) · [language.md: Absence](../../docs/language.md#absence) · [docs/ruby/errors.md](../../docs/ruby/errors.md).
 
 <!-- /generated -->
 

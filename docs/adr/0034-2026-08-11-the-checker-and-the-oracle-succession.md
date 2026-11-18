@@ -2,7 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
-> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [principles.md: 7. The seed is the oracle](../../docs/principles.md#7-the-seed-is-the-oracle) · [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [architecture.md: The oracle relationship is asymmetric, and dated](../../docs/architecture.md#the-oracle-relationship-is-asymmetric-and-dated) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [principles.md: 7. The seed is the oracle](../../docs/principles.md#7-the-seed-is-the-oracle) · [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [architecture.md: The oracle relationship is asymmetric, and dated](../../docs/architecture.md#the-oracle-relationship-is-asymmetric-and-dated) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
 
 <!-- /generated -->
 

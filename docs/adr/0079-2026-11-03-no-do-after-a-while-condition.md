@@ -2,7 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
-> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
 
 <!-- /generated -->
 

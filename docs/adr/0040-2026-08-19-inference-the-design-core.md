@@ -2,7 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
-> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/types.md](../../docs/ruby/types.md) · [docs/ruby/word-operators.md](../../docs/ruby/word-operators.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/types.md](../../docs/ruby/types.md) · [docs/ruby/word-operators.md](../../docs/ruby/word-operators.md).
 
 <!-- /generated -->
 
