@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The kernel output specs read what each call writes** ([#283](https://github.com/portlandlang/portland/issues/283)) — `spec/core/kernel/{p,pp,print,putc,printf,warn}_spec.pdx` now capture each call's output with `System.capture_standard_output` or `System.capture_standard_error` (#251) and check what it answers, as upstream's `output` matcher does.
+  - `putc` takes upstream's own values (`putc(65)` writes `A`) now that its output no longer has to end in a newline.
+  - `warn` gains five upstream rows: no doubled line-end, each argument and each array element on its own line, nothing written with no arguments, and the default record separator.
+  - `puts` has a spec of its own, `spec/core/kernel/puts_spec.pdx`, and its manifest entry points there.
+  - The rows that need a mock's own `inspect` or `to_s` are held as pendings for [#282](https://github.com/portlandlang/portland/issues/282), so `p` and `warn` are now partial-planned.
+
 - **`System.capture_standard_output` and `System.capture_standard_error`** ([#251](https://github.com/portlandlang/portland/issues/251)) — on both implementations, each runs its block and answers the text written to that stream, in place of writing it, so a spec can check what a call wrote: `expect(System.capture_standard_output { print "x" }).to eq("x")`.
   - It captures the interpreter's write path: `puts`, `print`, `p`, `pp`, `putc`, `printf`, `warn`, and `System.write_standard_output`/`_error`. It is not the OS file descriptor.
   - Captures nest, the innermost taking the text. The block's own value is dropped.

@@ -1,28 +1,66 @@
 # Ruby's output wrappers over the two standard streams (ADR 0068, #185):
 # `puts`, `p`, `pp`, `print`, `putc`, `printf` on standard output and `warn`
-# on standard error. Each spec asserts what the call answers; what it writes
-# is pinned by the two-oracle test, since nothing here can capture a stream.
-# A line written here passes through the harness harmlessly, so every write
-# ends in a newline.
+# on standard error. Each row captures what the call writes with
+# `System.capture_standard_output` or `System.capture_standard_error`
+# (#251), as upstream's `output` matcher does, and checks what it answers.
 #
 # From ruby/spec core/kernel/{p,pp,print,putc,printf,warn,puts}_spec.rb.
 # Upstream: the privacy and reflection rows, `$stdout` and `$VERBOSE`
-# reassignment, the mocks, `$_`, the IO-first-argument forms of printf, and
-# warn's uplevel and category keywords. `puts` answers no value (ADR 0012),
-# so its one row is the two-oracle test's.
+# reassignment, `output_to_fd`, `$_`, the separator globals, splatted
+# arguments, the IO-first-argument forms of printf, the `to_int` and `to_str`
+# mocks, and warn's uplevel and category keywords. A mock's own `inspect` or
+# `to_s` waits on #282, held as a pending.
+#
+# Portland has no `$VERBOSE`, so warn always writes, as Ruby's does when
+# `$VERBOSE` is true or false. Upstream's rows for those two settings are
+# ported as one; the row for nil, which writes nothing, stays upstream.
 
 require_relative "../../spec_helper"
 
+# Upstream's mock("obj"), its `to_s` answering the line.
+struct WarnedObject
+  name
+
+  def to_s
+    "to_s called"
+  end
+end
+
 context "Kernel#warn" do
-  specify "accepts multiple arguments" do
-    expect(warn("warn wrote this line to standard error", "and this one")).to be_nil
+  specify "does not append line-end if last character is line-end" do
+    captured = System.capture_standard_error { warn("this is some simple text with line-end\n") }
+    expect(captured).to eq("this is some simple text with line-end\n")
   end
 
-  specify "does not write strings when passed no arguments" do
-    expect(warn).to be_nil
+  specify "calls #write on $stderr if $VERBOSE is true or false" do
+    mutable answered = :unset
+    captured = System.capture_standard_error { answered = warn("this is some simple text") }
+    expect(captured).to eq("this is some simple text\n")
+    expect(answered).to be_nil
+  end
+
+  specify "writes each argument on a line when passed multiple arguments" do
+    expect(System.capture_standard_error { warn("line 1", "line 2") }).to eq("line 1\nline 2\n")
   end
 
   specify "writes each array element on a line when passes an array" do
-    expect(warn(["warn wrote this line to standard error", "and this one"])).to be_nil
+    expect(System.capture_standard_error { warn(["line 1", "line 2"]) }).to eq("line 1\nline 2\n")
+  end
+
+  specify "does not write strings when passed no arguments" do
+    mutable written = :unset
+    captured = System.capture_standard_error do
+      written = System.capture_standard_output { warn }
+    end
+    expect(written).to eq("")
+    expect(captured).to eq("")
+  end
+
+  specify "writes the default record separator and NOT $/ to $stderr after the warning message" do
+    expect(System.capture_standard_error { warn("") }).to eq("\n")
+  end
+
+  pending "writes to_s representation if passed a non-string (#282)" do
+    expect(System.capture_standard_error { warn(WarnedObject.new(name: "obj")) }).to eq("to_s called\n")
   end
 end

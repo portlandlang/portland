@@ -1,36 +1,52 @@
 # Ruby's output wrappers over the two standard streams (ADR 0068, #185):
 # `puts`, `p`, `pp`, `print`, `putc`, `printf` on standard output and `warn`
-# on standard error. Each spec asserts what the call answers; what it writes
-# is pinned by the two-oracle test, since nothing here can capture a stream.
-# A line written here passes through the harness harmlessly, so every write
-# ends in a newline.
+# on standard error. Each row captures what the call writes with
+# `System.capture_standard_output` or `System.capture_standard_error`
+# (#251), as upstream's `output` matcher does, and checks what it answers.
 #
 # From ruby/spec core/kernel/{p,pp,print,putc,printf,warn,puts}_spec.rb.
 # Upstream: the privacy and reflection rows, `$stdout` and `$VERBOSE`
-# reassignment, the mocks, `$_`, the IO-first-argument forms of printf, and
-# warn's uplevel and category keywords. `puts` answers no value (ADR 0012),
-# so its one row is the two-oracle test's.
+# reassignment, `output_to_fd`, `$_`, the separator globals, splatted
+# arguments, the IO-first-argument forms of printf, the `to_int` and `to_str`
+# mocks, and warn's uplevel and category keywords. A mock's own `inspect` or
+# `to_s` waits on #282, held as a pending.
+#
+# The rows are ruby/spec shared/io/putc.rb's, which Kernel#putc behaves like.
+# nil, true, and false refuse where Ruby raises TypeError, and the closed
+# stream waits on the handle model (#177).
 
 require_relative "../../spec_helper"
 
 context "Kernel#putc" do
   describe "with an Integer argument" do
     specify "writes one character as a String" do
-      expect(putc(10)).to eq(10)
+      mutable answered = nil
+      captured = System.capture_standard_output { answered = putc(65) }
+      expect(captured).to eq("A")
+      expect(answered).to eq(65)
     end
 
     specify "writes the low byte as a String" do
-      expect(putc(0x240a)).to eq(0x240a)
+      mutable answered = nil
+      captured = System.capture_standard_output { answered = putc(0x2441) }
+      expect(captured).to eq("A")
+      expect(answered).to eq(0x2441)
     end
   end
 
   describe "with a String argument" do
     specify "writes one character" do
-      expect(putc("\n")).to eq("\n")
+      mutable answered = nil
+      captured = System.capture_standard_output { answered = putc("B") }
+      expect(captured).to eq("B")
+      expect(answered).to eq("B")
     end
 
     specify "writes the first character" do
-      expect(putc("\nRuby")).to eq("\nRuby")
+      mutable answered = nil
+      captured = System.capture_standard_output { answered = putc("Ruby") }
+      expect(captured).to eq("R")
+      expect(answered).to eq("Ruby")
     end
   end
 end
