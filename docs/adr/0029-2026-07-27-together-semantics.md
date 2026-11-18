@@ -2,6 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
+> [!IMPORTANT]
 > **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Concurrency](../../docs/language.md#concurrency) · [docs/ruby/classes.md](../../docs/ruby/classes.md) · [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
 
 <!-- /generated -->

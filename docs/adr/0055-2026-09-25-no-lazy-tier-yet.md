@@ -2,6 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
+> [!IMPORTANT]
 > **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/enumerators.md](../../docs/ruby/enumerators.md).
 
 <!-- /generated -->

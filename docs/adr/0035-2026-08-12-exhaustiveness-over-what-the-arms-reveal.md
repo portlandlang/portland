@@ -2,6 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
+> [!IMPORTANT]
 > **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Pattern matching](../../docs/language.md#pattern-matching) · [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [architecture.md: The oracle relationship is asymmetric, and dated](../../docs/architecture.md#the-oracle-relationship-is-asymmetric-and-dated) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
 
 <!-- /generated -->

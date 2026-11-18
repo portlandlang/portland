@@ -2,6 +2,7 @@
 
 <!-- generated: do not edit by hand — script/docs/generate -->
 
+> [!IMPORTANT]
 > **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Values](../../docs/language.md#values) · [language.md: Absence](../../docs/language.md#absence) · [language.md: Not yet designed](../../docs/language.md#not-yet-designed) · [docs/ruby/errors.md](../../docs/ruby/errors.md).
 
 <!-- /generated -->

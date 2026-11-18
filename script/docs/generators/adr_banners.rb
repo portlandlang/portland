@@ -63,7 +63,8 @@ def adr_banner(path)
   end
 
   links = citations.map { |label, target| "[#{label}](../../#{target})" }.join(" · ")
-  "> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: #{links}."
+  # A GitHub alert, so the banner renders as a colored callout there.
+  "> [!IMPORTANT]\n> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: #{links}."
 end
 
 Dir.glob("#{REPO}/docs/adr/[0-9]*.md").sort.each do |path|

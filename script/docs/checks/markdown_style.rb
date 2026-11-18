@@ -18,7 +18,14 @@
 require_relative "../lib/shared"
 
 output = IO.popen(%w[bundle exec mdl .], chdir: REPO, err: [:child, :out], &:read)
-clean = $?.success?
+
+# GitHub's alerts (`> [!IMPORTANT]`, which the ADR banners use, ADR 0089)
+# are not kramdown syntax, so mdl reads the marker as a link with no
+# definition. Those five markers are dropped from the report; any other
+# kramdown warning still fails.
+GITHUB_ALERT = /Kramdown Warning: No link definition for link ID '!(note|tip|important|warning|caution)'/i
+output = output.lines.reject { it.match?(GITHUB_ALERT) }.join
+clean = $?.success? || !output.match?(/: (MD\d+|Kramdown Warning)/)
 
 # Ask the tool what it is, rather than grepping Gemfile.lock for it: that
 # would be a regex over someone else's file format, and it reports the
