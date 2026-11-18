@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Manifest reasons no longer say there is no Rational or Complex** ([#287](https://github.com/portlandlang/portland/issues/287)) — ten `spec/ruby_spec.yml` reasons, and the header of `spec/language/numbers_spec.pdx`, now name what actually keeps their Rational and Complex rows upstream: `fdiv`, `div`, `remainder`, `ceildiv`, and `pow` refuse a Rational or Complex argument, a prefixed literal with an `r` or `i` suffix refuses, some rows are past 64 bits, and the decimal `r` and `i` rows are not yet ported. Float `+`, `-`, and `*` never had Rational rows; their reason is the coercion protocol alone.
 - **Output uses a struct's own `to_s` and `inspect`** ([#282](https://github.com/portlandlang/portland/issues/282)) — on both implementations, `puts`, `print`, and `warn` write a struct's own `to_s` when it defines one, and `p` and `pp` its own `inspect`, as Ruby's do and as interpolation already did. A `to_s` or `inspect` that answers something other than a String refuses.
   - Kernel spec rows activated: `p`'s "prints obj.inspect" row and `warn`'s "writes to_s representation" row, so `warn` is back to partial-intentional.
   - A struct nested inside a collection still renders in the default form ([#285](https://github.com/portlandlang/portland/issues/285)). The `p([o])` line is split into a pending of its own, and `p` stays partial-planned, linked there.

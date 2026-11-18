@@ -991,7 +991,7 @@ core/float/modulo_spec.rb:
 core/float/fdiv_spec.rb:
   pdx: [spec/core/float/fdiv_spec.pdx]
   status: partial_intentional
-  reason: "No bignums, Rational, or Complex; a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
+  reason: "No bignums; fdiv refuses a Rational or Complex argument; a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
   link: docs/ruby/errors.md
 core/float/exponent_spec.rb:
   pdx: [spec/core/float/exponent_spec.pdx]
@@ -1017,7 +1017,7 @@ core/float/comparison_spec.rb:
 core/float/divide_spec.rb:
   pdx: [spec/core/float/divide_spec.pdx]
   status: partial_intentional
-  reason: "No coercion protocol and no Rational."
+  reason: "No coercion protocol (#155); the Rational row's denominator, 10**19, is past 64 bits."
 core/float/finite_spec.rb:
   pdx: [spec/core/float/finite_spec.pdx]
 core/float/floor_spec.rb:
@@ -1038,17 +1038,17 @@ core/float/lte_spec.rb:
 core/float/minus_spec.rb:
   pdx: [spec/core/float/minus_spec.pdx]
   status: partial_intentional
-  reason: "No coercion protocol and no Rational."
+  reason: "No coercion protocol (#155)."
 core/float/multiply_spec.rb:
   pdx: [spec/core/float/multiply_spec.pdx]
   status: partial_intentional
-  reason: "No coercion protocol and no Rational."
+  reason: "No coercion protocol (#155)."
 core/float/nan_spec.rb:
   pdx: [spec/core/float/nan_spec.pdx]
 core/float/plus_spec.rb:
   pdx: [spec/core/float/plus_spec.pdx]
   status: partial_intentional
-  reason: "No coercion protocol and no Rational."
+  reason: "No coercion protocol (#155)."
 core/float/round_spec.rb:
   pdx: [spec/core/float/round_spec.pdx]
 core/float/to_s_spec.rb:
@@ -1448,7 +1448,7 @@ core/integer/plus_spec.rb:
 core/integer/pow_spec.rb:
   pdx: [spec/core/integer/pow_spec.pdx]
   status: partial_intentional
-  reason: "No coercion protocol and no Rational."
+  reason: "No coercion protocol (#155); pow refuses a Rational exponent, so the Rational and Complex-result rows stay upstream."
 core/integer/pred_spec.rb:
   pdx: [spec/core/integer/pred_spec.pdx]
 core/integer/rationalize_spec.rb:
@@ -1527,17 +1527,17 @@ core/integer/divmod_spec.rb:
 core/integer/div_spec.rb:
   pdx: [spec/core/integer/div_spec.pdx]
   status: partial_intentional
-  reason: "No bignums, Rational, or coercion protocol; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  reason: "No bignums or coercion protocol; div refuses a Rational divisor; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
   link: docs/ruby/errors.md
 core/integer/remainder_spec.rb:
   pdx: [spec/core/integer/remainder_spec.pdx]
   status: partial_intentional
-  reason: "No bignums or Rational; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  reason: "No bignums; remainder refuses a Rational divisor; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
   link: docs/ruby/errors.md
 core/integer/ceildiv_spec.rb:
   pdx: [spec/core/integer/ceildiv_spec.pdx]
   status: partial_intentional
-  reason: "No bignums or Rational, so the 6/5r and 10**100 rows stay upstream."
+  reason: "No bignums, and ceildiv refuses a Rational divisor, so the 6/5r and 10**100 rows stay upstream."
   link: docs/ruby/integers.md
 core/integer/fdiv_spec.rb:
   pdx: [spec/core/integer/fdiv_spec.pdx]
@@ -4643,7 +4643,7 @@ language/numbered_parameters_spec.rb:
 language/numbers_spec.rb:
   pdx: [spec/language/numbers_spec.pdx]
   status: partial_intentional
-  reason: "A bare leading-zero octal refuses; no Rational or Complex suffixes."
+  reason: "A bare leading-zero octal refuses; a prefixed literal with an r or i suffix refuses, the bignum and long-decimal r rows are past 64 bits, and the decimal r and i rows are not yet ported."
   link: docs/ruby/integer-literals.md
 language/rescue_spec.rb:
   status: skipped
