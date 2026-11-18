@@ -16,8 +16,8 @@ require_relative "../../spec_helper"
 # close_to? at mspec's TOLERANCE, its eql? type checks ask inspect, and
 # infinite?'s 1 and -1 are asked as a sign. Where Ruby raises
 # (ZeroDivisionError, TypeError, ArgumentError) Portland refuses, which
-# ends a run, so those examples stay upstream with the bignum, Rational,
-# and coercion ones.
+# ends a run, so those examples stay upstream with the bignum and
+# coercion ones.
 
 def close_to?(actual, expected) = (actual - expected).abs <= 0.00003
 
@@ -25,6 +25,7 @@ context "Integer#remainder" do
   specify "returns the remainder of dividing self by other" do
     expect(5.remainder(3)).to eq(2)
     expect(5.remainder(3.0)).to eq(2.0)
+    expect(5.remainder(Rational(3, 1))).to eq(Rational(2, 1))
   end
 
   specify "means x-y*(x/y).truncate" do

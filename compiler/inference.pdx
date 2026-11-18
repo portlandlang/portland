@@ -660,6 +660,9 @@ end
 def synthesize_numeric_answer(receiver, name, arguments_empty: true)
   case name
   when "abs", "magnitude", "succ", "pred", "next", "gcd"
+    # A complex's magnitude is a real: a float off the axes, the part's
+    # own kind on them, so no one type to answer.
+    return ["unknown"] if receiver == ["complex"] && (name == "abs" || name == "magnitude")
     return receiver if numeric?(receiver)
     return ["integer"] if name == "gcd"
     # A string's or a symbol's successor is another of the same (ADR 0071).

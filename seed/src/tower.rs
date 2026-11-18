@@ -1225,6 +1225,28 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         ("i", []) => complex(Value::Integer(0), receiver.clone()),
         ("quo", [other]) if is_real(other) => real_quo(receiver, other),
         ("quo", [other @ Value::Complex { .. }]) => complex_div(receiver, other),
+        // An integer's or a float's named division and power given a
+        // rational or a complex (#292): the rational's own formulas below,
+        // and Ruby's `Float#fdiv`, which is `/`, so a complex divisor
+        // answers a complex.
+        ("fdiv", [other @ Value::Rational { .. }]) => {
+            Value::Float(to_f64(receiver) / to_f64(other))
+        }
+        ("fdiv", [other @ Value::Complex { .. }]) if matches!(receiver, Value::Float(_)) => {
+            complex_div(receiver, other)
+        }
+        ("div", [other @ Value::Rational { .. }]) => real_floor(&real_quo(receiver, other)),
+        ("remainder", [other @ Value::Rational { .. }]) => {
+            let quotient = real_truncate(&real_quo(receiver, other));
+            real_sub(receiver, &real_mul(&quotient, other))
+        }
+        // Ruby's `-div(0 - other)`, as the integer arm takes it.
+        ("ceildiv", [other @ Value::Rational { .. }]) if matches!(receiver, Value::Integer(_)) => {
+            let floored = real_floor(&real_quo(receiver, &real_negate(other)));
+            real_negate(&floored)
+        }
+        ("pow", [other @ Value::Rational { .. }]) => real_pow(receiver, other),
+        ("pow", [other @ Value::Complex { .. }]) => complex_pow(receiver, other),
         _ => {
             let Value::Rational {
                 numerator,
