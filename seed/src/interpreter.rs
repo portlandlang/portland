@@ -1862,8 +1862,8 @@ fn clock_nanoseconds(clock: libc::clockid_t) -> i64 {
 
 /// `System.entropy(byte_count)` (ADR 0068): bytes from the kernel's random
 /// source via `getentropy(2)`, which hands out at most 256 per call, as an
-/// array of integers 0–255 — the only shape Portland has for bytes until
-/// #119 decides. What `SecureRandom` is spelled over, and the seed an
+/// array of integers 0–255, the shape a string's `bytes` answer too; a
+/// bytes type is #183. What `SecureRandom` is spelled over, and the seed an
 /// unseeded `Random` draws.
 pub fn entropy_bytes(count: usize) -> Vec<u8> {
     let mut bytes = vec![0u8; count];
@@ -8525,8 +8525,8 @@ impl<W: std::io::Write> Interpreter<W> {
     ///
     /// Membership ("is `:pendign` a case of this enum?") and exhaustiveness
     /// are static — they need to know which enum a position expects, and the
-    /// seed has no types. Both wait for #9. This one is answerable because
-    /// the value carries its own case name.
+    /// seed has no types — so both are the compiler's checker's. This one is
+    /// answerable because the value carries its own case name.
     ///
     /// Enums are looked up by case name across every declaration, since a
     /// bare `:paid` says nothing about which vocabulary it came from. Two
@@ -9086,7 +9086,7 @@ impl<W: std::io::Write> Interpreter<W> {
     }
 
     /// An operand or an argument: its value, or `None` when evaluating it
-    /// left a `return` or `break` pending (#208) — a `yield` whose block
+    /// left a `return` or `break` unwinding (#208) — a `yield` whose block
     /// unwound — so the enclosing expression stops where Ruby's does
     /// rather than reading a value that never came. Anything else that
     /// produces no value is the bug `value_of` names.
@@ -9886,7 +9886,7 @@ end
     #[should_panic(expected = "`:paid` takes (on:)")]
     fn a_payload_must_name_the_labels_its_case_declared() {
         // The one enum check a runtime can make: membership and
-        // exhaustiveness are static and wait for #9.
+        // exhaustiveness are static, the compiler checker's.
         evaluate(&format!("{PURCHASE}\n:paid(wrong: 1)"));
     }
 

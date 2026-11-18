@@ -1,6 +1,7 @@
 # An array as source (#104), from ruby/spec core/array/inspect_spec.rb,
-# through the `inspect` function (ADR 0026). The mock, encoding, and
-# recursive-array rows stay upstream; `to_s` waits on #160.
+# through the `inspect` function (ADR 0026). `to_s` is its own file,
+# to_s_spec.pdx. What stays upstream, and why, is this file's entry in
+# spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 

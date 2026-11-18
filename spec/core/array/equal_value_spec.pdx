@@ -1,7 +1,7 @@
 # `Array#==` (#104), from ruby/spec core/array/equal_value_spec.rb and the
 # shared eql rows: element by element, numbers crossing kinds as Ruby's do.
-# The to_ary, mock, and recursive-array rows (values never mutate) stay
-# upstream; `eql?` waits on #154.
+# `eql?` is its own file, eql_spec.pdx. What stays upstream, and why, is
+# this file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 

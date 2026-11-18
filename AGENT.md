@@ -23,7 +23,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/docs/check` enforces the pair.
 
-**Never hard-wrap markdown prose.** One line per paragraph, bullet, or table row — let the editor wrap. Hard wrapping makes diffs lie: changing three words reflows every line after them, so a one-clause edit reads as a rewritten paragraph. Code blocks keep their own line breaks, since there the breaks are the content. Enforcement rides with [#31](https://github.com/portlandlang/portland/issues/31).
+**Never hard-wrap markdown prose.** One line per paragraph, bullet, or table row — let the editor wrap. Hard wrapping makes diffs lie: changing three words reflows every line after them, so a one-clause edit reads as a rewritten paragraph. Code blocks keep their own line breaks, since there the breaks are the content. No check enforces this: mdl's line-length rule is a ceiling, and it has no rule for a line broken too early.
 
 **Every commit gets a CHANGELOG entry.** `## Unreleased` is strictly newest-first: insert **directly under the `## Unreleased` header**, never anchored on a nearby existing bullet — that silently drifts as the file grows, and it has already scrambled the order once.
 

@@ -7,8 +7,8 @@
 require_relative "../spec_helper"
 
 # From ruby/spec language/until_spec.rb, the same way while_spec.pdx takes
-# its file: the value, do-while, redo, and containing-scope rows stay
-# upstream, and the optional `do` waits on #165.
+# its file. What stays upstream, and why, is this file's entry in
+# spec/ruby_spec.yml.
 context "The until expression" do
   specify "runs while the expression is false" do
     mutable index = 0

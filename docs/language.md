@@ -349,7 +349,7 @@ Nesting follows the rule that nests types in types, so `Purchase::Status` names 
 
 There are no generated predicates and no `Status.all`: an enum is a type, not a lookup table.
 
-**What the seed does not do.** Membership (`:pendign` is not a case of that enum) and exhaustiveness over cases are *static*, and the seed has no types — so both live in the compiler's checker instead ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), [ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)), which refuses programs the seed runs to completion. Coverage reaches as far as the arms reveal the enum today; the rest waits for inference ([#9](https://github.com/portlandlang/portland/issues/9)). The one check a runtime can make is here: a payload must name the labels its case declared, so `:paid(wrong: 1)` says `` `:paid` takes (on:) ``.
+**What the seed does not do.** Membership (`:pendign` is not a case of that enum) and exhaustiveness over cases are *static*, and the seed has no types — so both live in the compiler's checker instead ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), [ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)), which refuses programs the seed runs to completion. Coverage reaches as far as the arms reveal the enum; widening to the cases they leave out is [#220](https://github.com/portlandlang/portland/issues/220). The one check a runtime can make is here: a payload must name the labels its case declared, so `:paid(wrong: 1)` says `` `:paid` takes (on:) ``.
 
 ## Multi-file programs
 

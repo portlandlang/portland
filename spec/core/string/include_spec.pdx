@@ -3,9 +3,8 @@
 # The rows below the house examples are from ruby/spec
 # core/string/{include,start_with,end_with}_spec.rb and the shared
 # start_with/end_with rows. `start_with?` and `end_with?` take any number of
-# candidates. The regex rows wait on #74; the to_str conversion and the
-# refusals (ADR 0036), subclasses, encodings, and the partial-character rows
-# stay upstream.
+# candidates. What stays upstream, and why, is each file's entry in
+# spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 

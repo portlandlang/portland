@@ -8,11 +8,8 @@ def finished_loop
   while false
   end
 end
-# From ruby/spec language/while_spec.rb. A loop is a statement (ADR 0037),
-# so the rows reading its value or break's stay upstream, with the
-# `begin ... end while` do-while rows and the redo rows; a name first
-# bound in the body dies each iteration (ADR 0001), so the containing-scope
-# rows stay upstream; the optional `do` waits on #165.
+# From ruby/spec language/while_spec.rb. What stays upstream, and why, is
+# this file's entry in spec/ruby_spec.yml.
 context "The while expression" do
   specify "runs while the expression is true" do
     mutable index = 0
