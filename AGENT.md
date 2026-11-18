@@ -37,6 +37,22 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Adding, removing, or renaming a builtin in the seed changes the method table.** The checker's shape 2 and contract check read each builtin receiver's method set from the table in `compiler/inference.pdx`, which is derived from the seed's behavior, not from its Rust: run `script/probe_builtin_methods`, paste its eight lines over the table, and commit the two together. The seed reads the same eight lines at build (`seed/src/builtins.rs`) for its own wordings, so the table has one home; `script/check_builtin_table` diffs it against a fresh probe and runs in CI whenever the seed, the table, or the probe changed. The table retires with the seed at Stage 3, when the stdlib becomes Portland source.
 
+## Writing that stays true
+
+Prose goes stale when it says something the code later stops doing and nothing notices. These rules apply to docs, code comments, spec headers, manifest reasons, issues, and PR bodies ([#288](https://github.com/portlandlang/portland/issues/288)).
+
+**Never name a count or an exact timing.** Not lines of code, spec examples, spec files, open issues, manifest entries, or checks, and not "0.02s" or "15ms". A count is true for one commit. An approximate timing that makes a point ("about a minute") is fine.
+
+**No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; [#291](https://github.com/portlandlang/portland/issues/291) tracks it", not "doesn't work yet".
+
+**Before closing an issue, run `script/mentions N`** and bring every claim that waited on it up to date in the same change.
+
+**Comments say what the code does and why, never what it used to do.** History lives in git and the CHANGELOG; a comment that narrates the past ("once typed it as…", "no longer…") is a second, decaying record of it.
+
+**Pin behavior in a spec, not in prose.** A spec under `spec/` runs on both implementations, so a claim it holds cannot drift; a doc sample is only parsed (`script/docs/check code_samples`), so the answer in its comment can. Where a doc states what something does, a spec should say it too.
+
+**One home per fact.** The reference docs hold how things work ([Read in this order](#read-in-this-order)); everything else links to them rather than restating them.
+
 ## Running things
 
 |                        |                                                                                 |
@@ -47,6 +63,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |
 | `script/spec [path…]`  | the language spec in `spec/`, on both oracles — or only the files and directories named |
 | `script/ruby_spec_dashboard PATH` | the spec dashboard's JSON, from a ruby/spec checkout and `spec/ruby_spec.yml` |
+| `script/mentions N`    | every place this repo and its sibling checkouts cite issue N; run it before closing N |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
 **Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`. Every file not yet taken in has a generated stub under `spec/ruby/` (`script/ruby_spec_stubs ~/Developer/ruby/spec`): its upstream titles as pendings, parsed by the gate but never run. Importing a file means deleting its stub and regenerating.
