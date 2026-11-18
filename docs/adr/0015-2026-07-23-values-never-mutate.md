@@ -1,5 +1,12 @@
 # 0015 — Values never mutate; names do
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Names and binding](../../docs/language.md#names-and-binding) · [architecture.md: One known cost](../../docs/architecture.md#one-known-cost) · [docs/ruby/bitwise-operators.md](../../docs/ruby/bitwise-operators.md) · [docs/ruby/enumerators.md](../../docs/ruby/enumerators.md) · [docs/ruby/heredocs.md](../../docs/ruby/heredocs.md) · [docs/ruby/mutability.md](../../docs/ruby/mutability.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (`!`-suffix semantics explicitly deferred)
 - **Date:** 2026-07-23
 - **Issue:** [#10](https://github.com/portlandlang/portland/issues/10)

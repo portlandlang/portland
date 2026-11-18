@@ -1,5 +1,12 @@
 # 0057 — Block parameters spread a yielded array
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Style](../../docs/language.md#style) · [docs/ruby/pattern-matching.md](../../docs/ruby/pattern-matching.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-16 on the recommendation in [#158](https://github.com/portlandlang/portland/issues/158); built in the seed and the trio, differentially pinned, 2026-10-16)
 - **Date:** 2026-10-16
 - **Issue:** [#158](https://github.com/portlandlang/portland/issues/158)

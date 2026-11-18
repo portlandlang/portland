@@ -1,5 +1,12 @@
 # 0088 — `tr`, `tr_s`, `delete`, and `squeeze` read their characters literally
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/string-count.md](../../docs/ruby/string-count.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-08 on [#106](https://github.com/portlandlang/portland/issues/106)'s status, choosing literal characters over Ruby's set language; built on both implementations the same day)
 - **Date:** 2026-11-08
 - **Issue:** [#106](https://github.com/portlandlang/portland/issues/106)

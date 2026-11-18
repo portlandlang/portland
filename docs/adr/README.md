@@ -4,7 +4,7 @@
 
 One decision per file, named `NNNN-YYYY-MM-DD-slug.md`, never renumbered. Each records Context → Decision → Consequences, with a Status of **Accepted**, **Tentative** (leaning, not locked), or **Superseded by NNNN**.
 
-[`docs/language.md`](../language.md) records what's _built_. ADRs record what's _decided_. Everything is revisable pre-1.0, but the burden is on the challenger, and revisions get a new ADR that supersedes the old one.
+**ADRs are decision records, not references** ([ADR 0089](0089-2026-11-18-adrs-are-history.md)). Each records why a ruling was made; a later ruling can override part of one without marking it. The reference docs are [`docs/language.md`](../language.md), [`docs/architecture.md`](../architecture.md), the [`docs/ruby/`](../ruby/) ledger, and [`docs/principles.md`](../principles.md), and each ADR's banner links the reference sections that cite it. Everything is revisable pre-1.0, but the burden is on the challenger, and revisions get a new ADR.
 
 ## Index
 
@@ -100,6 +100,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0086](0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md) — Regex is Ruby's, and a match is a value
 - [0087](0087-2026-11-08-normalization-forms-are-rubys.md) — Normalization forms are Ruby's
 - [0088](0088-2026-11-08-character-lists-are-literal.md) — `tr`, `tr_s`, `delete`, and `squeeze` read their characters literally
+- [0089](0089-2026-11-18-adrs-are-history.md) — ADRs are decision records; the reference docs win
 
 <!-- /generated -->
 

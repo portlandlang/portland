@@ -1,5 +1,12 @@
 # 0034 — The checker arrives, and the oracle succession begins
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [principles.md: 7. The seed is the oracle](../../docs/principles.md#7-the-seed-is-the-oracle) · [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [architecture.md: The oracle relationship is asymmetric, and dated](../../docs/architecture.md#the-oracle-relationship-is-asymmetric-and-dated) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (settling the doctrine half of [#9](https://github.com/portlandlang/portland/issues/9)'s first increment; built the same day — `compiler/checker.pdx`, wired ahead of evaluation)
 - **Date:** 2026-08-11
 

@@ -1,5 +1,12 @@
 # 0052 — One definition per name: redefinition refuses, and the builtins are not for taking
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Names and binding](../../docs/language.md#names-and-binding) · [docs/ruby/redefinition.md](../../docs/ruby/redefinition.md) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (recommended and built in both oracles, 2026-09-24, under the deciding user's standing "make the case, recommend, build; course-correct after")
 - **Date:** 2026-09-24
 - **Issue:** [#70](https://github.com/portlandlang/portland/issues/70)

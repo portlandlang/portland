@@ -1,5 +1,12 @@
 # 0042 — `then` rows everywhere
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Control flow](../../docs/language.md#control-flow) · [docs/ruby/pattern-matching.md](../../docs/ruby/pattern-matching.md) · [docs/ruby/superset.md](../../docs/ruby/superset.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in both oracles, 2026-08-19)
 - **Date:** 2026-08-19
 - **Issue:** none — proposed directly by the deciding user during the subjectless-`case` discussion (#84 records that adjacent decline)

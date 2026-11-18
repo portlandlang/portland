@@ -1,5 +1,12 @@
 # 0079 — No `do` after a `while` or `until` condition
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#165](https://github.com/portlandlang/portland/issues/165); the refusal sentence built on both implementations the same day under [#192](https://github.com/portlandlang/portland/issues/192))
 - **Date:** 2026-11-03
 - **Issue:** [#165](https://github.com/portlandlang/portland/issues/165)

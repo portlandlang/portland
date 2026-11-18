@@ -15,6 +15,15 @@ SECTIONS.each do |section|
   expected = section[:build].call
   actual = generated_section(read(path))
 
+  if actual.nil? && section[:insert_under_heading]
+    failures << <<~REPORT
+      #{relative(path)}
+
+        No generated section yet. Run script/docs/generate, which places it under the heading.
+    REPORT
+    next
+  end
+
   if actual.nil?
     failures << <<~REPORT
       #{relative(path)}

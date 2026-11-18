@@ -1,5 +1,12 @@
 # 0011 — `together` has one register: named-at-site
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#3](https://github.com/portlandlang/portland/issues/3) — closes its last open item

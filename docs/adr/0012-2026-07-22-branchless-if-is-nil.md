@@ -1,5 +1,12 @@
 # 0012 — A branch that doesn't happen produces nil
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Control flow](../../docs/language.md#control-flow) · [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#22](https://github.com/portlandlang/portland/issues/22)

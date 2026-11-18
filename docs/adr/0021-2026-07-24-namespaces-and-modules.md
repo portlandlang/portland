@@ -1,5 +1,12 @@
 # 0021 — Namespaces: `module`, `::` for names, always qualified
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Namespaces](../../docs/language.md#namespaces) · [docs/ruby/constants.md](../../docs/ruby/constants.md) · [docs/ruby/namespaces.md](../../docs/ruby/namespaces.md) · [docs/ruby/redefinition.md](../../docs/ruby/redefinition.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, 2026-07-24)
 - **Date:** 2026-07-24
 - **Issue:** [#27](https://github.com/portlandlang/portland/issues/27) (carved out of the object-model umbrella)

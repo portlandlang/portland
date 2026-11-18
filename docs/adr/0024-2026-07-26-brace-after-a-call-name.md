@@ -1,5 +1,12 @@
 # 0024 — Brace blocks attach wherever `do` blocks do
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Blocks](../../docs/language.md#blocks) · [docs/ruby/parentheses.md](../../docs/ruby/parentheses.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-26)
 - **Date:** 2026-07-26
 

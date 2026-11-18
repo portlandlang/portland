@@ -1,5 +1,12 @@
 # 0048 — Contracts: the spelling, traits as names, no inheritance, agreement sharpens
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/types.md](../../docs/ruby/types.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (rulings ratified 2026-09-23; built the same day — contracts in the dump, and the call-site refusal for struct arguments; caller flow waits for a whole-program checker, see Consequences)
 - **Date:** 2026-09-23
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — increment 3c, the rulings ADR 0040 §1's hybrid model left open

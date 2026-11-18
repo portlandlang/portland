@@ -1,5 +1,12 @@
 # 0030 — `%w[]` contents take Ruby's rules: escapes and balanced nesting
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Values](../../docs/language.md#values) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (settling the bug half of [#29](https://github.com/portlandlang/portland/issues/29); the rest of the `%` zoo stays open there; built on both oracles, 2026-07-27)
 - **Date:** 2026-07-27
 

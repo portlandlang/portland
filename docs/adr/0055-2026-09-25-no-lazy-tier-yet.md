@@ -1,5 +1,12 @@
 # 0055 — No lazy tier: eager answers stay, external iteration is declined, and the rest waits on its real pull
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/enumerators.md](../../docs/ruby/enumerators.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (recommended 2026-09-25 under the deciding user's standing "make the case, recommend, build; course-correct after"; nothing to build — the eager behavior is what ships)
 - **Date:** 2026-09-25
 - **Issue:** [#80](https://github.com/portlandlang/portland/issues/80)

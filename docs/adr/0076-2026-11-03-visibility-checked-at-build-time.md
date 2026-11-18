@@ -1,5 +1,12 @@
 # 0076 — Visibility: `private`, `protected`, and `public` are Ruby's, checked at build time
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Not yet designed](../../docs/language.md#not-yet-designed) · [docs/ruby/visibility.md](../../docs/ruby/visibility.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#133](https://github.com/portlandlang/portland/issues/133); built on both implementations 2026-11-06 under [#189](https://github.com/portlandlang/portland/issues/189) — the checker refuses where the receiver's type is known, and `private :name` after a def refuses naming the section form)
 - **Date:** 2026-11-03
 - **Issue:** [#133](https://github.com/portlandlang/portland/issues/133)

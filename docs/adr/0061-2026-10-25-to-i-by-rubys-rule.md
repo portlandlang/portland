@@ -1,5 +1,12 @@
 # 0061 — `to_i` by Ruby's rule: leading digits count, garbage is 0
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/conversions.md](../../docs/ruby/conversions.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#162](https://github.com/portlandlang/portland/issues/162); built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
 - **Issue:** [#162](https://github.com/portlandlang/portland/issues/162)

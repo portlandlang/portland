@@ -1,5 +1,12 @@
 # 0039 — `alias`: a second name for a method
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Methods and calls](../../docs/language.md#methods-and-calls) · [docs/ruby/aliases.md](../../docs/ruby/aliases.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in both oracles, 2026-08-19)
 - **Date:** 2026-08-19
 - **Issue:** [#81](https://github.com/portlandlang/portland/issues/81)

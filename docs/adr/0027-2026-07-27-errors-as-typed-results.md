@@ -1,5 +1,12 @@
 # 0027 — Recoverable errors: failure is absence with a reason, and `!` propagates it
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Values](../../docs/language.md#values) · [language.md: Absence](../../docs/language.md#absence) · [language.md: Not yet designed](../../docs/language.md#not-yet-designed) · [docs/ruby/errors.md](../../docs/ruby/errors.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (chosen for [#28](https://github.com/portlandlang/portland/issues/28) over `begin/rescue` and the rescue-sugar hybrid, whose drafts closed unmerged; `!` settled with it, closing ADR 0015 §5's deferral. Built in the seed and the trio, differentially pinned, 2026-07-27.)
 - **Date:** 2026-07-27
 

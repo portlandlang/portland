@@ -1,5 +1,12 @@
 # 0069 — Strings are UTF-8, always; bytes are a type that waits for its pull
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/encodings.md](../../docs/ruby/encodings.md) · [docs/ruby/randomness.md](../../docs/ruby/randomness.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#119](https://github.com/portlandlang/portland/issues/119); `encoding` and `valid_encoding?` built on both implementations the same day, `core/encoding/` recorded never-port, the byte-shaped rows waiting on [#183](https://github.com/portlandlang/portland/issues/183))
 - **Date:** 2026-11-03
 - **Issue:** [#119](https://github.com/portlandlang/portland/issues/119)

@@ -1,5 +1,12 @@
 # 0065 — Randomness: Ruby's both, step for step
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/randomness.md](../../docs/ruby/randomness.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 against the recommendation in [#169](https://github.com/portlandlang/portland/issues/169), choosing its option 2; built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
 - **Issue:** [#169](https://github.com/portlandlang/portland/issues/169)

@@ -1,5 +1,12 @@
 # 0085 — Rational and Complex are core; BigDecimal is a default tile
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/numbers.md](../../docs/ruby/numbers.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, reversing the recommendation in [#124](https://github.com/portlandlang/portland/issues/124) to defer — "build now"; Rational and Complex built on both implementations 2026-11-06 under [#198](https://github.com/portlandlang/portland/issues/198); BigDecimal's build is [#199](https://github.com/portlandlang/portland/issues/199)). The shape below is the author's reading of "build now" and is open to amendment.
 - **Date:** 2026-11-03
 - **Issue:** [#124](https://github.com/portlandlang/portland/issues/124)

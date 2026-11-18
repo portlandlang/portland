@@ -1,5 +1,12 @@
 # 0029 — `together` semantics: independence declared, failure held, nothing shared
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Concurrency](../../docs/language.md#concurrency) · [docs/ruby/classes.md](../../docs/ruby/classes.md) · [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (settles [#11](https://github.com/portlandlang/portland/issues/11); built serially in the seed and the trio, differentially pinned, 2026-07-27 — the serial build is the oracle the parallel one must match)
 - **Date:** 2026-07-27
 

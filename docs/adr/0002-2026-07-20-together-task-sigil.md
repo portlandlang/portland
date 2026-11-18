@@ -1,5 +1,12 @@
 # 0002 — The `together` task sigil is `~`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [principles.md: 8. Verify, don't remember](../../docs/principles.md#8-verify-dont-remember) · [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Issue:** [#3](https://github.com/portlandlang/portland/issues/3)

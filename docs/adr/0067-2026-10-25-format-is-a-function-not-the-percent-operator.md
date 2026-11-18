@@ -1,5 +1,12 @@
 # 0067 — Formatting is `format(template, values)`, not `template % values`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/conversions.md](../../docs/ruby/conversions.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#172](https://github.com/portlandlang/portland/issues/172), choosing its option 2; built on both implementations 2026-10-26 with Ruby's directives whole and MRI's digit rounding, core/string/modulo and core/kernel/{format,sprintf} ported against `format`)
 - **Date:** 2026-10-25
 - **Issue:** [#172](https://github.com/portlandlang/portland/issues/172)

@@ -1,5 +1,12 @@
 # 0072 — JSON is core, written twice: `null` is `nil`, keys may be symbols, Ruby's answers byte for byte
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/json.md](../../docs/ruby/json.md) · [docs/ruby/standard-library.md](../../docs/ruby/standard-library.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03 on the recommendations in [#182](https://github.com/portlandlang/portland/issues/182); built on both implementations 2026-11-03 under [#182](https://github.com/portlandlang/portland/issues/182), with the json gem's Grisu2 digits taken as the shortest spelling instead — see [json.md](../ruby/json.md))
 - **Date:** 2026-11-03
 - **Issue:** [#182](https://github.com/portlandlang/portland/issues/182)

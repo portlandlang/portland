@@ -1,5 +1,12 @@
 # 0006 — The absence word is `nil`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/inspect.md](../../docs/ruby/inspect.md) · [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (partner word settled by [ADR 0009](0009-2026-07-22-presence-word-some.md): `some`)
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4)

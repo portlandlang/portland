@@ -93,8 +93,13 @@ GENERATED_END = "<!-- /generated -->"
 # README.md, so deriving it named all three generators "README".
 SECTIONS = []
 
-def generates(name, index:, &build)
-  SECTIONS << { name: name, index: index, build: build }
+#
+# `insert_under_heading:` lets the generator place the markers itself, under
+# the file's `# ` heading, when they are absent: every ADR carries a banner
+# (ADR 0089), and a new ADR should get one from `script/docs/generate`
+# rather than from someone remembering to paste markers.
+def generates(name, index:, insert_under_heading: false, &build)
+  SECTIONS << { name: name, index: index, build: build, insert_under_heading: insert_under_heading }
 end
 
 def heading(path)
@@ -148,6 +153,12 @@ def replace_generated_section(contents, replacement)
   return nil if first.nil? || last.nil?
 
   "#{contents[0...(first + GENERATED_BEGIN.length)]}\n\n#{replacement}\n\n#{contents[last..]}"
+end
+
+# Empty markers placed after the first line, which is the `# ` heading.
+def with_markers_under_heading(contents)
+  heading, rest = contents.split("\n", 2)
+  "#{heading}\n\n#{GENERATED_BEGIN}\n#{GENERATED_END}\n\n#{rest.to_s.sub(/\A\n+/, "")}"
 end
 
 def diff_summary(actual, expected)

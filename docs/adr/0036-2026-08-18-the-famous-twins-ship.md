@@ -1,5 +1,12 @@
 # 0036 — The famous twins ship
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [docs/ruby/aliases.md](../../docs/ruby/aliases.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in both oracles, 2026-08-18; the "beyond the six" boundary was redrawn the same day — see its revision note)
 - **Date:** 2026-08-18
 - **Issue:** [#79](https://github.com/portlandlang/portland/issues/79)

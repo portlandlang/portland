@@ -1,5 +1,12 @@
 # 0008 — The unwrap toolkit: narrowing, or-guard, `&.`, `case/in` — and nothing else
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md) · [docs/ruby/truthiness.md](../../docs/ruby/truthiness.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4)

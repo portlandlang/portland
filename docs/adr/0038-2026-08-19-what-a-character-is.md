@@ -1,5 +1,12 @@
 # 0038 — What a character is: graphemes, canonical equality, Unicode casing
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Values](../../docs/language.md#values) · [docs/ruby/characters.md](../../docs/ruby/characters.md) · [docs/ruby/regex.md](../../docs/ruby/regex.md) · [docs/ruby/string-count.md](../../docs/ruby/string-count.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in both oracles, 2026-08-19)
 - **Date:** 2026-08-19
 - **Issue:** [#75](https://github.com/portlandlang/portland/issues/75)

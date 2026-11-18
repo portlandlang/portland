@@ -10,14 +10,16 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 1. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
 1. **[docs/language.md](docs/language.md)** — what Portland speaks today.
 1. **[docs/architecture.md](docs/architecture.md)** — the seed, the compiler, and the contract between them.
-1. **[docs/adr/](docs/adr/)** — the decision log. ADRs beat everything except a newer ADR.
 1. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
+1. **[docs/adr/](docs/adr/)** — the decision log: why each ruling was made, when it was made.
+
+**The reference docs are principles.md, language.md, architecture.md, the docs/ruby/ ledger, and this file.** Where one of them and an ADR disagree, the reference doc wins: a later ruling can override an ADR without marking it, so never cite a single ADR as how something works ([ADR 0089](docs/adr/0089-2026-11-18-adrs-are-history.md)). Each ADR's banner links the reference sections that cite it.
 
 [docs/history/](docs/history/) is frozen writing. Read it for reasoning, never for status.
 
 ## Conventions
 
-**Decisions become ADRs**, one file per decision, `NNNN-YYYY-MM-DD-slug.md`, never renumbered, Status of Accepted / Tentative / Superseded by NNNN. An issue comment is not a decision record. Issues discuss; ADRs decide.
+**Decisions become ADRs**, one file per decision, `NNNN-YYYY-MM-DD-slug.md`, never renumbered, Status of Accepted / Tentative / Superseded by NNNN. An issue comment is not a decision record. Issues discuss; ADRs decide. **A new ADR lands with its edit to the reference doc** it changes, in the same commit; `script/docs/generate` then writes the ADR's banner from that citation, and `script/docs/check generated` fails for an ADR no reference doc cites.
 
 **Every Ruby-divergent ADR updates [docs/ruby/](docs/ruby/)** in the same breath — a file per difference, with the Ruby behavior, the Portland behavior, why, and what happens to migrating code. If a decision is a non-difference, say so explicitly; `script/docs/check` enforces the pair.
 

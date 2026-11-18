@@ -1,5 +1,12 @@
 # 0084 — `Point = Data.define(:x, :y)` is a spelling of `struct Point`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/classes.md](../../docs/ruby/classes.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#125](https://github.com/portlandlang/portland/issues/125); built on both implementations the same day under [#197](https://github.com/portlandlang/portland/issues/197), by rewriting the call into the `class` header the struct parser reads)
 - **Date:** 2026-11-03
 - **Issue:** [#125](https://github.com/portlandlang/portland/issues/125)

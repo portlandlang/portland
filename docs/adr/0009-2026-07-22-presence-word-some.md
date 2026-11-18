@@ -1,5 +1,12 @@
 # 0009 — The presence word is `some` / `some?`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4) — closes its last open task

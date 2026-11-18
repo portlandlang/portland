@@ -1,5 +1,12 @@
 # 0005 — Optionals are a wrapper, with a collapsed-feeling surface
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/lookups.md](../../docs/ruby/lookups.md) · [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issues:** [#4](https://github.com/portlandlang/portland/issues/4), evidence file on [#9](https://github.com/portlandlang/portland/issues/9)

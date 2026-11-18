@@ -1,5 +1,12 @@
 # 0049 — The whole-program door: a program is its require closure
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/requires.md](../../docs/ruby/requires.md) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (rulings 2026-09-24; built the same day — every checking tool follows requires, and run mode sharpens the entry file's own defs)
 - **Date:** 2026-09-24
 - **Issue:** [#94](https://github.com/portlandlang/portland/issues/94), out of [#9](https://github.com/portlandlang/portland/issues/9)

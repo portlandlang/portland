@@ -1,5 +1,12 @@
 # 0077 — `require "name"`: a load path, `.pdx` or `.rb`, literal and top-level
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/requires.md](../../docs/ruby/requires.md) · [docs/ruby/standard-library.md](../../docs/ruby/standard-library.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#116](https://github.com/portlandlang/portland/issues/116); built on both implementations 2026-11-06 under [#190](https://github.com/portlandlang/portland/issues/190) — the load path is `-I` and the program's `lib/` until the tile manifest ([#174](https://github.com/portlandlang/portland/issues/174)) adds the dependencies')
 - **Date:** 2026-11-03
 - **Issue:** [#116](https://github.com/portlandlang/portland/issues/116)

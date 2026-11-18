@@ -19,7 +19,9 @@ changed = 0
 selected.each do |section|
   path = "#{REPO}/#{section[:index]}"
   contents = read(path)
-  rewritten = replace_generated_section(contents, section[:build].call)
+  marked = contents
+  marked = with_markers_under_heading(contents) if section[:insert_under_heading] && generated_section(contents).nil?
+  rewritten = replace_generated_section(marked, section[:build].call)
 
   abort "#{relative(path)}: no #{GENERATED_BEGIN} … #{GENERATED_END} markers to write between" if rewritten.nil?
 

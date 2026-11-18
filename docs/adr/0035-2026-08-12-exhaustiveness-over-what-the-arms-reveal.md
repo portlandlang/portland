@@ -1,5 +1,12 @@
 # 0035 — Exhaustiveness over what the arms reveal
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Pattern matching](../../docs/language.md#pattern-matching) · [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [architecture.md: The oracle relationship is asymmetric, and dated](../../docs/architecture.md#the-oracle-relationship-is-asymmetric-and-dated) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the compiler, 2026-08-12; ratified with a tripwire 2026-08-18; **the tripwire fired 2026-09-22** — with narrowing built, a `case/in` over a maybe-typed subject demands both cases, wordings in [ADR 0047](0047-2026-09-22-the-error-voice.md)) — the refuse-only-disprovable boundary of §1 stands: the checker still refuses only what it can disprove, and inference is what lets it disprove more
 - **Date:** 2026-08-12
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) increment 2

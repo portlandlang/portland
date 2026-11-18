@@ -1,5 +1,12 @@
 # 0081 — Ranges over any orderable value
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/ranges.md](../../docs/ruby/ranges.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#149](https://github.com/portlandlang/portland/issues/149); built on both implementations 2026-11-06 under [#194](https://github.com/portlandlang/portland/issues/194)). Amends ADR 0019's integer-only rule.
 - **Date:** 2026-11-03
 - **Issue:** [#149](https://github.com/portlandlang/portland/issues/149)

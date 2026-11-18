@@ -1,5 +1,12 @@
 # 0010 — Partial operations return maybes; the only crash is one you typed; `fetch` retires
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/integers.md](../../docs/ruby/integers.md) · [docs/ruby/lookups.md](../../docs/ruby/lookups.md) · [docs/ruby/redefinition.md](../../docs/ruby/redefinition.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4) (the panic frontier)

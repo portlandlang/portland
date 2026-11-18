@@ -1,5 +1,12 @@
 # 0078 — `{name:, port:}` reads as Ruby 3.1 reads it
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> [!IMPORTANT]
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [docs/ruby/symbols.md](../../docs/ruby/symbols.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#167](https://github.com/portlandlang/portland/issues/167); built on both implementations the same day under [#191](https://github.com/portlandlang/portland/issues/191), with one refinement found in the build: a paren-less call's label at the end of its line refuses, since Ruby reads it two ways — see [symbols.md](../ruby/symbols.md))
 - **Date:** 2026-11-03
 - **Issue:** [#167](https://github.com/portlandlang/portland/issues/167)
