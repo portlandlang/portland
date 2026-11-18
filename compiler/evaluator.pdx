@@ -292,6 +292,20 @@ end
 # Case equality on a pattern already evaluated, the seed's `case_equal`:
 # what `when` asks of its value, and what a `^` pin asks of the value it
 # reads (#257). An outcome whose value is the verdict.
+# A struct's own `to_s` or `inspect`, when it defines one (#282): what
+# `puts`, `print`, and `warn` write for it, or what `p` writes. Any other
+# value, or a struct without the method, answers nil, and the value's own
+# rendering stands. The seed's own_rendering.
+def guest_own_rendering(value, method_name, bindings)
+  return nil unless value in ["__struct__", *]
+  method = struct_method_for(value, method_name, bindings)
+  return nil if method.nil?
+  result = invoke_struct_method(value, method, [], [], bindings)
+  answer = slot_value(result.value)
+  panic("'#{method_name}' answers a String, got #{shorten(render_inspect(answer))}") unless answer in String
+  answer
+end
+
 def guest_case_equal(pattern, subject, bindings)
   # A type held in a local, a parameter, or a field type-tests as the
   # written name does (#255).
@@ -5228,14 +5242,16 @@ def evaluate_call(node, mutable bindings)
       # The refusals come before the rendering, with the seed's wording.
       panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("puts got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      System.write_standard_output(lined(render(argument)))
+      text = guest_own_rendering(argument, "to_s", bindings) or render(argument)
+      System.write_standard_output(lined(text))
     end
     outcome([], bindings)
   # `pp` is `p` here: there is no pretty-printer to defer to (#185). `p`
   # answers its one argument, several as an array, and nil with none.
   when "p", "pp"
     arguments.each do |argument|
-      System.write_standard_output("#{render_inspect(argument)}\n")
+      inspected = guest_own_rendering(argument, "inspect", bindings) or render_inspect(argument)
+      System.write_standard_output("#{inspected}\n")
     end
     return outcome([nil], bindings) if arguments.empty?
     return outcome(arguments, bindings) if arguments.length == 1
@@ -5245,7 +5261,8 @@ def evaluate_call(node, mutable bindings)
     arguments.each do |argument|
       panic("print got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("print got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      System.write_standard_output(render(argument))
+      text = guest_own_rendering(argument, "to_s", bindings) or render(argument)
+      System.write_standard_output(text)
     end
     outcome([nil], bindings)
   # `putc` writes one character — an integer's low byte, or a string's first
@@ -5289,7 +5306,8 @@ def evaluate_call(node, mutable bindings)
     lines.each do |line|
       panic("warn got nil — handle the nil case first (p renders nil for debugging)") if line.nil?
       panic("warn got a failure — handle the failure case first (p renders it for debugging)") if line.failure?
-      System.write_standard_error(lined(render(line)))
+      text = guest_own_rendering(line, "to_s", bindings) or render(line)
+      System.write_standard_error(lined(text))
     end
     outcome([nil], bindings)
   when "some"

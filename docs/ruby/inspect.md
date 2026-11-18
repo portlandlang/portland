@@ -32,6 +32,10 @@ Portland has no ambient nil and absence has no methods (ADR 0006) — `nil?` and
 
 As Ruby's ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)): `[1, "two"].to_s` is `[1, "two"]`, `"#{{a: 1}}"` is `{a: 1}`, and `puts list` prints the same. The quotes and colons are what tell `["1"]` from `[1]` in a log line. `join` renders each element with its own `to_s`, nested arrays flattened into the join, as Ruby's does; the scalars are untouched — `:a.to_s` is `a`.
 
+## A struct's own `to_s` and `inspect`
+
+A struct that defines `to_s` is written with it by `puts`, `print`, `warn`, and interpolation, and one that defines `inspect` is written with it by `p` and `pp`, as Ruby's are ([#282](https://github.com/portlandlang/portland/issues/282)). Either must answer a String, or the write refuses. A struct inside a collection still renders in the default form, `Gadget(name: "g")`, where Ruby calls the element's own `inspect` ([#285](https://github.com/portlandlang/portland/issues/285)).
+
 ## Migrating
 
 `value.inspect` becomes `inspect(value)` — mechanical, and the output is byte-for-byte what Ruby prints for the shapes both languages share. `p` is unchanged from Ruby: it prints the inspect rendering and returns its argument. A collection interpolated or passed to `puts` prints as Ruby prints it.

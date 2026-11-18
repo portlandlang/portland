@@ -3855,8 +3855,8 @@ core/kernel/open_spec.rb:
 core/kernel/p_spec.rb:
   pdx: [spec/core/kernel/p_spec.pdx]
   status: partial_planned
-  reason: "What p writes is captured (#251); the mock's own inspect waits on #282, held as a pending, and the privacy and reflection rows, the File receiver, splatted arguments, and the output-separator globals stay upstream."
-  link: https://github.com/portlandlang/portland/issues/282
+  reason: "What p writes is captured (#251) and a mock is a struct with its own inspect (#282); the mock inside an array waits on #285, held as a pending, and the privacy and reflection rows, the File receiver, splatted arguments, and the output-separator globals stay upstream."
+  link: https://github.com/portlandlang/portland/issues/285
 core/kernel/pp_spec.rb:
   pdx: [spec/core/kernel/pp_spec.pdx]
   status: partial_intentional
@@ -4246,9 +4246,9 @@ core/kernel/display_spec.rb:
   link: docs/ruby/aliases.md
 core/kernel/warn_spec.rb:
   pdx: [spec/core/kernel/warn_spec.pdx]
-  status: partial_planned
-  reason: "What warn writes is captured (#251); the mock's own to_s waits on #282, held as a pending, and $VERBOSE, the uplevel and category keywords, Warning.warn, and the privacy rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/282
+  status: partial_intentional
+  reason: "What warn writes is captured (#251) and a mock is a struct with its own to_s (#282); $VERBOSE, the uplevel and category keywords, Warning.warn, and the privacy rows stay upstream."
+  link: docs/ruby/system.md
 core/encoding/:
   status: skipped
   reason: "A string is UTF-8, always (ADR 0069): there is no encoding tag, so no Encoding objects, lists, converters, defaults, or errors to port."
