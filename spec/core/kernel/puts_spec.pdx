@@ -1,0 +1,24 @@
+# Ruby's output wrappers over the two standard streams (ADR 0068, #185):
+# `puts`, `p`, `pp`, `print`, `putc`, `printf` on standard output and `warn`
+# on standard error. Each row captures what the call writes with
+# `System.capture_standard_output` or `System.capture_standard_error`
+# (#251), as upstream's `output` matcher does, and checks what it answers.
+#
+# From ruby/spec core/kernel/{p,pp,print,putc,printf,warn,puts}_spec.rb.
+# Upstream: the privacy and reflection rows, `$stdout` and `$VERBOSE`
+# reassignment, `output_to_fd`, `$_`, the separator globals, splatted
+# arguments, the IO-first-argument forms of printf, the `to_int` and `to_str`
+# mocks, and warn's uplevel and category keywords. A mock's own `inspect` or
+# `to_s` waits on #282, held as a pending.
+#
+# `puts` answers no value (ADR 0012), so no row here reads its answer.
+
+require_relative "../../spec_helper"
+
+context "Kernel#puts" do
+  # Upstream checks that `$stdout.puts` receives the argument; here the
+  # capture reads what reached the stream.
+  specify "delegates to $stdout.puts" do
+    expect(System.capture_standard_output { puts :arg }).to eq("arg\n")
+  end
+end
