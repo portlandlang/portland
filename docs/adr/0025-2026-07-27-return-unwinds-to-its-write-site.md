@@ -1,5 +1,11 @@
 # 0025 — `return` unwinds to the method it was written in
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Absence](../../docs/language.md#absence) · [language.md: Control flow](../../docs/language.md#control-flow).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-27)
 - **Date:** 2026-07-27
 

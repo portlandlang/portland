@@ -1,5 +1,11 @@
 # 0032 — Dotted calls take paren-less arguments
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Methods and calls](../../docs/language.md#methods-and-calls) · [docs/ruby/parentheses.md](../../docs/ruby/parentheses.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (settling [#68](https://github.com/portlandlang/portland/issues/68); built on both oracles the same day, differentially pinned, specced)
 - **Date:** 2026-08-11
 

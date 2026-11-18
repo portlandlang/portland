@@ -1,5 +1,11 @@
 # 0031 — Smart constructors: `new` is definable, and `fields` is the raw constructor
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/classes.md](../../docs/ruby/classes.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (chosen for [#61](https://github.com/portlandlang/portland/issues/61) job 3 over the `def self.`-only and namespace-coexistence drafts, whose PRs closed unmerged with their design records; a decision, not a build — the build is its own arc, 2026-07-31)
 - **Date:** 2026-07-31
 

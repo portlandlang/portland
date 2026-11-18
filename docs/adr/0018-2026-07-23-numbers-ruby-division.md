@@ -1,5 +1,11 @@
 # 0018 — Numbers: Ruby's division, floats without ceremony
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/numbers.md](../../docs/ruby/numbers.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, 2026-07-23)
 - **Date:** 2026-07-23
 

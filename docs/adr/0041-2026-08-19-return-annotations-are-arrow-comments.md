@@ -1,5 +1,11 @@
 # 0041 — Return annotations are arrow comments
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/superset.md](../../docs/ruby/superset.md) · [docs/ruby/types.md](../../docs/ruby/types.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (syntax ratified 2026-08-19; recognition and verification land *together* with the inference increment that can check them — never a window where an annotation can lie)
 - **Date:** 2026-08-19
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — decision 4 of the design ladder, the output half; input annotations stay deliberately TBD

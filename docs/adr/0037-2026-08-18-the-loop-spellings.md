@@ -1,5 +1,11 @@
 # 0037 — The loop spellings: `until` in, postfix loops in, `loop` in after all
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Control flow](../../docs/language.md#control-flow) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in both oracles, 2026-08-18; §3 reversed the same day — see its revision note)
 - **Date:** 2026-08-18
 - **Issue:** [#73](https://github.com/portlandlang/portland/issues/73) — three of its five spellings; `||=` and subjectless `case` stay open there, deliberately unruled

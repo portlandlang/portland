@@ -1,5 +1,11 @@
 # 0033 — Exponent is `**` and `pow`, and a negated base needs parens
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/numbers.md](../../docs/ruby/numbers.md) · [docs/ruby/parentheses.md](../../docs/ruby/parentheses.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built on both oracles the same day, differentially pinned, specced)
 - **Date:** 2026-08-11
 

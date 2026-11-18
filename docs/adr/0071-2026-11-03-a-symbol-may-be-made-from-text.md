@@ -1,5 +1,11 @@
 # 0071 — A symbol may be made from text; a declared vocabulary still refuses it
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [architecture.md: Guest values the compiler cannot spell](../../docs/architecture.md#guest-values-the-compiler-cannot-spell) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/symbols.md](../../docs/ruby/symbols.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03 in discussion; supersedes [ADR 0023](0023-2026-07-25-symbols.md) §3 and the interpolated-symbol sentence of §2; built on both implementations 2026-11-03 under [#184](https://github.com/portlandlang/portland/issues/184) — `to_sym`, `intern`, and interpolated symbols; the checked-position refusal of ruling 2 waits on a position that checks a vocabulary, which no struct field or argument does yet, and is [#200](https://github.com/portlandlang/portland/issues/200))
 - **Date:** 2026-11-03
 - **Supersedes in part:** [ADR 0023](0023-2026-07-25-symbols.md) §2 (interpolated symbols) and §3 (`to_sym`)

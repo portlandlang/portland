@@ -1,5 +1,11 @@
 # 0012 — A branch that doesn't happen produces nil
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Control flow](../../docs/language.md#control-flow) · [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#22](https://github.com/portlandlang/portland/issues/22)

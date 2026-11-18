@@ -1,5 +1,11 @@
 # 0087 — Normalization forms are Ruby's
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/characters.md](../../docs/ruby/characters.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-08 on [#106](https://github.com/portlandlang/portland/issues/106)'s status; built on both implementations the same day)
 - **Date:** 2026-11-08
 - **Issue:** [#106](https://github.com/portlandlang/portland/issues/106)

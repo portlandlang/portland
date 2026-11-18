@@ -1,5 +1,11 @@
 # 0051 — The `%` literal family: `%w` and `%i` with three delimiters, the rest declined
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled member by member and built in both oracles, 2026-09-24; `%r` deferred to #74)
 - **Date:** 2026-09-24
 - **Issue:** [#29](https://github.com/portlandlang/portland/issues/29)

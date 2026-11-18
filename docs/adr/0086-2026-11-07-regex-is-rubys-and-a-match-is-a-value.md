@@ -1,5 +1,11 @@
 # 0086 — Regex is Ruby's, and a match is a value
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [language.md: Not yet designed](../../docs/language.md#not-yet-designed) · [docs/ruby/characters.md](../../docs/ruby/characters.md) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md) · [docs/ruby/regex.md](../../docs/ruby/regex.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-07 on the recommendations in [#74](https://github.com/portlandlang/portland/issues/74), one question at a time; built on both implementations 2026-11-07. The engine is Onigmo ported to the seed, layer for layer from Ruby 4.0.9's own copy, agreeing with Ruby on all 1,075 cases of Onigmo's suite — [#212](https://github.com/portlandlang/portland/issues/212) records the evaluation of oniai that preceded it. The `o` flag's reading below is the author's and is open to amendment.)
 - **Date:** 2026-11-07
 - **Issue:** [#74](https://github.com/portlandlang/portland/issues/74)

@@ -1,5 +1,11 @@
 # 0004 — Concurrency vocabulary: `together` + `meanwhile` + `~`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
+
+<!-- /generated -->
+
 - **Status:** Tentative (strongest known candidate; open to better pre-1.0)
 - **Date:** 2026-07-20
 - **Issue:** [#3](https://github.com/portlandlang/portland/issues/3)

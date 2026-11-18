@@ -1,5 +1,11 @@
 # 0010 — Partial operations return maybes; the only crash is one you typed; `fetch` retires
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/integers.md](../../docs/ruby/integers.md) · [docs/ruby/lookups.md](../../docs/ruby/lookups.md) · [docs/ruby/redefinition.md](../../docs/ruby/redefinition.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4) (the panic frontier)

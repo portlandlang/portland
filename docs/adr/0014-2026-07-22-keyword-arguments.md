@@ -1,5 +1,11 @@
 # 0014 — Keyword arguments are Ruby 3's; splats stay out
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Methods and calls](../../docs/language.md#methods-and-calls) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (splat deferral revisitable on demand)
 - **Date:** 2026-07-22
 

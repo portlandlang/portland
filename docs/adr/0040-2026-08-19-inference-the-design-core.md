@@ -1,5 +1,11 @@
 # 0040 — Inference: the design core
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [architecture.md: The compiler](../../docs/architecture.md#the-compiler) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/types.md](../../docs/ruby/types.md) · [docs/ruby/word-operators.md](../../docs/ruby/word-operators.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (decisions 1–3 of the [#9](https://github.com/portlandlang/portland/issues/9) design session; increments build against this)
 - **Date:** 2026-08-19
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9)

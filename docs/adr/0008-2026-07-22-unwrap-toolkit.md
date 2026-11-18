@@ -1,5 +1,11 @@
 # 0008 — The unwrap toolkit: narrowing, or-guard, `&.`, `case/in` — and nothing else
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/nil-and-optionals.md](../../docs/ruby/nil-and-optionals.md) · [docs/ruby/truthiness.md](../../docs/ruby/truthiness.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4)

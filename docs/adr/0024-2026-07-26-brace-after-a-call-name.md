@@ -1,5 +1,11 @@
 # 0024 — Brace blocks attach wherever `do` blocks do
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Blocks](../../docs/language.md#blocks) · [docs/ruby/parentheses.md](../../docs/ruby/parentheses.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-26)
 - **Date:** 2026-07-26
 

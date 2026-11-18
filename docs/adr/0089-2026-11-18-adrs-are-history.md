@@ -1,5 +1,11 @@
 # 0089 — ADRs are history; the current-truth docs win
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [AGENT.md: Read in this order](../../AGENT.md#read-in-this-order).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-18 on [#288](https://github.com/portlandlang/portland/issues/288))
 - **Date:** 2026-11-18
 - **Issue:** [#288](https://github.com/portlandlang/portland/issues/288)

@@ -1,5 +1,11 @@
 # 0050 — Integer literals: three prefixes, no leading-zero octal
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/integer-literals.md](../../docs/ruby/integer-literals.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled and built in both oracles, 2026-09-24)
 - **Date:** 2026-09-24
 - **Issue:** [#72](https://github.com/portlandlang/portland/issues/72), out of the [#23](https://github.com/portlandlang/portland/issues/23) import

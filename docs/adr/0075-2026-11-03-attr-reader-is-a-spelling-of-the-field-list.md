@@ -1,5 +1,11 @@
 # 0075 — `attr_reader` is a spelling of the field list
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/classes.md](../../docs/ruby/classes.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#134](https://github.com/portlandlang/portland/issues/134); built on both implementations the same day under [#188](https://github.com/portlandlang/portland/issues/188))
 - **Date:** 2026-11-03
 - **Issue:** [#134](https://github.com/portlandlang/portland/issues/134)

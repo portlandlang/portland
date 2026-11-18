@@ -1,5 +1,11 @@
 # 0063 — A hash has no default
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/lookups.md](../../docs/ruby/lookups.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#170](https://github.com/portlandlang/portland/issues/170); `Hash.new` and the refusals built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
 - **Issue:** [#170](https://github.com/portlandlang/portland/issues/170)

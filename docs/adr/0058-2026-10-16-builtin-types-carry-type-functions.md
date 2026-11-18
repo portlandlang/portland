@@ -1,5 +1,11 @@
 # 0058 — The builtin types carry Ruby's type functions
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [docs/ruby/conversions.md](../../docs/ruby/conversions.md) · [docs/ruby/lookups.md](../../docs/ruby/lookups.md) · [docs/ruby/math.md](../../docs/ruby/math.md) · [docs/ruby/metaprogramming.md](../../docs/ruby/metaprogramming.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-16 on the recommendation in [#159](https://github.com/portlandlang/portland/issues/159); `Array.new` and `Integer.sqrt` built in the seed and the trio, differentially pinned, 2026-10-16; amended 2026-11-08 to welcome `Array[...]` and `Hash[...]`, built in the seed and the trio the same day, [#218](https://github.com/portlandlang/portland/issues/218))
 - **Date:** 2026-10-16
 - **Issue:** [#159](https://github.com/portlandlang/portland/issues/159)

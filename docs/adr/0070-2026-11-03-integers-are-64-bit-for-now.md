@@ -1,5 +1,11 @@
 # 0070 — Integers are 64-bit for now; past the edge refuses, and bignums stay possible
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/integers.md](../../docs/ruby/integers.md) · [docs/ruby/numbers.md](../../docs/ruby/numbers.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#156](https://github.com/portlandlang/portland/issues/156); recorded, not built — the behavior described is what both implementations already do)
 - **Date:** 2026-11-03
 - **Issue:** [#156](https://github.com/portlandlang/portland/issues/156)

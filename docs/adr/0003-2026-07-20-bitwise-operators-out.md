@@ -1,5 +1,11 @@
 # 0003 — Bitwise operators out of the grammar
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Decided, not yet built](../../docs/language.md#decided-not-yet-built) · [docs/ruby/bitwise-operators.md](../../docs/ruby/bitwise-operators.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/sets.md](../../docs/ruby/sets.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (locked 2026-10-25 by the deciding user on the recommendation in [#157](https://github.com/portlandlang/portland/issues/157); the named methods built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-07-20, locked 2026-10-25
 - **Issue:** [#3](https://github.com/portlandlang/portland/issues/3) (decided alongside the sigil); [#157](https://github.com/portlandlang/portland/issues/157) (the names)

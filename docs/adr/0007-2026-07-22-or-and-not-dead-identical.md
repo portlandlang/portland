@@ -1,5 +1,11 @@
 # 0007 — `or`/`||`, `and`/`&&`, `not`/`!` are dead-identical; `or` is typed
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Absence](../../docs/language.md#absence) · [docs/ruby/lookups.md](../../docs/ruby/lookups.md) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/word-operators.md](../../docs/ruby/word-operators.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (the two never-guess refusals built in the checker 2026-11-08, [#219](https://github.com/portlandlang/portland/issues/219))
 - **Date:** 2026-07-22
 - **Issue:** [#4](https://github.com/portlandlang/portland/issues/4) (unwrap ergonomics thread)

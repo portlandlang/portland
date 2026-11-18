@@ -1,5 +1,11 @@
 # 0068 — `System` is the floor module: a member touches the host, or it is not a member
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [architecture.md: The two kinds of Rust](../../docs/architecture.md#the-two-kinds-of-rust) · [docs/ruby/system.md](../../docs/ruby/system.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 in discussion following [#78](https://github.com/portlandlang/portland/issues/78); the first wave built on both implementations 2026-10-25/26 — `arguments`, `read_file`, `write_file`, `append_file`, `write_standard_output`, `write_standard_error`, `wall_clock_time`, `monotonic_time`, `entropy` — with the three bare placeholders retired; [#176](https://github.com/portlandlang/portland/issues/176); amended 2026-11-09 with the two captures, `capture_standard_output` and `capture_standard_error`, ruled by the deciding user and built on both implementations the same day, [#251](https://github.com/portlandlang/portland/issues/251))
 - **Date:** 2026-10-25
 - **Issue:** [#176](https://github.com/portlandlang/portland/issues/176)

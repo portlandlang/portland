@@ -1,5 +1,11 @@
 # 0002 — The `together` task sigil is `~`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [principles.md: 8. Verify, don't remember](../../docs/principles.md#8-verify-dont-remember) · [docs/ruby/concurrency.md](../../docs/ruby/concurrency.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Issue:** [#3](https://github.com/portlandlang/portland/issues/3)

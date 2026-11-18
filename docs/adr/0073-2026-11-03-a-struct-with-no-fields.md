@@ -1,5 +1,11 @@
 # 0073 — A struct with no fields is a value with one instance
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/classes.md](../../docs/ruby/classes.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-11-03, accepting the recommendation in [#140](https://github.com/portlandlang/portland/issues/140)). Already built: the seed stopped refusing a fieldless struct on 2026-09-27, when the compiler was found to accept one, and `a_struct_may_have_no_fields` in `seed/tests/run_pdx_files.rs` pins both implementations; #140's census had run against the seed before that fix. This ADR records the ruling the fix anticipated; [#186](https://github.com/portlandlang/portland/issues/186) closed as already done.
 - **Date:** 2026-11-03
 - **Issue:** [#140](https://github.com/portlandlang/portland/issues/140)

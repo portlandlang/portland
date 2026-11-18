@@ -1,5 +1,11 @@
 # 0001 — The mutability keyword is `mutable`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [architecture.md: Where the compiler falls short, on purpose](../../docs/architecture.md#where-the-compiler-falls-short-on-purpose) · [docs/ruby/mutability.md](../../docs/ruby/mutability.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Issue:** [#2](https://github.com/portlandlang/portland/issues/2)

@@ -1,5 +1,11 @@
 # 0056 — `class` is a spelling of `struct`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [docs/ruby/classes.md](../../docs/ruby/classes.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-09-27; built in the seed and the trio, differentially pinned, 2026-09-27, [#127](https://github.com/portlandlang/portland/issues/127)) — supersedes [ADR 0028](0028-2026-07-27-object-model-structs-and-traits.md) on the keyword only
 - **Date:** 2026-09-27
 - **Issue:** [#61](https://github.com/portlandlang/portland/issues/61), with job 4 split out as [#103](https://github.com/portlandlang/portland/issues/103)

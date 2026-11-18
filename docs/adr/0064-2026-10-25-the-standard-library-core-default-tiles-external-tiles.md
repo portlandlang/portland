@@ -1,5 +1,11 @@
 # 0064 — The standard library: a core, default tiles, and external tiles
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [docs/ruby/encodings.md](../../docs/ruby/encodings.md) · [docs/ruby/standard-library.md](../../docs/ruby/standard-library.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 in discussion on [#78](https://github.com/portlandlang/portland/issues/78); nothing built — the build is [#176](https://github.com/portlandlang/portland/issues/176), the package system is [#174](https://github.com/portlandlang/portland/issues/174))
 - **Date:** 2026-10-25
 - **Issue:** [#78](https://github.com/portlandlang/portland/issues/78)

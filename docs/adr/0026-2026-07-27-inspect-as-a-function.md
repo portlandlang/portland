@@ -1,5 +1,11 @@
 # 0026 — `inspect` is a function, because nil is its most important input
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [docs/ruby/inspect.md](../../docs/ruby/inspect.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (chosen over the method spelling for [#38](https://github.com/portlandlang/portland/issues/38); built in the seed and the trio, differentially pinned, 2026-07-27)
 - **Date:** 2026-07-27
 

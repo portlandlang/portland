@@ -1,5 +1,11 @@
 # 0059 — `eql?` on every value; `hash` stays unexposed
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/equality.md](../../docs/ruby/equality.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#154](https://github.com/portlandlang/portland/issues/154); `eql?` built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
 - **Issue:** [#154](https://github.com/portlandlang/portland/issues/154)

@@ -1,5 +1,11 @@
 # 0028 — The object model: structs stay the only type; traits carry shared behavior
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Values](../../docs/language.md#values) · [language.md: Namespaces](../../docs/language.md#namespaces) · [language.md: Not yet designed](../../docs/language.md#not-yet-designed) · [docs/ruby/classes.md](../../docs/ruby/classes.md) · [docs/ruby/mixins-and-inheritance.md](../../docs/ruby/mixins-and-inheritance.md) · [docs/ruby/namespaces.md](../../docs/ruby/namespaces.md) · [docs/ruby/superset.md](../../docs/ruby/superset.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (chosen for [#27](https://github.com/portlandlang/portland/issues/27) over single inheritance, whose draft closed unmerged; amended in review — the verb is `include`. Built in the seed and the trio, differentially pinned, 2026-07-27.) Superseded on the `class` keyword alone by [ADR 0056](0056-2026-09-27-class-is-a-spelling-of-struct.md): `class` is a spelling of `struct`; the object model stands.
 - **Date:** 2026-07-27
 

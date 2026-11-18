@@ -1,5 +1,11 @@
 # 0022 — Enums: closed vocabularies of symbol cases, with keyword payloads
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [docs/ruby/enums.md](../../docs/ruby/enums.md) · [docs/ruby/static-checks.md](../../docs/ruby/static-checks.md) · [docs/ruby/superset.md](../../docs/ruby/superset.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (built in the seed and the trio, differentially pinned, 2026-07-25)
 - **Date:** 2026-07-25
 

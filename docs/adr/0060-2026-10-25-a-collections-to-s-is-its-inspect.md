@@ -1,5 +1,11 @@
 # 0060 — A collection's `to_s` is its `inspect`
 
+<!-- generated: do not edit by hand — script/docs/generate -->
+
+> **History, not current truth.** This records why a ruling was made when it was; a later one may have changed it without marking this file. What holds today: [docs/ruby/conversions.md](../../docs/ruby/conversions.md) · [docs/ruby/inspect.md](../../docs/ruby/inspect.md).
+
+<!-- /generated -->
+
 - **Status:** Accepted (ruled by the deciding user 2026-10-25 on the recommendation in [#160](https://github.com/portlandlang/portland/issues/160); built in the seed and the trio, differentially pinned, 2026-10-25)
 - **Date:** 2026-10-25
 - **Issue:** [#160](https://github.com/portlandlang/portland/issues/160)
