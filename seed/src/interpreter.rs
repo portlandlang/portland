@@ -9058,6 +9058,27 @@ impl<W: std::io::Write> Interpreter<W> {
             .is_some_and(|(_, info)| info.methods.contains_key(method))
     }
 
+    /// A struct's own `to_s` or `inspect`, when it defines one (#282): what
+    /// `puts`, `print`, and `warn` write for it, or what `p` writes. Any
+    /// other value, or a struct without the method, answers `None`, and the
+    /// value's own rendering stands.
+    fn own_rendering(&mut self, value: &Value, method: &str) -> Option<String> {
+        let Value::Struct { name, .. } = value else {
+            return None;
+        };
+        let defined = Self::resolve(&self.module_path, name, &self.structs)
+            .and_then(|(_, info)| info.methods.get(method).cloned())?;
+        let answer =
+            self.call_struct_method(name.clone(), value.clone(), defined, Vec::new(), Vec::new());
+        match answer {
+            Some(Value::String(text)) => Some(text),
+            other => {
+                let got = other.map_or("nothing".to_string(), |value| value.shown());
+                panic!("'{method}' answers a String, got {got}")
+            }
+        }
+    }
+
     /// Evaluate an expression that must produce a value.
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
@@ -9337,7 +9358,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // Ruby's rule: a line already ending in a newline gets no
                 // second one.
-                let text = argument.to_string();
+                let text = self
+                    .own_rendering(argument, "to_s")
+                    .unwrap_or_else(|| argument.to_string());
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_output(&format!("{text}{newline}"))
                     .expect("failed to write output");
@@ -9358,7 +9381,10 @@ impl<W: std::io::Write> Interpreter<W> {
                         "print got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                self.emit_standard_output(&argument.to_string())
+                let text = self
+                    .own_rendering(argument, "to_s")
+                    .unwrap_or_else(|| argument.to_string());
+                self.emit_standard_output(&text)
                     .expect("failed to write output");
             }
             return Some(Value::Nil);
@@ -9421,7 +9447,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         "warn got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = line.to_string();
+                let text = self
+                    .own_rendering(line, "to_s")
+                    .unwrap_or_else(|| line.to_string());
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_error(&format!("{text}{newline}"));
             }
@@ -9453,7 +9481,9 @@ impl<W: std::io::Write> Interpreter<W> {
         // `pp` is `p` here: there is no pretty-printer to defer to (#185).
         if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
-                let inspected = argument.inspect();
+                let inspected = self
+                    .own_rendering(argument, "inspect")
+                    .unwrap_or_else(|| argument.inspect());
                 self.emit_standard_output(&format!("{inspected}\n"))
                     .expect("failed to write output");
             }

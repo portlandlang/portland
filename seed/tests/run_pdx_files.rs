@@ -1640,6 +1640,24 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// The output functions write a struct's own `to_s`, and `p` its own
+/// `inspect`, on both oracles (#282); one that answers something other
+/// than a String refuses.
+#[test]
+fn output_uses_a_structs_own_to_s_and_inspect() {
+    let gadget = "struct Gadget\n  name\n\n  def inspect\n    \"custom inspect\"\n  end\n\n  def to_s\n    \"custom to_s\"\n  end\nend\n\ngadget = Gadget.new(name: \"g\")\n";
+    assert_both_print(
+        "own_rendering.pdx",
+        &format!("{gadget}puts gadget\nprint gadget\nputs \"\"\np gadget\n"),
+        "custom to_s\ncustom to_s\ncustom inspect\n",
+    );
+    let cases = [(
+        "struct Gadget\n  name\n\n  def to_s\n    1\n  end\nend\n\nputs Gadget.new(name: \"g\")\n",
+        "'to_s' answers a String, got 1",
+    )];
+    assert_both_oracles_refuse("own_rendering_refusal.pdx", None, &cases);
+}
+
 /// A capture with no block, or with an argument, refuses on both oracles
 /// (#251): there is nothing to capture without the block's writes.
 #[test]
