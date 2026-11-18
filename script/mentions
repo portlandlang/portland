@@ -1,0 +1,43 @@
+#!/usr/bin/env -S rv run ruby
+# Every place an issue is cited, before it closes — so a claim that waited on
+# it ("waits on #N", "until #N lands") is found and brought up to date in the
+# same breath, rather than going stale (#288).
+#
+#   script/mentions 291
+#
+# Searches this repo for `#N` and `issues/N`, and each sibling portlandlang
+# checkout beside it for `portlandlang/portland#N` and `portland/issues/N`
+# (a bare `#N` there is that repo's own issue). Git-tracked files only, via
+# `git grep`, so build output and vendored gems stay out of it.
+
+number = ARGV.first
+abort "usage: script/mentions ISSUE_NUMBER" unless number&.match?(/\A\d+\z/)
+
+portland = File.expand_path("..", __dir__)
+siblings = %w[portlandlang.com pdxlang.com ruby_research rubocop-portland zed-portland]
+             .map { File.expand_path("../#{it}", portland) }
+             .select { File.directory?(File.join(it, ".git")) }
+
+def search(directory, patterns)
+  arguments = patterns.flat_map { ["-e", it] }
+  IO.popen(["git", "-C", directory, "grep", "-n", "-P", *arguments], err: File::NULL, &:read)
+end
+
+found = []
+local = search(portland, ["(?<![\\w/])##{number}(?!\\d)", "issues/#{number}(?!\\d)"])
+found << ["portland", local] unless local.empty?
+
+siblings.each do |directory|
+  hits = search(directory, ["portlandlang/portland##{number}(?!\\d)", "portland/issues/#{number}(?!\\d)"])
+  found << [File.basename(directory), hits] unless hits.empty?
+end
+
+if found.empty?
+  puts "no mentions of portland ##{number}"
+  exit
+end
+
+found.each do |repository, hits|
+  puts "== #{repository}"
+  puts hits
+end
