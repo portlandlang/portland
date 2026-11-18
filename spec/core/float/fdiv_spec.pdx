@@ -3,7 +3,7 @@
 # own TOLERANCE. Where Ruby raises — ZeroDivisionError, FloatDomainError,
 # TypeError — Portland refuses, and a refusal ends a run rather than
 # answering an example, so those examples stay upstream; so do the ones
-# that need a bignum, a Rational, a Complex, or a coercing mock. `infinite?`
+# that need a bignum or a coercing mock. `infinite?`
 # answers true or false here, so upstream's 1 and -1 are asked as a sign.
 # Alias checks compare the two answers rather than method objects.
 
@@ -51,5 +51,13 @@ context "Float#fdiv" do
 
   specify "returns -0.0 when the argument is -Infinity" do
     expect(1.9999918.fdiv(-Float::INFINITY)).to eq(-0.0)
+  end
+
+  specify "performs floating-point division between self and a Rational" do
+    expect(74620.09.fdiv(Rational(2, 3))).to eq(111930.135)
+  end
+
+  specify "performs floating-point division between self and a Complex" do
+    expect(74620.09.fdiv(Complex(8, 2))).to eq(Complex(8778.834117647059, -2194.7085294117646))
   end
 end

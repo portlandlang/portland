@@ -990,8 +990,8 @@ core/float/modulo_spec.rb:
   link: docs/ruby/errors.md
 core/float/fdiv_spec.rb:
   pdx: [spec/core/float/fdiv_spec.pdx]
-  status: partial_planned
-  reason: "No bignums; fdiv refuses a Rational or Complex argument (#292); a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
+  status: partial_intentional
+  reason: "No bignums; a non-number or a second argument refuses where Ruby raises; infinite? answers true or false, so upstream's 1 and -1 are asked as a sign."
   link: docs/ruby/errors.md
 core/float/exponent_spec.rb:
   pdx: [spec/core/float/exponent_spec.pdx]
@@ -1448,7 +1448,8 @@ core/integer/plus_spec.rb:
 core/integer/pow_spec.rb:
   pdx: [spec/core/integer/pow_spec.pdx]
   status: partial_planned
-  reason: "No coercion protocol (#155); pow refuses a Rational exponent (#292), so the Rational and Complex-result rows stay upstream."
+  reason: "No coercion protocol (#155); the Rational exponent rows are ported but for \"returns Rational when power is Rational\", which waits on #290, and the rest of the shared exponent rows are not yet ported."
+  link: https://github.com/portlandlang/portland/issues/290
 core/integer/pred_spec.rb:
   pdx: [spec/core/integer/pred_spec.pdx]
 core/integer/rationalize_spec.rb:
@@ -1526,18 +1527,18 @@ core/integer/divmod_spec.rb:
   link: docs/ruby/errors.md
 core/integer/div_spec.rb:
   pdx: [spec/core/integer/div_spec.pdx]
-  status: partial_planned
-  reason: "No bignums or coercion protocol; div refuses a Rational divisor (#292); a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  status: partial_intentional
+  reason: "No bignums or coercion protocol; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
   link: docs/ruby/errors.md
 core/integer/remainder_spec.rb:
   pdx: [spec/core/integer/remainder_spec.pdx]
-  status: partial_planned
-  reason: "No bignums; remainder refuses a Rational divisor (#292); a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  status: partial_intentional
+  reason: "No bignums; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
   link: docs/ruby/errors.md
 core/integer/ceildiv_spec.rb:
   pdx: [spec/core/integer/ceildiv_spec.pdx]
-  status: partial_planned
-  reason: "No bignums, and ceildiv refuses a Rational divisor (#292), so the 6/5r and 10**100 rows stay upstream."
+  status: partial_intentional
+  reason: "No bignums, so the 10**100 rows stay upstream."
   link: docs/ruby/integers.md
 core/integer/fdiv_spec.rb:
   pdx: [spec/core/integer/fdiv_spec.pdx]
