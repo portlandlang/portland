@@ -143,9 +143,9 @@ if [ -n "$stubs" ]; then
 fi
 
 # The hosted half runs once for the whole suite, not once per spec. What a
-# hosted spec costs is not the compiler — loading that is 0.02s — but
-# `spec_helper.pdx`, re-parsed into every spec's fresh scope at 0.40s a time;
-# `run_specs.pdx` parses the harness once and shares it (#69). The output is
+# hosted spec costs is not loading the compiler, which is quick, but
+# `spec_helper.pdx` re-parsed into every spec's fresh scope; `run_specs.pdx`
+# parses the harness once and shares it (#69). The output is
 # split back apart below so the per-file tallies survive.
 #
 # Not under `set -e`: a spec that panics should still print everything that

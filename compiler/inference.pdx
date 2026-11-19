@@ -892,8 +892,8 @@ end
 # by script/probe_builtin_methods rather than from a reading of its Rust —
 # run the script and paste, so the seed stays the oracle (principle 7) and
 # the spec suite, which exercises every builtin, stands guard over a name
-# gone missing. The seed reads these same eight lines at build for its own
-# wordings, so this is the table's one home. The four names every value
+# gone missing. The seed reads these same lines at build for its own
+# wordings, so this is the table's one home. The names every value
 # answers are in each list; nil is left out on purpose, the runtime's own
 # sentence handling it.
 def builtin_table(type)

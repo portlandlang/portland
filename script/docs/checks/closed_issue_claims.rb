@@ -10,14 +10,12 @@
 # It also holds the manifest to its own word: a `partial_planned` entry is
 # planned on an issue, so it must cite at least one that is open.
 #
-# Decision records (docs/adr/), dated writing (docs/history/), and the
-# CHANGELOG are history and are not read: a closed issue is what they should
-# say. Where `gh` cannot answer — no network, no login — the check declines
+# Which lines count as claims, and what is not read, is ../lib/claims.rb.
+# Where `gh` cannot answer — no network, no login — the check declines
 # rather than guessing, and says so in its summary.
 
 require "json"
-require "yaml"
-require_relative "../lib/shared"
+require_relative "../lib/claims"
 
 # Words that put a claim in waiting on what follows them.
 WAITING = /\b(waits? (on|for)|waiting (on|for)|until|blocked (on|by)|pending|deferred to|owed to|tracked (in|by)|rides with|depends on)\b/i
@@ -50,42 +48,6 @@ def waited_on(text)
   waiting.uniq
 end
 
-def tracked(patterns)
-  Dir.chdir(REPO) { `git ls-files -z -- #{patterns.join(" ")}`.split("\0") }
-end
-
-def prose_files
-  tracked(["'*.md'"]).reject do |path|
-    path == "CHANGELOG.md" || path.start_with?("docs/history/", "docs/adr/0")
-  end
-end
-
-def comment_files
-  tracked(%w['seed/src/*' 'seed/tests/*.rs' 'compiler/*' 'spec/*.pdx' 'script/*']).reject do |path|
-    path.start_with?("spec/ruby/") || path.include?("/fixtures/")
-  end
-end
-
-# [text, line number] pairs a reader takes as claims: prose outside code
-# fences, and comments in code.
-def claims(path)
-  lines = read_lines("#{REPO}/#{path}")
-  if path.end_with?(".md")
-    inside = false
-    lines.each_with_index.filter_map do |line, index|
-      inside = !inside if line.lstrip.start_with?("```")
-      [line, index + 1] unless inside
-    end
-  else
-    lines.each_with_index.filter_map do |line, index|
-      comment = line[%r{(?://|#)(?!!)(.*)}, 1]
-      [comment, index + 1] if comment
-    end
-  end
-rescue ArgumentError
-  []
-end
-
 closed = closed_issue_numbers
 if closed.nil?
   finish("closed_issue_claims", [], "skipped — `gh` could not list closed issues, so nothing was checked")
@@ -93,25 +55,20 @@ end
 
 failures = []
 
-(prose_files + comment_files).each do |path|
-  claims(path).each do |text, number|
-    waited_on(text).select { closed.include?(it) }.each do |issue|
-      failures << <<~REPORT
-        #{path}:#{number}
+every_claim.each do |path, text, number|
+  waited_on(text).select { closed.include?(it) }.each do |issue|
+    failures << <<~REPORT
+      #{path}:#{number}
 
-          Waits on ##{issue}, which is closed:
-            #{text.strip[0, 160]}
+        Waits on ##{issue}, which is closed:
+          #{text.strip[0, 160]}
 
-          Bring the claim up to date with what ##{issue} did (script/mentions #{issue}).
-      REPORT
-    end
+        Bring the claim up to date with what ##{issue} did (script/mentions #{issue}).
+    REPORT
   end
 end
 
-manifest = YAML.safe_load_file("#{REPO}/spec/ruby_spec.yml")
-manifest.each do |upstream, entry|
-  next unless entry.is_a?(Hash)
-
+manifest_entries.each do |upstream, entry|
   waited_on(entry["reason"].to_s).select { closed.include?(it) }.each do |issue|
     failures << <<~REPORT
       spec/ruby_spec.yml: #{upstream}

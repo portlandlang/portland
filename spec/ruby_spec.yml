@@ -185,7 +185,7 @@ core/array/filter_spec.rb:
 core/array/reject_spec.rb:
   pdx: [spec/core/array/reject_spec.pdx]
   status: partial_intentional
-  reason: "The block answers true or false, so the nil and 5 rows stay behind; values never mutate, so reject!, identity, and recursive arrays stay behind too; no subclasses."
+  reason: "The block answers true or false, so the rows where nil or a number stands for a truth stay behind; values never mutate, so reject!, identity, and recursive arrays stay behind too; no subclasses."
   link: docs/ruby/truthiness.md
 core/array/each_spec.rb:
   pdx: [spec/core/array/each_spec.pdx]
@@ -4332,7 +4332,7 @@ language/def_spec.rb:
   link: docs/ruby/metaprogramming.md
 language/defined_spec.rb:
   status: skipped
-  reason: "defined? refuses by design: every name is defined before it is read, and a maybe asks some?; the file's thirteen hundred rows are its reflection."
+  reason: "defined? refuses by design: every name is defined before it is read, and a maybe asks some?; the rest of the file is its reflection."
   link: docs/ruby/removed-syntax.md
 language/delegation_spec.rb:
   status: skipped
