@@ -2,7 +2,7 @@
 
 **Summary:** Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 
-**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The third family, inference-backed refusals, is built in [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)'s voice, below. ADR 0007's two never-guess checks on the word operators are built too ([#219](https://github.com/portlandlang/portland/issues/219)). Still to come: a refusal position on every node kind, enum-case widening, and patterns by capability ([#220](https://github.com/portlandlang/portland/issues/220)).
+**Status:** begun ([ADR 0034](../adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)); two families are built in the compiler's checker — enum vocabularies, and coverage where the arms establish the set ([ADR 0035](../adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)). The third family, inference-backed refusals, is built in [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md)'s voice, below. ADR 0007's two never-guess checks on the word operators are built too ([#219](https://github.com/portlandlang/portland/issues/219)). Still to come: a refusal position on every node kind ([#362](https://github.com/portlandlang/portland/issues/362)) and coverage widened by inference ([#365](https://github.com/portlandlang/portland/issues/365)); enum cases where a symbol is expected ([#363](https://github.com/portlandlang/portland/issues/363)) and patterns by trait ([#364](https://github.com/portlandlang/portland/issues/364)) wait on a ruling.
 
 ## Ruby
 
@@ -38,7 +38,7 @@ Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — ref
 
 The checker reports every refusal at once — one block per refusal with its line beneath, in source order, a count at the end — where Ruby stops at the first `NameError` it happens to reach. It sees a whole program ([ADR 0049](../adr/0049-2026-09-24-the-whole-program-door.md)): an entry file and everything `require_relative` pulls in, each file checked once with the declarations of its requires in view — where Ruby's `require_relative` loads at runtime and checks nothing. A required file's locals never cross; a computed require path is declined. A refusal in a required file names it: `lib.pdx:7 | puts name.knd`.
 
-The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about is silence, not a demand for `else`; widening that is [#220](https://github.com/portlandlang/portland/issues/220).
+The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about is silence, not a demand for `else`; widening that is [#365](https://github.com/portlandlang/portland/issues/365).
 
 ## Migration
 

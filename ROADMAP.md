@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The compiler — `lexer.pdx`, `parser.pdx`, `evaluator.pdx`, plus the two walkers the seed will never have, `checker.pdx` and `inference.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, the evaluator matches the seed byte-for-byte, the checker refuses only what it can disprove, and inference is what its refusals read — across a whole program, with run mode sharpening parameters from their callers. Nothing emits binaries; the back end is [#5](https://github.com/portlandlang/portland/issues/5).
 
-**Next:** the open language questions — holding a block in a value ([#77](https://github.com/portlandlang/portland/issues/77)), stateful objects ([#103](https://github.com/portlandlang/portland/issues/103)), the package system ([#174](https://github.com/portlandlang/portland/issues/174)), and numeric coercion ([#155](https://github.com/portlandlang/portland/issues/155)) — and porting the ruby/spec rows that already pass ([#323](https://github.com/portlandlang/portland/issues/323), [#349](https://github.com/portlandlang/portland/issues/349)). The checker's follow-ons ([#220](https://github.com/portlandlang/portland/issues/220)) wait for a real file to pull them. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
+**Next:** the open language questions — holding a block in a value ([#77](https://github.com/portlandlang/portland/issues/77)), stateful objects ([#103](https://github.com/portlandlang/portland/issues/103)), the package system ([#174](https://github.com/portlandlang/portland/issues/174)), and numeric coercion ([#155](https://github.com/portlandlang/portland/issues/155)) — and porting the ruby/spec rows that already pass ([#323](https://github.com/portlandlang/portland/issues/323), [#349](https://github.com/portlandlang/portland/issues/349)). The checker's follow-ons — a line on every refusal ([#362](https://github.com/portlandlang/portland/issues/362)) and coverage widened by inference ([#365](https://github.com/portlandlang/portland/issues/365)) — wait for a real file to pull them, and two checker questions wait on a ruling: enum cases where a symbol is expected ([#363](https://github.com/portlandlang/portland/issues/363)) and patterns by trait ([#364](https://github.com/portlandlang/portland/issues/364)). The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
 
 ## Done 🎉
 
@@ -95,7 +95,10 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 ### Toward the fixpoint
 
 - ✅ [#219](https://github.com/portlandlang/portland/issues/219) — ADR 0007's two never-guess checks on the word operators, the last static checks from the inference design ([#9](https://github.com/portlandlang/portland/issues/9))
-- [#220](https://github.com/portlandlang/portland/issues/220) — checker follow-ons: a position on every node kind, enum-case widening, patterns by capability; each waits to be pulled for
+- [#362](https://github.com/portlandlang/portland/issues/362) — a line on every node kind, so every checker refusal has a location
+- [#365](https://github.com/portlandlang/portland/issues/365) — `case/in` coverage widened by inference (ADR 0035)
+- [#363](https://github.com/portlandlang/portland/issues/363) — whether an enum case is assignable where a symbol is expected
+- [#364](https://github.com/portlandlang/portland/issues/364) — whether a pattern matches by trait
 - [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
 - **Stage 2** — the fixpoint; **the seed retires** and `architecture.md`'s seed section is deleted
 - **Stage 3** — the primitive boundary descends
