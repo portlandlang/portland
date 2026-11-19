@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (rulings ratified 2026-09-23; built the same day — contracts in the dump, and the call-site refusal for struct arguments; caller flow waits for a whole-program checker, see Consequences)
+- **Status:** Accepted (rulings ratified 2026-09-23; built the same day — contracts in the dump, and the call-site refusal for struct arguments; caller flow waited for a whole-program checker, see Consequences, which [ADR 0049](0049-2026-09-24-the-whole-program-door.md) built)
 - **Date:** 2026-09-23
 - **Issue:** [#9](https://github.com/portlandlang/portland/issues/9) — increment 3c, the rulings ADR 0040 §1's hybrid model left open
 

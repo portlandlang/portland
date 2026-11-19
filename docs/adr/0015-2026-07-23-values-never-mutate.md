@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (`!`-suffix semantics explicitly deferred)
+- **Status:** Accepted (`!`-suffix semantics explicitly deferred; [ADR 0044](0044-2026-08-19-propagation-is-the-toolkit.md) later retired the `!` operator)
 - **Date:** 2026-07-23
 - **Issue:** [#10](https://github.com/portlandlang/portland/issues/10)
 
