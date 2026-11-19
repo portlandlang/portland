@@ -1,4 +1,4 @@
-# A claim that waits on an issue is stale once the issue closes (#288).
+# Prose tied to an issue's being open goes stale when it closes (#288).
 #
 # ADRs 0002, 0004, and 0011 said `together` was unbuilt for four months
 # after it was built, and manifest reasons said "no Rational" long after
