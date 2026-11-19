@@ -14,13 +14,10 @@
 # Two checks are deliberately absent, and stay documented here so the
 # reasoning is not rediscovered:
 #
-#   Doc code samples run. It would have caught three constructs invented for
-#   docs/language.md in one sitting — endless methods, a one-line
-#   if/then/else, a ternary — so it is worth having. But `pdx` has no
-#   parse-only mode, and telling a parse failure from a runtime one by
-#   matching panic text would be a string match on interpreter internals,
-#   which is precisely the fragility the REPL already suffers from. Needs
-#   `pdx --parse` first — issue #35.
+#   Doc code samples run. checks/code_samples.rb parses every sample with
+#   `pdx --parse` (#35), which is what catches invented syntax. Running them
+#   would not work: an illustrative sample calls `lookup(id)` or reads
+#   `article` without defining either, and that is how docs are written.
 #
 #   CHANGELOG is newest-first. The ordering is chronological, and nothing in
 #   an entry's content reveals its date — entries cite several ADRs or none,

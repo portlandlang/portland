@@ -296,7 +296,7 @@ Statistics::LIMIT                      # naming → ::
 Statistics::Summary.new(mean: 2)       # both, in order
 ```
 
-`module` is a namespace and **nothing else** (ADR 0021). Mixins are decided and unbuilt: a `trait` is its own declaration kind, and `include` takes only traits (ADR 0028) — so `include Comparable` and `include Math` can never be confused the way they are in Ruby, because including a namespace is a refusal with the rewrite named.
+`module` is a namespace and **nothing else** (ADR 0021). Mixins are traits: a `trait` is its own declaration kind, and `include` takes only traits (ADR 0028) — so `include Comparable` and `include Math` can never be confused the way they are in Ruby, because including a namespace is a refusal with the rewrite named.
 
 **`::` names, `.` invokes** — a rule, not a convention. `Statistics::mean(x)` is a never-guess error.
 

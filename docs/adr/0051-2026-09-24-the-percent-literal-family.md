@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled member by member and built in both oracles, 2026-09-24; `%r` deferred to #74)
+- **Status:** Accepted (ruled member by member and built in both oracles, 2026-09-24; `%r` deferred to #74, then ruled and built by [ADR 0086](0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md))
 - **Date:** 2026-09-24
 - **Issue:** [#29](https://github.com/portlandlang/portland/issues/29)
 
