@@ -44,7 +44,7 @@ Four differences:
 - **A key with no value takes the name's value** ([ADR 0078](../adr/0078-2026-11-03-omitted-hash-values.md), built on both implementations 2026-11-03): `{name:, port:}` is `{name: name, port: port}` and `build(name:, port:)` forwards two keywords, as Ruby 3.1 reads them. The bare name resolves as any bare name does, a local first and then a method, and the no-shadow rule means there is never a question which one it took. Inside braces or parens a newline ends nothing, so `{name:\n}` omits and `{name:\n 2}` takes the next line's value, as Ruby's do; a paren-less call's label at the end of its line, `build name:`, is the one place Ruby reads two ways, and it refuses — `'name:' at the end of a line is ambiguous — write 'name: name', or put the value on this line`.
 - **No operator symbols.** `:+`, `:[]`, `:<=>` existed for `send`, `define_method`, and `&:`, all of which are gone.
 
-Comparison is equality only. `:paid == "paid"` is a compile error rather than Ruby's silent `false`, and symbols are not ordered.
+`:paid == "paid"` is a compile error rather than Ruby's silent `false`. Symbols order by their names, as Ruby's do ([ordering.md](ordering.md)).
 
 ## Migration
 

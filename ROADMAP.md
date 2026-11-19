@@ -8,7 +8,7 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 **Stage 0 is done and Stage 1 has begun.** The Rust seed interprets a real slice of Portland. The compiler — `lexer.pdx`, `parser.pdx`, `evaluator.pdx`, plus the two walkers the seed will never have, `checker.pdx` and `inference.pdx` — is Portland written in Portland: the parser parses the whole compiler including itself, the evaluator matches the seed byte-for-byte, the checker refuses only what it can disprove, and inference is what its refusals read — across a whole program, with run mode sharpening parameters from their callers. Nothing emits binaries; the back end is [#5](https://github.com/portlandlang/portland/issues/5).
 
-**Next:** with [#9](https://github.com/portlandlang/portland/issues/9)'s ladder climbed end to end — ADRs 0047–0049 in three days: the error voice, contracts, the whole-program door with run-mode sharpening — what the checker has left is ADR 0007's two never-guess checks ([#219](https://github.com/portlandlang/portland/issues/219)) and three small follow-ons pulled when a real file wants them ([#220](https://github.com/portlandlang/portland/issues/220)). The language questions come back to the front: the `%` zoo (#29), redefinition and the hijackable builtins (#70), ordering and `<=>` (#76), and the stdlib story (#78), which is also when the builtin method table retires. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
+**Next:** the open language questions — holding a block in a value ([#77](https://github.com/portlandlang/portland/issues/77)), stateful objects ([#103](https://github.com/portlandlang/portland/issues/103)), the package system ([#174](https://github.com/portlandlang/portland/issues/174)), and numeric coercion ([#155](https://github.com/portlandlang/portland/issues/155)) — and porting the ruby/spec rows that already pass ([#323](https://github.com/portlandlang/portland/issues/323), [#349](https://github.com/portlandlang/portland/issues/349)). The checker's follow-ons ([#220](https://github.com/portlandlang/portland/issues/220)) wait for a real file to pull them. The transitional-tooling trio (#36/#57/#58) is deliberately parked while the language grows.
 
 ## Done 🎉
 
@@ -80,21 +80,21 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Language surface — decide, then build
 
-- [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo; `%w[]`'s content rules are decided and built ([ADR 0030](docs/adr/0030-2026-07-27-word-array-contents.md)), the rest waits on the corpus
-- [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; jobs 1–3 are decided and built ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md) closed the ledger); job 4, stateful objects, is [#103](https://github.com/portlandlang/portland/issues/103), unparked by `together`'s semantics ([ADR 0029](docs/adr/0029-2026-07-27-together-semantics.md)) and waiting to be pulled for
-- Visibility — undecided on purpose; waits to be pulled for (noted closing [#27](https://github.com/portlandlang/portland/issues/27))
+- ✅ [#29](https://github.com/portlandlang/portland/issues/29) — the `%` literal zoo: `%w[]`, `%i[]`, and `%r{}` survive, the rest refuse by name ([ADR 0051](docs/adr/0051-2026-09-24-the-percent-literal-family.md))
+- ✅ [#61](https://github.com/portlandlang/portland/issues/61) — the four jobs Ruby's `class` did and where each goes; jobs 1–3 are decided and built ([ADR 0031](docs/adr/0031-2026-07-31-smart-constructors-definable-new.md)); job 4, stateful objects, is [#103](https://github.com/portlandlang/portland/issues/103)
+- ✅ Visibility — Ruby's, checked at build ([ADR 0076](docs/adr/0076-2026-11-03-visibility-checked-at-build-time.md))
 - [#14](https://github.com/portlandlang/portland/issues/14) — compile-time macros
-- ✅ [#74](https://github.com/portlandlang/portland/issues/74) — regex: Ruby's literals, Onigmo's pattern language, a match is a `MatchData` or nil, positions count graphemes, replacement strings keep Ruby's escapes ([ADR 0086](docs/adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)); the engine is evaluated in [#212](https://github.com/portlandlang/portland/issues/212), and nothing is built yet
-- ✅ [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: a character is a grapheme, equality is canonical, casing is full Unicode ([ADR 0038](docs/adr/0038-2026-08-19-what-a-character-is.md)); canonical _search_ is the recorded follow-on
-- [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>`, Comparable-as-a-trait, user types sorting
+- ✅ [#74](https://github.com/portlandlang/portland/issues/74) — regex: Ruby's literals, Onigmo's pattern language, a match is a `MatchData` or nil, positions count graphemes, replacement strings keep Ruby's escapes ([ADR 0086](docs/adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md)); built on both implementations over the seed's own engine ([#212](https://github.com/portlandlang/portland/issues/212), [#213](https://github.com/portlandlang/portland/pull/213))
+- ✅ [#75](https://github.com/portlandlang/portland/issues/75) — string semantics: a character is a grapheme, equality is canonical, casing is full Unicode ([ADR 0038](docs/adr/0038-2026-08-19-what-a-character-is.md)); canonical _search_ is [#355](https://github.com/portlandlang/portland/issues/355)
+- ✅ [#76](https://github.com/portlandlang/portland/issues/76) — ordering: `<=>` and `include Comparable` migrate unchanged ([ADR 0054](docs/adr/0054-2026-09-25-ordering.md))
 - [#77](https://github.com/portlandlang/portland/issues/77) — can a block be held in a value? the proc question
-- ✅ [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story: a core, default tiles, and external tiles over a coarse floor ([ADR 0064](docs/adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md)); the first primitives are [#176](https://github.com/portlandlang/portland/issues/176), the package system [#174](https://github.com/portlandlang/portland/issues/174)
+- ✅ [#78](https://github.com/portlandlang/portland/issues/78) — the stdlib story: a core, default tiles, and external tiles over a coarse floor ([ADR 0064](docs/adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md)); the first primitives are built ([#176](https://github.com/portlandlang/portland/issues/176)), the package system is [#174](https://github.com/portlandlang/portland/issues/174)
 - ✅ [#79](https://github.com/portlandlang/portland/issues/79) — the alias-cluster policy: the famous twins ship ([ADR 0036](docs/adr/0036-2026-08-18-the-famous-twins-ship.md)); an unshipped alias refuses by naming the survivor
 - ✅ [#73](https://github.com/portlandlang/portland/issues/73) — five probed spellings, all resolved: `until`, the postfix loops, `loop do` ([ADR 0037](docs/adr/0037-2026-08-18-the-loop-spellings.md)), and `||=` ([ADR 0043](docs/adr/0043-2026-08-19-or-equals.md)) shipped; subjectless `case` declined with [#84](https://github.com/portlandlang/portland/issues/84) standing
 
 ### Toward the fixpoint
 
-- [#219](https://github.com/portlandlang/portland/issues/219) — ADR 0007's two never-guess checks on the word operators, the last static checks from the inference design ([#9](https://github.com/portlandlang/portland/issues/9), closed: ADR 0040's ladder is climbed)
+- ✅ [#219](https://github.com/portlandlang/portland/issues/219) — ADR 0007's two never-guess checks on the word operators, the last static checks from the inference design ([#9](https://github.com/portlandlang/portland/issues/9))
 - [#220](https://github.com/portlandlang/portland/issues/220) — checker follow-ons: a position on every node kind, enum-case widening, patterns by capability; each waits to be pulled for
 - [#5](https://github.com/portlandlang/portland/issues/5) — the compile pipeline: MLIR dialects, codegen
 - **Stage 2** — the fixpoint; **the seed retires** and `architecture.md`'s seed section is deleted
@@ -107,10 +107,10 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 
 ### Ecosystem and tooling
 
-- [#23](https://github.com/portlandlang/portland/issues/23) — a living ruby/spec fork as compatibility oracle
+- ✅ [#23](https://github.com/portlandlang/portland/issues/23) — ruby/spec as the compatibility oracle: `spec/ruby_spec.yml` maps every upstream file, drawn at portlandlang.com/spec
 - [#1](https://github.com/portlandlang/portland/issues/1) — brand story: voice, tagline, the teal carpet, the rose
 - [#24](https://github.com/portlandlang/portland/issues/24) — Zed, the rest: `tree-sitter-portland`, registry publication
-- [#221](https://github.com/portlandlang/portland/issues/221) — benchmark receipts: compiled Portland against Ruby and Swift, tracked across commits; the harness is built ([#25](https://github.com/portlandlang/portland/issues/25), closed: `script/bench` with a Ruby column, hosted lex 4741x as the fixpoint's scoreboard)
+- [#221](https://github.com/portlandlang/portland/issues/221) — benchmark receipts: compiled Portland against Ruby and Swift, tracked across commits; the harness is built ([#25](https://github.com/portlandlang/portland/issues/25): `script/bench` with a Ruby column, the hosted lexer's ratio as the fixpoint's scoreboard)
 - [#30](https://github.com/portlandlang/portland/issues/30) — `portland report`: a non-judgmental self-audit of `panic`, `mutable`, `parallel`
 - [#36](https://github.com/portlandlang/portland/issues/36) — the polyfill shim gem and migration linter; a placeholder holding the tier inventory, not a commitment
 
