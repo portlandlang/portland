@@ -30,7 +30,7 @@ Version.new(major: 1, minor: 2) < Version.new(major: 1, minor: 10)   # true
 
 The differences, each small:
 
-- **`<=>` never answers `nil`.** Two values it cannot order refuse, `cannot apply '<=>' to 1 and "a"`, since Portland has no ambient nil. NaN is one of them: `cannot apply '<=>' to NaN and 1.0`.
+- **`<=>` refuses where Ruby answers `nil` for values of different kinds.** Two values it cannot order refuse, `cannot apply '<=>' to 1 and "a"`, since Portland has no ambient nil. NaN is one of them: `cannot apply '<=>' to NaN and 1.0`. The one `nil` it answers is Ruby's for a Complex with an imaginary part, which has no order ([numbers.md](numbers.md)).
 - **`clamp` with its bounds backwards refuses**, `'clamp' takes the low bound first, got 9 then 1`, where Ruby raises `ArgumentError`.
 - **Strings order by canonical text**, not bytes — a decomposed `é` equals the composed one ([characters.md](characters.md)).
 - **`Comparable` does not derive `==`.** Struct equality is already field-by-field; a `<=>` that disagrees with it would make two definitions of "equal".
