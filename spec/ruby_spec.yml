@@ -4061,8 +4061,8 @@ core/module/:
 core/module/case_compare_spec.rb:
   pdx: [spec/core/module/case_compare_spec.pdx]
   status: partial_planned
-  reason: "A type matches its own values; the subclass and extend rows are gone with inheritance (ADR 0028) and the singleton-class row with runtime metaprogramming, and a trait matching the values whose struct includes it waits on #220 (and silently never matches, #300)."
-  link: https://github.com/portlandlang/portland/issues/220
+  reason: "A type matches its own values; the subclass and extend rows are gone with inheritance (ADR 0028) and the singleton-class row with runtime metaprogramming, and a trait matching the values whose struct includes it waits on #364 (and silently never matches, #300)."
+  link: https://github.com/portlandlang/portland/issues/364
 core/module/name_spec.rb:
   pdx: [spec/core/module/name_spec.pdx]
   status: partial_intentional

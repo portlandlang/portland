@@ -350,7 +350,7 @@ end
 
 # The node kinds a refusal can point at carry their line (the ruling of
 # 2026-09-24: the first token that begins the node); the rest do not, and
-# #220 gives every kind one.
+# #362 gives every kind one.
 def line_of(node)
   case node
   in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode | StructDefNode | EnumDefNode | TraitDefNode | AliasNode | AssignmentNode
