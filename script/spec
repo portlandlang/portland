@@ -149,7 +149,7 @@ fi
 # split back apart below so the per-file tallies survive.
 #
 # Not under `set -e`: a spec that panics should still print everything that
-# ran before it, the way one-process-per-spec used to.
+# ran before it.
 hosted_status=0
 if [ -n "$specs" ]; then
   ./target/debug/pdx spec/run_specs.pdx spec/spec_helper.pdx $specs > "$hosted_all" || hosted_status=$?

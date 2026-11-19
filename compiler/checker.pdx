@@ -998,10 +998,9 @@ end
 # — the checks themselves —
 
 # Family three (#86): the reserved names, one list in one place. The seed
-# refuses these at parse — its refusals stay, as the runtime preview — but
-# the compiler's parser used to carry five separate copies of this list,
-# which is how `failure?` missed every one of them for three weeks and how
-# instance defs missed the check entirely. `new` is reserved on instances
+# refuses these at parse — its refusals stay, as the runtime preview — and
+# the compiler keeps one list, since separate copies drift: a name missing
+# from one copy goes unchecked wherever that copy is read. `new` is reserved on instances
 # and definable as a type function (ADR 0031), which is why the two calls
 # pass different lists. Aliases need no case of their own: a struct or
 # trait alias desugars at parse into a clone of the def it points at, so

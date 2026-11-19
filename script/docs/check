@@ -11,7 +11,7 @@
 # where it cannot tell (docs/principles.md: never guess, in the implementation
 # too).
 #
-# Two checks are deliberately absent, and stay documented here so the
+# Some checks are deliberately absent, and stay documented here so the
 # reasoning is not rediscovered:
 #
 #   Doc code samples run. checks/code_samples.rb parses every sample with
@@ -24,6 +24,12 @@
 #   so ADR numbers do not descend even when the order is correct. Rather than
 #   ship a check that fires on correct files, the rule stays in AGENT.md for a
 #   human to hold.
+#
+#   Comments narrate no history (#288). "used to", "no longer", "once" are
+#   mostly right where they appear: principles.md names the mistake behind
+#   each rule, the ledger contrasts Portland with what Ruby did, and a
+#   regression test names the bug it pins. Telling those from a comment that
+#   narrates its code's past would be a guess, so AGENT.md holds this one too.
 set -e
 cd "$(dirname "$0")/../.."
 

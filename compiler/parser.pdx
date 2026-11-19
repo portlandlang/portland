@@ -545,9 +545,7 @@ struct SelfNode
   end
 end
 
-# Exhibit A, resolved: bare `return` is a ReturnNode whose value is nil.
-# This struct once had a ReturnBareNode twin because absence couldn't be
-# said — the first real pull toward optionals, now speakable (ADR 0006).
+# Bare `return` is a ReturnNode whose value is nil (ADR 0006).
 # `in ^name` — compare against the variable's value instead of capturing.
 struct PinNode
   kind
@@ -3918,8 +3916,7 @@ def parse_if(tokens, mutable position)
     return Step.new(node: error_node("expected end to close if"), position: else_body.position)
   end
   if keyword_at?(tokens, position, %w[end])
-    # Exhibit B, resolved: an absent else is nil — no longer conflated
-    # with a present, empty else.
+    # An absent else is nil, distinct from a present, empty else.
     return Step.new(node: if_node(condition.node, then_body.node, nil, line: line), position: position + 1)
   end
   Step.new(node: error_node("expected end to close if"), position: position)
