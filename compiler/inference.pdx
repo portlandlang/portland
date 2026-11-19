@@ -435,8 +435,7 @@ def synthesize_safe_call(node, types)
 end
 
 # What a type function answers, the same on a plain call and behind `&.`
-# (#181 — for a while only the safe path knew, and `Array.new(3)` in a plain
-# call was Unknown). A name no type function has answers unknown, never an
+# (#181). A name no type function has answers unknown, never an
 # error; the evaluator refuses it.
 def type_function_answer(node) = type_function_answer_for(node.receiver.name, node.name)
 

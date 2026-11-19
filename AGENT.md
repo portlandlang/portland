@@ -47,7 +47,7 @@ Prose goes stale when it says something the code later stops doing and nothing n
 
 **Before closing an issue, run `script/mentions N`** and bring every claim that waited on it up to date in the same change.
 
-**Comments say what the code does and why, never what it used to do.** History lives in git and the CHANGELOG; a comment that narrates the past ("once typed it as…", "no longer…") is a second, decaying record of it.
+**Comments say what the code does and why, never what it used to do.** History lives in git and the CHANGELOG; a comment that narrates the past ("once typed it as…", "no longer…") is a second, decaying record of it. A regression test may name the bug it pins, since that is why it exists; implementation code states its reason in the present. No check enforces this one (`script/docs/check`'s header says why).
 
 **Pin behavior in a spec, not in prose.** A spec under `spec/` runs on both implementations, so a claim it holds cannot drift; a doc sample is only parsed (`script/docs/check code_samples`), so the answer in its comment can. Where a doc states what something does, a spec should say it too.
 

@@ -231,9 +231,8 @@ fn word_array_words(content: &str, opener: char, closer: char) -> Vec<String> {
 /// a plain literal, or — when it contains `#{...}` — a `+` chain with
 /// each interpolation wrapped in `.to_s`. The enclosing parser's block
 /// frames come along for the ride: an `it` inside an interpolation declares
-/// the implicit parameter exactly as one outside would (#47). A fresh
-/// sub-parser used to swallow it, so `{ "x #{it}" }` was `undefined
-/// variable or method it` at runtime.
+/// the implicit parameter exactly as one outside would (#47), so the
+/// sub-parser shares the frames rather than starting fresh.
 fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
     let content = &text[1..text.len() - 1];
     if text.starts_with('\'') {

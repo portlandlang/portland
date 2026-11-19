@@ -677,9 +677,8 @@ def match_alternative(pattern, subject, bindings, earlier)
 end
 
 def match_array(pattern, subject, bindings, earlier)
-  # A wrong-shaped subject misses rather than crashing — the seed's rule.
-  # This used to be a recorded crude gap, from before the tagged-shape
-  # predicates existed.
+  # A wrong-shaped subject misses rather than crashing — the seed's rule,
+  # told by the tagged-shape predicates.
   return nil unless plain_array?(subject)
   return nil if pattern.splat == false && subject.length != pattern.elements.length
   return nil if subject.length < pattern.elements.length
@@ -1523,9 +1522,9 @@ def evaluate_logical(node, bindings)
   return left_step if left_step.signal != "none"
   left = slot_value(left_step.value)
   if node.operator == "&&"
-    # Both sides must be booleans — the seed's rule and sentence (#87);
-    # the host's own `unless` used to answer for the left with the wrong
-    # words, and the right went unchecked.
+    # Both sides must be booleans — the seed's rule and sentence (#87) —
+    # checked here rather than left to the host's `unless`, whose words
+    # are not the seed's and which never sees the right side.
     refuse_operand("&&", left) unless left == true || left == false
     return outcome([false], left_step.bindings) if left == false
     right_step = evaluate_expression(node.right, left_step.bindings)
@@ -1581,8 +1580,8 @@ def evaluate_array(node, mutable bindings)
   outcome([elements], bindings)
 end
 
-# Guest hashes are host hashes now: `[]=` (ADR 0015) is exactly the
-# incremental construction Portland used to lack — the pair-list era ends.
+# Guest hashes are host hashes: `[]=` (ADR 0015) is the incremental
+# construction that building one needs.
 def evaluate_hash(node, mutable bindings)
   mutable built = {}
   node.pairs.each do |pair|
@@ -1659,8 +1658,8 @@ end
 
 # `name[index] = value` — a functional update rebound onto the name
 # (ADR 0015): arrays replace in range or append at the end, hashes replace
-# or add the pair. The array half used to fall into the hash rebuild and
-# crash on the two-parameter block (#43).
+# or add the pair. The array half is its own arm, apart from the hash
+# rebuild and its two-parameter block (#43).
 def evaluate_index_update(node, mutable bindings)
   slot = lookup(bindings, node.name)
   panic("undefined variable #{node.name}") if slot.empty?
@@ -2599,7 +2598,7 @@ def evaluate_new(node, mutable bindings)
   mutable provided = []
   node.arguments.each do |argument|
     # A struct is built by keyword (ADR 0062) — the seed's sentence for a
-    # positional argument, where the host used to read it as a label (#203).
+    # positional argument, which the host would otherwise read as a label (#203).
     panic("#{slot.first[0]}.new takes keyword arguments, not positional ones") unless argument in KeywordArgumentNode
     step = evaluate_expression(argument.value, bindings)
     bindings = step.bindings
@@ -3363,8 +3362,9 @@ def evaluate_method_call(node, mutable bindings)
   return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   # A struct answers its own field before any builtin arm can — the seed's
   # order: `with`, its methods, its fields, then only the four names every
-  # value answers. A guest struct is a tagged host array, so `size` on one
-  # used to answer 3 (#96). A name that is neither is the miss sentence.
+  # value answers. A guest struct is a tagged host array, so this order is
+  # what keeps `size` from answering the array's (#96). A name that is
+  # neither is the miss sentence.
   # An Enumerable struct (#110) answers Ruby's Enumerable through its own
   # `each`: the elements it yields, then the array's arm below — after its
   # own methods and fields, before the Struct views.
@@ -3731,10 +3731,9 @@ def evaluate_method_call(node, mutable bindings)
   when "to_int" then panic("to_int is spelled to_i here")
   when "to_str" then panic("to_str is spelled to_s here")
   else
-    # Anything else is a struct field read. On a non-struct that used to
-    # index and fail with an unrelated message — `7.positive?` reported
-    # "cannot index Integer(7) with Integer(2)" — which is how nine missing
-    # methods stayed hidden. Say what actually happened instead.
+    # Anything else is a struct field read. On a non-struct, say the method
+    # is missing, rather than letting the field read index and fail with a
+    # message about indexing, which hides which method is missing.
     unless receiver in ["__struct__", *]
       # The table (#88) says which: a name no builtin of this type answers
       # is the seed's sentence (ADR 0047 shape 2's runtime row); a name the
