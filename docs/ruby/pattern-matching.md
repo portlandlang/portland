@@ -2,7 +2,7 @@
 
 **Summary:** `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
 
-**Status:** specced ([ADR 0013](../adr/0013-2026-07-22-case-in-spec.md); the pattern-edge calls are tentative) and the **runtime half is built** in the seed and the compiler (2026-07-23) — including the payoff: the compiler's evaluator dispatches on its own AST with struct patterns. The static half (exhaustiveness, unreachable arms, the unused-capture lint) waits for #9, previewed as runtime panics.
+**Status:** specced ([ADR 0013](../adr/0013-2026-07-22-case-in-spec.md); the pattern-edge calls are tentative) and the **runtime half is built** in the seed and the compiler — including the payoff: the compiler's evaluator dispatches on its own AST with struct patterns. Of the static half, exhaustiveness and unreachable arms are built in the checker ([static-checks.md](static-checks.md)); the unused-capture lint is [#299](https://github.com/portlandlang/portland/issues/299).
 
 ## Ruby
 
@@ -37,7 +37,7 @@ What changes from Ruby:
 
 ## Pattern arguments
 
-Ruby's Enumerable takes a pattern where it also takes a block — `all?(1..3)`, `any?(2)`, `none?`, `one?`, `grep(3..7)`, `grep_v`, `slice_before(pattern)`, `slice_after(pattern)` — asking `pattern === element`. Here they take one too ([ADR 0066](../adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md)), under the `when` rule: a range covers a number, anything else asks `==`. `grep(3..7) { it + 1 }` is `filter_map` under that rule. A pattern beside a block refuses — `'all?' takes a pattern or a block, not both` — and a type name is not a pattern argument, since a type is not a value: `all? { it in Integer }` is the spelling. A regex pattern waits on [#74](https://github.com/portlandlang/portland/issues/74).
+Ruby's Enumerable takes a pattern where it also takes a block — `all?(1..3)`, `any?(2)`, `none?`, `one?`, `grep(3..7)`, `grep_v`, `slice_before(pattern)`, `slice_after(pattern)` — asking `pattern === element`. Here they take one too ([ADR 0066](../adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md)), under the `when` rule: a range covers a number, anything else asks `==`. `grep(3..7) { it + 1 }` is `filter_map` under that rule. A pattern beside a block refuses — `'all?' takes a pattern or a block, not both` — and a type name is not a pattern argument, since a type is not a value: `all? { it in Integer }` is the spelling. A regex pattern is compared by `==` and so matches nothing, where Ruby's matches by `===`: [#298](https://github.com/portlandlang/portland/issues/298).
 
 ## Migration
 

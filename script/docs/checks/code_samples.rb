@@ -26,10 +26,8 @@
 # deliberately invalid Portland (the never-guess errors, which exist to be
 # refused). Requiring the reason keeps an exemption from being a silent shrug.
 #
-# Deliberately absent: flagging a *stale* exemption — a marked block that has
-# since started parsing, which is what happened to the `together` blocks:
-# built in July, their markers stayed until #279. It looks free but it is
-# not: a block marked "Ruby, shown for contrast" may be valid Portland syntax by
+# Deliberately absent: flagging a *stale* exemption — a marked block whose
+# feature has since been built, so it parses. It looks free but it is not: a block marked "Ruby, shown for contrast" may be valid Portland syntax by
 # coincidence, since Portland is Ruby-shaped on purpose, and the check would
 # call that a stale exemption every time. A check that cries wolf is worse
 # than no check. Removing the markers belongs to whoever builds the feature.

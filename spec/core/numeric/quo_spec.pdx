@@ -1,0 +1,23 @@
+# `quo` on an integer (ADR 0085): exact division, a Rational for two
+# integers and a Float where a float is involved. Upstream's eql? type
+# checks ask inspect's answer.
+#
+# From ruby/spec core/numeric/quo_spec.rb, where a row runs on a builtin.
+# What stays upstream, and why, is this file's entry in spec/ruby_spec.yml.
+
+require_relative "../../spec_helper"
+
+context "Numeric#quo" do
+  specify "returns the result of self divided by the given Integer as a Rational" do
+    expect(inspect(5.quo(2))).to eq("(5/2)")
+  end
+
+  specify "returns the result of self divided by the given Float as a Float" do
+    expect(inspect(2.quo(2.5))).to eq("0.8")
+  end
+
+  specify "returns infinity if the given argument is zero and is a Float" do
+    expect(1.quo(0.0).to_s).to eq("Infinity")
+    expect(-1.quo(0.0).to_s).to eq("-Infinity")
+  end
+end

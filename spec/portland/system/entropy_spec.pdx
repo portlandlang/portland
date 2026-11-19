@@ -1,6 +1,6 @@
 # `System.entropy(byte_count)` (ADR 0068): bytes from the kernel's random
-# source, `getentropy(2)`, as an array of integers 0–255 — the shape bytes
-# take until #119 decides what a byte string is. What `SecureRandom` is
+# source, `getentropy(2)`, as an array of integers 0–255, the shape a
+# string's `bytes` answer too; a bytes type is #183. What `SecureRandom` is
 # spelled over.
 
 require_relative "../../spec_helper"

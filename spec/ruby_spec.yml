@@ -765,7 +765,7 @@ core/enumerable/zip_spec.rb:
 core/enumerable/group_by_spec.rb:
   pdx: [spec/core/enumerable/group_by_spec.pdx]
   status: partial_intentional
-  reason: "No blockless Enumerator (ADR 0055); hash defaults wait on #170."
+  reason: "No blockless Enumerator (ADR 0055), and a hash has no default, so default and default_proc refuse (ADR 0063)."
   link: docs/ruby/enumerators.md
 core/enumerable/filter_map_spec.rb:
   pdx: [spec/core/enumerable/filter_map_spec.pdx]
@@ -816,12 +816,12 @@ core/enumerable/each_with_object_spec.rb:
 core/enumerable/grep_spec.rb:
   pdx: [spec/core/enumerable/grep_spec.pdx]
   status: partial_intentional
-  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks and grep(Object) stay behind, a type not being a value; the regex and $~ rows wait on #74."
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks and grep(Object) stay behind, a type not being a value; the $~ rows go with the match globals, and the regex rows wait on #298."
   link: docs/ruby/pattern-matching.md
 core/enumerable/grep_v_spec.rb:
   pdx: [spec/core/enumerable/grep_v_spec.pdx]
   status: partial_intentional
-  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; the regex and $~ rows wait on #74."
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; the $~ rows go with the match globals, and the regex rows wait on #298."
   link: docs/ruby/pattern-matching.md
 core/enumerable/to_set_spec.rb:
   pdx: [spec/core/range/to_set_spec.pdx, spec/core/enumerable/to_set_spec.pdx]
@@ -995,9 +995,6 @@ core/float/fdiv_spec.rb:
   link: docs/ruby/errors.md
 core/float/exponent_spec.rb:
   pdx: [spec/core/float/exponent_spec.pdx]
-  status: partial_planned
-  reason: "A negative float to a fractional power is a Complex, as Ruby's is (spec/core/float/exponent_spec.pdx); the bignum and coercion rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/198
 core/float/next_float_spec.rb:
   pdx: [spec/core/float/next_float_spec.pdx]
 core/float/prev_float_spec.rb:
@@ -1400,8 +1397,9 @@ core/integer/denominator_spec.rb:
   link: docs/ruby/integers.md
 core/integer/divide_spec.rb:
   pdx: [spec/core/integer/divide_spec.pdx]
-  status: partial_planned
-  reason: "The divide-by-zero half: the refusal is a panic, and a panic ends the spec file."
+  status: partial_intentional
+  reason: "No bignums or coercion protocol; a zero divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  link: docs/ruby/errors.md
 core/integer/even_spec.rb:
   pdx: [spec/core/integer/even_spec.pdx]
   status: partial_intentional
@@ -1502,9 +1500,9 @@ core/integer/digits_spec.rb:
   link: docs/ruby/errors.md
 core/integer/ord_spec.rb:
   pdx: [spec/core/integer/ord_spec.pdx]
-  status: partial_planned
-  reason: "The ?a rows are String#ord, owed to core/string (#106); the bignum rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/106
+  status: partial_intentional
+  reason: "Portland has no character literal, so the ?a rows stay behind, and no bignums, so the bignum rows do too."
+  link: docs/ruby/removed-syntax.md
 core/integer/size_spec.rb:
   pdx: [spec/core/integer/size_spec.pdx]
   status: partial_intentional
@@ -1568,8 +1566,8 @@ core/integer/round_spec.rb:
 core/integer/times_spec.rb:
   pdx: [spec/core/integer/times_spec.pdx]
   status: partial_planned
-  reason: "break with a value waits on real demand (ADR 0012); the rest is ported, a blockless walk answering an array (ADR 0055)."
-  link: docs/adr/0012-2026-07-22-branchless-if-is-nil.md
+  reason: "break with a value refuses to parse and waits on #303; the rest is ported, a blockless walk answering an array (ADR 0055)."
+  link: https://github.com/portlandlang/portland/issues/303
 core/integer/upto_spec.rb:
   pdx: [spec/core/integer/upto_spec.pdx]
   status: partial_intentional
@@ -1996,7 +1994,7 @@ core/numeric/eql_spec.rb:
 core/numeric/fdiv_spec.rb:
   pdx: [spec/core/integer/fdiv_spec.pdx, spec/core/float/fdiv_spec.pdx]
   status: partial_intentional
-  reason: "The to_f coercion rows drive a mock Numeric subclass, and the bignum row waits on #156; fdiv itself is specced on Integer and Float."
+  reason: "The to_f coercion rows drive a mock Numeric subclass, and the bignum row needs an integer past 64 bits, which refuses (docs/ruby/integers.md); fdiv itself is specced on Integer and Float."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/finite_spec.rb:
   status: skipped
@@ -2049,10 +2047,10 @@ core/numeric/positive_spec.rb:
   reason: "The subclass rows drive a mock Numeric through >; there is no inheritance and no Numeric, and positive? is specced on Integer and Float."
   link: docs/ruby/mixins-and-inheritance.md
 core/numeric/quo_spec.rb:
-  pdx: [spec/core/float/quo_spec.pdx]
-  status: partial_planned
-  reason: "quo answers a Rational for two integers, as Ruby's does (spec/core/rational/rational_spec.pdx); the Float rows are specced, the bignum rows wait on #156, and the to_r row drives a mock subclass."
-  link: https://github.com/portlandlang/portland/issues/198
+  pdx: [spec/core/numeric/quo_spec.pdx, spec/core/float/quo_spec.pdx]
+  status: partial_intentional
+  reason: "The to_r rows drive a mock Numeric subclass, a bignum refuses past 64 bits, and a zero integer divisor or a non-number refuses where Ruby raises ZeroDivisionError or TypeError."
+  link: docs/ruby/errors.md
 core/numeric/rect_spec.rb:
   status: skipped
   reason: "The one row compares method objects, which a closed runtime has none of; the name itself is specced on the builtins in spec/core/numeric/rectangular_spec.pdx."
@@ -2135,8 +2133,8 @@ core/random/default_spec.rb:
   link: docs/ruby/randomness.md
 core/random/bytes_spec.rb:
   status: skipped
-  reason: "Random bytes wait on what a byte string is here (#119)."
-  link: https://github.com/portlandlang/portland/issues/119
+  reason: "Random.bytes answers a byte string, and strings are UTF-8 text (ADR 0069); the bytes type is #183."
+  link: https://github.com/portlandlang/portland/issues/183
 core/random/urandom_spec.rb:
   status: skipped
   reason: "The OS's entropy is where an unseeded generator's seed comes from; it is not a method (ADR 0065)."
@@ -3222,13 +3220,13 @@ core/string/each_grapheme_cluster_spec.rb:
 core/string/each_line_spec.rb:
   pdx: [spec/core/string/each_line_spec.pdx]
   status: partial_planned
-  reason: "each_line takes no separator or chomp argument yet; without a block it is an enumerator in Ruby and nothing here."
-  link: https://github.com/portlandlang/portland/issues/106
+  reason: "each_line takes no separator or chomp argument (#313), and the multibyte row is #323's to port; without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
+  link: https://github.com/portlandlang/portland/issues/313
 core/string/element_reference_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx]
-  status: partial_intentional
-  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the regex and string-pattern rows wait on the regex decision (#74)."
-  link: docs/ruby/ranges.md
+  status: partial_planned
+  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the $~ rows go with the match globals. The passing Regexp rows are #323's to port, the two-argument and string-pattern forms wait on #314, and a negative group past the captures on #315."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/empty_spec.rb:
   pdx: [spec/core/string/empty_spec.pdx]
 core/string/encoding_spec.rb:
@@ -3238,9 +3236,9 @@ core/string/encoding_spec.rb:
   link: docs/ruby/encodings.md
 core/string/end_with_spec.rb:
   pdx: [spec/core/string/end_with_spec.pdx]
-  status: partial_planned
-  reason: "The regex rows wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  status: partial_intentional
+  reason: "No to_str conversion of the argument (ADR 0036), and the encoding and part-of-a-character rows have no meaning with one UTF-8 String type."
+  link: docs/ruby/conversions.md
 core/string/eql_spec.rb:
   pdx: [spec/core/string/eql_spec.pdx]
   status: partial_intentional
@@ -3264,8 +3262,8 @@ core/string/grapheme_clusters_spec.rb:
 core/string/gsub_spec.rb:
   pdx: [spec/core/string/gsub_spec.pdx]
   status: partial_planned
-  reason: "The regex patterns, the hash replacement, and the backslash escapes in a replacement (#161) wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and gsub! rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/hex_spec.rb:
   pdx: [spec/core/string/hex_spec.pdx]
 core/string/include_spec.rb:
@@ -3273,8 +3271,8 @@ core/string/include_spec.rb:
 core/string/index_spec.rb:
   pdx: [spec/core/string/index_spec.pdx]
   status: partial_planned
-  reason: "The regex arguments wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing Regexp and String rows are #323's to port; a String with a start position waits on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/initialize_spec.rb:
   status: skipped
   reason: "There is no String class object; a string is a literal, and String.new has no spelling."
@@ -3297,6 +3295,9 @@ core/string/length_spec.rb:
   pdx: [spec/core/string/length_spec.pdx]
 core/string/lines_spec.rb:
   pdx: [spec/core/string/lines_spec.pdx]
+  status: partial_planned
+  reason: "lines takes no separator or chomp argument (#313)."
+  link: https://github.com/portlandlang/portland/issues/313
 core/string/ljust_spec.rb:
   pdx: [spec/core/string/ljust_spec.pdx]
 core/string/lstrip_spec.rb:
@@ -3304,7 +3305,7 @@ core/string/lstrip_spec.rb:
 core/string/match_spec.rb:
   pdx: [spec/core/string/match_spec.pdx]
   status: partial_intentional
-  reason: "=~ answers the match, not an index, since the match globals are gone; the $~ and last_match rows, the to_str and method_missing mocks, and the subclass row stay upstream; match with a block is #215."
+  reason: "=~ answers the match, not an index, since the match globals are gone; the $~ and last_match rows, the to_str and method_missing mocks, and the subclass row stay upstream; match with a block on a String waits on #319."
   link: docs/ruby/regex.md
 core/string/modulo_spec.rb:
   pdx: [spec/portland/string/format_spec.pdx]
@@ -3326,8 +3327,8 @@ core/string/ord_spec.rb:
 core/string/partition_spec.rb:
   pdx: [spec/core/string/partition_spec.pdx]
   status: partial_planned
-  reason: "The regex rows wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The regexp row passes and is #323's to port; the $1 row goes with the match globals, a block beside the argument is checked, not ignored, and the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/plus_spec.rb:
   pdx: [spec/core/string/plus_spec.pdx]
 core/string/prepend_spec.rb:
@@ -3343,15 +3344,15 @@ core/string/reverse_spec.rb:
 core/string/rindex_spec.rb:
   pdx: [spec/core/string/rindex_spec.pdx]
   status: partial_planned
-  reason: "The regex rows wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing Regexp rows are #323's to port; a Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
 core/string/rpartition_spec.rb:
   pdx: [spec/core/string/rpartition_spec.pdx]
   status: partial_planned
-  reason: "The regex rows wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The regexp rows pass and are #323's to port; the $~ row goes with the match globals, and the identity, to_str, and encoding rows have no meaning here."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/rstrip_spec.rb:
   pdx: [spec/core/string/rstrip_spec.pdx]
 core/string/scan_spec.rb:
@@ -3368,13 +3369,13 @@ core/string/size_spec.rb:
 core/string/slice_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx, spec/core/string/slice_spec.pdx]
   status: partial_intentional
-  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; slice! is a mutator (ADR 0015); the regex and string-pattern rows wait on the regex decision (#74)."
-  link: docs/ruby/ranges.md
+  reason: "slice! is a mutator (ADR 0015), so its rows stay behind, regex and string patterns with them; the alias check compares method objects, which a closed runtime has none of."
+  link: docs/ruby/mutability.md
 core/string/split_spec.rb:
   pdx: [spec/core/string/split_spec.pdx]
   status: partial_planned
-  reason: "The regex rows and the block form wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing Regexp rows are #323's to port; split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/squeeze_spec.rb:
   pdx: [spec/core/string/squeeze_spec.pdx]
   status: partial_intentional
@@ -3383,8 +3384,8 @@ core/string/squeeze_spec.rb:
 core/string/start_with_spec.rb:
   pdx: [spec/core/string/start_with_spec.pdx]
   status: partial_planned
-  reason: "The regex rows wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing regex rows are #323's to port; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/string_spec.rb:
   status: skipped
   reason: "Kernel#String is the implicit-conversion protocol's entry point, and to_str is a false alias that refuses naming to_s (ADR 0036); to_s is the spelling."
@@ -3394,8 +3395,8 @@ core/string/strip_spec.rb:
 core/string/sub_spec.rb:
   pdx: [spec/core/string/sub_spec.pdx]
   status: partial_planned
-  reason: "The regex patterns, the hash replacement, and the backslash escapes in a replacement (#161) wait on the regex decision."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and sub! rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/323
 core/string/succ_spec.rb:
   pdx: [spec/core/string/succ_spec.pdx]
 core/string/swapcase_spec.rb:
@@ -3643,8 +3644,8 @@ core/symbol/empty_spec.rb:
 core/symbol/end_with_spec.rb:
   pdx: [spec/core/symbol/end_with_spec.pdx]
   status: partial_planned
-  reason: "end_with? takes one argument here; the several-argument and to_str forms come with the string port, and regexps wait on #74."
-  link: https://github.com/portlandlang/portland/issues/106
+  reason: "The several-candidate and multibyte rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036)."
+  link: https://github.com/portlandlang/portland/issues/323
 core/symbol/id2name_spec.rb:
   pdx: [spec/core/symbol/id2name_spec.pdx]
   status: partial_intentional
@@ -3663,8 +3664,8 @@ core/symbol/length_spec.rb:
 core/symbol/match_spec.rb:
   pdx: [spec/core/symbol/match_spec.pdx]
   status: partial_planned
-  reason: "Regex is built (ADR 0086); the rows Portland's spec held are ported and the rest is not yet. Symbol#=~ answers the match rather than a position, as String#=~ does here."
-  link: docs/adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md
+  reason: "=~ answers the match, not an index, and the $1 rows go with the match globals; the passing match and match? rows are #323's to port, and match with a block and match? with a position wait on #319."
+  link: https://github.com/portlandlang/portland/issues/323
 core/symbol/name_spec.rb:
   pdx: [spec/core/symbol/name_spec.pdx]
   status: partial_intentional
@@ -3683,8 +3684,8 @@ core/symbol/size_spec.rb:
 core/symbol/start_with_spec.rb:
   pdx: [spec/core/symbol/start_with_spec.pdx]
   status: partial_planned
-  reason: "start_with? takes one argument here; the several-argument and to_str forms come with the string port, and regexps wait on #74."
-  link: https://github.com/portlandlang/portland/issues/106
+  reason: "The several-candidate and regex rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036), and the last_match row goes with the match globals."
+  link: https://github.com/portlandlang/portland/issues/323
 core/symbol/succ_spec.rb:
   pdx: [spec/core/symbol/succ_spec.pdx]
 core/symbol/swapcase_spec.rb:
@@ -3820,7 +3821,7 @@ core/kernel/fork_spec.rb:
   link: https://github.com/portlandlang/portland/issues/179
 core/kernel/gets_spec.rb:
   status: skipped
-  reason: "gets reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  reason: "The privacy rows are reflection a closed runtime has none of; the ARGF row reads a stream, which waits on the handle model (#177)."
   link: https://github.com/portlandlang/portland/issues/177
 core/kernel/inspect_spec.rb:
   status: skipped
@@ -3837,8 +3838,8 @@ core/kernel/loop_spec.rb:
   link: docs/adr/0037-2026-08-18-the-loop-spellings.md
 core/kernel/match_spec.rb:
   status: skipped
-  reason: "=~ waits on the regex decision (#74)."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The one row asks respond_to? of an Object, and the runtime is closed: what a value answers is known at build time."
+  link: docs/ruby/metaprogramming.md
 core/kernel/nil_spec.rb:
   pdx: [spec/core/kernel/nil_spec.pdx]
   status: partial_intentional
@@ -3847,11 +3848,11 @@ core/kernel/nil_spec.rb:
 core/kernel/not_match_spec.rb:
   pdx: [spec/core/kernel/not_match_spec.pdx]
   status: partial_planned
-  reason: "Regex is built (ADR 0086); the rows Portland's spec held are ported and the rest is not yet."
-  link: docs/adr/0086-2026-11-07-regex-is-rubys-and-a-match-is-a-value.md
+  reason: "A type defining !~ or =~ waits on #320; the mock row stays behind, the runtime being closed."
+  link: https://github.com/portlandlang/portland/issues/320
 core/kernel/open_spec.rb:
   status: skipped
-  reason: "open reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  reason: "open answers a file handle or takes the block form, which wait on the handle model (#177); the privacy and open-uri rows are reflection."
   link: https://github.com/portlandlang/portland/issues/177
 core/kernel/p_spec.rb:
   pdx: [spec/core/kernel/p_spec.pdx]
@@ -3894,12 +3895,12 @@ core/kernel/rand_spec.rb:
   link: docs/ruby/randomness.md
 core/kernel/readline_spec.rb:
   status: skipped
-  reason: "readline reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  reason: "The privacy rows are reflection a closed runtime has none of; the ARGF row reads a stream, which waits on the handle model (#177)."
   link: https://github.com/portlandlang/portland/issues/177
 core/kernel/readlines_spec.rb:
   status: skipped
-  reason: "readlines reads a handle, which waits on the handle model (#177) and the process rows (#178)."
-  link: https://github.com/portlandlang/portland/issues/177
+  reason: "The file holds only the privacy rows, Kernel.private_instance_methods and public_methods, which are reflection a closed runtime has none of."
+  link: docs/ruby/metaprogramming.md
 core/kernel/require_relative_spec.rb:
   pdx: [spec/core/kernel/require_relative_spec.pdx]
   status: partial_intentional
@@ -3912,7 +3913,7 @@ core/kernel/require_spec.rb:
   link: docs/ruby/requires.md
 core/kernel/select_spec.rb:
   status: skipped
-  reason: "select reads a handle, which waits on the handle model (#177) and the process rows (#178)."
+  reason: "The privacy rows are reflection; the timeout row needs a pipe and readiness on it, which wait on the handle model (#177)."
   link: https://github.com/portlandlang/portland/issues/177
 core/kernel/spawn_spec.rb:
   status: skipped
@@ -3939,19 +3940,23 @@ core/module/:
 core/module/case_compare_spec.rb:
   pdx: [spec/core/module/case_compare_spec.pdx]
   status: partial_planned
-  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+  reason: "A type matches its own values; the subclass and extend rows are gone with inheritance (ADR 0028) and the singleton-class row with runtime metaprogramming, and a trait matching the values whose struct includes it waits on #220 (and silently never matches, #300)."
+  link: https://github.com/portlandlang/portland/issues/220
 core/module/name_spec.rb:
   pdx: [spec/core/module/name_spec.pdx]
-  status: partial_planned
-  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+  status: partial_intentional
+  reason: "A module is a namespace, not an object (ADR 0021), so the anonymous-module, constant-reassignment, and module-keyword rows have nothing to name; frozen?, equal?, and encoding have no meaning for a value that never mutates (ADR 0015)."
+  link: docs/ruby/namespaces.md
 core/module/private_constant_spec.rb:
   pdx: [spec/core/module/private_constant_spec.pdx]
   status: partial_planned
-  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+  reason: "An outside read of a private constant refuses at build (ADR 0076), and a symbol is the only name form; naming a constant the module does not define waits on #301, and the subclass setup has no inheritance (ADR 0028)."
+  link: https://github.com/portlandlang/portland/issues/301
 core/module/protected_spec.rb:
   pdx: [spec/core/module/protected_spec.pdx]
-  status: partial_planned
-  reason: "The rows Portland's spec held before it mirrored ruby/spec; the rest of the file is not yet ported."
+  status: partial_intentional
+  reason: "Every upstream row checks visibility through reflection (protected_instance_methods, send, Module.new, eval) or the singleton class, which a closed runtime does not have; protected :name refuses naming protected def, and type functions are public."
+  link: docs/ruby/visibility.md
 core/io/buffer/:
   status: skipped
   reason: "IO::Buffer is a region of memory written in place, with a memory map — values never mutate (ADR 0015; #175)."
@@ -4300,8 +4305,8 @@ core/threadgroup/:
 language/array_spec.rb:
   pdx: [spec/language/array_spec.pdx]
   status: partial_planned
-  reason: "The splat operator is deferred (ADR 0014); %W is declined (ADR 0051)."
-  link: docs/adr/0014-2026-07-22-keyword-arguments.md
+  reason: "The splat operator is deferred (ADR 0014), %W is declined (ADR 0051), and the side-effect row needs mutable instance state (#103); an empty () element and a brace-less trailing hash wait on #307."
+  link: https://github.com/portlandlang/portland/issues/307
 language/BEGIN_spec.rb:
   status: skipped
   reason: "BEGIN and END blocks are removed syntax."
@@ -4352,8 +4357,8 @@ language/magic_comment_spec.rb:
   link: docs/ruby/characters.md
 language/match_spec.rb:
   status: skipped
-  reason: "=~ and !~ wait on the regex decision (#74)."
-  link: https://github.com/portlandlang/portland/issues/74
+  reason: "The operator rows call through send and the local-variable rows read local_variables, both gone with the open runtime; whether a named capture binds a local, and whether a type may define =~, is #320."
+  link: https://github.com/portlandlang/portland/issues/320
 language/method_spec.rb:
   pdx: [spec/language/method_spec.pdx]
   status: partial_intentional
@@ -4393,13 +4398,13 @@ language/regexp/back-references_spec.rb:
 language/regexp/character_classes_spec.rb:
   pdx: [spec/language/regexp/character_classes_spec.pdx]
   status: partial_planned
-  reason: "The common classes and POSIX brackets port; the long property-by-property walk waits for a pull."
-  link: docs/ruby/regex.md
+  reason: "The passing class, POSIX-bracket, and property rows are #323's to port; the rows that spell characters with \\u, \\0, and \\x escapes wait on #304, the /u rows on #321, and the eval rows stay behind."
+  link: https://github.com/portlandlang/portland/issues/323
 language/regexp/empty_checks_spec.rb:
   pdx: [spec/language/regexp/empty_checks_spec.pdx]
   status: partial_planned
-  reason: "A selection of the empty-iteration rows port; the rest wait for a pull."
-  link: docs/ruby/regex.md
+  reason: "Every row passes; the ones not in the pdx spec are #323's to port."
+  link: https://github.com/portlandlang/portland/issues/323
 language/regexp/encoding_spec.rb:
   status: skipped
   reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
@@ -4466,7 +4471,7 @@ language/block_spec.rb:
 language/break_spec.rb:
   pdx: [spec/language/break_spec.pdx]
   status: partial_planned
-  reason: "the block rows run (#166); the captured-block and lambda rows wait on the proc question (#77); break carries no value (ADR 0012), the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there are no threads."
+  reason: "The captured-block and lambda rows wait on the proc question (#77), and break with a value on #303; the ensure rows have no begin to attach to, splats are deferred (ADR 0014), and there is no eval, inheritance, or threads."
   link: https://github.com/portlandlang/portland/issues/77
 language/case_spec.rb:
   pdx: [spec/language/case_spec.pdx]
@@ -4565,9 +4570,9 @@ language/predefined_spec.rb:
   link: docs/ruby/removed-syntax.md
 language/range_spec.rb:
   pdx: [spec/language/range_spec.pdx]
-  status: partial_planned
-  reason: "Range.new has no spelling yet; the rows compare literals and ask the ends."
-  link: https://github.com/portlandlang/portland/issues/111
+  status: partial_intentional
+  reason: "The identity row asks equal?, which does not exist; values never mutate, so identity is not observable."
+  link: docs/ruby/equality.md
 language/retry_spec.rb:
   status: skipped
   reason: "retry rides begin/rescue, which do not exist: a fallible operation returns its failure."
@@ -4597,8 +4602,8 @@ language/singleton_class_spec.rb:
 language/string_spec.rb:
   pdx: [spec/language/string_spec.pdx]
   status: partial_planned
-  reason: "Unicode escapes and adjacent-literal concatenation wait on the string-semantics decision; only #{} interpolates (no instance, class, or global variables), the % delimiters refuse by name, the escape set is closed, and the frozen-comment and encoding rows stay upstream."
-  link: https://github.com/portlandlang/portland/issues/75
+  reason: "Unicode escapes wait on #304, adjacent-literal concatenation on #305, and an empty interpolation on #306; only #{} interpolates (no instance, class, or global variables), the % delimiters and ?z refuse by name, and the frozen-comment and encoding rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/304
 language/super_spec.rb:
   status: skipped
   reason: "There is no inheritance — declined, not deferred — so super has nothing to reach; traits carry shared behavior (ADR 0028)."

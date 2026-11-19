@@ -1,11 +1,7 @@
 # An integer's places and what it is as a character code and in memory
 # (#107), from ruby/spec core/integer: digits, ord, and size. Upstream's
-# eql? type checks ask inspect's answer. Its `?a.ord` rows are String#ord,
-# which waits on core/string (#106): Ruby's answers the first codepoint,
-# and a Portland character is a grapheme cluster (ADR 0038).
-# Where Ruby raises (ArgumentError, Math::DomainError) Portland refuses in
-# the same words, which ends a run, so those examples stay upstream with
-# the bignum and to_int ones.
+# eql? type checks ask inspect's answer. What stays upstream, and why, is
+# each file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 

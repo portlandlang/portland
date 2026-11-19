@@ -34,7 +34,11 @@ jobs:
         with:
           path: ~/.rustup
           key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+      # `script/docs/check closed_issue_claims` asks GitHub which issues are
+      # closed, through `gh`, which reads this token.
       - run: script/cibuild
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   # The builtin method table (#88) in compiler/inference.pdx is derived from
   # the seed's behavior: re-derive it and diff, about four minutes, only when
