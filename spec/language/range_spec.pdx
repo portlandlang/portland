@@ -4,27 +4,27 @@
 
 require_relative "../spec_helper"
 
-# From ruby/spec language/range_spec.rb. Range.new has no spelling yet
-# (#111), so the rows compare literals and ask the ends; the identity row
-# stays upstream.
+# From ruby/spec language/range_spec.rb. What stays upstream, and why, is
+# this file's entry in spec/ruby_spec.yml.
 context "Literal Ranges" do
   specify "creates range object" do
-    expect(1..10).to eq(1..10)
+    expect(1..10).to eq(Range.new(1, 10))
   end
 
   specify "creates range with excluded right boundary" do
+    expect(1...10).to eq(Range.new(1, 10, true))
     expect((1...10).exclude_end?).to be_true
     expect((1..10).exclude_end?).to be_false
   end
 
   specify "creates endless ranges" do
-    expect((1..).end).to be_nil
-    expect((1...).exclude_end?).to be_true
+    expect(1..).to eq(Range.new(1, nil))
+    expect(1...).to eq(Range.new(1, nil, true))
   end
 
   specify "creates beginless ranges" do
-    expect((..1).begin).to be_nil
-    expect((...1).exclude_end?).to be_true
+    expect(..1).to eq(Range.new(nil, 1))
+    expect(...1).to eq(Range.new(nil, 1, true))
   end
 
   specify "two dots keep the end" do

@@ -25,4 +25,4 @@ The reasoning is the never-guess family's, one step short of it: `\q` has one pl
 - Every escape Ruby and Portland share migrates verbatim — the entire common set.
 - An unknown escape is a loud compile error naming the sequence; the rewrite is the bare character (`"\q"` → `"q"`) or the escape that was meant.
 - Tier: _gem-supplied_ — a linter can flag unknown escapes inside valid Ruby before the flip, since Ruby's own parser already warns about some of them.
-- What is **not** covered yet: `\u` Unicode escapes, `\e`, `\0`, and octal/hex forms, none of which exist in either direction here. They arrive with the string-semantics ADR, and each one added is a program that used to refuse and now works — never the reverse.
+- What is **not** covered: `\u` Unicode escapes, `\e`, `\0`, and octal/hex forms, none of which exist in either direction here; [#304](https://github.com/portlandlang/portland/issues/304) tracks them. Each one added is a program that refused and then works — never the reverse.

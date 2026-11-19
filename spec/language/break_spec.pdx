@@ -152,3 +152,18 @@ context "The break statement in a block" do
     expect(broken_out).to be_nil
   end
 end
+
+def counted_to_two
+  mutable count = 0
+  while true
+    break if count == 2
+    count += 1
+  end
+  count
+end
+
+context "Break inside a while loop" do
+  specify "stops a while loop when run" do
+    expect(counted_to_two).to eq(2)
+  end
+end
