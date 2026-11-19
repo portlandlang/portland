@@ -4,7 +4,7 @@
 # (ADR 0050 refuses a leading zero, naming both readings — `0o377` is the
 # spelling); a prefixed literal with an `r` or `i` suffix (`0xffr`, which
 # refuses); the bignum and long-decimal `r` rows, past 64 bits; the decimal
-# `r` and `i` rows, not yet ported; and the three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
+# `r` and `i` rows, unported; and the three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
 # name here as there, and `.75` a parse refusal.
 
 # Up one, because `require_relative` resolves against this file's own

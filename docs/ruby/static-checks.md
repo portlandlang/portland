@@ -38,7 +38,7 @@ Third family, from [ADR 0047](../adr/0047-2026-09-22-the-error-voice.md) — ref
 
 The checker reports every refusal at once — one block per refusal with its line beneath, in source order, a count at the end — where Ruby stops at the first `NameError` it happens to reach. It sees a whole program ([ADR 0049](../adr/0049-2026-09-24-the-whole-program-door.md)): an entry file and everything `require_relative` pulls in, each file checked once with the declarations of its requires in view — where Ruby's `require_relative` loads at runtime and checks nothing. A required file's locals never cross; a computed require path is declined. A refusal in a required file names it: `lib.pdx:7 | puts name.knd`.
 
-The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about yet is silence, not a demand for `else`, and inference is what widens that later.
+The checker declines wherever it cannot tell (principle 4): unknown constructs pass through, bare symbols are never checked, guarded arms sit outside the arithmetic in both directions, and each future check fires only where the tree alone proves it applies. Coverage refuses only what it can *disprove* — a `case/in` it cannot reason about is silence, not a demand for `else`; widening that is [#220](https://github.com/portlandlang/portland/issues/220).
 
 ## Migration
 

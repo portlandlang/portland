@@ -31,4 +31,4 @@ seen + ["d"]                     # Set["a", "b", "d"] — + is union, - is diffe
 - Reading a set — membership, the algebra by its word names, iteration — ports verbatim. _Free._
 - `set << x` and `set.add(x)` as a statement become `set = set.add(x)`, as every collection mutation does here. _Mechanical, loud._
 - `a | b`, `a & b`, and `a ^ b` become `a.union(b)`, `a.intersection(b)`, and `(a + b) - a.intersection(b)` until [#207](https://github.com/portlandlang/portland/issues/207) decides. _Mechanical, loud._
-- `require "set"` is a line to delete; it is core on both sides now ([requires.md](requires.md)).
+- `require "set"` is a line to delete; it is core on both sides ([requires.md](requires.md)).

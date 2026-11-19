@@ -8,7 +8,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 1. **[docs/principles.md](docs/principles.md)** — the rules that settle arguments, in precedence order. Read before deciding anything. Several exist because we broke them once, and the file says which.
 1. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
-1. **[docs/language.md](docs/language.md)** — what Portland speaks today.
+1. **[docs/language.md](docs/language.md)** — what Portland speaks.
 1. **[docs/architecture.md](docs/architecture.md)** — the seed, the compiler, and the contract between them.
 1. **[docs/ruby/](docs/ruby/)** — what each divergence costs a Rubyist.
 1. **[docs/adr/](docs/adr/)** — the decision log: why each ruling was made, when it was made.
@@ -43,7 +43,7 @@ Prose goes stale when it says something the code later stops doing and nothing n
 
 **Never name a count or an exact timing.** Not lines of code, spec examples, spec files, open issues, manifest entries, or checks, and not "0.02s" or "15ms". A count is true for one commit. An approximate timing that makes a point ("about a minute") is fine. `script/docs/check counts_and_timings` flags a written-out number of files, lines, examples, rows, issues, or entries, and an exact timing; spelled-out numbers are left to you.
 
-**No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; [#291](https://github.com/portlandlang/portland/issues/291) tracks it", not "doesn't work yet".
+**No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; [#291](https://github.com/portlandlang/portland/issues/291) tracks it", not "doesn't work yet". `script/docs/check time_words` flags these in the docs and manifest, and the unambiguous ones in comments, unless the clause names an issue.
 
 **Before closing an issue, run `script/mentions N`** and bring every claim that waited on it up to date in the same change.
 
@@ -66,7 +66,7 @@ Prose goes stale when it says something the code later stops doing and nothing n
 | `script/mentions N`    | every place this repo and its sibling checkouts cite issue N; run it before closing N |
 | `script/bootstrap`     | first-time setup, installs the git hooks                                        |
 
-**Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`. Every file not yet taken in has a generated stub under `spec/ruby/` (`script/ruby_spec_stubs ~/Developer/ruby/spec`): its upstream titles as pendings, parsed by the gate but never run. Importing a file means deleting its stub and regenerating.
+**Importing from ruby/spec updates `spec/ruby_spec.yml`** in the same commit: each upstream file taken in gets an entry naming its pdx specs, and a partial or a skip says why, with the ledger page or issue. The dashboard at portlandlang.com is drawn from it — refresh it with `script/ruby_spec_dashboard ~/Developer/ruby/spec > ../portlandlang.com/_data/ruby_spec.json`. Every file not taken in has a generated stub under `spec/ruby/` (`script/ruby_spec_stubs ~/Developer/ruby/spec`): its upstream titles as pendings, parsed by the gate but never run. Importing a file means deleting its stub and regenerating.
 
 Hooks are tracked in `script/hooks/` and installed via `core.hooksPath`. There is one, `pre-push`, the fast gate (`script/test --fast`); it takes `--no-verify`. Commits run nothing. The whole suites and the builtin method table are CI's.
 

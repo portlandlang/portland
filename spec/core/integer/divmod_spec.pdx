@@ -3,8 +3,8 @@
 # Arithmetic that follows Ruby rather than the Rust floor it is built on.
 #
 # Grown from ruby/spec core/integer/divide_spec.rb (#23); the
-# divide-by-zero half stays behind — the panic is the seed's whole error
-# story today, and a panic ends the file.
+# divide-by-zero half stays behind — dividing by zero panics, and a panic
+# ends the file.
 
 # Up two, because `require_relative` resolves against this file's own directory
 # (the seed's rule, matched by the compiler) — not against `spec/`.

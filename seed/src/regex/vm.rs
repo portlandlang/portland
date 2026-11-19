@@ -149,7 +149,7 @@ enum CacheVerdict {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CacheStatus {
-    /// Not yet failed often enough to be worth it.
+    /// Has not failed often enough to be worth it.
     Waiting,
     /// On: the bit array is live.
     Enabled,

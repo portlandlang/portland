@@ -2968,7 +2968,7 @@ end
 
 # Ruby's splat parameters (#135) are deferred, not refused for good (ADR
 # 0014); until they land, the parse names the deferral and the shapes that
-# exist today — the seed's sentence.
+# exist — the seed's sentence.
 def refuse_splat_parameter(tokens, position)
   return unless operator_at?(tokens, position, %w[* **])
   name = position + 1 < tokens.length && tokens[position + 1].identifier? ? tokens[position + 1].text : ""

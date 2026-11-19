@@ -1,8 +1,8 @@
 # The standard library
 
-**Summary:** Ruby's current shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
+**Summary:** Ruby 4's shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
 
-**Status:** decided ([ADR 0064](../adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md), 2026-10-25, out of [#78](https://github.com/portlandlang/portland/issues/78)); nothing built yet — the first primitives are [#176](https://github.com/portlandlang/portland/issues/176), the package system is [#174](https://github.com/portlandlang/portland/issues/174).
+**Status:** decided ([ADR 0064](../adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md), 2026-10-25, out of [#78](https://github.com/portlandlang/portland/issues/78)); core's first-wave primitives are built ([#176](https://github.com/portlandlang/portland/issues/176)); the package system, and so every tile, is [#174](https://github.com/portlandlang/portland/issues/174).
 
 ## Ruby
 
@@ -12,17 +12,17 @@ The OS surface is core: `File`, `Dir`, `ENV`, `Time`, `Process`, `Signal`, `IO` 
 
 ## Portland
 
-**Core** needs no `require`, ships inside `pdx`, and is versioned with the language: the builtin types, plus what Ruby made core — `Set`, `Math`, `Random`, `Time` — as each is decided. Core also owns the **floor**: a small set of coarse primitives, one crossing each, that are the only things written in Rust. Today those are `System.arguments`, `System.read_file`, `System.write_file`, `System.append_file`, `System.write_standard_output` (which `puts` and `p` are spelled over), `System.write_standard_error`, `System.wall_clock_time`, `System.monotonic_time`, and `System.entropy` — the first wave, built — and the two captures, `System.capture_standard_output` and `System.capture_standard_error` ([#251](https://github.com/portlandlang/portland/issues/251)). Core also holds anything Rust-backed that is not a floor crossing — `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` ([ADR 0072](../adr/0072-2026-11-03-json-is-core-written-twice.md), built 2026-11-03): Rust by hand in the seed, Portland on the compiler side (`compiler/json.pdx`, the first library written in Portland), no dependency; a Rust-backed library cannot be a tile, and the Portland twin is what becomes one when the tile system exists.
+**Core** needs no `require`, ships inside `pdx`, and is versioned with the language: the builtin types, plus what Ruby made core — `Set`, `Math`, `Random`, `Time` — as each is decided. Core also owns the **floor**: a small set of coarse primitives, one crossing each, that are the only things written in Rust. Those are `System.arguments`, `System.read_file`, `System.write_file`, `System.append_file`, `System.write_standard_output` (which `puts` and `p` are spelled over), `System.write_standard_error`, `System.wall_clock_time`, `System.monotonic_time`, and `System.entropy` — the first wave, built — and the two captures, `System.capture_standard_output` and `System.capture_standard_error` ([#251](https://github.com/portlandlang/portland/issues/251)). Core also holds anything Rust-backed that is not a floor crossing — `JSON.parse`, `JSON.generate`, and `JSON.pretty_generate` ([ADR 0072](../adr/0072-2026-11-03-json-is-core-written-twice.md), built 2026-11-03): Rust by hand in the seed, Portland on the compiler side (`compiler/json.pdx`, the first library written in Portland), no dependency; a Rust-backed library cannot be a tile, and the Portland twin is what becomes one when the tile system exists.
 
 **Default tiles** are Portland packages installed beside `pdx` — their own version and repo, upgradable without upgrading the language — that load by `require "name"` with no manifest line. The first four, in the corpus's order: `base64`, `logger`, `securerandom`, `benchmark`. Each is spelled as Ruby spells it: `Base64.strict_encode64`, `Logger.new`, `SecureRandom.hex`, `Benchmark.measure`.
 
 **External tiles** are declared in the manifest and installed. Everything else lives here.
 
-**No bundled tier.** A library is in the default set or it is external; nothing arrives with `pdx` yet needs a line to load.
+**No bundled tier.** A library is in the default set or it is external; nothing arrives with `pdx` and still needs a line to load.
 
 **Declined by doctrine**, each refusing by name when the tile system exists: `ostruct`, `delegate`, `forwardable`, `singleton`, `observer`, `weakref`, `monitor`, `thread`, `timeout`, `English`, `pp`. The reasons are the ledger's existing ones — [metaprogramming.md](metaprogramming.md), [mutability.md](mutability.md), [concurrency.md](concurrency.md), [removed-syntax.md](removed-syntax.md).
 
-**The OS surface** is Ruby's spelling over the floor: `File.read` over the read primitive, `Time.now` over the clock, each arriving when a real file pulls for it. The floor is coarse — `File.read` hands back the whole file — so streaming a file larger than memory has no spelling yet; the fine handle model is parked, not refused.
+**The OS surface** is Ruby's spelling over the floor: `File.read` over the read primitive, `Time.now` over the clock, each arriving when a real file pulls for it. The floor is coarse — `File.read` hands back the whole file — so streaming a file larger than memory has no spelling; the fine handle model is parked, not refused ([#177](https://github.com/portlandlang/portland/issues/177)).
 
 ## Migration
 

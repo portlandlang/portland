@@ -3,7 +3,7 @@
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 > [!IMPORTANT]
-> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [architecture.md: The two kinds of Rust](../../docs/architecture.md#the-two-kinds-of-rust) · [docs/ruby/system.md](../../docs/ruby/system.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: The library](../../docs/language.md#the-library) · [architecture.md: The two kinds of Rust](../../docs/architecture.md#the-two-kinds-of-rust) · [docs/ruby/system.md](../../docs/ruby/system.md).
 
 <!-- /generated -->
 

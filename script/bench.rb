@@ -13,7 +13,7 @@
 #
 # `script/bench` runs the quick set (median of three runs); add `slow` to
 # include the slow tier — bench/lex.pdx hosted is the compiler running its own
-# front end, and it takes minutes today. That is a finding, not a bug in
+# front end, and it takes minutes. That is a finding, not a bug in
 # this script.
 #
 # A third column runs the same text under MRI, through bench/shim.rb, for

@@ -12,7 +12,7 @@
 - **`BEGIN` / `END` blocks** — perlisms.
 - **Truthiness** — see [truthiness](truthiness.md).
 - **Ambient nil / `NilClass`** — see [nil and optionals](nil-and-optionals.md).
-- **Bitwise operators** — tentative; see [bitwise operators](bitwise-operators.md).
+- **Bitwise operators** — the glyphs refuse, naming the methods (ADR 0003); see [bitwise operators](bitwise-operators.md).
 - **Character literals (`?a`)** and flip-flops — perlisms; the seed never learned them and nothing has missed them.
 - **Numbered block parameters (`_1`–`_9`)** — the line noise `it` was invented to replace (ADR 0017). `it` covers one parameter; names cover the rest. The polyfill autocorrects `_1 → it` for free.
 - **Plain and dash heredocs (`<<EOS`, `<<-EOS`) and lowercase terminators** — squiggly `<<~SQL` is the only opener and terminators are SCREAMING_CAPS; see [heredocs](heredocs.md).
@@ -26,7 +26,7 @@ Postfix guards, `unless`, `until`, the postfix loop modifiers, and `loop do` ([A
 
 ## Deferred, not removed
 
-Not yet buildable is different from ruled out. These currently give parse errors and are expected to arrive:
+Unbuilt is different from ruled out. These give parse errors and are expected to arrive:
 
 - **Splats (`*args`, `**kwargs`)** — deferred by ADR 0014, which shipped the rest of Ruby 3's keyword-argument story. Ruby code using them gets a clean parse error until they land.
 - **`&&=`** — undecided on purpose: its maybe personality would silently decide `and`-on-a-maybe semantics, and [ruby_research#2](https://github.com/portlandlang/ruby_research/issues/2) sizes whether the idiom outlived `&.` at all. (`||=` shipped — [ADR 0043](../adr/0043-2026-08-19-or-equals.md).)

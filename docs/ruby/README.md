@@ -15,7 +15,7 @@ Smooth Ruby → Portland migration is a standing design criterion. Two promises 
 - **Cut — the runtime.** Monkeypatching, `method_missing`, runtime `define_method`, `eval`, globals, truthiness, ambient nil, the GIL. The cut-list and the "blocks static safety and speed" list are nearly the same set.
 - **Changed — the ground it stands on.** Portland is ahead-of-time compiled (MLIR/LLVM), statically typed with inferred-not-written types, and runs only on Apple silicon (macOS 27+). Ruby is a portable interpreted VM; Portland is a native binary for one vendor's hardware, on purpose.
 
-`../adr/` records the decisions behind these; [`../language.md`](../language.md) records what Portland speaks today. Where a difference is **Tentative** or merely **Sketched**, its file says so — check the Status line at its top before relying on it.
+`../adr/` records the decisions behind these; [`../language.md`](../language.md) records what Portland speaks. Where a difference is **Tentative** or merely **Sketched**, its file says so — check the Status line at its top before relying on it.
 
 ## Every difference
 
@@ -30,7 +30,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Concurrency](concurrency.md) — No GIL, no `Thread` — one model baked in, spelled `together` / `meanwhile` / `~`.
 - [Constants](constants.md) — `SCREAMING_CASE = value` at the top level is a constant — bound once, computed once, readable from every def and every requiring file; reassigning it refuses instead of warning.
 - [Conversions: `to_i`, `to_f`, `to_s`](conversions.md) — `to_i` and `to_f` are Ruby's lenient readers — leading digits count, garbage is 0 — and `to_s` is universal except on nil; the strict `Integer()` and `Float()` wait for a pull.
-- [Encodings and binary data](encodings.md) — A string is UTF-8 text, always — no encoding tag, so `encoding` answers `Encoding::UTF_8` and `valid_encoding?` is true on every string, `force_encoding` and `encode` have no meaning, and binary data is a different type that does not exist yet; `pack` and `unpack` wait for it.
+- [Encodings and binary data](encodings.md) — A string is UTF-8 text, always — no encoding tag, so `encoding` answers `Encoding::UTF_8` and `valid_encoding?` is true on every string, `force_encoding` and `encode` have no meaning, and binary data is a different type, unbuilt; `pack` and `unpack` wait for it in [#183](https://github.com/portlandlang/portland/issues/183).
 - [Enumerators](enumerators.md) — There are none; a method Ruby answers with a lazy enumerator answers the finished collection here, and `.to_a` on a collection is the identity.
 - [Enums](enums.md) — Ruby has none; Portland's are closed vocabularies of symbol cases, with keyword payloads and checked exhaustiveness.
 - [Equality](equality.md) — `==` and `eql?` migrate unchanged; `hash` and `equal?` do not exist.
@@ -47,7 +47,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Mutability](mutability.md) — Immutable by default; `mutable` marks the exception, and it governs names rather than values.
 - [Namespaces and modules](namespaces.md) — `module` is namespace-only; `::` names and `.` invokes; names are always fully qualified.
 - [nil and optionals](nil-and-optionals.md) — No ambient nil; absence is an explicit maybe; the word is still `nil`.
-- [Numbers: the tower](numbers.md) — A number is an Integer, a Float, a Rational, or a Complex — four builtin values with Ruby's spellings and Ruby's mixing rules — and BigDecimal is a default tile; there is no `Numeric` superclass to inherit from and no coercion protocol yet.
+- [Numbers: the tower](numbers.md) — A number is an Integer, a Float, a Rational, or a Complex — four builtin values with Ruby's spellings and Ruby's mixing rules — and BigDecimal is a default tile; there is no `Numeric` superclass to inherit from and no coercion protocol ([#155](https://github.com/portlandlang/portland/issues/155)).
 - [Ordering](ordering.md) — `<=>` and `include Comparable` migrate unchanged; strings order by canonical text, and `Comparable` is a builtin trait that needs your `<=>` to exist.
 - [Parentheses and ambiguity](parentheses.md) — Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 - [Pattern matching](pattern-matching.md) — `case/in` is compile-checked exhaustive, `===` is static, and captures are fenced.
@@ -59,7 +59,7 @@ Each line is that file's own one-line summary, so the two cannot drift. Adding a
 - [Removed syntax](removed-syntax.md) — `for`, globals, perlisms, and the other deliberate deletions — plus what is merely deferred.
 - [`require` and `require_relative`](requires.md) — `require "name"` searches a load path for `name.pdx` or `name.rb`, and `require_relative` resolves against the requiring file; both take a string literal at a file's top level, since a program is its require closure, known at build.
 - [Sets](sets.md) — `Set` is a builtin immutable value, as it is core in Ruby 4 — `Set.new`, `Set[...]`, and `to_set` build one, `add` and `delete` answer a new one, and the query and algebra surface is Ruby's under its word names.
-- [The standard library](standard-library.md) — Ruby's current shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
+- [The standard library](standard-library.md) — Ruby 4's shape, not its 1.8 one — a language core that needs no `require`, default tiles installed beside `pdx` that are real packages, and external tiles; no bundled tier, no monolithic stdlib.
 - [Static checks: the build refuses what Ruby ships](static-checks.md) — Ruby checks everything at runtime or never; Portland's compiler refuses code that is written wrong, whether or not it would ever run.
 - [`String#count`, `tr`, and character sets](string-count.md) — `count` takes a single character, and `tr`, `tr_s`, `delete`, and `squeeze` read their arguments as lists of literal characters; Ruby's set spellings — ranges, negation, escapes — refuse instead of quietly meaning something else.
 - [String escapes](string-escapes.md) — The escape set is closed — Ruby passes an unknown escape through as its bare character, and Portland refuses it.

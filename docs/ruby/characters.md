@@ -2,7 +2,7 @@
 
 **Summary:** A character is a grapheme cluster and string equality is canonical — `"🇺🇸".length` is 1 and composed `é` equals decomposed `é`, where Ruby counts scalars and compares bytes.
 
-**Status:** decided ([ADR 0038](../adr/0038-2026-08-19-what-a-character-is.md)), built in both oracles. Canonical *search* (`include?`, `index` finding across encodings) is a recorded gap in the ADR, not yet built.
+**Status:** decided ([ADR 0038](../adr/0038-2026-08-19-what-a-character-is.md)), built in both oracles. Canonical *search* (`include?`, `index` finding across encodings) is a recorded gap in the ADR, unbuilt.
 
 ## Ruby
 
@@ -25,4 +25,4 @@
 - ASCII-only code — the overwhelming majority — behaves identically down to the byte. Both divergences are invisible until a string leaves ASCII.
 - Code that counted scalars on purpose (rare, usually encoding-layer work) diverges *silently in values*, not loudly — the one place this ledger's loud-divergence promise bends, because there is no spelling to refuse: `length` is the same method answering the better number. The polyfill linter can flag non-ASCII string literals near `length`/`slice` for review; `codepoints`/`bytes` arrive under their own names when pulled for.
 - The macOS-filename bug class (`filename == typed_name` failing on decomposed input) is fixed rather than migrated: code that worked around it keeps working, code that never knew about it stops being wrong.
-- Canonical search is not yet built: `include?`/`index` still match bytes, so a composed needle misses a decomposed haystack even though the two are `==`. The gap is recorded in the ADR and can only close in the forgiving direction (misses become finds).
+- Canonical search is unbuilt: `include?`/`index` match bytes, so a composed needle misses a decomposed haystack even though the two are `==`. The gap is recorded in the ADR and can only close in the forgiving direction (misses become finds).

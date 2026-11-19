@@ -3,7 +3,7 @@
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 > [!IMPORTANT]
-> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Decided, not yet built](../../docs/language.md#decided-not-yet-built) · [docs/ruby/bitwise-operators.md](../../docs/ruby/bitwise-operators.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/sets.md](../../docs/ruby/sets.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Gone, on purpose, forever](../../docs/language.md#gone-on-purpose-forever) · [docs/ruby/bitwise-operators.md](../../docs/ruby/bitwise-operators.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/sets.md](../../docs/ruby/sets.md).
 
 <!-- /generated -->
 

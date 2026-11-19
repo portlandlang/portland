@@ -22,7 +22,7 @@
 #
 # The reason is required. Three kinds are legitimate and all appear in this
 # repo: Ruby quoted for comparison (the whole `docs/ruby/` ledger), Portland
-# that is decided but not yet built (an ADR's proposed syntax), and
+# that is decided but unbuilt (an ADR's proposed syntax), and
 # deliberately invalid Portland (the never-guess errors, which exist to be
 # refused). Requiring the reason keeps an exemption from being a silent shrug.
 #

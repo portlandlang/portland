@@ -1,6 +1,6 @@
 # Encodings and binary data
 
-**Summary:** A string is UTF-8 text, always — no encoding tag, so `encoding` answers `Encoding::UTF_8` and `valid_encoding?` is true on every string, `force_encoding` and `encode` have no meaning, and binary data is a different type that does not exist yet; `pack` and `unpack` wait for it.
+**Summary:** A string is UTF-8 text, always — no encoding tag, so `encoding` answers `Encoding::UTF_8` and `valid_encoding?` is true on every string, `force_encoding` and `encode` have no meaning, and binary data is a different type, unbuilt; `pack` and `unpack` wait for it in [#183](https://github.com/portlandlang/portland/issues/183).
 
 **Status:** decided ([ADR 0069](../adr/0069-2026-11-03-strings-are-utf-8-always.md), 2026-11-03, out of [#119](https://github.com/portlandlang/portland/issues/119)); `encoding` and `valid_encoding?` built on both implementations; the bytes type is [#183](https://github.com/portlandlang/portland/issues/183).
 

@@ -85,5 +85,5 @@ end
 - **`module Foo::Bar`** — compiles verbatim _and_ behaves less surprisingly than in Ruby, since outer names stay visible. Free tier, and it silently fixes a bug class.
 - **`Foo::bar()` used to call** — compile error, fix is `Foo.bar()`. Free tier autocorrect; the distinction is mechanical.
 - **`include Foo` for namespace convenience** — no equivalent. The fix is to qualify the call sites. Loud, mechanical, but real work in code that leans on it.
-- **`include Foo` for a genuine mixin** — waits on the object-model session; no answer yet either way.
+- **`include Foo` for a genuine mixin** — `Foo` becomes a `trait`, and `include` takes it ([mixins-and-inheritance.md](mixins-and-inheritance.md)).
 - **Deeply nested namespaces** — unaffected. Depth is forced by collision avoidance in any ecosystem (`Nokogiri::XML::Document`, `Aws::S3::Client`), and Portland keeps the path form precisely so those libraries do not pay three indents per file.

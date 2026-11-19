@@ -349,7 +349,8 @@ def locate(node, scope)
 end
 
 # The node kinds a refusal can point at carry their line (the ruling of
-# 2026-09-24: the first token that begins the node); the rest do not yet.
+# 2026-09-24: the first token that begins the node); the rest do not, and
+# #220 gives every kind one.
 def line_of(node)
   case node
   in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode | StructDefNode | EnumDefNode | TraitDefNode | AliasNode | AssignmentNode
@@ -1058,7 +1059,8 @@ end
 # type inside its body, and the ordinary shapes reach a place they could
 # not see. Callers that disagree, a parameter no one passes, an unknown
 # anywhere, a def defined twice, a call with the wrong count — each leaves
-# the parameter at its default's type or unknown, exactly as today.
+# the parameter at its default's type or unknown, exactly as outside run
+# mode.
 
 # [def_name, [[parameter, type]]] for the entry's top-level defs.
 def sharpen_parameters(entry, files)

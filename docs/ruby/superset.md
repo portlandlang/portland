@@ -6,7 +6,7 @@
 
 ## Why this list matters
 
-The [polyfill promise](README.md) grades every difference: _free_ (valid Ruby, same meaning), _gem-supplied_ (valid Ruby grammar, a gem adds the behavior), _locked-until-flip_ (grammar Ruby cannot parse). This page is the third tier's roll call: the forms below are the exact places a Portland file stops being loadable by a Ruby interpreter, and therefore the cost of the flip. Everything not listed here parses under Ruby today.
+The [polyfill promise](README.md) grades every difference: _free_ (valid Ruby, same meaning), _gem-supplied_ (valid Ruby grammar, a gem adds the behavior), _locked-until-flip_ (grammar Ruby cannot parse). This page is the third tier's roll call: the forms below are the exact places a Portland file stops being loadable by a Ruby interpreter, and therefore the cost of the flip. Everything not listed here parses under Ruby.
 
 ## Grammar Ruby refuses, Portland speaks
 

@@ -21,7 +21,7 @@ The same sentence covers a literal past the edge, unary minus of −2⁶³, `abs
 
 Where an approximate answer is fine, the integer becomes a float first: `2.0 ** 100` is `1.2676506002282294e+30`.
 
-**Why 64-bit, and why now.** An ahead-of-time compiler emits one instruction for `i64` addition and a function call with an allocation for a bignum, and Portland's thesis is that the beautiful line is also the fast one (principle 1). Nothing in the compiler, the spec suite, or the gem census has yet pulled for an exact integer past 2⁶³ (principle 6). And waiting is free: because today's answer past the edge is always a refusal, an arbitrary-precision integer added later would turn refusals into answers and change no working program. The record exists so that, if it comes, it comes as an ADR that supersedes [ADR 0070](../adr/0070-2026-11-03-integers-are-64-bit-for-now.md) rather than as a drift.
+**Why 64-bit.** An ahead-of-time compiler emits one instruction for `i64` addition and a function call with an allocation for a bignum, and Portland's thesis is that the beautiful line is also the fast one (principle 1). Nothing in the compiler, the spec suite, or the gem census pulls for an exact integer past 2⁶³ (principle 6). And waiting is free: because the answer past the edge is always a refusal, an arbitrary-precision integer added later would turn refusals into answers and change no working program. The record exists so that, if it comes, it comes as an ADR that supersedes [ADR 0070](../adr/0070-2026-11-03-integers-are-64-bit-for-now.md) rather than as a drift.
 
 ## Migration
 
