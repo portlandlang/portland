@@ -24,7 +24,7 @@
 //! ```
 //!
 //! `start` is the character position the search begins at; `steps` the
-//! baseline, `-` for an error or a case not yet recorded; `pattern` and
+//! baseline, `-` for an error or an unrecorded case; `pattern` and
 //! `text` escape `\` as `\\`, a tab, newline, and carriage return as `\t`,
 //! `\n`, `\r`, and other invisible characters as `\u{hex}`; a text of
 //! `@file:name` is the contents of that file in the same directory.

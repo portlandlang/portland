@@ -4,7 +4,7 @@ A joyous programming language for Apple silicon.
 
 _Close to the metal, on Metal._
 
-**Status:** Stage 0 done, Stage 1 begun. A Rust seed interprets a real slice of the language; Portland's own lexer, parser, and evaluator are written in Portland, and the parser parses itself. There is no compiler yet — see [ROADMAP](ROADMAP.md) for the honest burn-down.
+**Status:** Stage 0 done, Stage 1 begun. A Rust seed interprets a real slice of the language; Portland's own lexer, parser, and evaluator are written in Portland, and the parser parses itself. Nothing emits a binary; the back end is [#5](https://github.com/portlandlang/portland/issues/5) — see [ROADMAP](ROADMAP.md) for the honest burn-down.
 
 ## The question
 
@@ -20,7 +20,7 @@ Programmer happiness first. Job one is the joy of reading and writing the code �
 
 Most of Ruby's felt joy is its _surface_ — blocks as prose, everything-is-an-expression, implicit returns, no ceremony — and that part survives static compilation untouched. Most of Ruby's pain lives in its _runtime_. So: keep how it reads, replace what it does underneath.
 
-This runs today:
+This runs:
 
 ```ruby
 def greeting(name)
@@ -58,7 +58,7 @@ end
 - **Immutable by default, and values never mutate.** `mutable` marks the rare exception, and it governs _names_, not values — so two names can never spook each other through a shared buffer.
 - **No truthiness.** Conditions take booleans. There is no nil to be falsy, so there is nothing to be clever about.
 - **Never guess.** Where one spelling has two honest readings, Portland refuses and shows you both with their rewrites, rather than resolving it with a whitespace rule nobody can recite.
-- **Concurrency you don't manage.** Declare independence and the runtime spreads work across P and E cores, the GPU, and the matrix unit — safe _because_ values are immutable. (Designed; not yet built.)
+- **Concurrency you don't manage.** Declare independence and the runtime spreads work across P and E cores, the GPU, and the matrix unit — safe _because_ values are immutable. (Designed; unbuilt — [#13](https://github.com/portlandlang/portland/issues/13) carries it.)
 - **Self-hosted early.** A tiny Rust seed, deleted on purpose once Portland can compile itself.
 
 ## Where to go from here
@@ -72,7 +72,7 @@ end
 | [**ADRs**](docs/adr/)                    | the decision log, one file per decision                         |
 | [**ROADMAP**](ROADMAP.md)                | what's done, what's dropped, what's coming                      |
 | [**CHANGELOG**](CHANGELOG.md)            | what changed, newest first                                      |
-| [**History**](docs/history/)             | dated writing, frozen — never current, never a source of truth  |
+| [**History**](docs/history/)             | dated writing, frozen — never updated, never a source of truth  |
 
 Try it with `script/console a_file.pdx`, or `script/console` alone for a REPL. Portland targets **macOS 27+ on Apple silicon** and nothing else, on purpose.
 

@@ -3,7 +3,7 @@
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 > [!IMPORTANT]
-> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [language.md: The library, so far](../../docs/language.md#the-library-so-far) · [architecture.md: Guest values the compiler cannot spell](../../docs/architecture.md#guest-values-the-compiler-cannot-spell) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/symbols.md](../../docs/ruby/symbols.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [language.md: Symbols and enums](../../docs/language.md#symbols-and-enums) · [language.md: The library](../../docs/language.md#the-library) · [architecture.md: Guest values the compiler cannot spell](../../docs/architecture.md#guest-values-the-compiler-cannot-spell) · [docs/ruby/percent-literals.md](../../docs/ruby/percent-literals.md) · [docs/ruby/removed-syntax.md](../../docs/ruby/removed-syntax.md) · [docs/ruby/symbols.md](../../docs/ruby/symbols.md).
 
 <!-- /generated -->
 

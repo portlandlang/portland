@@ -21,5 +21,5 @@ No `require` — JSON is core ([standard-library.md](standard-library.md)). Thre
 
 - `JSON.parse(text)`, `JSON.parse(text, symbolize_names: true)`, `JSON.generate(value)`, `JSON.pretty_generate(value)` — port verbatim, same text — _free_. Drop the `require "json"` ([#116](https://github.com/portlandlang/portland/issues/116) says what it does meanwhile).
 - `rescue JSON::ParserError` — becomes `or` / `case/in` on the failure ([errors.md](errors.md)): `document = JSON.parse(text) or return failure(:bad_json)`.
-- `value.to_json` — not yet; write `JSON.generate(value)`. `JSON.dump`/`load`, `object_class:`, `max_nesting:` — not yet, each its own pull.
+- `value.to_json` — no spelling; write `JSON.generate(value)`. `JSON.dump`/`load`, `object_class:`, `max_nesting:` — unbuilt, each its own pull.
 - A struct passed to `generate` — refuses; give it a `to_h` and generate that. A bignum in a document — a failure; the document needs a string there.

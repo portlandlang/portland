@@ -3417,7 +3417,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 self.module_path.pop();
                 None
             }
-            // `together do ... end` (ADR 0029): serial today, and the oracle
+            // `together do ... end` (ADR 0029): serial, and the oracle
             // the parallel build must match on everything promised. Task
             // expressions run in line order; names bind at the join; nothing
             // unwinds across it; no outer mutable moves inside a task.

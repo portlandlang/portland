@@ -6,7 +6,7 @@
 
 ## Ruby
 
-`require "foo/bar"` searches `$LOAD_PATH` for `foo/bar.rb` (or a native `.so`/`.bundle`), loads it once, and answers true the first time and false after; `require_relative` resolves against the requiring file. The argument may be any expression, the call may sit anywhere — inside a method as lazy loading, inside a `rescue LoadError` as a feature probe — and a missing file raises `LoadError` at the moment it runs. RubyGems extends `require` to activate a gem whose `lib/` holds the name; Bundler narrows the path to the Gemfile's gems.
+`require "foo/bar"` searches `$LOAD_PATH` for `foo/bar.rb` (or a native `.so`/`.bundle`), loads it once, and answers true the first time and false after; `require_relative` resolves against the requiring file. The argument may be any expression, the call may sit anywhere — inside a method as lazy loading, inside a `rescue LoadError` as a feature probe — and a missing file raises `LoadError` when it runs. RubyGems extends `require` to activate a gem whose `lib/` holds the name; Bundler narrows the path to the Gemfile's gems.
 
 ## Portland
 

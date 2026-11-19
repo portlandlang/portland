@@ -2751,7 +2751,7 @@ impl<'source> Parser<'source> {
 
     /// Ruby's splat parameters (#135) are deferred, not refused for good
     /// (ADR 0014); until they land, the parse names the deferral and the
-    /// shapes that exist today.
+    /// shapes that exist.
     fn refuse_splat_parameter(&self) {
         if let Some(token) = self.tokens.get(self.position)
             && matches!(token.kind, TokenKind::Star | TokenKind::StarStar)

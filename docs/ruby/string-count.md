@@ -44,5 +44,5 @@ A character is a grapheme, as for `count`, so the two differ from Ruby only arou
 
 - Single-character `count` — the overwhelmingly common case — migrates verbatim, same answer.
 - `tr`, `tr_s`, `delete`, and `squeeze` with plain character lists migrate verbatim. A range or a negation refuses naming its `gsub`; `tr("a-z", "A-Z")` is `upcase`.
-- Multi-character `count` fails loudly with the explanation above; the migrating author decides whether they meant the set (rare, and usually a surprise to them) or a substring count (rewrite when the name exists; today, `split` or a loop).
+- Multi-character `count` fails loudly with the explanation above; the migrating author decides whether they meant the set (rare, and usually a surprise to them) or a substring count (which has no name of its own; rewrite with `split` or a loop).
 - Tier: _free_ for single characters; _gem-supplied_ lint for the rest — a linter can flag every multi-character `count` in valid Ruby before the flip.

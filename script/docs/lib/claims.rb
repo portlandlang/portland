@@ -15,7 +15,7 @@ end
 
 def prose_files
   tracked(["'*.md'"]).reject do |path|
-    path == "CHANGELOG.md" || path.start_with?("docs/history/", "docs/adr/0")
+    path == "CHANGELOG.md" || path.start_with?("docs/history/", "docs/adr/0") || path.include?("/fixtures/")
   end
 end
 
@@ -25,18 +25,31 @@ def comment_files
   end
 end
 
-# [text, line number] pairs: prose outside code fences, and comments in code.
+# A comment's text: Rust's `//`, and elsewhere a `#` that starts the line or
+# follows a space — so `"#{name}"` inside a string, or `#` inside a Rust
+# string literal, is not mistaken for one.
+def comment_text(path, line)
+  return line[%r{//+\s?(.*)}, 1] if path.end_with?(".rs")
+
+  line[/(?:\A|\s)#(?![!{])\s?(.*)/, 1]
+end
+
+# [text, line number] pairs: prose outside code fences and generated
+# sections, and comments in code.
 def claims(path)
   lines = read_lines("#{REPO}/#{path}")
   if path.end_with?(".md")
     inside = false
+    generated = false
     lines.each_with_index.filter_map do |line, index|
       inside = !inside if line.lstrip.start_with?("```")
-      [line, index + 1] unless inside
+      generated = true if line.include?(GENERATED_BEGIN)
+      generated = false if line.include?(GENERATED_END)
+      [line, index + 1] unless inside || generated
     end
   else
     lines.each_with_index.filter_map do |line, index|
-      comment = line[%r{(?://|#)(?!!)(.*)}, 1]
+      comment = comment_text(path, line)
       [comment, index + 1] if comment
     end
   end

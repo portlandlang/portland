@@ -6,7 +6,7 @@ What Portland _is_ — syntax, rules, style — lives in [language.md](language.
 
 Portland is being bootstrapped. That single fact explains most of the layout: there are two implementations of the language in this repo, one in Rust and one in Portland, and they are not rivals. One is the reference; the other is the future. Keeping them byte-identical is the central discipline of the project.
 
-## The shape today
+## The shape
 
 ```text
 compiler/*.pdx     the compiler — Portland, written in Portland
@@ -16,18 +16,18 @@ seed/  (Rust)      the seed — lexer, parser, tree-walking interpreter, pdx bin
 macOS 27+ / Apple silicon
 ```
 
-The compiler does not emit binaries yet — it checks, then runs programs through its evaluator; the back end (#5) is the missing part. The seed interprets, and the compiler is interpreted _by_ the seed. Everything below the seed is, for now, just the operating system.
+The compiler does not emit binaries — it checks, then runs programs through its evaluator; the back end (#5) is the missing part. The seed interprets, and the compiler is interpreted _by_ the seed. Everything below the seed is just the operating system.
 
-![Three states of the architecture: now, with a fat Rust seed and the compiler interpreted on top of it; next, with the seed retired and a Portland compiler lowering through LLVM to a native binary over a thin Rust floor; and the ideal future, adding inference and heterogeneous dispatch across P/E cores, SME, and the Metal GPU, with FFI and Apple-framework bridges, the Rust floor still thin and shrinking.](architecture.svg)
+![Three states of the architecture: "now", with a fat Rust seed and the compiler interpreted on top of it; next, with the seed retired and a Portland compiler lowering through LLVM to a native binary over a thin Rust floor; and the ideal future, adding inference and heterogeneous dispatch across P/E cores, SME, and the Metal GPU, with FFI and Apple-framework bridges, the Rust floor still thin and shrinking.](architecture.svg)
 
 ## The two kinds of Rust
 
 This distinction is the one to keep straight, because "there's a lot of Rust here" is misleading:
 
 - **The disposable seed** (`seed/`, ~7,900 lines). Crude on purpose. It never has to be good — it has to exist and be correct. It is **deleted at Stage 2** and nothing in it is a commitment.
-- **The permanent-but-shrinking floor** (does not exist yet). Memory, LLVM/MLIR glue, GPU dispatch, syscalls. The irreducible bottom that cannot be written in Portland. The standing design pressure is to push this boundary _down_. Its Portland face is the `System` module ([ADR 0068](adr/0068-2026-10-25-system-is-the-floor-module.md)): a member touches the host or it is not a member, and the share of members still written in Rust is the boundary made into a number.
+- **The permanent-but-shrinking floor** (unbuilt; #5 designs it). Memory, LLVM/MLIR glue, GPU dispatch, syscalls. The irreducible bottom that cannot be written in Portland. The standing design pressure is to push this boundary _down_. Its Portland face is the `System` module ([ADR 0068](adr/0068-2026-10-25-system-is-the-floor-module.md)): a member touches the host or it is not a member, and the share of members still written in Rust is the boundary made into a number.
 
-Almost all the Rust you can see today is the first kind. That is why its crudeness is a non-issue and why adding `rustyline` to it was an easy call — you do not optimize something you plan to delete.
+Almost all the Rust in this repo is the first kind. That is why its crudeness is a non-issue and why adding `rustyline` to it was an easy call — you do not optimize something you plan to delete.
 
 ## The seed
 
@@ -79,13 +79,13 @@ The failure mode this harness has already shown: it stayed green through an enti
 
 ### The oracle relationship is asymmetric, and dated
 
-"The seed is the oracle" is true today and will stop being true, per check, in a predictable way. It is worth writing down before it happens, because the first time it does it will look like a regression.
+"The seed is the oracle" stops being true per check, in a predictable way. It is worth writing down, because each time it does it looks like a regression.
 
 What lives in `compiler/` is not a second implementation kept around for comparison — **it is the language's one real implementation**, at an early stage. Stage 1 grows into Stage 2, and the seed is deleted. So the compiler is expected to overtake the seed, and the first place it does is static analysis: a tree-walking interpreter structurally cannot check exhaustiveness, and a compiler must ([#9](https://github.com/portlandlang/portland/issues/9) inventories the seven deferred checks).
 
 At that point, for a non-exhaustive `case/in`, the seed runs the program and panics at runtime while the compiler refuses to build it. Byte-equivalence breaks — **because the compiler got better**.
 
-So the contract has three states, not two — and as of the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md), 2026-08-11), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the compiler, exactly as this section predicted. A day later ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)) the sentence above stopped being hypothetical too: a `case/in` missing an enum case or leaving an integer gap is refused at build, on the same terms.
+So the contract has three states, not two — and with the checker ([ADR 0034](adr/0034-2026-08-11-the-checker-and-the-oracle-succession.md)), all three exist: an enum typo in a dead branch runs to completion on the seed and refuses to build on the compiler, exactly as this section predicted. A day later ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)) the sentence above stopped being hypothetical too: a `case/in` missing an enum case or leaving an integer gap is refused at build, on the same terms.
 
 |                                 | seed    | compiler         | harness                                                                  |
 | ------------------------------- | ------- | ---------------- | ------------------------------------------------------------------------ |
@@ -101,7 +101,7 @@ Note the overlap window is real rather than theoretical — the order is #9, the
 
 The compiler's parser is **functional** — it holds no mutable per-block state — where the seed's is not. So there are checks the seed can make that the compiler structurally cannot, and where it cannot tell, it **declines to check** rather than checking wrongly.
 
-One rule is currently accepted silently by the compiler and refused by the seed: a nested `it`, which needs the per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. (`it` colliding with a local used to sit beside it, but that one is a *binding* question, and the evaluator catches it at bind time since [#45](https://github.com/portlandlang/portland/issues/45) brought ADR 0001 enforcement hosted — rebinding immutables, double `mutable` declarations, and method shadows all refuse with the seed's wording now.) Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
+One rule is accepted silently by the compiler's build and refused by the seed's parser: a nested `it`, which needs the per-block frames a flat token scan does not have — a scan cannot tell an `it` of _this_ block from one belonging to a block inside it. (`it` colliding with a local is a *binding* question instead, and the evaluator catches it at bind time, where ADR 0001 enforcement runs hosted ([#45](https://github.com/portlandlang/portland/issues/45)) — rebinding immutables, double `mutable` declarations, and method shadows all refuse with the seed's wording.) Everything else reports the seed's wording verbatim, including the never-guess brace menu at both widths.
 
 The related check that _is_ possible — `it` mixed with declared `|parameters|` — works only because it declines to guess whenever the block body opens a block of its own. That is the whole principle in miniature: a gap leaves the compiler incomplete, a false positive would make it unusable, and the seed catches it either way.
 
@@ -109,7 +109,7 @@ The related check that _is_ possible — `it` mixed with declared `|parameters|`
 
 The compiler represents some guest values as **tagged arrays** — `["__struct__", name, pairs]`, `["__symbol__", name]`, `["__enum_case__", name, payload]` — because it cannot construct the host equivalent. They compare and match correctly, and since [#39](https://github.com/portlandlang/portland/issues/39) they _print_ correctly too: the evaluator carries the seed's Display and inspect rules as two Portland walkers (`render` and `render_inspect`), so `puts`, `p`, `to_s`, `join`, and interpolation say what the seed says, tagged shapes included. The representation is the compiler's private business again, which is what a representation should be.
 
-For structs the tags are ordinary crudeness. For symbols they were, for a while, something better: `String#to_sym` did not exist (ADR 0023 §3), cut so that no symbol could be conjured from a name at runtime, and the compiler, holding a symbol's name as text, could not build one either — the decision felt by its own compiler. [ADR 0071](adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md) reversed the cut on 2026-11-03, and `to_sym` was built the same day: the checking that omission bought moves into the checker, as a refusal where a declared vocabulary is expected, and the tag for symbols is ordinary crudeness too now, retirable whenever the compiler cares to call `to_sym`.
+For structs and symbols alike the tags are ordinary crudeness. `String#to_sym` exists ([ADR 0071](adr/0071-2026-11-03-a-symbol-may-be-made-from-text.md)), so the symbol tag is retirable whenever the compiler cares to call it; the checking ADR 0023 §3 had bought by cutting `to_sym` belongs in the checker, as a refusal where a declared vocabulary is expected, and [#200](https://github.com/portlandlang/portland/issues/200) tracks it.
 
 Two rendering divergences are accepted and recorded: the seed asks Unicode whether a symbol is identifier-shaped where the compiler asks an ASCII table, and the seed escapes strings with Rust's debug formatting where the compiler escapes the four sequences Portland strings can spell. No literally-written program has met either edge.
 

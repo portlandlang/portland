@@ -1,5 +1,5 @@
-# `together` (ADR 0029): task names bind at `end` and not before. Serial
-# today, and only the promised semantics are pinned here, so these examples
+# `together` (ADR 0029): task names bind at `end` and not before. Serial,
+# and only the promised semantics are pinned here, so these examples
 # survive the parallel build unchanged.
 
 require_relative "../../spec_helper"

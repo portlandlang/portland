@@ -2,7 +2,7 @@
 
 **Summary:** The escape set is closed — Ruby passes an unknown escape through as its bare character, and Portland refuses it.
 
-**Status:** standing behavior, not yet an ADR — the seed has refused unknown escapes since the first lexer and the compiler was brought into line 2026-08-12; the Ruby-compat argument for pass-through is live and unlitigated, and belongs with the string-semantics ADR ([#75](https://github.com/portlandlang/portland/issues/75)).
+**Status:** standing behavior, with no ADR — both implementations refuse unknown escapes; the Ruby-compat argument for pass-through is live and unlitigated, and [#304](https://github.com/portlandlang/portland/issues/304) carries the escapes beyond the closed set.
 
 ## Ruby
 

@@ -14,7 +14,7 @@
 - **`to_f` is Ruby's**: the longest leading decimal, 0.0 for none, `"-0"` keeping its sign; no base prefixes, no `Infinity`.
 - **`hex` and `oct`** read the same way at their bases.
 - **`to_s` is universal** except on nil, which has no methods ([nil and optionals](nil-and-optionals.md)); a collection's `to_s` is its `inspect` ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)).
-- **`Integer(text)` and `Float(text)`**, the strict forms, do not exist yet; they arrive as type functions ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)) when a port pulls for them.
+- **`Integer(text)` and `Float(text)`**, the strict forms, have no spelling (`'Integer' is not defined`); they arrive as type functions ([ADR 0058](../adr/0058-2026-10-16-builtin-types-carry-type-functions.md)) when a port pulls for them.
 
 ## Formatting: `format`, not `%`
 
@@ -26,4 +26,4 @@ Two differences a Rubyist meets: width and precision on `%s`, `%p`, and `%c` cou
 
 - `params[:page].to_i`, `"3 apples".to_i`, `line.split(",").map { it.to_i }` — port verbatim, same answers.
 - `format(...)` and `sprintf(...)` — port verbatim; `template % values` becomes `format(template, *values)`, a mechanical rewrite, and the `%<name>d` hash form becomes keyword arguments.
-- `Integer(input)` for validation — today, read with `to_i` and check the text yourself, or wait for the type function; `nil.to_i` becomes `value or 0`.
+- `Integer(input)` for validation — read with `to_i` and check the text yourself, or wait for the type function; `nil.to_i` becomes `value or 0`.

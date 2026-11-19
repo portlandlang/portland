@@ -40,4 +40,4 @@ The difference is *when*. Which methods a section marks and who the receiver is 
 
 - `private`, `protected`, `public`, `private def`, and `private_constant` port verbatim; the one change is that a violation stops the build instead of a test run. _Free._
 - `module_function` becomes `def self.` on each method. _Mechanical._
-- `private_class_method` has no spelling yet; the method stays public until a file pulls for it.
+- `private_class_method` has no spelling; the method stays public until a file pulls for it.

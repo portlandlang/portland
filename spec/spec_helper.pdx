@@ -5,8 +5,8 @@
 # other; it cannot prove either agrees with what was *decided*, since a shared
 # misreading of an ADR passes it. Every example cites the ADR it pins.
 #
-# Deliberately tiny, and built only from what the language has today: no
-# classes, no exceptions, and no instance variables — none of which exist yet.
+# Deliberately tiny, and built from defs, structs, and blocks: no exceptions
+# and no instance variables, neither of which the language has.
 #
 # The shape is rubyspec's, which `yield` is what made possible: `describe`
 # names a subject, `specify` an example, `expect` compares. Nothing here counts
@@ -36,7 +36,7 @@ require_relative "expectations/expectation"
 # `negated_failure_message` — structural, not declared. Nothing checks that a
 # matcher supplies all three until it is asked for one; type inference (#9)
 # is what turns the convention into a checked shape, and a `trait` cannot do
-# it today because each matcher's `matches?` is its own.
+# it because each matcher's `matches?` is its own.
 #
 # Every matcher carries at least one field, because a struct needs one. That
 # is not a workaround here: the field a stateless matcher would not have

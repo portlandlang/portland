@@ -2,7 +2,7 @@
 
 **Summary:** Command calls, the no-shadow rule, and never-guess errors instead of whitespace heuristics.
 
-**Status:** decided and built — this is in the seed and the Portland compiler today (see [the language](../language.md#methods-and-calls)).
+**Status:** decided and built — this is in the seed and the Portland compiler (see [the language](../language.md#methods-and-calls)).
 
 ## Ruby
 
@@ -66,11 +66,11 @@ expecting {name: 1}
 
 Not accepted as a hash, even though that is the only reading the grammar admits, because `foo { ... }` would then mean a block for most bodies and a hash argument for pair-shaped ones. Nothing is lost: `foo name: 1` already passes keyword arguments.
 
-## `it` (ADR 0017 — decided, not yet built)
+## `it` (ADR 0017 — decided and built)
 
 Ruby 3.4's `it` is a soft keyword: a local or method named `it` silently wins over the block parameter. Portland makes `it` an ordinary binding under the no-shadow rule — `nodes.map { it.sexp }` just works; naming anything else `it` in the same reach is a rename-one compile error; `it` nested under a block that also uses `it` is shadowing, so it errors ("name your parameters"); `it` alongside declared `|parameters|` errors (Ruby agrees). Wherever `it` compiles, it has exactly one possible meaning.
 
-Numbered parameters (`_1`–`_9`) are out — see [removed syntax](removed-syntax.md). The polyfill autocorrects `_1 → it` for free (both are valid Ruby today).
+Numbered parameters (`_1`–`_9`) are out — see [removed syntax](removed-syntax.md). The polyfill autocorrects `_1 → it` for free (both are valid Ruby 3.4).
 
 ## Migration (brace blocks)
 

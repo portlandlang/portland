@@ -93,7 +93,7 @@ Four rules, all checkable:
 - **Every doc names its reader**, in a line under the title. A doc written for everyone is written for nobody.
 - **No fact has two homes.** Where a doc needs a fact it does not own, it links. Every duplicated sentence is a future contradiction, and this repo has already produced several.
 - **High level outside, detail as you zoom in.** README is the widest view; each link goes one level deeper and never repeats the level above at the same detail.
-- **A doc that is not current says so, at the top.** Frozen writing is safe to keep — it can only be old, never wrong. Frozen writing linked as if it were a plan is neither.
+- **A doc that is not kept up to date says so, at the top.** Frozen writing is safe to keep — it can only be old, never wrong. Frozen writing linked as if it were a plan is neither.
 
 Decisions get an ADR, not a paragraph in a brief. Issues discuss; ADRs decide. Changes get a CHANGELOG entry the day they land.
 

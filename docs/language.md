@@ -2,7 +2,7 @@
 
 **For:** anyone reading or writing Portland — what it is, what the rules are, and how it's meant to be written.
 
-Everything here **runs today**, unless a section says otherwise. Run it with `script/console a_file.pdx`, or line by line with `script/console` and no arguments.
+Everything here **runs**, unless a section says otherwise. Run it with `script/console a_file.pdx`, or line by line with `script/console` and no arguments.
 
 How it's built underneath is [architecture.md](architecture.md). Why each rule is the way it is lives in [ADRs](adr/); what it costs a Rubyist lives in [docs/ruby/](ruby/).
 
@@ -224,7 +224,7 @@ Struct patterns are **keyword-only**, and `text:` on its own binds a name of the
 
 Builtin type patterns are `in String`, `Integer`, `Array`, `Hash`, `Boolean`. **The type predicate is a pattern, not a reflection API** — `is_a?` and `.class` do not exist.
 
-No match and no `else` panics on the seed. On the compiler that is now a **build** refusal wherever the arms say what the whole set is ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)): all-range arms claim the integers, and one payload-carrying arm names its enum. Range patterns count toward totality — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`; overlap is legal, first match wins, and a gap is named (`case/in leaves 10..19 uncovered`). Arms that can never fire — below a bare capture, or below a case already matched whole — are refused too. Everything the checker cannot yet reason about stays silent rather than demanding an `else`, and widens when inference lands ([#9](https://github.com/portlandlang/portland/issues/9)).
+No match and no `else` panics on the seed. On the compiler that is a **build** refusal wherever the arms say what the whole set is ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)): all-range arms claim the integers, and one payload-carrying arm names its enum. Range patterns count toward totality — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`; overlap is legal, first match wins, and a gap is named (`case/in leaves 10..19 uncovered`). Arms that can never fire — below a bare capture, or below a case already matched whole — are refused too. Everything the checker cannot reason about stays silent rather than demanding an `else`; widening it is [#220](https://github.com/portlandlang/portland/issues/220).
 
 Hash patterns and the find pattern (`in [*, x, *]`) are deliberately not built; they wait to be pulled for.
 
@@ -355,7 +355,7 @@ There are no generated predicates and no `Status.all`: an enum is a type, not a 
 
 `require_relative "lexer"` — resolved against the requiring file's directory, `.pdx` implied, loaded once and returning false on a repeat. A required file gets the scope a method call gets: its defs, structs, enums, traits, and namespace constants cross into the requirer, and bare locals do not, in either direction ([#95](https://github.com/portlandlang/portland/issues/95)). A require is not a paste.
 
-## The library, so far
+## The library
 
 Read-only, and small on purpose.
 
@@ -390,11 +390,11 @@ Emerging rather than settled — this section describes how the compiler is actu
 - **Keyword arguments at struct construction**, which the language requires, and increasingly at call sites where a bare positional would be a mystery at the call site.
 - **Ask, don't guess.** When you write a construct with two readings, the compiler will make you disambiguate. Reach for the parens rather than learning which way it would have gone — there is no which-way to learn.
 
-Open, and not yet ruled on: whether `or`/`and` or `||`/`&&` is preferred prose when they are dead-identical, and how much to lean on postfix guards. Both wait on more real Portland to look at.
+Open, and unruled: whether `or`/`and` or `||`/`&&` is preferred prose when they are dead-identical, and how much to lean on postfix guards. Both wait on more real Portland to look at.
 
 ## Concurrency
 
-Three tiers, and you will live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` will spread across cores when it is worth it and you never asked. **Tier two runs today** — serially, with its semantics decided and pinned, so the eventual scheduler must match it (ADR 0029):
+Three tiers, and you will live almost entirely in the first: implicit parallelism, safe _because_ values are immutable, where `photos.map { it.thumbnail }` will spread across cores when it is worth it and you never asked. **Tier two runs** — serially, with its semantics decided and pinned, so the eventual scheduler must match it (ADR 0029):
 
 ```ruby
 together do
@@ -404,20 +404,16 @@ end
 render(user, orders)                # plain values after end
 ```
 
-The rules are the language's rules, applied: task names bind **at the `end`** and not before, so nothing can read a result that is not there yet; a task cannot see a sibling's name, because independence is the declaration; a failed task binds its `failure` to its name, handled after the join with the toolkit — siblings always run to completion; nothing unwinds across the join (`return`, `break`, `!` inside a task refuse); a task cannot rebind an outer `mutable`, which is safe-because-immutable as a rule rather than a slogan; and `together` produces nothing, its answer being the names. Plain lines interleave freely, their locals dying at `end`. Cross-task effect ordering is deliberately unpromised — that is the room the scheduler will live in.
+The rules are the language's rules, applied: task names bind **at the `end`** and not before, so nothing can read a result before it exists; a task cannot see a sibling's name, because independence is the declaration; a failed task binds its `failure` to its name, handled after the join with the toolkit — siblings always run to completion; nothing unwinds across the join (`return`, `break`, `!` inside a task refuse); a task cannot rebind an outer `mutable`, which is safe-because-immutable as a rule rather than a slogan; and `together` produces nothing, its answer being the names. Plain lines interleave freely, their locals dying at `end`. Cross-task effect ordering is deliberately unpromised — that is the room the scheduler will live in.
 
 Tier three — cancellation, timeouts, racing — is future work, rare by design.
 
-## Decided, not yet built
+## Undesigned
 
-- **Bitwise operators are out** (ADR 0003, tentative), with named methods instead.
-
-## Not yet designed
-
-Compile-time macros (#14), the `%` literal zoo (#29), string semantics beyond what Rust's choices gave the seed by accident, and types themselves (#9). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it), error handling stopped being on this list on 2026-07-27 (ADR 0027), visibility on 2026-11-03 (ADR 0076, built 2026-11-06), and regex on 2026-11-07 (ADR 0086: Ruby's literals, Onigmo's patterns over the seed's own port of Onigmo, a match is a `MatchData` or nil; built on both implementations the same day).
+Compile-time macros ([#14](https://github.com/portlandlang/portland/issues/14)). Inheritance is not deferred but **declined** (ADR 0028 chose traits over it).
 
 ## Gone, on purpose, forever
 
-Monkeypatching and open classes. `method_missing`. Runtime `define_method`. `eval`. Globals and `$specials`. Truthiness. Ambient nil and `NilClass`. The GIL and the `Thread` API. `for`, `BEGIN`/`END`, flip-flops, and the `and`/`or` precedence trick. `fetch`. Force-unwrap operators and `if let`-style binding conditionals. Numbered block parameters. In-place mutators.
+Monkeypatching and open classes. `method_missing`. Runtime `define_method`. `eval`. Globals and `$specials`. Truthiness. Ambient nil and `NilClass`. The GIL and the `Thread` API. `for`, `BEGIN`/`END`, flip-flops, and the `and`/`or` precedence trick. `fetch`. Force-unwrap operators and `if let`-style binding conditionals. Numbered block parameters. In-place mutators. The bitwise operator glyphs, whose operations are named methods (ADR 0003).
 
 Runtime metaprogramming's replacement is compile-time macros, which are undesigned. Everything else on this list is simply not coming back — see [docs/ruby/removed-syntax.md](ruby/removed-syntax.md) for what each one costs a migrating codebase, and how loudly it fails.
