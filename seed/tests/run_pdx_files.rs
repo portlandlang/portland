@@ -4,27 +4,17 @@ use std::process::Command;
 
 /// A coarse wall-clock tripwire (#32), not a benchmark (#25 is that).
 ///
-/// `parses_the_whole_compiler_including_itself` once grew to 31.5s of a 33s
-/// suite without anything noticing: `parser.pdx` got longer, `<<` was
-/// quadratic, and no single commit looked slow. Nothing in the suite carried
-/// a performance signal, so a test could get 10× slower and stay green.
+/// Without it nothing in the suite carries a performance signal: an
+/// accidental quadratic grows a test several times slower across commits
+/// that each look harmless, and the suite stays green.
 ///
 /// The ceiling is deliberately loose. It exists to catch the *next* accidental
 /// quadratic — which announces itself in multiples, not percentages — and a
 /// tripwire that flakes gets deleted, at which point there is no signal at all.
-///
-/// Calibration, measured rather than guessed. When set (2026-07-24) the
-/// self-parse ran in ~6s locally and took 32.7s on the `macos-26` runner
-/// *before* the RC-exact append fix (#34), when it cost 29.7s locally — CI
-/// within ~10% of a dev machine, and 20s roughly 3× headroom. Recalibrated
-/// 2026-10-25 (#180): `parser.pdx` had grown from 1,961 to 3,453 lines, the
-/// self-parse to 12.8s locally and 22–30s on the runner, which now runs
-/// about 2× a dev machine, and the 20s ceiling failed seven of ten runs in
-/// a day, three of them docs-only commits. The ceiling went to 45s for a
-/// day; then the dev profile went to `opt-level = 1` (Cargo.toml, #180) and
-/// the self-parse fell to 2.0s locally, so every case is back under one
-/// 20s ceiling with roughly 5× headroom on the runner — the 5× regression
-/// that prompted the tripwire would fire again.
+/// So it sits at several times the slowest case's time on the CI runner, which
+/// is slower than a dev machine: loose enough not to flake there, tight enough
+/// that a 5× regression fires. Measured, not guessed; how it was calibrated
+/// is #32 and #180.
 fn within_seconds<T>(limit: u64, label: &str, work: impl FnOnce() -> T) -> T {
     let started = std::time::Instant::now();
     let result = work();

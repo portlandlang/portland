@@ -2,9 +2,9 @@
 #
 # Usage: pdx spec/run_specs.pdx <spec_helper.pdx> <a_spec.pdx> [more...]
 #
-# What a hosted spec pays for is not the compiler — loading that is 0.02s — it is
+# What a hosted spec pays for is not loading the compiler, which is quick, but
 # `spec_helper.pdx`, which every spec re-requires into its own fresh scope:
-# 0.40s of the 0.42s, once per file, a hundred-odd times. This driver
+# nearly all of a spec's time, once per file. This driver
 # evaluates the harness once and hands each spec a scope that starts from it.
 #
 # Sharing the harness is safe where sharing a spec's own scope would not be.

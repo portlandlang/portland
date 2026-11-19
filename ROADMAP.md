@@ -72,8 +72,8 @@ One page, one line per item. Details live behind the links — [ADRs](docs/adr/)
 - ✅ Zed support v0 — [zed-portland](https://github.com/portlandlang/zed-portland) ([#24](https://github.com/portlandlang/portland/issues/24))
 - ✅ Git hooks tracked in `script/hooks`; `script/docs/check` gating doc discipline, `script/docs/generate` building every index
 - ✅ Markdown linting via `mdl`, rules in `script/docs/lib/markdownlint.rb` ([#31](https://github.com/portlandlang/portland/issues/31); `overcommit` declined on the merits)
-- ✅ **RC-exact `<<`** — appends update in place when unshared; the self-parse test went 32.7s → 7.2s on CI ([#34](https://github.com/portlandlang/portland/issues/34))
-- ✅ A 20s wall-clock tripwire on every test that shells out to `pdx` ([#32](https://github.com/portlandlang/portland/issues/32))
+- ✅ **RC-exact `<<`** — appends update in place when unshared, which took the self-parse test from quadratic to linear ([#34](https://github.com/portlandlang/portland/issues/34))
+- ✅ A wall-clock tripwire on every test that shells out to `pdx` ([#32](https://github.com/portlandlang/portland/issues/32))
 - ✅ `pdx --parse`, and a doc check that every code sample parses as Portland ([#35](https://github.com/portlandlang/portland/issues/35))
 
 ## Coming ⬜

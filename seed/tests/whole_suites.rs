@@ -8,28 +8,20 @@ use std::process::Command;
 
 /// A coarse wall-clock tripwire (#32), not a benchmark (#25 is that).
 ///
-/// `parses_the_whole_compiler_including_itself` once grew to 31.5s of a 33s
-/// suite without anything noticing: `parser.pdx` got longer, `<<` was
-/// quadratic, and no single commit looked slow. Nothing in the suite carried
-/// a performance signal, so a test could get 10× slower and stay green.
+/// Without it nothing in the suite carries a performance signal: an
+/// accidental quadratic grows a test several times slower across commits
+/// that each look harmless, and the suite stays green.
 ///
 /// The ceiling is deliberately loose. It exists to catch the *next* accidental
 /// quadratic — which announces itself in multiples, not percentages — and a
 /// tripwire that flakes gets deleted, at which point there is no signal at all.
 ///
-/// Calibration, measured rather than guessed: this case runs in ~6s locally
-/// and took 32.7s on the `macos-26` runner *before* the RC-exact append fix
-/// (#34), when it cost 29.7s locally. So CI is within ~10% of a dev machine
-/// here, and a 20s ceiling is roughly 3× headroom that still would have fired
-/// on the regression that prompted this.
-///
 /// The ceiling is per example rather than per batch — counted off the `- `
 /// line the harness prints for each — because the batch grows with every
-/// ruby/spec port, and a flat number was raised three times in one day
-/// (120s, 130s, 150s) without anything getting slower. Only the evaluator
-/// getting slower moves this one. Measured 2026-10-16: 0.15s an example
-/// hosted over about a thousand examples, no file an outlier; 0.3s is 2×
-/// headroom, and an accidental quadratic announces itself in multiples.
+/// ruby/spec port, and a flat number had to be raised for every port without
+/// anything getting slower. Only the evaluator getting slower moves this one.
+/// It sits at about twice the measured hosted time an example, no file an
+/// outlier; how it was calibrated is #32 and #180.
 fn within_seconds_per_example(
     limit: f64,
     label: &str,
@@ -146,9 +138,9 @@ fn the_language_spec_passes_on_both_oracles() {
     assert!(!specs.is_empty(), "no *_spec.pdx files found under spec/");
 
     // The hosted half runs once for the whole suite. What a hosted spec costs
-    // is not the compiler — loading that is 0.02s — but `spec_helper.pdx`,
-    // re-parsed into every spec's fresh scope at 0.40s a time; run_specs.pdx
-    // parses the harness once and shares it (#69). The ceiling is so much
+    // is not loading the compiler, which is quick, but `spec_helper.pdx`
+    // re-parsed into every spec's fresh scope; run_specs.pdx parses the
+    // harness once and shares it (#69). The ceiling is so much
     // an example, so a port that grows the batch moves it along.
     let batch = within_seconds_per_example(0.3, "language spec, hosted", || {
         Command::new(env!("CARGO_BIN_EXE_pdx"))

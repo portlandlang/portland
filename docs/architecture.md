@@ -113,11 +113,9 @@ For structs the tags are ordinary crudeness. For symbols they were, for a while,
 
 Two rendering divergences are accepted and recorded: the seed asks Unicode whether a symbol is identifier-shaped where the compiler asks an ASCII table, and the seed escapes strings with Rust's debug formatting where the compiler escapes the four sequences Portland strings can spell. No literally-written program has met either edge.
 
-## One known cost
+## Appending without copying
 
-`<<` is rebinding sugar (ADR 0015), and the seed implements it by cloning: appending to an array copies the whole array. Parsing 1,961 lines of Portland with the Portland parser therefore costs on the order of 200 million element copies, and that single test is 31.5 seconds of a 33-second suite. It is why the git hooks split — `pre-commit` runs the fast gate, `pre-push` runs everything.
-
-This is not a semantics problem, it is a naive implementation of correct semantics. At refcount 1 the old array is dead and can be mutated in place, which is exactly what reference-count exactness buys (#34, on the road to #12).
+`<<` is rebinding sugar (ADR 0015): `list << item` binds `list` to a new array with `item` on the end. The seed appends in place when the old array is unshared — at refcount 1 it is dead, so mutating it is unobservable — and copies only when another binding still holds it (`Rc::make_mut`). That is what reference-count exactness buys (#34, on the road to #12), and it is why the compiler parsing its own source is not quadratic.
 
 ## The bootstrap ladder
 

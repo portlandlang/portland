@@ -6,7 +6,7 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 ## Read in this order
 
-1. **[docs/principles.md](docs/principles.md)** — the eleven rules that settle arguments, in precedence order. Read before deciding anything. Several exist because we broke them once, and the file says which.
+1. **[docs/principles.md](docs/principles.md)** — the rules that settle arguments, in precedence order. Read before deciding anything. Several exist because we broke them once, and the file says which.
 1. **[ROADMAP.md](ROADMAP.md)** — where we are and what's next.
 1. **[docs/language.md](docs/language.md)** — what Portland speaks today.
 1. **[docs/architecture.md](docs/architecture.md)** — the seed, the compiler, and the contract between them.
@@ -35,13 +35,13 @@ This file is orientation and conventions only. It deliberately summarizes nothin
 
 **Single quotes for a string that interpolates nothing and escapes only a quote.** Ruby's own preference, and the specs are where it shows: an expected value that is itself quoted text — JSON, an `inspect` rendering, a refusal's sentence — reads `'"sym"'`, never `"\"sym\""`. Double quotes stay for interpolation and for the escapes single quotes cannot spell (`\n`, `\t`). The repo has no `rubocop.yml`; this list is the style guide, and this is its first entry about how Portland itself is written ([#206](https://github.com/portlandlang/portland/issues/206)).
 
-**Adding, removing, or renaming a builtin in the seed changes the method table.** The checker's shape 2 and contract check read each builtin receiver's method set from the table in `compiler/inference.pdx`, which is derived from the seed's behavior, not from its Rust: run `script/probe_builtin_methods`, paste its eight lines over the table, and commit the two together. The seed reads the same eight lines at build (`seed/src/builtins.rs`) for its own wordings, so the table has one home; `script/check_builtin_table` diffs it against a fresh probe and runs in CI whenever the seed, the table, or the probe changed. The table retires with the seed at Stage 3, when the stdlib becomes Portland source.
+**Adding, removing, or renaming a builtin in the seed changes the method table.** The checker's shape 2 and contract check read each builtin receiver's method set from the table in `compiler/inference.pdx`, which is derived from the seed's behavior, not from its Rust: run `script/probe_builtin_methods`, paste its lines over the table, and commit the two together. The seed reads the same eight lines at build (`seed/src/builtins.rs`) for its own wordings, so the table has one home; `script/check_builtin_table` diffs it against a fresh probe and runs in CI whenever the seed, the table, or the probe changed. The table retires with the seed at Stage 3, when the stdlib becomes Portland source.
 
 ## Writing that stays true
 
 Prose goes stale when it says something the code later stops doing and nothing notices. These rules apply to docs, code comments, spec headers, manifest reasons, issues, and PR bodies ([#288](https://github.com/portlandlang/portland/issues/288)).
 
-**Never name a count or an exact timing.** Not lines of code, spec examples, spec files, open issues, manifest entries, or checks, and not "0.02s" or "15ms". A count is true for one commit. An approximate timing that makes a point ("about a minute") is fine.
+**Never name a count or an exact timing.** Not lines of code, spec examples, spec files, open issues, manifest entries, or checks, and not "0.02s" or "15ms". A count is true for one commit. An approximate timing that makes a point ("about a minute") is fine. `script/docs/check counts_and_timings` flags a written-out number of files, lines, examples, rows, issues, or entries, and an exact timing; spelled-out numbers are left to you.
 
 **No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; [#291](https://github.com/portlandlang/portland/issues/291) tracks it", not "doesn't work yet".
 

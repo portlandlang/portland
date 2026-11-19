@@ -114,8 +114,8 @@ workloads.each do |path|
   rows << [name, ruby_seconds, direct_seconds, hosted_seconds]
 end
 
-# MRI's own startup is most of a small bench's Ruby time — about 40ms
-# against the seed's 4ms — so it is measured and shown, and the ratio is
+# MRI's own startup is most of a small bench's Ruby time — far more than the
+# seed's — so it is measured and shown, and the ratio is
 # given to two places rather than rounded to a flattering 0x.
 ruby_floor = ruby_startup_seconds
 
