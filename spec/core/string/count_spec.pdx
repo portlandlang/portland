@@ -1,6 +1,6 @@
 # From ruby/spec core/string/count_spec.rb.
 #
-# The rows Portland's spec held; the rest of the file is not yet ported.
+# What stays upstream, and why, is this file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 
