@@ -222,7 +222,7 @@ end
 
 Struct patterns are **keyword-only**, and `text:` on its own binds a name of the same name. Captures bind and persist as in Ruby, fenced by no-shadow. One-line forms: `expression in pattern` is a boolean that binds on a hit, and `expression => pattern` destructures rightward and panics on mismatch — which is also the answer to destructuring assignment.
 
-Builtin type patterns are `in String`, `Integer`, `Array`, `Hash`, `Boolean`. **The type predicate is a pattern, not a reflection API** — `is_a?` and `.class` do not exist.
+Builtin type patterns are `in String`, `Integer`, `Array`, `Hash`, `Boolean`. **The type predicate is a pattern, not a reflection API** — `is_a?` does not exist, and `.class` answers the type ([ADR 0074](adr/0074-2026-11-03-class-answers-the-type.md)).
 
 No match and no `else` panics on the seed. On the compiler that is a **build** refusal wherever the arms say what the whole set is ([ADR 0035](adr/0035-2026-08-12-exhaustiveness-over-what-the-arms-reveal.md)): all-range arms claim the integers, and one payload-carrying arm names its enum. Range patterns count toward totality — sorted integer ranges with a beginless first, an endless last, and no gaps are total, and need no `else`; overlap is legal, first match wins, and a gap is named (`case/in leaves 10..19 uncovered`). Arms that can never fire — below a bare capture, or below a case already matched whole — are refused too. Everything the checker cannot reason about stays silent rather than demanding an `else`; widening it is [#220](https://github.com/portlandlang/portland/issues/220).
 

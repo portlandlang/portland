@@ -4491,8 +4491,8 @@ language/order_spec.rb:
   link: docs/ruby/mutability.md
 language/predefined/:
   status: skipped
-  reason: "DATA, __END__, and TOPLEVEL_BINDING are the predefined globals and bindings, removed with the runtime dynamism."
-  link: docs/ruby/removed-syntax.md
+  reason: "TOPLEVEL_BINDING goes with binding, which a closed runtime does not have; DATA and __END__ are unruled, #360."
+  link: https://github.com/portlandlang/portland/issues/360
 language/private_spec.rb:
   pdx: [spec/language/private_spec.pdx]
   status: partial_intentional
