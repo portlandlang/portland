@@ -59,3 +59,14 @@ context "String#gsub with a string pattern" do
     expect("éa".gsub("é", "â")).to eq("âa")
   end
 end
+
+context "String#gsub with pattern and a hash" do
+  specify "replace each match with the hash value its text looks up" do
+    expect("hello".gsub(/[el]/, {"e" => "ee", "l" => "ll"})).to eq("heellllo")
+    expect("hello world".gsub(/o/, {"o" => "0"})).to eq("hell0 w0rld")
+  end
+
+  specify "replace a match no key holds with nothing" do
+    expect("hello".gsub(/o/, {"x" => "y"})).to eq("hell")
+  end
+end
