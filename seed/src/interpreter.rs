@@ -7988,6 +7988,36 @@ impl<W: std::io::Write> Interpreter<W> {
                 result.push_str(&text[copied_to..]);
                 Value::String(result)
             }
+            // A hash replacement with a string pattern looks the match up
+            // the same way a Regexp pattern's does (#311).
+            (
+                Value::String(text),
+                "sub" | "gsub",
+                [Value::String(pattern), Value::Hash(replacement)],
+            ) => {
+                let mut result = String::new();
+                let mut copied_to = 0;
+                for (start, end) in matched_spans(text, pattern, name == "gsub") {
+                    result.push_str(&text[copied_to..start]);
+                    let matched = Value::String(text[start..end].to_string());
+                    let text_of = replacement
+                        .iter()
+                        .find(|(key, _)| *key == matched)
+                        .map_or_else(String::new, |(_, value)| value.to_string());
+                    result.push_str(&text_of);
+                    copied_to = end;
+                }
+                result.push_str(&text[copied_to..]);
+                Value::String(result)
+            }
+            (Value::String(_), "sub" | "gsub", [pattern, replacement])
+                if matches!(pattern, Value::Regex(_) | Value::String(_)) =>
+            {
+                panic!(
+                    "no implicit conversion of {} into String",
+                    replacement.type_name()
+                )
+            }
             (Value::String(_), "sub" | "gsub", [other, _]) => panic!(
                 "wrong argument type {} (expected Regexp)",
                 other.type_name()

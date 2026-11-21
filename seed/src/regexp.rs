@@ -613,6 +613,37 @@ pub fn replace(text: &str, pattern: &Rc<Pattern>, replacement: &str, all: bool) 
     result
 }
 
+/// `sub`/`gsub` with a hash replacement: each match's text looked up, the
+/// value's `to_s` as the text, a match no key holds replaced with nothing,
+/// as Ruby's is.
+pub fn replace_with_hash(
+    text: &str,
+    pattern: &Rc<Pattern>,
+    replacement: &[(Value, Value)],
+    all: bool,
+) -> String {
+    let mut result = String::new();
+    let mut copied_to = 0;
+    let matches = if all {
+        pattern.all(text)
+    } else {
+        pattern.search(text).into_iter().collect()
+    };
+    for found in matches {
+        let (start, end) = found.span(0).expect("a match has a whole");
+        result.push_str(&text[copied_to..start]);
+        let matched = Value::String(found.matched().to_string());
+        let text_of = replacement
+            .iter()
+            .find(|(key, _)| *key == matched)
+            .map_or_else(String::new, |(_, value)| value.to_string());
+        result.push_str(&text_of);
+        copied_to = end;
+    }
+    result.push_str(&text[copied_to..]);
+    result
+}
+
 /// `scan`: each match's text, or an array of its groups when it has any.
 pub fn scan_values(text: &str, pattern: &Rc<Pattern>) -> Vec<Value> {
     pattern
@@ -935,6 +966,16 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
             "sub" | "gsub",
             [Value::Regex(pattern), Value::String(replacement)],
         ) => Some(Value::String(replace(
+            text,
+            pattern,
+            replacement,
+            name == "gsub",
+        ))),
+        (
+            Value::String(text),
+            "sub" | "gsub",
+            [Value::Regex(pattern), Value::Hash(replacement)],
+        ) => Some(Value::String(replace_with_hash(
             text,
             pattern,
             replacement,

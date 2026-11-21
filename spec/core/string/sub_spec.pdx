@@ -38,3 +38,14 @@ context "String#sub with pattern, replacement" do
     expect("a\nb".sub(/a.b/m, "X")).to eq("X")
   end
 end
+
+context "String#sub with pattern and a hash" do
+  specify "replace the match with the hash value its text looks up" do
+    expect("hello".sub(/[el]/, {"e" => "ee", "l" => "ll"})).to eq("heello")
+    expect("hello".sub(/[aeiou]/, {"e" => 3})).to eq("h3llo")
+  end
+
+  specify "replace a match no key holds with nothing" do
+    expect("hello".sub(/o/, {"x" => "y"})).to eq("hell")
+  end
+end
