@@ -4519,13 +4519,10 @@ language/regexp/back-references_spec.rb:
 language/regexp/character_classes_spec.rb:
   pdx: [spec/language/regexp/character_classes_spec.pdx]
   status: partial_planned
-  reason: "The passing class, POSIX-bracket, and property rows are #323's to port; the rows that spell characters with \\u, \\0, and \\x escapes wait on #304, the /u rows on #321, and the eval rows stay behind."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The rows that spell characters with \\u, \\0, \\x, \\f, and \\v escapes wait on #304, the /u rows on #321, and the eval rows stay behind."
+  link: https://github.com/portlandlang/portland/issues/304
 language/regexp/empty_checks_spec.rb:
   pdx: [spec/language/regexp/empty_checks_spec.pdx]
-  status: partial_planned
-  reason: "Every row passes; the ones not in the pdx spec are #323's to port."
-  link: https://github.com/portlandlang/portland/issues/323
 language/regexp/encoding_spec.rb:
   status: skipped
   reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
