@@ -13,3 +13,13 @@ context "Complex#rectangular" do
     expect(Complex(3, 4).rectangular).to eq([3, 4])
   end
 end
+
+context "Complex.rectangular" do
+  describe "when passed a Complex" do
+    specify "ignores the imaginary part if it is zero" do
+      result = Complex.rectangular(1.0 + 0i, 2 + 0.0i)
+      expect(result.real).to eq(1.0)
+      expect(result.imag).to eq(2)
+    end
+  end
+end

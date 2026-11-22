@@ -4,6 +4,8 @@
 
 require_relative "../../spec_helper"
 
+TOLERANCE = 0.00003
+
 context "Complex.polar" do
   specify "comes from polar and rectangular coordinates" do
     expect(inspect(Complex.polar(1, Math::PI))).to eq("(-1+0.0i)")
@@ -12,5 +14,19 @@ context "Complex.polar" do
 
   specify "abs, abs2, arg, polar" do
     expect(Complex(3, 4).polar).to eq([5.0, 0.9272952180016122])
+  end
+
+  specify "computes the real values of the real & imaginary parts from the polar form" do
+    quarter = Complex.polar(1.0 + 0.0i, Math::PI / 2 + 0.0i)
+    expect(quarter.real).to be_close(0.0, TOLERANCE)
+    expect(quarter.imag).to be_close(1.0, TOLERANCE)
+    expect(quarter.real.real?).to be_true
+    expect(quarter.imag.real?).to be_true
+
+    whole = Complex.polar(1 + 0.0i)
+    expect(whole.real).to be_close(1.0, TOLERANCE)
+    expect(whole.imag).to be_close(0.0, TOLERANCE)
+    expect(whole.real.real?).to be_true
+    expect(whole.imag.real?).to be_true
   end
 end
