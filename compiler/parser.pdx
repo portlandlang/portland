@@ -3491,11 +3491,30 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || type_constant_at?(tokens, position) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
+  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || type_constant_at?(tokens, position) || (position < tokens.length && tokens[position].identifier?)
     if type_constant_at?(tokens, position)
       constant = parse_type_constant(tokens, position)
       constants << constant.node
       position = skip_newlines_at(tokens, constant.position)
+    elsif tokens[position].identifier? && !visibility_word?(tokens[position].text)
+      # A field after an include or a nested type (#302): fields sit
+      # anywhere before the first method — the seed's rule, in its
+      # sentences and its order of asking.
+      if tokens[position].text != "attr_reader" && position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1])
+        return Step.new(node: error_node("'#{tokens[position].text} #{tokens[position + 1].text}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def"), position: position + 1)
+      end
+      unless methods.empty? && type_functions.empty?
+        return Step.new(node: error_node("fields come before methods in struct #{name}"), position: position + 1)
+      end
+      if tokens[position].text == "attr_reader"
+        declared = parse_attr_reader(tokens, position + 1, name)
+        return declared if declared.node in ErrorNode
+        fields += declared.node
+        position = skip_newlines_at(tokens, declared.position)
+      else
+        fields << tokens[position].text
+        position = skip_newlines_at(tokens, position + 1)
+      end
     elsif tokens[position].identifier?
       marker = parse_visibility_marker(tokens, position)
       return marker if marker.node in ErrorNode

@@ -1630,6 +1630,23 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A struct's fields sit anywhere before its first method (#302): after an
+/// `include` or a nested type on both oracles, and a field after a def
+/// refuses on both in one sentence.
+#[test]
+fn a_structs_fields_may_follow_an_include_or_a_nested_type() {
+    assert_both_print(
+        "fields_after_include.pdx",
+        "trait Basic\n  def greet = \"hi\"\nend\nstruct Child\n  first\n  include Basic\n  second\n  enum Kind\n    :small\n  end\n  attr_reader :third\nend\nchild = Child.new(first: 1, second: 2, third: 3)\nputs child.greet\nputs child.first + child.second + child.third\n",
+        "hi\n6\n",
+    );
+    let cases = [(
+        "struct Child\n  def greet = \"hi\"\n  name\nend\n",
+        "fields come before methods in struct Child",
+    )];
+    assert_both_oracles_refuse("field_after_method.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
