@@ -7988,6 +7988,60 @@ impl<W: std::io::Write> Interpreter<W> {
                 result.push_str(&text[copied_to..]);
                 Value::String(result)
             }
+            // A hash replacement (#311): each match's text is looked up and
+            // its value's `to_s` written; a match no key holds is replaced
+            // with nothing, Ruby's rule, and a nil value refuses as nil's
+            // `to_s` does.
+            (
+                Value::String(text),
+                "sub" | "gsub",
+                [
+                    pattern @ (Value::Regex(_) | Value::String(_)),
+                    Value::Hash(replacement),
+                ],
+            ) => {
+                let spans: Vec<(usize, usize)> = match pattern {
+                    Value::Regex(pattern) => {
+                        let matches = if name == "gsub" {
+                            pattern.all(text)
+                        } else {
+                            pattern.search(text).into_iter().collect()
+                        };
+                        matches
+                            .iter()
+                            .map(|found| found.spans[0].expect("a match has a whole"))
+                            .collect()
+                    }
+                    Value::String(needle) => matched_spans(text, needle, name == "gsub"),
+                    _ => unreachable!(),
+                };
+                let mut result = String::new();
+                let mut copied_to = 0;
+                for (start, end) in spans {
+                    result.push_str(&text[copied_to..start]);
+                    let matched = Value::String(text[start..end].to_string());
+                    if let Some((_, value)) = replacement.iter().find(|(key, _)| *key == matched) {
+                        if matches!(value, Value::Nil) {
+                            panic!("nil has no method 'to_s' — handle the nil case first");
+                        }
+                        result.push_str(&value.to_string());
+                    }
+                    copied_to = end;
+                }
+                result.push_str(&text[copied_to..]);
+                Value::String(result)
+            }
+            // A pattern beside a replacement that is neither text nor a
+            // hash: the replacement is the argument at fault, in Ruby's
+            // words.
+            (
+                Value::String(_),
+                "sub" | "gsub",
+                [Value::Regex(_) | Value::String(_), replacement],
+            ) => panic!(
+                "no implicit conversion of {} into String",
+                replacement.type_name()
+            ),
             (Value::String(_), "sub" | "gsub", [other, _]) => panic!(
                 "wrong argument type {} (expected Regexp)",
                 other.type_name()

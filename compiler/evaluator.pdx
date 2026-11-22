@@ -2027,6 +2027,18 @@ def joined_guest(values, separator)
   rendered.join(separator)
 end
 
+# A `sub` or `gsub` replacement as the host is to read it (#311). A hash's
+# values go over as their `to_s`, since the host would
+# write a guest symbol's or struct's representation; a nil value goes over
+# as nil, so it refuses only where a match looks it up, as on the seed.
+def replacement_for_host(replacement)
+  return replacement unless replacement in Hash
+  pairs = replacement.map do |key, value|
+    [key, value.nil? ? nil : render(value)]
+  end
+  pairs.to_h
+end
+
 # A line for `puts` and `warn`: Ruby's rule, a text already ending in a
 # newline gets no second one.
 def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
@@ -3546,8 +3558,8 @@ def evaluate_method_call(node, mutable bindings)
     arguments.empty? ? receiver.unicode_normalized? : receiver.unicode_normalized?(host_symbol(value_at(arguments, 0)))
   # A symbol may be made from text (ADR 0071): the guest's tagged shape.
   when "to_sym", "intern" then ["__symbol__", receiver]
-  when "sub" then receiver.sub(value_at(arguments, 0), value_at(arguments, 1))
-  when "gsub" then receiver.gsub(value_at(arguments, 0), value_at(arguments, 1))
+  when "sub" then receiver.sub(value_at(arguments, 0), replacement_for_host(value_at(arguments, 1)))
+  when "gsub" then receiver.gsub(value_at(arguments, 0), replacement_for_host(value_at(arguments, 1)))
   # A pattern's questions (ADR 0086), on a string, a symbol's name, or the
   # pattern itself: the host's own, a match being a host value.
   when "=~" then host_text(receiver) =~ host_text(value_at(arguments, 0))

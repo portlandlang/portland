@@ -55,3 +55,28 @@ context "String#sub with pattern, replacement" do
     expect("a\nb".sub(/a.b/m, "X")).to eq("X")
   end
 end
+
+context "String#sub with pattern and Hash" do
+  specify "returns a copy of self with the first occurrence of pattern replaced with the value of the corresponding hash key" do
+    expect("hello".sub(/./, {"l" => "L"})).to eq("ello")
+    expect("hello!".sub(/(.)(.)/, {"he" => "she ", "ll" => "said"})).to eq("she llo!")
+    expect("hello".sub("l", {"l" => "el"})).to eq("heello")
+  end
+
+  specify "removes keys that don't correspond to matches" do
+    expect("hello".sub(/./, {"z" => "b", "o" => "ow"})).to eq("ello")
+  end
+
+  specify "ignores non-String keys" do
+    expect("tattoo".sub(/(tt)/, {"tt" => "b", tt: "z"})).to eq("taboo")
+  end
+
+  specify "uses a key's value as many times as needed" do
+    expect("food".sub(/o/, {"o" => "0"})).to eq("f0od")
+  end
+
+  specify "coerces the hash values with #to_s" do
+    expect("food!".sub(/o/, {"o" => 0})).to eq("f0od!")
+    expect("food!".sub(/!/, {"!" => :bang})).to eq("foodbang")
+  end
+end
