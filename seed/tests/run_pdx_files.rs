@@ -969,6 +969,20 @@ fn portland_evaluator_matches_the_seed_on_exponents() {
     );
 }
 
+/// Coverage over a Boolean subject refuses only a provable gap (#365, ADR
+/// 0035 §1): arms that take true and false between them pass, by literal,
+/// alternative, capture, or the type's name; an arm whose reach the checker
+/// cannot read, a pin, leaves the question open; and a Boolean? subject's
+/// present case is covered by a true arm and a false arm together.
+#[test]
+fn boolean_coverage_stays_silent_where_no_gap_is_provable() {
+    assert_both_print(
+        "boolean_coverage_silent.pdx",
+        "flag = 1 < 2\ncase flag\nin true then puts \"yes\"\nin false then puts \"no\"\nend\ncase flag\nin Boolean then puts \"named\"\nend\ncase flag\nin true | false => both then puts both\nend\ncase flag\nin _ then puts \"any\"\nend\npinned = true\ncase flag\nin ^pinned then puts \"pinned\"\nend\ncase flag\nin true then puts \"else\"\nelse puts \"other\"\nend\ntop = [true, false].first\ncase top\nin nil then puts \"none\"\nin true then puts \"present yes\"\nin false then puts \"present no\"\nend\n",
+        "yes\nnamed\ntrue\nany\npinned\nelse\npresent yes\n",
+    );
+}
+
 /// The checker (#9, ADR 0034): the first place the compiler overtakes the seed.
 /// Each case is a program the seed runs to completion — the offending line
 /// is dead code — and the compiler refuses at build. Nothing to compare, and
@@ -1103,6 +1117,33 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "top = [1].first\ncase top\nin 1 then puts \"one\"\nend\n",
             "one\n",
             "case/in does not cover nil — add the arm, or an else",
+        ),
+        // Coverage widened by inference (#365): a subject inference knows
+        // to be a Boolean is true or false, so arms that reveal no set
+        // still leave a provable gap. The seed runs each on the value
+        // its arm takes.
+        (
+            "flag = 1 < 2\ncase flag\nin true then puts \"yes\"\nend\n",
+            "yes\n",
+            "case/in does not cover false — add the arm, or an else",
+        ),
+        (
+            // A guarded arm covers nothing (ADR 0035 §4).
+            "flag = 1 > 2\ncase flag\nin true if flag then puts \"guarded\"\nin false then puts \"no\"\nend\n",
+            "no\n",
+            "case/in does not cover true — add the arm, or an else",
+        ),
+        (
+            "flag = 1 < 2\ncase flag\nin 1 then puts \"one\"\nin nil then puts \"none\"\nin _ if flag then puts \"guarded\"\nend\n",
+            "guarded\n",
+            "case/in does not cover true, false — add the arm, or an else",
+        ),
+        (
+            // A Boolean? subject: nil is taken, and the present case is
+            // true or false, so the one left out is named.
+            "top = [true, false].first\ncase top\nin nil then puts \"none\"\nin true then puts \"yes\"\nend\n",
+            "yes\n",
+            "case/in does not cover false — add the arm, or an else",
         ),
         // ADR 0048's call-site refusal: a call hands a def what its body
         // cannot use. The calls that satisfy their contracts run first.
