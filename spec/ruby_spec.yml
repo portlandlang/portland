@@ -3459,7 +3459,7 @@ core/string/reverse_spec.rb:
 core/string/rindex_spec.rb:
   pdx: [spec/core/string/rindex_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp rows are #323's to port; a Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
+  reason: "The passing Regexp rows are #323's to port; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
   link: https://github.com/portlandlang/portland/issues/323
 core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
