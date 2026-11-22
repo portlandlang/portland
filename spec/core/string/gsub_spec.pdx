@@ -31,6 +31,23 @@ context "String#gsub with pattern and replacement" do
     expect("hello".gsub("l", '<\&>')).to eq("he<l><l>o")
   end
 
+  specify "replaces \\+ with the last paren that actually matched" do
+    greeting = "hello!"
+
+    expect(greeting.gsub(/(.)(.)/, '\+')).to eq("el!")
+    expect(greeting.gsub(/(.)(.)+/, '\+')).to eq("!")
+    expect(greeting.gsub(/(.)()/, '\+')).to eq("")
+    expect(greeting.gsub(/(.)(.{20})?/, '<\+>')).to eq("<h><e><l><l><o><!>")
+
+    letters = "ABCDEFGHIJKLabcdefghijkl"
+    twelve = /#{"(.)" * 12}/
+    expect(letters.gsub(twelve, '\+')).to eq("Ll")
+  end
+
+  specify "treats \\+ as an empty string if there was no captures" do
+    expect("hello!".gsub(/./, '\+')).to eq("")
+  end
+
   specify "hand the block the matched text" do
     expect("hello world".gsub(/\w+/) { |word| word.capitalize }).to eq("Hello World")
     expect("a1b2".gsub(/\d/) { |digit| (digit.to_i * 2).to_s }).to eq("a2b4")
