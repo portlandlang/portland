@@ -7712,7 +7712,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // `start_with?` and `end_with?` take any number of candidates and
             // answer whether one matches, as Ruby's do; a candidate that is
             // not a string refuses in Ruby's words.
-            (Value::String(text), "end_with?", suffixes) if !suffixes.is_empty() => {
+            (Value::String(text), "end_with?", suffixes) => {
                 Value::Boolean(suffixes.iter().any(|suffix| match suffix {
                     Value::String(suffix) => text.ends_with(suffix.as_str()),
                     other => panic!(
@@ -7752,7 +7752,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "split", [Value::String(separator), Value::Integer(limit)]) => {
                 split_value(text, Some(separator), *limit)
             }
-            (Value::String(text), "start_with?", prefixes) if !prefixes.is_empty() => {
+            (Value::String(text), "start_with?", prefixes) => {
                 Value::Boolean(prefixes.iter().any(|prefix| match prefix {
                     Value::String(prefix) => text.starts_with(prefix.as_str()),
                     other => panic!(

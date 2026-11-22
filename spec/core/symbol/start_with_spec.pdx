@@ -24,4 +24,8 @@ context "Symbol#start_with?" do
   specify "works for multibyte strings" do
     expect(:"céréale".start_with?("cér")).to eq(true)
   end
+
+  specify "answers false when given no candidates" do
+    expect(:hello.start_with?()).to be_false
+  end
 end

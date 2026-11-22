@@ -20,4 +20,8 @@ context "Symbol#end_with?" do
     expect(:hello.end_with?("")).to eq(true)
     expect(:"".end_with?("")).to eq(true)
   end
+
+  specify "answers false when given no candidates" do
+    expect(:hello.end_with?()).to be_false
+  end
 end

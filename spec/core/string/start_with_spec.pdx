@@ -40,4 +40,8 @@ context "String#start_with?" do
     expect("hello".start_with?(/l/)).to be_false
     expect("hello".start_with?("x", /h/)).to be_true
   end
+
+  specify "answers false when given no candidates" do
+    expect("hello".start_with?()).to be_false
+  end
 end
