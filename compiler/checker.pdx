@@ -329,8 +329,38 @@ def check_requires(nodes, inside, scope, mutable found)
   found
 end
 
-def declarations_of(nodes)
+def declarations_of(written)
+  nodes = with_guarded_definitions(written)
   Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
+end
+
+# A def under a top-level condition or loop is defined when that statement
+# runs (ADR 0090), which the checker cannot know. It declares what a
+# top-level def declares, each one listed after the statement that holds
+# it, so a call to it reads as a call to a defined method.
+def with_guarded_definitions(nodes)
+  mutable declaring = []
+  nodes.each do |node|
+    declaring << node
+    declaring += guarded_definitions(node)
+  end
+  declaring
+end
+
+def guarded_definitions(node)
+  held = guarded_statements(node)
+  mutable definitions = []
+  held.each do |statement|
+    definitions << statement if statement in DefNode
+    definitions += guarded_definitions(statement)
+  end
+  definitions
+end
+
+def guarded_statements(node)
+  return (node.then_body or []) + (node.else_body or []) if node in IfNode
+  return node.body if node in WhileNode
+  []
 end
 
 def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
