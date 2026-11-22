@@ -3415,8 +3415,8 @@ core/string/ljust_spec.rb:
 core/string/lstrip_spec.rb:
   pdx: [spec/core/string/lstrip_spec.pdx]
   status: partial_planned
-  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, the NUL rows on #304 and #344, and Ruby 4's character-selector argument on #344."
-  link: https://github.com/portlandlang/portland/issues/344
+  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, and Ruby 4's character-selector argument on #398; the NUL rows are spelled with 0.chr."
+  link: https://github.com/portlandlang/portland/issues/398
 core/string/match_spec.rb:
   pdx: [spec/core/string/match_spec.pdx]
   status: partial_intentional
@@ -3471,8 +3471,8 @@ core/string/rpartition_spec.rb:
 core/string/rstrip_spec.rb:
   pdx: [spec/core/string/rstrip_spec.pdx]
   status: partial_planned
-  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, the NUL rows on #304 and #344, and Ruby 4's character-selector argument on #344."
-  link: https://github.com/portlandlang/portland/issues/344
+  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, and Ruby 4's character-selector argument on #398; the NUL rows are spelled with 0.chr."
+  link: https://github.com/portlandlang/portland/issues/398
 core/string/scan_spec.rb:
   pdx: [spec/core/string/scan_spec.pdx]
   status: partial_intentional
@@ -3511,8 +3511,8 @@ core/string/string_spec.rb:
 core/string/strip_spec.rb:
   pdx: [spec/core/string/strip_spec.pdx]
   status: partial_planned
-  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, the NUL rows on #304 and #344, and Ruby 4's character-selector argument on #344."
-  link: https://github.com/portlandlang/portland/issues/344
+  reason: "The bang forms stay upstream (ADR 0015) with the subclass, encoding, and to_str rows (ADR 0028, ADR 0069, ADR 0036); the \\v escape waits on #304, and Ruby 4's character-selector argument on #398; the NUL rows are spelled with 0.chr."
+  link: https://github.com/portlandlang/portland/issues/398
 core/string/sub_spec.rb:
   pdx: [spec/core/string/sub_spec.pdx]
   status: partial_planned

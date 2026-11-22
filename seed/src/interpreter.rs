@@ -1945,6 +1945,12 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
 /// into the same string with the same separator, as Ruby's is. A nil
 /// element refuses as interpolating one does, since nil has no `to_s`
 /// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
+/// What `strip`, `lstrip`, and `rstrip` take off an end: whitespace, and
+/// NUL, which Ruby counts with it.
+fn strippable(character: char) -> bool {
+    character.is_whitespace() || character == '\0'
+}
+
 fn joined(elements: &[Value], separator: &str) -> String {
     elements
         .iter()
@@ -7993,9 +7999,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 other.type_name()
             ),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
-            (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
-            (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),
-            (Value::String(text), "rstrip", []) => Value::String(text.trim_end().to_string()),
+            // NUL strips with the whitespace, as in Ruby (#344).
+            (Value::String(text), "strip", []) => {
+                Value::String(text.trim_matches(strippable).to_string())
+            }
+            (Value::String(text), "lstrip", []) => {
+                Value::String(text.trim_start_matches(strippable).to_string())
+            }
+            (Value::String(text), "rstrip", []) => {
+                Value::String(text.trim_end_matches(strippable).to_string())
+            }
             // One trailing line ending comes off — `\r\n` as a unit, else one
             // `\n` or `\r` — and a string without one passes through whole.
             (Value::String(text), "chomp", []) => {
