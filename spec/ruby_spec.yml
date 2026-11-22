@@ -1025,7 +1025,7 @@ core/float/quo_spec.rb:
 core/float/ceil_spec.rb:
   pdx: [spec/core/float/ceil_spec.pdx]
   status: partial_planned
-  reason: "A precision argument refuses (#331); integers are 64-bit, so the rows past 2⁶³ stay upstream; the plain row passes and is #349's to port."
+  reason: "A precision argument refuses (#331); integers are 64-bit, so the rows past 2⁶³ stay upstream."
   link: https://github.com/portlandlang/portland/issues/331
 core/float/comparison_spec.rb:
   pdx: [spec/core/float/comparison_spec.pdx]
@@ -1038,24 +1038,21 @@ core/float/divide_spec.rb:
   reason: "No coercion protocol (#155); the Rational row's denominator, 10**19, is past 64 bits."
 core/float/finite_spec.rb:
   pdx: [spec/core/float/finite_spec.pdx]
-  status: partial_planned
-  reason: "The negative-infinity and NaN rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
 core/float/floor_spec.rb:
   pdx: [spec/core/float/floor_spec.pdx]
   status: partial_planned
-  reason: "A precision argument refuses (#331); integers are 64-bit, so the rows past 2⁶³ stay upstream; the plain row passes and is #349's to port."
+  reason: "A precision argument refuses (#331); integers are 64-bit, so the rows past 2⁶³ stay upstream."
   link: https://github.com/portlandlang/portland/issues/331
 core/float/gt_spec.rb:
   pdx: [spec/core/float/gt_spec.pdx]
   status: partial_planned
-  reason: "The ordinary, NaN, and infinity rows pass and are #349's to port; a non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
+  link: https://github.com/portlandlang/portland/issues/155
 core/float/gte_spec.rb:
   pdx: [spec/core/float/gte_spec.pdx]
   status: partial_planned
-  reason: "The ordinary, NaN, and infinity rows pass and are #349's to port; a non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
+  link: https://github.com/portlandlang/portland/issues/155
 core/float/infinite_spec.rb:
   pdx: [spec/portland/number/float/predicates_spec.pdx]
   status: partial_intentional
@@ -1064,13 +1061,13 @@ core/float/infinite_spec.rb:
 core/float/lt_spec.rb:
   pdx: [spec/core/float/lt_spec.pdx]
   status: partial_planned
-  reason: "The ordinary, NaN, and infinity rows pass and are #349's to port; a non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
+  link: https://github.com/portlandlang/portland/issues/155
 core/float/lte_spec.rb:
   pdx: [spec/core/float/lte_spec.pdx]
   status: partial_planned
-  reason: "The ordinary, NaN, and infinity rows pass and are #349's to port; a non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A non-number operand refuses where Ruby raises, coerce waits on #155, and bignum operands stay upstream since integers are 64-bit."
+  link: https://github.com/portlandlang/portland/issues/155
 core/float/minus_spec.rb:
   pdx: [spec/core/float/minus_spec.pdx]
   status: partial_intentional
@@ -1088,7 +1085,7 @@ core/float/plus_spec.rb:
 core/float/round_spec.rb:
   pdx: [spec/core/float/round_spec.pdx]
   status: partial_planned
-  reason: "A precision argument and the half: modes refuse (#331); NaN and infinity refuse where Ruby raises FloatDomainError, and results past 2⁶³ stay upstream; the nearest-Integer rows pass and are #349's to port."
+  reason: "A precision argument and the half: modes refuse (#331); NaN and infinity refuse where Ruby raises FloatDomainError, and results past 2⁶³ stay upstream."
   link: https://github.com/portlandlang/portland/issues/331
 core/float/to_s_spec.rb:
   pdx: [spec/core/float/to_s_spec.pdx]
@@ -1098,7 +1095,7 @@ core/float/to_s_spec.rb:
 core/float/truncate_spec.rb:
   pdx: [spec/core/float/truncate_spec.pdx]
   status: partial_planned
-  reason: "A precision argument refuses (#331); NaN refuses where Ruby raises FloatDomainError, and integers are 64-bit, so 2⁶³ stays upstream; the plain row passes and is #349's to port."
+  reason: "A precision argument refuses (#331); NaN refuses where Ruby raises FloatDomainError, and integers are 64-bit, so 2⁶³ stays upstream."
   link: https://github.com/portlandlang/portland/issues/331
 core/float/zero_spec.rb:
   pdx: [spec/core/float/zero_spec.pdx]
