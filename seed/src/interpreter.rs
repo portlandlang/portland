@@ -1941,22 +1941,6 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
     elements.iter().take(parameters.len()).cloned().collect()
 }
 
-/// `join` (#104): each element as `to_s` renders it, a nested array joined
-/// into the same string with the same separator, as Ruby's is. A nil
-/// element refuses as interpolating one does, since nil has no `to_s`
-/// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
-fn joined(elements: &[Value], separator: &str) -> String {
-    elements
-        .iter()
-        .map(|element| match element {
-            Value::Array(inner) => joined(inner, separator),
-            Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
-            other => other.to_string(),
-        })
-        .collect::<Vec<_>>()
-        .join(separator)
-}
-
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
 /// while they last; from the first float — or a float init — the rest go
 /// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
@@ -5963,7 +5947,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -5998,7 +5982,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6915,10 +6899,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // No separator joins with nothing between, as Ruby's does (#142),
             // and a nil one is none (#104).
             (Value::Array(elements), "join", [] | [Value::Nil]) => {
-                Value::String(joined(elements, ""))
+                Value::String(self.joined(elements, ""))
             }
             (Value::Array(elements), "join", [Value::String(separator)]) => {
-                Value::String(joined(elements, separator))
+                Value::String(self.joined(elements, separator))
             }
             (Value::Array(elements), "last", []) => {
                 elements.last().cloned().map_or(Value::Nil, Value::present)
@@ -8071,7 +8055,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         .count() as i64,
                 )
             }
-            (receiver, "to_s", []) => Value::String(receiver.to_string()),
+            (receiver, "to_s", []) => Value::String(self.rendered(receiver)),
             // `between?` and `clamp` (ADR 0054): on anything `<=>` orders.
             (receiver, "between?", [low, high]) if orderable(receiver) => {
                 let above_low = self.ordering_of(receiver, low) >= 0;
@@ -9079,6 +9063,54 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// A value as source, the way `p` and `inspect` show it (#285): a
+    /// struct that defines `inspect` renders by it wherever it sits — an
+    /// element, a hash key or value, a set member, another struct's field —
+    /// and everything else takes `Value::inspect`'s form.
+    fn inspected(&mut self, value: &Value) -> String {
+        value.inspect_with(&mut |inner| self.own_rendering(inner, "inspect"))
+    }
+
+    /// A value as text, the way `puts`, `to_s`, `join`, and interpolation
+    /// show it (#285): a struct's own `to_s` when it defines one. A
+    /// collection's `to_s` is its `inspect` (ADR 0060), and a struct
+    /// without a `to_s` shows its fields, so the values inside either
+    /// render by their own `inspect`.
+    fn rendered(&mut self, value: &Value) -> String {
+        if let Some(own) = self.own_rendering(value, "to_s") {
+            return own;
+        }
+        match value {
+            Value::Struct { .. } => {
+                value.inspect_inside_with(&mut |inner| self.own_rendering(inner, "inspect"))
+            }
+            Value::Array(_)
+            | Value::EnumCase { .. }
+            | Value::Failure(_)
+            | Value::Hash(_)
+            | Value::Set(_)
+            | Value::Some(_) => self.inspected(value),
+            other => other.to_string(),
+        }
+    }
+
+    /// `join` (#104): each element as `to_s` renders it, a nested array
+    /// joined into the same string with the same separator, as Ruby's is.
+    /// A nil element refuses as interpolating one does, since nil has no
+    /// `to_s` (ADR 0005) — Ruby's silent "" would be the one place nil
+    /// rendered.
+    fn joined(&mut self, elements: &[Value], separator: &str) -> String {
+        let mut parts = Vec::with_capacity(elements.len());
+        for element in elements {
+            parts.push(match element {
+                Value::Array(inner) => self.joined(inner, separator),
+                Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
+                other => self.rendered(other),
+            });
+        }
+        parts.join(separator)
+    }
+
     /// Evaluate an expression that must produce a value.
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
@@ -9358,9 +9390,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // Ruby's rule: a line already ending in a newline gets no
                 // second one.
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_output(&format!("{text}{newline}"))
                     .expect("failed to write output");
@@ -9381,9 +9411,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "print got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 self.emit_standard_output(&text)
                     .expect("failed to write output");
             }
@@ -9447,9 +9475,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "warn got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(line, "to_s")
-                    .unwrap_or_else(|| line.to_string());
+                let text = self.rendered(line);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_error(&format!("{text}{newline}"));
             }
@@ -9481,9 +9507,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // `pp` is `p` here: there is no pretty-printer to defer to (#185).
         if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
-                let inspected = self
-                    .own_rendering(argument, "inspect")
-                    .unwrap_or_else(|| argument.inspect());
+                let inspected = self.inspected(argument);
                 self.emit_standard_output(&format!("{inspected}\n"))
                     .expect("failed to write output");
             }
@@ -9502,7 +9526,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // input, and nil has no methods (ADR 0006).
         if self.lookup_method(name).is_none() && name == "inspect" {
             match arguments.as_slice() {
-                [argument] => return Some(Value::String(argument.inspect())),
+                [argument] => return Some(Value::String(self.inspected(argument))),
                 other => panic!("inspect takes one argument, got {}", other.len()),
             }
         }
