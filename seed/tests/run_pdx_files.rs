@@ -1237,6 +1237,31 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.
+/// `pow`, `**`, and `fdiv` are typed by their argument as well as their
+/// receiver (#294): a whole power keeps the base's kind, a complex on either
+/// side answers a complex, and a pair whose answer depends on the values —
+/// a root, a negative base to a fraction — is unknown.
+#[test]
+fn portland_types_reads_pow_and_fdiv_by_their_argument() {
+    let sample = std::env::temp_dir().join("inference_power.pdx");
+    std::fs::write(
+        &sample,
+        "whole = 2.pow(3)\nmodular = 2.pow(3, 5)\nrooted = 2.pow(0.5)\nfraction = 9.pow(Rational(1, 2))\nturned = 2.pow(Complex(1, 1))\nsquared = 1.5 ** 2\nhalved = Rational(1, 2) ** 2\nfloated = 2.0 ** 0.5\ndivided = 3.fdiv(2)\nspun = 2.5.fdiv(Complex(8, 2))\nrefused = 3.fdiv(Complex(8, 2))\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "types.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "whole: Integer\nmodular: Integer\nrooted: Unknown\nfraction: Unknown\nturned: Complex\nsquared: Float\nhalved: Rational\nfloated: Unknown\ndivided: Float\nspun: Complex\nrefused: Unknown\n"
+    );
+}
+
 #[test]
 fn portland_types_dumps_synthesized_bindings() {
     let sample = std::env::temp_dir().join("inference_sample.pdx");
