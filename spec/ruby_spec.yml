@@ -3332,7 +3332,7 @@ core/string/each_grapheme_cluster_spec.rb:
 core/string/each_line_spec.rb:
   pdx: [spec/core/string/each_line_spec.pdx]
   status: partial_planned
-  reason: "each_line takes no separator or chomp argument (#313), and the multibyte row is #323's to port; without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
+  reason: "each_line takes no separator or chomp argument (#313); without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
   link: https://github.com/portlandlang/portland/issues/313
 core/string/element_reference_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx]
@@ -3441,9 +3441,9 @@ core/string/ord_spec.rb:
   pdx: [spec/core/string/ord_spec.pdx]
 core/string/partition_spec.rb:
   pdx: [spec/core/string/partition_spec.pdx]
-  status: partial_planned
-  reason: "The regexp row passes and is #323's to port; the $1 row goes with the match globals, a block beside the argument is checked, not ignored, and the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
-  link: https://github.com/portlandlang/portland/issues/323
+  status: partial_intentional
+  reason: "The $1 row goes with the match globals, a block beside the argument is checked, not ignored, and the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
+  link: docs/ruby/regex.md
 core/string/plus_spec.rb:
   pdx: [spec/core/string/plus_spec.pdx]
 core/string/prepend_spec.rb:
@@ -3465,9 +3465,9 @@ core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
 core/string/rpartition_spec.rb:
   pdx: [spec/core/string/rpartition_spec.pdx]
-  status: partial_planned
-  reason: "The regexp rows pass and are #323's to port; the $~ row goes with the match globals, and the identity, to_str, and encoding rows have no meaning here."
-  link: https://github.com/portlandlang/portland/issues/323
+  status: partial_intentional
+  reason: "The $~ row goes with the match globals, and the identity, to_str, and encoding rows have no meaning here."
+  link: docs/ruby/regex.md
 core/string/rstrip_spec.rb:
   pdx: [spec/core/string/rstrip_spec.pdx]
   status: partial_planned
@@ -3502,8 +3502,8 @@ core/string/squeeze_spec.rb:
 core/string/start_with_spec.rb:
   pdx: [spec/core/string/start_with_spec.pdx]
   status: partial_planned
-  reason: "The passing regex rows are #323's to port; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte rows have no meaning with one UTF-8 String type."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/string/string_spec.rb:
   status: skipped
   reason: "Kernel#String is the implicit-conversion protocol's entry point, and to_str is a false alias that refuses naming to_s (ADR 0036); to_s is the spelling."
@@ -3765,8 +3765,8 @@ core/symbol/empty_spec.rb:
 core/symbol/end_with_spec.rb:
   pdx: [spec/core/symbol/end_with_spec.pdx]
   status: partial_planned
-  reason: "The several-candidate and multibyte rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036)."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), and the encoding and invalid-byte rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/symbol/id2name_spec.rb:
   pdx: [spec/core/symbol/id2name_spec.pdx]
   status: partial_intentional
@@ -3785,8 +3785,8 @@ core/symbol/length_spec.rb:
 core/symbol/match_spec.rb:
   pdx: [spec/core/symbol/match_spec.pdx]
   status: partial_planned
-  reason: "=~ answers the match, not an index, and the $1 rows go with the match globals; the passing match and match? rows are #323's to port, and match with a block and match? with a position wait on #319."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "=~ answers the match, not an index, and the $1 and Regexp.last_match rows go with the match globals; match with a block and match? with a position wait on #319."
+  link: https://github.com/portlandlang/portland/issues/319
 core/symbol/name_spec.rb:
   pdx: [spec/core/symbol/name_spec.pdx]
   status: partial_intentional
@@ -3805,8 +3805,8 @@ core/symbol/size_spec.rb:
 core/symbol/start_with_spec.rb:
   pdx: [spec/core/symbol/start_with_spec.pdx]
   status: partial_planned
-  reason: "The several-candidate and regex rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036), and the last_match row goes with the match globals."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte row has no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/symbol/succ_spec.rb:
   pdx: [spec/core/symbol/succ_spec.pdx]
 core/symbol/swapcase_spec.rb:
