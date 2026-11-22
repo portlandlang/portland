@@ -1365,6 +1365,18 @@ def evaluate_type_receiver_call(type_name, node, bindings)
   evaluate_method_call(method_call_node(written, node.name, node.arguments, node.block, line: node.line), bindings)
 end
 
+# The refusal for `receiver[first, second]` on anything but a match (ADR
+# 0091), the seed's sentence.
+def two_value_index_sentence(receiver, arguments)
+  type_name = value_type_label(receiver)
+  if plain_array?(receiver) || (receiver in String)
+    first = shorten(render_inspect(value_at(arguments, 0)))
+    second = shorten(render_inspect(value_at(arguments, 1)))
+    return "#{article(type_name)} #{type_name} takes one index between brackets — with two, write slice(#{first}, #{second})"
+  end
+  "#{article(type_name)} #{type_name} takes one index between brackets, got 2"
+end
+
 # A guest value's type as Ruby names it: in a conversion refusal, and as
 # what `value.class` answers for a builtin.
 def value_type_label(value)
@@ -3312,6 +3324,13 @@ def evaluate_method_call(node, mutable bindings)
     takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures")
     panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
   end
+  # Two values between brackets (ADR 0091): a match answers the slice of
+  # its groups, the host's own; any other receiver refuses in the seed's
+  # sentence, an array and a string pointed at `slice`.
+  if node.name == "[]" && arguments.length == 2
+    return outcome([receiver[value_at(arguments, 0), value_at(arguments, 1)]], bindings) if receiver in MatchData
+    panic(two_value_index_sentence(receiver, arguments))
+  end
   # A set (ADR 0082): its own names answer here, a mutator names the
   # spelling that answers a new set, and Ruby's Enumerable walks the members
   # as an array's — the walks that answer their receiver answering the set
@@ -3866,7 +3885,7 @@ def matchdata_answer(found, name, arguments)
   when "offset" then found.offset(host_group_key(value_at(arguments, 0)))
   when "match" then found.match(host_group_key(value_at(arguments, 0)))
   when "match_length" then found.match_length(host_group_key(value_at(arguments, 0)))
-  else arguments.map { |group| found[host_group_key(group)] }
+  else arguments.flat_map { |group| found.values_at(host_group_key(group)) }
   end
 end
 

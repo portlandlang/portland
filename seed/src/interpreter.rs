@@ -2114,6 +2114,22 @@ fn rotated(elements: &[Value], count: i64) -> Value {
     Value::array(turned)
 }
 
+/// The refusal for `receiver[first, second]` on anything but a match (ADR
+/// 0091): an array and a string are pointed at `slice`, which takes the
+/// same two values.
+fn two_value_index_sentence(receiver: &Value, arguments: &[Value]) -> String {
+    let type_name = receiver.type_name();
+    let article = Value::article_for(&type_name);
+    match receiver {
+        Value::Array(_) | Value::String(_) => format!(
+            "{article} {type_name} takes one index between brackets — with two, write slice({}, {})",
+            arguments[0].shown(),
+            arguments[1].shown()
+        ),
+        _ => format!("{article} {type_name} takes one index between brackets, got 2"),
+    }
+}
+
 /// `slice(start, length)`: the run of `length` elements from `start`. A
 /// negative start counts from the end, as Ruby's does; a start past either
 /// end answers no elements, never nil (ADR 0019).
@@ -8133,6 +8149,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             (receiver, name, arguments) => {
+                // Two values between brackets read a match's groups only
+                // (ADR 0091); an array and a string spell the same slice by
+                // name.
+                if name == "[]" && arguments.len() == 2 {
+                    refusal("arguments");
+                    panic!("{}", two_value_index_sentence(receiver, arguments));
+                }
                 if let Some(survivor) = alias_survivor(name) {
                     refusal("alias");
                     panic!("{name} is spelled {survivor} here");

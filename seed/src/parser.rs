@@ -3420,6 +3420,30 @@ impl<'source> Parser<'source> {
                     }
                     self.position += 1; // the `[`
                     let index = Box::new(self.expression());
+                    // `found[start, length]` (ADR 0091): a second value
+                    // between the brackets makes the read a call of `[]`
+                    // with both, which a match answers and every other
+                    // receiver refuses toward `slice`.
+                    if self.peek_kind() == Some(TokenKind::Comma) {
+                        self.position += 1; // the `,`
+                        let length = self.expression();
+                        if self.peek_kind() != Some(TokenKind::RightBracket) {
+                            panic!(
+                                "expected closing bracket, got {:?}",
+                                self.tokens.get(self.position)
+                            );
+                        }
+                        self.position += 1; // the `]`
+                        expression = Expression::MethodCall {
+                            arguments: vec![*index, length],
+                            block: None,
+                            keyword_arguments: Vec::new(),
+                            name: "[]".to_string(),
+                            receiver: Box::new(expression),
+                            safe: false,
+                        };
+                        continue;
+                    }
                     if self.peek_kind() != Some(TokenKind::RightBracket) {
                         panic!(
                             "expected closing bracket, got {:?}",
