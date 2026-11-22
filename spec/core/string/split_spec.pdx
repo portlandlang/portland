@@ -4,7 +4,7 @@
 # Every expected value is Ruby 4.0.9's answer for the same call.
 #
 # The rows below the house examples are from ruby/spec
-# core/string/split_spec.rb, "with String". What stays upstream, and why,
+# core/string/split_spec.rb. What stays upstream, and why,
 # is this file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
@@ -178,5 +178,115 @@ context "String#split with String" do
     expect("".split(",")).to eq([])
     expect("x".split(",")).to eq(["x"])
     expect("a::b".split("::")).to eq(["a", "b"])
+  end
+end
+
+context "String#split with Regexp" do
+  specify "divides self on regexp matches" do
+    expect(" now's  the time".split(/ /)).to eq(["", "now's", "", "the", "time"])
+    expect(" x\ny ".split(/ /)).to eq(["", "x\ny"])
+    expect("1, 2.34,56, 7".split(/,\s*/)).to eq(["1", "2.34", "56", "7"])
+    expect("1x2X3".split(/x/i)).to eq(["1", "2", "3"])
+  end
+
+  specify "treats negative limits as no limit" do
+    expect("".split(%r{/+}, -1)).to eq([])
+  end
+
+  specify "suppresses trailing empty fields when limit isn't given or 0" do
+    expect("1,2,,3,4,,".split(/,/)).to eq(["1", "2", "", "3", "4"])
+    expect("1,2,,3,4,,".split(/,/, 0)).to eq(["1", "2", "", "3", "4"])
+    expect("  a  b  c\nd  ".split(/\s+/)).to eq(["", "a", "b", "c", "d"])
+    expect("hai".split(/hai/)).to eq([])
+    expect(",".split(/,/)).to eq([])
+    expect(",".split(/,/, 0)).to eq([])
+  end
+
+  specify "returns an array with one entry if limit is 1: the original string" do
+    expect("hai".split(/hai/, 1)).to eq(["hai"])
+    expect("xAyBzC".split(/[A-Z]/, 1)).to eq(["xAyBzC"])
+    expect("hello world ".split(/\s+/, 1)).to eq(["hello world "])
+    expect("hi!".split(//, 1)).to eq(["hi!"])
+  end
+
+  specify "returns at most limit fields when limit > 1" do
+    expect("hai".split(/hai/, 2)).to eq(["", ""])
+
+    expect("1,2".split(/,/, 3)).to eq(["1", "2"])
+
+    expect("1,2,,3,4,,".split(/,/, 2)).to eq(["1", "2,,3,4,,"])
+    expect("1,2,,3,4,,".split(/,/, 3)).to eq(["1", "2", ",3,4,,"])
+    expect("1,2,,3,4,,".split(/,/, 4)).to eq(["1", "2", "", "3,4,,"])
+    expect("1,2,,3,4,,".split(/,/, 5)).to eq(["1", "2", "", "3", "4,,"])
+    expect("1,2,,3,4,,".split(/,/, 6)).to eq(["1", "2", "", "3", "4", ","])
+
+    expect("x".split(/x/, 2)).to eq(["", ""])
+    expect("xx".split(/x/, 2)).to eq(["", "x"])
+    expect("xx".split(/x/, 3)).to eq(["", "", ""])
+    expect("xxx".split(/x/, 2)).to eq(["", "xx"])
+    expect("xxx".split(/x/, 3)).to eq(["", "", "x"])
+    expect("xxx".split(/x/, 4)).to eq(["", "", "", ""])
+  end
+
+  specify "doesn't suppress or limit fields when limit is negative" do
+    expect("1,2,,3,4,,".split(/,/, -1)).to eq(["1", "2", "", "3", "4", "", ""])
+    expect("1,2,,3,4,,".split(/,/, -5)).to eq(["1", "2", "", "3", "4", "", ""])
+    expect("  a  b  c\nd  ".split(/\s+/, -1)).to eq(["", "a", "b", "c", "d", ""])
+    expect(",".split(/,/, -1)).to eq(["", ""])
+  end
+
+  specify "splits between characters when regexp matches a zero-length string" do
+    expect("hello".split(//)).to eq(["h", "e", "l", "l", "o"])
+    expect("hello".split(//, -1)).to eq(["h", "e", "l", "l", "o", ""])
+    expect("hello".split(//, 0)).to eq(["h", "e", "l", "l", "o"])
+    expect("hello".split(//, 1)).to eq(["hello"])
+    expect("hello".split(//, 2)).to eq(["h", "ello"])
+    expect("hello".split(//, 5)).to eq(["h", "e", "l", "l", "o"])
+    expect("hello".split(//, 6)).to eq(["h", "e", "l", "l", "o", ""])
+    expect("hello".split(//, 7)).to eq(["h", "e", "l", "l", "o", ""])
+
+    expect("hi mom".split(/\s*/)).to eq(["h", "i", "m", "o", "m"])
+
+    expect("AABCCBAA".split(/(?=B)/)).to eq(["AA", "BCC", "BAA"])
+    expect("AABCCBAA".split(/(?=B)/, -1)).to eq(["AA", "BCC", "BAA"])
+    expect("AABCCBAA".split(/(?=B)/, 2)).to eq(["AA", "BCCBAA"])
+  end
+
+  # Upstream spells the empty pattern `%r!!`; `%r` takes `{}` here.
+  specify "respects unicode when splitting between characters" do
+    text = "こにちわ"
+    pattern = %r{}
+    pieces = text.split(pattern)
+    expect(pieces.size).to eq(4)
+    expect(pieces).to eq(["こ", "に", "ち", "わ"])
+  end
+
+  specify "includes all captures in the result array" do
+    expect("hello".split(/(el)/)).to eq(["h", "el", "lo"])
+    expect("hi!".split(/()/)).to eq(["h", "", "i", "", "!"])
+    expect("hi!".split(/()/, -1)).to eq(["h", "", "i", "", "!", "", ""])
+    expect("hello".split(/((el))()/)).to eq(["h", "el", "el", "", "lo"])
+    expect("AabB".split(/([a-z])+/)).to eq(["A", "b", "B"])
+  end
+
+  specify "applies the limit to the number of split substrings, without counting captures" do
+    expect("aBaBa".split(/(B)()()/, 2)).to eq(["a", "B", "", "", "aBa"])
+  end
+
+  specify "does not include non-matching captures in the result array" do
+    expect("hello".split(/(el)|(xx)/)).to eq(["h", "el", "lo"])
+  end
+
+  specify "returns the original string if no matches are found" do
+    expect("foo".split(/bar/)).to eq(["foo"])
+    expect("foo".split(/bar/, -1)).to eq(["foo"])
+    expect("foo".split(/bar/, 0)).to eq(["foo"])
+    expect("foo".split(/bar/, 1)).to eq(["foo"])
+    expect("foo".split(/bar/, 2)).to eq(["foo"])
+    expect("foo".split(/bar/, 3)).to eq(["foo"])
+  end
+
+  specify "splits a string on each character for a multibyte encoding and empty split" do
+    expect("That's why eﬃciency could not be helped".split("").size).to eq(39)
   end
 end

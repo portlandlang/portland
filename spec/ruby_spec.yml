@@ -3383,8 +3383,8 @@ core/string/include_spec.rb:
 core/string/index_spec.rb:
   pdx: [spec/core/string/index_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp and String rows are #323's to port; a String with a start position waits on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "A String with a start position, and the escaped-regexp row that compares against it, wait on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/316
 core/string/initialize_spec.rb:
   status: skipped
   reason: "There is no String class object; a string is a literal, and String.new has no spelling."
@@ -3459,8 +3459,8 @@ core/string/reverse_spec.rb:
 core/string/rindex_spec.rb:
   pdx: [spec/core/string/rindex_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp rows are #323's to port; a Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "A Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/317
 core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
 core/string/rpartition_spec.rb:
@@ -3492,8 +3492,8 @@ core/string/slice_spec.rb:
 core/string/split_spec.rb:
   pdx: [spec/core/string/split_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp rows are #323's to port; split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/318
 core/string/squeeze_spec.rb:
   pdx: [spec/core/string/squeeze_spec.pdx]
   status: partial_intentional
