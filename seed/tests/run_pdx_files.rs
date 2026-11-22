@@ -843,6 +843,14 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "`def self.` belongs inside a struct body — write def of",
         ),
         (
+            "struct Circle\n  radius\n\n  def area = radius if true\nend\n",
+            "def area in a struct body is always defined — 'if' cannot guard it; put the condition inside the method",
+        ),
+        (
+            "trait Round\n  def area = 2 unless true\nend\n",
+            "def area in a trait body is always defined — 'unless' cannot guard it; put the condition inside the method",
+        ),
+        (
             "trait Sexp\n  def self.of\n    1\n  end\nend\n",
             "a trait cannot define def self.of — a type function lives on the struct that includes it",
         ),
@@ -1150,7 +1158,7 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         // teeth). A comment to the seed; a checked promise to the compiler.
         // The truthful annotations above it, every shape, stay silent.
         (
-            "def answer = 42 # -> Integer\ndef greet(name = \"friend\") # -> String\n  \"hi \" + name\nend\ndef pair(first,\n         second = 2) # -> [Integer]\n  [first.to_i, second]\nend\ndef maybe_ran(flag) = \"ran\" if flag # -> String?\ndef handle # -> String\n  42\nend\nputs handle\n",
+            "def answer = 42 # -> Integer\ndef greet(name = \"friend\") # -> String\n  \"hi \" + name\nend\ndef pair(first,\n         second = 2) # -> [Integer]\n  [first.to_i, second]\nend\ndef maybe_ran(flag) # -> String?\n  \"ran\" if flag\nend\ndef handle # -> String\n  42\nend\nputs handle\n",
             "42\n",
             "'handle' answers Integer, not the annotated String — change one",
         ),
@@ -1297,7 +1305,7 @@ fn portland_types_dumps_method_returns() {
     let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
     std::fs::write(
         &sample,
-        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found\nend\ndef presence(top = [1].first) = top.some? ? top : 0\ndef compared(top = [1].first)\n  if top == nil then 0 else top end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present\n  end\nend\ndef negated(top = [1].first)\n  return 0 unless top.some?\n  top\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\ndef safe(words = %w[a]) = words.first&.upcase\ndef unguarded(top = [1].first) = top + 1\ndef shout(word)\n  word.upcase + word.length.to_s\nend\ndef half(n) = n / 2\ndef head(list) = list[0]\n",
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag)\n  \"ran\" if flag\nend\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found\nend\ndef presence(top = [1].first) = top.some? ? top : 0\ndef compared(top = [1].first)\n  if top == nil then 0 else top end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present\n  end\nend\ndef negated(top = [1].first)\n  return 0 unless top.some?\n  top\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\ndef safe(words = %w[a]) = words.first&.upcase\ndef unguarded(top = [1].first) = top + 1\ndef shout(word)\n  word.upcase + word.length.to_s\nend\ndef half(n) = n / 2\ndef head(list) = list[0]\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1628,6 +1636,29 @@ fn exponent_literals_on_both_oracles() {
         ("x = 01e5\n", "'01e5' has a leading zero — write 1e5"),
     ];
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
+}
+
+/// A modifier after a `def` guards the definition (ADR 0090, #238): one
+/// that fails defines nothing on either oracle, and a def under a
+/// condition that holds is defined on both.
+#[test]
+fn a_guarded_def_is_defined_only_when_its_guard_holds() {
+    assert_both_print(
+        "guarded_def.pdx",
+        "def eager = \"ran\" if true\nif true\n  def nested = \"nested\"\nend\nputs eager\nputs nested\n",
+        "ran\nnested\n",
+    );
+    let cases = [
+        (
+            "def cautious = \"ran\" if false\nputs cautious\n",
+            "'cautious' is not defined",
+        ),
+        (
+            "def whole\n  \"ran\"\nend unless true\nputs whole\n",
+            "'whole' is not defined",
+        ),
+    ];
+    assert_both_oracles_refuse("guarded_def_refusal.pdx", None, &cases);
 }
 
 /// The output functions write a struct's own `to_s`, and `p` its own
