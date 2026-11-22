@@ -5448,11 +5448,15 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `match` with a block (#215), Ruby's: the block runs only on a
         // match, given it, and the call answers the block's result — a maybe,
-        // nil when nothing matched and the block never ran.
+        // nil when nothing matched and the block never ran. A pattern, a
+        // string, and a symbol all take it (#319).
         // Arguments `match` does not take fall through to the general
         // refusals, as they do without a block.
         if let Some(block) = block
-            && matches!(receiver, Value::Regex(_))
+            && matches!(
+                receiver,
+                Value::Regex(_) | Value::String(_) | Value::Symbol(_)
+            )
             && name == "match"
             && let Some(found) = crate::regexp::method(&receiver, name, &arguments)
         {

@@ -3420,7 +3420,7 @@ core/string/lstrip_spec.rb:
 core/string/match_spec.rb:
   pdx: [spec/core/string/match_spec.pdx]
   status: partial_intentional
-  reason: "=~ answers the match, not an index, since the match globals are gone; the $~ and last_match rows, the to_str and method_missing mocks, and the subclass row stay upstream; match with a block on a String waits on #319."
+  reason: "=~ answers the match, not an index, since the match globals are gone; the $~ and last_match rows, the to_str and method_missing mocks, and the subclass row stay upstream."
   link: docs/ruby/regex.md
 core/string/modulo_spec.rb:
   pdx: [spec/portland/string/format_spec.pdx]
@@ -3785,7 +3785,7 @@ core/symbol/length_spec.rb:
 core/symbol/match_spec.rb:
   pdx: [spec/core/symbol/match_spec.pdx]
   status: partial_planned
-  reason: "=~ answers the match, not an index, and the $1 rows go with the match globals; the passing match and match? rows are #323's to port, and match with a block and match? with a position wait on #319."
+  reason: "=~ answers the match, not an index, and the $1 rows go with the match globals; and the passing match and match? rows are #323's to port."
   link: https://github.com/portlandlang/portland/issues/323
 core/symbol/name_spec.rb:
   pdx: [spec/core/symbol/name_spec.pdx]
