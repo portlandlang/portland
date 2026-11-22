@@ -3191,9 +3191,9 @@ core/complex/to_i_spec.rb:
   link: docs/ruby/numbers.md
 core/complex/to_r_spec.rb:
   pdx: [spec/core/complex/to_r_spec.pdx]
-  status: partial_planned
-  reason: "A Float 0.0 imaginary part refuses where Ruby 3.4 answers a Rational (#328); the mock rows stay upstream, and a nonzero imaginary part refuses in Ruby's words."
-  link: https://github.com/portlandlang/portland/issues/328
+  status: partial_intentional
+  reason: "The mock rows stay upstream (docs/ruby/numbers.md), and a nonzero imaginary part refuses in Ruby's words."
+  link: docs/ruby/numbers.md
 core/complex/to_s_spec.rb:
   pdx: [spec/core/complex/to_s_spec.pdx]
   status: partial_planned
