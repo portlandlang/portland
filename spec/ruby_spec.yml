@@ -36,7 +36,7 @@ core/array/all_spec.rb:
 core/array/any_spec.rb:
   pdx: [spec/core/array/any_spec.pdx]
   status: partial_planned
-  reason: "The block rows pass and are #349's to port; a bare any? refuses where Ruby answers (#337). Growing the array mid-walk and a pattern beside a block stay out: values never mutate, and a pattern beside a block refuses (ADR 0066)."
+  reason: "A bare any? refuses where Ruby answers (#337). Growing the array mid-walk and a pattern beside a block stay out: values never mutate, and a pattern beside a block refuses (ADR 0066)."
   link: https://github.com/portlandlang/portland/issues/337
 core/array/comparison_spec.rb:
   pdx: [spec/core/array/comparison_spec.pdx]
@@ -45,16 +45,16 @@ core/array/comparison_spec.rb:
   link: docs/ruby/ordering.md
 core/array/compact_spec.rb:
   pdx: [spec/core/array/compact_spec.pdx]
-  status: partial_planned
-  reason: "The copy row passes and is #349's to port; compact! stays behind since values never mutate, and there is no equal? or subclass."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "compact! stays behind since values never mutate (ADR 0015), and there is no equal? or subclass."
+  link: docs/adr/0015-2026-07-23-values-never-mutate.md
 core/array/count_spec.rb:
   pdx: [spec/core/array/count_spec.pdx]
 core/array/find_spec.rb:
   pdx: [spec/core/array/find_spec.pdx]
   status: partial_planned
-  reason: "The block rows pass and are #349's to port; the ifnone proc waits on #77, find with an argument on #336, and a blockless each_with_index on #338. Enumerators and mutation mid-walk stay out."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The ifnone proc waits on #77, find with an argument on #336, and a blockless each_with_index on #338. Enumerators and mutation mid-walk stay out."
+  link: https://github.com/portlandlang/portland/issues/77
 core/array/first_spec.rb:
   pdx: [spec/core/array/first_spec.pdx]
   status: partial_intentional
@@ -63,7 +63,7 @@ core/array/first_spec.rb:
 core/array/flatten_spec.rb:
   pdx: [spec/core/array/flatten_spec.pdx]
   status: partial_planned
-  reason: "flatten with a level refuses (#338), and the plain rows pass and are #349's to port; flatten! stays behind since values never mutate, with the to_int, to_ary, and method_missing rows."
+  reason: "flatten with a level refuses (#338); flatten! stays behind since values never mutate, with the to_int, to_ary, and method_missing rows."
   link: https://github.com/portlandlang/portland/issues/338
 core/array/index_spec.rb:
   pdx: [spec/core/array/index_spec.pdx]
@@ -74,9 +74,9 @@ core/array/last_spec.rb:
   link: docs/ruby/lookups.md
 core/array/reverse_spec.rb:
   pdx: [spec/core/array/reverse_spec.pdx]
-  status: partial_planned
-  reason: "The new-array row passes and is #349's to port; reverse! stays behind since values never mutate, with the recursive and subclass rows."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "reverse! stays behind since values never mutate (ADR 0015), with the recursive and subclass rows."
+  link: docs/adr/0015-2026-07-23-values-never-mutate.md
 core/array/sort_by_spec.rb:
   pdx: [spec/portland/block/queries_spec.pdx]
 core/array/sort_spec.rb:
@@ -87,12 +87,12 @@ core/array/sort_spec.rb:
 core/array/uniq_spec.rb:
   pdx: [spec/core/array/uniq_spec.pdx]
   status: partial_planned
-  reason: "uniq with a block refuses on the seed and answers nil hosted (#336); the plain rows pass and are #349's to port. uniq! stays behind since values never mutate, with the hash-mock and subclass rows."
+  reason: "uniq with a block refuses on the seed and answers nil hosted (#336); uniq! stays behind since values never mutate, with the hash-mock and subclass rows."
   link: https://github.com/portlandlang/portland/issues/336
 core/array/zip_spec.rb:
   pdx: [spec/core/array/zip_spec.pdx]
   status: partial_planned
-  reason: "The pairing and nil-fill rows pass and are #349's to port; zip with a block waits on #336; to_ary, each-only arguments, infinite enumerators, and subclasses stay out."
+  reason: "zip with a block waits on #336; to_ary, each-only arguments, infinite enumerators, and subclasses stay out."
   link: https://github.com/portlandlang/portland/issues/336
 core/array/take_spec.rb:
   pdx: [spec/core/array/take_spec.pdx]
@@ -1123,8 +1123,8 @@ core/hash/default_proc_spec.rb:
 core/hash/dig_spec.rb:
   pdx: [spec/core/hash/dig_spec.pdx]
   status: partial_planned
-  reason: "The plain dig rows pass and are #349's to port; a hash has no default (ADR 0063), a dig past a non-container refuses where Ruby raises, a bare dig's refusal is #338, and the mock and singleton rows need reflection."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A hash has no default (ADR 0063), a dig past a non-container refuses where Ruby raises, a bare dig's refusal is #338, and the mock and singleton rows need reflection."
+  link: https://github.com/portlandlang/portland/issues/338
 core/hash/fetch_spec.rb:
   status: skipped
   reason: "fetch is retired: a lookup miss answers a maybe, and the default is the or-guard."
@@ -2575,17 +2575,17 @@ core/range/count_spec.rb:
 core/range/max_spec.rb:
   pdx: [spec/core/range/max_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises, and a string range's succ walk refuses in the wrong words (#333); the remaining rows pass and are #349's to port."
+  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises, and a string range's succ walk refuses in the wrong words (#333)."
   link: https://github.com/portlandlang/portland/issues/332
 core/range/min_spec.rb:
   pdx: [spec/core/range/min_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises; the remaining rows pass and are #349's to port."
+  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises."
   link: https://github.com/portlandlang/portland/issues/332
 core/range/step_spec.rb:
   pdx: [spec/core/range/step_spec.pdx]
   status: partial_planned
-  reason: "The block form on the seed, a step with no argument, a negative stride, and a float stride refuse (#333); an ArithmeticSequence and endless steps have no counterpart (ADR 0055), string ranges refuse, and coerce waits on #155; the Integer-step rows pass and are #349's to port."
+  reason: "The block form on the seed, a step with no argument, a negative stride, and a float stride refuse (#333); an ArithmeticSequence and endless steps have no counterpart (ADR 0055), string ranges refuse, and coerce waits on #155."
   link: https://github.com/portlandlang/portland/issues/333
 core/range/to_set_spec.rb:
   pdx: [spec/core/range/to_set_spec.pdx]
