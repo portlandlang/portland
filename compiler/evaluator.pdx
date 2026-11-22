@@ -4874,7 +4874,10 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([runs], scope)
   when "flat_map", "collect_concat"
-    results = receiver.flat_map do |element|
+    # The opening is the evaluator's own, one level and only where the
+    # block answered an array: the host's flat_map would open a struct or a
+    # symbol too, each being a tagged array to it (#341).
+    answers = receiver.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
@@ -4885,6 +4888,14 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
+    mutable results = []
+    answers.each do |answer|
+      if plain_array?(answer)
+        results += answer
+      else
+        results << answer
+      end
+    end
     outcome([results], scope)
   else
     puts "evaluator: cannot evaluate block method #{node.name} yet"
@@ -5021,7 +5032,9 @@ def evaluate_yield(node, mutable bindings)
   # A gathering block (#110) keeps what it is handed — one value as itself,
   # several as an array, as Ruby's Enumerable packs them — and answers nil.
   if block == "__collector__"
-    item = values.length == 1 ? value_at(values, 0) : values
+    # A bare `yield` hands over nothing, which gathers as nil, Ruby's
+    # reading (#341).
+    item = values.empty? ? nil : (values.length == 1 ? value_at(values, 0) : values)
     return Outcome.new(value: [nil], bindings: [["__block__", "block", ["__collector__", written_in + [item]]]] + bindings, signal: "none", target: nil)
   end
   result = run_guest_block(block, values, written_in)

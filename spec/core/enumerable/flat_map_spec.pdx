@@ -4,8 +4,32 @@
 
 require_relative "../../spec_helper"
 
+struct FlatMapOpaque
+  name
+end
+
+struct FlatMapYieldsBare
+  first
+
+  include Enumerable
+
+  def each
+    yield
+    yield 1
+  end
+end
+
 context "Enumerable#flat_map" do
   specify "each_slice chunks and flat_map opens one level" do
     expect([1, 2].flat_map { [it, it] }).to eq([1, 1, 2, 2])
+  end
+
+  specify "appends non-Array elements that do not define #to_ary" do
+    opaque = FlatMapOpaque.new(name: "o")
+    expect([1, opaque, 2].flat_map { |element| element }).to eq([1, opaque, 2])
+  end
+
+  specify "gathers a bare yield as nil" do
+    expect(FlatMapYieldsBare.new(first: 1).to_a).to eq([nil, 1])
   end
 end

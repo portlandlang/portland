@@ -708,6 +708,7 @@ def check_node(node, scope, mutable found)
   in StructDefNode(methods:, nested:, type_functions:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs", scope, found)
     found = check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs", scope, found)
+    found = check_implicit_conversions(methods, scope, found)
     # Inside the type's own methods (ADR 0076): protected calls on another
     # value of the type pass, and its private constants are in reach.
     within = scope.with(home: qualified_under(scope.home, node.name), inside: node.name)
@@ -716,6 +717,7 @@ def check_node(node, scope, mutable found)
     check_body(nested, within, found)
   in TraitDefNode(methods:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it", scope, found)
+    found = check_implicit_conversions(methods, scope, found)
     check_methods(methods, scope, found)
   # A module's bare names may reach its own defs by lexical scope (ADR
   # 0021), which the globals do not hold — so names are not judged inside.
@@ -1005,6 +1007,20 @@ end
 # pass different lists. Aliases need no case of their own: a struct or
 # trait alias desugars at parse into a clone of the def it points at, so
 # the clone walks through here like any def.
+# A method named for one of Ruby's implicit conversions (ADR 0036) would
+# never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
+# definition refuses, naming the conversion that is read (#341) — the
+# seed's sentence.
+def check_implicit_conversions(methods, scope, mutable found)
+  methods.each do |method|
+    next unless method in DefNode
+    survivor = alias_survivor(method.name)
+    next if survivor.nil?
+    found = noted(found, ["sentence", "#{method.name} is Ruby's implicit conversion, which nothing here calls — define #{survivor}"], locate(method, scope))
+  end
+  found
+end
+
 def check_reserved(methods, names, wording, scope, mutable found)
   methods.each do |method|
     next unless method in DefNode

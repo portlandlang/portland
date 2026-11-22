@@ -92,6 +92,19 @@ pub fn constant_name(name: &str) -> bool {
 /// A numeric literal's digits, underscores shed — the lexer has already
 /// refused any underscore not sitting between digits (#71) — and a base
 /// prefix folded: `0x`, `0b`, `0o`, either case (#72, ADR 0050).
+/// A method named for one of Ruby's implicit conversions (ADR 0036) would
+/// never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
+/// definition refuses, naming the conversion that is read (#341).
+fn refuse_implicit_conversion(name: &str) {
+    let survivor = match name {
+        "to_ary" => "to_a",
+        "to_int" => "to_i",
+        "to_str" => "to_s",
+        _ => return,
+    };
+    panic!("{name} is Ruby's implicit conversion, which nothing here calls — define {survivor}");
+}
+
 fn integer_literal(text: &str) -> i64 {
     let plain = text.replace('_', "");
     let base = match plain.get(..2) {
@@ -1524,6 +1537,7 @@ impl<'source> Parser<'source> {
                     ) {
                         panic!("{method_name} is reserved on structs");
                     }
+                    refuse_implicit_conversion(method_name);
                     if type_taken {
                         panic!(
                             "{method_name} is defined on {name} instances and on the type — rename one"
@@ -1815,6 +1829,7 @@ impl<'source> Parser<'source> {
                 ) {
                     panic!("{method_name} is reserved on structs, so a trait cannot carry it");
                 }
+                refuse_implicit_conversion(method_name);
                 if methods.iter().any(|existing| {
                     matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
                 }) {
