@@ -243,6 +243,9 @@ p(city.rindex("a"))
 p(city.rindex("a", 5))
 p(city.casecmp("PORTLAND"))
 p(city.casecmp?("PORTLAND"))
+mutable split_pieces = []
+city.split("t") { |part| split_pieces << part }
+p(split_pieces)
 p(city.codepoints)
 p(city.bytes)
 p(city.bytesize)

@@ -3334,6 +3334,21 @@ def evaluate_method_call(node, mutable bindings)
     end
     receiver = value_at(receiver, 1)
   end
+  # `split` with a block (#318), Ruby's: each piece the blockless call
+  # would answer is handed over through `each`'s own walk, and the string
+  # comes back.
+  if (receiver in String) && node.name == "split" && node.block.some?
+    check_builtin_count(receiver, node.name, arguments.length)
+    pieces = case arguments.length
+             when 0 then receiver.split
+             when 1 then receiver.split(value_at(arguments, 0))
+             else receiver.split(arguments[0], arguments[1])
+             end
+    walking = method_call_node(node.receiver, "each", [], node.block, line: node.line)
+    walked = evaluate_block_call(walking, pieces, [], bindings)
+    return walked unless walked.signal == "none"
+    return outcome([receiver], walked.bindings)
+  end
   return set_rewrapped(original, node.name, evaluate_block_call(node, receiver, arguments, bindings)) if node.block.some?
   # `sample(random:)` and `shuffle(random:)` (ADR 0065): the one keyword a
   # builtin takes, handed to the host's own.

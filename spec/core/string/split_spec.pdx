@@ -180,3 +180,69 @@ context "String#split with String" do
     expect("a::b".split("::")).to eq(["a", "b"])
   end
 end
+
+context "String#split when a block is given" do
+  specify "yields each split substring with default pattern" do
+    mutable pieces = []
+    returned = "chunky bacon".split { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky bacon")
+    expect(pieces).to eq(["Chunky", "Bacon"])
+  end
+
+  specify "yields each split substring with default pattern for a non-ASCII string" do
+    mutable pieces = []
+    returned = "l'été arrive bientôt".split { |part| pieces << part }
+
+    expect(returned).to eq("l'été arrive bientôt")
+    expect(pieces).to eq(["l'été", "arrive", "bientôt"])
+  end
+
+  specify "yields the string when limit is 1" do
+    mutable pieces = []
+    returned = "chunky bacon".split("", 1) { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky bacon")
+    expect(pieces).to eq(["Chunky bacon"])
+  end
+
+  specify "yields each split letter" do
+    mutable pieces = []
+    returned = "chunky".split("", 0) { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky")
+    expect(pieces).to eq(%w[C H U N K Y])
+  end
+
+  specify "yields each split substring with a pattern" do
+    mutable pieces = []
+    returned = "chunky-bacon".split("-", 0) { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky-bacon")
+    expect(pieces).to eq(["Chunky", "Bacon"])
+  end
+
+  specify "yields each split substring with empty regexp pattern" do
+    mutable pieces = []
+    returned = "chunky".split(//) { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky")
+    expect(pieces).to eq(%w[C H U N K Y])
+  end
+
+  specify "yields each split substring with empty regexp pattern and limit" do
+    mutable pieces = []
+    returned = "chunky".split(//, 3) { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("chunky")
+    expect(pieces).to eq(%w[C H Unky])
+  end
+
+  specify "returns a string as is (and doesn't call block) if it is empty" do
+    mutable pieces = []
+    returned = "".split { |part| pieces << part.capitalize }
+
+    expect(returned).to eq("")
+    expect(pieces).to eq([])
+  end
+end
