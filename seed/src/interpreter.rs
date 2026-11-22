@@ -1945,6 +1945,66 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
 /// into the same string with the same separator, as Ruby's is. A nil
 /// element refuses as interpolating one does, since nil has no `to_s`
 /// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
+/// The pieces `lines` and `each_line` cut a string into, given a separator
+/// or `chomp:` (#313): each ends with the separator — a line feed by
+/// default — unless `chomp:` takes it off, a carriage return before a line
+/// feed going with it. Ruby's paragraph mode, an empty separator, is
+/// unbuilt and refuses by name.
+fn separated_lines(
+    text: &str,
+    name: &str,
+    arguments: &[Value],
+    keyword_arguments: &[(String, Value)],
+) -> Vec<String> {
+    let separator = match arguments {
+        [] => None,
+        [Value::String(separator)] => Some(separator.as_str()),
+        [other] => panic!(
+            "'{name}' takes a String for its separator, got {}",
+            other.shown()
+        ),
+        _ => {
+            refusal("arity");
+            panic!("'{name}' takes 0 to 1 arguments, got {}", arguments.len())
+        }
+    };
+    let mut chomp = false;
+    for (label, value) in keyword_arguments {
+        match (label.as_str(), value) {
+            ("chomp", Value::Boolean(flag)) => chomp = *flag,
+            ("chomp", other) => panic!(
+                "'{name}' takes true or false for chomp:, got {}",
+                other.shown()
+            ),
+            (other, _) => panic!("'{name}' does not take {other}: — chomp: is its one keyword"),
+        }
+    }
+    if separator == Some("") {
+        panic!(
+            "'{name}' with an empty separator is Ruby's paragraph mode, which is unbuilt — split on the blank lines: split(/\\n{{2,}}/)"
+        );
+    }
+    let pieces: Vec<&str> = match separator {
+        Some(separator) => text.split_inclusive(separator).collect(),
+        None => text.split_inclusive('\n').collect(),
+    };
+    pieces
+        .into_iter()
+        .map(|piece| {
+            if !chomp {
+                return piece.to_string();
+            }
+            match separator {
+                Some(separator) => piece.strip_suffix(separator).unwrap_or(piece).to_string(),
+                None => {
+                    let line = piece.strip_suffix('\n').unwrap_or(piece);
+                    line.strip_suffix('\r').unwrap_or(line).to_string()
+                }
+            }
+        })
+        .collect()
+}
+
 fn joined(elements: &[Value], separator: &str) -> String {
     elements
         .iter()
@@ -5406,6 +5466,7 @@ impl<W: std::io::Write> Interpreter<W> {
             && !matches!(receiver, Value::Struct { .. } | Value::Type(_))
             && !(matches!(receiver, Value::Array(_)) && matches!(name, "sample" | "shuffle"))
             && !(matches!(receiver, Value::MatchData(_)) && name == "named_captures")
+            && !(matches!(receiver, Value::String(_)) && matches!(name, "each_line" | "lines"))
         {
             panic!("'{name}' takes no keyword arguments, got {label}:");
         }
@@ -5437,6 +5498,28 @@ impl<W: std::io::Write> Interpreter<W> {
             && !matches!(receiver, Value::Nil)
         {
             return Some(Self::class_of(&receiver));
+        }
+        // `lines` and `each_line` with a separator or `chomp:` (#313), Ruby's:
+        // each piece ends with the separator unless `chomp:` takes it off.
+        // With a block the pieces are handed over and the string comes
+        // back; without one they are the answer.
+        if let Value::String(text) = &receiver
+            && matches!(name, "each_line" | "lines")
+            && (!arguments.is_empty() || !keyword_arguments.is_empty())
+        {
+            let pieces = separated_lines(text, name, &arguments, &keyword_arguments);
+            let Some(block) = block else {
+                return Some(Value::array(
+                    pieces.into_iter().map(Value::String).collect(),
+                ));
+            };
+            for piece in pieces {
+                self.run_block(block, vec![Value::String(piece)]);
+                if let Some(interrupted) = self.block_interrupt() {
+                    return interrupted;
+                }
+            }
+            return Some(receiver);
         }
         // The tower's methods (ADR 0085): a rational's and a complex's own,
         // and the names every real answers — before the integer and float
