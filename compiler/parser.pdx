@@ -2318,6 +2318,11 @@ def string_expression(lexeme, line: nil)
       parts << string_node(literal) unless literal.empty?
       literal = ""
       inner = read_inner_source(characters, index + 2)
+      # An empty interpolation adds nothing, as in Ruby (#306).
+      if inner.node.strip.empty?
+        index = inner.position
+        next
+      end
       inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
       parts << method_call_node(inner_step.node, "to_s", [], nil)
       index = inner.position
@@ -2374,6 +2379,11 @@ def regex_expression(lexeme, line: nil)
       parts << string_node(literal) unless literal.empty?
       literal = ""
       inner = read_inner_source(characters, index + 2)
+      # An empty interpolation adds nothing, as in Ruby (#306).
+      if inner.node.strip.empty?
+        index = inner.position
+        next
+      end
       inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
       parts << method_call_node(inner_step.node, "to_s", [], nil)
       index = inner.position
