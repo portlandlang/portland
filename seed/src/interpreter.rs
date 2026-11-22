@@ -7375,6 +7375,22 @@ impl<W: std::io::Write> Interpreter<W> {
                 flatten_into(elements, &mut flat);
                 Value::array(flat)
             }
+            // `flatten(level)` opens that many levels, Ruby's: none at
+            // zero, all of them below it (#338).
+            (Value::Array(elements), "flatten", [Value::Integer(depth)]) => {
+                Value::array(flattened_to_depth(elements, *depth))
+            }
+            // A blockless `each_with_index` answers the finished collection
+            // (docs/ruby/enumerators.md): each element beside its index.
+            (Value::Array(elements), "each_with_index", []) => Value::array(
+                elements
+                    .iter()
+                    .enumerate()
+                    .map(|(index, element)| {
+                        Value::array(vec![element.clone(), Value::Integer(index as i64)])
+                    })
+                    .collect(),
+            ),
             (Value::Array(elements), "compact", []) => Value::array(
                 elements
                     .iter()
@@ -8158,8 +8174,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         if arguments.len() < low || arguments.len() > high =>
                     {
                         refusal("arity");
+                        // An open-ended count (`dig/1+`) has no upper bound to
+                        // name (#338).
                         let expected = if low == high {
                             low.to_string()
+                        } else if high == usize::MAX {
+                            format!("{low} or more")
                         } else {
                             format!("{low} to {high}")
                         };

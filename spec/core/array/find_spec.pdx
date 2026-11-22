@@ -9,4 +9,13 @@ context "Array#find" do
     expect([1, 2, 3].find { it > 1 }).to eq(2)
     expect([1, 2, 3].find { it > 9 }).to be_nil
   end
+
+  specify "passes through the values yielded by #each_with_index" do
+    mutable seen = []
+    [:a, :b].each_with_index.to_a.find do |item, index|
+      seen << [item, index]
+      false
+    end
+    expect(seen).to eq([[:a, 0], [:b, 1]])
+  end
 end
