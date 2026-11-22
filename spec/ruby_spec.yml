@@ -4491,8 +4491,13 @@ language/order_spec.rb:
   link: docs/ruby/mutability.md
 language/predefined/:
   status: skipped
-  reason: "TOPLEVEL_BINDING goes with binding, which a closed runtime does not have; DATA and __END__ are unruled, #360."
-  link: https://github.com/portlandlang/portland/issues/360
+  reason: "TOPLEVEL_BINDING goes with binding, which a closed runtime does not have: scopes are not values here."
+  link: docs/ruby/metaprogramming.md
+language/predefined/data_spec.rb:
+  pdx: [spec/language/predefined/data_spec.pdx]
+  status: partial_intentional
+  reason: "__END__ and DATA are Ruby's (ADR 0092), and DATA is a String, so the File rows stay upstream: its class and offset, pos, and rewind to the head of the script. The -r and at_exit row has neither here. The rows that need a second program (no __END__, a required file's __END__ alone, nothing after the marker, no newline after it) are pinned on both implementations by seed/tests/run_pdx_files.rs."
+  link: docs/ruby/data.md
 language/private_spec.rb:
   pdx: [spec/language/private_spec.pdx]
   status: partial_intentional

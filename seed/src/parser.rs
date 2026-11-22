@@ -16,7 +16,12 @@ pub fn parse(source: &str) -> Program {
     // Heredocs are rewritten into ordinary string literals first (ADR 0020):
     // a dedented body is not a slice of the source, and tokens borrow it.
     let expanded = crate::heredoc::expand(source);
-    let tokens = lexer::lex(&expanded);
+    let mut tokens = lexer::lex(&expanded);
+    // The text after `__END__` (ADR 0092) is no part of the program: it
+    // leaves the tokens here and rides on the program as its data.
+    let data = tokens
+        .pop_if(|token| token.kind == TokenKind::Data)
+        .map(|token| token.text.to_string());
     let mut parser = Parser {
         command_arguments: false,
         depth: 0,
@@ -25,8 +30,9 @@ pub fn parse(source: &str) -> Program {
         position: 0,
         tokens,
     };
-    let program = parser.program();
+    let mut program = parser.program();
     parser.expect_end();
+    program.data = data;
     program
 }
 
@@ -456,7 +462,10 @@ impl<'source> Parser<'source> {
             self.expect_statement_boundary();
             self.skip_newlines();
         }
-        Program { statements }
+        Program {
+            data: None,
+            statements,
+        }
     }
 
     /// Ruby's multiple assignment, `a, b = pair` (#135): the names before
