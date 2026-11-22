@@ -83,3 +83,11 @@ context "String#slice" do
     expect("hello world".slice(6, 5).slice(5, 0)).to eq("")
   end
 end
+
+context "String#slice with Regexp, index" do
+  specify "returns nil if the index is larger than the number of captures" do
+    expect("hello there".slice(/hello (.)/, 2)).to be_nil
+    # A negative index reaches the captures only, never the whole match.
+    expect("hello there".slice(/hello (.)/, -2)).to be_nil
+  end
+end

@@ -41,4 +41,12 @@ context "MatchData#[]" do
     md = /(a)(b)?/.match("a") or panic("no match")
     expect(md[2]).to be_nil
   end
+
+  specify "counts a negative index back through the captures, never to the whole match" do
+    found = /(h)(e)/.match("hello")
+    expect(found[-1]).to eq("e")
+    expect(found[-2]).to eq("h")
+    expect(found[-3]).to be_nil
+    expect(found[-4]).to be_nil
+  end
 end
