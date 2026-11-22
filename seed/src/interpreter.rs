@@ -8006,6 +8006,32 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or(text);
                 Value::String(trimmed.to_string())
             }
+            // `chomp(separator)` (#343), Ruby's three readings: a line feed
+            // asks what the bare form asks, an empty string takes every
+            // trailing line ending off, and anything else comes off once
+            // where the string ends with it.
+            (Value::String(text), "chomp", [Value::String(separator)]) => {
+                let trimmed = match separator.as_str() {
+                    "\n" => text
+                        .strip_suffix("\r\n")
+                        .or_else(|| text.strip_suffix('\n'))
+                        .or_else(|| text.strip_suffix('\r'))
+                        .unwrap_or(text),
+                    "" => {
+                        let mut rest = text.as_str();
+                        while let Some(shorter) = rest
+                            .strip_suffix("\r\n")
+                            .or_else(|| rest.strip_suffix('\n'))
+                        {
+                            rest = shorter;
+                        }
+                        rest
+                    }
+                    other => text.strip_suffix(other).unwrap_or(text),
+                };
+                Value::String(trimmed.to_string())
+            }
+            (Value::String(text), "ascii_only?", []) => Value::Boolean(text.is_ascii()),
             // Ruby's capitalize moves both ways: the first character up, all
             // the rest down. The first goes to titlecase, so where upcasing
             // one character makes several — ß to SS — only the first stays

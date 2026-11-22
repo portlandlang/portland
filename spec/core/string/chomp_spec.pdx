@@ -10,4 +10,66 @@ context "String#chomp" do
     expect("rose\r\n".chomp).to eq("rose")
     expect("rose".chomp).to eq("rose")
   end
+
+  describe "when passed ''" do
+    specify "removes a final newline" do
+      expect("abc\n".chomp("")).to eq("abc")
+    end
+
+    specify "removes a final carriage return, newline" do
+      expect("abc\r\n".chomp("")).to eq("abc")
+    end
+
+    specify "does not remove a final carriage return" do
+      expect("abc\r".chomp("")).to eq("abc\r")
+    end
+
+    specify "removes more than one trailing newlines" do
+      expect("abc\n\n\n".chomp("")).to eq("abc")
+    end
+
+    specify "removes more than one trailing carriage return, newline pairs" do
+      expect("abc\r\n\r\n\r\n".chomp("")).to eq("abc")
+    end
+
+    specify "returns an empty String when self is empty" do
+      expect("".chomp("")).to eq("")
+    end
+  end
+
+  describe "when passed '\\n'" do
+    specify "removes one trailing newline" do
+      expect("abc\n\n".chomp("\n")).to eq("abc\n")
+    end
+
+    specify "removes one trailing carriage return" do
+      expect("abc\r\r".chomp("\n")).to eq("abc\r")
+    end
+
+    specify "removes one trailing carriage return, newline pair" do
+      expect("abc\r\n\r\n".chomp("\n")).to eq("abc\r\n")
+    end
+
+    specify "returns an empty String when self is empty" do
+      expect("".chomp("\n")).to eq("")
+    end
+  end
+
+  describe "when passed a String" do
+    specify "removes the trailing characters if they match the argument" do
+      expect("abcabc".chomp("abc")).to eq("abc")
+    end
+
+    specify "does not modify the String if the argument does not match the trailing characters" do
+      expect("abc".chomp("def")).to eq("abc")
+    end
+
+    specify "returns an empty String when self is empty" do
+      expect("".chomp("abc")).to eq("")
+    end
+
+    specify "returns an empty String when the argument equals self" do
+      expect("abc".chomp("abc")).to eq("")
+    end
+  end
 end
