@@ -1656,6 +1656,28 @@ fn a_hash_replacement_refuses_by_the_argument_at_fault() {
     assert_both_oracles_refuse("hash_replacement_refusal.pdx", None, &cases);
 }
 
+/// A replacement beside a block refuses on both oracles (#312): Ruby
+/// ignores the block, and a block beside an argument is checked here, not
+/// ignored.
+#[test]
+fn a_replacement_beside_a_block_refuses_on_both_oracles() {
+    let cases = [
+        (
+            "puts \"food\".gsub(/f/, \"g\") { \"w\" }\n",
+            "'gsub' takes a replacement or a block, not both",
+        ),
+        (
+            "puts \"food\".sub(\"f\", \"g\") { \"w\" }\n",
+            "'sub' takes a replacement or a block, not both",
+        ),
+        (
+            "puts \"food\".gsub { \"w\" }\n",
+            "'gsub' takes 1 to 2 arguments, got 0",
+        ),
+    ];
+    assert_both_oracles_refuse("replacement_beside_block.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
