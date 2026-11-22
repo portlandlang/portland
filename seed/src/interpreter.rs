@@ -4985,11 +4985,13 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    /// A pattern argument's match (ADR 0065): the `when` rule applied to a
-    /// value — a range covers, anything else asks `==`.
+    /// A pattern argument's match (ADR 0066): the `when` rule applied to a
+    /// value — a range covers, a regex matches a string or a symbol as it
+    /// does in `case/in` (#298), anything else asks `==`.
     fn pattern_matches(&mut self, pattern: &Value, element: &Value) -> bool {
         match pattern {
             Value::Range { .. } => self.range_covers(pattern, element),
+            Value::Regex(regex) => crate::regexp::case_matches(regex, element),
             _ => pattern.ruby_equals(element),
         }
     }

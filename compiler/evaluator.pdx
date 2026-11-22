@@ -2027,6 +2027,46 @@ def joined_guest(values, separator)
   rendered.join(separator)
 end
 
+# What a method answers for a pattern argument (ADR 0066). A regex asks
+# each element whether it matches (#298) through the block forms, since
+# the question has to read a guest symbol by its name; every other
+# pattern goes to the host's own `when` rule.
+def pattern_answer(receiver, name, pattern)
+  # A range goes to the host whatever the pattern, so it answers or
+  # refuses as the seed does.
+  if (pattern in Regexp) && !(receiver in Range)
+    elements = receiver.to_a
+    return case name
+           when "all?"         then elements.all? { regex_matches_element?(pattern, it) }
+           when "any?"         then elements.any? { regex_matches_element?(pattern, it) }
+           when "grep"         then elements.select { regex_matches_element?(pattern, it) }
+           when "grep_v"       then elements.reject { regex_matches_element?(pattern, it) }
+           when "none?"        then elements.none? { regex_matches_element?(pattern, it) }
+           when "one?"         then elements.one? { regex_matches_element?(pattern, it) }
+           when "slice_before" then elements.slice_before { regex_matches_element?(pattern, it) }
+           else elements.slice_after { regex_matches_element?(pattern, it) }
+           end
+  end
+  case name
+  when "all?"         then receiver.all?(pattern)
+  when "any?"         then receiver.any?(pattern)
+  when "grep"         then receiver.grep(pattern)
+  when "grep_v"       then receiver.grep_v(pattern)
+  when "none?"        then receiver.none?(pattern)
+  when "one?"         then receiver.one?(pattern)
+  when "slice_before" then receiver.slice_before(pattern)
+  else receiver.slice_after(pattern)
+  end
+end
+
+# A regex's `===`: a match on a string or on a symbol's name, false for
+# anything else, as the seed's is.
+def regex_matches_element?(pattern, element)
+  return pattern.match?(element) if element in String
+  return pattern.match?(value_at(element, 1)) if element in ["__symbol__", *]
+  false
+end
+
 # A line for `puts` and `warn`: Ruby's rule, a text already ending in a
 # newline gets no second one.
 def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
@@ -3714,15 +3754,11 @@ def evaluate_method_call(node, mutable bindings)
   when "overlap?" then receiver.overlap?(value_at(arguments, 0))
   # Bare `any?` on a hash asks whether it holds a pair (#105); with a
   # pattern (ADR 0065), the predicates, grep, and the slices ask the
-  # host's `when` rule — a range covers, anything else asks `==`.
-  when "any?" then arguments.empty? ? receiver.any? : receiver.any?(value_at(arguments, 0))
-  when "all?" then receiver.all?(value_at(arguments, 0))
-  when "none?" then receiver.none?(value_at(arguments, 0))
-  when "one?" then receiver.one?(value_at(arguments, 0))
-  when "grep" then receiver.grep(value_at(arguments, 0))
-  when "grep_v" then receiver.grep_v(value_at(arguments, 0))
-  when "slice_before" then receiver.slice_before(value_at(arguments, 0))
-  when "slice_after" then receiver.slice_after(value_at(arguments, 0))
+  # host's `when` rule — a range covers, a regex matches, anything else
+  # asks `==`.
+  when "any?" then arguments.empty? ? receiver.any? : pattern_answer(receiver, "any?", value_at(arguments, 0))
+  when "all?", "none?", "one?", "grep", "grep_v", "slice_before", "slice_after"
+    pattern_answer(receiver, node.name, value_at(arguments, 0))
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))
   when "key" then receiver.key(value_at(arguments, 0))
   # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
@@ -4742,7 +4778,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # the guest block answers for each. A pattern beside a block on the
   # predicates refuses rather than letting one silently win.
   when "grep", "grep_v"
-    matched = node.name == "grep" ? receiver.grep(value_at(arguments, 0)) : receiver.grep_v(value_at(arguments, 0))
+    matched = pattern_answer(receiver, node.name, value_at(arguments, 0))
     results = matched.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
