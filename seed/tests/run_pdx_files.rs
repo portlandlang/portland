@@ -1630,6 +1630,17 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A literal with an `r` or `i` suffix starts a paren-less argument on
+/// both oracles (#354), after a command and after a dotted call.
+#[test]
+fn a_suffixed_literal_starts_a_paren_less_argument() {
+    assert_both_print(
+        "suffixed_argument.pdx",
+        "p 3r\np 2i\np 1.5r\nfound = [1, 2].include? 3r\np found\n",
+        "(3/1)\n(0+2i)\n(3/2)\nfalse\n",
+    );
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

@@ -2561,7 +2561,7 @@ def command_start?(tokens, position)
   # "float" earned its place the hard way: its absence meant `p 2.5` never
   # became a command call at all, and the statement boundary reported the
   # leftover token instead (#46).
-  when "float", "integer", "string", "symbol", "symbol_array", "word_array", "regex", "identifier" then true
+  when "float", "integer", "rational", "imaginary", "string", "symbol", "symbol_array", "word_array", "regex", "identifier" then true
   when "keyword" then token.text == "true" || token.text == "false" || token.text == "nil"
   # `p ::Config` — a spaced `::` starts a top-level name (#147).
   when "operator" then token.text == "!" || (token.text == "::" && token.leading_space)
