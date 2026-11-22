@@ -1630,6 +1630,33 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// `begin`, `end`, and `offset` on a match refuse a negative index in
+/// Ruby's words on both oracles (#392); `[]` still counts one back.
+#[test]
+fn a_matchs_positions_refuse_a_negative_index() {
+    let found = "found = /(h)(e)/.match(\"hello\")\n";
+    assert_both_print(
+        "match_negative_index.pdx",
+        &format!("{found}p found[-1]\np found.begin(2)\n"),
+        "\"e\"\n1\n",
+    );
+    let cases = [
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.begin(-1)\n",
+            "index -1 out of matches",
+        ),
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.end(-1)\n",
+            "index -1 out of matches",
+        ),
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.offset(-2)\n",
+            "index -2 out of matches",
+        ),
+    ];
+    assert_both_oracles_refuse("match_negative_position.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
