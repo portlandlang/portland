@@ -1630,6 +1630,19 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A string whose first character is a combining mark or a zero-width
+/// joiner lexes on both oracles (#322): a mark written after a quote, or
+/// after an interpolation's closing brace, shares a character with it, and
+/// the hosted lexer once lost the quote.
+#[test]
+fn a_string_may_begin_with_a_combining_mark_on_both_oracles() {
+    assert_both_print(
+        "combining_mark_string.pdx",
+        "mark = \"\u{36f}\"\np mark.length\njoined = \"\u{200d}q\"\np joined.length\nsingle = '\u{36f}single'\np single.length\nname = \"pdx\"\nputs \"\u{36f}#{name}\u{36f}\"\np :\"\u{36f}s\"\np(/\u{36f}+x/i.match?(\"\u{36f}\u{36f}X\"))\np(%w[\u{36f} a].length)\n",
+        "1\n2\n7\n\u{36f}pdx\u{36f}\n:\"\u{36f}s\"\ntrue\n2\n",
+    );
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

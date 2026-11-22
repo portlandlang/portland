@@ -253,7 +253,7 @@ def read_interpolation(characters, start)
     elsif character == "\""
       nested = read_simple_string(characters, index, "\"")
       text << nested
-      index += nested.length
+      index += entries_spanned(characters, index, nested)
       next
     end
     text << character
@@ -313,7 +313,7 @@ def read_regex(characters, start)
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
       inner = read_interpolation(characters, index)
       text << inner
-      index += inner.length
+      index += entries_spanned(characters, index, inner)
       next
     end
     text << character
@@ -345,7 +345,7 @@ def read_percent_regex(characters, start)
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
       inner = read_interpolation(characters, index)
       text << inner
-      index += inner.length
+      index += entries_spanned(characters, index, inner)
       next
     end
     text << character
@@ -375,7 +375,7 @@ def read_double_quoted(characters, start)
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
       inner = read_interpolation(characters, index)
       text << inner
-      index += inner.length
+      index += entries_spanned(characters, index, inner)
       next
     end
     text << character
@@ -753,9 +753,44 @@ def normalize_line_endings(source)
   source.chars.map { it == "\r\n" ? "\n" : it }.join("")
 end
 
+# The characters the lexer walks. A character is a grapheme (ADR 0038), so
+# a combining mark or a joiner written straight after an ASCII character —
+# most often a string's opening quote — clusters with it and hides it. Such
+# a cluster is handed over as the ASCII character and then the rest, which
+# is how the seed's lexer, walking codepoints, has always seen it (#322).
+# Text that is all single bytes has no such cluster and is not searched.
+def lexable_characters(source)
+  return source.chars if source.length == source.bytesize
+  mutable characters = []
+  source.chars.each do |character|
+    codes = character.codepoints
+    if codes.length == 1 || codes.first > 127
+      characters << character
+    else
+      characters << codes.first.chr
+      characters << codes.drop(1).map { it.chr(Encoding::UTF_8) }.join("")
+    end
+  end
+  characters
+end
+
+# How many of the lexer's characters, from `start`, a lexeme read from
+# them spans. The lexeme's own length can be less: a cluster split for the
+# lexer (see lexable_characters) joins up again in the text.
+def entries_spanned(characters, start, text)
+  wanted = text.bytesize
+  mutable seen = 0
+  mutable index = start
+  while seen < wanted && index < characters.length
+    seen += characters[index].bytesize
+    index += 1
+  end
+  index - start
+end
+
 def lex(raw_source, first_line: 1)
   source = expand_heredocs(normalize_line_endings(raw_source))
-  characters = source.chars
+  characters = lexable_characters(source)
   mutable tokens = []
   mutable index = 0
   mutable line = first_line
@@ -799,14 +834,14 @@ def lex(raw_source, first_line: 1)
       text = read_double_quoted(characters, index)
       tokens << Token.new(kind: "string", text: text, leading_space: leading, line: line)
       line += text.count("\n")
-      index += text.length
+      index += entries_spanned(characters, index, text)
       next
     end
     if character == "'"
       text = read_simple_string(characters, index, "'")
       tokens << Token.new(kind: "string", text: text, leading_space: leading, line: line)
       line += text.count("\n")
-      index += text.length
+      index += entries_spanned(characters, index, text)
       next
     end
     if character == "%" && index + 1 < characters.length && (characters[index + 1] == "w" || characters[index + 1] == "i")
@@ -814,7 +849,7 @@ def lex(raw_source, first_line: 1)
       kind = characters[index + 1] == "w" ? "word_array" : "symbol_array"
       tokens << Token.new(kind: kind, text: text, leading_space: leading, line: line)
       line += text.count("\n")
-      index += text.length
+      index += entries_spanned(characters, index, text)
       next
     end
     # `%r{...}flags` (ADR 0086): the family's delimiters around a pattern.
@@ -822,7 +857,7 @@ def lex(raw_source, first_line: 1)
       text = read_percent_regex(characters, index)
       tokens << Token.new(kind: "regex", text: text, leading_space: leading, line: line)
       line += text.count("\n")
-      index += text.length
+      index += entries_spanned(characters, index, text)
       next
     end
     if character == "%" && declined_percent_literal?(characters, index)
@@ -944,7 +979,7 @@ def lex(raw_source, first_line: 1)
         # interpolation are the string's, so the token ends where its would.
         quoted = read_double_quoted(characters, index)
         text << quoted
-        index += quoted.length
+        index += entries_spanned(characters, index, quoted)
       else
         while index < characters.length && name_character?(characters[index])
           text << characters[index]
@@ -969,7 +1004,7 @@ def lex(raw_source, first_line: 1)
       text = read_regex(characters, index)
       tokens << Token.new(kind: "regex", text: text, leading_space: leading, line: line)
       line += text.count("\n")
-      index += text.length
+      index += entries_spanned(characters, index, text)
       next
     end
     if index + 2 < characters.length && three_character_operator?(character + characters[index + 1] + characters[index + 2])
