@@ -4624,6 +4624,9 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
   when "find", "detect"
+    # Ruby's `find(ifnone)` takes a proc, which waits on #77; with any
+    # argument beside the block it refuses, as on the seed (#336).
+    panic("undefined block-taking method #{node.name}") unless arguments.empty?
     result = receiver.find do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4887,8 +4890,10 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
   else
-    puts "evaluator: cannot evaluate block method #{node.name} yet"
-    outcome([], scope)
+    # A block form this evaluator has no arm for refuses, in the seed's
+    # sentence (#336): printing a notice and answering nothing let the
+    # program run on with a value it never computed.
+    panic("undefined block-taking method #{node.name}")
   end
 end
 

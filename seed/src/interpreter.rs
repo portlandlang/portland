@@ -6879,8 +6879,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         refusal("alias");
                         panic!("{name} is spelled {survivor} here");
                     }
+                    // The name alone: a receiver walked as an array by now
+                    // is not the value the program wrote, and the hosted
+                    // evaluator says the same sentence (#336).
+                    let _ = receiver;
                     refusal("missing");
-                    panic!("undefined block-taking method {name} for {receiver:?}")
+                    panic!("undefined block-taking method {name}")
                 }
             };
         }
