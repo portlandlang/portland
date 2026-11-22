@@ -3234,6 +3234,12 @@ def parse_array_pattern(tokens, mutable position)
           rest_name = tokens[position].text
           position += 1
         end
+        # More after the rest is Ruby's find pattern, `[*, x, *]`, or a rest
+        # in the middle; neither is built, and the refusal says the rule —
+        # the seed's sentence (#357).
+        if operator_at?(tokens, position, %w[,])
+          return Step.new(node: error_node("a * rest must end an array pattern"), position: position)
+        end
         break
       end
       element = parse_pattern(tokens, position)

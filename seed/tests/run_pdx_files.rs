@@ -843,6 +843,10 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "`def self.` belongs inside a struct body — write def of",
         ),
         (
+            "answer = case [1, 2]\nin [*, found, *] then found\nelse 0\nend\np answer\n",
+            "a * rest must end an array pattern",
+        ),
+        (
             "trait Sexp\n  def self.of\n    1\n  end\nend\n",
             "a trait cannot define def self.of — a type function lives on the struct that includes it",
         ),
