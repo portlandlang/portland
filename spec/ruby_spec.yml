@@ -2578,12 +2578,12 @@ core/range/count_spec.rb:
 core/range/max_spec.rb:
   pdx: [spec/core/range/max_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises, and a string range's succ walk refuses in the wrong words (#333); the remaining rows pass and are #349's to port."
+  reason: "A count argument refuses, the count form being unbuilt (#413); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises, and a string range's succ walk refuses in the wrong words (#333); the remaining rows pass and are #349's to port."
   link: https://github.com/portlandlang/portland/issues/332
 core/range/min_spec.rb:
   pdx: [spec/core/range/min_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses on the seed and is dropped hosted (#332); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises; the remaining rows pass and are #349's to port."
+  reason: "A count argument refuses, the count form being unbuilt (#413); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises; the remaining rows pass and are #349's to port."
   link: https://github.com/portlandlang/portland/issues/332
 core/range/step_spec.rb:
   pdx: [spec/core/range/step_spec.pdx]

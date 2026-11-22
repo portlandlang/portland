@@ -3831,6 +3831,9 @@ def builtin_type_of(value)
   return ["regexp"] if value in Regexp
   return ["matchdata"] if value in MatchData
   return ["set"] if value in ["__set__", *]
+  # A range has a row in the table too, so a wrong count on one refuses
+  # here as it does on the seed, and is never dropped (#332).
+  return ["range", ["unknown"]] if value in Range
   return ["rational"] if value in Rational
   return ["complex"] if value in Complex
   nil
@@ -4662,6 +4665,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     outcome([result], scope)
   when "min"
+    check_builtin_count(receiver, node.name, arguments.length)
     result = receiver.min do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4669,6 +4673,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     outcome([result], scope)
   when "max"
+    check_builtin_count(receiver, node.name, arguments.length)
     result = receiver.max do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)

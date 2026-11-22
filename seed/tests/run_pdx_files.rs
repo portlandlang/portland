@@ -1630,6 +1630,26 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A count given to `max` or `min` refuses on both oracles in one
+/// sentence, with or without a comparator block (#332): the hosted
+/// evaluator checks a range's argument count as it does an array's.
+#[test]
+fn a_count_to_max_or_min_refuses_on_both_oracles() {
+    let cases = [
+        ("p((1..10).max(2))\n", "'max' takes 0 arguments, got 1"),
+        ("p((1..10).min(2))\n", "'min' takes 0 arguments, got 1"),
+        (
+            "p((1..10).max(2) { |left, right| left <=> right })\n",
+            "'max' takes 0 arguments, got 1",
+        ),
+        (
+            "p([3, 1].min(2) { |left, right| left <=> right })\n",
+            "'min' takes 0 arguments, got 1",
+        ),
+    ];
+    assert_both_oracles_refuse("counted_extreme.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
