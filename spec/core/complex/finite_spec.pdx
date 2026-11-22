@@ -8,4 +8,29 @@ context "Complex#finite?" do
   specify "the predicates" do
     expect(Complex(1, 2).finite?).to be_true
   end
+
+  specify "returns false for positive infinity" do
+    value = Complex(Float::INFINITY, 42)
+    expect(value.finite?).to be_false
+  end
+
+  specify "returns false for positive complex with infinite imaginary" do
+    value = Complex(1, Float::INFINITY)
+    expect(value.finite?).to be_false
+  end
+
+  specify "returns false for negative infinity" do
+    value = -Complex(Float::INFINITY, 42)
+    expect(value.finite?).to be_false
+  end
+
+  specify "returns false for negative complex with infinite imaginary" do
+    value = -Complex(1, Float::INFINITY)
+    expect(value.finite?).to be_false
+  end
+
+  specify "returns false for NaN" do
+    value = Complex(Float::NAN, Float::NAN)
+    expect(value.finite?).to be_false
+  end
 end

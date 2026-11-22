@@ -3004,8 +3004,8 @@ core/rational/numerator_spec.rb:
 core/rational/plus_spec.rb:
   pdx: [spec/core/rational/rational_spec.pdx, spec/core/kernel/Rational_spec.pdx, spec/core/rational/plus_spec.pdx]
   status: partial_planned
-  reason: "The coercion rows wait on #155; the arithmetic rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion rows wait on #155."
+  link: https://github.com/portlandlang/portland/issues/155
 core/rational/quo_spec.rb:
   pdx: [spec/core/rational/rational_spec.pdx, spec/core/kernel/Rational_spec.pdx]
 core/rational/rational_spec.rb:
@@ -3050,9 +3050,9 @@ core/complex/coerce_spec.rb:
   link: docs/ruby/numbers.md
 core/complex/comparison_spec.rb:
   pdx: [spec/core/complex/comparison_spec.pdx]
-  status: partial_planned
-  reason: "A non-numeric argument refuses rather than answering nil (docs/ruby/ordering.md); the nil and ordering rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "A non-numeric argument refuses rather than answering nil (docs/ruby/ordering.md)."
+  link: docs/ruby/ordering.md
 core/complex/conj_spec.rb:
   pdx: [spec/core/complex/conj_spec.pdx]
 core/complex/conjugate_spec.rb:
@@ -3066,33 +3066,30 @@ core/complex/denominator_spec.rb:
 core/complex/divide_spec.rb:
   pdx: [spec/core/complex/divide_spec.pdx]
   status: partial_planned
-  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md); a zero divisor refuses and Float's infinite? is a predicate; the arithmetic rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md); a zero divisor refuses and Float's infinite? is a predicate."
+  link: https://github.com/portlandlang/portland/issues/155
 core/complex/eql_spec.rb:
   pdx: [spec/core/complex/eql_spec.pdx]
-  status: partial_planned
-  reason: "The mock row stays upstream (docs/ruby/numbers.md); the class and equality rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The mock row stays upstream (docs/ruby/numbers.md)."
+  link: docs/ruby/numbers.md
 core/complex/equal_value_spec.rb:
   pdx: [spec/core/complex/equal_value_spec.pdx]
-  status: partial_planned
-  reason: "The mock rows stay upstream (docs/ruby/numbers.md) and the bignum lines with them (docs/ruby/integers.md); the equality rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The mock rows stay upstream (docs/ruby/numbers.md) and the bignum lines with them (docs/ruby/integers.md)."
+  link: docs/ruby/numbers.md
 core/complex/exponent_spec.rb:
   pdx: [spec/core/complex/exponent_spec.pdx]
   status: partial_planned
-  reason: "The coercion row waits on #155; the power rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion row waits on #155."
+  link: https://github.com/portlandlang/portland/issues/155
 core/complex/fdiv_spec.rb:
   pdx: [spec/core/complex/fdiv_spec.pdx]
   status: partial_planned
-  reason: "Float's infinite? is a predicate (docs/ruby/nil-and-optionals.md), and a non-numeric argument refuses, in other words than Ruby's (#295); the NaN, argument, and table rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "Float's infinite? is a predicate (docs/ruby/nil-and-optionals.md), and a non-numeric argument refuses, in other words than Ruby's (#295)."
+  link: https://github.com/portlandlang/portland/issues/295
 core/complex/finite_spec.rb:
   pdx: [spec/core/complex/finite_spec.pdx]
-  status: partial_planned
-  reason: "The infinity and NaN rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
 core/complex/hash_spec.rb:
   status: skipped
   reason: "hash is not exposed (ADR 0059): a value is a hash key by eql?."
@@ -3104,18 +3101,15 @@ core/complex/imaginary_spec.rb:
 core/complex/infinite_spec.rb:
   pdx: [spec/core/complex/infinite_spec.pdx]
   status: partial_planned
-  reason: "The negated rows wait on #329, where hosted types infinite? as a Boolean; the infinite-imaginary and NaN rows pass and are #349's to port."
+  reason: "The negated rows wait on #329, where hosted types infinite? as a Boolean."
   link: https://github.com/portlandlang/portland/issues/329
 core/complex/inspect_spec.rb:
   pdx: [spec/core/complex/inspect_spec.pdx]
-  status: partial_planned
-  reason: "inspect is a function, inspect(complex), not a method (ADR 0026), and the subclass rows stay upstream (docs/ruby/numbers.md); the rendering rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "inspect is a function, inspect(complex), not a method (ADR 0026), and the subclass rows stay upstream (docs/ruby/numbers.md)."
+  link: docs/ruby/numbers.md
 core/complex/integer_spec.rb:
   pdx: [spec/core/complex/integer_spec.pdx]
-  status: partial_planned
-  reason: "Both rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
 core/complex/magnitude_spec.rb:
   pdx: [spec/core/complex/magnitude_spec.pdx]
 core/complex/marshal_dump_spec.rb:
@@ -3125,13 +3119,13 @@ core/complex/marshal_dump_spec.rb:
 core/complex/minus_spec.rb:
   pdx: [spec/core/complex/minus_spec.pdx]
   status: partial_planned
-  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md); the arithmetic rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md)."
+  link: https://github.com/portlandlang/portland/issues/155
 core/complex/multiply_spec.rb:
   pdx: [spec/core/complex/multiply_spec.pdx]
   status: partial_planned
-  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md); the arithmetic rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md)."
+  link: https://github.com/portlandlang/portland/issues/155
 core/complex/negative_spec.rb:
   status: skipped
   reason: "The row asserts negative? is missing, which the method table says before anything runs."
@@ -3142,12 +3136,12 @@ core/complex/phase_spec.rb:
 core/complex/plus_spec.rb:
   pdx: [spec/core/complex/plus_spec.pdx]
   status: partial_planned
-  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md); the arithmetic rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The coercion row waits on #155 and the mock rows stay upstream (docs/ruby/numbers.md)."
+  link: https://github.com/portlandlang/portland/issues/155
 core/complex/polar_spec.rb:
   pdx: [spec/core/complex/polar_spec.pdx]
   status: partial_planned
-  reason: "A complex argument with a zero imaginary part refuses where Ruby answers (#327), and a non-real refuses in other words than Ruby's (#295); the radius-and-angle rows pass and are #349's to port."
+  reason: "A complex argument with a zero imaginary part refuses where Ruby answers (#327), and a non-real refuses in other words than Ruby's (#295)."
   link: https://github.com/portlandlang/portland/issues/327
 core/complex/positive_spec.rb:
   status: skipped
@@ -3156,14 +3150,14 @@ core/complex/quo_spec.rb:
   pdx: [spec/core/complex/quo_spec.pdx]
 core/complex/rationalize_spec.rb:
   pdx: [spec/core/complex/rationalize_spec.pdx]
-  status: partial_planned
-  reason: "The mock row stays upstream, a nonzero imaginary part or a second argument refuses in Ruby's words, and the single-argument and zero-imaginary rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The mock row stays upstream, and a nonzero imaginary part or a second argument refuses in Ruby's words."
+  link: docs/ruby/numbers.md
 core/complex/real_spec.rb:
   pdx: [spec/core/complex/real_spec.pdx]
-  status: partial_planned
-  reason: "The rows pass and are #349's to port, all but a bignum line (docs/ruby/integers.md)."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "A bignum line stays upstream, since integers are 64-bit (docs/ruby/integers.md)."
+  link: docs/ruby/integers.md
 core/complex/rect_spec.rb:
   pdx: [spec/core/complex/rect_spec.pdx]
   status: partial_intentional
@@ -3172,7 +3166,7 @@ core/complex/rect_spec.rb:
 core/complex/rectangular_spec.rb:
   pdx: [spec/core/complex/rectangular_spec.pdx]
   status: partial_planned
-  reason: "A complex argument with a zero imaginary part refuses where Ruby answers (#327); the mock rows stay upstream (docs/ruby/numbers.md), and an argument or a non-real refuses; the array rows pass and are #349's to port."
+  reason: "A complex argument with a zero imaginary part refuses where Ruby answers (#327); the mock rows stay upstream (docs/ruby/numbers.md), and an argument or a non-real refuses."
   link: https://github.com/portlandlang/portland/issues/327
 core/complex/to_c_spec.rb:
   pdx: [spec/core/complex/to_c_spec.pdx]
@@ -3196,9 +3190,9 @@ core/complex/to_r_spec.rb:
   link: https://github.com/portlandlang/portland/issues/328
 core/complex/to_s_spec.rb:
   pdx: [spec/core/complex/to_s_spec.pdx]
-  status: partial_planned
-  reason: "The subclass row stays upstream (docs/ruby/numbers.md); the rendering rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The subclass row stays upstream (docs/ruby/numbers.md)."
+  link: docs/ruby/numbers.md
 core/complex/uminus_spec.rb:
   pdx: [spec/core/complex/uminus_spec.pdx]
   status: partial_intentional
