@@ -1261,6 +1261,11 @@ def evaluate_math(name, arguments)
   unless (name == "log" && (given == 1 || given == 2)) || given == expected
     panic("wrong number of arguments (given #{given}, expected #{expected})")
   end
+  # A guest value that is no number refuses in Ruby's words with its own
+  # type's name, where the host would name a tagged shape an Array (#330).
+  arguments.each do |argument|
+    panic("can't convert #{value_type_label(argument)} into Float") if guest_tagged?(argument)
+  end
   first = value_at(arguments, 0)
   second = value_at(arguments, 1)
   case name
@@ -2504,6 +2509,12 @@ def evaluate_builtin_type_function(node, mutable bindings)
   # `Complex.polar` and `Complex.rectangular` (ADR 0085), the host's own.
   if type_name == "Complex" && %w[polar rect rectangular].include?(node.name)
     panic("Complex.#{node.name} takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    # A guest value that is no number refuses here in the seed's sentence,
+    # every argument written as the guest writes it, before the host could
+    # show a symbol's or a struct's tagged shape (#330).
+    if arguments.any? { guest_tagged?(it) }
+      panic("Complex.#{node.name} takes numbers, got #{arguments.map { render_inspect(it) }.join(", ")}")
+    end
     first = value_at(arguments, 0)
     built = if node.name == "polar"
       arguments.length == 1 ? Complex.polar(first) : Complex.polar(first, value_at(arguments, 1))
@@ -3438,6 +3449,7 @@ def evaluate_method_call(node, mutable bindings)
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).
   check_builtin_count(receiver, node.name, arguments.length)
+  refuse_guest_argument(receiver, node.name, arguments)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
@@ -3841,6 +3853,52 @@ end
 # The tower's constructors take numbers (ADR 0085); a guest value that is
 # not one — a symbol, a string, nil — refuses here with its guest rendering,
 # before the host's constructor could show its tagged shape.
+# A guest value the host holds as a tagged array: a symbol, a struct, an
+# enum case, a set, or a type.
+def guest_tagged?(value)
+  value in ["__symbol__", *] | ["__struct__", *] | ["__enum_case__", *] | ["__set__", *] | ["__type__", *]
+end
+
+# The number and string methods that read a guest value themselves, or
+# refuse one in a sentence of their own: equality and ordering, the
+# pattern questions and a slice by a group's name, the forms that name a
+# normalization or a type, and the methods whose argument is converted in
+# Ruby's words.
+GUEST_READING_METHODS = %w[!= !~ == === =~ <=> [] chr delete encode end_with? eql? equal? gsub instance_of? is_a? kind_of? match match? scan slice squeeze start_with? sub tr tr_s unicode_normalize unicode_normalized?]
+
+# A number or string method handed a guest value it does not take (#330):
+# the seed's sentence, each value written as the guest writes it, said here
+# before the host could print a symbol's or a struct's tagged shape. A
+# struct asked a pattern's question refuses the same way.
+def refuse_guest_argument(receiver, name, arguments)
+  written = arguments.map { render_inspect(it) }.join(", ")
+  if (name == "=~" || name == "!~") && (receiver in ["__struct__", *])
+    panic("undefined method #{name} for #{render_inspect(receiver)} with [#{written}]")
+  end
+  scalar = (receiver in Integer) || (receiver in Float) || (receiver in Rational) || (receiver in Complex) || (receiver in String)
+  return unless scalar && arguments.any? { guest_tagged?(it) }
+  # `between?` orders the receiver against each bound, and `clamp` the
+  # bounds against each other first; the pair that does not order is the
+  # one the seed names.
+  if name == "between?" || name == "clamp"
+    first = value_at(arguments, 0)
+    unordered = arguments.find { guest_tagged?(it) }
+    against = (name == "clamp" && !guest_tagged?(first)) ? first : receiver
+    panic("cannot apply '<=>' to #{render_inspect(against)} and #{render_inspect(unordered)}")
+  end
+  # The two families Ruby's own words refuse: a candidate that is no
+  # string, and a pattern that is neither a string nor a regex.
+  if (receiver in String) && (name == "start_with?" || name == "end_with?")
+    candidate = arguments.find { guest_tagged?(it) }
+    panic("no implicit conversion of #{value_type_label(candidate)} into String")
+  end
+  if (receiver in String) && (name == "sub" || name == "gsub") && guest_tagged?(value_at(arguments, 0))
+    panic("wrong argument type #{value_type_label(value_at(arguments, 0))} (expected Regexp)")
+  end
+  return if GUEST_READING_METHODS.include?(name)
+  panic("undefined method #{name} for #{render_inspect(receiver)} with [#{written}]")
+end
+
 def refuse_non_number(name, arguments)
   arguments.each do |argument|
     next if (argument in Integer) || (argument in Float) || (argument in Rational) || (argument in Complex)

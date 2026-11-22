@@ -1630,6 +1630,56 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A refusal about a guest value names it as the guest writes it on both
+/// oracles (#330): the hosted evaluator says the seed's sentence before the
+/// host could print a symbol's or a struct's tagged shape.
+#[test]
+fn refusals_render_guest_values_alike_on_both_oracles() {
+    let cases = [
+        (
+            "struct Plain\n  name\nend\np Complex.rectangular(:sym)\n",
+            "Complex.rectangular takes numbers, got :sym",
+        ),
+        (
+            "struct Plain\n  name\nend\np Complex.polar(Plain.new(name: \"x\"))\n",
+            "Complex.polar takes numbers, got Plain(name: \"x\")",
+        ),
+        (
+            "struct Plain\n  name\nend\np Complex(20).fdiv(:sym)\n",
+            "undefined method fdiv for (20+0i) with [:sym]",
+        ),
+        (
+            "struct Plain\n  name\nend\np 3.gcd(:sym)\n",
+            "undefined method gcd for 3 with [:sym]",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".index(Plain.new(name: \"x\"))\n",
+            "undefined method index for \"a\" with [Plain(name: \"x\")]",
+        ),
+        (
+            "struct Plain\n  name\nend\np(Plain.new(name: \"x\") !~ /x/)\n",
+            "undefined method !~ for Plain(name: \"x\") with [/x/]",
+        ),
+        (
+            "struct Plain\n  name\nend\np 3.clamp(1, :b)\n",
+            "cannot apply '<=>' to 1 and :b",
+        ),
+        (
+            "struct Plain\n  name\nend\np Math.sqrt(:sym)\n",
+            "can't convert Symbol into Float",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".start_with?(:sym)\n",
+            "no implicit conversion of Symbol into String",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".sub(Plain.new(name: \"x\"), \"y\")\n",
+            "wrong argument type Plain (expected Regexp)",
+        ),
+    ];
+    assert_both_oracles_refuse("guest_value_refusal.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
