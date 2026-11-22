@@ -153,6 +153,116 @@ fn integer_steps(start: i64, limit: i64, stride: i64) -> Vec<Value> {
     steps
 }
 
+/// The values a range's `step` walks between two numbers (#333), Ruby's:
+/// by one when no stride is given, downward when the stride is negative,
+/// and through floats when the stride or either end is one. `None` where
+/// the ends or the stride are something else, so the arms that walk a
+/// range's elements, and their refusals, still answer. A zero stride
+/// refuses in Ruby's words.
+fn range_steps(range: &Value, strides: &[Value]) -> Option<Vec<Value>> {
+    let stride = match strides {
+        [] => Value::Integer(1),
+        [stride @ (Value::Integer(_) | Value::Float(_))] => stride.clone(),
+        _ => return None,
+    };
+    let (start, end, exclusive) = range_ends(range);
+    let (start, end) = match (start, end) {
+        (
+            Some(start @ (Value::Integer(_) | Value::Float(_))),
+            Some(end @ (Value::Integer(_) | Value::Float(_))),
+        ) => (start, end),
+        _ => return None,
+    };
+    if matches!(stride, Value::Integer(0)) || matches!(stride, Value::Float(zero) if zero == 0.0) {
+        panic!("step can't be 0");
+    }
+    if let (Value::Integer(start), Value::Integer(end), Value::Integer(stride)) =
+        (start, end, &stride)
+    {
+        let mut steps = Vec::new();
+        let mut current = *start;
+        loop {
+            let inside = match (*stride > 0, exclusive) {
+                (true, false) => current <= *end,
+                (true, true) => current < *end,
+                (false, false) => current >= *end,
+                (false, true) => current > *end,
+            };
+            if !inside {
+                break;
+            }
+            steps.push(Value::Integer(current));
+            match current.checked_add(*stride) {
+                Some(next) => current = next,
+                None => break,
+            }
+        }
+        return Some(steps);
+    }
+    Some(
+        float_steps(
+            crate::tower::to_f64(start),
+            crate::tower::to_f64(end),
+            crate::tower::to_f64(&stride),
+            exclusive,
+        )
+        .into_iter()
+        .map(Value::Float)
+        .collect(),
+    )
+}
+
+/// Ruby's float stepping (`ruby_float_step` in numeric.c), step for step:
+/// the count comes from the span over the stride with an error allowance,
+/// so a sum of inexact strides cannot add or lose a last value, and each
+/// value is `start + index * stride`, pinned to the end where it would
+/// pass it. The multiply and add are fused, as CRuby's are on Apple
+/// silicon, which is what makes `(-2.0..0).step(0.1)` read
+/// `-1.0999999999999999` at its tenth value and not `-1.1`.
+fn float_steps(start: f64, end: f64, stride: f64, exclusive: bool) -> Vec<f64> {
+    let mut count = (end - start) / stride;
+    let error =
+        ((start.abs() + end.abs() + (end - start).abs()) / stride.abs() * f64::EPSILON).min(0.5);
+    if stride.is_infinite() {
+        let reached = if stride > 0.0 {
+            start <= end
+        } else {
+            start >= end
+        };
+        return if reached { vec![start] } else { Vec::new() };
+    }
+    if exclusive {
+        if count <= 0.0 {
+            return Vec::new();
+        }
+        count = if count < 1.0 {
+            0.0
+        } else {
+            (count - error).floor()
+        };
+        let next = (count + 1.0).mul_add(stride, start);
+        if (start < end && next < end) || (start > end && next > end) {
+            count += 1.0;
+        }
+    } else {
+        if count < 0.0 {
+            return Vec::new();
+        }
+        count = (count + error).floor();
+    }
+    (0..=count as u64)
+        .map(|index| {
+            let value = (index as f64).mul_add(stride, start);
+            let passed = if stride >= 0.0 {
+                end < value
+            } else {
+                value < end
+            };
+            if passed { end } else { value }
+        })
+        .collect()
+}
+
 /// Ruby 4.1's Range#clamp (#111): each end held inside the bounds, an
 /// absent end or bound leaving the other side alone; the answer excludes
 /// its end when the end it kept was excluded by whichever side supplied
@@ -5020,6 +5130,14 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("cannot get the maximum of endless range");
         };
         let top = if exclusive {
+            // Ruby finds an excluded string end's maximum by walking
+            // `succ`, which is unbuilt; that is the sentence a string
+            // range's other walks give (#333).
+            if matches!(end, Value::String(_)) {
+                panic!(
+                    "a string range is not walked here — Ruby's succ walk (\"a\"..\"e\") waits for a pull; write the strings out"
+                );
+            }
             let Value::Integer(end) = end else {
                 panic!("cannot exclude non Integer end value");
             };
@@ -5807,6 +5925,22 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             if matches!(name, "to_a" | "entries") && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
+            }
+            // `step` with a block (#333): each value handed over and the
+            // range answered, as Ruby's does — asked here, before the walk
+            // below turns the range into its elements, which a float
+            // range has none of.
+            if let Some(block) = block
+                && name == "step"
+                && let Some(steps) = range_steps(&receiver, &arguments)
+            {
+                for value in steps {
+                    self.run_block(block, vec![value]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
             }
             // The walks that answer the range itself, as Ruby's do.
             if let Some(block) = block
@@ -7254,6 +7388,14 @@ impl<W: std::io::Write> Interpreter<W> {
             // Strides and extremes walk the same elements `each` walks, so a
             // range without both ends refuses with the same words. The
             // extremes are maybes: an empty range has neither.
+            // A range between two numbers steps as Ruby's does (#333): by
+            // one with no stride, downward by a negative one, through
+            // floats where one is involved.
+            (range @ Value::Range { .. }, "step", strides)
+                if range_steps(range, strides).is_some() =>
+            {
+                Value::array(range_steps(range, strides).expect("checked by the guard"))
+            }
             (range @ Value::Range { .. }, "step", [Value::Integer(stride)]) => {
                 if *stride <= 0 {
                     panic!("step takes a positive stride, got {stride}");
