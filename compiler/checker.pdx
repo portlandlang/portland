@@ -348,17 +348,10 @@ def locate(node, scope)
   [line, text.chomp, scope.file]
 end
 
-# The node kinds a refusal can point at carry their line (the ruling of
-# 2026-09-24: the first token that begins the node); the rest do not, and
-# #362 gives every kind one.
-def line_of(node)
-  case node
-  in IfNode | WhileNode | LogicalNode | BinaryNode | UnaryNode | CallNode | MethodCallNode | SafeMethodCallNode | DefNode | CaseInNode | EnumCaseNode | EnumCasePatternNode | IndexNode | IdentifierNode | StructDefNode | EnumDefNode | TraitDefNode | AliasNode | AssignmentNode
-    node.line
-  else
-    nil
-  end
-end
+# Every node kind carries its line (the ruling of 2026-09-24: the first
+# token that begins the node, #362). It is nil only on a node a desugar
+# built with no token in hand.
+def line_of(node) = node.line
 
 # Every top-level def's parameters with their contracts (ADR 0048), as
 # [name, parameters] where each parameter is [name, keyword?, entry] and
@@ -1646,10 +1639,10 @@ def check_unreachable_arms(node, scope, mutable found)
   mutable seen_cases = []
   unguarded_arms(node).each do |branch|
     pattern = branch.pattern
-    found = noted(found, ["sentence", "this arm can never match — the capture above binds every subject"], locate(node, scope)) if seen_capture
+    found = noted(found, ["sentence", "this arm can never match — the capture above binds every subject"], locate(branch, scope)) if seen_capture
     name = whole_case_name(pattern)
     unless name.nil?
-      found = noted(found, ["sentence", "in :#{name} can never match — an arm above already matches :#{name}"], locate(node, scope)) if seen_cases.include?(name)
+      found = noted(found, ["sentence", "in :#{name} can never match — an arm above already matches :#{name}"], locate(branch, scope)) if seen_cases.include?(name)
       seen_cases << name
     end
     seen_capture = true if pattern in IdentifierNode
