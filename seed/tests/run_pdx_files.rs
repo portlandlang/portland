@@ -1679,6 +1679,28 @@ fn output_uses_a_structs_own_to_s_and_inspect() {
     assert_both_oracles_refuse("own_rendering_refusal.pdx", None, &cases);
 }
 
+/// A struct inside a collection or another struct renders by its own
+/// `inspect`, and `join` by its own `to_s`, on both oracles (#285). The
+/// rows are the issue's table: Ruby's output, except that `puts` of a
+/// collection prints its inspect form (ADR 0060) and a struct's default
+/// form is Portland's.
+#[test]
+fn a_nested_struct_renders_by_its_own_inspect_and_to_s() {
+    let gadget = "struct Gadget\n  name\n\n  def inspect\n    \"ci\"\n  end\n\n  def to_s\n    \"cs\"\n  end\nend\n\nstruct Wrapper\n  inner\nend\n\ngadget = Gadget.new(name: \"g\")\n";
+    assert_both_print(
+        "nested_own_rendering.pdx",
+        &format!(
+            "{gadget}p([gadget])\np({{gadget => gadget}})\np Set[gadget]\np Wrapper.new(inner: gadget)\nputs inspect([gadget])\nputs \"#{{[gadget]}}\"\nputs([gadget])\np([gadget].join(\",\"))\n"
+        ),
+        "[ci]\n{ci => ci}\nSet[ci]\nWrapper(inner: ci)\n[ci]\n[ci]\n[ci]\n\"cs\"\n",
+    );
+    let cases = [(
+        "struct Gadget\n  name\n\n  def inspect\n    1\n  end\nend\n\np([Gadget.new(name: \"g\")])\n",
+        "'inspect' answers a String, got 1",
+    )];
+    assert_both_oracles_refuse("nested_own_rendering_refusal.pdx", None, &cases);
+}
+
 /// A capture with no block, or with an argument, refuses on both oracles
 /// (#251): there is nothing to capture without the block's writes.
 #[test]
