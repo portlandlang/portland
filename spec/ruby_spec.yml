@@ -3383,7 +3383,7 @@ core/string/include_spec.rb:
 core/string/index_spec.rb:
   pdx: [spec/core/string/index_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp and String rows are #323's to port; a String with a start position waits on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
+  reason: "The passing Regexp rows are #323's to port; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
   link: https://github.com/portlandlang/portland/issues/323
 core/string/initialize_spec.rb:
   status: skipped

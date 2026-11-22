@@ -8056,6 +8056,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 .map_or(Value::Nil, |byte_position| {
                     Value::Integer(text[..byte_position].graphemes(true).count() as i64)
                 }),
+            // From a start position, counted in characters and from the end
+            // when negative, as the Regexp form reads one (#316); a position
+            // outside the string finds nothing.
+            (Value::String(text), "index", [Value::String(needle), Value::Integer(from)]) => {
+                let boundaries: Vec<usize> = text
+                    .grapheme_indices(true)
+                    .map(|(at, _)| at)
+                    .chain(std::iter::once(text.len()))
+                    .collect();
+                let count = boundaries.len() as i64 - 1;
+                let position = if *from < 0 { count + from } else { *from };
+                if position < 0 || position > count {
+                    Value::Nil
+                } else {
+                    let start = boundaries[position as usize];
+                    text[start..]
+                        .find(needle.as_str())
+                        .map_or(Value::Nil, |byte_position| {
+                            Value::Integer(
+                                text[..start + byte_position].graphemes(true).count() as i64
+                            )
+                        })
+                }
+            }
             // One character only: Ruby's multi-character count is a
             // character-set count, not a substring count, and following it
             // quietly would be principle 5's exact shape — so more refuses.
