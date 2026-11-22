@@ -5503,9 +5503,12 @@ impl<W: std::io::Write> Interpreter<W> {
         // each piece ends with the separator unless `chomp:` takes it off.
         // With a block the pieces are handed over and the string comes
         // back; without one they are the answer.
+        // `lines` takes no block: one beside it falls through to the
+        // general refusal, never run and never ignored.
         if let Value::String(text) = &receiver
             && matches!(name, "each_line" | "lines")
             && (!arguments.is_empty() || !keyword_arguments.is_empty())
+            && (block.is_none() || name == "each_line")
         {
             let pieces = separated_lines(text, name, &arguments, &keyword_arguments);
             let Some(block) = block else {

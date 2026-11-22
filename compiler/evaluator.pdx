@@ -3358,7 +3358,8 @@ def evaluate_method_call(node, mutable bindings)
   # `lines` and `each_line` with a separator or `chomp:` (#313): the host
   # cuts the pieces, and with a block each is handed over through `each`'s
   # own walk and the string comes back.
-  if (receiver in String) && %w[each_line lines].include?(node.name) && !(arguments.empty? && keyword_values.empty?)
+  # `lines` takes no block: one beside it goes on to the general refusal.
+  if (receiver in String) && %w[each_line lines].include?(node.name) && !(arguments.empty? && keyword_values.empty?) && (node.block.nil? || node.name == "each_line")
     pieces = separated_lines(receiver, node.name, arguments, keyword_values)
     return outcome([pieces], bindings) if node.block.nil?
     walking = method_call_node(node.receiver, "each", [], node.block, line: node.line)
