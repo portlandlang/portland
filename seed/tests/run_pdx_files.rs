@@ -1175,6 +1175,17 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         // ADR 0047 shape 4 — an operator on operands it cannot take, the
         // legal pairs being the seed's own match arms read as types.
         (
+            // #301: `private_constant` names a constant its module defines.
+            "module Config\n  FOO = 1\n  private_constant :MISSING\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "private_constant names MISSING, which Config does not define — it hides a constant Config defines",
+        ),
+        (
+            "struct Token\n  kind\n  KINDS = %w[word mark]\n  private_constant :KINDZ\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "private_constant names KINDZ, which Token does not define — it hides a constant Token defines",
+        ),
+        (
             "count = 3\nif false\n  label = \"total: \" + count\nend\nputs \"reached the end\"\n",
             "reached the end\n",
             "cannot apply '+' to String and Integer",
@@ -1628,6 +1639,17 @@ fn exponent_literals_on_both_oracles() {
         ("x = 01e5\n", "'01e5' has a leading zero — write 1e5"),
     ];
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
+}
+
+/// `private_constant` among a struct's fields, before any def, is read as
+/// the marker it is on both oracles (#301), and may hide a nested type.
+#[test]
+fn private_constant_sits_among_a_structs_fields() {
+    assert_both_print(
+        "private_constant_in_fields.pdx",
+        "struct Token\n  kind\n  KINDS = %w[word mark]\n  private_constant :KINDS\n\n  def known? = KINDS.include?(kind)\nend\nmodule Config\n  struct Helper\n    name\n  end\n  private_constant :Helper\nend\nputs Token.new(kind: \"word\").known?\n",
+        "true\n",
+    );
 }
 
 /// The output functions write a struct's own `to_s`, and `p` its own

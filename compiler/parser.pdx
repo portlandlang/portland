@@ -3457,7 +3457,9 @@ def parse_struct(tokens, mutable position)
     # Ruby's class macros — `validates :email`, `format :json` — are calls
     # in a type body, where Portland only declares (#135): nothing runs at
     # definition time. The seed's sentence.
-    if position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1])
+    # A visibility word with a symbol after it (`private_constant :NAME`)
+    # is ADR 0076's marker, read below, not a macro.
+    if position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1]) && !visibility_word?(tokens[position].text)
       refusal = "'#{tokens[position].text} #{tokens[position + 1].text}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def" if refusal.nil?
       position = skip_newlines_at(tokens, skip_line_at(tokens, position))
       next

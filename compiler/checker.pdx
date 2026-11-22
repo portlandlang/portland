@@ -151,7 +151,8 @@ def check_program_with(nodes, source, file, imports, sharpened)
   annotated = check_annotations(nodes, source, scope, [])
   found = check_requires(nodes, false, scope, annotated)
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
-  in_source_order(check_body(nodes, scope, walked.last))
+  hidden = check_private_constant_names(nodes, "", scope, walked.last)
+  in_source_order(check_body(nodes, scope, hidden))
 end
 
 # Refusals in the order the source has them: by line, with the walk's own
@@ -1480,6 +1481,50 @@ def declared_visibilities(nodes)
     table << [declaration.name, marked] unless marked.empty?
   end
   table
+end
+
+# `private_constant` hides a constant its own module or struct defines
+# (#301): a name it does not define is a typo that would leave the
+# intended constant public, so it refuses, where Ruby raises NameError. A
+# constant is a SCREAMING_CASE binding or a type declared in the body.
+def check_private_constant_names(nodes, home, scope, mutable found)
+  nodes.each do |node|
+    if node in ModuleDefNode
+      owner = qualified_under(home, node.path.join("::"))
+      defined = constants_defined_in(node.body)
+      node.body.each do |statement|
+        next unless statement in PrivateConstantNode
+        statement.names.each do |name|
+          found = noted(found, ["sentence", undefined_private_constant(name, owner)], locate(statement, scope)) unless defined.include?(name)
+        end
+      end
+      found = check_private_constant_names(node.body, owner, scope, found)
+    elsif node in StructDefNode
+      owner = qualified_under(home, node.name)
+      defined = constants_defined_in(node.constants + node.nested)
+      node.private_constants.each do |name|
+        found = noted(found, ["sentence", undefined_private_constant(name, owner)], locate(node, scope)) unless defined.include?(name)
+      end
+      found = check_private_constant_names(node.nested, owner, scope, found)
+    end
+  end
+  found
+end
+
+def undefined_private_constant(name, owner)
+  "private_constant names #{name}, which #{owner} does not define — it hides a constant #{owner} defines"
+end
+
+# The constants a body defines by name: its SCREAMING_CASE bindings and
+# the types and modules declared in it.
+def constants_defined_in(statements)
+  mutable names = []
+  statements.each do |statement|
+    names << statement.name if constant_declaration?(statement)
+    names << statement.name if (statement in StructDefNode) || (statement in EnumDefNode) || (statement in TraitDefNode)
+    names << module_name(statement) if statement in ModuleDefNode
+  end
+  names
 end
 
 # The constants `private_constant` hid, qualified under their namespace: a
