@@ -4034,8 +4034,8 @@ core/kernel/spawn_spec.rb:
 core/kernel/sprintf_spec.rb:
   pdx: [spec/core/kernel/sprintf_spec.pdx, spec/core/kernel/format_spec.pdx]
   status: partial_planned
-  reason: "The shared sprintf rows are ported against format, sprintf's twin (ADR 0067), and the valid-encoding and Unicode %c rows pass and are #349's to port; the to_str mock row and the public_methods reflection row stay upstream, with the rows the shared examples leave behind (mocks, Hash#default, KeyError's receiver, $VERBOSE, encodings)."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The shared sprintf rows are ported against format, sprintf's twin (ADR 0067), and the valid-encoding and Unicode %c rows pass and are #380's to port; the to_str mock row and the public_methods reflection row stay upstream, with the rows the shared examples leave behind (mocks, Hash#default, KeyError's receiver, $VERBOSE, encodings)."
+  link: https://github.com/portlandlang/portland/issues/380
 core/kernel/format_spec.rb:
   pdx: [spec/core/kernel/format_spec.pdx]
   status: partial_intentional
@@ -4500,13 +4500,13 @@ language/redo_spec.rb:
 language/regexp/anchors_spec.rb:
   pdx: [spec/language/regexp/anchors_spec.pdx]
   status: partial_planned
-  reason: "The subjects spelled with \\0, \\f, and \\v wait on #304; the $~ assertions pass when read from the bound match and are #349's to port."
+  reason: "The subjects spelled with \\0, \\f, and \\v wait on #304; the $~ assertions pass when read from the bound match and are #380's to port."
   link: https://github.com/portlandlang/portland/issues/304
 language/regexp/back-references_spec.rb:
   pdx: [spec/language/regexp/back-references_spec.pdx]
   status: partial_planned
-  reason: "The $~ and $1 rows stay upstream, since the match globals are gone, and the thread row has no Thread; a bad pattern refuses; the passing back-reference rows are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The $~ and $1 rows stay upstream, since the match globals are gone, and the thread row has no Thread; a bad pattern refuses; the passing back-reference rows are #380's to port."
+  link: https://github.com/portlandlang/portland/issues/380
 language/regexp/character_classes_spec.rb:
   pdx: [spec/language/regexp/character_classes_spec.pdx]
   status: partial_planned
@@ -4524,35 +4524,35 @@ language/regexp/encoding_spec.rb:
 language/regexp/escapes_spec.rb:
   pdx: [spec/language/regexp/escapes_spec.pdx]
   status: partial_planned
-  reason: "The file is binary-encoded upstream; %r takes the family's delimiters only, and the eval-driven syntax errors refuse; the subjects spelled with \\e, \\0, \\v, \\f, \\a, and octal wait on #304, and the rest pass and are #349's to port."
+  reason: "The file is binary-encoded upstream; %r takes the family's delimiters only, and the eval-driven syntax errors refuse; the subjects spelled with \\e, \\0, \\v, \\f, \\a, and octal wait on #304, and the rest pass and are #380's to port."
   link: https://github.com/portlandlang/portland/issues/304
 language/regexp/grouping_spec.rb:
   pdx: [spec/language/regexp/grouping_spec.pdx]
   status: partial_planned
-  reason: "A malformed pattern or group name refuses, which a spec cannot assert; the comment-in-a-class row passes and is #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "A malformed pattern or group name refuses, which a spec cannot assert; the comment-in-a-class row passes and is #380's to port."
+  link: https://github.com/portlandlang/portland/issues/380
 language/regexp/interpolation_spec.rb:
   pdx: [spec/language/regexp/interpolation_spec.pdx]
   status: partial_planned
-  reason: "A malformed pattern refuses and the o flag refuses by name; the /n row waits on #321, \\c before #{ on #346, and the to_s row passes and is #349's to port."
+  reason: "A malformed pattern refuses and the o flag refuses by name; the /n row waits on #321, \\c before #{ on #346, and the to_s row passes and is #380's to port."
   link: https://github.com/portlandlang/portland/issues/346
 language/regexp/modifiers_spec.rb:
   pdx: [spec/language/regexp/modifiers_spec.pdx]
   status: partial_planned
-  reason: "The o flag refuses by name — a constant pattern is hoisted anyway — and the eval-driven syntax errors stay upstream; the ASCII/Unicode modifier rows and the inline-modifier assertions pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The o flag refuses by name — a constant pattern is hoisted anyway — and the eval-driven syntax errors stay upstream; the ASCII/Unicode modifier rows and the inline-modifier assertions pass and are #380's to port."
+  link: https://github.com/portlandlang/portland/issues/380
 language/regexp/repetition_spec.rb:
   pdx: [spec/language/regexp/repetition_spec.pdx]
   status: partial_planned
-  reason: "Ruby's nested-repeat warning has no counterpart, and a nested repeat is read as Ruby reads it; the nested-quantifier and remaining assertions pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "Ruby's nested-repeat warning has no counterpart, and a nested repeat is read as Ruby reads it; the nested-quantifier and remaining assertions pass and are #380's to port."
+  link: https://github.com/portlandlang/portland/issues/380
 language/regexp/subexpression_call_spec.rb:
   pdx: [spec/language/regexp/subexpression_call_spec.pdx]
 language/regexp_spec.rb:
   pdx: [spec/language/regexp_spec.pdx]
   status: partial_planned
-  reason: "The $_ conditional, frozen?, identity, and syntax-error rows stay upstream; %r takes the family's delimiters only, so the other delimiter rows have no spelling; the paired-delimiter and lookbehind rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  reason: "The $_ conditional, frozen?, identity, and syntax-error rows stay upstream; %r takes the family's delimiters only, so the other delimiter rows have no spelling; the paired-delimiter and lookbehind rows pass and are #380's to port."
+  link: https://github.com/portlandlang/portland/issues/380
 language/source_encoding_spec.rb:
   status: skipped
   reason: "Source is UTF-8 with ASCII outside strings and comments (#139); there is no encoding comment and no BOM handling to specify."
