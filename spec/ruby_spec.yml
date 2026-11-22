@@ -840,17 +840,17 @@ core/enumerable/to_set_spec.rb:
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/core/enumerable/each_slice_spec.pdx]
   status: partial_planned
-  reason: "each_slice answers the slices as an array, so the enumerator and its nil size stay upstream (ADR 0055); the block form waits on #336, the early break with a value on #303, and the passing rows are #349's to port."
+  reason: "each_slice answers the slices as an array, so the enumerator and its nil size stay upstream (ADR 0055); the block form waits on #336, and the early break with a value on #303."
   link: https://github.com/portlandlang/portland/issues/336
 core/enumerable/flat_map_spec.rb:
   pdx: [spec/core/enumerable/flat_map_spec.pdx]
   status: partial_planned
-  reason: "The to_ary rows stay upstream (ADR 0036) and the enumerator rows with them (ADR 0055); a struct answered by the block waits on #341, and the flattening row is #349's to port."
+  reason: "The to_ary rows stay upstream (ADR 0036) and the enumerator rows with them (ADR 0055); a struct answered by the block waits on #341."
   link: https://github.com/portlandlang/portland/issues/341
 core/enumerable/tally_spec.rb:
   pdx: [spec/core/enumerable/tally_spec.pdx]
   status: partial_planned
-  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, a bare yield on #341, an ignored block on #336, and the passing rows are #349's to port."
+  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, a bare yield on #341, and an ignored block on #336."
   link: https://github.com/portlandlang/portland/issues/342
 
 # — core/false —
@@ -2227,14 +2227,14 @@ core/data/define_spec.rb:
   link: docs/ruby/classes.md
 core/data/eql_spec.rb:
   pdx: [spec/core/data/eql_spec.pdx]
-  status: partial_planned
-  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015); the same-object and different-fields rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015)."
+  link: docs/adr/0015-2026-07-23-values-never-mutate.md
 core/data/equal_value_spec.rb:
   pdx: [spec/core/data/equal_value_spec.pdx]
-  status: partial_planned
-  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015); the same-object and unequal-field rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "The different-class row builds a class at runtime, and the recursive rows need a value that mutates (ADR 0015)."
+  link: docs/adr/0015-2026-07-23-values-never-mutate.md
 core/data/hash_spec.rb:
   status: skipped
   reason: "There is no hash (ADR 0059); a value is a hash key by eql?."
@@ -2815,7 +2815,7 @@ core/set/initialize_clone_spec.rb:
 core/set/initialize_spec.rb:
   pdx: [spec/core/set/initialize_spec.pdx]
   status: partial_planned
-  reason: "The private-method check stays upstream; the mock enumerables wait on #340, Set.new taking a struct that includes Enumerable, and the set-and-block and block-only rows pass and are #349's to port."
+  reason: "The private-method check stays upstream; the mock enumerables wait on #340, Set.new taking a struct that includes Enumerable."
   link: https://github.com/portlandlang/portland/issues/340
 core/set/inspect_spec.rb:
   pdx: [spec/core/set/inspect_spec.pdx]
@@ -2917,9 +2917,9 @@ core/set/to_a_spec.rb:
   pdx: [spec/core/set/to_a_spec.pdx]
 core/set/to_s_spec.rb:
   pdx: [spec/core/set/to_s_spec.pdx]
-  status: partial_planned
-  reason: "No value can hold itself (ADR 0015), so the cyclic row cannot be built; the String-type row passes and is #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "No value can hold itself (ADR 0015), so the cyclic row cannot be built."
+  link: docs/adr/0015-2026-07-23-values-never-mutate.md
 core/set/union_spec.rb:
   pdx: [spec/core/set/union_spec.pdx]
   status: partial_intentional
@@ -3241,7 +3241,7 @@ core/string/chilled_string_spec.rb:
 core/string/chomp_spec.rb:
   pdx: [spec/core/string/chomp_spec.pdx]
   status: partial_planned
-  reason: "chomp with a separator waits on #343; chomp! and the $/, copy-identity, subclass, encoding, and to_str rows stay upstream (ADR 0015, ADR 0069, ADR 0036), and the no-argument rows pass and are #349's to port."
+  reason: "chomp with a separator waits on #343; chomp! and the $/, copy-identity, subclass, encoding, and to_str rows stay upstream (ADR 0015, ADR 0069, ADR 0036)."
   link: https://github.com/portlandlang/portland/issues/343
 core/string/chop_spec.rb:
   pdx: [spec/core/string/chop_spec.pdx]
@@ -3288,9 +3288,9 @@ core/string/element_set_spec.rb:
   link: docs/ruby/mutability.md
 core/string/count_spec.rb:
   pdx: [spec/core/string/count_spec.pdx]
-  status: partial_planned
-  reason: "count takes a single character; Ruby's character-set count refuses rather than meaning something else (docs/ruby/string-count.md), and the multibyte row passes and is #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "count takes a single character; Ruby's character-set count refuses rather than meaning something else (docs/ruby/string-count.md)."
+  link: docs/ruby/string-count.md
 core/string/delete_prefix_spec.rb:
   pdx: [spec/core/string/delete_prefix_spec.pdx]
 core/string/delete_suffix_spec.rb:
