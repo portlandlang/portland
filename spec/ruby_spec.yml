@@ -4543,8 +4543,8 @@ language/regexp/grouping_spec.rb:
 language/regexp/interpolation_spec.rb:
   pdx: [spec/language/regexp/interpolation_spec.pdx]
   status: partial_planned
-  reason: "A malformed pattern refuses and the o flag refuses by name; the /n row waits on #321, \\c before #{ on #346, and the to_s row passes and is #349's to port."
-  link: https://github.com/portlandlang/portland/issues/346
+  reason: "A malformed pattern refuses and the o flag refuses by name; the /n row waits on #321, and the to_s row passes and is #349's to port."
+  link: https://github.com/portlandlang/portland/issues/321
 language/regexp/modifiers_spec.rb:
   pdx: [spec/language/regexp/modifiers_spec.pdx]
   status: partial_planned

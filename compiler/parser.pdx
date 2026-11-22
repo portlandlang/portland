@@ -2368,6 +2368,13 @@ def regex_expression(lexeme, line: nil)
         literal << following
       end
       index += 2
+      # `\c` takes the character after it as the one to control, so a
+      # `\c#` before a brace is a control escape and a literal brace, as
+      # Ruby reads it, never an interpolation (#346).
+      if following == "c" && index < characters.length
+        literal << characters[index]
+        index += 1
+      end
       next
     end
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"

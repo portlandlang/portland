@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **`\c` before `#{` in a regex is a control escape** ([#346](https://github.com/portlandlang/portland/issues/346)) — `/\c#{str}/` interpolated `str` on both implementations, a silently different pattern; Ruby reads `\c#` as a control escape and `{str}` as literal text. Both parsers let `\c` take the character after it, so the `#` is the character controlled and no interpolation opens.
+  - ruby/spec rows activated: "gives precedence to escape sequences over substitution" of `language/regexp/interpolation`.
+
 - **#220 split into the four things it held** — a line on every refusal ([#362](https://github.com/portlandlang/portland/issues/362)), enum cases where a symbol is expected ([#363](https://github.com/portlandlang/portland/issues/363)), patterns by trait ([#364](https://github.com/portlandlang/portland/issues/364)), and `case/in` coverage widened by inference ([#365](https://github.com/portlandlang/portland/issues/365)), which the docs cited #220 for but its body never listed. Each carries its own `buildable` or `needs-decision` label.
 - **language.md on `.class`, and the predefined-globals manifest row** ([#288](https://github.com/portlandlang/portland/issues/288)) — language.md said `.class` does not exist; it answers the type (ADR 0074). The manifest called `DATA` and `__END__` removed, citing a page that names neither; they are unruled, [#360](https://github.com/portlandlang/portland/issues/360).
 - **Implementation comments state their reason instead of narrating history** ([#288](https://github.com/portlandlang/portland/issues/288)) — comments in the compiler, the seed's parser, and `script/spec` that explained their code by what it "used to" do now say why it is shaped as it is. No check enforces this: "used to" and "no longer" are right in principles.md, the ledger, and regression tests, and telling those apart would be a guess, so `script/docs/check`'s header records the absence and AGENT.md the rule.
