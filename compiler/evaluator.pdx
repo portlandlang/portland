@@ -3716,9 +3716,12 @@ def evaluate_method_call(node, mutable bindings)
   # pattern (ADR 0065), the predicates, grep, and the slices ask the
   # host's `when` rule — a range covers, anything else asks `==`.
   when "any?" then arguments.empty? ? receiver.any? : receiver.any?(value_at(arguments, 0))
-  when "all?" then receiver.all?(value_at(arguments, 0))
-  when "none?" then receiver.none?(value_at(arguments, 0))
-  when "one?" then receiver.one?(value_at(arguments, 0))
+  # With neither a block nor a pattern, each of these three is the host's
+  # bare call, which refuses as the seed does: handing over a missing
+  # pattern as nil made them answer, wrongly (#337).
+  when "all?" then arguments.empty? ? receiver.all? : receiver.all?(value_at(arguments, 0))
+  when "none?" then arguments.empty? ? receiver.none? : receiver.none?(value_at(arguments, 0))
+  when "one?" then arguments.empty? ? receiver.one? : receiver.one?(value_at(arguments, 0))
   when "grep" then receiver.grep(value_at(arguments, 0))
   when "grep_v" then receiver.grep_v(value_at(arguments, 0))
   when "slice_before" then receiver.slice_before(value_at(arguments, 0))
