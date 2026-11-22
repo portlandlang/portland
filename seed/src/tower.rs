@@ -461,6 +461,9 @@ fn rational_round(numerator: i64, denominator: i64) -> Value {
 /// power — which, for a negative base and a fractional exponent, is a
 /// complex (`rb_dbl_complex_new_polar_pi`).
 fn real_pow(left: &Value, right: &Value) -> Value {
+    // A Rational power answers a Rational even where it is integral, as
+    // Ruby's does: `2 ** Rational(2, 1)` is `(4/1)` (#290).
+    let rational_power = matches!(right, Value::Rational { .. });
     let right = match right {
         Value::Rational {
             numerator,
@@ -473,8 +476,8 @@ fn real_pow(left: &Value, right: &Value) -> Value {
     {
         if exponent == 0 {
             return match left {
-                Value::Rational { .. } => rational(1, 1),
-                _ => Value::Integer(1),
+                Value::Integer(_) if !rational_power => Value::Integer(1),
+                _ => rational(1, 1),
             };
         }
         if exponent < 0 && exact_zero(left) {
@@ -498,7 +501,9 @@ fn real_pow(left: &Value, right: &Value) -> Value {
             return rational_wide(raised_denominator, raised_numerator, &shown);
         }
         return match left {
-            Value::Integer(_) => Value::Integer(narrow(raised_numerator, &shown)),
+            Value::Integer(_) if !rational_power => {
+                Value::Integer(narrow(raised_numerator, &shown))
+            }
             _ => rational_wide(raised_numerator, raised_denominator, &shown),
         };
     }
