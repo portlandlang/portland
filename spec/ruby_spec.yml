@@ -3374,8 +3374,8 @@ core/string/grapheme_clusters_spec.rb:
 core/string/gsub_spec.rb:
   pdx: [spec/core/string/gsub_spec.pdx]
   status: partial_planned
-  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and gsub! rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The \\+ escape waits on #310, the hash replacement on #311, a block beside a replacement on #312, and a struct's own to_s as a block's value on #370; the $~, to_str, encoding, and gsub! rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/310
 core/string/hex_spec.rb:
   pdx: [spec/core/string/hex_spec.pdx]
 core/string/include_spec.rb:
@@ -3516,8 +3516,8 @@ core/string/strip_spec.rb:
 core/string/sub_spec.rb:
   pdx: [spec/core/string/sub_spec.pdx]
   status: partial_planned
-  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and sub! rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The \\+ escape waits on #310, the hash replacement on #311, a block beside a replacement on #312, and a struct's own to_s as a block's value on #370; the $~, to_str, encoding, and sub! rows, and a block's arguments gathered by a splat, stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/310
 core/string/succ_spec.rb:
   pdx: [spec/core/string/succ_spec.pdx]
 core/string/swapcase_spec.rb:
