@@ -1945,6 +1945,14 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
 /// into the same string with the same separator, as Ruby's is. A nil
 /// element refuses as interpolating one does, since nil has no `to_s`
 /// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
+/// A trait named where a pattern goes (#300): no value is of a trait's
+/// type, so the arm could never match.
+fn trait_pattern_sentence(name: &str) -> String {
+    format!(
+        "'in {name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include {name}"
+    )
+}
+
 fn joined(elements: &[Value], separator: &str) -> String {
     elements
         .iter()
@@ -8922,6 +8930,13 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Rational", Value::Rational { .. })
                     );
                     return if matched { Some(Vec::new()) } else { None };
+                }
+                // A trait is not a type a value has, so as a pattern it
+                // would match nothing, silently; it refuses instead (#300).
+                if Self::resolve(&self.module_path, name, &self.structs).is_none()
+                    && Self::resolve(&self.module_path, name, &self.traits).is_some()
+                {
+                    panic!("{}", trait_pattern_sentence(name));
                 }
                 let Value::Struct {
                     fields,
