@@ -2932,11 +2932,16 @@ def parse_parameter_list(tokens, mutable position, parens)
         parameters << keyword_parameter_node(name, nil)
       else
         default = parse_expression(tokens, position)
+        # A default that does not parse is the refusal, carried up whole.
+        return default if default.node in ErrorNode
         parameters << keyword_parameter_node(name, default.node)
         position = default.position
       end
     elsif operator_at?(tokens, position, %w[=])
       default = parse_expression(tokens, position + 1)
+      # A default that does not parse is the refusal, carried up whole: a
+      # parameter holding an error node crashed the evaluator (#348).
+      return default if default.node in ErrorNode
       parameters << if rebindable
         mutable_assignment_node(name, default.node)
       else

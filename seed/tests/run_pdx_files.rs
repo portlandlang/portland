@@ -1630,6 +1630,37 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A function's parameter named for a method refuses on both oracles
+/// (#348), a default or a keyword parameter included; a struct method's
+/// parameter is not asked, on either.
+#[test]
+fn a_parameter_named_for_a_method_refuses_on_both_oracles() {
+    assert_both_print(
+        "parameter_beside_struct_method.pdx",
+        "def helper = 1\nstruct Point\n  size\n\n  def grow(helper) = helper\nend\np Point.new(size: 1).grow(2)\n",
+        "2\n",
+    );
+    let cases = [
+        (
+            "def bar = 1\ndef foo(bar = bar())\n  bar\nend\np foo\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def bar = 1\ndef foo(bar)\n  bar\nend\np foo(2)\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def bar = 1\ndef foo(bar: 2)\n  bar\nend\np foo\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def run(puts) = puts\np run(1)\n",
+            "parameter puts shadows method puts — rename one",
+        ),
+    ];
+    assert_both_oracles_refuse("parameter_shadows_method.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
