@@ -134,4 +134,26 @@ context "String#[]" do
     expect("hello"[/l+/]).to eq("ll")
     expect("hello"[/z/]).to be_nil
   end
+
+  specify "returns the substring starting at the given index with the given length" do
+    expect("hello there"[0, 5]).to eq("hello")
+    expect("hello there"[6, 5]).to eq("there")
+    expect("hello there"[-3, 2]).to eq("er")
+    expect("hello there"[1, 0]).to eq("")
+  end
+
+  specify "returns the capture for the given index" do
+    expect("hello there"[/[aeiou](.)\1/, 0]).to eq("ell")
+    expect("hello there"[/[aeiou](.)\1/, 1]).to eq("l")
+    expect("hello there"[/[aeiou](.)\1/, -1]).to eq("l")
+  end
+
+  specify "returns other_str if it occurs in self" do
+    needle = "lo"
+    expect("hello there"[needle]).to eq(needle)
+  end
+
+  specify "returns nil if there is no match" do
+    expect("hello there"["bye"]).to be_nil
+  end
 end

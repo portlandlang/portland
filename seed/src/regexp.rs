@@ -993,9 +993,9 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
                 None => Value::Nil,
             })
         }
-        // By name only: `text[/pattern/, group]` is a string's two-value
-        // index, which refuses toward this spelling (#314).
-        (Value::String(text), "slice", [Value::Regex(pattern), group]) => {
+        // In either spelling: `text[/pattern/, group]` is a string's
+        // two-value index, read as `slice` reads it (#314).
+        (Value::String(text), "slice" | "[]", [Value::Regex(pattern), group]) => {
             Some(match pattern.search(text) {
                 Some(found) => match group_or_refuse(&found, group) {
                     Some(group) => found.group_value(group),

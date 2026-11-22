@@ -3337,7 +3337,7 @@ core/string/each_line_spec.rb:
 core/string/element_reference_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx]
   status: partial_planned
-  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the $~ rows go with the match globals. The passing Regexp rows are #323's to port, the two-argument and string-pattern forms wait on #314, and a negative group past the captures on #315."
+  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the $~ rows go with the match globals. The passing Regexp rows are #323's to port, and a negative group past the captures waits on #315."
   link: https://github.com/portlandlang/portland/issues/323
 core/string/empty_spec.rb:
   pdx: [spec/core/string/empty_spec.pdx]

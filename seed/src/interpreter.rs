@@ -2114,9 +2114,9 @@ fn rotated(elements: &[Value], count: i64) -> Value {
     Value::array(turned)
 }
 
-/// The refusal for `receiver[first, second]` on anything but a match (ADR
-/// 0091): an array and a string are pointed at `slice`, which takes the
-/// same two values.
+/// The refusal for `receiver[first, second]` on anything but a match or a
+/// string (ADR 0091, #314): an array is pointed at `slice`, which takes
+/// the same two values.
 fn two_value_index_sentence(receiver: &Value, arguments: &[Value]) -> String {
     let type_name = receiver.type_name();
     let article = Value::article_for(&type_name);
@@ -2332,6 +2332,15 @@ fn index_read(receiver: &Value, index: &Value) -> Value {
                 return Value::Nil;
             }
             Value::present(elements[position as usize].clone())
+        }
+        // `text["needle"]` is the needle where the string holds it, nil
+        // where it does not (#314).
+        (Value::String(text), Value::String(needle)) => {
+            if text.contains(needle.as_str()) {
+                Value::present(Value::String(needle.clone()))
+            } else {
+                Value::Nil
+            }
         }
         (Value::String(text), Value::Integer(index)) => {
             // Indexing a string yields a one-character string.
@@ -7755,7 +7764,22 @@ impl<W: std::io::Write> Interpreter<W> {
             // A negative start counts from the end, as Ruby's does; a start
             // past either end answers the empty string, never nil (ADR
             // 0019 — a slice is a collection, never a maybe).
-            (Value::String(text), "slice", [Value::Integer(start), Value::Integer(length)]) => {
+            // A String pattern (#314): the pattern itself where the string
+            // holds it, nil where it does not, Ruby's reading.
+            (Value::String(text), "slice" | "[]", [Value::String(needle)]) => {
+                if text.contains(needle.as_str()) {
+                    Value::present(Value::String(needle.clone()))
+                } else {
+                    Value::Nil
+                }
+            }
+            // `text[start, length]` reads as `slice(start, length)` does
+            // (#314).
+            (
+                Value::String(text),
+                "slice" | "[]",
+                [Value::Integer(start), Value::Integer(length)],
+            ) => {
                 let length = usize::try_from(*length)
                     .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
                 let count = text.graphemes(true).count() as i64;
@@ -8149,9 +8173,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             (receiver, name, arguments) => {
-                // Two values between brackets read a match's groups only
-                // (ADR 0091); an array and a string spell the same slice by
-                // name.
+                // Two values between brackets read a match's groups and a
+                // string's slice (ADR 0091, #314); an array spells the same
+                // slice by name.
                 if name == "[]" && arguments.len() == 2 {
                     refusal("arguments");
                     panic!("{}", two_value_index_sentence(receiver, arguments));
