@@ -562,7 +562,19 @@ fn quoted(text: &str) -> String {
             '\n' => result.push_str("\\n"),
             '\r' => result.push_str("\\r"),
             '\t' => result.push_str("\\t"),
+            // Ruby's named control escapes, then every other character
+            // that does not print — the controls and the two Unicode line
+            // separators — as `\uXXXX`, so an inspected string is readable
+            // whatever it holds (#345).
+            '\u{7}' => result.push_str("\\a"),
+            '\u{8}' => result.push_str("\\b"),
+            '\u{b}' => result.push_str("\\v"),
+            '\u{c}' => result.push_str("\\f"),
+            '\u{1b}' => result.push_str("\\e"),
             '#' if matches!(characters.peek(), Some('{' | '$' | '@')) => result.push_str("\\#"),
+            other if other.is_control() || matches!(other, '\u{2028}' | '\u{2029}') => {
+                result.push_str(&format!("\\u{:04X}", other as u32));
+            }
             other => result.push(other),
         }
     }

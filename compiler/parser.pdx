@@ -2392,27 +2392,41 @@ def regex_expression(lexeme, line: nil)
   RegexNode.new(kind: "regex", flags: flags, source: chain)
 end
 
-# Re-encode a decoded string for sexp display.
+# Re-encode a decoded string for sexp display and for `inspect`, as the
+# seed's `quoted` does. It walks codepoints, not characters: a CR LF is
+# one character, and each half is escaped on its own (#345).
 def encode_string(text)
   mutable result = "\""
-  characters = text.chars
-  characters.each_with_index do |character, index|
-    following = characters.slice(index + 1, 1).join("")
-    # A `#` that would open an interpolation is escaped, as Ruby's inspect
-    # escapes it before `{`, `$`, and `@`.
-    opens_interpolation = character == "#" && (following == "{" || following == "$" || following == "@")
-    encoded = case character
-    when "\\" then "\\\\"
-    when "\"" then "\\\""
-    when "\n" then "\\n"
-    when "\r" then "\\r"
-    when "\t" then "\\t"
-    else
-      opens_interpolation ? "\\#" : character
-    end
-    result << encoded
+  codes = text.codepoints
+  codes.each_with_index do |code, index|
+    following = index + 1 < codes.length ? codes[index + 1] : 0
+    result << encoded_codepoint(code, following)
   end
   result + "\""
+end
+
+# One codepoint as `inspect` writes it: Ruby's named escapes, a `#` that
+# would open an interpolation (before `{`, `$`, and `@`), and every other
+# character that does not print — the controls and the two Unicode line
+# separators — as `\uXXXX`.
+def encoded_codepoint(code, following)
+  case code
+  when 7 then "\\a"
+  when 8 then "\\b"
+  when 9 then "\\t"
+  when 10 then "\\n"
+  when 11 then "\\v"
+  when 12 then "\\f"
+  when 13 then "\\r"
+  when 27 then "\\e"
+  when 34 then "\\\""
+  when 92 then "\\\\"
+  when 35
+    following == 123 || following == 36 || following == 64 ? "\\#" : "#"
+  else
+    unprintable = code < 32 || (code >= 127 && code <= 159) || code == 8232 || code == 8233
+    unprintable ? "\\u" + code.to_s(16).upcase.rjust(4, "0") : code.chr(Encoding::UTF_8)
+  end
 end
 
 # — statements —

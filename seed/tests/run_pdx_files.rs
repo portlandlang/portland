@@ -1630,6 +1630,18 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// `inspect` escapes what does not print (#345): Ruby's named control
+/// escapes, `\\uXXXX` for the rest, a CR LF as its two halves — the same
+/// text on both oracles, inside a collection too.
+#[test]
+fn inspect_escapes_control_characters_on_both_oracles() {
+    assert_both_print(
+        "inspect_controls.pdx",
+        "p \"a\\r\\nb\"\np 7.chr\np 27.chr\np 0.chr\np 127.chr\nputs inspect([1.chr, \"x\"])\np 8232.chr(Encoding::UTF_8)\n",
+        "\"a\\r\\nb\"\n\"\\a\"\n\"\\e\"\n\"\\u0000\"\n\"\\u007F\"\n[\"\\u0001\", \"x\"]\n\"\\u2028\"\n",
+    );
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

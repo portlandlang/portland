@@ -28,6 +28,10 @@ inspect(nil)      # => "nil"
 
 Portland has no ambient nil and absence has no methods (ADR 0006) — `nil?` and `some?` are the one dispatch a maybe allows. A method spelling would force a choice Ruby never faces: refuse `nil.inspect`, crippling the debugging tool on its most important input, or grant nil a third method and chip the wall. A function takes absence as an argument without ceremony, exactly as `some(nil)` already does.
 
+## What does not print is escaped
+
+An inspected string writes its control characters as Ruby does for a UTF-8 string: `\a`, `\b`, `\t`, `\n`, `\v`, `\f`, `\r`, and `\e` by name, and every other control character and the two Unicode line separators as `\uXXXX`. `inspect(0.chr)` is `"\u0000"`. Ruby writes `"\x00"` for `0.chr`, since that string is not UTF-8 there; every string is UTF-8 here (ADR 0069), so the UTF-8 form is the one form.
+
 ## A collection's `to_s` is its `inspect`
 
 As Ruby's ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)): `[1, "two"].to_s` is `[1, "two"]`, `"#{{a: 1}}"` is `{a: 1}`, and `puts list` prints the same. The quotes and colons are what tell `["1"]` from `[1]` in a log line. `join` renders each element with its own `to_s`, nested arrays flattened into the join, as Ruby's does; the scalars are untouched — `:a.to_s` is `a`.
