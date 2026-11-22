@@ -2755,9 +2755,6 @@ core/set/difference_spec.rb:
   reason: "The alias check compares method objects; difference and - are both specified."
 core/set/disjoint_spec.rb:
   pdx: [spec/core/set/disjoint_spec.pdx]
-  status: partial_planned
-  reason: "A Set-like object, a struct that includes Enumerable, refuses where Ruby answers (#340)."
-  link: https://github.com/portlandlang/portland/issues/340
 core/set/divide_spec.rb:
   status: skipped
   reason: "divide's two-arity form walks a graph of member pairs and its one-arity form is classify's groups as a set of sets; classify is the surface here."
@@ -2818,17 +2815,14 @@ core/set/initialize_clone_spec.rb:
 core/set/initialize_spec.rb:
   pdx: [spec/core/set/initialize_spec.pdx]
   status: partial_planned
-  reason: "The private-method check stays upstream; the mock enumerables wait on #340, Set.new taking a struct that includes Enumerable, and the set-and-block and block-only rows pass and are #349's to port."
-  link: https://github.com/portlandlang/portland/issues/340
+  reason: "The private-method check and the each_entry mocks stay upstream, and the set-and-block and block-only rows pass and are #349's to port."
+  link: https://github.com/portlandlang/portland/issues/349
 core/set/inspect_spec.rb:
   pdx: [spec/core/set/inspect_spec.pdx]
   status: partial_intentional
   reason: "The alias check compares method objects; inspect and to_s both read Set[1, 2]."
 core/set/intersect_spec.rb:
   pdx: [spec/core/set/intersect_spec.pdx]
-  status: partial_planned
-  reason: "A Set-like object, a struct that includes Enumerable, refuses where Ruby answers (#340)."
-  link: https://github.com/portlandlang/portland/issues/340
 core/set/intersection_spec.rb:
   pdx: [spec/core/set/intersection_spec.pdx]
   status: partial_intentional
