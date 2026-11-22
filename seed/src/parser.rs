@@ -115,6 +115,13 @@ fn float_literal(text: &str) -> f64 {
 /// point's position is the power of ten — reduced here, so `1.5r` is `3/2`.
 fn rational_literal(text: &str) -> (i64, i64) {
     let digits = text.trim_end_matches('r').replace('_', "");
+    // A prefixed literal is a whole number in its base (#291).
+    if matches!(
+        digits.get(..2),
+        Some("0x" | "0X" | "0b" | "0B" | "0o" | "0O")
+    ) {
+        return (integer_literal(&digits), 1);
+    }
     let (whole, fraction) = digits.split_once('.').unwrap_or((&digits, ""));
     let scale = 10i128.pow(fraction.len() as u32);
     let numerator: i128 = format!("{whole}{fraction}")
