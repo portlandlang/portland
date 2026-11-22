@@ -4440,7 +4440,7 @@ language/constants_spec.rb:
 language/def_spec.rb:
   pdx: [spec/language/def_spec.pdx]
   status: partial_planned
-  reason: "A def answers its last expression and refuses the wrong count (ADR 0045, ADR 0014); a name is defined once (docs/ruby/redefinition.md), splats are deferred (ADR 0014), and the visibility, singleton, metaclass, instance_eval, eval, and frozen rows are runtime metaprogramming. Chained assignment and def as a value wait on #347, an empty () default on #307, a lambda default on #77, and the passing default-argument rows are #349's to port."
+  reason: "A def answers its last expression and refuses the wrong count (ADR 0045, ADR 0014); a name is defined once (docs/ruby/redefinition.md), splats are deferred (ADR 0014), and the visibility, singleton, metaclass, instance_eval, eval, and frozen rows are runtime metaprogramming. Chained assignment and def as a value wait on #347, an empty () default on #307, and a lambda default on #77."
   link: https://github.com/portlandlang/portland/issues/347
 language/defined_spec.rb:
   status: skipped
@@ -4456,9 +4456,9 @@ language/encoding_spec.rb:
   link: docs/ruby/characters.md
 language/keyword_arguments_spec.rb:
   pdx: [spec/language/keyword_arguments_spec.pdx]
-  status: partial_planned
-  reason: "Keyword and positional arguments are strictly separate, unknown and missing keywords refuse (ADR 0014); the splat, **, ruby2_keywords, delegation, proc, and lambda rows stay upstream, and the omitted-value shorthand passes and is #349's to port."
-  link: https://github.com/portlandlang/portland/issues/349
+  status: partial_intentional
+  reason: "Keyword and positional arguments are strictly separate, unknown and missing keywords refuse (ADR 0014); the splat, **, ruby2_keywords, delegation, proc, and lambda rows stay upstream."
+  link: docs/adr/0014-2026-07-22-keyword-arguments.md
 language/lambda_spec.rb:
   status: skipped
   reason: "-> refuses with its rewrite: a block is handed to a method and called with yield; the proc question (#77) holds the rest."
@@ -4630,7 +4630,7 @@ language/if_spec.rb:
 language/it_parameter_spec.rb:
   pdx: [spec/language/it_parameter_spec.pdx]
   status: partial_planned
-  reason: "it is the single parameter of a block that names none (ADR 0017): a nested it is a shadow, it never reassigns, a block handed too few values refuses (ADR 0057), and there is no binding or eval; the arity, parameters, and lambda rows wait on #77, and the multiple-argument row passes and is #349's to port."
+  reason: "it is the single parameter of a block that names none (ADR 0017): a nested it is a shadow, it never reassigns, a block handed too few values refuses (ADR 0057), and there is no binding or eval; the arity, parameters, and lambda rows wait on #77."
   link: https://github.com/portlandlang/portland/issues/77
 language/loop_spec.rb:
   pdx: [spec/language/loop_spec.pdx]
@@ -4761,8 +4761,8 @@ language/numbered_parameters_spec.rb:
 language/numbers_spec.rb:
   pdx: [spec/language/numbers_spec.pdx]
   status: partial_planned
-  reason: "A bare leading-zero octal refuses; a prefixed literal with an r or i suffix refuses (#291), the bignum and long-decimal r rows are past 64 bits, and the decimal r and i rows are not yet ported."
-  link: docs/ruby/integer-literals.md
+  reason: "A bare leading-zero octal refuses; a prefixed literal with an r or i suffix refuses (#291), and the bignum and long-decimal r rows are past 64 bits."
+  link: https://github.com/portlandlang/portland/issues/291
 language/rescue_spec.rb:
   status: skipped
   reason: "begin/rescue/raise do not exist: a fallible operation returns its failure."
