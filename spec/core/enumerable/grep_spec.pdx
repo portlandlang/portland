@@ -58,3 +58,19 @@ context "Enumerable#grep" do
     end
   end
 end
+
+context "Enumerable#grep on a range" do
+  specify "takes a pattern argument, as the predicates and the slices do" do
+    expect((1..3).grep(2)).to eq([2])
+    expect((1..3).grep(2..5)).to eq([2, 3])
+    expect((1..3).grep_v(2)).to eq([1, 3])
+    expect((1..3).all?(1..9)).to be_true
+    expect((1..5).one?(3)).to be_true
+    expect((1...4).none?(4)).to be_true
+    expect((1..5).slice_before(3).to_a).to eq([[1, 2], [3, 4, 5]])
+  end
+
+  specify "passes the matches through a block" do
+    expect((1..3).grep(2..3) { it * 10 }).to eq([20, 30])
+  end
+end
