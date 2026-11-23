@@ -7,8 +7,15 @@
 #
 # A rule is a def that takes a file's path, its text, and its top-level
 # nodes, and answers its findings. `lint_source` runs each in turn.
+#
+# This file is held to its own rules, the order of its defs among them.
 
-require_relative "parser"
+require_relative "inference"
+
+# What each kind of top-level statement is called, in the order a file
+# holds them (#509). A statement that is none of the first five is the
+# last: what a driver runs.
+KIND_NAMES = ["a require", "a constant", "a trait", "a struct", "a def", "a statement"]
 
 # What may stand at the left margin inside a statement that runs over
 # several lines: the words and brackets that close one or divide it.
@@ -19,6 +26,17 @@ struct LintFinding
   path
   line
   message
+end
+
+# Where a top-level statement falls in the order of a file (#509): its
+# place in KIND_NAMES.
+def kind_place(node)
+  return 0 if node.kind == "call" && node.name == "require_relative"
+  return 1 if node.kind == "assignment" && constant_name?(node.name)
+  return 2 if node.kind == "trait_def"
+  return 3 if node.kind == "struct_def"
+  return 4 if node.kind == "def"
+  5
 end
 
 # A line of code at the left margin inside a definition or a list: every
@@ -46,6 +64,45 @@ def lint_margins(path, source, nodes)
   findings
 end
 
+# The order inside a struct or a trait (#509): its methods alphabetical.
+def lint_method_order(path, nodes)
+  mutable findings = []
+  nodes.each do |node|
+    next unless node.kind == "struct_def" || node.kind == "trait_def"
+    mutable previous = nil
+    node.methods.each do |method|
+      if previous.some? && method.name < previous.name
+        findings << LintFinding.new(path: path, line: (method.line or node.line), message: "#{method.name} is written after #{previous.name} — the methods of #{node.name} are alphabetical")
+      end
+      previous = method
+    end
+  end
+  findings
+end
+
+# The order of a file (#509): its requires, its constants, its traits,
+# its structs, its defs, and then what it runs, with each kind but the
+# first and the last alphabetical. A constant built from another is
+# written after it, whatever their names.
+def lint_order(path, nodes)
+  mutable findings = []
+  mutable previous = nil
+  nodes.each do |node|
+    next if node.line.nil?
+    place = kind_place(node)
+    if previous.some?
+      before = kind_place(previous)
+      if place < before
+        findings << LintFinding.new(path: path, line: node.line, message: "#{KIND_NAMES[place]} is written after #{KIND_NAMES[before]} — a file holds its requires, constants, traits, structs, and defs in that order, and then what it runs")
+      elsif place == before && place >= 1 && place <= 4 && node.name < previous.name && !(place == 1 && mentions?(node.value, previous.name))
+        findings << LintFinding.new(path: path, line: node.line, message: "#{node.name} is written after #{previous.name} — #{KIND_NAMES[place].slice(2, 20)}s are alphabetical")
+      end
+    end
+    previous = node
+  end
+  findings
+end
+
 # A file that does not parse cannot be read for anything else.
 def lint_parse(path, nodes)
   nodes.select { it.kind == "error" }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse") }
@@ -56,7 +113,7 @@ def lint_source(path, source)
   nodes = parse_program(lex(source))
   unparsed = lint_parse(path, nodes)
   return unparsed unless unparsed.empty?
-  lint_margins(path, source, nodes)
+  lint_margins(path, source, nodes) + lint_order(path, nodes) + lint_method_order(path, nodes)
 end
 
 # Whether a line at the margin is one that belongs there: empty, a comment,
@@ -64,4 +121,11 @@ end
 def margin_allowed?(text)
   return true if text.empty? || text.start_with?("#")
   MARGIN_WORDS.any? { |word| text == word || text.start_with?(word + " ") || text.start_with?(word + ")") || text.start_with?(word + ",") }
+end
+
+# Whether a name is read anywhere inside a node.
+def mentions?(node, name)
+  return false if node.nil?
+  return true if (node in IdentifierNode) && node.name == name
+  children_of(node).any? { mentions?(it, name) }
 end

@@ -1,32 +1,31 @@
 # What a type that can walk its elements answers, written over `each`
 # (ADR 0093). A core type includes this and supplies `each`; the methods
 # here are then its own.
+#
+# A method with more than one name is written once for each, and each
+# names its twins.
 
 trait Enumerable
-  # Each element as the block answers for it.
-  def map
-    mutable gathered = []
-    self.each { |element| gathered << yield(element) }
-    gathered
-  end
-
+  # Each element as the block answers for it. Its twin is `map`.
   def collect
     mutable gathered = []
     self.each { |element| gathered << yield(element) }
     gathered
   end
 
-  # The elements the block answers true for.
-  def select
-    mutable gathered = []
+  # The first element the block answers true for, or nil. Its twin is
+  # `find`.
+  def detect
     self.each do |element|
-      kept = yield(element)
-      panic("select's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
-      gathered << element if kept
+      found = yield(element)
+      panic("find's block must answer true or false, got #{inspect(found)}") unless found in Boolean
+      return element if found
     end
-    gathered
+    nil
   end
 
+  # The elements the block answers true for. Its twins are `find_all` and
+  # `select`.
   def filter
     mutable gathered = []
     self.each do |element|
@@ -37,6 +36,19 @@ trait Enumerable
     gathered
   end
 
+  # The first element the block answers true for, or nil. Its twin is
+  # `detect`.
+  def find
+    self.each do |element|
+      found = yield(element)
+      panic("find's block must answer true or false, got #{inspect(found)}") unless found in Boolean
+      return element if found
+    end
+    nil
+  end
+
+  # The elements the block answers true for. Its twins are `filter` and
+  # `select`.
   def find_all
     mutable gathered = []
     self.each do |element|
@@ -44,6 +56,13 @@ trait Enumerable
       panic("select's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
       gathered << element if kept
     end
+    gathered
+  end
+
+  # Each element as the block answers for it. Its twin is `collect`.
+  def map
+    mutable gathered = []
+    self.each { |element| gathered << yield(element) }
     gathered
   end
 
@@ -58,22 +77,15 @@ trait Enumerable
     gathered
   end
 
-  # The first element the block answers true for, or nil.
-  def find
+  # The elements the block answers true for. Its twins are `filter` and
+  # `find_all`.
+  def select
+    mutable gathered = []
     self.each do |element|
-      found = yield(element)
-      panic("find's block must answer true or false, got #{inspect(found)}") unless found in Boolean
-      return element if found
+      kept = yield(element)
+      panic("select's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
+      gathered << element if kept
     end
-    nil
-  end
-
-  def detect
-    self.each do |element|
-      found = yield(element)
-      panic("find's block must answer true or false, got #{inspect(found)}") unless found in Boolean
-      return element if found
-    end
-    nil
+    gathered
   end
 end
