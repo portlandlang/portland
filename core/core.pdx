@@ -10,3 +10,5 @@
 # Portland. What a file does not define stays a primitive in the floor.
 
 require_relative "kernel"
+require_relative "enumerable"
+require_relative "array"

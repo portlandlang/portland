@@ -1,0 +1,9 @@
+# The builtin array (ADR 0093). In the core, `class Array` is that type:
+# what is defined here is what an array answers, and what is not stays a
+# primitive in the floor — `each`, `[]`, and `length` among them.
+
+class Array
+  include Enumerable
+
+  def empty? = self.length == 0
+end

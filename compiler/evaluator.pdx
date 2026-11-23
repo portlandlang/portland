@@ -105,8 +105,65 @@ end
 # program's first bindings itself starts them here.
 def with_core(starting)
   core = core_nodes
-  loaded = run_body(core, starting)
-  [["__core__", "core", core_function_names(core)]] + loaded.bindings
+  loaded = run_body(core, [["__loading_core__", "core", true]] + starting)
+  [["__core__", "core", core_function_names(core)]] + loaded.bindings.reject { it[0] == "__loading_core__" }
+end
+
+# Whether the core's own files are what is running: there a struct named
+# for a builtin type is that type, and a builtin trait's name is the
+# core's to define (ADR 0093).
+def loading_core?(bindings) = !lookup(bindings, "__loading_core__").empty?
+
+# The builtin type a value is, by the name a core file gives it, or nil.
+# A guest struct, symbol, set, and type are tagged host arrays, and are
+# not arrays here.
+def core_type_of(receiver)
+  return "Array" if (receiver in Array) && !guest_tagged?(receiver)
+  nil
+end
+
+# What the core defined for a builtin value under this name, or nil: it
+# answers before the host's own arm for the type.
+def core_method_for(receiver, method_name, bindings)
+  type = core_type_of(receiver)
+  return nil if type.nil?
+  slot = lookup(bindings, "__core_type__::" + type)
+  return nil if slot.empty?
+  mutable found = nil
+  value_at(slot.first, 2).each do |method|
+    found = method if method.name == method_name
+  end
+  found
+end
+
+# A method the core wrote for a builtin type answers the calls it was
+# written for: one with a count of arguments it does not take goes on to
+# the host's arm, whose refusal for that shape stands. A struct's own
+# method takes every call, and refuses a wrong count itself.
+def method_takes_call?(receiver, method, arguments, block_given)
+  return true if receiver in ["__struct__", *]
+  required = method.parameters.count { (it in AssignmentNode) ? it.value.nil? : true }
+  return false unless arguments.length >= required && arguments.length <= method.parameters.length
+  # It takes a block exactly when its body yields.
+  block_given == method.body.any? { yields_inside?(it) }
+end
+
+# Whether a `yield` is written anywhere inside a node.
+def yields_inside?(node)
+  return true if node in YieldNode
+  children_of(node).any? { yields_inside?(it) }
+end
+
+# Whose method is being run, for its refusals, and the fields it sees
+# bare: a builtin value has a type's name and no fields.
+def method_owner_of(receiver)
+  return value_at(receiver, 1) if receiver in ["__struct__", *]
+  core_type_of(receiver) or "value"
+end
+
+def field_pairs_of(receiver)
+  return value_at(receiver, 2) if receiver in ["__struct__", *]
+  []
 end
 
 # Whether the core defined a function by this name.
@@ -580,7 +637,7 @@ def declared_names(bindings)
 end
 
 def declare(name, bindings)
-  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || core_function?(name, bindings) || name == "Comparable" || name == "Enumerable"
+  panic("'#{name}' is a builtin — rename yours") if !loading_core?(bindings) && (builtin_method?(name) || core_function?(name, bindings) || name == "Comparable" || name == "Enumerable")
   panic("'#{name}' is already defined — rename one") if declared_names(bindings).include?(name)
   [["__declared__", "declared", declared_names(bindings) + [name]]] + bindings
 end
@@ -919,6 +976,15 @@ def register_in_namespace(statement, home, mutable bindings)
     panic("alias points at nothing — no method #{old_name} defined yet") if found.empty? || found.first[1] != "method"
     [[qualify(home, new_name), "method", found.first[2]]] + declare(qualify(home, new_name), bindings)
   in StructDefNode(name:, fields:, includes:, methods:, nested:, type_functions:, constants:)
+    # In the core, a struct named for a builtin type is that type (ADR
+    # 0093): its methods are kept for the type, and no struct is declared.
+    if core_type_name?(name) && loading_core?(bindings)
+      panic("#{name} is a builtin type, whose values are the floor's — it takes no fields") unless fields.empty?
+      gathered = merged_methods(name, fields, includes, methods, home, bindings)
+      return [["__core_type__::" + name, "core_type", value_at(gathered, 0)]] + bindings
+    end
+    # A program cannot reopen a core type: the seed's sentence.
+    panic(core_type_sentence(name)) if home.empty? && core_type_name?(name)
     inner_home = qualify(home, name)
     # Included traits merge here, at registration (ADR 0028), so dispatch
     # needs no new rungs and every collision refuses naming both owners.
@@ -977,16 +1043,19 @@ def merged_methods(struct_name, fields, includes, methods, home, bindings)
   mutable origins = []
   mutable comparable = false
   mutable enumerable = false
+  # A core type includes the core's own traits, the two builtin names among
+  # them.
+  core_type = core_type_name?(struct_name) && loading_core?(bindings)
   includes.each do |written|
     # `Comparable` and `Enumerable` are the two builtin traits (ADR 0054,
     # #110): no methods of their own — the orderings derive from the
     # struct's `<=>` and the walks from its `each`, which must exist.
-    if written == "Comparable"
+    if written == "Comparable" && !core_type
       panic("#{struct_name} includes Comparable but defines no '<=>' — define it") unless methods.any? { it.name == "<=>" }
       comparable = true
       next
     end
-    if written == "Enumerable"
+    if written == "Enumerable" && !core_type
       panic("#{struct_name} includes Enumerable but defines no 'each' — define it") unless methods.any? { it.name == "each" }
       enumerable = true
       next
@@ -1281,7 +1350,7 @@ def enumerable_elements(receiver, bindings)
     triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
   end
   scope = [["__self__", "local", receiver]] + scope
-  pairs = value_at(receiver, 2)
+  pairs = field_pairs_of(receiver)
   pairs.each do |pair|
     scope = [[pair[0], "local", value_at(pair, 1)]] + scope
   end
@@ -1668,6 +1737,9 @@ def evaluate_append(node, mutable bindings)
   # A right side that left a `return` or `break` pending appends nothing
   # (#208); the signal travels on.
   return value_step if value_step.signal != "none"
+  # A `yield` whose block answered nothing has no value to append: the
+  # seed's sentence, which a method written in the core reaches (#437).
+  panic("the block produced no value") if (node.value in YieldNode) && value_step.value.empty?
   bindings = value_step.bindings
   value = slot_value(value_step.value)
   slot = lookup(bindings, node.name)
@@ -3013,14 +3085,14 @@ def invoke_struct_method_with_block(receiver, method, arguments, block, bindings
     triple[1] == "local" || triple[1] == "mutable" || triple[1] == "fields"
   end
   scope = [["__self__", "local", receiver]] + scope
-  pairs = value_at(receiver, 2)
+  pairs = field_pairs_of(receiver)
   pairs.each do |pair|
     scope = [[pair[0], "local", value_at(pair, 1)]] + scope
   end
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
   scope = [["__block__", "block", [block, bindings]]] + scope
-  check_call_count("#{value_at(receiver, 1)} method", method.parameters, arguments.length)
+  check_call_count("#{method_owner_of(receiver)} method", method.parameters, arguments.length)
   scope = bind_parameters(method.parameters, arguments, [], scope)
   result = run_body(method.body, scope)
   panic("next outside of a loop") if result.signal == "next"
@@ -3087,7 +3159,7 @@ end
 # has no methods beyond its predicate — the sad path stays opaque.
 def struct_method_for(receiver, method_name, bindings)
   return nil if receiver.failure?
-  return nil unless receiver in ["__struct__", *]
+  return core_method_for(receiver, method_name, bindings) unless receiver in ["__struct__", *]
   slot = lookup(bindings, value_at(receiver, 1))
   return nil if slot.empty?
   methods = value_at(slot.first[2], 1)
@@ -3107,7 +3179,7 @@ def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
   end
   scope = [["__self__", "local", receiver]] + scope
   mutable pair_index = 0
-  pairs = value_at(receiver, 2)
+  pairs = field_pairs_of(receiver)
   while pair_index < pairs.length
     pair = pairs[pair_index]
     scope = [[pair[0], "local", value_at(pair, 1)]] + scope
@@ -3116,7 +3188,7 @@ def invoke_struct_method(receiver, method, arguments, keyword_values, bindings)
   # This frame's depth, for `return` to aim at (ADR 0025).
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
-  check_call_count("#{value_at(receiver, 1)} method", method.parameters, arguments.length)
+  check_call_count("#{method_owner_of(receiver)} method", method.parameters, arguments.length)
   scope = bind_parameters(method.parameters, arguments, keyword_values, scope)
   result = run_body(method.body, scope)
   panic("next outside of a loop") if result.signal == "next"
@@ -3586,7 +3658,7 @@ def evaluate_method_call(node, mutable bindings)
   end
   # Struct methods dispatch before builtins and field access (#27).
   own = struct_method_for(receiver, node.name, bindings)
-  return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
+  return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil? || !method_takes_call?(receiver, own, arguments, false)
   # A struct answers its own field before any builtin arm can — the seed's
   # order: `with`, its methods, its fields, then only the four names every
   # value answers. A guest struct is a tagged host array, so this order is
@@ -4297,7 +4369,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # A struct's own method takes the block first (#110), as the seed's
   # dispatch order has it; its `yield` reaches the block.
   own = struct_method_for(receiver, node.name, scope)
-  return invoke_struct_method_with_block(receiver, own, arguments, block, scope) unless own.nil?
+  return invoke_struct_method_with_block(receiver, own, arguments, block, scope) unless own.nil? || !method_takes_call?(receiver, own, arguments, true)
   # An Enumerable struct (#110) walks through its own `each`: the elements
   # it yields, then the array's arm.
   if (receiver in ["__struct__", *]) && enumerable_name?(node.name) && struct_enumerable?(receiver, scope)

@@ -310,6 +310,14 @@ fn range_clamped(
 /// The names Ruby's Enumerable gives a struct that defines `each` (#110),
 /// as far as the array arms carry them. Not the array's own — `length`,
 /// `join`, `[]`, `flatten`, the combinatorics — which Enumerable lacks.
+/// The refusal for a program's struct named for a core type (ADR 0093).
+fn core_type_sentence(name: &str) -> String {
+    let article = Value::article_for(name);
+    format!(
+        "'{name}' is a core type, and the runtime is closed, so a program cannot reopen it — write a trait, a struct that holds {article} {name}, or a function"
+    )
+}
+
 fn enumerable_name(name: &str) -> bool {
     matches!(
         name,
@@ -2858,6 +2866,10 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     loading_core: bool,
     /// The defs the core made, by qualified name: as fixed as a builtin.
     core_names: std::collections::HashSet<String>,
+    /// The methods the core gave a builtin type (ADR 0093): `class Array`
+    /// in a core file is the builtin array, and what it defines there is
+    /// what an array answers, ahead of the floor's own arms.
+    core_types: HashMap<String, HashMap<String, std::rc::Rc<Method>>>,
     arguments: Vec<String>,
     call_depth: usize,
     /// The call depth a `return` executed right now would belong to: the
@@ -3027,6 +3039,7 @@ impl<W: std::io::Write> Interpreter<W> {
         Self {
             loading_core: false,
             core_names: std::collections::HashSet::new(),
+            core_types: HashMap::new(),
             arguments: Vec::new(),
             call_depth: 0,
             home_depth: 0,
@@ -3280,7 +3293,9 @@ impl<W: std::io::Write> Interpreter<W> {
         if !self.loading_core && self.core_names.contains(&self.qualified(name)) {
             panic!("'{name}' is a builtin — rename yours");
         }
-        if Self::builtin_name(name) || name == "Comparable" || name == "Enumerable" {
+        if !self.loading_core
+            && (Self::builtin_name(name) || name == "Comparable" || name == "Enumerable")
+        {
             panic!("'{name}' is a builtin — rename yours");
         }
         if self.redefinable {
@@ -3611,20 +3626,23 @@ impl<W: std::io::Write> Interpreter<W> {
                 let mut origin: HashMap<String, String> = HashMap::new();
                 let mut comparable = false;
                 let mut enumerable = false;
+                // In the core, a struct named for a builtin type is that
+                // type (ADR 0093), and a trait it includes is the core's own.
+                let core_type = self.loading_core && Self::core_type_named(name);
                 for written in includes {
                     // `Comparable` and `Enumerable` are the two builtin traits
                     // (ADR 0054, #110). They carry no methods of their own:
                     // the four orderings, `between?`, and `clamp` derive from
                     // the struct's `<=>`, and the walks and views from its
                     // `each`, which must therefore exist.
-                    if written == "Comparable" {
+                    if written == "Comparable" && !core_type {
                         if !method_table.contains_key("<=>") {
                             panic!("{name} includes Comparable but defines no '<=>' — define it");
                         }
                         comparable = true;
                         continue;
                     }
-                    if written == "Enumerable" {
+                    if written == "Enumerable" && !core_type {
                         if !method_table.contains_key("each") {
                             panic!("{name} includes Enumerable but defines no 'each' — define it");
                         }
@@ -3683,6 +3701,23 @@ impl<W: std::io::Write> Interpreter<W> {
                         origin.insert(method_name.clone(), written.clone());
                         method_table.insert(method_name, method);
                     }
+                }
+                if core_type {
+                    // Its values are the floor's, so it has no fields, and
+                    // what it does not define stays a floor arm.
+                    if !fields.is_empty() {
+                        panic!(
+                            "{name} is a builtin type, whose values are the floor's — it takes no fields"
+                        );
+                    }
+                    self.core_types.insert(name.clone(), method_table);
+                    return None;
+                }
+                // A program cannot reopen a core type (ADR 0093): Ruby's
+                // `class Array` in any file opens the one Array, and here
+                // only the core says what a builtin type answers.
+                if self.module_path.is_empty() && Self::core_type_named(name) {
+                    panic!("{}", core_type_sentence(name));
                 }
                 self.refuse_redefinition(name);
                 self.structs.insert(
@@ -6039,6 +6074,50 @@ impl<W: std::io::Write> Interpreter<W> {
                 fields: updated,
                 name,
             });
+        }
+        // What the core defined for a builtin type answers before the
+        // floor's own arm for it (ADR 0093), run as a struct's method is:
+        // `self` is the value, and a block is handed over the same way.
+        // It answers the calls it was written for: one with a count of
+        // arguments it does not take goes on to the floor, whose refusal
+        // for that shape stands.
+        if let Some(type_name) = Self::core_type_of(&receiver)
+            && let Some(method) = self
+                .core_types
+                .get(type_name)
+                .and_then(|methods| methods.get(name))
+                .cloned()
+            && arguments.len() <= method.parameters.len()
+            && arguments.len()
+                >= method
+                    .parameters
+                    .iter()
+                    .take_while(|parameter| parameter.default.is_none())
+                    .count()
+            && block.is_some() == Self::method_yields(&method)
+        {
+            let handed = block.map(|block| {
+                std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
+                    block: block.clone(),
+                    collects: false,
+                    home: self.home_depth,
+                    outer: self.current_block.clone(),
+                    scope: self.variables.clone(),
+                }))
+            });
+            let outer = std::mem::replace(&mut self.current_block, handed.clone());
+            let result = self.call_struct_method(
+                type_name.to_string(),
+                receiver,
+                method,
+                arguments,
+                keyword_arguments,
+            );
+            if let Some(handed) = handed {
+                self.variables = handed.borrow().scope.clone();
+            }
+            self.current_block = outer;
+            return result;
         }
         // Struct methods dispatch before field access (#27): token.integer?
         if let Value::Struct {
@@ -9779,10 +9858,20 @@ impl<W: std::io::Write> Interpreter<W> {
         parts.join(separator)
     }
 
+    /// What to say of an expression read for a value it did not produce. A
+    /// `yield` whose block answered nothing is the block's doing, and is
+    /// said so, since a method written in the core reads its block this way.
+    fn no_value_sentence(expression: &Expression) -> String {
+        match expression {
+            Expression::Yield(_) => "the block produced no value".to_string(),
+            other => format!("{other:?} produced no value"),
+        }
+    }
+
     /// Evaluate an expression that must produce a value.
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
-            .unwrap_or_else(|| panic!("{expression:?} produced no value"))
+            .unwrap_or_else(|| panic!("{}", Self::no_value_sentence(expression)))
     }
 
     /// An operand or an argument: its value, or `None` when evaluating it
@@ -9793,7 +9882,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn operand(&mut self, expression: &Expression) -> Option<Value> {
         let value = self.expression(expression);
         if value.is_none() && self.pending.is_none() {
-            panic!("{expression:?} produced no value");
+            panic!("{}", Self::no_value_sentence(expression));
         }
         value
     }
@@ -9813,7 +9902,44 @@ impl<W: std::io::Write> Interpreter<W> {
         self.structs
             .get(struct_name)
             .and_then(|info| info.methods.get(name))
+            .or_else(|| {
+                self.core_types
+                    .get(struct_name)
+                    .and_then(|methods| methods.get(name))
+            })
             .cloned()
+    }
+
+    /// Whether a method's body yields anywhere: a core method takes a
+    /// block exactly when it does. Read off the body's debug form, which
+    /// names every `yield` in it as `Yield(` — crude, and enough for the
+    /// core's own source, which is the only code asked.
+    fn method_yields(method: &Method) -> bool {
+        format!("{:?}", method.body).contains("Yield(")
+    }
+
+    /// Whether a name is a builtin type's, which a core file may define
+    /// the methods of (ADR 0093).
+    fn core_type_named(name: &str) -> bool {
+        matches!(
+            name,
+            "Array" | "Hash" | "Range" | "Set" | "String" | "Integer" | "Float" | "Symbol"
+        )
+    }
+
+    /// The builtin type a value is, by the name a core file gives it.
+    fn core_type_of(value: &Value) -> Option<&'static str> {
+        match value {
+            Value::Array(_) => Some("Array"),
+            Value::Hash(_) => Some("Hash"),
+            Value::Range { .. } => Some("Range"),
+            Value::Set(_) => Some("Set"),
+            Value::String(_) => Some("String"),
+            Value::Integer(_) => Some("Integer"),
+            Value::Float(_) => Some("Float"),
+            Value::Symbol(_) => Some("Symbol"),
+            _ => None,
+        }
     }
 
     /// The constant `name` of the current receiver's type (#145), if both
@@ -9872,6 +9998,9 @@ impl<W: std::io::Write> Interpreter<W> {
                 );
             }
             fields.iter().map(|(field, _)| field.clone()).collect()
+        } else if self.core_types.contains_key(&struct_name) {
+            // A builtin value has no fields to bring into scope.
+            Vec::new()
         } else {
             panic!("struct method on a non-struct receiver: {receiver:?}");
         };

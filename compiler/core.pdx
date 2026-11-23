@@ -21,6 +21,27 @@ def core_nodes = load_core_file("core.pdx", CoreLoad.new(files: [], nodes: [])).
 # The names of the functions the core defines: as fixed as a builtin's.
 def core_function_names(nodes) = nodes.select { it in DefNode }.map { it.name }
 
+# Whether a name is a builtin type's, which a core file may define the
+# methods of: there, `class Array` is the builtin array (ADR 0093).
+def core_type_name?(name) = %w[Array Float Hash Integer Range Set String Symbol].include?(name)
+
+# The refusal for a program's struct named for a core type (ADR 0093): the
+# runtime is closed, and only the core says what a builtin type answers.
+def core_type_sentence(name)
+  determiner = %w[A E I O U].include?(name.slice(0, 1)) ? "an" : "a"
+  "'#{name}' is a core type, and the runtime is closed, so a program cannot reopen it — write a trait, a struct that holds #{determiner} #{name}, or a function"
+end
+
+# The core's nodes that declare what a program can name. A builtin type's
+# own definition and the two builtin traits are left out: the checker
+# already knows those names as builtins, and reads their methods from the
+# table inference keeps.
+def core_declaring_nodes(nodes)
+  nodes.reject do |node|
+    ((node in StructDefNode) && core_type_name?(node.name)) || ((node in TraitDefNode) && %w[Comparable Enumerable].include?(node.name))
+  end
+end
+
 def load_core_file(name, loading)
   return loading if loading.files.include?(name)
   mutable current = loading.with(files: loading.files + [name])

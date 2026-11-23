@@ -209,7 +209,7 @@ def check_closure_with(path, mutable checked, sharpen, load_path)
   # The core is loaded ahead of every program (ADR 0093), so what it
   # declares is in scope in every file, as a required file's would be.
   loaded = core_nodes
-  core = declarations_of(loaded).with(builtins: core_function_names(loaded))
+  core = declarations_of(core_declaring_nodes(loaded)).with(builtins: core_function_names(loaded))
   mutable found = []
   files.each do |file|
     own = if entry.some? && file.path == entry.path then sharpened else [] end
@@ -599,7 +599,10 @@ def check_redefinitions(nodes, home, scope, mutable seen, mutable found)
       # `fields` is the one builtin with a designed refusal of its own
       # (ADR 0031), which the runtime keeps — the seed's list, not this
       # file's, says which names are never taken.
-      if (builtin_function?(name) && name != "fields") || seen.any? { it[0] == qualified && it[1] == "builtin" }
+      if (node in StructDefNode) && home.empty? && core_type_name?(name)
+        # A program cannot reopen a core type (ADR 0093).
+        found = noted(found, ["core_type", name], locate(node, scope))
+      elsif (builtin_function?(name) && name != "fields") || seen.any? { it[0] == qualified && it[1] == "builtin" }
         found = noted(found, ["builtin", name], locate(node, scope))
       elsif seen.any? { it[0] == qualified }
         found = noted(found, ["redefined", name], locate(node, scope))
