@@ -30,7 +30,7 @@ Box.new(contents: 1).reveal    # refuses to build: 'reveal' is private to Box
 - **`private`** — methods after it, to the end of the body or the next visibility word, are callable only without a receiver or through `self.`: from the struct's own methods and from the methods of a trait it includes. `private def name` marks one method.
 - **`protected`** — `private` plus a receiver of the same type from inside the type's methods, which is what `def ==(other)` and `def <=>(other)` want.
 - **`public`** — ends a section; everything before any visibility word is public.
-- **`private_constant :NAME`** — a module's or struct's constant unreadable from outside its namespace.
+- **`private_constant :NAME`** — a module's or struct's constant unreadable from outside its namespace. The name must be a constant that module or struct defines — a SCREAMING_CASE binding or a type declared in its body — or the build refuses, where Ruby raises NameError when the line runs.
 - **Type functions (`def self.`) are public.** `private_class_method` waits for a pull.
 - **`module_function` refuses**, naming `def self.`: a module's `def` is already a module function ([namespaces.md](namespaces.md)). So does a bare `private` in a module body, which has no instance methods to mark — a mixin is a trait, where `private` marks its methods — and `private :name`, which marks a method after its def: write `private` above the def, or `private def name`.
 

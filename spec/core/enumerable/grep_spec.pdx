@@ -59,6 +59,26 @@ context "Enumerable#grep" do
   end
 end
 
+context "Enumerable#grep with a Regexp" do
+  specify "correctly handles non-string elements" do
+    expect([:a, "b", "z", :c, 42, nil].grep(/[a-d]/)).to eq([:a, "b", :c])
+  end
+
+  specify "passes the matched elements through a block" do
+    expect(["ab", "cd", "ae"].grep(/a/) { it.upcase }).to eq(["AB", "AE"])
+  end
+
+  specify "is the rule the predicates and the slices ask too" do
+    words = ["ab", "cd", "ae"]
+    expect(words.all?(/[a-e]/)).to be_true
+    expect(words.any?(/z/)).to be_false
+    expect(words.none?(/z/)).to be_true
+    expect(words.one?(/c/)).to be_true
+    expect(words.slice_before(/a/).to_a).to eq([["ab", "cd"], ["ae"]])
+    expect(words.slice_after(/c/).to_a).to eq([["ab", "cd"], ["ae"]])
+  end
+end
+
 context "Enumerable#grep on a range" do
   specify "takes a pattern argument, as the predicates and the slices do" do
     expect((1..3).grep(2)).to eq([2])

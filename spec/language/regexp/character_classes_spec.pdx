@@ -16,4 +16,54 @@ context "Regexp with character classes" do
     expect(found(/\p{Alpha}+/, "12ab")).to eq(["ab"])
     expect(found(/\p{Hiragana}+/, "aあいb")).to eq(["あい"])
   end
+
+  specify "supports [] (character class)" do
+    expect(found(/[a-z]+/, "fooBAR")).to eq(["foo"])
+    # \b inside character class is backspace. Upstream spells the subject
+    # "\b", an escape a string literal does not read (#304); `8.chr` is it.
+    expect(found(/[\b]/, 8.chr)).to eq([8.chr])
+  end
+
+  specify "matches Unicode letter characters with [[:alnum:]]" do
+    expect(found(/[[:alnum:]]/, "à")).to eq(["à"])
+  end
+
+  specify "matches Unicode letter characters with [[:alpha:]]" do
+    expect(found(/[[:alpha:]]/, "à")).to eq(["à"])
+  end
+
+  specify "doesn't match Unicode letter characters with [[:blank:]]" do
+    expect("à".match(/[[:blank:]]/)).to be_nil
+  end
+
+  specify "doesn't Unicode letter characters with [[:cntrl:]]" do
+    expect("à".match(/[[:cntrl:]]/)).to be_nil
+  end
+
+  specify "doesn't match Unicode letter characters with [[:digit:]]" do
+    expect("à".match(/[[:digit:]]/)).to be_nil
+  end
+
+  specify "matches Unicode letter characters with [[:graph:]]" do
+    expect(found(/[[:graph:]]/, "à")).to eq(["à"])
+  end
+
+  specify "doesn't match Unicode letter characters [^a-fA-F] with [[:xdigit:]]" do
+    expect("à".match(/[[:xdigit:]]/)).to be_nil
+    expect("g".match(/[[:xdigit:]]/)).to be_nil
+    expect("X".match(/[[:xdigit:]]/)).to be_nil
+  end
+
+  specify "matches Unicode letter characters [a-fA-F] with [[:xdigit:]]" do
+    expect(found(/[[:xdigit:]]/, "a")).to eq(["a"])
+    expect(found(/[[:xdigit:]]/, "F")).to eq(["F"])
+  end
+
+  specify "matches unicode named character properties" do
+    expect(found(/\p{Alpha}/, "a1")).to eq(["a"])
+  end
+
+  specify "matches unicode abbreviated character properties" do
+    expect(found(/\p{L}/, "a1")).to eq(["a"])
+  end
 end
