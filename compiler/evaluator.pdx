@@ -3781,6 +3781,9 @@ def evaluate_method_call(node, mutable bindings)
   when "tally" then receiver.tally
   when "zip" then receiver.zip(value_at(arguments, 0))
   when "each_slice" then receiver.each_slice(value_at(arguments, 0))
+  # Without a block, each element beside its index: the finished
+  # collection, where Ruby answers an enumerator (#338).
+  when "each_with_index" then receiver.each_with_index
   when "each_cons" then receiver.each_cons(value_at(arguments, 0))
   # Guest-aware (#105): a guest symbol, struct, or enum case is a tagged
   # array here, which the host's flatten would open. An array flattens all
@@ -4058,7 +4061,10 @@ def check_builtin_count(receiver, name, given)
   low = value_at(arity, 0)
   high = value_at(arity, 1)
   return if given >= low && given <= high
-  expected = if low == high then low.to_s else "#{low} to #{high}" end
+  # An open-ended count (`dig/1+`) has no upper bound to name (#338).
+  open_ended = high == 9223372036854775807
+  bounded = if low == high then low.to_s else "#{low} to #{high}" end
+  expected = if open_ended then "#{low} or more" else bounded end
   panic("#{spelled(name)} takes #{expected} #{arguments_word(expected)}, got #{given}")
 end
 

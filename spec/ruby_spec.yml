@@ -53,7 +53,7 @@ core/array/count_spec.rb:
 core/array/find_spec.rb:
   pdx: [spec/core/array/find_spec.pdx]
   status: partial_planned
-  reason: "The ifnone proc waits on #77, find with an argument on #336, and a blockless each_with_index on #338. Enumerators and mutation mid-walk stay out."
+  reason: "The ifnone proc waits on #77, and find with an argument on #336. Enumerators and mutation mid-walk stay out."
   link: https://github.com/portlandlang/portland/issues/77
 core/array/first_spec.rb:
   pdx: [spec/core/array/first_spec.pdx]
@@ -62,9 +62,9 @@ core/array/first_spec.rb:
   link: docs/ruby/lookups.md
 core/array/flatten_spec.rb:
   pdx: [spec/core/array/flatten_spec.pdx]
-  status: partial_planned
-  reason: "flatten with a level refuses (#338); flatten! stays behind since values never mutate, with the to_int, to_ary, and method_missing rows."
-  link: https://github.com/portlandlang/portland/issues/338
+  status: partial_intentional
+  reason: "flatten! stays behind since values never mutate, with the to_int, to_ary, and method_missing rows."
+  link: docs/ruby/mutability.md
 core/array/index_spec.rb:
   pdx: [spec/core/array/index_spec.pdx]
 core/array/last_spec.rb:
@@ -1122,9 +1122,9 @@ core/hash/default_proc_spec.rb:
   link: docs/ruby/lookups.md
 core/hash/dig_spec.rb:
   pdx: [spec/core/hash/dig_spec.pdx]
-  status: partial_planned
-  reason: "A hash has no default (ADR 0063), a dig past a non-container refuses where Ruby raises, a bare dig's refusal is #338, and the mock and singleton rows need reflection."
-  link: https://github.com/portlandlang/portland/issues/338
+  status: partial_intentional
+  reason: "A hash has no default (ADR 0063), a dig past a non-container refuses where Ruby raises, as a bare dig does, and the mock and singleton rows need reflection."
+  link: docs/ruby/lookups.md
 core/hash/fetch_spec.rb:
   status: skipped
   reason: "fetch is retired: a lookup miss answers a maybe, and the default is the or-guard."

@@ -36,4 +36,13 @@ context "Array#find" do
     multi = [[1, 2], [3, 4, 5], [6, 7, 8, 9]]
     expect(multi.find { |element| element == [1, 2] }).to eq([1, 2])
   end
+
+  specify "passes through the values yielded by #each_with_index" do
+    mutable seen = []
+    [:a, :b].each_with_index.to_a.find do |item, index|
+      seen << [item, index]
+      false
+    end
+    expect(seen).to eq([[:a, 0], [:b, 1]])
+  end
 end
