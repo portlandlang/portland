@@ -1,0 +1,237 @@
+# The native build's types (#445): every def's parameters and answer pinned
+# to concrete types, read off how the program calls it.
+#
+# Inference (inference.pdx) withholds an opinion wherever it cannot be sure,
+# which is right for a checker that refuses only what it can disprove: a
+# parameter is unknown, a def that calls itself answers unknown, and a name
+# rebound inside a loop is unknown after it. A code generator needs a type
+# for every value, so this pass asks a narrower question of a whole
+# program: called the way it is called, what is each def's type?
+#
+#   - A parameter takes its type from the arguments at its call sites, which
+#     must all agree.
+#   - A def that calls itself is assumed to answer a type, and the
+#     assumption is checked against its body.
+#   - A local keeps the type of its first binding; a rebinding to another
+#     type unpins it.
+#
+# The checker reads none of this: knowing more, it would disprove more, and
+# that is its own proposal. Expressions are still read by inference's
+# `synthesize`; only the bindings around them are kept differently.
+
+require_relative "inference"
+
+# One def's pinned types: its parameters as [name, type] pairs and its
+# answer, or the reason it could not be pinned.
+struct PinnedDef
+  name
+  parameters
+  answer
+  reason
+
+  def pinned? = reason.nil?
+end
+
+# A whole program's pinned types: its defs in written order, and its
+# top-level bindings as [name, type] pairs in first-appearance order.
+struct PinnedProgram
+  defs
+  bindings
+end
+
+# What a walk over statements has gathered: the bindings in scope, and the
+# calls seen, each as [def name, argument types].
+struct PinWalk
+  bindings
+  calls
+end
+
+def pin_program(nodes)
+  definitions = nodes.select { it in DefNode }
+  statements = nodes.reject { it in DefNode }
+  names = definitions.map { it.name }
+  unpinned = definitions.map { |definition| PinnedDef.new(name: definition.name, parameters: [], answer: ["unknown"], reason: "nothing calls it") }
+  # Two passes. The first pins from the arguments whose types are known,
+  # since `double(double(3))` cannot say its outer argument until `double`
+  # itself is pinned. The second holds every call to what was pinned: an
+  # argument still unknown, or of another type, unpins the def it is
+  # handed to, and whatever leaned on that def after it.
+  reached = settle_pins(definitions, statements, names, unpinned, false)
+  pinned = settle_pins(definitions, statements, names, reached, true)
+  answers = pinned_answers(pinned)
+  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  PinnedProgram.new(defs: pinned, bindings: walk.bindings.reverse)
+end
+
+# Rounds of pinning until one changes nothing. Each round can settle the
+# defs the last round's pins reach, so the rounds needed are bounded by
+# how many defs there are.
+def settle_pins(definitions, statements, names, starting, strict)
+  mutable pinned = starting
+  mutable round = 0
+  while round <= definitions.length + 1
+    answers = pinned_answers(pinned)
+    mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+    definitions.each do |definition|
+      found = pinned.find { it.name == definition.name }
+      next if found.nil? || found.parameters.length != definition.parameters.length
+      inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), answers, names)
+      walk = walk.with(calls: inner.calls)
+    end
+    settled = definitions.map { |definition| pin_definition(definition, walk.calls, answers, names, strict) }
+    break if settled == pinned
+    pinned = settled
+    round += 1
+  end
+  pinned
+end
+
+# The pinned defs' answers as bindings, the way inference keeps a def's
+# return under its name.
+def pinned_answers(pinned)
+  pinned.select { it.pinned? }.map { [it.name, it.answer] }
+end
+
+# One def against the calls gathered: its parameters from their arguments,
+# then its answer from its body. Unless strict, an argument whose type is
+# not known is passed over, to be read again once more is pinned.
+def pin_definition(definition, calls, answers, names, strict)
+  sites = calls.select { it[0] == definition.name }
+  unpinned = PinnedDef.new(name: definition.name, parameters: [], answer: ["unknown"], reason: "nothing calls it")
+  return unpinned if sites.empty?
+  mutable parameters = []
+  mutable index = 0
+  while index < definition.parameters.length
+    parameter = definition.parameters[index]
+    given = unique_types(sites.map { |site| type_at(type_at(site, 1), index) })
+    seen = strict ? given : given.select { concrete?(it) }
+    return unpinned.with(reason: "#{parameter.name} is called with a value whose type is not known") if strict && !given.all? { concrete?(it) }
+    if seen.length > 1
+      return unpinned.with(reason: "#{parameter.name} is #{with_article(seen[0])} at one call and #{with_article(seen[1])} at another")
+    end
+    only = seen.first or ["unknown"]
+    return unpinned.with(reason: "#{parameter.name} is called with a value whose type is not known") unless concrete?(only)
+    parameters << [parameter.name, only]
+    index += 1
+  end
+  answer = solved_answer(definition, parameters, answers, names)
+  return PinnedDef.new(name: definition.name, parameters: parameters, answer: answer, reason: "its answer is #{render_type(answer)}") unless concrete?(answer)
+  PinnedDef.new(name: definition.name, parameters: parameters, answer: answer, reason: nil)
+end
+
+# A def's answer with its parameters pinned. Read plainly first; where the
+# def calls itself that is unknown, so each type a value of the slice can
+# be is assumed in turn and kept only if the body then answers it. One
+# assumption holding is the answer; none or several is no answer.
+def solved_answer(definition, parameters, answers, names)
+  others = answers.reject { it[0] == definition.name }
+  plain = body_answer(definition.body, parameters, others, names)
+  return plain if concrete?(plain)
+  holding = [["integer"], ["boolean"]].select do |assumed|
+    body_answer(definition.body, parameters, [[definition.name, assumed]] + others, names) == assumed
+  end
+  return ["unknown"] unless holding.length == 1
+  holding.first or ["unknown"]
+end
+
+# What a body answers: its last statement and its early returns, as
+# inference's synthesize_body rules, but with bindings that keep their type.
+def body_answer(body, parameters, answers, names)
+  mutable walk = PinWalk.new(bindings: parameters, calls: [])
+  mutable early = []
+  mutable last = ["nil"]
+  body.each do |statement|
+    scope = walk.bindings + answers
+    early += return_types_in(statement, scope)
+    last = statement_answer(statement, scope)
+    walk = pin_statement(statement, walk, answers, names)
+  end
+  merge_candidates(early + [last])
+end
+
+def pin_statements(statements, walk, answers, names)
+  mutable current = walk
+  statements.each do |statement|
+    current = pin_statement(statement, current, answers, names)
+  end
+  current
+end
+
+# One statement: the calls inside it are recorded with the bindings above
+# it, and what it binds is in scope below. A loop's and a branch's bodies
+# are walked in place, so a name bound above them keeps its type inside
+# and after.
+def pin_statement(statement, walk, answers, names)
+  case statement
+  in AssignmentNode(name:, value:)
+    return walk if value.nil?
+    seen = pin_expression(value, walk, answers, names)
+    seen.with(bindings: rebound(seen.bindings, name, synthesize(value, seen.bindings + answers)))
+  in WhileNode(condition:, body:)
+    pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+  in IfNode(condition:, then_body:, else_body:)
+    after_condition = pin_expression(condition, walk, answers, names)
+    after_then = pin_statements((then_body or []), after_condition, answers, names)
+    pin_statements((else_body or []), after_then, answers, names)
+  else
+    pin_expression(statement, walk, answers, names)
+  end
+end
+
+# The calls to the program's defs anywhere inside an expression, each with
+# its arguments' types as the bindings in scope give them.
+def pin_expression(node, walk, answers, names)
+  mutable current = walk
+  if (node in CallNode) && names.include?(node.name)
+    scope = current.bindings + answers
+    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }]])
+  end
+  children_of(node).each do |child|
+    current = pin_statement(child, current, answers, names)
+  end
+  current
+end
+
+# A name bound to a type: new names are added, a rebinding to the same type
+# changes nothing, and a rebinding to another type leaves the name unknown.
+def rebound(bindings, name, type)
+  found = bindings.find { it[0] == name }
+  return [[name, type]] + bindings if found.nil?
+  return bindings if type_at(found, 1) == type
+  bindings.map { it[0] == name ? [name, ["unknown"]] : it }
+end
+
+def unique_types(types)
+  mutable unique = []
+  types.each do |type|
+    unique << type unless unique.include?(type)
+  end
+  unique
+end
+
+# Whether a type says everything a code generator needs: no unknown in it.
+def concrete?(type) = !render_type(type).include?("Unknown")
+
+def with_article(type)
+  rendered = render_type(type)
+  article = %w[A E I O U].include?(rendered.slice(0, 1)) ? "an" : "a"
+  "#{article} #{rendered}"
+end
+
+# The dump's lines, one per def and then one per top-level binding.
+def render_pinned(program)
+  mutable lines = []
+  program.defs.each do |pinned|
+    rendered = pinned.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
+    signature = pinned.parameters.empty? ? "def #{pinned.name}" : "def #{pinned.name}(#{rendered})"
+    if pinned.pinned?
+      lines << "#{signature} # -> #{render_type(pinned.answer)}"
+    else
+      lines << "#{signature}: not pinned — #{pinned.reason}"
+    end
+  end
+  program.bindings.each do |binding|
+    lines << "#{binding[0]}: #{render_type(type_at(binding, 1))}"
+  end
+  lines
+end

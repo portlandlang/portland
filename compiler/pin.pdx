@@ -1,0 +1,12 @@
+# The pinned-types dump (#445): one line per top-level def, with its
+# parameters and answer as the program's own calls pin them, or the reason
+# it could not be pinned; then one line per top-level binding. What the
+# native build reads, shown before any code is generated.
+#
+# Usage: pdx compiler/pin.pdx some_file.pdx
+
+require_relative "pinning"
+
+path = System.arguments.first or panic "pin.pdx: needs a file to pin"
+source = System.read_file(path) or panic "pin.pdx: cannot read #{path}"
+render_pinned(pin_program(parse_program(lex(source)))).each { puts it }
