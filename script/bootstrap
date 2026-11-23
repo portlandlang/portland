@@ -14,6 +14,15 @@ brew bundle check > /dev/null 2>&1 || brew bundle
 . script/lib/macos.sh
 macos_check
 
+# Apple's clang compiles what the native build writes (#447). It comes with
+# Xcode or the Command Line Tools, never Homebrew, and xcrun finds the
+# active one.
+if ! xcrun --find clang > /dev/null 2>&1; then
+  echo "script/bootstrap: Apple's clang is required — install the Command Line Tools: xcode-select --install" >&2
+  exit 1
+fi
+xcrun clang --version | head -1
+
 . script/lib/rust.sh
 # The Rust rust-toolchain.toml pins, with its components; with no name given,
 # rustup installs the toolchain that file selects.

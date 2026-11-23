@@ -1,0 +1,39 @@
+#!/bin/sh
+# Build a Portland program into a native executable (#447, ADR 0094).
+#
+#   script/build fib.pdx        writes target/portland/fib.ll and
+#                               target/portland/fib, and prints the binary's path
+#
+# The compiler, running on the seed, checks the program and writes LLVM IR
+# as text; Apple's clang, found through xcrun so it is the active Xcode's,
+# compiles that. The compiler cannot run a process itself (#179), which is
+# why this script sits between the two.
+#
+# Only a slice of the language compiles (#443); anything outside it refuses
+# by name and nothing is written.
+set -e
+if [ $# -ne 1 ]; then
+  echo "usage: script/build FILE.pdx" >&2
+  exit 64
+fi
+invoked_from=$(pwd)
+case "$1" in
+  /*) program=$1 ;;
+  *) program=$invoked_from/$1 ;;
+esac
+cd "$(dirname "$0")/.."
+root=$(pwd)
+
+. script/lib/rust.sh
+. script/lib/macos.sh
+
+cargo build --quiet
+name=$(basename "$program" .pdx)
+output=$root/target/portland
+mkdir -p "$output"
+# A stale .ll from an earlier build must not be compiled when this one refuses.
+rm -f "$output/$name.ll" "$output/$name"
+target/debug/pdx compiler/build.pdx "$program" "$output/$name.ll"
+# The IR names no target, so clang supplies the host's and would warn that it did.
+xcrun clang -O2 -Wno-override-module -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll"
+echo "$output/$name"

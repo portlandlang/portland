@@ -1,0 +1,19 @@
+# The native build's driver (#447): check a program, lower it, and write it
+# out as LLVM IR text for `clang` to compile. A program the checker refuses
+# says here what it says hosted; one outside the native slice refuses by
+# name, and nothing is written.
+#
+# The compiler cannot run a process (#179), so `script/build` runs this and
+# then `clang`.
+#
+# Usage: pdx compiler/build.pdx some_file.pdx some_file.ll
+
+require_relative "checker"
+require_relative "llvm"
+
+path = System.arguments[0] or panic "build.pdx: needs a file to build"
+destination = System.arguments[1] or panic "build.pdx: needs a path to write the LLVM IR to"
+source = System.read_file(path) or panic "build.pdx: cannot read #{path}"
+program = parse_program(lex(source))
+check_program_closure(path, [], default_load_path(path, []))
+System.write_file(destination, llvm_text(lower_program(program)))
