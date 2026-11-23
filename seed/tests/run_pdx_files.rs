@@ -1615,6 +1615,35 @@ fn a_native_build_that_refuses_leaves_nothing_behind() {
     assert!(!binary.exists(), "a refused build should leave no binary");
 }
 
+/// A def that dispatches on its parameter with `case/in` takes every type
+/// an arm handles (#457): what an arm calls on the name is asked of the
+/// value that arm matched, so it is no part of the parameter's contract.
+/// A call outside any arm is still the contract.
+#[test]
+fn a_case_in_on_a_parameter_narrows_its_contract() {
+    assert_both_print(
+        "narrowed_contract.pdx",
+        "def first_code(value)\n  case value\n  in Integer then value\n  in String then value.codepoints.first\n  else 0\n  end\nend\n\nputs first_code(65)\nputs first_code(\"A\")\n",
+        "65\n65\n",
+    );
+    let sample = std::env::temp_dir().join("contract_outside_case.pdx");
+    std::fs::write(
+        &sample,
+        "def shout(value)\n  case value\n  in Integer then value\n  else 0\n  end\n  value.upcase\nend\n\nputs shout(65)\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let stderr = String::from_utf8(hosted.stderr).unwrap();
+    assert!(
+        stderr.contains("'65' is an Integer, but 'shout' needs '.upcase'"),
+        "a call outside the case should still be the contract, got: {stderr}"
+    );
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.

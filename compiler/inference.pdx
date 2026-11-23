@@ -1017,6 +1017,10 @@ end
 
 def add_demands(node, name, mutable found)
   return found if node.nil?
+  # A `case/in` on the name itself narrows it: what an arm asks, it asks
+  # of the value that arm matched, never of every value the def is handed
+  # (#457).
+  return found if (node in CaseInNode) && names?(node.subject, name)
   demand = demand_of(node, name)
   found << demand unless demand.nil? || found.include?(demand)
   children_of(node).each do |child|
