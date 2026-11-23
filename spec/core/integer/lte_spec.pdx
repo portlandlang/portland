@@ -13,4 +13,17 @@ context "Integer#<=" do
   specify "order below zero" do
     expect((-5) <= (-5)).to be_true
   end
+
+  describe "fixnum" do
+    specify "returns true if self is less than or equal to other" do
+      expect(2 <= 13).to be_true
+      expect(-600 <= -500).to be_true
+
+      expect(5 <= 1).to be_false
+      expect(5 <= 5).to be_true
+      expect(-2 <= -2).to be_true
+
+      expect(5 <= 4.999).to be_false
+    end
+  end
 end

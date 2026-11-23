@@ -12,4 +12,17 @@ context "Integer#>=" do
   specify "mirror them" do
     expect(5 >= 5).to be_true
   end
+
+  describe "fixnum" do
+    specify "returns true if self is greater than or equal to the given argument" do
+      expect(13 >= 2).to be_true
+      expect(-500 >= -600).to be_true
+
+      expect(1 >= 5).to be_false
+      expect(2 >= 2).to be_true
+      expect(5 >= 5).to be_true
+
+      expect(5 >= 4.999).to be_true
+    end
+  end
 end
