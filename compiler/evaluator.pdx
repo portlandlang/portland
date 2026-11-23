@@ -2132,6 +2132,27 @@ def regex_matches_element?(pattern, element)
   false
 end
 
+# The pieces `lines` and `each_line` cut a string into, given a separator
+# or `chomp:` (#313): the host's own cut, the arguments read here first so
+# each refusal is the seed's sentence with the guest's rendering.
+def separated_lines(text, name, arguments, keyword_values)
+  panic("'#{name}' takes 0 to 1 arguments, got #{arguments.length}") if arguments.length > 1
+  mutable chomp = false
+  keyword_values.each do |pair|
+    label = pair[0]
+    flag = value_at(pair, 1)
+    panic("'#{name}' does not take #{label}: — chomp: is its one keyword") unless label == "chomp"
+    panic("'#{name}' takes true or false for chomp:, got #{render_inspect(flag)}") unless flag in Boolean
+    chomp = flag
+  end
+  return text.lines(chomp: chomp) if arguments.empty?
+  separator = value_at(arguments, 0)
+  panic("'#{name}' takes a String for its separator, got #{render_inspect(separator)}") unless separator in String
+  # Said here so the sentence names the method that was written.
+  panic("'#{name}' with an empty separator is Ruby's paragraph mode, which is unbuilt — split on the blank lines: split(/\\n{2,}/)") if separator.empty?
+  text.lines(separator, chomp: chomp)
+end
+
 # A line for `puts` and `warn`: Ruby's rule, a text already ending in a
 # newline gets no second one.
 def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
@@ -3447,7 +3468,7 @@ def evaluate_method_call(node, mutable bindings)
   # without reading it (#264), the seed's guard: a struct's own methods and
   # `with`, and the builtins that take one, read their own.
   unless keyword_values.empty? || (receiver in ["__struct__", *])
-    takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures")
+    takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures") || ((receiver in String) && %w[each_line lines].include?(node.name))
     panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
   end
   # Two values between brackets (ADR 0091): a match answers the slice of
@@ -3479,6 +3500,18 @@ def evaluate_method_call(node, mutable bindings)
       panic("no method #{node.name} on this value — the compiler may be missing a builtin the seed has")
     end
     receiver = value_at(receiver, 1)
+  end
+  # `lines` and `each_line` with a separator or `chomp:` (#313): the host
+  # cuts the pieces, and with a block each is handed over through `each`'s
+  # own walk and the string comes back.
+  # `lines` takes no block: one beside it goes on to the general refusal.
+  if (receiver in String) && %w[each_line lines].include?(node.name) && !(arguments.empty? && keyword_values.empty?) && (node.block.nil? || node.name == "each_line")
+    pieces = separated_lines(receiver, node.name, arguments, keyword_values)
+    return outcome([pieces], bindings) if node.block.nil?
+    walking = method_call_node(node.receiver, "each", [], node.block, line: node.line)
+    walked = evaluate_block_call(walking, pieces, [], bindings)
+    return walked unless walked.signal == "none"
+    return outcome([receiver], walked.bindings)
   end
   return set_rewrapped(original, node.name, evaluate_block_call(node, receiver, arguments, bindings)) if node.block.some?
   # `sample(random:)` and `shuffle(random:)` (ADR 0065): the one keyword a

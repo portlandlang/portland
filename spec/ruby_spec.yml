@@ -3317,8 +3317,8 @@ core/string/each_grapheme_cluster_spec.rb:
 core/string/each_line_spec.rb:
   pdx: [spec/core/string/each_line_spec.pdx]
   status: partial_planned
-  reason: "each_line takes no separator or chomp argument (#313); without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
-  link: https://github.com/portlandlang/portland/issues/313
+  reason: "Paragraph mode, an empty separator, waits on #426; without a block it is an enumerator in Ruby and the finished pieces here (ADR 0055), and the to_str, subclass, and encoding rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/426
 core/string/element_reference_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx]
   status: partial_planned
@@ -3393,8 +3393,8 @@ core/string/length_spec.rb:
 core/string/lines_spec.rb:
   pdx: [spec/core/string/lines_spec.pdx]
   status: partial_planned
-  reason: "lines takes no separator or chomp argument (#313)."
-  link: https://github.com/portlandlang/portland/issues/313
+  reason: "Paragraph mode, an empty separator, waits on #426; the to_str, subclass, and encoding rows stay upstream."
+  link: https://github.com/portlandlang/portland/issues/426
 core/string/ljust_spec.rb:
   pdx: [spec/core/string/ljust_spec.pdx]
 core/string/lstrip_spec.rb:
