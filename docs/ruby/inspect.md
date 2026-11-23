@@ -28,13 +28,17 @@ inspect(nil)      # => "nil"
 
 Portland has no ambient nil and absence has no methods (ADR 0006) — `nil?` and `some?` are the one dispatch a maybe allows. A method spelling would force a choice Ruby never faces: refuse `nil.inspect`, crippling the debugging tool on its most important input, or grant nil a third method and chip the wall. A function takes absence as an argument without ceremony, exactly as `some(nil)` already does.
 
+## What does not print is escaped
+
+An inspected string writes its control characters as Ruby does for a UTF-8 string: `\a`, `\b`, `\t`, `\n`, `\v`, `\f`, `\r`, and `\e` by name, and every other control character and the two Unicode line separators as `\uXXXX`. `inspect(0.chr)` is `"\u0000"`. Ruby writes `"\x00"` for `0.chr`, since that string is not UTF-8 there; every string is UTF-8 here (ADR 0069), so the UTF-8 form is the one form.
+
 ## A collection's `to_s` is its `inspect`
 
 As Ruby's ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.md)): `[1, "two"].to_s` is `[1, "two"]`, `"#{{a: 1}}"` is `{a: 1}`, and `puts list` prints the same. The quotes and colons are what tell `["1"]` from `[1]` in a log line. `join` renders each element with its own `to_s`, nested arrays flattened into the join, as Ruby's does; the scalars are untouched — `:a.to_s` is `a`.
 
 ## A struct's own `to_s` and `inspect`
 
-A struct that defines `to_s` is written with it by `puts`, `print`, `warn`, and interpolation, and one that defines `inspect` is written with it by `p` and `pp`, as Ruby's are ([#282](https://github.com/portlandlang/portland/issues/282)). Either must answer a String, or the write refuses. A struct inside a collection still renders in the default form, `Gadget(name: "g")`, where Ruby calls the element's own `inspect` ([#285](https://github.com/portlandlang/portland/issues/285)).
+A struct that defines `to_s` is written with it by `puts`, `print`, `warn`, and interpolation, and one that defines `inspect` is written with it by `p` and `pp`, as Ruby's are ([#282](https://github.com/portlandlang/portland/issues/282)). Either must answer a String, or the write refuses. A struct inside something else renders by its own method too ([#285](https://github.com/portlandlang/portland/issues/285)): an array, a hash's keys and values, a set, and another struct's fields call each struct's own `inspect`, at any depth, so `p([gadget])` is `[ci]` where `gadget` inspects as `ci`, and `inspect(value)` answers the same text `p` writes. `join` calls each element's own `to_s`, as Ruby's does. `puts([gadget])` prints `[ci]` where Ruby prints the element's `to_s`, since a collection's `to_s` is its `inspect`. A struct with an `inspect` and no `to_s` writes its default form, `Gadget(name: "g")`, under `puts` and interpolation, as Ruby's default `to_s` is not its `inspect`.
 
 ## Migrating
 

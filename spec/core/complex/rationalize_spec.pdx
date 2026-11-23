@@ -8,4 +8,12 @@ context "Complex#rationalize" do
   specify "to a real when the imaginary part is an exact zero" do
     expect(Complex(1, 0).rationalize).to eq(Rational(1, 1))
   end
+
+  specify "returns a Rational if self has zero imaginary part" do
+    expect(Complex(1,0).rationalize).to eq(Rational(1,1))
+  end
+
+  specify "ignores a single argument" do
+    expect(Complex(1,0).rationalize(0.1)).to eq(Rational(1,1))
+  end
 end

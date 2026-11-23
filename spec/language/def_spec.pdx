@@ -29,6 +29,21 @@ end
 def bang_named!
   "loud and proud"
 end
+def default_alone(value = 1)
+  value
+end
+def default_after_required(first, second = 2)
+  [first, second]
+end
+def default_source
+  1
+end
+def default_from_call(value = default_source())
+  value
+end
+def default_from_preceding(text, width = text.length)
+  width
+end
 
 context "Redefining a method" do
   specify "a bang is just part of a method's name now" do
@@ -54,5 +69,27 @@ context "Redefining a method" do
 
   specify "is a plain def — Ruby's spelling of the same meaning" do
     expect(Doubling.double(21)).to eq(42)
+  end
+end
+
+context "An instance method with a default argument" do
+  specify "evaluates the default when no arguments are passed" do
+    expect(default_alone).to eq(1)
+    expect(default_alone(2)).to eq(2)
+  end
+
+  specify "evaluates the default when required arguments precede it" do
+    expect(default_after_required(1)).to eq([1, 2])
+  end
+end
+
+context "A method defined with extreme default arguments" do
+  specify "may use an fcall as a default" do
+    expect(default_from_call).to eq(1)
+    expect(default_from_call(2)).to eq(2)
+  end
+
+  specify "may use preceding arguments as defaults" do
+    expect(default_from_preceding("abcde")).to eq(5)
   end
 end
