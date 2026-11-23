@@ -49,6 +49,7 @@
 # and the closure refuses once at the end with the whole report, in
 # source order, each file in dependency order. Nothing panics mid-walk.
 
+require_relative "core"
 require_relative "paths"
 require_relative "refusals"
 
@@ -202,10 +203,13 @@ def check_closure_with(path, mutable checked, sharpen, load_path)
   files = value_at_checked(resolution, 1)
   entry = files.last
   sharpened = if sharpen && entry.some? then sharpen_parameters(entry, files) else [] end
+  # The core is loaded ahead of every program (ADR 0093), so what it
+  # declares is in scope in every file, as a required file's would be.
+  core = declarations_of(core_nodes)
   mutable found = []
   files.each do |file|
     own = if entry.some? && file.path == entry.path then sharpened else [] end
-    found += check_program_with(file.nodes, file.source, file.named, file.imports, own)
+    found += check_program_with(file.nodes, file.source, file.named, merge_declarations(file.imports, core), own)
   end
   report(found)
   checked
@@ -1351,7 +1355,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf putc puts rand require require_relative some sprintf srand warn].include?(name)
+def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf puts rand require require_relative some sprintf srand warn].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it

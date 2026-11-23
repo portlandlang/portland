@@ -13,6 +13,7 @@
 # To run a file, see run.pdx.
 
 require_relative "parser"
+require_relative "core"
 require_relative "paths"
 # The renderer's helpers (ADR 0047) — the runtime rows of its sentences
 # are spelled with the same quoting, article, and truncation as the build's.
@@ -94,7 +95,21 @@ end
 # guest's own, what its `System.arguments` answers (ADR 0068); `load_path`
 # is where `require "name"` looks (ADR 0077).
 def evaluate_program(nodes, path, arguments, load_path, data: nil)
-  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + data_bindings(data) + builtin_constants)
+  starting = [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + data_bindings(data) + builtin_constants
+  # The core runs first, in the program's own environment (ADR 0093), and
+  # the names it defined ride the bindings as `__core__`: a program that
+  # defines one is told it is a builtin.
+  core = core_nodes
+  loaded = run_body(core, starting)
+  return loaded unless loaded.signal == "none"
+  run_body(nodes, [["__core__", "core", core_function_names(core)]] + loaded.bindings)
+end
+
+# Whether the core defined a function by this name.
+def core_function?(name, bindings)
+  found = lookup(bindings, "__core__").first
+  return false if found.nil?
+  value_at(found, 2).include?(name)
 end
 
 # `DATA` (ADR 0092): the text after the `__END__` line of the file that is
@@ -561,7 +576,7 @@ def declared_names(bindings)
 end
 
 def declare(name, bindings)
-  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || name == "Comparable" || name == "Enumerable"
+  panic("'#{name}' is a builtin — rename yours") if builtin_method?(name) || core_function?(name, bindings) || name == "Comparable" || name == "Enumerable"
   panic("'#{name}' is already defined — rename one") if declared_names(bindings).include?(name)
   [["__declared__", "declared", declared_names(bindings) + [name]]] + bindings
 end
@@ -2513,6 +2528,14 @@ def evaluate_builtin_type_function(node, mutable bindings)
   if type_name == "System" && node.name == "arguments"
     panic("System.arguments takes 0 arguments, got #{arguments.length}") unless arguments.empty?
     return outcome([arguments_of(bindings)], bindings)
+  end
+  # One core file's text as the running seed carries it (ADR 0093), the
+  # host's own answer and its own refusal.
+  if type_name == "System" && node.name == "core_source"
+    panic("System.core_source takes 1 argument, got #{arguments.length}") unless arguments.length == 1
+    name = value_at(arguments, 0)
+    panic("System.core_source takes a String, got #{render_inspect(name)}") unless name in String
+    return outcome([System.core_source(name)], bindings)
   end
   # One whole file as a string, or a failure (ADR 0027) — the host's own
   # crossing answers both, and both are plain values the guest can hold.
@@ -5579,19 +5602,6 @@ def evaluate_call(node, mutable bindings)
       System.write_standard_output(text)
     end
     outcome([nil], bindings)
-  # `putc` writes one character — an integer's low byte, or a string's first
-  # character — and answers its argument (#185).
-  when "putc"
-    panic("putc takes 1 argument, got #{arguments.length}") unless arguments.length == 1
-    written = value_at(arguments, 0)
-    if written in Integer
-      System.write_standard_output((written % 256).chr)
-    elsif written in String
-      System.write_standard_output(written.slice(0, 1))
-    else
-      panic("putc takes an integer or a string, got #{render_inspect(written)}")
-    end
-    outcome(arguments, bindings)
   # `printf` is `format` then `print` (#185).
   when "printf"
     panic("too few arguments") if arguments.empty?

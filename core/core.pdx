@@ -1,0 +1,12 @@
+# Portland's core, loaded before every program (ADR 0093).
+#
+# This file is the load order and nothing else: one `require_relative` per
+# core file, read top to bottom by both implementations. The seed carries
+# these files inside its binary, and `System.core_source(name)` hands one
+# file's text to the compiler, so a program run hosted gets the same core
+# the seed gives it.
+#
+# A file here says what Portland's own types and functions answer, in
+# Portland. What a file does not define stays a primitive in the floor.
+
+require_relative "kernel"

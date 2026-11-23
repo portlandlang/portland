@@ -1,0 +1,22 @@
+# The bare functions (ADR 0093): Ruby's `Kernel`, as top-level defs. The
+# core loads ahead of every program in one environment, so a def here is
+# callable bare, and there is no `Kernel` module to qualify it with.
+#
+# `puts`, `p`, `print`, and `format` take any number of arguments, which a
+# def cannot spell while splat parameters are deferred (ADR 0014), so they
+# stay in the floor.
+
+# `putc` writes one character — an Integer's low byte, or a String's first
+# code point — and answers its argument, as Ruby's does (#185).
+def putc(character)
+  case character
+  in Integer
+    System.write_standard_output(character.bit_and(255).chr(Encoding::UTF_8))
+  in String
+    first = character.codepoints.first
+    System.write_standard_output(first.chr(Encoding::UTF_8)) unless first.nil?
+  else
+    panic("putc takes an integer or a string, got #{inspect(character)}")
+  end
+  character
+end
