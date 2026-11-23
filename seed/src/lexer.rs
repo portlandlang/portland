@@ -17,6 +17,9 @@ pub enum TokenKind {
     /// `::` — reaches a name inside a namespace (ADR 0021).
     ColonColon,
     Comma,
+    /// The text after an `__END__` line (ADR 0092): the last token when
+    /// there is one, and `DATA`'s value in the file that is run.
+    Data,
     Dot,
     /// `..` inclusive and `...` exclusive (ADR 0019).
     DotDot,
@@ -242,6 +245,20 @@ pub fn normalize_line_endings(source: String) -> String {
     }
 }
 
+/// The line that ends a program's text (ADR 0092), Ruby's spelling.
+pub const END_MARKER: &str = "__END__";
+
+/// Whether `__END__` starts at `start` and is the whole of its line: at the
+/// line's first column, with a newline or the end of the source after it,
+/// as Ruby requires.
+fn ends_program(source: &str, start: usize) -> bool {
+    let at_line_start = start == 0 || source.as_bytes()[start - 1] == b'\n';
+    let rest = &source[start..];
+    at_line_start
+        && rest.starts_with(END_MARKER)
+        && matches!(rest.as_bytes().get(END_MARKER.len()), None | Some(b'\n'))
+}
+
 pub fn lex(source: &str) -> Vec<Token<'_>> {
     let mut tokens = Vec::new();
     let mut chars = source.char_indices().peekable();
@@ -290,10 +307,24 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     });
                 }
                 let text = &source[start..end];
-                check_prefixed_literal(text);
+                // Ruby's `r` and `i` suffixes end a prefixed literal too
+                // (#291): `0xffr` is `(255/1)`, `0b1110i` is `(0+14i)`.
+                // Neither letter is a digit of any base, so the last one
+                // is the suffix and the digits before it are checked.
+                let kind = match text.as_bytes().last() {
+                    Some(b'r') => TokenKind::Rational,
+                    Some(b'i') => TokenKind::Imaginary,
+                    _ => TokenKind::Integer,
+                };
+                let digits = if kind == TokenKind::Integer {
+                    text
+                } else {
+                    &text[..text.len() - 1]
+                };
+                check_prefixed_literal(digits);
                 tokens.push(Token {
                     leading_space: false,
-                    kind: TokenKind::Integer,
+                    kind,
                     text,
                 });
             }
@@ -717,6 +748,22 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                         Some(_) => {}
                     }
                 }
+            }
+            // `__END__` alone on a line ends the program text (ADR 0092):
+            // nothing after it is lexed, and the rest of the source rides
+            // out as the one `Data` token.
+            '_' if ends_program(source, start) => {
+                let after = start + END_MARKER.len();
+                // Past the marker's own newline; a marker that ends the
+                // source leaves the empty text at the source's end, so the
+                // token is still a slice of it.
+                let text = &source[(after + 1).min(source.len())..];
+                tokens.push(Token {
+                    leading_space: false,
+                    kind: TokenKind::Data,
+                    text,
+                });
+                break;
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 let mut end = scan_while(&mut chars, |character| {
@@ -1214,6 +1261,22 @@ mod tests {
     fn lexes_identifiers() {
         assert_eq!(kinds("photos"), vec![TokenKind::Identifier]);
         assert_eq!(texts("user_count2"), vec!["user_count2"]);
+    }
+
+    /// ADR 0092: `__END__` alone on a line ends the program text, and the
+    /// rest is one token. Indented, trailed, or mid-line it is a name.
+    #[test]
+    fn an_end_marker_line_ends_the_program_text() {
+        assert_eq!(
+            kinds("answer\n__END__\nnot = code \"\n"),
+            vec![TokenKind::Identifier, TokenKind::Newline, TokenKind::Data]
+        );
+        assert_eq!(texts("__END__\nfirst\nsecond\n"), vec!["first\nsecond\n"]);
+        assert_eq!(texts("__END__"), vec![""]);
+        assert_eq!(texts("__END__\n"), vec![""]);
+        assert_eq!(kinds(" __END__"), vec![TokenKind::Identifier]);
+        assert_eq!(kinds("__END__ "), vec![TokenKind::Identifier]);
+        assert_eq!(kinds("__END__S"), vec![TokenKind::Identifier]);
     }
 
     #[test]
