@@ -36,8 +36,8 @@ core/array/all_spec.rb:
 core/array/any_spec.rb:
   pdx: [spec/core/array/any_spec.pdx]
   status: partial_planned
-  reason: "A bare any? refuses where Ruby answers (#337). Growing the array mid-walk and a pattern beside a block stay out: values never mutate, and a pattern beside a block refuses (ADR 0066)."
-  link: https://github.com/portlandlang/portland/issues/337
+  reason: "A bare any? refuses where Ruby answers; what it should mean waits on #440. Growing the array mid-walk and a pattern beside a block stay out: values never mutate, and a pattern beside a block refuses (ADR 0066)."
+  link: https://github.com/portlandlang/portland/issues/440
 core/array/comparison_spec.rb:
   pdx: [spec/core/array/comparison_spec.pdx]
   status: partial_intentional
