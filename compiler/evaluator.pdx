@@ -3855,7 +3855,13 @@ def evaluate_method_call(node, mutable bindings)
   # host's `when` rule — a range covers, a regex matches, anything else
   # asks `==`.
   when "any?" then arguments.empty? ? receiver.any? : pattern_answer(receiver, "any?", value_at(arguments, 0))
-  when "all?", "none?", "one?", "grep", "grep_v", "slice_before", "slice_after"
+  # With neither a block nor a pattern, each of these three is the host's
+  # bare call, which refuses as the seed does: handing over a missing
+  # pattern as nil made them answer, wrongly (#337).
+  when "all?" then arguments.empty? ? receiver.all? : pattern_answer(receiver, "all?", value_at(arguments, 0))
+  when "none?" then arguments.empty? ? receiver.none? : pattern_answer(receiver, "none?", value_at(arguments, 0))
+  when "one?" then arguments.empty? ? receiver.one? : pattern_answer(receiver, "one?", value_at(arguments, 0))
+  when "grep", "grep_v", "slice_before", "slice_after"
     pattern_answer(receiver, node.name, value_at(arguments, 0))
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))
   when "key" then receiver.key(value_at(arguments, 0))

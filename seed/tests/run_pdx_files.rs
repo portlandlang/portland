@@ -2055,6 +2055,28 @@ fn refusals_render_guest_values_alike_on_both_oracles() {
     assert_both_oracles_refuse("guest_value_refusal.pdx", None, &cases);
 }
 
+/// `all?`, `none?`, and `one?` with neither a block nor a pattern refuse on
+/// both oracles in one sentence (#337): the hosted evaluator once handed
+/// the missing pattern over as nil and answered.
+#[test]
+fn the_bare_predicates_refuse_on_both_oracles() {
+    let cases = [
+        (
+            "p([true, true].all?)\n",
+            "undefined method all? for [true, true] with []",
+        ),
+        (
+            "p([true, true].none?)\n",
+            "undefined method none? for [true, true] with []",
+        ),
+        (
+            "p([true, false].one?)\n",
+            "undefined method one? for [true, false] with []",
+        ),
+    ];
+    assert_both_oracles_refuse("bare_predicates.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
