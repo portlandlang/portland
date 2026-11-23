@@ -1,0 +1,5 @@
+# nil ordered against a value refuses as the seed does (#503).
+numbers = [3, 8]
+if numbers[9] < 1
+  puts "unreached"
+end

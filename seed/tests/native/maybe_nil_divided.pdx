@@ -1,0 +1,3 @@
+# nil divided refuses before the division is tried (#503).
+numbers = [3, 0]
+puts numbers[5] / numbers[1]

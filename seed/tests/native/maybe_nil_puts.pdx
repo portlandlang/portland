@@ -1,0 +1,4 @@
+# puts handed nil refuses as the seed does (#503).
+numbers = [3, 8]
+puts numbers[1]
+puts numbers[9]

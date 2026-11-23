@@ -1,0 +1,4 @@
+# nil interpolated refuses as the seed does (#503).
+names = ["ada"]
+puts "hello, #{names[0]}"
+puts "hello, #{names[4]}"

@@ -122,9 +122,36 @@ def synthesize(node, types)
   # pinning says (#493), under a name no local can have. The checker
   # binds none, and reads unknown.
   in YieldNode then synthesize_name("yield", types)
+  in IndexNode then synthesize_index(node, types)
   else
     ["unknown"]
   end
+end
+
+# The name the native build's pinning reads under (#503): bound by it and
+# by nothing else, and spelled as no local can be. Under it, inference
+# answers the way a code generator needs and a checker does not: an
+# element read by index is a maybe of the element, and a maybe used where
+# a value is needed is read as the value, since the native build opens
+# it when the line runs, as the interpreters do. The checker binds no
+# such name, and withholds both opinions.
+NATIVE_READING = "native&"
+
+def native_reading?(types) = types.any? { it[0] == NATIVE_READING }
+
+# A maybe as the native build reads it where its value is needed.
+def opened_natively(type, types)
+  return type unless (type in ["maybe", *]) && native_reading?(types)
+  type_at(type, 1)
+end
+
+# `array[index]` under the native reading: the element, or nil past
+# either end.
+def synthesize_index(node, types)
+  return ["unknown"] unless native_reading?(types)
+  receiver = synthesize(node.receiver, types)
+  return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
+  maybe_of(type_at(receiver, 1))
 end
 
 def synthesize_array(node, types)
@@ -346,8 +373,8 @@ end
 # The arithmetic and comparison operators, ADR 0018's shapes: whole numbers
 # stay whole, one float anywhere makes a float, comparisons answer booleans.
 def synthesize_binary(node, types)
-  left = synthesize(node.left, types)
-  right = synthesize(node.right, types)
+  left = opened_natively(synthesize(node.left, types), types)
+  right = opened_natively(synthesize(node.right, types), types)
   case node.operator
   when "==", "!=", "<", "<=", ">", ">=" then ["boolean"]
   # `<=>` (ADR 0054) answers -1, 0, or 1 on what it orders; a struct's own
@@ -447,7 +474,11 @@ end
 # (ADR 0040 §3). Unlisted names answer unknown, never an error.
 def synthesize_call(node, types)
   return type_function_answer(node) if builtin_type_function?(node, types)
-  call_answer(synthesize(node.receiver, types), node, types)
+  receiver = synthesize(node.receiver, types)
+  # `nil?` and `some?` are asked of the maybe itself; every other method
+  # is asked of its value.
+  asked = %w[nil? some?].include?(node.name) ? receiver : opened_natively(receiver, types)
+  call_answer(asked, node, types)
 end
 
 # `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh

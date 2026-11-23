@@ -1,0 +1,5 @@
+# nil on the left of an operator refuses as the seed does (#503).
+numbers = [3, 8]
+puts numbers[0] + 1
+puts numbers[9] - 1
+puts "unreached"

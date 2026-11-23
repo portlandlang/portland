@@ -113,7 +113,9 @@ end
 def pinned_answers(pinned)
   answers = pinned.select { it.pinned? }.map { [it.name, it.answer] }
   yielded = pinned.reject { it.block.nil? }.map { [block_key(it.name), it.block.parameters] }
-  answers + yielded
+  # Everything pinning reads, it reads the way the native build runs it
+  # (#503): the name that says so rides with the answers into every scope.
+  answers + yielded + [[NATIVE_READING, ["boolean"]]]
 end
 
 def block_key(name) = "#{name}&"

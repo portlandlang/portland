@@ -1448,9 +1448,22 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "empty = []\nputs empty.length\n",
             format!("{compiles} — an array that is never given an element, empty on line 2 is unbuilt (#443)"),
         ),
+        // A maybe outside the first step (#503).
         (
-            "numbers = [1, 2]\nputs numbers[0]\n",
-            format!("{compiles} — an index with [ ] on line 2 is unbuilt (#443)"),
+            "numbers = [1, 2]\nputs numbers[\"a\"]\n",
+            format!("{compiles} — an index that is a String on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "rows = [[1], [2]]\nputs rows[0][0]\n",
+            format!("{compiles} — an index into a [Integer]? on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "flags = [true]\nif flags[0]\n  puts 1\nend\n",
+            format!("{compiles} — a condition that is a Boolean? on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "numbers = [1, 2]\nheld = [numbers[0]]\n",
+            format!("{compiles} — an array of Integer? on line 2 is unbuilt (#443)"),
         ),
         (
             "numbers = [1, 2]\ndoubled = numbers.map { |number| number * 2 }\n",
