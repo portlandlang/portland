@@ -4962,6 +4962,21 @@ fn refusals_point_at_their_line() {
             "def greet(name)\n  \"hi \" + name.upcase\nend\nif false\n  greet(5)\nend\n",
             "'5' is an Integer, but 'greet' needs '.upcase'\n  5 | greet(5)",
         ),
+        // Every node kind carries its line (#362): an arm that can never
+        // match points at the arm, not at the `case` above it, and a path
+        // to a private constant points at the read.
+        (
+            "value = 3\nresult = case value\nin 1 then \"one\"\nin other then \"any\"\nin 2 then \"two\"\nend\nputs result\n",
+            "this arm can never match — the capture above binds every subject\n  5 | in 2 then \"two\"",
+        ),
+        (
+            "enum Status\n  :paid\n  :due\nend\nstate = :paid\nlabel = case state\nin :paid then \"p\"\nin :paid then \"again\"\nin :due then \"d\"\nend\nputs label\n",
+            "in :paid can never match — an arm above already matches :paid\n  8 | in :paid then \"again\"",
+        ),
+        (
+            "module Config\n  LIMIT = 1\n  private_constant :LIMIT\nend\nputs Config::LIMIT\n",
+            "'LIMIT' is private to Config\n  5 | puts Config::LIMIT",
+        ),
     ];
     for (source, expected) in cases {
         let sample = std::env::temp_dir().join("refusal_location.pdx");

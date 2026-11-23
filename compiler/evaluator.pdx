@@ -1388,7 +1388,7 @@ end
 # a synthetic call on an identifier or path node, dispatched as any is.
 def evaluate_type_receiver_call(type_name, node, bindings)
   return outcome([type_name], bindings) if node.name == "name" && node.arguments.empty?
-  written = if type_name.include?("::") then path_node(type_name.split("::")) else identifier_node(type_name, line: node.line) end
+  written = if type_name.include?("::") then path_node(type_name.split("::"), line: node.line) else identifier_node(type_name, line: node.line) end
   evaluate_method_call(method_call_node(written, node.name, node.arguments, node.block, line: node.line), bindings)
 end
 
