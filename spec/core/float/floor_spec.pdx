@@ -9,4 +9,12 @@ context "Float#floor" do
     expect(1.5.floor).to eq(1)
     expect((-1.5).floor).to eq(-2)
   end
+
+  specify "returns the largest Integer less than or equal to self" do
+    expect(-1.2.floor).to eql(-2)
+    expect(-1.0.floor).to eql(-1)
+    expect(0.0.floor).to eql(0)
+    expect(1.0.floor).to eql(1)
+    expect(5.9.floor).to eql(5)
+  end
 end

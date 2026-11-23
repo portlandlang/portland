@@ -461,6 +461,9 @@ fn rational_round(numerator: i64, denominator: i64) -> Value {
 /// power — which, for a negative base and a fractional exponent, is a
 /// complex (`rb_dbl_complex_new_polar_pi`).
 fn real_pow(left: &Value, right: &Value) -> Value {
+    // A Rational power answers a Rational even where it is integral, as
+    // Ruby's does: `2 ** Rational(2, 1)` is `(4/1)` (#290).
+    let rational_power = matches!(right, Value::Rational { .. });
     let right = match right {
         Value::Rational {
             numerator,
@@ -473,8 +476,8 @@ fn real_pow(left: &Value, right: &Value) -> Value {
     {
         if exponent == 0 {
             return match left {
-                Value::Rational { .. } => rational(1, 1),
-                _ => Value::Integer(1),
+                Value::Integer(_) if !rational_power => Value::Integer(1),
+                _ => rational(1, 1),
             };
         }
         if exponent < 0 && exact_zero(left) {
@@ -498,7 +501,9 @@ fn real_pow(left: &Value, right: &Value) -> Value {
             return rational_wide(raised_denominator, raised_numerator, &shown);
         }
         return match left {
-            Value::Integer(_) => Value::Integer(narrow(raised_numerator, &shown)),
+            Value::Integer(_) if !rational_power => {
+                Value::Integer(narrow(raised_numerator, &shown))
+            }
             _ => rational_wide(raised_numerator, raised_denominator, &shown),
         };
     }
@@ -1170,7 +1175,18 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
             ("rectangular" | "rect", []) => Value::array(vec![real.clone(), imaginary.clone()]),
             ("conjugate" | "conj", []) => complex(real.clone(), real_negate(imaginary)),
             ("to_c", []) => receiver.clone(),
-            ("to_r", []) => to_rational(&real_of_complex(receiver, "Rational"), "to_r"),
+            // `to_r` alone takes a Float zero imaginary part too, as Ruby
+            // does from 3.4 (#328); `to_f`, `to_i`, and `rationalize` keep
+            // the exact-zero rule, as Ruby's do.
+            ("to_r", []) => {
+                let (real, imaginary) = complex_parts(receiver);
+                let zero = exact_zero(&imaginary)
+                    || matches!(imaginary, Value::Float(part) if part == 0.0);
+                if !zero {
+                    panic!("can't convert {receiver} into Rational");
+                }
+                to_rational(&real, "to_r")
+            }
             ("rationalize", []) => rationalize(&real_of_complex(receiver, "Rational"), None),
             ("rationalize", [epsilon]) => {
                 rationalize(&real_of_complex(receiver, "Rational"), Some(epsilon))
