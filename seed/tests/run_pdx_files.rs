@@ -1717,6 +1717,66 @@ fn a_function_the_core_defines_runs_on_both_oracles() {
     assert_both_oracles_refuse("core_putc_refusal.pdx", None, &cases);
 }
 
+/// The debug runtime's two checks fire (#465, ADR 0095): a program that
+/// ends still holding a String it made, and one that releases a String
+/// more times than it was held, each stop with the runtime's sentence. The
+/// programs are LLVM IR written by hand, since the compiler is meant never
+/// to write either.
+#[test]
+fn the_debug_runtime_refuses_a_leak_and_a_release_too_many() {
+    let root = format!("{}/..", env!("CARGO_MANIFEST_DIR"));
+    let built = Command::new("cargo")
+        .args(["build", "--quiet", "--package", "portland-runtime"])
+        .current_dir(&root)
+        .status()
+        .expect("failed to build the runtime");
+    assert!(built.success(), "the debug runtime should build");
+    let runtime = format!("{root}/target/debug/libportland_runtime.a");
+    let declarations = "declare ptr @portland_string_from_integer(i64)\ndeclare void @portland_release(ptr)\ndeclare void @portland_exit_check()\n";
+    let cases = [
+        (
+            "runtime_leak",
+            "  %made = call ptr @portland_string_from_integer(i64 7)\n",
+            "1 String was still held when the program ended — the native build missed a release (#465)",
+        ),
+        (
+            "runtime_release_too_many",
+            "  %made = call ptr @portland_string_from_integer(i64 7)\n  call void @portland_release(ptr %made)\n  call void @portland_release(ptr %made)\n",
+            "a String was released more times than it was held — the native build counted wrong (#465)",
+        ),
+    ];
+    for (name, body, expected) in cases {
+        let text = std::env::temp_dir().join(format!("{name}.ll"));
+        let binary = std::env::temp_dir().join(name);
+        std::fs::write(
+            &text,
+            format!("{declarations}define i32 @main() {{\n{body}  call void @portland_exit_check()\n  ret i32 0\n}}\n"),
+        )
+        .unwrap();
+        let compiled = Command::new("xcrun")
+            .args(["clang", "-Wno-override-module", "-o"])
+            .arg(&binary)
+            .arg(&text)
+            .arg(&runtime)
+            .output()
+            .expect("failed to run clang");
+        assert!(
+            compiled.status.success(),
+            "{name} should compile: {}",
+            String::from_utf8_lossy(&compiled.stderr)
+        );
+        let ran = Command::new(&binary)
+            .output()
+            .expect("failed to run the binary");
+        assert_eq!(
+            ran.status.code(),
+            Some(70),
+            "{name} should stop with the runtime's status"
+        );
+        assert_eq!(String::from_utf8_lossy(&ran.stderr).trim(), expected);
+    }
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.

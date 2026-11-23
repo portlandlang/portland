@@ -18,6 +18,23 @@
 # runtime reads as "never freed". What a String needs done to it is a call
 # into the runtime, each function there named `portland_…`.
 #
+# Strings are reference counted, plainly (ADR 0095). Every String a
+# value produces is held once by whoever asked for it:
+#
+#   - Reading a local retains what the slot holds; a call, a `+`, and an
+#     Integer written out each answer a String already held.
+#   - A store hands the String to the slot and releases what the slot
+#     held. A call hands each argument to the callee, whose parameter
+#     slot then holds it. A return hands it to the caller.
+#   - `puts`, `+`, and a value computed and dropped release what they
+#     were handed once they are done with it.
+#   - Every way out of a function releases each slot it holds.
+#
+# A slot starts empty, and a release of nothing does nothing, so no path
+# has to know which locals were bound. The entry function ends by asking
+# the runtime whether anything is still held, which the debug build
+# answers.
+#
 # No target is named, so `clang` supplies the host's.
 
 require_relative "intermediate_representation"
@@ -33,6 +50,9 @@ struct LlvmEmitter
   # top of the module, and the prefix that keeps their names its own.
   globals
   prefix
+  # The parameters and locals that hold a String, each released on every
+  # way out of the function.
+  held
 end
 
 # A value written: the text so far, and how to refer to the value.
@@ -52,6 +72,11 @@ LLVM_PRELUDE = [
   "declare i32 @dprintf(i32, ptr, ...)",
   "declare void @exit(i32)",
 "declare void @portland_puts_string(ptr)",
+"declare ptr @portland_string_concat(ptr, ptr)",
+"declare ptr @portland_string_from_integer(i64)",
+"declare void @portland_retain(ptr)",
+"declare void @portland_release(ptr)",
+"declare void @portland_exit_check()",
   "declare {i64, i1} @llvm.sadd.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.ssub.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.smul.with.overflow.i64(i64, i64)",
@@ -83,9 +108,15 @@ def llvm_function(function, prefix)
   entry = function.name == "main"
   parameters = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }.join(", ")
   header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters}) {"
-  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix)
+  held = (function.parameters + function.locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
+  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held)
   (function.parameters + function.locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
+  end
+  # A local that holds a String starts empty, so releasing it before it is
+  # bound does nothing.
+  function.locals.each do |local|
+    emitter = llvm_line(emitter, "store ptr null, ptr #{llvm_slot(local[0])}") if type_at(local, 1) == ["string"]
   end
   function.parameters.each do |parameter|
     type = llvm_type(type_at(parameter, 1))
@@ -94,7 +125,26 @@ def llvm_function(function, prefix)
   emitter = llvm_statements(emitter, function.body)
   # Every path through a def has returned by here; the entry function
   # falls off its end and answers success.
-  llvm_line(emitter, entry ? "ret i32 0" : "unreachable")
+  return llvm_line(emitter, "unreachable") unless entry
+  finished = llvm_line(llvm_release_held(emitter), "call void @portland_exit_check()")
+  llvm_line(finished, "ret i32 0")
+end
+
+# Every String this function's slots hold, released: written before each
+# way out.
+def llvm_release_held(emitter)
+  mutable current = emitter
+  emitter.held.each do |name|
+    loaded = llvm_named(current, "load ptr, ptr #{llvm_slot(name)}")
+    current = llvm_line(loaded.emitter, "call void @portland_release(ptr #{loaded.operand})")
+  end
+  current
+end
+
+# A value that was handed over and is done with: released if it is a String.
+def llvm_drop(emitter, type, operand)
+  return emitter unless type == ["string"]
+  llvm_line(emitter, "call void @portland_release(ptr #{operand})")
 end
 
 def llvm_statements(emitter, statements)
@@ -109,23 +159,35 @@ def llvm_statement(emitter, statement)
   case statement
   in IntermediateStore(name:, value:)
     written = llvm_value(emitter, value)
+    if value.type == ["string"]
+      # The slot takes the new String and lets go of the one it held.
+      previous = llvm_named(written.emitter, "load ptr, ptr #{llvm_slot(name)}")
+      stored = llvm_line(previous.emitter, "store ptr #{written.operand}, ptr #{llvm_slot(name)}")
+      return llvm_drop(stored, ["string"], previous.operand)
+    end
     llvm_line(written.emitter, "store #{llvm_type(value.type)} #{written.operand}, ptr #{llvm_slot(name)}")
   in IntermediateReturn(value:)
     returned = if value.nil?
-      llvm_line(emitter, "ret void")
+      llvm_line(llvm_release_held(emitter), "ret void")
     else
+      # The value is computed first: it may read a local the release
+      # after it lets go of.
       written = llvm_value(emitter, value)
-      llvm_line(written.emitter, "ret #{llvm_type(value.type)} #{written.operand}")
+      llvm_line(llvm_release_held(written.emitter), "ret #{llvm_type(value.type)} #{written.operand}")
     end
     # Whatever is written after a return needs a block of its own to sit
     # in, though nothing reaches it.
     llvm_label(returned, "after#{returned.counter}")
   in IntermediatePrint(value:)
     written = llvm_value(emitter, value)
-    return llvm_line(written.emitter, "call void @portland_puts_string(ptr #{written.operand})") if value.type == ["string"]
+    if value.type == ["string"]
+      printed = llvm_line(written.emitter, "call void @portland_puts_string(ptr #{written.operand})")
+      return llvm_drop(printed, ["string"], written.operand)
+    end
     llvm_line(written.emitter, "call i32 (ptr, ...) @printf(ptr @.integer_line, i64 #{written.operand})")
   in IntermediateEvaluate(value:)
-    llvm_value(emitter, value).emitter
+    written = llvm_value(emitter, value)
+    llvm_drop(written.emitter, value.type, written.operand)
   in IntermediateLoop(condition:, body:)
     number = emitter.counter
     started = llvm_label(llvm_line(emitter, "br label %loop#{number}.test"), "loop#{number}.test")
@@ -148,7 +210,19 @@ def llvm_value(emitter, value)
   in IntermediateConstant(type: ["string"], value: text) then llvm_literal(emitter, text)
   in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
-    llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
+    loaded = llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
+    return loaded unless type == ["string"]
+    # The slot keeps its hold; whoever reads gets one of their own.
+    LlvmValue.new(emitter: llvm_line(loaded.emitter, "call void @portland_retain(ptr #{loaded.operand})"), operand: loaded.operand)
+  in IntermediateConcat(left:, right:)
+    first = llvm_value(emitter, left)
+    second = llvm_value(first.emitter, right)
+    joined = llvm_named(second.emitter, "call ptr @portland_string_concat(ptr #{first.operand}, ptr #{second.operand})")
+    released = llvm_drop(llvm_drop(joined.emitter, ["string"], first.operand), ["string"], second.operand)
+    LlvmValue.new(emitter: released, operand: joined.operand)
+  in IntermediateText(value: number)
+    written = llvm_value(emitter, number)
+    llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})")
   in IntermediateArithmetic(operator:, left:, right:)
     first = llvm_value(emitter, left)
     second = llvm_value(first.emitter, right)

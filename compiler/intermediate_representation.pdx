@@ -61,6 +61,19 @@ struct IntermediateComparison
   right
 end
 
+# `+` between two Strings: a new String holding both texts.
+struct IntermediateConcat
+  type
+  left
+  right
+end
+
+# An Integer written out as a String, as interpolation writes one.
+struct IntermediateText
+  type
+  value
+end
+
 # A call to one of the program's functions.
 struct IntermediateCall
   type
@@ -261,6 +274,7 @@ def lower_value(node, bindings, context)
   in BinaryNode(operator:, left:, right:)
     first = lower_value(left, bindings, context)
     second = lower_value(right, bindings, context)
+    return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && first.type == ["string"] && second.type == ["string"]
     if %w[+ - *].include?(operator)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
       return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
@@ -277,6 +291,13 @@ def lower_value(node, bindings, context)
     called = lower_call(node, name, arguments, bindings, context)
     panic("#{name} answers nothing, so there is no value to read from it on line #{node.line}") if called.type == NOTHING
     called
+  # `to_s`, which is what interpolation asks of each piece: a String is
+  # itself, and an Integer is written out.
+  in MethodCallNode(receiver:, name: "to_s", arguments: [], block: nil)
+    written = lower_value(receiver, bindings, context)
+    return written if written.type == ["string"]
+    refuse_native("to_s of #{with_article(written.type)}", node) unless written.type == ["integer"]
+    IntermediateText.new(type: ["string"], value: written)
   in IfNode(condition:, then_body:, else_body:)
     taken = then_body or []
     other = else_body or []
@@ -362,11 +383,14 @@ end
 
 def render_value(value)
   case value
+  in IntermediateConstant(type: ["string"], value: text) then inspect(text)
   in IntermediateConstant(value: literal) then literal.to_s
   in IntermediateLocal(name:) then name
   in IntermediateArithmetic(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
   in IntermediateComparison(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
   in IntermediateCall(name:, arguments:) then "(call #{([name] + arguments.map { render_value(it) }).join(" ")})"
+  in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
+  in IntermediateText(value: number) then "(text #{render_value(number)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
   end

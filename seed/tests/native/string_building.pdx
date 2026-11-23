@@ -1,0 +1,14 @@
+# Strings made at run time (#465): `+`, and interpolation of a String or an
+# Integer.
+
+def greet(name) = "hello, " + name
+
+def label(count) = "count: #{count}"
+
+name = "Portland"
+puts greet(name)
+puts "hello, #{name}!"
+puts label(3)
+puts "#{1} and #{0 - 2} make #{1 + (0 - 2)}"
+puts "a" + "b" + "c"
+puts "" + ""

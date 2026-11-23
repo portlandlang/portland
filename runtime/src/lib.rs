@@ -67,3 +67,192 @@ pub unsafe extern "C" fn portland_puts_string(text: *const StringBlock) {
         }
     }
 }
+
+/// How many Strings made at run time are alive. Kept only by the debug
+/// build, which is the one that checks the compiler's counting.
+static LIVE: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// The Strings made at run time and not yet freed: zero in a release build,
+/// which does not keep the tally.
+pub fn live_strings() -> i64 {
+    LIVE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The memory a String of `length` bytes takes: its header and its text.
+fn layout_of(length: usize) -> std::alloc::Layout {
+    std::alloc::Layout::from_size_align(
+        std::mem::size_of::<StringBlock>() + length,
+        std::mem::align_of::<StringBlock>(),
+    )
+    .expect("a String's size fits the address space")
+}
+
+/// A new String holding the given pieces end to end, held once: by
+/// whoever asked for it.
+fn string_from(pieces: &[&[u8]]) -> *mut StringBlock {
+    let length: usize = pieces.iter().map(|piece| piece.len()).sum();
+    unsafe {
+        let block = std::alloc::alloc(layout_of(length)).cast::<StringBlock>();
+        if block.is_null() {
+            std::alloc::handle_alloc_error(layout_of(length));
+        }
+        block.write(StringBlock {
+            count: 1,
+            length: length as i64,
+        });
+        let mut next = block.add(1).cast::<u8>();
+        for piece in pieces {
+            std::ptr::copy_nonoverlapping(piece.as_ptr(), next, piece.len());
+            next = next.add(piece.len());
+        }
+        if cfg!(debug_assertions) {
+            LIVE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        block
+    }
+}
+
+/// `left + right`: a new String, held once.
+///
+/// # Safety
+/// Both point at live Strings.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_concat(
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> *mut StringBlock {
+    unsafe { string_from(&[bytes_of(left), bytes_of(right)]) }
+}
+
+/// An Integer as its digits, for interpolation: a new String, held once.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_string_from_integer(number: i64) -> *mut StringBlock {
+    string_from(&[number.to_string().as_bytes()])
+}
+
+/// One more name holds this String. A literal is not counted, and neither
+/// is the absence of a String: a local not yet bound.
+///
+/// # Safety
+/// `text` is null or points at a live String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_retain(text: *mut StringBlock) {
+    unsafe {
+        if text.is_null() || (*text).count == LITERAL {
+            return;
+        }
+        (*text).count += 1;
+    }
+}
+
+/// One name fewer holds this String, and the last one frees it. A count
+/// that would go below zero means the compiler released a String it did
+/// not hold; the debug build says so and stops.
+///
+/// # Safety
+/// `text` is null or points at a String that has not been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_release(text: *mut StringBlock) {
+    unsafe {
+        if text.is_null() || (*text).count == LITERAL {
+            return;
+        }
+        if cfg!(debug_assertions) && (*text).count <= 0 {
+            refuse(
+                "a String was released more times than it was held — the native build counted wrong (#465)",
+            );
+        }
+        (*text).count -= 1;
+        if (*text).count == 0 {
+            let length = (*text).length as usize;
+            if cfg!(debug_assertions) {
+                // Left readable as freed, so a second release is caught
+                // above and never frees the block twice.
+                LIVE.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+            std::alloc::dealloc(text.cast(), layout_of(length));
+        }
+    }
+}
+
+/// The end of a program that ran to its last line: in the debug build,
+/// every String made at run time must have been freed. One that was not
+/// means the compiler missed a release.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_exit_check() {
+    if cfg!(debug_assertions) && live_strings() != 0 {
+        let count = live_strings();
+        let noun = if count == 1 {
+            "String was"
+        } else {
+            "Strings were"
+        };
+        refuse(&format!(
+            "{count} {noun} still held when the program ended — the native build missed a release (#465)"
+        ));
+    }
+}
+
+/// A refusal of the runtime's own: what was written so far, then the
+/// sentence on standard error, and a status no Portland program exits with.
+fn refuse(sentence: &str) -> ! {
+    unsafe {
+        libc::fflush(__stdoutp);
+    }
+    eprintln!("{sentence}");
+    std::process::exit(70);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text_of(text: *const StringBlock) -> String {
+        String::from_utf8(unsafe { bytes_of(text) }.to_vec()).unwrap()
+    }
+
+    #[test]
+    fn a_made_string_is_held_once_and_freed_by_its_last_release() {
+        let before = live_strings();
+        let number = portland_string_from_integer(-42);
+        assert_eq!(text_of(number), "-42");
+        let joined = unsafe { portland_string_concat(number, number) };
+        assert_eq!(text_of(joined), "-42-42");
+        assert_eq!(live_strings(), before + 2);
+        unsafe {
+            portland_retain(joined);
+            portland_release(joined);
+            assert_eq!(live_strings(), before + 2, "one holder is left");
+            portland_release(joined);
+            portland_release(number);
+        }
+        assert_eq!(live_strings(), before);
+    }
+
+    #[test]
+    fn a_literal_and_an_unbound_local_are_not_counted() {
+        #[repr(C)]
+        struct Literal {
+            header: StringBlock,
+            bytes: [u8; 2],
+        }
+        let mut literal = Literal {
+            header: StringBlock {
+                count: LITERAL,
+                length: 2,
+            },
+            bytes: *b"hi",
+        };
+        let pointer = std::ptr::addr_of_mut!(literal).cast::<StringBlock>();
+        unsafe {
+            portland_retain(pointer);
+            portland_release(pointer);
+            portland_release(pointer);
+            assert_eq!((*pointer).count, LITERAL);
+            portland_retain(std::ptr::null_mut());
+            portland_release(std::ptr::null_mut());
+        }
+        assert_eq!(text_of(pointer), "hi");
+    }
+}
