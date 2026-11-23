@@ -14,7 +14,8 @@
 #     the ways out of its body that are known, and that answer is then
 #     held to the whole body.
 #   - A local keeps the type of its first binding; a rebinding to another
-#     type unpins it.
+#     type unpins it. An empty array is the one exception: it takes its
+#     element type from what is first appended to it (#497).
 #   - A def that yields is pinned with its block (#493): the block's
 #     parameters take the types of what the def yields, a `yield` is read
 #     as what the block answers, and where the calls hand the def blocks
@@ -323,6 +324,7 @@ end
 # its arguments' types as the bindings in scope give them.
 def pin_expression(node, walk, answers, names)
   return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
+  return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
   mutable current = walk
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
@@ -371,6 +373,29 @@ def pin_block_call(node, walk, answers, names)
   PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer]])
 end
 
+# A block handed to a method of a value (#497), as `each` on an array.
+# Its parameters are bound by the receiver's type, the way inference
+# binds them; its body is walked for the calls inside it and for what it
+# rebinds; and a name it binds first is its own.
+def pin_walk(node, walk, answers, names)
+  mutable current = pin_statement(node.receiver, walk, answers, names)
+  node.arguments.each do |argument|
+    current = pin_statement(argument, current, answers, names)
+  end
+  scope = current.bindings + answers
+  receiver = synthesize(node.receiver, scope)
+  arguments = node.arguments.map { synthesize(it, scope) }
+  mutable inner = current.bindings
+  mutable index = 0
+  node.block.parameters.each do |parameter|
+    inner = [[parameter, block_parameter_type(receiver, index, node.name, arguments, parameter_count: node.block.parameters.length)]] + inner
+    index += 1
+  end
+  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
+  outer = current.bindings.length
+  walked.with(bindings: walked.bindings.slice(walked.bindings.length - outer, outer))
+end
+
 # What a block answers: nothing where it ends in what produces no value,
 # and otherwise what its body does, read as a def's is. A block that
 # answers nil, or a value or nil, is taken as one run for what it does,
@@ -384,10 +409,16 @@ end
 
 # A name bound to a type: new names are added, a rebinding to the same type
 # changes nothing, and a rebinding to another type leaves the name unknown.
+# An array whose elements are not known yet is the same array once they
+# are: an empty literal, named by its first append.
+EMPTY_ARRAY = ["array", ["unknown"]]
+
 def rebound(bindings, name, type)
   found = bindings.find { it[0] == name }
   return [[name, type]] + bindings if found.nil?
   return bindings if type_at(found, 1) == type
+  return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
+  return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
   bindings.map { it[0] == name ? [name, ["unknown"]] : it }
 end
 

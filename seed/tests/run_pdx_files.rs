@@ -1416,16 +1416,16 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a float on line 1 is unbuilt (#443)"),
         ),
         (
-            "list = [1, 2]\n",
-            format!("{compiles} — an array on line 1 is unbuilt (#443)"),
+            "table = { one: 1 }\n",
+            format!("{compiles} — a hash on line 1 is unbuilt (#443)"),
         ),
         (
             "puts 2 ** 3\n",
             format!("{compiles} — the operator '**' on line 1 is unbuilt (#443)"),
         ),
         (
-            "[1].each { puts it }\n",
-            format!("{compiles} — a call with a dot, .each on line 1 is unbuilt (#443)"),
+            "[1].each_slice(1) { puts 1 }\n",
+            format!("{compiles} — a call with a dot, .each_slice on line 1 is unbuilt (#443)"),
         ),
         (
             "puts 1 < 2\n",
@@ -1434,6 +1434,27 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
         (
             "def show(number)\n  puts number\nend\nvalue = show(1)\n",
             "show answers nothing, so there is no value to read from it on line 4".to_string(),
+        ),
+        // An array outside the first step (#497).
+        (
+            "mixed = [1, \"two\"]\n",
+            format!("{compiles} — an array holding an Integer and a String on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "left = [1]\nright = [1]\nif left == right\n  puts 1\nend\n",
+            format!("{compiles} — '==' between arrays on line 3 is unbuilt (#443)"),
+        ),
+        (
+            "empty = []\nputs empty.length\n",
+            format!("{compiles} — an array that is never given an element, empty on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "numbers = [1, 2]\nputs numbers[0]\n",
+            format!("{compiles} — an index with [ ] on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "numbers = [1, 2]\ndoubled = numbers.map { |number| number * 2 }\n",
+            format!("{compiles} — a call with a dot, .map on line 2 is unbuilt (#443)"),
         ),
         // A block reaches past its own function with these (#493).
         (

@@ -141,6 +141,21 @@ struct IntermediateCall
   block
 end
 
+# An array literal (#497): its elements in order, all of one type. The
+# empty one has no element type of its own, and takes its local's.
+struct IntermediateArray
+  type
+  elements
+end
+
+# `array.each { … }`: the block run once for each element, in order. It
+# answers the array it walked.
+struct IntermediateWalk
+  type
+  array
+  block
+end
+
 # A `yield`: a call of the block the function was handed.
 struct IntermediateYield
   type
@@ -161,6 +176,16 @@ end
 # A local bound or rebound.
 struct IntermediateStore
   name
+  value
+end
+
+# `name << value` on a local that holds an array: the local then holds
+# the array with the value after its last element. Values never mutate,
+# so an array another name holds is copied first, which the runtime
+# sees to.
+struct IntermediateAppend
+  name
+  type
   value
 end
 
@@ -218,6 +243,10 @@ struct LoweringContext
   # Whether the statement in hand is inside a block, where `return` and
   # a `break` outside a loop reach past the block's own function.
   inside_block
+  # The types pinning gave the locals of the function being lowered, as
+  # [name, type]. An empty array literal is typed from here, since what
+  # names its elements may be an append written later, or inside a block.
+  pinned
 end
 
 # Statements lowered, and the bindings in scope after them.
@@ -240,7 +269,7 @@ def lower_program(nodes)
 panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false)
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false, pinned: pinned.bindings)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -259,7 +288,9 @@ def lower_function(definition, found, context)
     refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
   end
   refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
-  inside = context.with(procedure: found.answer == NOTHING, yielding: found.block)
+  names = context.arities.map { it[0] }
+  settled = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(context.answers, found.block), names)
+  inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, pinned: settled.bindings)
   lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
   locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
   IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
@@ -343,7 +374,8 @@ def lower_statement(statement, bindings, context)
   case statement
   in AssignmentNode(name:, value:)
     refuse_native("a parameter declared mutable", statement) if value.nil?
-    lowered = lower_value(value, bindings, context)
+    return lower_append(statement, value, bindings, context) if value in AppendNode
+    lowered = settled_empty(lower_value(value, bindings, context), name, bindings, context)
     found = bindings.find { it[0] == name }
     if found.some? && type_at(found, 1) != lowered.type
       refuse_native("#{name} rebound from #{with_article(type_at(found, 1))} to #{with_article(lowered.type)}", statement)
@@ -398,6 +430,35 @@ def lower_statement(statement, bindings, context)
   end
 end
 
+# An empty array literal bound to a name takes the type the name has: a
+# local already bound, or what pinning settled for it from the appends
+# that follow.
+def settled_empty(lowered, name, bindings, context)
+  return lowered unless lowered.type == EMPTY_ARRAY
+  found = bindings.find { it[0] == name }
+  return lowered.with(type: type_at(found, 1)) if found.some? && (type_at(found, 1) in ["array", *])
+  pinned = context.pinned.find { it[0] == name }
+  return lowered if pinned.nil? || !native_type?(type_at(pinned, 1))
+  lowered.with(type: type_at(pinned, 1))
+end
+
+# `name << value` (#497). The parser writes it as a binding of the name
+# to the append, and that is the one shape built: the local takes the
+# grown array.
+def lower_append(statement, append, bindings, context)
+  refuse_native("a << bound to another name", statement) unless append.name == statement.name
+  found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
+  held = type_at(found, 1)
+  refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
+  value = lower_value(append.value, bindings, context)
+  type = ["array", value.type]
+  refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
+  refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
+  # An empty array no append had named yet is named by this one.
+  after = bindings.map { it[0] == append.name ? [append.name, type] : it }
+  Lowered.new(nodes: [IntermediateAppend.new(name: append.name, type: type, value: value)], bindings: after)
+end
+
 def lower_condition(node, bindings, context)
   value = lower_value(node, bindings, context)
   refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == ["boolean"]
@@ -412,8 +473,18 @@ def lower_value(node, bindings, context)
   in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
   in IdentifierNode(name:)
     found = bindings.find { it[0] == name }
+    refuse_native("an array that is never given an element, #{name}", node) if found.some? && type_at(found, 1) == EMPTY_ARRAY
     return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
     lower_call(node, name, [], bindings, context)
+  in ArrayNode(elements:)
+    values = elements.map { lower_value(it, bindings, context) }
+    return IntermediateArray.new(type: EMPTY_ARRAY, elements: []) if values.empty?
+    first = values[0].type
+    values.each do |value|
+      refuse_native("an array holding #{with_article(first)} and #{with_article(value.type)}", node) unless value.type == first
+    end
+    refuse_native("an array of #{render_type(first)}", node) unless native_type?(["array", first])
+    IntermediateArray.new(type: ["array", first], elements: values)
   in BinaryNode(operator:, left:, right:)
     first = lower_value(left, bindings, context)
     second = lower_value(right, bindings, context)
@@ -429,6 +500,7 @@ def lower_value(node, bindings, context)
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
     refuse_native("'#{operator}' between Booleans", node) if first.type == ["boolean"] && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between arrays", node) if first.type in ["array", *]
     # Strings are equal or not (ADR 0038); ordering them is unbuilt.
     refuse_native("'#{operator}' between Strings", node) if first.type == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
@@ -458,6 +530,14 @@ def lower_value(node, bindings, context)
     return written if written.type == ["string"]
     refuse_native("to_s of #{with_article(written.type)}", node) unless written.type == ["integer"]
     IntermediateText.new(type: ["string"], value: written)
+  # `each` on an array (#497): the block is handed each element, and
+  # answers nothing anyone reads.
+  in MethodCallNode(receiver:, name: "each", arguments: [], block:)
+    refuse_native("each without a block", node) if block.nil?
+    walked = lower_value(receiver, bindings, context)
+    refuse_native("a call with a dot, .each, on #{with_article(walked.type)}", node) unless walked.type in ["array", *]
+    handed = PinnedBlock.new(parameters: [type_at(walked.type, 1)], answer: NOTHING, reason: nil)
+    IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, context))
   in MethodCallNode(receiver:, name:, arguments: [], block: nil)
     asked = lower_value(receiver, bindings, context)
     answer = native_method_answer(asked.type, name)
@@ -501,13 +581,21 @@ def native_method_answer(type, name)
   in ["string"]
     return ["integer"] if %w[length size].include?(name)
     return ["boolean"] if name == "empty?"
+  in ["array", *]
+    return ["integer"] if %w[length size].include?(name)
+    return ["boolean"] if name == "empty?"
   else
     return nil
   end
   nil
 end
 
-def native_type?(type) = type == ["integer"] || type == ["boolean"] || type == ["string"]
+# The types the native build holds: an Integer, a Boolean, a String, and
+# an array of Integers (#497).
+def native_type?(type)
+  return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
+  type == ["array", ["integer"]]
+end
 
 # What to call a node the slice does not hold, in the refusal.
 def native_name_of(node)
@@ -521,6 +609,7 @@ def native_name_of(node)
   in UnaryNode(operator:) then "the operator '#{operator}'"
   in WhileNode then "a while read for its value"
   in YieldNode then "a yield"
+  in IndexNode then "an index with [ ]"
   in AssignmentNode then "a binding read for its value"
   in ReturnNode then "a return read for its value"
   else "this (#{node.kind})"
@@ -557,6 +646,7 @@ def render_statements(statements, indent)
     in IntermediateReturn(value:) then lines << (value.nil? ? "#{indent}return" : "#{indent}return #{render_value(value)}")
     in IntermediatePrint(value:) then lines << "#{indent}print #{render_value(value)}"
     in IntermediateEvaluate(value:) then lines << "#{indent}evaluate #{render_value(value)}"
+    in IntermediateAppend(name:, value:) then lines << "#{indent}append #{name} #{render_value(value)}"
     in IntermediateBreak then lines << "#{indent}break"
     in IntermediateNext then lines << "#{indent}next"
     in IntermediateLoop(condition:, body:)
@@ -589,6 +679,8 @@ def render_value(value)
     handed = block.nil? ? [] : [render_handed_block(block)]
     "(call #{([name] + arguments.map { render_value(it) } + handed).join(" ")})"
   in IntermediateYield(arguments:) then "(yield#{arguments.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateArray(elements:) then "(array#{elements.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateWalk(array:, block:) then "(each #{render_value(array)} #{render_handed_block(block)})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"

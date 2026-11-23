@@ -360,6 +360,13 @@ pub unsafe extern "C" fn portland_array_append_word(
     value: i64,
 ) -> *mut ArrayBlock {
     unsafe {
+        // A local on a path that never bound it holds nothing, which
+        // grows as the empty array does.
+        let array = if array.is_null() {
+            array_with(WORDS, SMALLEST_ROOM)
+        } else {
+            array
+        };
         let grown = with_room(array, WORDS);
         let length = (*grown).length as usize;
         elements_of(grown).add(length).write(value);
