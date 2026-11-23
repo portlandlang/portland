@@ -843,6 +843,14 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "`def self.` belongs inside a struct body — write def of",
         ),
         (
+            "struct Circle\n  radius\n\n  def area = radius if true\nend\n",
+            "def area in a struct body is always defined — 'if' cannot guard it; put the condition inside the method",
+        ),
+        (
+            "trait Round\n  def area = 2 unless true\nend\n",
+            "def area in a trait body is always defined — 'unless' cannot guard it; put the condition inside the method",
+        ),
+        (
             "trait Sexp\n  def self.of\n    1\n  end\nend\n",
             "a trait cannot define def self.of — a type function lives on the struct that includes it",
         ),
@@ -966,6 +974,20 @@ fn portland_evaluator_matches_the_seed_on_exponents() {
     assert_evaluator_matches_seed(
         "evaluator_exponents.pdx",
         "p 2 ** 8\np 2 ** 3 ** 2\np 4 * 2 ** 3\np 2 ** 0\np 0 ** 0\np 9 ** 0.5\np 2.0 ** -1\np(-2 ** 2)\nx = 3\np(-x ** 2)\np(-(2) ** 2)\np((-2) ** 2)\np(-2 ** 2 * 3)\ny = 2.0\np 2 ** -y\np(-2.5 ** 2)\np(-2.5.abs)\np((-1) ** 9)\np 0 ** 99999999999999\np 2.pow(8)\np 2.pow(0.5)\np 6.25.pow(0.5)\n",
+    );
+}
+
+/// Coverage over a Boolean subject refuses only a provable gap (#365, ADR
+/// 0035 §1): arms that take true and false between them pass, by literal,
+/// alternative, capture, or the type's name; an arm whose reach the checker
+/// cannot read, a pin, leaves the question open; and a Boolean? subject's
+/// present case is covered by a true arm and a false arm together.
+#[test]
+fn boolean_coverage_stays_silent_where_no_gap_is_provable() {
+    assert_both_print(
+        "boolean_coverage_silent.pdx",
+        "flag = 1 < 2\ncase flag\nin true then puts \"yes\"\nin false then puts \"no\"\nend\ncase flag\nin Boolean then puts \"named\"\nend\ncase flag\nin true | false => both then puts both\nend\ncase flag\nin _ then puts \"any\"\nend\npinned = true\ncase flag\nin ^pinned then puts \"pinned\"\nend\ncase flag\nin true then puts \"else\"\nelse puts \"other\"\nend\ntop = [true, false].first\ncase top\nin nil then puts \"none\"\nin true then puts \"present yes\"\nin false then puts \"present no\"\nend\n",
+        "yes\nnamed\ntrue\nany\npinned\nelse\npresent yes\n",
     );
 }
 
@@ -1104,6 +1126,33 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
             "one\n",
             "case/in does not cover nil — add the arm, or an else",
         ),
+        // Coverage widened by inference (#365): a subject inference knows
+        // to be a Boolean is true or false, so arms that reveal no set
+        // still leave a provable gap. The seed runs each on the value
+        // its arm takes.
+        (
+            "flag = 1 < 2\ncase flag\nin true then puts \"yes\"\nend\n",
+            "yes\n",
+            "case/in does not cover false — add the arm, or an else",
+        ),
+        (
+            // A guarded arm covers nothing (ADR 0035 §4).
+            "flag = 1 > 2\ncase flag\nin true if flag then puts \"guarded\"\nin false then puts \"no\"\nend\n",
+            "no\n",
+            "case/in does not cover true — add the arm, or an else",
+        ),
+        (
+            "flag = 1 < 2\ncase flag\nin 1 then puts \"one\"\nin nil then puts \"none\"\nin _ if flag then puts \"guarded\"\nend\n",
+            "guarded\n",
+            "case/in does not cover true, false — add the arm, or an else",
+        ),
+        (
+            // A Boolean? subject: nil is taken, and the present case is
+            // true or false, so the one left out is named.
+            "top = [true, false].first\ncase top\nin nil then puts \"none\"\nin true then puts \"yes\"\nend\n",
+            "yes\n",
+            "case/in does not cover false — add the arm, or an else",
+        ),
         // ADR 0048's call-site refusal: a call hands a def what its body
         // cannot use. The calls that satisfy their contracts run first.
         (
@@ -1150,7 +1199,7 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         // teeth). A comment to the seed; a checked promise to the compiler.
         // The truthful annotations above it, every shape, stay silent.
         (
-            "def answer = 42 # -> Integer\ndef greet(name = \"friend\") # -> String\n  \"hi \" + name\nend\ndef pair(first,\n         second = 2) # -> [Integer]\n  [first.to_i, second]\nend\ndef maybe_ran(flag) = \"ran\" if flag # -> String?\ndef handle # -> String\n  42\nend\nputs handle\n",
+            "def answer = 42 # -> Integer\ndef greet(name = \"friend\") # -> String\n  \"hi \" + name\nend\ndef pair(first,\n         second = 2) # -> [Integer]\n  [first.to_i, second]\nend\ndef maybe_ran(flag) # -> String?\n  \"ran\" if flag\nend\ndef handle # -> String\n  42\nend\nputs handle\n",
             "42\n",
             "'handle' answers Integer, not the annotated String — change one",
         ),
@@ -1297,7 +1346,7 @@ fn portland_types_dumps_method_returns() {
     let sample = std::env::temp_dir().join("inference_3b_sample.pdx");
     std::fs::write(
         &sample,
-        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag) = \"ran\" if flag\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found\nend\ndef presence(top = [1].first) = top.some? ? top : 0\ndef compared(top = [1].first)\n  if top == nil then 0 else top end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present\n  end\nend\ndef negated(top = [1].first)\n  return 0 unless top.some?\n  top\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\ndef safe(words = %w[a]) = words.first&.upcase\ndef unguarded(top = [1].first) = top + 1\ndef shout(word)\n  word.upcase + word.length.to_s\nend\ndef half(n) = n / 2\ndef head(list) = list[0]\n",
+        "def answer = 42 # -> Integer\ndef greet(name = \"friend\")\n  \"hi \" + name\nend\ndef pick(flag)\n  return \"left\" if flag\n  \"right\"\nend\ndef maybe_ran(flag)\n  \"ran\" if flag\nend\ndef liar = \"text\" # -> Integer\ndef last_of(values)\n  mutable result = nil\n  values.each do |value|\n    result = value\n  end\n  result\nend\nmutable box = []\nbox << 3\ndoubled = [1, 2].map { |n| n * 3 }\nevens = [1, 2, 3].select { |n| n.even? }\nlabel = 1 < 2 ? \"yes\" : \"no\"\npicked = pick(true)\nmutable mode = \"text\"\nif picked == \"left\"\n  mode = 1\nend\nstruct Order\n  size\n  def self.unit = Order.new(size: 1)\nend\nunit = Order.unit\nbigger = unit.with(size: 2)\ndef guarded(top = [1].first)\n  return 0 if top.nil?\n  top + 1\nend\ndef bailed(values = [1])\n  found = values.first or return 0\n  found\nend\ndef presence(top = [1].first) = top.some? ? top : 0\ndef compared(top = [1].first)\n  if top == nil then 0 else top end\nend\ndef matched(top = [1].first)\n  case top\n  in nil then 0\n  in present then present\n  end\nend\ndef negated(top = [1].first)\n  return 0 unless top.some?\n  top\nend\ndef both(top = [1].first, other = [2].first)\n  return 0 if top.nil? || other.nil?\n  top + other\nend\ndef safe(words = %w[a]) = words.first&.upcase\ndef unguarded(top = [1].first) = top + 1\ndef shout(word)\n  word.upcase + word.length.to_s\nend\ndef half(n) = n / 2\ndef head(list) = list[0]\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/types.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1630,6 +1679,29 @@ fn exponent_literals_on_both_oracles() {
     assert_both_oracles_refuse("exponent_refusal.pdx", Some("refusal: parse"), &cases);
 }
 
+/// A modifier after a `def` guards the definition (ADR 0090, #238): one
+/// that fails defines nothing on either oracle, and a def under a
+/// condition that holds is defined on both.
+#[test]
+fn a_guarded_def_is_defined_only_when_its_guard_holds() {
+    assert_both_print(
+        "guarded_def.pdx",
+        "def eager = \"ran\" if true\nif true\n  def nested = \"nested\"\nend\nputs eager\nputs nested\n",
+        "ran\nnested\n",
+    );
+    let cases = [
+        (
+            "def cautious = \"ran\" if false\nputs cautious\n",
+            "'cautious' is not defined",
+        ),
+        (
+            "def whole\n  \"ran\"\nend unless true\nputs whole\n",
+            "'whole' is not defined",
+        ),
+    ];
+    assert_both_oracles_refuse("guarded_def_refusal.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
@@ -1646,6 +1718,28 @@ fn output_uses_a_structs_own_to_s_and_inspect() {
         "'to_s' answers a String, got 1",
     )];
     assert_both_oracles_refuse("own_rendering_refusal.pdx", None, &cases);
+}
+
+/// A struct inside a collection or another struct renders by its own
+/// `inspect`, and `join` by its own `to_s`, on both oracles (#285). The
+/// rows are the issue's table: Ruby's output, except that `puts` of a
+/// collection prints its inspect form (ADR 0060) and a struct's default
+/// form is Portland's.
+#[test]
+fn a_nested_struct_renders_by_its_own_inspect_and_to_s() {
+    let gadget = "struct Gadget\n  name\n\n  def inspect\n    \"ci\"\n  end\n\n  def to_s\n    \"cs\"\n  end\nend\n\nstruct Wrapper\n  inner\nend\n\ngadget = Gadget.new(name: \"g\")\n";
+    assert_both_print(
+        "nested_own_rendering.pdx",
+        &format!(
+            "{gadget}p([gadget])\np({{gadget => gadget}})\np Set[gadget]\np Wrapper.new(inner: gadget)\nputs inspect([gadget])\nputs \"#{{[gadget]}}\"\nputs([gadget])\np([gadget].join(\",\"))\n"
+        ),
+        "[ci]\n{ci => ci}\nSet[ci]\nWrapper(inner: ci)\n[ci]\n[ci]\n[ci]\n\"cs\"\n",
+    );
+    let cases = [(
+        "struct Gadget\n  name\n\n  def inspect\n    1\n  end\nend\n\np([Gadget.new(name: \"g\")])\n",
+        "'inspect' answers a String, got 1",
+    )];
+    assert_both_oracles_refuse("nested_own_rendering_refusal.pdx", None, &cases);
 }
 
 /// A capture with no block, or with an argument, refuses on both oracles

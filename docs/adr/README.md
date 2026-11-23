@@ -101,6 +101,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0087](0087-2026-11-08-normalization-forms-are-rubys.md) — Normalization forms are Ruby's
 - [0088](0088-2026-11-08-character-lists-are-literal.md) — `tr`, `tr_s`, `delete`, and `squeeze` read their characters literally
 - [0089](0089-2026-11-18-adrs-are-history.md) — ADRs are decision records; the reference docs win
+- [0090](0090-2026-11-22-a-modifier-after-a-def-guards-the-definition.md) — A modifier after a `def` guards the definition
 
 <!-- /generated -->
 

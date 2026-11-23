@@ -3977,9 +3977,9 @@ core/kernel/open_spec.rb:
   link: https://github.com/portlandlang/portland/issues/177
 core/kernel/p_spec.rb:
   pdx: [spec/core/kernel/p_spec.pdx]
-  status: partial_planned
-  reason: "What p writes is captured (#251) and a mock is a struct with its own inspect (#282); the mock inside an array waits on #285, held as a pending, and the privacy and reflection rows, the File receiver, splatted arguments, and the output-separator globals stay upstream."
-  link: https://github.com/portlandlang/portland/issues/285
+  status: partial_intentional
+  reason: "What p writes is captured (#251) and a mock is a struct with its own inspect (#282), inside an array too; the privacy and reflection rows, the File receiver, splatted arguments, and the output-separator globals stay upstream."
+  link: docs/ruby/system.md
 core/kernel/pp_spec.rb:
   pdx: [spec/core/kernel/pp_spec.pdx]
   status: partial_intentional
