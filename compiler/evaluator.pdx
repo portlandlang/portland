@@ -250,6 +250,9 @@ def evaluate_statement(node, bindings)
     return step unless step.signal == "none"
     # A right side with no value at all — `puts`, a definition — binds
     # nothing (ADR 0012); the seed's sentence.
+    # A `yield` whose block answered nothing is the block's doing, and is
+    # said so by the method's name (#484).
+    panic(silent_block_sentence(yielder_of(bindings))) if (value in YieldNode) && step.value.empty?
     panic("assignment to #{name} produced no value") if step.value.empty?
     bound = slot_value(step.value)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
@@ -1739,8 +1742,9 @@ def evaluate_append(node, mutable bindings)
   # (#208); the signal travels on.
   return value_step if value_step.signal != "none"
   # A `yield` whose block answered nothing has no value to append: the
-  # seed's sentence, which a method written in the core reaches (#437).
-  panic("the block produced no value") if (node.value in YieldNode) && value_step.value.empty?
+  # seed's sentence, which a method written in the core reaches (#437),
+  # naming the method the block was handed to (#484).
+  panic(silent_block_sentence(yielder_of(bindings))) if (node.value in YieldNode) && value_step.value.empty?
   bindings = value_step.bindings
   value = slot_value(value_step.value)
   slot = lookup(bindings, node.name)
@@ -2093,7 +2097,7 @@ def evaluate_set_block_call(node, receiver, arguments, mutable scope)
       interrupt = step
       break
     end
-    panic("classify block produced no value") if step.value.empty?
+    panic(silent_block_sentence("classify")) if step.value.empty?
     key = slot_value(step.value)
     if groups.any? { guest_eql?(it[0], key) }
       groups = groups.map { guest_eql?(it[0], key) ? [key, value_at(it, 1) + [member]] : it }
@@ -2849,7 +2853,7 @@ def evaluate_new(node, mutable bindings)
       end
     end
     check_call_count("#{slot.first[0]}::new", value_at(new_slot.first[2], 0), arguments.length)
-    return invoke_with_block(new_slot.first[2], arguments, keyword_values, nil, slot.first[0], bindings)
+    return invoke_with_block(new_slot.first[2], arguments, keyword_values, nil, slot.first[0], bindings, nil)
   end
   fields = value_at(slot.first[2], 0)
   mutable provided = []
@@ -3092,7 +3096,7 @@ def invoke_struct_method_with_block(receiver, method, arguments, block, bindings
   end
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
-  scope = [["__block__", "block", [block, bindings]]] + scope
+  scope = [["__block__", "block", [block, bindings, method.name]]] + scope
   check_call_count("#{method_owner_of(receiver)} method", method.parameters, arguments.length)
   scope = bind_parameters(method.parameters, arguments, [], scope)
   result = run_body(method.body, scope)
@@ -3511,7 +3515,7 @@ def evaluate_method_call(node, mutable bindings)
           end
         end
         check_call_count("#{struct_slot.first[0]}::#{node.name}", value_at(function_slot.first[2], 0), arguments.length)
-        return invoke_with_block(function_slot.first[2], arguments, keyword_values, nil, nil, bindings)
+        return invoke_with_block(function_slot.first[2], arguments, keyword_values, nil, nil, bindings, nil)
       end
     end
   end
@@ -4334,8 +4338,34 @@ def guest_replacement(block, matched, scope, interrupt, entry, name)
   step = run_guest_block(block, [matched], scope)
   settled = compacted_since(entry, step.bindings)
   return ["", settled, step] if step.signal != "none"
-  panic("#{name} block produced no value") if step.value.empty?
+  panic(silent_block_sentence(name)) if step.value.empty?
   [joined_guest([slot_value(step.value)], "", settled), settled, nil]
+end
+
+# What to say of a block that answered nothing where the method it was
+# handed to reads its answer (#484), the seed's sentence. A walk that
+# gathers each answer is most often written where `each` was meant, and
+# says so.
+def silent_block_sentence(name)
+  return "#{name}'s block produced no value — to run a block for each element without gathering, use each" if %w[map collect flat_map].include?(name)
+  "#{name}'s block produced no value"
+end
+
+# A guest block's answer on its way to the host method that reads it. A
+# block that answered nothing is refused here by the method's name (#484),
+# since the host would be handed a nil the block never answered.
+def block_answer(step, name)
+  panic(silent_block_sentence(name)) if step.value.empty?
+  slot_value(step.value)
+end
+
+# The name of the method whose block a `yield` written here reaches, for
+# a refusal to name (#484).
+def yielder_of(bindings)
+  slot = lookup(bindings, "__block__")
+  return "the" if slot.empty?
+  name = value_at(slot.first[2], 2)
+  name.nil? ? "the" : name
 end
 
 def evaluate_block_call(node, receiver, arguments, mutable scope)
@@ -4417,7 +4447,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
       return block_interrupted(interrupt, scope) if interrupt.some?
       return outcome([results], scope)
@@ -4528,7 +4558,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       end
       # A valueless pass — a bare `next`, a trailing `puts` — has nothing to
       # collect, and the seed refuses rather than inventing a nil.
-      panic("map block produced no value") if step.value.empty?
+      panic(silent_block_sentence(node.name)) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4542,7 +4572,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -4554,7 +4584,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -4568,7 +4598,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     else
       receiver.select do |element|
@@ -4578,7 +4608,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4686,7 +4716,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        panic("#{node.name} block produced no value") if step.value.empty?
+        panic(silent_block_sentence(node.name)) if step.value.empty?
         result = result + joined_guest([slot_value(step.value)], "", scope)
       elsif position > 0
         result = result + pattern
@@ -4725,7 +4755,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -4737,7 +4767,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -4751,7 +4781,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -4764,7 +4794,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     else
       receiver.reject do |element|
@@ -4774,7 +4804,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4831,7 +4861,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("sum block produced no value") if step.value.empty?
+      panic(silent_block_sentence("sum")) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4856,7 +4886,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -4869,7 +4899,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     else
       receiver.to_h do |element|
@@ -4879,7 +4909,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4903,7 +4933,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("reduce block produced no value") if step.value.empty?
+      panic(silent_block_sentence("reduce")) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4952,7 +4982,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -4964,7 +4994,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -4976,7 +5006,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -4990,7 +5020,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -5002,7 +5032,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -5017,7 +5047,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -5029,7 +5059,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("sort_by block produced no value") if step.value.empty?
+      panic(silent_block_sentence("sort_by")) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -5080,7 +5110,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -5092,7 +5122,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -5104,7 +5134,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      slot_value(step.value)
+      block_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -5114,14 +5144,14 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       receiver.min_by do |element|
         step = run_guest_block(block, [element], scope)
         scope = compacted_since(entry, step.bindings)
-        panic("min_by block produced no value") if step.value.empty?
+        panic(silent_block_sentence("min_by")) if step.value.empty?
         slot_value(step.value)
       end
     else
       receiver.max_by do |element|
         step = run_guest_block(block, [element], scope)
         scope = compacted_since(entry, step.bindings)
-        panic("max_by block produced no value") if step.value.empty?
+        panic(silent_block_sentence("max_by")) if step.value.empty?
         slot_value(step.value)
       end
     end
@@ -5138,7 +5168,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("#{node.name} block produced no value") if step.value.empty?
+      panic(silent_block_sentence(node.name)) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -5158,7 +5188,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        panic("filter_map block produced no value") if step.value.empty?
+        panic(silent_block_sentence("filter_map")) if step.value.empty?
         slot_value(step.value)
       end
     when "group_by"
@@ -5169,7 +5199,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        panic("group_by block produced no value") if step.value.empty?
+        panic(silent_block_sentence("group_by")) if step.value.empty?
         slot_value(step.value)
       end
     when "minmax_by"
@@ -5180,7 +5210,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        panic("minmax_by block produced no value") if step.value.empty?
+        panic(silent_block_sentence("minmax_by")) if step.value.empty?
         slot_value(step.value)
       end
     when "chunk_while"
@@ -5191,7 +5221,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     when "slice_when"
       elements.slice_when do |left, right|
@@ -5201,7 +5231,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     when "slice_before"
       elements.slice_before do |element|
@@ -5211,7 +5241,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     else
       elements.slice_after do |element|
@@ -5221,7 +5251,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        slot_value(step.value)
+        block_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -5237,7 +5267,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("chunk block produced no value") if step.value.empty?
+      panic(silent_block_sentence("chunk")) if step.value.empty?
       key = slot_value(step.value)
       if key.nil? || key == ["__symbol__", "_separator"]
         open = false
@@ -5272,7 +5302,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      panic("flat_map block produced no value") if step.value.empty?
+      panic(silent_block_sentence("flat_map")) if step.value.empty?
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -5354,10 +5384,10 @@ end
 # Run a user method: fresh scope of methods only (no outer locals). The
 # caller's bindings come back untouched — callee scope is discarded.
 def invoke(payload, arguments, keyword_values, bindings)
-  invoke_with_block(payload, arguments, keyword_values, nil, nil, bindings)
+  invoke_with_block(payload, arguments, keyword_values, nil, nil, bindings, nil)
 end
 
-def invoke_with_block(payload, arguments, keyword_values, block, fields_target, bindings)
+def invoke_with_block(payload, arguments, keyword_values, block, fields_target, bindings, name)
   parameters = payload[0]
   body = payload[1]
   # Everything global survives into the fresh scope; only locals drop —
@@ -5374,7 +5404,7 @@ def invoke_with_block(payload, arguments, keyword_values, block, fields_target, 
   # A `yield` inside the body reaches this. The caller's bindings travel with
   # it, because a block closes over where it was *written*: the method's own
   # scope has dropped every local, so yielding into it would hide them.
-  scope = [["__block__", "block", [block, bindings]]] + scope unless block.nil?
+  scope = [["__block__", "block", [block, bindings, name]]] + scope unless block.nil?
   # This frame's depth, for `return` to aim at (ADR 0025). The caller's
   # `__frame__` survives the local-reject above; prepending shadows it.
   depth = frame_of(bindings) + 1
@@ -5456,7 +5486,7 @@ def evaluate_yield(node, mutable bindings)
   # The signal rides along too (#41), target included: a `return` in the
   # block stops the yielding method's body at this statement and keeps its
   # aim on the block's writer (ADR 0025).
-  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings]]] + bindings, signal: result.signal, target: target)
+  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings, value_at(handed, 2)]]] + bindings, signal: result.signal, target: target)
 end
 
 # The caller's scope as it stands after the body ran, which is whatever the
@@ -5642,7 +5672,7 @@ def evaluate_call(node, mutable bindings)
   slot = resolve(bindings, node.name) if slot.empty?
   if !slot.empty? && slot.first[1] == "method"
     check_call_count(node.name, value_at(slot.first[2], 0), arguments.length)
-    return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings)
+    return invoke_with_block(slot.first[2], arguments, keyword_values, node.block, nil, bindings, node.name)
   end
   # The seed's rule (#264): of the builtin functions, only the formatters
   # read keywords; every other refuses rather than dropping them.

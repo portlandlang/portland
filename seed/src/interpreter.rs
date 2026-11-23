@@ -2987,6 +2987,8 @@ struct HandedBlock {
     /// Enumerable struct's `each` is read into elements.
     collects: bool,
     home: usize,
+    /// The method this block was handed to, for a refusal to name.
+    method: String,
     /// The writer's own handed block — what a `yield` inside this block
     /// reaches, the way Ruby's `yield` always means the lexically enclosing
     /// method's block.
@@ -3441,6 +3443,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         // An or-guard diverted (`x = f() or return`): no
                         // binding happens; the pending signal unwinds.
                         return None;
+                    }
+                    // A `yield` whose block answered nothing is the
+                    // block's doing, and is said so (#484).
+                    if matches!(value, Expression::Yield(_)) {
+                        panic!("{}", self.no_value_sentence(value));
                     }
                     panic!("assignment to {name} produced no value");
                 };
@@ -4519,6 +4526,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
                         block,
                         collects: false,
+                        method: name.to_string(),
                         home: self.home_depth,
                         outer: self.current_block.clone(),
                         scope: self.variables.clone(),
@@ -5015,6 +5023,7 @@ impl<W: std::io::Write> Interpreter<W> {
             },
             collects: true,
             home: self.home_depth,
+            method: "each".to_string(),
             outer: self.current_block.clone(),
             scope: self.variables.clone(),
         }));
@@ -5140,7 +5149,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     match verdict {
                         Some(Value::Boolean(true)) => kept.push(value),
                         Some(Value::Boolean(false)) => {}
-                        other => panic!("{name} block must produce true or false, got {other:?}"),
+                        other => self.refuse_verdict(name, other),
                     }
                 }
                 Value::array(kept)
@@ -5164,7 +5173,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         Some(other) => {
                             panic!("wrong element type {} (expected array)", other.type_name())
                         }
-                        None => panic!("to_h block produced no value"),
+                        None => panic!("{}", Self::silent_block_sentence("to_h")),
                     }
                 }
                 Value::hash(pairs)
@@ -5320,7 +5329,8 @@ impl<W: std::io::Write> Interpreter<W> {
                     if let Some(interrupted) = self.block_interrupt() {
                         return Some(interrupted);
                     }
-                    let key = key.unwrap_or_else(|| panic!("classify block produced no value"));
+                    let key = key
+                        .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence("classify")));
                     match groups.iter_mut().find(|(held, _)| *held == key) {
                         Some((_, group)) => group.push(member),
                         None => groups.push((key, vec![member])),
@@ -5622,9 +5632,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        built.push(
-                            value.unwrap_or_else(|| panic!("Array.new block produced no value")),
-                        );
+                        built.push(value.unwrap_or_else(|| {
+                            panic!("{}", Self::silent_block_sentence("Array.new"))
+                        }));
                     }
                     return Some(Value::array(built));
                 }
@@ -6100,6 +6110,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
                     block: block.clone(),
                     collects: false,
+                    method: name.to_string(),
                     home: self.home_depth,
                     outer: self.current_block.clone(),
                     scope: self.variables.clone(),
@@ -6139,6 +6150,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
                         block: block.clone(),
                         collects: false,
+                        method: name.to_string(),
                         home: self.home_depth,
                         outer: self.current_block.clone(),
                         scope: self.variables.clone(),
@@ -6491,8 +6503,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let answer =
-                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        let answer = answer
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
                         result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
@@ -6526,8 +6538,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let answer =
-                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        let answer = answer
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
                         result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
@@ -6582,9 +6594,7 @@ impl<W: std::io::Write> Interpreter<W> {
                                     kept.push((key, value));
                                 }
                             }
-                            other => {
-                                panic!("{name} block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::hash(kept))
@@ -6613,8 +6623,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let answer =
-                            answer.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        let answer = answer
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
                         rewritten.push(if name == "transform_keys" {
                             Value::array(vec![answer, value])
                         } else {
@@ -6631,7 +6641,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        built.push(pair.unwrap_or_else(|| panic!("to_h block produced no value")));
+                        built.push(
+                            pair.unwrap_or_else(|| {
+                                panic!("{}", Self::silent_block_sentence("to_h"))
+                            }),
+                        );
                     }
                     Some(array_pairs_to_hash(built.into_iter()))
                 }
@@ -6644,8 +6658,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let result =
-                            result.unwrap_or_else(|| panic!("map block produced no value"));
+                        let result = result
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence("map")));
                         results.push(result);
                     }
                     Some(Value::array(results))
@@ -6684,9 +6698,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::present(element)),
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("rfind block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("rfind", other),
                         }
                     }
                     Some(Value::Nil)
@@ -6699,8 +6711,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        addends
-                            .push(addend.unwrap_or_else(|| panic!("sum block produced no value")));
+                        addends.push(
+                            addend.unwrap_or_else(|| {
+                                panic!("{}", Self::silent_block_sentence("sum"))
+                            }),
+                        );
                     }
                     let initial = arguments.first().cloned().unwrap_or(Value::Integer(0));
                     Some(ruby_sum(&addends, initial))
@@ -6713,7 +6728,11 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        pairs.push(pair.unwrap_or_else(|| panic!("to_h block produced no value")));
+                        pairs.push(
+                            pair.unwrap_or_else(|| {
+                                panic!("{}", Self::silent_block_sentence("to_h"))
+                            }),
+                        );
                     }
                     Some(array_pairs_to_hash(pairs.into_iter()))
                 }
@@ -6734,8 +6753,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        accumulator =
-                            result.unwrap_or_else(|| panic!("reduce block produced no value"));
+                        accumulator = result
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence("reduce")));
                     }
                     Some(accumulator)
                 }
@@ -6749,9 +6768,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => {}
                             Some(Value::Boolean(false)) => kept.push(element),
-                            other => {
-                                panic!("reject block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("reject", other),
                         }
                     }
                     Some(Value::array(kept))
@@ -6839,9 +6856,7 @@ impl<W: std::io::Write> Interpreter<W> {
                                 split = position;
                                 break;
                             }
-                            other => {
-                                panic!("{name} block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     let (taken, dropped) = elements.split_at(split);
@@ -6859,9 +6874,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => kept.push(element),
                             Some(Value::Boolean(false)) => rest.push(element),
-                            other => {
-                                panic!("partition block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("partition", other),
                         }
                     }
                     Some(Value::array(vec![Value::array(kept), Value::array(rest)]))
@@ -6877,9 +6890,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => counted += 1,
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("count block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("count", other),
                         }
                     }
                     Some(Value::Integer(counted))
@@ -6895,7 +6906,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => found += 1,
                             Some(Value::Boolean(false)) => {}
-                            other => panic!("one? block must produce true or false, got {other:?}"),
+                            other => self.refuse_verdict("one?", other),
                         }
                         if found > 1 {
                             return Some(Value::Boolean(false));
@@ -6913,9 +6924,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => kept.push(element),
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("select block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("select", other),
                         }
                     }
                     Some(Value::array(kept))
@@ -6929,9 +6938,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::Boolean(true)),
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("any? block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("any?", other),
                         }
                     }
                     Some(Value::Boolean(false))
@@ -6945,9 +6952,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => {}
                             Some(Value::Boolean(false)) => return Some(Value::Boolean(false)),
-                            other => {
-                                panic!("all? block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("all?", other),
                         }
                     }
                     Some(Value::Boolean(true))
@@ -6961,9 +6966,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::Boolean(false)),
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("none? block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("none?", other),
                         }
                     }
                     Some(Value::Boolean(true))
@@ -6978,9 +6981,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::present(element)),
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("find block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict("find", other),
                         }
                     }
                     Some(Value::Nil)
@@ -7003,9 +7004,7 @@ impl<W: std::io::Write> Interpreter<W> {
                                 return Some(Value::Integer(position as i64));
                             }
                             Some(Value::Boolean(false)) => {}
-                            other => {
-                                panic!("{name} block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::Nil)
@@ -7077,7 +7076,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let key = key.unwrap_or_else(|| panic!("{name} block produced no value"));
+                        let key =
+                            key.unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
                         let replaces = match &best {
                             None => true,
                             Some((best_key, _)) => {
@@ -7104,7 +7104,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let key = key.unwrap_or_else(|| panic!("sort_by block produced no value"));
+                        let key = key.unwrap_or_else(|| {
+                            panic!("{}", Self::silent_block_sentence("sort_by"))
+                        });
                         keyed.push((key, element));
                     }
                     if keyed
@@ -7146,7 +7148,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match result {
                             Some(Value::Array(inner)) => results.extend(inner.iter().cloned()),
                             Some(other) => results.push(other),
-                            None => panic!("flat_map block produced no value"),
+                            None => panic!("{}", Self::silent_block_sentence("flat_map")),
                         }
                     }
                     Some(Value::array(results))
@@ -7166,9 +7168,10 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        results.push(
-                            result.unwrap_or_else(|| panic!("{name} block produced no value")),
-                        );
+                        results
+                            .push(result.unwrap_or_else(|| {
+                                panic!("{}", Self::silent_block_sentence(name))
+                            }));
                     }
                     Some(Value::array(results))
                 }
@@ -7189,7 +7192,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match result {
                             Some(Value::Nil) | Some(Value::Boolean(false)) => {}
                             Some(value) => results.push(value),
-                            None => panic!("filter_map block produced no value"),
+                            None => panic!("{}", Self::silent_block_sentence("filter_map")),
                         }
                     }
                     Some(Value::array(results))
@@ -7203,7 +7206,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let key = key.unwrap_or_else(|| panic!("group_by block produced no value"));
+                        let key = key.unwrap_or_else(|| {
+                            panic!("{}", Self::silent_block_sentence("group_by"))
+                        });
                         match groups.iter_mut().find(|(existing, _)| *existing == key) {
                             Some((_, members)) => members.push(element),
                             None => groups.push((key, vec![element])),
@@ -7240,9 +7245,7 @@ impl<W: std::io::Write> Interpreter<W> {
                                     !answer
                                 }
                             }
-                            other => {
-                                panic!("{name} block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict(name, other),
                         };
                         if together {
                             runs.last_mut().expect("a run exists").push(element);
@@ -7264,9 +7267,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let matched = match verdict {
                             Some(Value::Boolean(answer)) => answer,
-                            other => {
-                                panic!("{name} block must produce true or false, got {other:?}")
-                            }
+                            other => self.refuse_verdict(name, other),
                         };
                         if name == "slice_before" {
                             if matched || runs.is_empty() {
@@ -7297,7 +7298,8 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let key = key.unwrap_or_else(|| panic!("chunk block produced no value"));
+                        let key = key
+                            .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence("chunk")));
                         match &key {
                             Value::Nil => {
                                 open = false;
@@ -7342,8 +7344,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         if let Some(interrupted) = self.block_interrupt() {
                             return interrupted;
                         }
-                        let key =
-                            key.unwrap_or_else(|| panic!("minmax_by block produced no value"));
+                        let key = key.unwrap_or_else(|| {
+                            panic!("{}", Self::silent_block_sentence("minmax_by"))
+                        });
                         let replaces_least = match &least {
                             None => true,
                             Some((best_key, _)) => self.ordering_of(&key, best_key) < 0,
@@ -9860,18 +9863,46 @@ impl<W: std::io::Write> Interpreter<W> {
 
     /// What to say of an expression read for a value it did not produce. A
     /// `yield` whose block answered nothing is the block's doing, and is
-    /// said so, since a method written in the core reads its block this way.
-    fn no_value_sentence(expression: &Expression) -> String {
-        match expression {
-            Expression::Yield(_) => "the block produced no value".to_string(),
-            other => format!("{other:?} produced no value"),
+    /// said so by the name of the method it was handed to (#484), since a
+    /// method written in the core reads its block this way.
+    fn no_value_sentence(&self, expression: &Expression) -> String {
+        match (expression, &self.current_block) {
+            (Expression::Yield(_), Some(handed)) => {
+                Self::silent_block_sentence(&handed.borrow().method)
+            }
+            (other, _) => format!("{other:?} produced no value"),
+        }
+    }
+
+    /// What to say of a block that answered nothing where the method it was
+    /// handed to reads its answer (#484). A walk that gathers each answer is
+    /// most often written where `each` was meant, and says so.
+    fn silent_block_sentence(name: &str) -> String {
+        match name {
+            "map" | "collect" | "flat_map" => format!(
+                "{name}'s block produced no value — to run a block for each element without gathering, use each"
+            ),
+            _ => format!("{name}'s block produced no value"),
+        }
+    }
+
+    /// Refuse a block whose answer a method reads as a verdict (#484) and
+    /// which answered something other than true or false: the value as
+    /// `inspect` shows it, or that there was none.
+    fn refuse_verdict(&mut self, name: &str, answer: Option<Value>) -> ! {
+        match answer {
+            Some(value) => panic!(
+                "{name}'s block must answer true or false, got {}",
+                self.inspected(&value)
+            ),
+            None => panic!("{}", Self::silent_block_sentence(name)),
         }
     }
 
     /// Evaluate an expression that must produce a value.
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
-            .unwrap_or_else(|| panic!("{}", Self::no_value_sentence(expression)))
+            .unwrap_or_else(|| panic!("{}", self.no_value_sentence(expression)))
     }
 
     /// An operand or an argument: its value, or `None` when evaluating it
@@ -9882,7 +9913,7 @@ impl<W: std::io::Write> Interpreter<W> {
     fn operand(&mut self, expression: &Expression) -> Option<Value> {
         let value = self.expression(expression);
         if value.is_none() && self.pending.is_none() {
-            panic!("{}", Self::no_value_sentence(expression));
+            panic!("{}", self.no_value_sentence(expression));
         }
         value
     }
@@ -11266,7 +11297,7 @@ end
     }
 
     #[test]
-    #[should_panic(expected = "select block must produce true or false")]
+    #[should_panic(expected = "select's block must answer true or false")]
     fn panics_on_a_non_boolean_select_block() {
         evaluate("[1].select do |number|\n  number\nend\n");
     }
