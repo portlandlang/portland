@@ -93,8 +93,35 @@ end
 # it, so it is in scope from the first statement; `arguments` are the
 # guest's own, what its `System.arguments` answers (ADR 0068); `load_path`
 # is where `require "name"` looks (ADR 0077).
-def evaluate_program(nodes, path, arguments, load_path)
-  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + builtin_constants)
+def evaluate_program(nodes, path, arguments, load_path, data: nil)
+  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + data_bindings(data) + builtin_constants)
+end
+
+# `DATA` (ADR 0092): the text after the `__END__` line of the file that is
+# run, bound as a top-level constant before its first line runs, beside
+# the `__data__` marker that says the constant is the predefined one. A
+# required file's text is never handed here, so its `__END__` only ends it.
+def data_bindings(data)
+  return [] if data.nil?
+  [["DATA", "constant", data], ["__data__", "data", true]]
+end
+
+# What Ruby's `DATA`, a File, answers by moving or reading its cursor.
+# Portland's is a String (ADR 0092), so each refuses by name.
+DATA_CURSOR_NAMES = %w[close eof eof? gets lineno pos readline readlines rewind seek]
+
+# `DATA.read` is `DATA`, Ruby's commonest spelling of it, and a name that
+# moves a File's cursor refuses, in the seed's sentence. Nil where the call
+# is anything else, or where `DATA` is not the predefined constant.
+def evaluate_data_call(node, bindings)
+  return nil unless (node.receiver in IdentifierNode) && node.receiver.name == "DATA"
+  return nil unless node.arguments.empty? && node.block.nil?
+  return nil if lookup(bindings, "__data__").empty? || local_name?(bindings, "DATA")
+  return outcome([value_at(lookup(bindings, "DATA").first, 2)], bindings) if node.name == "read"
+  if DATA_CURSOR_NAMES.include?(node.name)
+    panic("DATA is a String, the text after __END__, with no cursor for '#{node.name}' to move — read it whole with DATA or DATA.read, or by line with DATA.lines or DATA.each_line")
+  end
+  nil
 end
 
 # The constants every program starts with (#152): `Float`'s, the seed's
@@ -3246,6 +3273,8 @@ end
 
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
+  data_answer = evaluate_data_call(node, bindings)
+  return data_answer unless data_answer.nil?
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
   if (node.receiver in IdentifierNode) && %w[Array Complex Hash Integer JSON Math Random Range Regexp Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
@@ -5401,7 +5430,9 @@ def evaluate_call(node, mutable bindings)
     # The seed's sentence, and a failure rather than a debug line (#98) —
     # reached only where the checker could not judge the name, a struct's
     # method body or a module's. A removed Ruby spelling names its rewrite
-    # (#135).
+    # (#135). `DATA` in a run whose file has no `__END__` line says so (ADR
+    # 0092); the checker leaves that name to the run.
+    panic("DATA is the text after an __END__ line, and the file that is run has none — end the program with __END__ and put the text below it") if node.name == "DATA"
     panic(retired_sentence(node.name) or "#{spelled(node.name)} is not defined")
   end
 end

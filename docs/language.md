@@ -149,6 +149,8 @@ Parameters are binding sites too, so `def f(mutable position)` works. Blocks reb
 
 **Constants** are `SCREAMING_CASE` bindings at the top level ([ADR 0053](adr/0053-2026-09-24-constants.md)): `LIMIT = 9` is computed once, read from inside every def and struct method and from every file that requires this one, and bound once — a second binding, or a `mutable` one, refuses. In a module body the same line is the module's constant, `Config::LIMIT`; in a struct or class body it is the type's, `Token::KINDS`, read bare from the type's own methods and type functions ([#145](https://github.com/portlandlang/portland/issues/145)). Each sees the constants written before it. A name is defined once, full stop ([ADR 0052](adr/0052-2026-09-24-one-definition-per-name.md)): a second `def`, `struct`, `enum`, or `trait` of a name refuses with `'apply' is already defined — rename one`, and a builtin's name is never taken.
 
+**`__END__` ends the program, and `DATA` is the text after it** ([ADR 0092](adr/0092-2026-11-22-end-marker-and-data.md), [the ledger](ruby/data.md)). A line that is exactly `__END__` ends the program text, Ruby's rule; nothing after it is parsed. `DATA` is that text in the file that is run — a String, a top-level constant, empty when nothing follows the marker. `DATA.read` answers it, `DATA.lines` and `DATA.each_line` are the String's own, and the names that move a File's cursor (`rewind`, `gets`, `pos`) refuse, saying so. `DATA` in a run whose file has no `__END__` refuses by name. A required file's `__END__` ends that file and defines nothing.
+
 ## Absence
 
 The headline feature (ADRs 0005–0010, 0012). There is no ambient nil. Absence is one explicit case of a maybe, and it is typed.

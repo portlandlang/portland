@@ -1321,6 +1321,10 @@ def check_defined(name, node, scope, found)
   return found if scope.locals.any? { it[0] == name }
   return found if scope.globals.any? { it[0] == name }
   return found if builtin_function?(name)
+  # `DATA` is defined when the file that is run has an `__END__` line (ADR
+  # 0092), which a file checked on its own cannot know; the run refuses it
+  # by name where there is none.
+  return found if name == "DATA"
   # A builtin type's bare name is the type as a value (ADR 0074).
   return found if %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(name)
   # A removed Ruby spelling names its rewrite instead (#135).

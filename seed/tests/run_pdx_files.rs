@@ -1748,6 +1748,59 @@ fn a_match_takes_two_values_between_brackets() {
     assert_both_oracles_refuse("match_slice_refusal.pdx", None, &cases);
 }
 
+/// `__END__` and `DATA` (ADR 0092, #360), on both oracles: the text after
+/// the marker of the file that is run, empty when nothing follows it, and
+/// each refusal in the same words. A required file's `__END__` only ends
+/// it. The rows are ruby/spec's language/predefined/data_spec.rb, the ones
+/// that need a program of their own.
+#[test]
+fn data_is_the_text_after_the_end_marker_of_the_file_that_is_run() {
+    assert_both_print(
+        "data_section.pdx",
+        "puts DATA\nputs DATA.read.length\n__END__\nfirst\n\"second\n",
+        "first\n\"second\n14\n",
+    );
+    assert_both_print("data_empty.pdx", "p DATA\n__END__\n", "\"\"\n");
+    assert_both_print("data_no_newline.pdx", "p DATA\n__END__", "\"\"\n");
+    let missing = "DATA is the text after an __END__ line, and the file that is run has none — end the program with __END__ and put the text below it";
+    let cases = [
+        ("puts DATA\n", missing),
+        ("def show = DATA\nputs show\n", missing),
+        (
+            "DATA.rewind\nputs DATA.lines.first\n__END__\ndata 5\n",
+            "DATA is a String, the text after __END__, with no cursor for 'rewind' to move — read it whole with DATA or DATA.read, or by line with DATA.lines or DATA.each_line",
+        ),
+        (
+            "DATA = 1\n__END__\ndata\n",
+            "'DATA' is a constant — it is bound once",
+        ),
+    ];
+    assert_both_oracles_refuse("data_refusal.pdx", None, &cases);
+
+    let directory = std::env::temp_dir().join("data_across_a_require");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("data4.pdx"),
+        "# nothing\n\n__END__\ndata 4\n",
+    )
+    .unwrap();
+    let program = directory.join("data2.pdx");
+    std::fs::write(&program, "require_relative \"data4\"\n\nputs DATA\n").unwrap();
+    for arguments in [vec![], vec![portland_run()]] {
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .args(arguments)
+            .arg(&program)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!output.status.success());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(missing),
+            "a required file's __END__ should define no DATA, got: {stderr}"
+        );
+    }
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

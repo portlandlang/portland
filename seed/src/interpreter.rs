@@ -601,6 +601,35 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
     }
 }
 
+/// `DATA` (ADR 0092): the name of the text after `__END__`.
+const DATA_NAME: &str = "DATA";
+
+/// What Ruby's `DATA`, a File, answers by moving or reading its cursor.
+/// Portland's is a String (ADR 0092), so each refuses by name.
+const DATA_CURSOR_NAMES: [&str; 10] = [
+    "close",
+    "eof",
+    "eof?",
+    "gets",
+    "lineno",
+    "pos",
+    "readline",
+    "readlines",
+    "rewind",
+    "seek",
+];
+
+fn data_cursor_sentence(name: &str) -> String {
+    format!(
+        "DATA is a String, the text after __END__, with no cursor for '{name}' to move — read it whole with DATA or DATA.read, or by line with DATA.lines or DATA.each_line"
+    )
+}
+
+/// `DATA` where the file that is run has no `__END__` line (ADR 0092).
+fn missing_data_sentence() -> &'static str {
+    "DATA is the text after an __END__ line, and the file that is run has none — end the program with __END__ and put the text below it"
+}
+
 /// The constants every program starts with (#152): `Float`'s, Ruby's values
 /// for an IEEE 754 double, under their qualified names, so `Float::MAX` reads
 /// like `Config::LIMIT`, and sit with every other constant.
@@ -2642,6 +2671,9 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// The program's entry file, whose `lib/` is on the load path (ADR
     /// 0077), and the `-I` directories as written.
     entry_file: Option<std::path::PathBuf>,
+    /// Whether the file that is run has an `__END__` line (ADR 0092), and
+    /// so whether `DATA` is the predefined constant holding its text.
+    has_data: bool,
     load_path: Vec<String>,
     /// How many branch, loop, and block bodies deep the run is — zero at a
     /// file's top level and in a module body, where a require belongs.
@@ -2766,6 +2798,7 @@ impl<W: std::io::Write> Interpreter<W> {
             home_depth: 0,
             current_file: None,
             entry_file: None,
+            has_data: false,
             load_path: Vec::new(),
             nesting: 0,
             loaded: std::collections::HashSet::new(),
@@ -2810,6 +2843,40 @@ impl<W: std::io::Write> Interpreter<W> {
 
     pub fn set_arguments(&mut self, arguments: Vec<String>) {
         self.arguments = arguments;
+    }
+
+    /// `DATA` (ADR 0092): the text after the `__END__` line of the file
+    /// that is run, bound as a top-level constant before its first line
+    /// runs. A required file's text is never handed here, so its `__END__`
+    /// only ends it.
+    pub fn set_data(&mut self, text: String) {
+        self.has_data = true;
+        self.constants
+            .insert(DATA_NAME.to_string(), Value::String(text));
+    }
+
+    /// `DATA.read` is `DATA`, Ruby's commonest spelling of it, and a name
+    /// that moves a File's cursor refuses: the text is a String and has no
+    /// cursor (ADR 0092). `None` where the call is anything else, or where
+    /// `DATA` is not the predefined constant.
+    fn data_call(&self, receiver: &Expression, name: &str, bare: bool) -> Option<Value> {
+        let Expression::Variable(receiver_name) = receiver else {
+            return None;
+        };
+        if !self.has_data
+            || receiver_name != DATA_NAME
+            || !bare
+            || self.variables.contains_key(DATA_NAME)
+        {
+            return None;
+        }
+        if name == "read" {
+            return self.constants.get(DATA_NAME).cloned();
+        }
+        if DATA_CURSOR_NAMES.contains(&name) {
+            panic!("{}", data_cursor_sentence(name));
+        }
+        None
     }
 
     /// `<=>` and the four orderings on a struct (ADR 0054): `<=>` calls the
@@ -3884,6 +3951,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 receiver,
                 safe,
             } => {
+                let bare = arguments.is_empty() && keyword_arguments.is_empty() && block.is_none();
+                if let Some(answer) = self.data_call(receiver, name, bare) {
+                    return Some(answer);
+                }
                 // The builtin types carry Ruby's type functions (ADR 0058):
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere. `System`
@@ -4119,6 +4190,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     // A removed Ruby spelling names its rewrite instead (#135).
                     if let Some(sentence) = crate::lexer::retired_sentence(name) {
                         panic!("{sentence}");
+                    }
+                    if name == DATA_NAME {
+                        panic!("{}", missing_data_sentence());
                     }
                     panic!("'{name}' is not defined")
                 }
