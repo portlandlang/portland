@@ -1791,19 +1791,19 @@ fn a_method_the_core_defines_for_a_builtin_type_runs_on_both_oracles() {
     let cases = [
         (
             "list = [1, 2]\np(list.select { it })\n",
-            "select block must produce true or false, got 1",
+            "select's block must answer true or false, got 1",
         ),
         (
             "list = [1, 2]\np(list.reject { it })\n",
-            "reject block must produce true or false, got 1",
+            "reject's block must answer true or false, got 1",
         ),
         (
             "list = [1, 2]\np(list.find { it })\n",
-            "find block must produce true or false, got 1",
+            "find's block must answer true or false, got 1",
         ),
         (
             "list = [1, 2]\nskipped = list.map do |number|\n  next if number == 2\n  number\nend\n",
-            "the block produced no value",
+            "map's block produced no value — to run a block for each element without gathering, use each",
         ),
         (
             "list = [1, 2, 3]\np(list.find(42) { false })\n",
@@ -1811,6 +1811,65 @@ fn a_method_the_core_defines_for_a_builtin_type_runs_on_both_oracles() {
         ),
     ];
     assert_both_oracles_refuse("core_array_refusal.pdx", None, &cases);
+}
+
+/// A misbehaving block is refused in one sentence per fault (#484),
+/// wherever the method is written: the block is named as the method's,
+/// a value prints as `inspect` prints it, and a gathering walk points
+/// at `each`.
+#[test]
+fn a_misbehaving_block_is_refused_in_one_sentence_on_both_oracles() {
+    let cases = [
+        (
+            "p([1, 2].select { 1 })\n",
+            "select's block must answer true or false, got 1",
+        ),
+        (
+            "p([1, 2].any? { \"yes\" })\n",
+            "any?'s block must answer true or false, got \"yes\"",
+        ),
+        (
+            "p({ a: 1 }.select { 1 })\n",
+            "select's block must answer true or false, got 1",
+        ),
+        (
+            "p([1, 2].count { nil })\n",
+            "count's block must answer true or false, got nil",
+        ),
+        (
+            "p([1, 2].all? { |number| puts number })\n",
+            "all?'s block produced no value",
+        ),
+        (
+            "p([1, 2].select { |number| puts number })\n",
+            "select's block produced no value",
+        ),
+        (
+            "p([1, 2].map { |number| puts number })\n",
+            "map's block produced no value — to run a block for each element without gathering, use each",
+        ),
+        (
+            "p([1, 2].collect { |number| puts number })\n",
+            "collect's block produced no value — to run a block for each element without gathering, use each",
+        ),
+        (
+            "p({ a: 1 }.map { |key, value| puts key })\n",
+            "map's block produced no value — to run a block for each element without gathering, use each",
+        ),
+        (
+            "p([1, 2].flat_map { |number| puts number })\n",
+            "flat_map's block produced no value — to run a block for each element without gathering, use each",
+        ),
+        (
+            "p([1, 2].sum { |number| puts number })\n",
+            "sum's block produced no value",
+        ),
+        (
+            "def twice\n  first = yield\n  first + yield\nend\np(twice { puts 1 })\n",
+            "twice's block produced no value",
+        ),
+    ];
+    assert_both_oracles_refuse("misbehaving_block_refusal.pdx", None, &cases);
 }
 
 /// A program cannot reopen a core type (ADR 0093, #437): a struct named
@@ -3312,7 +3371,7 @@ fn enumerable_runs_and_groups_match_ruby() {
         ),
         (
             "p([1, 2].chunk_while { |a, b| 5 })\n",
-            "chunk_while block must produce true or false, got Some(Integer(5))",
+            "chunk_while's block must answer true or false, got 5",
         ),
     ];
     assert_both_oracles_refuse("runs_and_groups_refusal.pdx", None, &cases);
@@ -4963,11 +5022,11 @@ fn array_partition_one_minmax_match_ruby() {
     let cases = [
         (
             "p([1, 2].partition { 1 })\n",
-            "partition block must produce true or false",
+            "partition's block must answer true or false",
         ),
         (
             "p([1, 2].one? { nil })\n",
-            "one? block must produce true or false",
+            "one?'s block must answer true or false",
         ),
     ];
     assert_both_oracles_refuse("array_partition_refusal.pdx", None, &cases);
@@ -5001,7 +5060,7 @@ fn array_index_family_matches_ruby() {
     );
     let cases = [(
         "p([1, 2].rindex { 1 })\n",
-        "rindex block must produce true or false",
+        "rindex's block must answer true or false",
     )];
     assert_both_oracles_refuse("array_index_family_refusal.pdx", None, &cases);
 }
@@ -5023,11 +5082,11 @@ fn array_take_and_drop_match_ruby() {
         ("p([1, 2].drop(-3))\n", "attempt to drop negative size"),
         (
             "p([1, 2].take_while { 1 })\n",
-            "take_while block must produce true or false",
+            "take_while's block must answer true or false",
         ),
         (
             "p([1, 2].drop_while { nil })\n",
-            "drop_while block must produce true or false",
+            "drop_while's block must answer true or false",
         ),
     ];
     assert_both_oracles_refuse("array_take_drop_refusal.pdx", None, &cases);
