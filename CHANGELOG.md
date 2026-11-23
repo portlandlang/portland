@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **An empty interpolation adds nothing** ([#306](https://github.com/portlandlang/portland/issues/306)) — `"a#{}b"` refused on both implementations as `unexpected end of input`, pointing at the end of the program; Ruby reads `"ab"`. An interpolation holding nothing, or only spaces, adds nothing to a string, a quoted symbol, or a regex on both parsers.
+  - ruby/spec rows activated: "permits an empty expression" of `language/string`.
 - **`rindex` with a Regexp reads a position past the end as the end, and anchors `\G` at the position given** ([#317](https://github.com/portlandlang/portland/issues/317)) — `"blablabla".rindex(/a/, 11)` and `"helloYOU.".rindex(/YOU\G/, 8)` answered nil on both implementations where Ruby answers 8 and 5. A position past the end is the end, as the String form already read it, and `\G` stands at the position the backward search began from for every start it tries, where it stood at each candidate start. The regex engine gains `matches_at`, a match at one offset with `\G` at another.
   - ruby/spec rows activated: "supports \G which matches at the given start offset" and "behaves the same as String#rindex(string) for escaped string regexps" of `core/string/rindex`.
 - **A negative group index reaches the captures only** ([#315](https://github.com/portlandlang/portland/issues/315)) — `"hello there".slice(/hello (.)/, -2)` answered the whole match, `"hello t"`, on both implementations where Ruby answers nil: a negative index counted back through the captures and on to group 0. It stops at the first capture, so one that counts back to the whole match or past it names no group. The same count served `found[-3]` on a `MatchData`, which answered the whole match and answers nil, as Ruby's does.

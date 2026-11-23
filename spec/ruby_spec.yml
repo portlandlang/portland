@@ -4716,7 +4716,7 @@ language/singleton_class_spec.rb:
 language/string_spec.rb:
   pdx: [spec/language/string_spec.pdx]
   status: partial_planned
-  reason: "Unicode escapes wait on #304, adjacent-literal concatenation on #305, and an empty interpolation on #306; only #{} interpolates (no instance, class, or global variables), the % delimiters and ?z refuse by name, and the frozen-comment and encoding rows stay upstream."
+  reason: "Unicode escapes wait on #304, and adjacent-literal concatenation on #305; only #{} interpolates (no instance, class, or global variables), the % delimiters and ?z refuse by name, and the frozen-comment and encoding rows stay upstream."
   link: https://github.com/portlandlang/portland/issues/304
 language/super_spec.rb:
   status: skipped

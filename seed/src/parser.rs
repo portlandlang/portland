@@ -312,6 +312,10 @@ fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
                 if !literal.is_empty() {
                     parts.push(Expression::String(std::mem::take(&mut literal)));
                 }
+                // An empty interpolation adds nothing, as in Ruby (#306).
+                if content[inner_start..inner_end].trim().is_empty() {
+                    continue;
+                }
                 let inner = expression_from(&content[inner_start..inner_end], it_frames);
                 parts.push(Expression::MethodCall {
                     arguments: Vec::new(),
@@ -409,6 +413,10 @@ fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
                 };
                 if !literal.is_empty() {
                     parts.push(Expression::String(std::mem::take(&mut literal)));
+                }
+                // An empty interpolation adds nothing, as in Ruby (#306).
+                if body[inner_start..inner_end].trim().is_empty() {
+                    continue;
                 }
                 let inner = expression_from(&body[inner_start..inner_end], it_frames);
                 parts.push(Expression::MethodCall {
