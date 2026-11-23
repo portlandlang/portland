@@ -18,7 +18,7 @@
 #   ["unary", operator, operand]              — a mismatched unary operand
 #   ["annotation", name, computed, written]   — an annotation that lies; written is the source's text
 #   ["arity", name, expected, got]            — the wrong argument count
-#   ["coverage", missing]                     — a case/in over a maybe leaving a case (ADR 0035's tripwire)
+#   ["coverage", missing]                     — a case/in over a maybe or a Boolean leaving a case (ADR 0035)
 #   ["contract", spelling, type, def, wanted] — a call handing a def what its body cannot use (ADR 0048);
 #                                               wanted is ["trait", name] or ["demands", [...]]
 #   ["alias", name, survivor]                 — a false alias (ADR 0036), the seed's sentence moved earlier

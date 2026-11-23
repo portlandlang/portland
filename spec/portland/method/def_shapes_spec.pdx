@@ -1,7 +1,7 @@
 # The def shapes (#82, ADR 0045): multiline parenthesized parameter lists,
 # Seattle.rb paren-less parameters (a trailing comma continues past the
-# newline, the boundary ends the list), and endless defs — one guarded
-# statement, no `end`, parens required around any parameters (which falls
+# newline, the boundary ends the list), and endless defs — one statement,
+# no `end`, a modifier after it guarding the definition, parens required around any parameters (which falls
 # out of Ruby's own carve-out: after a bare list, `=` was already a
 # default). All Ruby-parity, probed on 4.0.9.
 
@@ -21,7 +21,16 @@ end
 def answer = 42
 def blank() = 42
 def double(number) = number * 2
+def cautious = "first"
 def cautious = "ran" if false
+def eager = "ran" if true
+def patient = "ran" unless false
+def whole
+  "ran"
+end if true
+if true
+  def nested = "ran"
+end
 def fallback bar = 9
   bar
 end
@@ -35,8 +44,25 @@ end
 
 context "the def shapes" do
   describe "endless defs" do
-    specify "take a postfix guard, answering nil when it fails" do
-      expect(cautious).to be_nil
+    specify "are not defined when a modifier after them fails" do
+      expect(cautious).to eq("first")
+    end
+
+    specify "are defined when a modifier after them holds" do
+      expect(eager).to eq("ran")
+      expect(patient).to eq("ran")
+    end
+  end
+
+  describe "defs under a condition" do
+    specify "are defined when the condition holds" do
+      expect(nested).to eq("ran")
+    end
+  end
+
+  describe "defs closed by end" do
+    specify "take a modifier after the end, guarding the definition" do
+      expect(whole).to eq("ran")
     end
   end
 end

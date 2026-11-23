@@ -13,9 +13,12 @@ context "Integer#pow" do
 
   # From core/integer/shared/exponent.rb, the Rational exponents. Its
   # eql? asks inspect here, and be_close is close_to? at mspec's TOLERANCE.
-  # "returns Rational when power is Rational" waits on #290.
   specify "returns self raised to a Rational power" do
     expect(inspect(9.pow(Rational(1, 2)))).to eq("3.0")
+  end
+
+  specify "returns Rational when power is Rational" do
+    expect(2.pow(Rational(2, 1))).to eql(Rational(4, 1))
   end
 
   specify "returns a complex number when negative and raised to a fractional Rational power" do
