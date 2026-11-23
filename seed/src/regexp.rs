@@ -447,6 +447,13 @@ impl Found {
         }
     }
 
+    /// The whole match, then every group: what `to_a` answers.
+    pub fn groups(&self) -> Vec<Value> {
+        (0..self.spans.len())
+            .map(|group| self.group_value(group))
+            .collect()
+    }
+
     pub fn captures(&self) -> Vec<Value> {
         (1..self.spans.len())
             .map(|group| self.group_value(group))
@@ -831,20 +838,25 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         (Value::MatchData(found), "size" | "length", []) => {
             Some(Value::Integer(found.spans.len() as i64))
         }
-        (Value::MatchData(found), "to_a", []) => Some(Value::array(
-            (0..found.spans.len())
-                .map(|group| found.group_value(group))
-                .collect(),
-        )),
-        (Value::MatchData(found), "values_at", indices) => Some(Value::array(
-            indices
-                .iter()
-                .map(|index| match group_or_refuse(found, index) {
-                    Some(group) => found.group_value(group),
-                    None => Value::Nil,
-                })
-                .collect(),
-        )),
+        (Value::MatchData(found), "to_a", []) => Some(Value::array(found.groups())),
+        // A range picks its run of groups as an array's `values_at` does,
+        // nil past the end (#214); a number or a name picks one group.
+        (Value::MatchData(found), "values_at", indices) => {
+            let groups = found.groups();
+            let mut picked = Vec::new();
+            for index in indices {
+                match index {
+                    Value::Range { .. } => {
+                        crate::interpreter::values_at_position(&groups, index, &mut picked)
+                    }
+                    _ => picked.push(match group_or_refuse(found, index) {
+                        Some(group) => found.group_value(group),
+                        None => Value::Nil,
+                    }),
+                }
+            }
+            Some(Value::array(picked))
+        }
         (Value::MatchData(found), "begin", [index]) => Some(match group_or_refuse(found, index) {
             Some(group) => found.begin_of(group),
             None => {
@@ -866,6 +878,29 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
                 panic!("index {} out of matches", index.shown())
             }
         }),
+        // A match's slices are its groups' (ADR 0091, #214): a range or a
+        // start and a length answers an array, empty past either end as an
+        // array's slice is (ADR 0019), where Ruby answers nil.
+        (Value::MatchData(found), "[]", [range @ Value::Range { .. }]) => {
+            let groups = found.groups();
+            let (from, to) = crate::interpreter::slice_bounds(range, groups.len());
+            Some(Value::array(groups[from..to].to_vec()))
+        }
+        (Value::MatchData(found), "[]", [Value::Integer(start), Value::Integer(length)]) => {
+            Some(Value::array(crate::interpreter::run_from(
+                &found.groups(),
+                *start,
+                *length,
+            )))
+        }
+        (Value::MatchData(_), "[]", [start, length]) => {
+            crate::interpreter::refusal("arguments");
+            panic!(
+                "a match's [start, length] takes two integers, got {} and {}",
+                start.shown(),
+                length.shown()
+            )
+        }
         (Value::MatchData(found), "[]", [index]) => Some(match group_or_refuse(found, index) {
             Some(group) => found.group_value(group),
             None => Value::Nil,
@@ -958,7 +993,9 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
                 None => Value::Nil,
             })
         }
-        (Value::String(text), "slice" | "[]", [Value::Regex(pattern), group]) => {
+        // By name only: `text[/pattern/, group]` is a string's two-value
+        // index, which refuses toward this spelling (#314).
+        (Value::String(text), "slice", [Value::Regex(pattern), group]) => {
             Some(match pattern.search(text) {
                 Some(found) => match group_or_refuse(&found, group) {
                     Some(group) => found.group_value(group),

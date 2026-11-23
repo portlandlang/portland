@@ -126,6 +126,9 @@ fn run_file(path: &str, load_path: Vec<String>, program_arguments: Vec<String>) 
     interpreter.set_arguments(program_arguments);
     interpreter.set_load_path(load_path);
     interpreter.set_current_file(std::path::PathBuf::from(path));
+    if let Some(text) = &program.data {
+        interpreter.set_data(text.clone());
+    }
     interpreter.program(&program);
 }
 

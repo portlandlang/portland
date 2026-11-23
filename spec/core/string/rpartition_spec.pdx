@@ -1,7 +1,6 @@
 # Splitting a string at a match, three ways (#106), from ruby/spec
-# core/string/{partition,rpartition}_spec.rb. The multibyte row asks for
-# "@" as a string where upstream asks /@/. What stays upstream, and why, is
-# each file's entry in spec/ruby_spec.yml.
+# core/string/{partition,rpartition}_spec.rb. What stays upstream, and why,
+# is each file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 
@@ -20,7 +19,11 @@ context "String#rpartition with String" do
   end
 
   specify "handles multibyte string correctly" do
-    expect("ユーザ@ドメイン".rpartition("@")).to eq(["ユーザ", "@", "ドメイン"])
+    expect("ユーザ@ドメイン".rpartition(/@/)).to eq(["ユーザ", "@", "ドメイン"])
+  end
+
+  specify "accepts regexp" do
+    expect("hello!".rpartition(/l./)).to eq(["hel", "lo", "!"])
   end
 
   specify "rpartition splits around the last match" do
