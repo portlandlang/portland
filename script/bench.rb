@@ -21,11 +21,21 @@
 # a mature bytecode VM against a tree-walking debug build, so the gap is
 # large and expected. A bench Ruby cannot parse (struct patterns) or cannot
 # run (the compiler itself) shows "—" there with its reason below.
+#
+# A fourth column runs the workload built natively by script/build (#448),
+# where it builds: only a slice of the language compiles (#443), and every
+# other bench shows "—". The slice is integers, so that column says nothing
+# about strings, collections, or memory, which is where the cost of a real
+# program will be.
 
 require "English"
 
 QUICK_RUNS = 3
 SLOW_WORKLOADS = %w[lex].freeze
+# Hosted, these take minutes: the compiler interpreting a million calls.
+# They run direct, native, and under Ruby in the quick set, and hosted
+# only with `slow`.
+HOSTED_SLOW_WORKLOADS = %w[count fib].freeze
 RUBY_UNRUNNABLE = { "lex" => "requires the Portland compiler" }.freeze
 
 def repo_root = File.expand_path("..", __dir__)
@@ -49,11 +59,23 @@ end
 
 def median(durations) = durations.sort[durations.length / 2]
 
-def measure(workload, runs, runner:)
+# The workload built natively, or nil where the native build refuses it.
+def native_binary(workload)
+  pdx = File.join(repo_root, "target/debug/pdx")
+  built = IO.popen({ "PDX" => pdx }, ["script/build", workload], chdir: repo_root, err: File::NULL, &:read)
+  $CHILD_STATUS.success? ? built.strip : nil
+end
+
+def clang_version
+  IO.popen(%w[xcrun clang --version], &:read).lines.first.to_s.strip
+end
+
+def measure(workload, runs, runner:, binary: nil)
   pdx = File.join(repo_root, "target/debug/pdx")
   command = case runner
             when :direct then [pdx, workload]
             when :hosted then [pdx, "compiler/run.pdx", workload]
+            when :native then [binary]
             when :ruby   then ["ruby", "-r", "./bench/shim.rb", workload]
             end
   results = Array.new(runs) { timed_run(command) }
@@ -83,6 +105,7 @@ build_seed
 
 workloads = Dir[File.join(repo_root, "bench/*.pdx")].sort
 skipped = []
+hosted_skipped = []
 ruby_skipped = []
 rows = []
 
@@ -95,10 +118,25 @@ workloads.each do |path|
   end
   runs = SLOW_WORKLOADS.include?(name) ? 1 : QUICK_RUNS
   direct_seconds, direct_output = measure(workload, runs, runner: :direct)
-  hosted_seconds, hosted_output = measure(workload, runs, runner: :hosted)
-  unless direct_output == hosted_output
-    abort "bench: #{workload} diverged between the oracles — a bench that got faster by getting wrong:\n" \
-          "direct:\n#{direct_output}hosted:\n#{hosted_output}"
+  hosted_seconds = nil
+  if HOSTED_SLOW_WORKLOADS.include?(name) && !include_slow
+    hosted_skipped << name
+  else
+    hosted_runs = HOSTED_SLOW_WORKLOADS.include?(name) ? 1 : runs
+    hosted_seconds, hosted_output = measure(workload, hosted_runs, runner: :hosted)
+    unless direct_output == hosted_output
+      abort "bench: #{workload} diverged between the oracles — a bench that got faster by getting wrong:\n" \
+            "direct:\n#{direct_output}hosted:\n#{hosted_output}"
+    end
+  end
+  native_seconds = nil
+  binary = native_binary(workload)
+  unless binary.nil?
+    native_seconds, native_output = measure(workload, runs, runner: :native, binary: binary)
+    unless native_output == direct_output
+      abort "bench: #{workload} diverged between the seed and the native build:\n" \
+            "direct:\n#{direct_output}native:\n#{native_output}"
+    end
   end
   ruby_reason = ruby_skip_reason(name, workload)
   ruby_seconds = nil
@@ -111,7 +149,7 @@ workloads.each do |path|
   else
     ruby_skipped << "#{name} (#{ruby_reason})"
   end
-  rows << [name, ruby_seconds, direct_seconds, hosted_seconds]
+  rows << [name, ruby_seconds, direct_seconds, hosted_seconds, native_seconds]
 end
 
 # MRI's own startup is most of a small bench's Ruby time — far more than the
@@ -119,21 +157,30 @@ end
 # given to two places rather than rounded to a flattering 0x.
 ruby_floor = ruby_startup_seconds
 
-puts "| workload | ruby (s) | direct (s) | hosted (s) | direct/ruby | hosted/direct |"
-puts "|----------|---------:|-----------:|-----------:|------------:|--------------:|"
-rows.each do |name, ruby_seconds, direct_seconds, hosted_seconds|
+puts "| workload | ruby (s) | direct (s) | hosted (s) | native (s) | direct/ruby | hosted/direct | direct/native |"
+puts "|----------|---------:|-----------:|-----------:|-----------:|------------:|--------------:|--------------:|"
+rows.each do |name, ruby_seconds, direct_seconds, hosted_seconds, native_seconds|
   ruby_column = ruby_seconds ? format("%8.3f", ruby_seconds) : format("%8s", "—")
+  hosted_column = hosted_seconds ? format("%10.3f", hosted_seconds) : format("%10s", "—")
+  native_column = native_seconds ? format("%10.3f", native_seconds) : format("%10s", "—")
   seed_ratio = ruby_seconds ? format("%10.2fx", direct_seconds / ruby_seconds) : format("%11s", "—")
-  puts format("| %-8s | %s | %10.3f | %10.3f | %s | %12.0fx |",
+  hosted_ratio = hosted_seconds ? format("%12.0fx", hosted_seconds / direct_seconds) : format("%13s", "—")
+  native_ratio = native_seconds ? format("%12.0fx", direct_seconds / native_seconds) : format("%13s", "—")
+  puts format("| %-8s | %s | %10.3f | %s | %s | %s | %s | %s |",
               name,
               ruby_column,
               direct_seconds,
-              hosted_seconds,
+              hosted_column,
+              native_column,
               seed_ratio,
-              hosted_seconds / direct_seconds)
+              hosted_ratio,
+              native_ratio)
 end
 puts
 puts "medians of #{QUICK_RUNS} (slow tier: 1); outputs verified identical across oracles, and Ruby where it runs"
 puts format("ruby's startup alone: %.3fs — the floor under every ruby (s) above", ruby_floor)
 puts "skipped slow tier: #{skipped.join(", ")} — run `script/bench slow` to include" unless skipped.empty?
 puts "not run under Ruby: #{ruby_skipped.join(", ")}" unless ruby_skipped.empty?
+puts "not run hosted: #{hosted_skipped.join(", ")} — minutes each; run `script/bench slow` to include" unless hosted_skipped.empty?
+puts "native: built by script/build with #{clang_version}, startup included. Only integer workloads build (#443), so the " \
+     "column says nothing about strings, collections, or memory."

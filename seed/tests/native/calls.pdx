@@ -1,0 +1,19 @@
+# One def calling another, a call as an argument, several parameters, and
+# a Boolean-answering def.
+
+def double(value) = value * 2
+
+def quadruple(value) = double(double(value))
+
+def area(width, height) = width * height
+
+def small?(number) = number < 10
+
+puts quadruple(3)
+puts area(6, 7)
+tiny = small?(quadruple(2))
+if tiny
+  puts 1
+else
+  puts 0
+end

@@ -1,0 +1,14 @@
+# A counting loop over two integers: the native spike's second target
+# (#443). It says nothing about strings, collections, or memory.
+
+def sum_to(limit)
+  mutable total = 0
+  mutable index = 1
+  while index <= limit
+    total += index
+    index += 1
+  end
+  total
+end
+
+puts sum_to(10000000)

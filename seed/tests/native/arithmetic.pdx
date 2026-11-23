@@ -1,0 +1,7 @@
+# `+`, `-`, and `*` between Integers, negative answers among them.
+
+puts 2 + 3
+puts 2 - 7
+puts 6 * 7
+puts((0 - 4) * 5)
+puts 1 + 2 * 3 - 4

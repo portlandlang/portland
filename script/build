@@ -4,6 +4,17 @@
 #   script/build fib.pdx        writes target/portland/fib.ll and
 #                               target/portland/fib, and prints the binary's path
 #
+#   script/build --unoptimized fib.pdx
+#                               the same, with clang's optimizer off
+#
+# A build is optimized unless asked otherwise, since a build should produce
+# the fast thing. Unoptimized, the binary does what the compiler wrote and
+# no more: every local read from its slot, every loop turn taken, every
+# overflow check made. That is the one to read when the question is what
+# Portland emitted, not what LLVM made of it.
+#
+# With PDX set to a built seed, that seed runs the compiler and none is built.
+#
 # The compiler, running on the seed, checks the program and writes LLVM IR
 # as text; Apple's clang, found through xcrun so it is the active Xcode's,
 # compiles that. The compiler cannot run a process itself (#179), which is
@@ -12,8 +23,13 @@
 # Only a slice of the language compiles (#443); anything outside it refuses
 # by name and nothing is written.
 set -e
+optimization=-O2
+if [ "$1" = "--unoptimized" ]; then
+  optimization=-O0
+  shift
+fi
 if [ $# -ne 1 ]; then
-  echo "usage: script/build FILE.pdx" >&2
+  echo "usage: script/build [--unoptimized] FILE.pdx" >&2
   exit 64
 fi
 invoked_from=$(pwd)
@@ -27,13 +43,18 @@ root=$(pwd)
 . script/lib/rust.sh
 . script/lib/macos.sh
 
-cargo build --quiet
+# PDX names a seed already built, as the tests do from inside cargo;
+# without it the seed is built here.
+if [ -z "$PDX" ]; then
+  cargo build --quiet --package portland-seed --bin pdx
+  PDX=target/debug/pdx
+fi
 name=$(basename "$program" .pdx)
 output=$root/target/portland
 mkdir -p "$output"
 # A stale .ll from an earlier build must not be compiled when this one refuses.
 rm -f "$output/$name.ll" "$output/$name"
-target/debug/pdx compiler/build.pdx "$program" "$output/$name.ll"
+"$PDX" compiler/build.pdx "$program" "$output/$name.ll"
 # The IR names no target, so clang supplies the host's and would warn that it did.
-xcrun clang -O2 -Wno-override-module -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll"
+xcrun clang "$optimization" -Wno-override-module -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll"
 echo "$output/$name"

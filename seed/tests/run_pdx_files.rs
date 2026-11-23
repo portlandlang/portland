@@ -1503,6 +1503,118 @@ fn portland_build_writes_nothing_when_it_refuses() {
     }
 }
 
+/// The sentence a seed run refused with: the line its panic wrote, between
+/// the line that says where and the note about backtraces.
+fn seed_refusal_sentence(stderr: &str) -> String {
+    stderr
+        .lines()
+        .skip_while(|line| !line.contains("panicked at"))
+        .nth(1)
+        .unwrap_or("")
+        .to_string()
+}
+
+/// Builds a program with `script/build`, the seed under test running the
+/// compiler, and answers the build's own output. `flags` go before the
+/// program, as `--unoptimized` does.
+fn native_build(program: &std::path::Path, flags: &[&str]) -> std::process::Output {
+    let script = format!("{}/../script/build", env!("CARGO_MANIFEST_DIR"));
+    Command::new(script)
+        .args(flags)
+        .arg(program)
+        .env("PDX", env!("CARGO_BIN_EXE_pdx"))
+        .output()
+        .expect("failed to run script/build")
+}
+
+/// The native build is held to the seed (#448, ADR 0094): every program in
+/// tests/native prints the same bytes and exits with the same status built
+/// natively as run on the seed, and one the seed refuses says the seed's
+/// sentence. A construct is native when its fixture is here and passes.
+#[test]
+fn every_native_fixture_matches_the_seed() {
+    let directory = format!("{}/tests/native", env!("CARGO_MANIFEST_DIR"));
+    let mut fixtures: Vec<_> = std::fs::read_dir(&directory)
+        .expect("tests/native should exist")
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
+        .collect();
+    fixtures.sort();
+    assert!(!fixtures.is_empty(), "tests/native should hold fixtures");
+    for fixture in fixtures {
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&fixture)
+            .output()
+            .expect("failed to run pdx");
+        // Both ways: optimized is what a build produces, and unoptimized
+        // runs every check and every loop turn the compiler wrote.
+        let builds: [&[&str]; 2] = [&[], &["--unoptimized"]];
+        for flags in builds {
+            let built = native_build(&fixture, flags);
+            assert!(
+                built.status.success(),
+                "{} {flags:?} should build natively: {}",
+                fixture.display(),
+                String::from_utf8_lossy(&built.stderr)
+            );
+            let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+            let native = Command::new(&binary)
+                .output()
+                .expect("failed to run the native binary");
+            assert_eq!(
+                String::from_utf8_lossy(&native.stdout),
+                String::from_utf8_lossy(&seed.stdout),
+                "{} {flags:?} prints differently natively",
+                fixture.display()
+            );
+            assert_eq!(
+                native.status.code(),
+                seed.status.code(),
+                "{} {flags:?} exits differently natively",
+                fixture.display()
+            );
+            if !seed.status.success() {
+                assert_eq!(
+                    String::from_utf8_lossy(&native.stderr).trim(),
+                    seed_refusal_sentence(&String::from_utf8_lossy(&seed.stderr)),
+                    "{} {flags:?} refuses in other words natively",
+                    fixture.display()
+                );
+            }
+        }
+    }
+}
+
+/// A program outside the native slice refuses at build (#448): the
+/// sentence names what it met, and neither the IR nor a binary is left
+/// under target/portland — a stale one from an earlier build included.
+#[test]
+fn a_native_build_that_refuses_leaves_nothing_behind() {
+    let sample = std::env::temp_dir().join("native_refusal_probe.pdx");
+    std::fs::write(&sample, "puts 1\n").unwrap();
+    let built = native_build(&sample, &[]);
+    assert!(
+        built.status.success(),
+        "the probe should build before it is broken"
+    );
+    let binary = std::path::PathBuf::from(String::from_utf8(built.stdout).unwrap().trim());
+    let text = binary.with_extension("ll");
+    assert!(
+        binary.exists() && text.exists(),
+        "the build should leave both files"
+    );
+    std::fs::write(&sample, "puts \"hi\"\n").unwrap();
+    let refused = native_build(&sample, &[]);
+    assert!(!refused.status.success(), "a string should refuse");
+    let stderr = String::from_utf8(refused.stderr).unwrap();
+    assert!(
+        stderr.contains("a string on line 1 is unbuilt (#443)"),
+        "expected the native refusal, got: {stderr}"
+    );
+    assert!(!text.exists(), "a refused build should leave no IR");
+    assert!(!binary.exists(), "a refused build should leave no binary");
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.

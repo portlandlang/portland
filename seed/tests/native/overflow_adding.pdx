@@ -1,0 +1,5 @@
+# `+` and `-` overflow as `*` does, each naming its own operator.
+
+largest = 9223372036854775807
+puts largest - 1
+puts largest + 1
