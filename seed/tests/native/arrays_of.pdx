@@ -1,0 +1,77 @@
+# Arrays of Strings, Booleans, and arrays (#499): a String or an array as
+# an element is a counted pointer the array holds once, and a Boolean is a
+# plain word.
+def shout(names)
+  mutable loud = []
+  names.each { |name| loud << name + "!" }
+  loud
+end
+
+def lengths(names)
+  mutable counted = []
+  names.each { |name| counted << name.length }
+  counted
+end
+
+def table(limit)
+  mutable rows = []
+  mutable row = 0
+  while row < limit
+    mutable cells = []
+    mutable cell = 0
+    while cell <= row
+      cells << row * 10 + cell
+      cell += 1
+    end
+    rows << cells
+    row += 1
+  end
+  rows
+end
+
+names = ["ada", "grace"]
+names.each { |name| puts "hello, " + name }
+shout(names).each { |name| puts name }
+lengths(names).each { |count| puts count }
+mutable more = names
+more << "barbara"
+puts names.length
+puts more.length
+more.each { |name| puts name }
+mutable flags = [true]
+flags << false
+flags << (1 < 2)
+flags.each do |flag|
+  if flag
+    puts "yes"
+  else
+    puts "no"
+  end
+end
+rows = [[1, 2], [3], []]
+rows.each do |row|
+  puts row.length
+  row.each { |number| puts number }
+end
+table(3).each do |row|
+  mutable line = ""
+  row.each { |cell| line = line + "#{cell} " }
+  puts line
+end
+mutable words = []
+mutable index = 0
+while index < 20
+  words << "word #{index}"
+  index += 1
+end
+puts words.length
+copy = words
+words << "last"
+puts copy.length
+puts words.length
+nested = [names, more]
+nested.each { |group| puts group.length }
+mutable groups = [["a"]]
+groups << []
+groups << ["b", "c"]
+groups.each { |group| puts group.length }
