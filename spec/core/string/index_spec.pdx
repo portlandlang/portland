@@ -24,3 +24,136 @@ context "String#index" do
     expect("portland".index("rose")).to be_nil
   end
 end
+
+context "String#index with String" do
+  specify "returns the index of the first occurrence of the given substring" do
+    expect("blablabla".index("")).to eq(0)
+    expect("blablabla".index("b")).to eq(0)
+    expect("blablabla".index("bla")).to eq(0)
+    expect("blablabla".index("blabla")).to eq(0)
+    expect("blablabla".index("blablabla")).to eq(0)
+
+    expect("blablabla".index("l")).to eq(1)
+    expect("blablabla".index("la")).to eq(1)
+    expect("blablabla".index("labla")).to eq(1)
+    expect("blablabla".index("lablabla")).to eq(1)
+
+    expect("blablabla".index("a")).to eq(2)
+    expect("blablabla".index("abla")).to eq(2)
+    expect("blablabla".index("ablabla")).to eq(2)
+  end
+
+  # The rows with a start position wait on #316.
+  specify "returns nil if the substring isn't found" do
+    expect("blablabla".index("B")).to be_nil
+    expect("blablabla".index("z")).to be_nil
+    expect("blablabla".index("BLA")).to be_nil
+    expect("blablabla".index("blablablabla")).to be_nil
+    expect("I’ve got a multibyte character.\n".index("\n\n")).to be_nil
+  end
+
+  specify "returns the character index of a multibyte character" do
+    expect("ありがとう".index("が")).to eq(2)
+  end
+
+  specify "returns the character index after a partial first match" do
+    expect("</</h".index("</h")).to eq(2)
+  end
+end
+
+context "String#index with Regexp" do
+  specify "returns the index of the first match of regexp" do
+    expect("blablabla".index(/bla/)).to eq(0)
+    expect("blablabla".index(/BLA/i)).to eq(0)
+
+    expect("blablabla".index(/.{0}/)).to eq(0)
+    expect("blablabla".index(/.{6}/)).to eq(0)
+    expect("blablabla".index(/.{9}/)).to eq(0)
+
+    expect("blablabla".index(/.*/)).to eq(0)
+    expect("blablabla".index(/.+/)).to eq(0)
+
+    expect("blablabla".index(/lab|b/)).to eq(0)
+
+    expect("blablabla".index(/\A/)).to eq(0)
+    expect("blablabla".index(/\Z/)).to eq(9)
+    expect("blablabla".index(/\z/)).to eq(9)
+    expect("blablabla\n".index(/\Z/)).to eq(9)
+    expect("blablabla\n".index(/\z/)).to eq(10)
+
+    expect("blablabla".index(/^/)).to eq(0)
+    expect("\nblablabla".index(/^/)).to eq(0)
+    expect("b\nablabla".index(/$/)).to eq(1)
+    expect("bl\nablabla".index(/$/)).to eq(2)
+
+    expect("blablabla".index(/.l./)).to eq(0)
+  end
+
+  specify "starts the search at the given offset" do
+    expect("blablabla".index(/.{0}/, 5)).to eq(5)
+    expect("blablabla".index(/.{1}/, 5)).to eq(5)
+    expect("blablabla".index(/.{2}/, 5)).to eq(5)
+    expect("blablabla".index(/.{3}/, 5)).to eq(5)
+    expect("blablabla".index(/.{4}/, 5)).to eq(5)
+
+    expect("blablabla".index(/.{0}/, 3)).to eq(3)
+    expect("blablabla".index(/.{1}/, 3)).to eq(3)
+    expect("blablabla".index(/.{2}/, 3)).to eq(3)
+    expect("blablabla".index(/.{5}/, 3)).to eq(3)
+    expect("blablabla".index(/.{6}/, 3)).to eq(3)
+
+    expect("blablabla".index(/.l./, 0)).to eq(0)
+    expect("blablabla".index(/.l./, 1)).to eq(3)
+    expect("blablabla".index(/.l./, 2)).to eq(3)
+    expect("blablabla".index(/.l./, 3)).to eq(3)
+
+    expect("xblaxbla".index(/x./, 0)).to eq(0)
+    expect("xblaxbla".index(/x./, 1)).to eq(4)
+    expect("xblaxbla".index(/x./, 2)).to eq(4)
+
+    expect("blablabla\n".index(/\Z/, 9)).to eq(9)
+  end
+
+  specify "returns nil if the substring isn't found" do
+    expect("blablabla".index(/BLA/)).to be_nil
+
+    expect("blablabla".index(/.{10}/)).to be_nil
+    expect("blaxbla".index(/.x/, 3)).to be_nil
+    expect("blaxbla".index(/..x/, 2)).to be_nil
+  end
+
+  specify "returns nil if the Regexp matches the empty string and the offset is out of range" do
+    expect("ruby".index(//, 12)).to be_nil
+  end
+
+  specify 'supports \G which matches at the given start offset' do
+    expect("helloYOU.".index(/\GYOU/, 5)).to eq(5)
+    expect("helloYOU.".index(/\GYOU/)).to be_nil
+
+    pattern = /\G.+YOU/
+    # The # marks where \G will match.
+    [
+      ["#hi!YOUall.", 0],
+      ["h#i!YOUall.", 1],
+      ["hi#!YOUall.", 2]
+    ].each do |row|
+      start = row[0].index("#")
+      text = row[0].delete("#")
+
+      expect(text.index(pattern, start)).to eq(row[1])
+    end
+    expect("hi!YOUall.".index(pattern, 3)).to be_nil
+  end
+
+  specify "returns the character index of a multibyte character" do
+    expect("ありがとう".index(/が/)).to eq(2)
+  end
+
+  specify "returns the character index after offset" do
+    expect("われわれ".index(/わ/, 1)).to eq(2)
+  end
+
+  specify "treats the offset as a character index" do
+    expect("われわわれ".index(/わ/, 3)).to eq(3)
+  end
+end

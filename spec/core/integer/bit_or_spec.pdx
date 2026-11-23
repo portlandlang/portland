@@ -16,6 +16,7 @@ context "Integer#|" do
     expect(1.shift_left(33).bit_or(-1)).to eq(-1)
     expect(-1.bit_or(1.shift_left(33))).to eq(-1)
     expect((-(1.shift_left(33)) - 1).bit_or(5)).to eq(-8589934593)
+    expect(5.bit_or(-(1.shift_left(33)) - 1)).to eq(-8589934593)
   end
 
   specify "returns self bitwise OR other when both operands are negative" do

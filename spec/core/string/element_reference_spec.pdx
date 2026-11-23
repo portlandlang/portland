@@ -9,7 +9,7 @@
 # Ruby answers nil for a start outside the string, Portland answers the
 # empty string, and those rows are reworded. A negative length refuses. The
 # to_int conversions (ADR 0036), the bignum rows, subclasses, encodings,
-# slice! (ADR 0015), and the regex and string-pattern rows stay upstream.
+# slice! (ADR 0015), and the string-pattern rows stay upstream.
 
 require_relative "../../spec_helper"
 
@@ -94,6 +94,17 @@ context "String#[] with Range" do
     expect("hello there"[...5]).to eq("hello")
     expect("hello there"[..-4]).to eq("hello th")
     expect("hello there"[...-4]).to eq("hello t")
+  end
+end
+
+context "String#[] with Regexp" do
+  specify "returns the matching portion of self" do
+    expect("hello there"[/[aeiou](.)\1/]).to eq("ell")
+    expect(""[//]).to eq("")
+  end
+
+  specify "returns nil if there is no match" do
+    expect("hello there"[/xyz/]).to be_nil
   end
 end
 

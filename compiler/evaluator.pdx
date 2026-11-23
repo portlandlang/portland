@@ -93,8 +93,35 @@ end
 # it, so it is in scope from the first statement; `arguments` are the
 # guest's own, what its `System.arguments` answers (ADR 0068); `load_path`
 # is where `require "name"` looks (ADR 0077).
-def evaluate_program(nodes, path, arguments, load_path)
-  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + builtin_constants)
+def evaluate_program(nodes, path, arguments, load_path, data: nil)
+  run_body(nodes, [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + data_bindings(data) + builtin_constants)
+end
+
+# `DATA` (ADR 0092): the text after the `__END__` line of the file that is
+# run, bound as a top-level constant before its first line runs, beside
+# the `__data__` marker that says the constant is the predefined one. A
+# required file's text is never handed here, so its `__END__` only ends it.
+def data_bindings(data)
+  return [] if data.nil?
+  [["DATA", "constant", data], ["__data__", "data", true]]
+end
+
+# What Ruby's `DATA`, a File, answers by moving or reading its cursor.
+# Portland's is a String (ADR 0092), so each refuses by name.
+DATA_CURSOR_NAMES = %w[close eof eof? gets lineno pos readline readlines rewind seek]
+
+# `DATA.read` is `DATA`, Ruby's commonest spelling of it, and a name that
+# moves a File's cursor refuses, in the seed's sentence. Nil where the call
+# is anything else, or where `DATA` is not the predefined constant.
+def evaluate_data_call(node, bindings)
+  return nil unless (node.receiver in IdentifierNode) && node.receiver.name == "DATA"
+  return nil unless node.arguments.empty? && node.block.nil?
+  return nil if lookup(bindings, "__data__").empty? || local_name?(bindings, "DATA")
+  return outcome([value_at(lookup(bindings, "DATA").first, 2)], bindings) if node.name == "read"
+  if DATA_CURSOR_NAMES.include?(node.name)
+    panic("DATA is a String, the text after __END__, with no cursor for '#{node.name}' to move — read it whole with DATA or DATA.read, or by line with DATA.lines or DATA.each_line")
+  end
+  nil
 end
 
 # The constants every program starts with (#152): `Float`'s, the seed's
@@ -1361,8 +1388,20 @@ end
 # a synthetic call on an identifier or path node, dispatched as any is.
 def evaluate_type_receiver_call(type_name, node, bindings)
   return outcome([type_name], bindings) if node.name == "name" && node.arguments.empty?
-  written = if type_name.include?("::") then path_node(type_name.split("::")) else identifier_node(type_name, line: node.line) end
+  written = if type_name.include?("::") then path_node(type_name.split("::"), line: node.line) else identifier_node(type_name, line: node.line) end
   evaluate_method_call(method_call_node(written, node.name, node.arguments, node.block, line: node.line), bindings)
+end
+
+# The refusal for `receiver[first, second]` on anything but a match (ADR
+# 0091), the seed's sentence.
+def two_value_index_sentence(receiver, arguments)
+  type_name = value_type_label(receiver)
+  if plain_array?(receiver) || (receiver in String)
+    first = shorten(render_inspect(value_at(arguments, 0)))
+    second = shorten(render_inspect(value_at(arguments, 1)))
+    return "#{article(type_name)} #{type_name} takes one index between brackets — with two, write slice(#{first}, #{second})"
+  end
+  "#{article(type_name)} #{type_name} takes one index between brackets, got 2"
 end
 
 # A guest value's type as Ruby names it: in a conversion refusal, and as
@@ -2019,10 +2058,10 @@ end
 # `join`, the seed's `joined` (#104): a nested guest array joins into the
 # same string with the same separator, and a nil element refuses as
 # interpolating one does.
-def joined_guest(values, separator)
+def joined_guest(values, separator, bindings)
   rendered = values.map do |value|
     panic("nil has no method 'to_s' — handle the nil case first") if value.nil?
-    plain_array?(value) ? joined_guest(value, separator) : render(value)
+    plain_array?(value) ? joined_guest(value, separator, bindings) : render(value, bindings)
   end
   rendered.join(separator)
 end
@@ -2043,46 +2082,69 @@ end
 # newline gets no second one.
 def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
 
-def render(value)
+# With `bindings`, a struct's own `to_s` speaks for it and the values
+# inside a collection or a struct render by their own `inspect` (#285), the
+# seed's `rendered`; without, every value takes its default form, which is
+# what a refusal's sentence shows.
+def render(value, bindings = nil)
   return "nil" if value.nil?
-  return render_inspect(value) if value.failure?
+  return render_inspect(value, bindings) if value.failure?
   return value_at(value, 1) if value in ["__symbol__", *] | ["__type__", *]
-  return render_inspect(value) if value in ["__struct__", *] | ["__enum_case__", *] | ["__set__", *]
+  if value in ["__struct__", *]
+    own = bindings.nil? ? nil : guest_own_rendering(value, "to_s", bindings)
+    return own unless own.nil?
+    # A struct without a `to_s` shows its fields, not its own `inspect`.
+    return render_inspect_inside(value, bindings)
+  end
+  return render_inspect(value, bindings) if value in ["__enum_case__", *] | ["__set__", *]
   # A collection's `to_s` is its `inspect` (ADR 0060), as Ruby's.
-  return render_inspect(value) if plain_array?(value) || (value in Hash)
+  return render_inspect(value, bindings) if plain_array?(value) || (value in Hash)
   "#{value}"
 end
 
 # The seed's inspect: what `p` shows — strings with their quotes, symbols
 # with their colons, and hash pairs written the way they would be typed,
 # shorthand for identifier-shaped symbol keys and the rocket for the rest.
-def render_inspect(value)
+# With `bindings`, a struct that defines `inspect` renders by it wherever
+# it sits (#285), the seed's `inspected`. A value that is no struct costs
+# one shape test more than the default form does.
+def render_inspect(value, bindings = nil)
   return "nil" if value.nil?
-  return "failure(#{render_inspect(failure_payload(value))})" if value.failure?
+  return "failure(#{render_inspect(failure_payload(value), bindings)})" if value.failure?
+  own = bindings.nil? ? nil : guest_own_rendering(value, "inspect", bindings)
+  return own unless own.nil?
+  render_inspect_inside(value, bindings)
+end
+
+# A value's own source form, the values inside it rendered by
+# render_inspect.
+def render_inspect_inside(value, bindings)
+  return "nil" if value.nil?
+  return "failure(#{render_inspect(failure_payload(value), bindings)})" if value.failure?
   return symbol_source(value_at(value, 1)) if value in ["__symbol__", *]
   # A type inspects as its name (ADR 0074).
   return value_at(value, 1) if value in ["__type__", *]
   if value in ["__enum_case__", *]
-    labels = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
+    labels = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1), bindings)}" }
     return "#{symbol_source(value_at(value, 1))}(#{labels.join(", ")})"
   end
   if value in ["__struct__", *]
-    fields = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1))}" }
+    fields = value_at(value, 2).map { "#{it[0]}: #{render_inspect(value_at(it, 1), bindings)}" }
     return "#{value_at(value, 1)}(#{fields.join(", ")})"
   end
   # Ruby 4's spelling, which is also the constructor's (ADR 0082).
   if value in ["__set__", *]
-    members = value_at(value, 1).map { render_inspect(it) }
+    members = value_at(value, 1).map { render_inspect(it, bindings) }
     return "Set[" + members.join(", ") + "]"
   end
   if plain_array?(value)
-    rendered = value.map { render_inspect(it) }
+    rendered = value.map { render_inspect(it, bindings) }
     return "[" + rendered.join(", ") + "]"
   end
   if value in Hash
     mutable pairs = []
     value.each do |key, entry|
-      pairs << rendered_pair(key, entry)
+      pairs << rendered_pair(key, entry, bindings)
     end
     return "{" + pairs.join(", ") + "}"
   end
@@ -2095,8 +2157,8 @@ def render_inspect(value)
   return inspect(value) if (value in Regexp) || (value in MatchData)
   # A range inspects each end (ADR 0081), so `"a".."f"` keeps its quotes.
   if value in Range
-    low = value.begin.nil? ? "" : render_inspect(value.begin)
-    high = value.end.nil? ? "" : render_inspect(value.end)
+    low = value.begin.nil? ? "" : render_inspect(value.begin, bindings)
+    high = value.end.nil? ? "" : render_inspect(value.end, bindings)
     return low + (value.exclude_end? ? "..." : "..") + high
   end
   "#{value}"
@@ -2104,15 +2166,15 @@ end
 
 # `to_s`, rendering: nil keeps the host's refusal — absence has no methods,
 # `to_s` included (ADR 0006) — and everything else takes the seed's Display.
-def rendered_to_s(receiver)
+def rendered_to_s(receiver, bindings)
   return receiver.to_s if receiver.nil?
-  render(receiver)
+  render(receiver, bindings)
 end
 
 # `to_s` at the dispatch: bare renders; with a base it rides the host,
 # bounds refusal included.
-def to_s_of(receiver, arguments)
-  return rendered_to_s(receiver) if arguments.empty?
+def to_s_of(receiver, arguments, bindings)
+  return rendered_to_s(receiver, bindings) if arguments.empty?
   receiver.to_s(value_at(arguments, 0))
 end
 
@@ -2164,12 +2226,12 @@ def count_of(receiver, arguments)
 end
 
 # One hash pair, written the way it would be typed (ADR 0023 §1).
-def rendered_pair(key, entry)
+def rendered_pair(key, entry, bindings)
   if key in ["__symbol__", *]
     name = value_at(key, 1)
-    return "#{name}: #{render_inspect(entry)}" if identifier_shaped?(name)
+    return "#{name}: #{render_inspect(entry, bindings)}" if identifier_shaped?(name)
   end
-  "#{render_inspect(key)} => #{render_inspect(entry)}"
+  "#{render_inspect(key, bindings)} => #{render_inspect(entry, bindings)}"
 end
 
 # The seed's array rule: a negative index counts from the end, the position
@@ -3223,6 +3285,8 @@ end
 
 # Guest receivers are host values, so host method dispatch does the work.
 def evaluate_method_call(node, mutable bindings)
+  data_answer = evaluate_data_call(node, bindings)
+  return data_answer unless data_answer.nil?
   # The builtin types carry Ruby's type functions (ADR 0058): the name is
   # not a value, and a struct or local wearing it wins, as everywhere.
   if (node.receiver in IdentifierNode) && %w[Array Complex Hash Integer JSON Math Random Range Regexp Set System].include?(node.receiver.name) && resolve(bindings, node.receiver.name).empty?
@@ -3323,6 +3387,13 @@ def evaluate_method_call(node, mutable bindings)
   unless keyword_values.empty? || (receiver in ["__struct__", *])
     takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures")
     panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
+  end
+  # Two values between brackets (ADR 0091): a match answers the slice of
+  # its groups, the host's own; any other receiver refuses in the seed's
+  # sentence, an array and a string pointed at `slice`.
+  if node.name == "[]" && arguments.length == 2
+    return outcome([receiver[value_at(arguments, 0), value_at(arguments, 1)]], bindings) if receiver in MatchData
+    panic(two_value_index_sentence(receiver, arguments))
   end
   # A set (ADR 0082): its own names answer here, a mutator names the
   # spelling that answers a new set, and Ruby's Enumerable walks the members
@@ -3462,7 +3533,7 @@ def evaluate_method_call(node, mutable bindings)
   when "failure?" then receiver.failure?
   # `to_s` renders (#39); the nil refusal stays the host's, reached below
   # when a tagless receiver has no `to_s` of its own.
-  when "to_s" then to_s_of(receiver, arguments)
+  when "to_s" then to_s_of(receiver, arguments, bindings)
   when "rotate" then arguments.empty? ? receiver.rotate : receiver.rotate(value_at(arguments, 0))
   # Ruby's combinatorics (#104) ride the host's arms; `product` takes any
   # number of arrays, folded one at a time; a count-less `cycle` refuses.
@@ -3687,7 +3758,7 @@ def evaluate_method_call(node, mutable bindings)
   # No separator, or a nil one, joins with nothing between (#142, #104).
   when "join"
     separator = value_at(arguments, 0)
-    joined_guest(receiver, separator.nil? ? "" : separator)
+    joined_guest(receiver, separator.nil? ? "" : separator, bindings)
   when "include?" then receiver.include?(value_at(arguments, 0))
   # Ruby's rules, the seed's `ruby_split` (#142): the host answers, so the
   # arguments pass through as written.
@@ -3878,7 +3949,7 @@ def matchdata_answer(found, name, arguments)
   when "offset" then found.offset(host_group_key(value_at(arguments, 0)))
   when "match" then found.match(host_group_key(value_at(arguments, 0)))
   when "match_length" then found.match_length(host_group_key(value_at(arguments, 0)))
-  else arguments.map { |group| found[host_group_key(group)] }
+  else arguments.flat_map { |group| found.values_at(host_group_key(group)) }
   end
 end
 
@@ -3977,7 +4048,7 @@ def guest_replacement(block, matched, scope, interrupt, entry, name)
   settled = compacted_since(entry, step.bindings)
   return ["", settled, step] if step.signal != "none"
   panic("#{name} block produced no value") if step.value.empty?
-  [joined_guest([slot_value(step.value)], ""), settled, nil]
+  [joined_guest([slot_value(step.value)], "", settled), settled, nil]
 end
 
 def evaluate_block_call(node, receiver, arguments, mutable scope)
@@ -4322,7 +4393,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           break
         end
         panic("#{node.name} block produced no value") if step.value.empty?
-        result = result + joined_guest([slot_value(step.value)], "")
+        result = result + joined_guest([slot_value(step.value)], "", scope)
       elsif position > 0
         result = result + pattern
       end
@@ -5253,7 +5324,7 @@ def evaluate_call(node, mutable bindings)
       # The refusals come before the rendering, with the seed's wording.
       panic("puts got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("puts got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      text = guest_own_rendering(argument, "to_s", bindings) or render(argument)
+      text = render(argument, bindings)
       System.write_standard_output(lined(text))
     end
     outcome([], bindings)
@@ -5261,7 +5332,7 @@ def evaluate_call(node, mutable bindings)
   # answers its one argument, several as an array, and nil with none.
   when "p", "pp"
     arguments.each do |argument|
-      inspected = guest_own_rendering(argument, "inspect", bindings) or render_inspect(argument)
+      inspected = render_inspect(argument, bindings)
       System.write_standard_output("#{inspected}\n")
     end
     return outcome([nil], bindings) if arguments.empty?
@@ -5272,7 +5343,7 @@ def evaluate_call(node, mutable bindings)
     arguments.each do |argument|
       panic("print got nil — handle the nil case first (p renders nil for debugging)") if argument.nil?
       panic("print got a failure — handle the failure case first (p renders it for debugging)") if argument.failure?
-      text = guest_own_rendering(argument, "to_s", bindings) or render(argument)
+      text = render(argument, bindings)
       System.write_standard_output(text)
     end
     outcome([nil], bindings)
@@ -5317,7 +5388,7 @@ def evaluate_call(node, mutable bindings)
     lines.each do |line|
       panic("warn got nil — handle the nil case first (p renders nil for debugging)") if line.nil?
       panic("warn got a failure — handle the failure case first (p renders it for debugging)") if line.failure?
-      text = guest_own_rendering(line, "to_s", bindings) or render(line)
+      text = render(line, bindings)
       System.write_standard_error(lined(text))
     end
     outcome([nil], bindings)
@@ -5329,7 +5400,7 @@ def evaluate_call(node, mutable bindings)
   when "inspect"
     # `p` without the printing (ADR 0026); the host builtin answers the
     # untagged shapes, and render_inspect already speaks for the tagged ones.
-    outcome([render_inspect(slot_value(arguments))], bindings)
+    outcome([render_inspect(slot_value(arguments), bindings)], bindings)
   # The tower's constructors (ADR 0085): the host's own, since a guest
   # rational or complex is a host value, as a float is.
   when "Rational"
@@ -5371,7 +5442,9 @@ def evaluate_call(node, mutable bindings)
     # The seed's sentence, and a failure rather than a debug line (#98) —
     # reached only where the checker could not judge the name, a struct's
     # method body or a module's. A removed Ruby spelling names its rewrite
-    # (#135).
+    # (#135). `DATA` in a run whose file has no `__END__` line says so (ADR
+    # 0092); the checker leaves that name to the run.
+    panic("DATA is the text after an __END__ line, and the file that is run has none — end the program with __END__ and put the text below it") if node.name == "DATA"
     panic(retired_sentence(node.name) or "#{spelled(node.name)} is not defined")
   end
 end

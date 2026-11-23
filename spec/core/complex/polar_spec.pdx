@@ -4,6 +4,8 @@
 
 require_relative "../../spec_helper"
 
+TOLERANCE = 0.00003
+
 context "Complex.polar" do
   specify "comes from polar and rectangular coordinates" do
     expect(inspect(Complex.polar(1, Math::PI))).to eq("(-1+0.0i)")
@@ -12,5 +14,24 @@ context "Complex.polar" do
 
   specify "abs, abs2, arg, polar" do
     expect(Complex(3, 4).polar).to eq([5.0, 0.9272952180016122])
+  end
+
+  specify "returns a complex number in terms of radius and angle" do
+    expect(Complex.polar(50, 60)).to be_close(Complex(-47.6206490207578, -15.2405310551108), TOLERANCE)
+    expect(Complex.polar(-10, -20)).to be_close(Complex(-4.08082061813392, 9.12945250727628), TOLERANCE)
+  end
+end
+
+context "Complex#polar" do
+  specify "returns the absolute value and the argument" do
+    integral = Complex(3, 4)
+    expect(integral.polar.size).to eq(2)
+    expect(integral.polar.first).to eq(5.0)
+    expect(integral.polar.last).to be_close(0.927295218001612, TOLERANCE)
+
+    fractional = Complex(-3.5, 4.7)
+    expect(fractional.polar.size).to eq(2)
+    expect(fractional.polar.first).to be_close(5.86003412959345, TOLERANCE)
+    expect(fractional.polar.last).to be_close(2.21088447955664, TOLERANCE)
   end
 end
