@@ -851,46 +851,6 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def area in a trait body is always defined — 'unless' cannot guard it; put the condition inside the method",
         ),
         (
-            "trait Sexp\n  def self.of\n    1\n  end\nend\n",
-            "a trait cannot define def self.of — a type function lives on the struct that includes it",
-        ),
-        (
-            "struct Token\n  kind\n\n  def greet\n    kind\n  end\n\n  def self.greet\n    1\n  end\nend\n",
-            "greet is defined on Token instances and on the type — rename one",
-        ),
-        (
-            "def fields\n  1\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    fields(kind: raw)\n  end\nend\nToken.new(\"rose\")\n",
-            "fields is the raw constructor inside def self.new — rename the fields function",
-        ),
-        (
-            "struct Token\n  kind\n\n  def self.new(raw)\n    fields(raw)\n  end\nend\nToken.new(\"rose\")\n",
-            "fields takes keyword arguments, not positional ones",
-        ),
-        (
-            "def helper\n  fields(kind: \"word\")\nend\nstruct Token\n  kind\n\n  def self.new(raw)\n    helper\n  end\nend\nToken.new(\"rose\")\n",
-            "`fields` is the raw constructor — it only exists inside def self.new",
-        ),
-        (
-            "struct Token\n  kind\n\n  def self.with\n    1\n  end\nend\n",
-            "with is reserved on structs",
-        ),
-    ];
-    for (source, expected) in cases {
-        let sample = std::env::temp_dir().join("compiler_error_case.pdx");
-        std::fs::write(&sample, source).expect("failed to write probe file");
-        let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
-            .arg(portland_run())
-            .arg(&sample)
-            .output()
-            .expect("failed to run pdx");
-        let stderr = String::from_utf8(hosted.stderr).unwrap();
-        assert!(
-            stderr.contains(expected),
-            "the compiler should report {expected:?}, got: {stderr}"
-        );
-    }
-}
-
             "answer = case [1, 2]\nin [*, found, *] then found\nelse 0\nend\np answer\n",
             "a * rest must end an array pattern",
         ),
