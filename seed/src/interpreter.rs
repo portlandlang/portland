@@ -6617,6 +6617,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(sorted))
                 }
+                // A count beside the comparator block is the same wrong
+                // count it is without one, in the same sentence (#332).
+                (Value::Array(_), "min" | "max", counted) if !counted.is_empty() => {
+                    refusal("arity");
+                    panic!("'{name}' takes 0 arguments, got {}", counted.len())
+                }
                 // `min`/`max` by a comparator block (#99): the first of
                 // equals, and absent for an empty array, as without one.
                 (Value::Array(elements), "min" | "max", []) => {
