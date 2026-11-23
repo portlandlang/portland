@@ -2,6 +2,9 @@
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
+    /// The text after an `__END__` line (ADR 0092), when the source has
+    /// one: `DATA`'s value in the file that is run.
+    pub data: Option<String>,
     pub statements: Vec<Statement>,
 }
 

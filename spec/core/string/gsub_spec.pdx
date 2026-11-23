@@ -31,6 +31,23 @@ context "String#gsub with pattern and replacement" do
     expect("hello".gsub("l", '<\&>')).to eq("he<l><l>o")
   end
 
+  specify "replaces \\+ with the last paren that actually matched" do
+    greeting = "hello!"
+
+    expect(greeting.gsub(/(.)(.)/, '\+')).to eq("el!")
+    expect(greeting.gsub(/(.)(.)+/, '\+')).to eq("!")
+    expect(greeting.gsub(/(.)()/, '\+')).to eq("")
+    expect(greeting.gsub(/(.)(.{20})?/, '<\+>')).to eq("<h><e><l><l><o><!>")
+
+    letters = "ABCDEFGHIJKLabcdefghijkl"
+    twelve = /#{"(.)" * 12}/
+    expect(letters.gsub(twelve, '\+')).to eq("Ll")
+  end
+
+  specify "treats \\+ as an empty string if there was no captures" do
+    expect("hello!".gsub(/./, '\+')).to eq("")
+  end
+
   specify "hand the block the matched text" do
     expect("hello world".gsub(/\w+/) { |word| word.capitalize }).to eq("Hello World")
     expect("a1b2".gsub(/\d/) { |digit| (digit.to_i * 2).to_s }).to eq("a2b4")
@@ -44,11 +61,158 @@ context "String#gsub with pattern and replacement" do
   specify "take the flags" do
     expect("Hello".gsub(/l/i, "L")).to eq("HeLLo")
   end
+
+  specify "inserts the replacement around every character when the pattern collapses" do
+    expect("hello".gsub(//, ".")).to eq(".h.e.l.l.o.")
+  end
+
+  # Upstream spells the empty pattern `%r!!`; `%r` takes `{}` here.
+  specify "respects unicode when the pattern collapses" do
+    text = "こにちわ"
+    pattern = %r{}
+
+    expect(text.gsub(pattern, ".")).to eq(".こ.に.ち.わ.")
+  end
+
+  specify "doesn't freak out when replacing ^" do
+    expect("Text\n".gsub(/^/, " ")).to eq(" Text\n")
+    expect("Text\nFoo".gsub(/^/, " ")).to eq(" Text\n Foo")
+  end
+
+  specify "returns a copy of self with all occurrences of pattern replaced with replacement" do
+    expect("hello".gsub(/[aeiou]/, "*")).to eq("h*ll*")
+
+    text = "hello homely world. hah!"
+    expect(text.gsub(/\Ah\S+\s*/, "huh? ")).to eq("huh? homely world. hah!")
+
+    spanish = "¿por qué?"
+    expect(spanish.gsub(/([a-z\d]*)/, "*")).to eq("*¿** **é*?*")
+  end
+
+  specify 'supports \G which matches at the beginning of the remaining (non-matched) string' do
+    text = "hello homely world. hah!"
+    expect(text.gsub(/\Gh\S+\s*/, "huh? ")).to eq("huh? huh? world. hah!")
+  end
+
+  specify "supports /i for ignoring case" do
+    text = "Hello. How happy are you?"
+    expect(text.gsub(/h/i, "j")).to eq("jello. jow jappy are you?")
+    expect(text.gsub(/H/i, "j")).to eq("jello. jow jappy are you?")
+  end
+
+  specify "replaces \\1 sequences with the regexp's corresponding capture" do
+    text = "hello"
+
+    expect(text.gsub(/([aeiou])/, '<\1>')).to eq("h<e>ll<o>")
+    expect(text.gsub(/(.)/, '\1\1')).to eq("hheelllloo")
+
+    expect(text.gsub(/.(.?)/, '<\0>(\1)')).to eq("<he>(e)<ll>(l)<o>()")
+
+    expect(text.gsub(/.(.)+/, '\1')).to eq("o")
+
+    letters = "ABCDEFGHIJKLabcdefghijkl"
+    pattern = /#{"(.)" * 12}/
+    expect(letters.gsub(pattern, '\1')).to eq("Aa")
+    expect(letters.gsub(pattern, '\9')).to eq("Ii")
+    # Only the first 9 captures can be accessed in MRI
+    expect(letters.gsub(pattern, '\10')).to eq("A0a0")
+  end
+
+  specify 'treats \1 sequences without corresponding captures as empty strings' do
+    text = "hello!"
+
+    expect(text.gsub("", '<\1>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub("h", '<\1>')).to eq("<>ello!")
+
+    expect(text.gsub(//, '<\1>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub(/./, '\1\2\3')).to eq("")
+    expect(text.gsub(/.(.{20})?/, '\1')).to eq("")
+  end
+
+  specify 'replaces \& and \0 with the complete match' do
+    text = "hello!"
+
+    expect(text.gsub("", '<\0>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub("", '<\&>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub("he", '<\0>')).to eq("<he>llo!")
+    expect(text.gsub("he", '<\&>')).to eq("<he>llo!")
+    expect(text.gsub("l", '<\0>')).to eq("he<l><l>o!")
+    expect(text.gsub("l", '<\&>')).to eq("he<l><l>o!")
+
+    expect(text.gsub(//, '<\0>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub(//, '<\&>')).to eq("<>h<>e<>l<>l<>o<>!<>")
+    expect(text.gsub(/../, '<\0>')).to eq("<he><ll><o!>")
+    expect(text.gsub(/../, '<\&>')).to eq("<he><ll><o!>")
+    expect(text.gsub(/(.)./, '<\0>')).to eq("<he><ll><o!>")
+  end
+
+  specify 'replaces \` with everything before the current match' do
+    text = "hello!"
+
+    expect(text.gsub("", '<\`>')).to eq("<>h<h>e<he>l<hel>l<hell>o<hello>!<hello!>")
+    expect(text.gsub("h", '<\`>')).to eq("<>ello!")
+    expect(text.gsub("l", '<\`>')).to eq("he<he><hel>o!")
+    expect(text.gsub("!", '<\`>')).to eq("hello<hello>")
+
+    expect(text.gsub(//, '<\`>')).to eq("<>h<h>e<he>l<hel>l<hell>o<hello>!<hello!>")
+    expect(text.gsub(/../, '<\`>')).to eq("<><he><hell>")
+  end
+
+  specify "replaces \\' with everything after the current match" do
+    text = "hello!"
+
+    expect(text.gsub("", '<\\\'>')).to eq("<hello!>h<ello!>e<llo!>l<lo!>l<o!>o<!>!<>")
+    expect(text.gsub("h", '<\\\'>')).to eq("<ello!>ello!")
+    expect(text.gsub("ll", '<\\\'>')).to eq("he<o!>o!")
+    expect(text.gsub("!", '<\\\'>')).to eq("hello<>")
+
+    expect(text.gsub(//, '<\\\'>')).to eq("<hello!>h<ello!>e<llo!>l<lo!>l<o!>o<!>!<>")
+    expect(text.gsub(/../, '<\\\'>')).to eq("<llo!><o!><>")
+  end
+
+  specify 'maps \\\\ in replacement to \\' do
+    expect("hello".gsub(/./, '\\\\')).to eq('\\' * 5)
+  end
+
+  specify 'leaves unknown \x escapes in replacement untouched' do
+    expect("hello".gsub(/./, '\\x')).to eq('\\x' * 5)
+    expect("hello".gsub(/./, '\\y')).to eq('\\y' * 5)
+  end
+
+  specify 'leaves \ at the end of replacement untouched' do
+    expect("hello".gsub(/./, 'hah\\')).to eq('hah\\' * 5)
+  end
+
+  specify "replaces \\k named backreferences with the regexp's corresponding capture" do
+    text = "hello"
+
+    expect(text.gsub(/(?<foo>[aeiou])/, '<\k<foo>>')).to eq("h<e>ll<o>")
+    expect(text.gsub(/(?<foo>.)/, '\k<foo>\k<foo>')).to eq("hheelllloo")
+  end
+
+  specify "handles pattern collapse" do
+    text = "こにちわ"
+    pattern = %r{}
+    expect(text.gsub(pattern, ".")).to eq(".こ.に.ち.わ.")
+  end
 end
 
 context "String#gsub with pattern and block" do
   specify "returns a copy of self with all occurrences of pattern replaced with the block's return value" do
     expect("hello".gsub("l") { "x" }).to eq("hexxo")
+  end
+
+  specify 'doesn\'t interpolate special sequences like \1 for the block\'s return value' do
+    replacement = '\& \0 \1 \` \\\' \+ \\\\ foo'
+    expect("hello".gsub(/(.+)/) { replacement }).to eq(replacement)
+  end
+
+  # Upstream's mocks define `to_s`; a symbol and an integer, whose `to_s`
+  # is builtin, stand in. A struct's own `to_s` waits on #370.
+  specify "converts the block's return value to a string using to_s" do
+    expect("hello".gsub(/hello/) { :hello_replacement }).to eq("hello_replacement")
+
+    expect("hello".gsub(/.+/) { 42 }).to eq("42")
   end
 end
 
@@ -57,5 +221,33 @@ context "String#gsub with a string pattern" do
     expect("é".gsub("é", "â")).to eq("â")
     expect("aé".gsub("é", "â")).to eq("aâ")
     expect("éa".gsub("é", "â")).to eq("âa")
+  end
+end
+
+context "String#gsub with pattern and Hash" do
+  specify "returns a copy of self with all occurrences of pattern replaced with the value of the corresponding hash key" do
+    expect("hello".gsub(/./, {"l" => "L"})).to eq("LL")
+    expect("hello!".gsub(/(.)(.)/, {"he" => "she ", "ll" => "said"})).to eq("she said")
+    expect("hello".gsub("l", {"l" => "el"})).to eq("heelelo")
+  end
+
+  specify "ignores keys that don't correspond to matches" do
+    expect("hello".gsub(/./, {"z" => "L", "h" => "b", "o" => "ow"})).to eq("bow")
+  end
+
+  specify "returns an empty string if the pattern matches but the hash specifies no replacements" do
+    expect("hello".gsub(/./, {"z" => "L"})).to eq("")
+  end
+
+  specify "ignores non-String keys" do
+    expect("tattoo".gsub(/(tt)/, {"tt" => "b", tt: "z"})).to eq("taboo")
+  end
+
+  specify "uses a key's value as many times as needed" do
+    expect("food".gsub(/o/, {"o" => "0"})).to eq("f00d")
+  end
+
+  specify "coerces the hash values with #to_s" do
+    expect("food!".gsub(/./, {"o" => 0, "!" => :bang, "d" => [1, 2]})).to eq("00[1, 2]bang")
   end
 end

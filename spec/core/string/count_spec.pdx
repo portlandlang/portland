@@ -12,4 +12,10 @@ context "String#count" do
   specify "count sees through the encodings too" do
     expect("café".count("é")).to eq(1)
   end
+
+  specify "counts multibyte characters" do
+    star = "★"
+    expect(star.count(star)).to eq(1)
+    expect("asd#{star}zzz#{star}ggg".count(star)).to eq(2)
+  end
 end
