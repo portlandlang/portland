@@ -20,7 +20,7 @@ Where a test in Ruby swaps `$stdout` for a `StringIO` to see what a call wrote, 
 
 `system`, lowercase, is unrelated to the module: shell execution is undecided ([#179](https://github.com/portlandlang/portland/issues/179)), and if it arrives it will be one coarse `System.spawn` with Ruby's spellings as sugar, or it will not arrive. Until then `system("ls")` refuses as any undefined name does.
 
-**`System.core_source(name)`** answers the text of one file of Portland's own core, embedded in the binary ([ADR 0093](../adr/0093-2026-11-22-the-core-is-portland-source.md)). It exists so the hosted evaluator reads the same core the seed does. Decided; unbuilt ([#436](https://github.com/portlandlang/portland/issues/436)).
+**`System.core_source(name)`** answers the text of one file of Portland's own core, embedded in the binary ([ADR 0093](../adr/0093-2026-11-22-the-core-is-portland-source.md), [#436](https://github.com/portlandlang/portland/issues/436)): `System.core_source("core.pdx")` is the load order, and a name the binary does not hold refuses. It exists so the compiler reads the same core the seed does.
 
 ## Migration
 

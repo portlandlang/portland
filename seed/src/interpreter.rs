@@ -2853,6 +2853,11 @@ const MAXIMUM_CALL_DEPTH: usize = 10_000;
 const MAXIMUM_EXPRESSION_DEPTH: usize = 100_000;
 
 pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
+    /// True while the core's own files run (ADR 0093): a `require_relative`
+    /// then names a file in the binary, and a def is the core's to make.
+    loading_core: bool,
+    /// The defs the core made, by qualified name: as fixed as a builtin.
+    core_names: std::collections::HashSet<String>,
     arguments: Vec<String>,
     call_depth: usize,
     /// The call depth a `return` executed right now would belong to: the
@@ -2985,7 +2990,43 @@ impl Interpreter {
 
 impl<W: std::io::Write> Interpreter<W> {
     pub fn with_output(output: W) -> Self {
+        let mut interpreter = Self::without_core(output);
+        interpreter.load_core();
+        interpreter
+    }
+
+    /// Portland's core (ADR 0093), run before any program: the entry file
+    /// and whatever it requires, from the files baked into this binary.
+    /// What they define is then as fixed as a builtin, and a program that
+    /// defines one of the names is told so.
+    fn load_core(&mut self) {
+        self.loading_core = true;
+        self.load_core_file(crate::core_source::ENTRY);
+        self.loading_core = false;
+        self.core_names = self.methods.keys().cloned().collect();
+    }
+
+    /// One core file, once, with the scope a required file gets.
+    fn load_core_file(&mut self, name: &str) -> bool {
+        let key = std::path::PathBuf::from(format!("core:{name}"));
+        if self.loaded.contains(&key) {
+            return false;
+        }
+        let source = crate::core_source::text_of(name)
+            .unwrap_or_else(|| panic!("cannot load '{name}' — the core has no such file"));
+        self.loaded.insert(key);
+        let program = parser::parse(&crate::lexer::normalize_line_endings(source.to_string()));
+        let mut scope = HashMap::new();
+        std::mem::swap(&mut self.variables, &mut scope);
+        self.run_body(&program.statements);
+        std::mem::swap(&mut self.variables, &mut scope);
+        true
+    }
+
+    fn without_core(output: W) -> Self {
         Self {
+            loading_core: false,
+            core_names: std::collections::HashSet::new(),
             arguments: Vec::new(),
             call_depth: 0,
             home_depth: 0,
@@ -3235,6 +3276,10 @@ impl<W: std::io::Write> Interpreter<W> {
     /// redefined, and a def, struct, enum, trait, alias, or constant is
     /// defined once — except in the REPL, where redefining is the point.
     fn refuse_redefinition(&self, name: &str) {
+        // What the core defines is as fixed as what the floor does.
+        if !self.loading_core && self.core_names.contains(&self.qualified(name)) {
+            panic!("'{name}' is a builtin — rename yours");
+        }
         if Self::builtin_name(name) || name == "Comparable" || name == "Enumerable" {
             panic!("'{name}' is a builtin — rename yours");
         }
@@ -4671,6 +4716,20 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 Some(self.process_arguments())
             }
+            // One core file's text, as this binary carries it (ADR 0093):
+            // what the compiler reads to give a hosted program the same
+            // core the seed gives it.
+            ("System", "core_source") => match arguments.as_slice() {
+                [Value::String(name)] => match crate::core_source::text_of(name) {
+                    Some(text) => Some(Value::String(text.to_string())),
+                    None => panic!("System.core_source: the core has no file named {name:?}"),
+                },
+                [other] => panic!("System.core_source takes a String, got {}", other.shown()),
+                _ => panic!(
+                    "System.core_source takes 1 argument, got {}",
+                    arguments.len()
+                ),
+            },
             ("System", "read_file") => match arguments.as_slice() {
                 [Value::String(path)] => Some(read_file_value(path)),
                 [other] => panic!("System.read_file takes a String, got {}", other.shown()),
@@ -8797,7 +8856,6 @@ impl<W: std::io::Write> Interpreter<W> {
                 | "pp"
                 | "print"
                 | "printf"
-                | "putc"
                 | "puts"
                 | "rand"
                 | "require"
@@ -8825,6 +8883,15 @@ impl<W: std::io::Write> Interpreter<W> {
     /// only once (returns false when already loaded).
     fn require_relative(&mut self, path: &str) -> bool {
         self.refuse_nested_require("require_relative");
+        // Inside the core, a file names its neighbors in the binary.
+        if self.loading_core {
+            let name = if path.ends_with(".pdx") {
+                path.to_string()
+            } else {
+                format!("{path}.pdx")
+            };
+            return self.load_core_file(&name);
+        }
         let base = self
             .current_file
             .as_ref()
@@ -10017,27 +10084,6 @@ impl<W: std::io::Write> Interpreter<W> {
                     .expect("failed to write output");
             }
             return Some(Value::Nil);
-        }
-        // `putc` writes one character — an integer's low byte, or a string's
-        // first character — and answers its argument, as Ruby's does (#185).
-        if self.lookup_method(name).is_none() && name == "putc" {
-            match arguments.as_slice() {
-                [Value::Integer(code)] => {
-                    let character = char::from((code & 0xff) as u8);
-                    self.emit_standard_output(&character.to_string())
-                        .expect("failed to write output");
-                }
-                [Value::String(text)] => {
-                    if let Some(character) = text.chars().next() {
-                        self.emit_standard_output(&character.to_string())
-                            .expect("failed to write output");
-                    }
-                }
-                [other] => panic!("putc takes an integer or a string, got {}", other.inspect()),
-                other => panic!("putc takes 1 argument, got {}", other.len()),
-            }
-            let mut arguments = arguments;
-            return Some(arguments.remove(0));
         }
         // `printf` is `format` then `print` (#185).
         if self.lookup_method(name).is_none() && name == "printf" {

@@ -49,6 +49,7 @@
 # and the closure refuses once at the end with the whole report, in
 # source order, each file in dependency order. Nothing panics mid-walk.
 
+require_relative "core"
 require_relative "paths"
 require_relative "refusals"
 
@@ -94,6 +95,9 @@ end
 # file's locals stay unknown to its requirer on purpose (#95).
 struct Declarations
   arities
+  # The functions the core defined (ADR 0093): as fixed as a builtin, so a
+  # file that defines one is told it is a builtin's name.
+  builtins
   constants
   contracts
   enums
@@ -202,10 +206,14 @@ def check_closure_with(path, mutable checked, sharpen, load_path)
   files = value_at_checked(resolution, 1)
   entry = files.last
   sharpened = if sharpen && entry.some? then sharpen_parameters(entry, files) else [] end
+  # The core is loaded ahead of every program (ADR 0093), so what it
+  # declares is in scope in every file, as a required file's would be.
+  loaded = core_nodes
+  core = declarations_of(loaded).with(builtins: core_function_names(loaded))
   mutable found = []
   files.each do |file|
     own = if entry.some? && file.path == entry.path then sharpened else [] end
-    found += check_program_with(file.nodes, file.source, file.named, file.imports, own)
+    found += check_program_with(file.nodes, file.source, file.named, merge_declarations(file.imports, core), own)
   end
   report(found)
   checked
@@ -332,7 +340,7 @@ end
 
 def declarations_of(written)
   nodes = with_guarded_definitions(written)
-  Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
+  Declarations.new(arities: declared_arities(nodes), builtins: [], constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
 end
 
 # A def under a top-level condition or loop is defined when that statement
@@ -364,10 +372,10 @@ def guarded_statements(node)
   []
 end
 
-def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
+def empty_declarations = Declarations.new(arities: [], builtins: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
 
 def merge_declarations(first, second)
-  Declarations.new(arities: first.arities + second.arities, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
+  Declarations.new(arities: first.arities + second.arities, builtins: first.builtins + second.builtins, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
 end
 
 # Where a refusal points (#89): the node's line and that line of the
@@ -591,7 +599,7 @@ def check_redefinitions(nodes, home, scope, mutable seen, mutable found)
       # `fields` is the one builtin with a designed refusal of its own
       # (ADR 0031), which the runtime keeps — the seed's list, not this
       # file's, says which names are never taken.
-      if builtin_function?(name) && name != "fields"
+      if (builtin_function?(name) && name != "fields") || seen.any? { it[0] == qualified && it[1] == "builtin" }
         found = noted(found, ["builtin", name], locate(node, scope))
       elsif seen.any? { it[0] == qualified }
         found = noted(found, ["redefined", name], locate(node, scope))
@@ -605,7 +613,11 @@ end
 # What a program's requires declare, as [name, kind] pairs for the walk
 # above: every global, with the constants among them marked.
 def imported_names(imports)
-  imports.globals.map { [it.first, imports.constants.include?(it.first) ? "constant" : "declaration"] }
+  imports.globals.map do |global|
+    name = global.first
+    kind = if imports.builtins.include?(name) then "builtin" elsif imports.constants.include?(name) then "constant" else "declaration" end
+    [name, kind]
+  end
 end
 
 # The names a file's top-level and module-body constants take, qualified.
@@ -1351,7 +1363,7 @@ end
 # The seed's own list (`builtin_name`): the bare functions every program
 # can call without defining — and `fields`, which outside `def self.new`
 # has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf putc puts rand require require_relative some sprintf srand warn].include?(name)
+def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf puts rand require require_relative some sprintf srand warn].include?(name)
 
 # Each reads a type off inference and refuses through the renderer, and
 # each fires only where the type is fully known: an unknown anywhere in it

@@ -3,11 +3,11 @@
 <!-- generated: do not edit by hand — script/docs/generate -->
 
 > [!IMPORTANT]
-> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [architecture.md: The core — decided, not built](../../docs/architecture.md#the-core--decided-not-built) · [docs/ruby/metaprogramming.md](../../docs/ruby/metaprogramming.md) · [docs/ruby/system.md](../../docs/ruby/system.md).
+> **A decision record, not a reference.** It says why a ruling was made; a later ruling may have changed it without marking this file. See also: [architecture.md: The core](../../docs/architecture.md#the-core) · [docs/ruby/metaprogramming.md](../../docs/ruby/metaprogramming.md) · [docs/ruby/system.md](../../docs/ruby/system.md).
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-22 on [#211](https://github.com/portlandlang/portland/issues/211), one question at a time). Decision 6 is provisional and may change after the Ruby corpus research. Unbuilt: the loader is [#436](https://github.com/portlandlang/portland/issues/436), the declaration form and its refusal are [#437](https://github.com/portlandlang/portland/issues/437), and the first type moved is [#438](https://github.com/portlandlang/portland/issues/438).
+- **Status:** Accepted (ruled by the deciding user 2026-11-22 on [#211](https://github.com/portlandlang/portland/issues/211), one question at a time). Decision 6 is provisional and may change after the Ruby corpus research. The loader is built ([#436](https://github.com/portlandlang/portland/issues/436), 2026-11-23), with `putc` the first function written in core. Unbuilt: the declaration form and its refusal are [#437](https://github.com/portlandlang/portland/issues/437), and the first type moved is [#438](https://github.com/portlandlang/portland/issues/438).
 - **Date:** 2026-11-22
 - **Issue:** [#211](https://github.com/portlandlang/portland/issues/211)
 

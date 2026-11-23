@@ -117,11 +117,11 @@ Two rendering divergences are accepted and recorded: the seed asks Unicode wheth
 
 `<<` is rebinding sugar (ADR 0015): `list << item` binds `list` to a new array with `item` on the end. The seed appends in place when the old array is unshared — at refcount 1 it is dead, so mutating it is unobservable — and copies only when another binding still holds it (`Rc::make_mut`). That is what reference-count exactness buys (#34, on the road to #12), and it is why the compiler parsing its own source is not quadratic.
 
-## The core — decided, not built
+## The core
 
-The language's own library is Portland source under `core/`, one file per type or trait, loaded before every program ([ADR 0093](adr/0093-2026-11-22-the-core-is-portland-source.md)). `core/core.pdx` lists the files in load order. The seed embeds them at build, and `System.core_source(name)` hands one file's text to the hosted evaluator, so both implementations read the same bytes ([#436](https://github.com/portlandlang/portland/issues/436)).
+The language's own library is Portland source under `core/`, one file per type or trait, loaded before every program ([ADR 0093](adr/0093-2026-11-22-the-core-is-portland-source.md)). `core/core.pdx` lists the files in load order. The seed embeds them at build and runs them ahead of the program; `System.core_source(name)` hands one file's text to the compiler, whose evaluator runs the same core ahead of a hosted program and whose checker reads its declarations, so both implementations read the same bytes ([#436](https://github.com/portlandlang/portland/issues/436)). A function the core defines is as fixed as a builtin: a program that defines one by the same name is told so. `core/kernel.pdx` holds the bare functions, `putc` the first of them.
 
-In core, `class Array` is the builtin array: its methods are the array's methods, and whatever it does not define stays a floor arm in Rust ([#437](https://github.com/portlandlang/portland/issues/437)). A method that moves into core is deleted from the seed and from the hosted evaluator in the same change, so it is written once. What is left in Rust is the primitive set, and that set is the interface a native runtime supplies. Array's block-taking methods are the first to move ([#438](https://github.com/portlandlang/portland/issues/438)).
+Decided and unbuilt: in core, `class Array` is the builtin array: its methods are the array's methods, and whatever it does not define stays a floor arm in Rust ([#437](https://github.com/portlandlang/portland/issues/437)). A method that moves into core is deleted from the seed and from the hosted evaluator in the same change, so it is written once. What is left in Rust is the primitive set, and that set is the interface a native runtime supplies. Array's block-taking methods are the first to move ([#438](https://github.com/portlandlang/portland/issues/438)).
 
 ## The bootstrap ladder
 

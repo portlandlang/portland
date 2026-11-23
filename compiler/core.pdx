@@ -1,0 +1,45 @@
+# Portland's core as the compiler reads it (ADR 0093): the nodes of every
+# core file, in load order, for the evaluator to run ahead of a program and
+# the checker to read the declarations of.
+#
+# The text comes from `System.core_source`, the files baked into the seed
+# that is running this, so a program run hosted gets the same core the seed
+# gives it. `core/core.pdx` is the load order: each `require_relative` in
+# the core names a neighbor in the binary, and is replaced here by that
+# file's own nodes, once.
+
+require_relative "parser"
+
+# What loading has gathered: the files read so far, and their nodes.
+struct CoreLoad
+  files
+  nodes
+end
+
+def core_nodes = load_core_file("core.pdx", CoreLoad.new(files: [], nodes: [])).nodes
+
+# The names of the functions the core defines: as fixed as a builtin's.
+def core_function_names(nodes) = nodes.select { it in DefNode }.map { it.name }
+
+def load_core_file(name, loading)
+  return loading if loading.files.include?(name)
+  mutable current = loading.with(files: loading.files + [name])
+  parse_program(lex(System.core_source(name))).each do |node|
+    required = core_require_of(node)
+    if required.nil?
+      current = current.with(nodes: current.nodes + [node])
+    else
+      current = load_core_file(required, current)
+    end
+  end
+  current
+end
+
+# The file a `require_relative "name"` line in the core names, or nil for
+# any other statement.
+def core_require_of(node)
+  return nil unless (node in CallNode) && node.name == "require_relative" && node.arguments.length == 1
+  written = node.arguments.first
+  return nil unless written in StringNode
+  written.value.end_with?(".pdx") ? written.value : written.value + ".pdx"
+end
