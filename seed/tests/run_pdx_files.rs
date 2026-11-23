@@ -1849,6 +1849,17 @@ fn a_replacement_beside_a_block_refuses_on_both_oracles() {
     assert_both_oracles_refuse("replacement_beside_block.pdx", None, &cases);
 }
 
+/// A `/` after a literal with an `r` or `i` suffix divides (#308): a
+/// suffixed number is an operand to both lexers, as any number is.
+#[test]
+fn a_slash_after_a_suffixed_literal_divides_on_both_oracles() {
+    assert_both_print(
+        "suffixed_division.pdx",
+        "third = 1r / 3\np(third)\np(2i / 2)\np(3r / 2 / 3)\n",
+        "(1/3)\n(0+1i)\n(1/2)\n",
+    );
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

@@ -271,7 +271,7 @@ end
 def regex_begins?(tokens)
   return true if tokens.empty?
   previous = tokens.last
-  return false if %w[identifier integer float string symbol word_array symbol_array regex].include?(previous.kind)
+  return false if %w[identifier integer float rational imaginary string symbol word_array symbol_array regex].include?(previous.kind)
   return !%w[end self nil true false].include?(previous.text) if previous.kind == "keyword"
   return !%w[) \] }].include?(previous.text) if previous.kind == "operator"
   true

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A `/` after a literal with an `r` or `i` suffix divides, hosted too** ([#308](https://github.com/portlandlang/portland/issues/308)) — `1r / 3` was `(1/3)` on the seed and `unterminated regex` hosted: the hosted lexer's division-or-regex rule did not count a rational or imaginary literal as an operand, so the `/` opened a regex. It counts both, as the seed's does.
 - **A prefixed literal takes Ruby's `r` and `i` suffixes** ([#291](https://github.com/portlandlang/portland/issues/291)) — `0xffr` refused as `'0xffr' has a digit outside its base`, blaming a digit, on both implementations. Hexadecimal, binary, and `0o` octal literals read the suffix as Ruby does: `0xffr` is `(255/1)` and `0b1110i` is `(0+14i)`. Neither letter is a digit of any base, so the last one is the suffix. AGENT.md's example of an issue-anchored phrase cited this issue by number, which the closed-issue check would have flagged once it closed; the example names no issue.
   - ruby/spec rows activated: the hexadecimal and binary `r` and `i` rows of `language/numbers`, and the octal rows in the `0o` spelling.
 - **An Integer to a Rational power answers a Rational** ([#290](https://github.com/portlandlang/portland/issues/290)) — `2 ** Rational(2, 1)` answered the Integer `4` on both implementations where Ruby answers `(4/1)`: an integral Rational exponent was read as an Integer one, and the answer took the base's type. A Rational exponent answers a Rational, `2 ** Rational(0, 1)` being `(1/1)`; roots and negative bases are unchanged.
