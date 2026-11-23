@@ -8,4 +8,11 @@ context "Array#compact" do
   specify "Array#compact drops the nils" do
     expect([1, nil, 2].compact).to eq([1, 2])
   end
+
+  specify "returns a copy of array with all nil elements removed" do
+    expect([1, 2, 4].compact).to eq([1, 2, 4])
+    expect([1, nil, 2, 4].compact).to eq([1, 2, 4])
+    expect([1, 2, 4, nil].compact).to eq([1, 2, 4])
+    expect([nil, 1, 2, 4].compact).to eq([1, 2, 4])
+  end
 end
