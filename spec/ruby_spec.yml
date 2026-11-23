@@ -828,12 +828,12 @@ core/enumerable/each_with_object_spec.rb:
 core/enumerable/grep_spec.rb:
   pdx: [spec/core/enumerable/grep_spec.pdx]
   status: partial_intentional
-  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks and grep(Object) stay behind, a type not being a value; the $~ rows go with the match globals, and the regex rows wait on #298."
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks and grep(Object) stay behind, a type not being a value; and the $~ rows go with the match globals."
   link: docs/ruby/pattern-matching.md
 core/enumerable/grep_v_spec.rb:
   pdx: [spec/core/enumerable/grep_v_spec.pdx]
   status: partial_intentional
-  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; the $~ rows go with the match globals, and the regex rows wait on #298."
+  reason: "A pattern argument takes the when rule (ADR 0066), so the === mocks stay behind; and the $~ rows go with the match globals."
   link: docs/ruby/pattern-matching.md
 core/enumerable/to_set_spec.rb:
   pdx: [spec/core/range/to_set_spec.pdx, spec/core/enumerable/to_set_spec.pdx]
