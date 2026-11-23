@@ -35,6 +35,19 @@
 # the runtime whether anything is still held, which the debug build
 # answers.
 #
+# A block is a function of its own (ADR 0096), written out after the
+# function it was written in. It takes a pointer to a frame, then what it
+# is yielded. The frame is an array on its writer's stack holding the
+# address of each slot the block captures, so inside the block a captured
+# local's slot is that address, and is read and stored through exactly as
+# the block's own slots are. A def that yields takes two more parameters,
+# the block's function and its frame, and a `yield` calls the one with
+# the other. A block cannot be held in a value, so the frame never
+# outlives the call it was built for and nothing is put on the heap.
+# Counting is a call's: what is yielded is handed to the block, whose
+# parameter slot then holds it, and what the block answers is handed
+# back.
+#
 # No target is named, so `clang` supplies the host's.
 
 require_relative "intermediate_representation"
@@ -56,6 +69,13 @@ struct LlvmEmitter
   # The loops being written, innermost first, by the number in their
   # labels: where `break` and `next` go.
   loops
+  # The frames this function builds for the blocks it hands over, as
+  # the lines that make room for them. They are written at the top of
+  # the function, so a call inside a loop takes no more stack each turn.
+  frames
+  # The blocks written in this function, each a finished function's
+  # lines, written out after it.
+  routines
 end
 
 # A value written: the text so far, and how to refer to the value.
@@ -107,38 +127,85 @@ def llvm_text(program)
   program.functions.each do |function|
     written = llvm_function(function, "f#{index}")
     globals += written.globals
-    bodies += [""] + written.lines + ["}"]
+    bodies += [""] + written.lines + ["}"] + written.routines
     index += 1
   end
   (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
 end
 
-# One function, as the emitter that wrote it: its lines, and the
-# constants its String literals became.
+# One function, as the emitter that wrote it: its lines, the constants
+# its String literals became, and the blocks written in it.
 def llvm_function(function, prefix)
   entry = function.name == "main"
-  parameters = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }.join(", ")
-  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters}) {"
-  held = (function.parameters + function.locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
-  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [])
-  (function.parameters + function.locals).each do |slot|
+  named = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
+  # A def that yields is handed its block: the function, and the frame
+  # to call it with.
+  parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_FRAME}"]
+  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters.join(", ")}) {"
+  llvm_routine(header, [], function.parameters, function.locals, function.body, prefix, entry)
+end
+
+# The names a def's block and its frame arrive under, and the frame a
+# block's own function is handed. No local can be named with a dot first.
+LLVM_BLOCK = "%\".block\""
+LLVM_FRAME = "%\".frame\""
+
+# A function's lines under a header written by the caller: a def's, the
+# entry function's, or a block's. A block's captures are read out of its
+# frame first, each as the address of a slot that lives in its writer.
+def llvm_routine(header, captures, parameters, locals, body, prefix, entry)
+  held = (parameters + locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
+  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
+  mutable position = 0
+  captures.each do |capture|
+    place = llvm_named(emitter, "getelementptr [#{captures.length} x ptr], ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
+    emitter = llvm_line(place.emitter, "#{llvm_slot(capture[0])} = load ptr, ptr #{place.operand}")
+    position += 1
+  end
+  (parameters + locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
   end
   # A local that holds a String starts empty, so releasing it before it is
   # bound does nothing.
-  function.locals.each do |local|
+  locals.each do |local|
     emitter = llvm_line(emitter, "store ptr null, ptr #{llvm_slot(local[0])}") if type_at(local, 1) == ["string"]
   end
-  function.parameters.each do |parameter|
+  parameters.each do |parameter|
     type = llvm_type(type_at(parameter, 1))
     emitter = llvm_line(emitter, "store #{type} #{llvm_local(parameter[0])}, ptr #{llvm_slot(parameter[0])}")
   end
-  emitter = llvm_statements(emitter, function.body)
-  # Every path through a def has returned by here; the entry function
-  # falls off its end and answers success.
-  return llvm_line(emitter, "unreachable") unless entry
-  finished = llvm_line(llvm_release_held(emitter), "call void @portland_exit_check()")
-  llvm_line(finished, "ret i32 0")
+  emitter = llvm_statements(emitter, body)
+  # Every path through a def or a block has returned by here; the entry
+  # function falls off its end and answers success.
+  finished = if entry
+    llvm_line(llvm_line(llvm_release_held(emitter), "call void @portland_exit_check()"), "ret i32 0")
+  else
+    llvm_line(emitter, "unreachable")
+  end
+  # The frames go first, ahead of everything the body wrote.
+  finished.with(lines: finished.lines.slice(0, 2) + finished.frames + finished.lines.slice(2, finished.lines.length - 2))
+end
+
+# A block handed to a call: its function written, and its frame built.
+# The operand is the two arguments the call hands over.
+def llvm_block(emitter, block)
+  number = emitter.counter
+  name = "@\"portland.block.#{emitter.prefix}.#{number}\""
+  named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
+  header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
+  written = llvm_routine(header, block.captures, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
+  mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
+  return LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr null") if block.captures.empty?
+  frame = "%\"frame.#{number}\""
+  shape = "[#{block.captures.length} x ptr]"
+  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
+  mutable position = 0
+  block.captures.each do |capture|
+    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
+    position += 1
+  end
+  LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr #{frame}")
 end
 
 # Every String this function's slots hold, released: written before each
@@ -286,7 +353,7 @@ def llvm_value(emitter, value)
   in IntermediateMethod(receiver:, name:)
     asked = llvm_value(emitter, receiver)
     llvm_method(asked.emitter, receiver.type, name, asked.operand)
-  in IntermediateCall(type:, name:, arguments:)
+  in IntermediateCall(type:, name:, arguments:, block:)
     mutable current = emitter
     mutable operands = []
     arguments.each do |argument|
@@ -294,8 +361,26 @@ def llvm_value(emitter, value)
       current = written.emitter
       operands << "#{llvm_type(argument.type)} #{written.operand}"
     end
+    if block.some?
+      handed = llvm_block(current, block)
+      current = handed.emitter
+      operands << handed.operand
+    end
     call = "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})"
     # A call that answers nothing has no result to name.
+    return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
+    llvm_named(current, call)
+  # A `yield` calls the block this function was handed, with its frame
+  # and then what is yielded.
+  in IntermediateYield(type:, arguments:)
+    mutable current = emitter
+    mutable operands = ["ptr #{LLVM_FRAME}"]
+    arguments.each do |argument|
+      written = llvm_value(current, argument)
+      current = written.emitter
+      operands << "#{llvm_type(argument.type)} #{written.operand}"
+    end
+    call = "call #{llvm_type(type)} #{LLVM_BLOCK}(#{operands.join(", ")})"
     return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
   in IntermediateChoice(type:, condition:, then_value:, else_value:)

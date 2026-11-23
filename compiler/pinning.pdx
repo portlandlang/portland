@@ -17,8 +17,8 @@
 #     type unpins it.
 #   - A def that yields is pinned with its block (#493): the block's
 #     parameters take the types of what the def yields, a `yield` is read
-#     as what the block answers, and every call must hand the def a block
-#     that answers one type.
+#     as what the block answers, and where the calls hand the def blocks
+#     that answer different types, the block answers nothing.
 #
 # The checker reads none of this: knowing more, it would disprove more, and
 # that is its own proposal. Expressions are still read by inference's
@@ -161,21 +161,24 @@ end
 
 # A yielding def's block, from the calls gathered and the def's own
 # body, or nil for a def that does not yield. What the block answers is
-# read off the calls, which must agree, as arguments must. What it is
-# handed is read off the def's yields, which must agree too. Unless
-# strict, a type not known is passed over, to be read again once more
-# is pinned.
+# read off the calls. What it is handed is read off the def's yields,
+# which must agree, as arguments must. Unless strict, a type not known
+# is passed over, to be read again once more is pinned.
 def pinned_block(definition, parameters, sites, answers, names, strict)
   return nil unless yields?(definition.body)
   mutable reason = nil
   reason = "it yields, and one call hands it no block" if sites.any? { type_at(it, 2).nil? }
+  # Blocks handed over for what they do answer whatever their last
+  # statement happens to be, one type at one call and another at the
+  # next. So where the calls do not agree on one known type, the block
+  # answers nothing: the def cannot be reading it, and one that tries is
+  # refused where it reads. Unless strict, an answer not known is waited
+  # for.
   handed = unique_types(sites.map { type_at(it, 2) or ["unknown"] })
-  told = strict ? handed : handed.select { concrete?(it) }
-  reason = (reason or "its block's answer is not known") if strict && !handed.all? { concrete?(it) }
-  if told.length > 1
-    reason = (reason or "its block answers #{answer_words(told[0])} at one call and #{answer_words(told[1])} at another")
-  end
-  answer = told.length == 1 ? told[0] : ["unknown"]
+  known = handed.select { concrete?(it) }
+  agreed = known.length == 1 && (handed.length == 1 || !strict)
+  waiting = !strict && known.empty?
+  answer = agreed ? known[0] : (waiting ? ["unknown"] : NOTHING)
   walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), answers + [[YIELD, answer]], names)
   yields = walked.calls.select { it[0] == YIELD }.map { type_at(it, 1) }
   counts = unique_types(yields.map { it.length })
@@ -198,8 +201,6 @@ end
 def yields?(body)
   body.any? { (it in YieldNode) || yields?(children_of(it)) }
 end
-
-def answer_words(type) = type == NOTHING ? "nothing" : with_article(type)
 
 # A def's answer with its parameters pinned. Read plainly first. Where
 # that is unknown — the def calls itself, or one that calls it back — the

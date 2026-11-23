@@ -8,9 +8,10 @@
 # This is that form, and it is Portland's own: the LLVM printer (#447)
 # reads it, and so would an MLIR printer after it.
 #
-# The slice is small on purpose (#443, #461): Integer, Boolean, and String
-# values, `+`, `-`, `*`, the comparisons, bindings, `if`, `while`, `def`,
-# calls, and `puts` of an Integer or a String. Anything else refuses here, by name, before a line
+# The slice is small on purpose (#443, #461, #491): Integer, Boolean, and
+# String values, `+`, `-`, `*`, the comparisons, bindings, `if`, `while`,
+# `def`, calls, a block handed to a def that yields, and `puts` of an
+# Integer or a String. Anything else refuses here, by name, before a line
 # of output exists.
 
 require_relative "pinning"
@@ -29,6 +30,22 @@ struct IntermediateFunction
   answer
   locals
   body
+  # What a def that yields hands its block and reads back, as pinning's
+  # PinnedBlock, or nil for a def that does not yield.
+  block
+end
+
+# A block (#493): a function of its own, written where it was handed
+# over. Its parameters are one per value the def yields, the ones the
+# block did not name under names no local can have. Its captures are the
+# locals of its writer in scope where it was written, which it reads and
+# rebinds where they live; its locals are the names it bound first.
+struct IntermediateBlock
+  parameters
+  answer
+  locals
+  body
+  captures
 end
 
 # The values. Each carries the type it produces.
@@ -112,10 +129,18 @@ struct IntermediateMethod
   name
 end
 
-# A call to one of the program's functions.
+# A call to one of the program's functions, with the block it is handed,
+# or nil.
 struct IntermediateCall
   type
   name
+  arguments
+  block
+end
+
+# A `yield`: a call of the block the function was handed.
+struct IntermediateYield
+  type
   arguments
 end
 
@@ -183,6 +208,14 @@ struct LoweringContext
   # Whether the statement in hand is inside a loop, where `break` and
   # `next` have somewhere to go.
   looping
+  # The yielding defs' blocks by name, as [name, PinnedBlock].
+  blocks
+  # The block the function being lowered is handed, where it yields.
+  yielding
+  # Whether the statement in hand is inside a block, where `return`,
+  # `yield`, and a `break` or `next` outside a loop reach past the
+  # block's own function.
+  inside_block
 end
 
 # Statements lowered, and the bindings in scope after them.
@@ -205,7 +238,7 @@ def lower_program(nodes)
 panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false)
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -213,42 +246,83 @@ panic("the native build needs one type for every value — def #{found.name}#{li
     functions << lower_function(definition, found, context)
   end
   entry = lower_statements(statements, [], context)
-  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes)
+  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil)
   IntermediateProgram.new(functions: functions)
 end
 
 # A def: its statements, the last one read for its value, since a def
 # answers its last expression.
 def lower_function(definition, found, context)
-  return lower_procedure(definition, found, context) if found.answer == NOTHING
-  refuse_native("a def answering #{with_article(found.answer)}", definition) unless native_type?(found.answer)
   found.parameters.each do |parameter|
     refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
   end
-  leading = definition.body.slice(0, definition.body.length - 1)
-  last = definition.body.last
-  refuse_native("a def with an empty body", definition) if last.nil?
-  lowered = lower_statements(leading, found.parameters, context)
-  closing = if last in ReturnNode
-    lower_statement(last, lowered.bindings, context)
-  else
-    value = lower_value(last, lowered.bindings, context)
-    refuse_native("a def whose last expression is #{with_article(value.type)} where it answers #{with_article(found.answer)}", last) unless value.type == found.answer
-    Lowered.new(nodes: [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
-  end
-  locals = closing.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
-  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes + closing.nodes)
+  refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
+  inside = context.with(procedure: found.answer == NOTHING, yielding: found.block)
+  lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
+  locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
+  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
 end
 
-# A def that answers nothing: every statement is run for what it does,
-# and the function hands nothing back.
-def lower_procedure(definition, found, context)
-  found.parameters.each do |parameter|
-    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
+# A def's body or a block's. One that answers nothing has every statement
+# run for what it does, and hands nothing back. One that answers a value
+# has its last statement read for it: an expression, a `return`, or a
+# binding, which answers what it bound.
+def lower_body(body, owner, what, bindings, answer, context)
+  if answer == NOTHING
+    lowered = lower_statements(body, bindings, context)
+    return Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: nil)], bindings: lowered.bindings)
   end
-  lowered = lower_statements(definition.body, found.parameters, context.with(procedure: true))
-  locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
-  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: NOTHING, locals: locals.reverse, body: lowered.nodes + [IntermediateReturn.new(value: nil)])
+  leading = body.slice(0, body.length - 1)
+  last = body.last
+  refuse_native("#{what} with an empty body", owner) if last.nil?
+  lowered = lower_statements(leading, bindings, context)
+  if last in ReturnNode
+    closing = lower_statement(last, lowered.bindings, context)
+    return Lowered.new(nodes: lowered.nodes + closing.nodes, bindings: closing.bindings)
+  end
+  if last in AssignmentNode
+    stored = lower_statement(last, lowered.bindings, context)
+    bound = stored.bindings.find { it[0] == last.name }
+    value = IntermediateLocal.new(type: type_at(bound, 1), name: last.name)
+    refuse_native("#{what} whose last expression is #{with_article(value.type)} where it answers #{with_article(answer)}", last) unless value.type == answer
+    return Lowered.new(nodes: lowered.nodes + stored.nodes + [IntermediateReturn.new(value: value)], bindings: stored.bindings)
+  end
+  value = lower_value(last, lowered.bindings, context)
+  refuse_native("#{what} whose last expression is #{with_article(value.type)} where it answers #{with_article(answer)}", last) unless value.type == answer
+  Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
+end
+
+# A block handed to a def (#493). Its parameters are bound to what the
+# def yields, in order; one it leaves unnamed is still handed over, and
+# takes a name no local can have. Every local of the writer's in scope
+# is captured, less the ones a parameter of the block's hides. A name
+# the block binds first is the block's own, and is not seen after it.
+def lower_block(block, handed, bindings, context)
+  refuse_native("a block that names more than it is yielded", block) if block.parameters.length > handed.parameters.length
+  refuse_native("a block answering #{with_article(handed.answer)}", block) unless handed.answer == NOTHING || native_type?(handed.answer)
+  mutable parameters = []
+  mutable index = 0
+  handed.parameters.each do |type|
+    refuse_native("a block handed #{with_article(type)}", block) unless native_type?(type)
+    name = type_at(block.parameters, index) or "unnamed #{index}"
+    refuse_native("a block parameter that is not a name", block) unless name in String
+    parameters << [name, type]
+    index += 1
+  end
+  captures = bindings.reject { |binding| parameters.any? { it[0] == binding[0] } }
+  start = parameters.reverse + captures
+  inside = context.with(procedure: handed.answer == NOTHING, looping: false, yielding: nil, inside_block: true)
+  lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
+  locals = lowered.bindings.slice(0, lowered.bindings.length - start.length)
+  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: captures)
+end
+
+# A `yield`: what it hands over, and the type the block answers.
+def lower_yield(node, bindings, context)
+  refuse_native("a yield in a block", node) if context.inside_block
+  handed = context.yielding or refuse_native("a yield outside a def", node)
+  arguments = node.values.map { lower_value(it, bindings, context) }
+  IntermediateYield.new(type: handed.answer, arguments: arguments)
 end
 
 def lower_statements(statements, bindings, context)
@@ -278,9 +352,11 @@ def lower_statement(statement, bindings, context)
     inner = lower_statements(body, bindings, context.with(looping: true))
     Lowered.new(nodes: [IntermediateLoop.new(condition: test, body: inner.nodes)], bindings: inner.bindings)
   in BreakNode
+    refuse_native("a break in a block", statement) if context.inside_block && !context.looping
     refuse_native("a break outside a while", statement) unless context.looping
     Lowered.new(nodes: [IntermediateBreak.new(line: statement.line)], bindings: bindings)
   in NextNode
+    refuse_native("a next in a block", statement) if context.inside_block && !context.looping
     refuse_native("a next outside a while", statement) unless context.looping
     Lowered.new(nodes: [IntermediateNext.new(line: statement.line)], bindings: bindings)
   in IfNode(condition:, then_body:, else_body:)
@@ -289,6 +365,7 @@ def lower_statement(statement, bindings, context)
     other = lower_statements((else_body or []), taken.bindings, context)
     Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
   in ReturnNode(value:)
+    refuse_native("a return in a block", statement) if context.inside_block
     if context.procedure
       refuse_native("a return with a value in a def that answers nothing", statement) unless value.nil?
       return Lowered.new(nodes: [IntermediateReturn.new(value: nil)], bindings: bindings)
@@ -301,11 +378,13 @@ def lower_statement(statement, bindings, context)
     value = lower_value(arguments[0], bindings, context)
     refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"] || value.type == ["string"]
     Lowered.new(nodes: [IntermediatePrint.new(value: value)], bindings: bindings)
-  in CallNode(name:, arguments:, block:)
+  in CallNode(name:, arguments:)
     # A call made for what it does: one to a def that answers nothing may
     # stand here, and nowhere a value is read.
-    refuse_native("a block", statement) unless block.nil?
     Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_call(statement, name, arguments, bindings, context))], bindings: bindings)
+  # A `yield` made for what the block does, which may answer nothing.
+  in YieldNode
+    Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_yield(statement, bindings, context))], bindings: bindings)
   else
     Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_value(statement, bindings, context))], bindings: bindings)
   end
@@ -345,11 +424,14 @@ def lower_value(node, bindings, context)
     # Strings are equal or not (ADR 0038); ordering them is unbuilt.
     refuse_native("'#{operator}' between Strings", node) if first.type == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
-  in CallNode(name:, arguments:, block:)
-    refuse_native("a block", node) unless block.nil?
+  in CallNode(name:, arguments:)
     called = lower_call(node, name, arguments, bindings, context)
     panic("#{name} answers nothing, so there is no value to read from it on line #{node.line}") if called.type == NOTHING
     called
+  in YieldNode
+    yielded = lower_yield(node, bindings, context)
+    panic("the block answers nothing, so there is no value to read from yield on line #{node.line}") if yielded.type == NOTHING
+    yielded
   in LogicalNode(operator:, left:, right:)
     refuse_native("the operator '#{operator}'", node) unless %w[&& ||].include?(operator)
     first = lower_condition(left, bindings, context)
@@ -390,7 +472,15 @@ def lower_call(node, name, arguments, bindings, context)
   arity = context.arities.find { it[0] == name }
   refuse_native("a call to #{name}", node) if arity.nil?
   answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
-  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: arguments.map { lower_value(it, bindings, context) })
+  lowered = arguments.map { lower_value(it, bindings, context) }
+  handed = context.blocks.find { it[0] == name }
+  # A def called by its bare name is a name and not a call, and is
+  # handed no block.
+  written = (node in CallNode) ? node.block : nil
+  refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && handed.nil?
+  refuse_native("a call to #{name} without the block it yields to", node) if written.nil? && handed.some?
+  block = written.nil? ? nil : lower_block(written, type_at(handed, 1), bindings, context)
+  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: lowered, block: block)
 end
 
 # What a method with no arguments answers natively, by its receiver's
@@ -422,6 +512,7 @@ def native_name_of(node)
   in LogicalNode(operator:) then "the operator '#{operator}'"
   in UnaryNode(operator:) then "the operator '#{operator}'"
   in WhileNode then "a while read for its value"
+  in YieldNode then "a yield"
   in AssignmentNode then "a binding read for its value"
   in ReturnNode then "a return read for its value"
   else "this (#{node.kind})"
@@ -432,7 +523,7 @@ end
 # does compile, then what it met and where.
 def refuse_native(what, node)
   line = node.nil? ? "" : " on line #{node.line}"
-  panic("the native build compiles integers, strings, comparisons, if, while, def, and puts — #{what}#{line} is unbuilt (#443)")
+  panic("the native build compiles integers, strings, comparisons, if, while, def, yield, and puts — #{what}#{line} is unbuilt (#443)")
 end
 
 # The dump: one line per function and statement, values as S-expressions.
@@ -440,7 +531,8 @@ def render_intermediate(program)
   mutable lines = []
   program.functions.each do |function|
     parameters = function.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
-    lines << "function #{function.name}(#{parameters}) -> #{render_pinned_type(function.answer)}"
+    taking = function.block.nil? ? "" : " #{render_pinned_block(function.block)}"
+    lines << "function #{function.name}(#{parameters})#{taking} -> #{render_pinned_type(function.answer)}"
     function.locals.each do |local|
       lines << "  local #{local[0]}: #{render_type(type_at(local, 1))}"
     end
@@ -485,11 +577,21 @@ def render_value(value)
   in IntermediateLogical(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
   in IntermediateNegation(value: negated) then "(- #{render_value(negated)})"
   in IntermediateNot(value: inverted) then "(! #{render_value(inverted)})"
-  in IntermediateCall(name:, arguments:) then "(call #{([name] + arguments.map { render_value(it) }).join(" ")})"
+  in IntermediateCall(name:, arguments:, block:)
+    handed = block.nil? ? [] : [render_handed_block(block)]
+    "(call #{([name] + arguments.map { render_value(it) } + handed).join(" ")})"
+  in IntermediateYield(arguments:) then "(yield#{arguments.map { " #{render_value(it)}" }.join("")})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
   end
+end
+
+# A block in the dump: its parameters between bars, then its statements,
+# on one line.
+def render_handed_block(block)
+  parameters = block.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
+  "(block |#{parameters}| #{render_statements(block.body, "").map { it.strip }.join("; ")})"
 end

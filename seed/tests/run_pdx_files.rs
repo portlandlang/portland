@@ -1351,9 +1351,9 @@ fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
 /// A def that yields is pinned with its block (#493): the block's
 /// parameters take the types of what the def yields, a `yield` is read as
 /// what the block answers, and a block that ends in what produces no
-/// value answers nothing. A def that yields two types at one position,
-/// or whose calls hand it blocks that answer two types, is declined by
-/// that reason.
+/// value answers nothing, as does one whose answer differs from call to
+/// call. A def that yields two types at one position is declined by that
+/// reason.
 #[test]
 fn portland_pin_reads_a_block_with_the_def_it_is_handed_to() {
     let sample = std::env::temp_dir().join("pinning_block_sample.pdx");
@@ -1371,7 +1371,7 @@ fn portland_pin_reads_a_block_with_the_def_it_is_handed_to() {
     assert!(output.status.success(), "pin.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "def twice { -> Integer } # -> Integer\ndef apply(number: Integer) { |Integer| -> Integer } # -> Integer\ndef each_upto(limit: Integer) { |Integer| -> nothing } # -> nothing\ndef greet(name: String) { |String| -> nothing } # -> nothing\ndef torn: not pinned — it yields an Integer at one place and a String at another\ndef split: not pinned — its block answers an Integer at one call and a String at another\ntotal: Integer\n"
+        "def twice { -> Integer } # -> Integer\ndef apply(number: Integer) { |Integer| -> Integer } # -> Integer\ndef each_upto(limit: Integer) { |Integer| -> nothing } # -> nothing\ndef greet(name: String) { |String| -> nothing } # -> nothing\ndef torn: not pinned — it yields an Integer at one place and a String at another\ndef split(number: Integer) { |Integer| -> nothing } # -> nothing\ntotal: Integer\n"
     );
 }
 
@@ -1409,7 +1409,7 @@ fn portland_intermediate_dumps_a_program_inside_the_native_slice() {
 #[test]
 fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
     let compiles =
-        "the native build compiles integers, strings, comparisons, if, while, def, and puts";
+        "the native build compiles integers, strings, comparisons, if, while, def, yield, and puts";
     let cases = [
         (
             "puts 1.5\n",
@@ -1434,6 +1434,39 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
         (
             "def show(number)\n  puts number\nend\nvalue = show(1)\n",
             "show answers nothing, so there is no value to read from it on line 4".to_string(),
+        ),
+        // A block reaches past its own function with these (#493).
+        (
+            "def run\n  yield\nend\nrun do\n  break\nend\n",
+            format!("{compiles} — a break in a block on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield\nend\nrun do\n  next\nend\n",
+            format!("{compiles} — a next in a block on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield\nend\ndef first\n  run { return 1 }\n  2\nend\nputs first\n",
+            format!("{compiles} — a return in a block on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield\nend\ndef outer\n  run { yield }\nend\nouter { puts 1 }\n",
+            format!("{compiles} — a yield in a block on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "def plain(number) = number + 1\nputs(plain(1) { 2 })\n",
+            format!("{compiles} — a block handed to plain, which does not yield on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield(1)\nend\nrun { |first, second| puts first }\n",
+            format!("{compiles} — a block that names more than it is yielded on line 4 is unbuilt (#443)"),
+        ),
+        (
+            "def twice\n  yield\n  yield\nend\nputs(twice { puts 1 })\n",
+            "twice answers nothing, so there is no value to read from it on line 5".to_string(),
+        ),
+        (
+            "def run\n  yield\nend\nrun\n",
+            "the native build needs one type for every value — def run on line 1 has none: it yields, and one call hands it no block".to_string(),
         ),
         (
             "def twice(value) = value + value\ntwice(1)\ntwice(1.5)\n",
@@ -1511,7 +1544,7 @@ fn portland_build_writes_nothing_when_it_refuses() {
     let cases = [
         (
             "puts 1.5\n",
-            "the native build compiles integers, strings, comparisons, if, while, def, and puts — a float on line 1 is unbuilt (#443)",
+            "the native build compiles integers, strings, comparisons, if, while, def, yield, and puts — a float on line 1 is unbuilt (#443)",
         ),
         ("count = 1\nputs missing\n", "'missing' is not defined"),
     ];

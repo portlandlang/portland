@@ -1,0 +1,49 @@
+# A def that yields, and a block handed to it (#493): the block is its own
+# function, and reads and rebinds its writer's locals where they live.
+def twice
+  yield
+  yield
+end
+
+def apply(number)
+  yield(number) + 1
+end
+
+def each_upto(limit)
+  mutable index = 0
+  while index < limit
+    yield(index)
+    index += 1
+  end
+end
+
+def greet(name)
+  yield("hello, " + name)
+end
+
+def tally(limit)
+  mutable total = 0
+  each_upto(limit) { |index| total += index }
+  total
+end
+
+mutable total = 0
+twice { total += 5 }
+puts total
+puts(apply(4) { |number| number * 2 })
+puts(apply(4) { it * 3 })
+each_upto(3) { |index| puts index }
+each_upto(3) do |index|
+  if index > 0
+    puts "big"
+  end
+end
+greeting = "said: "
+greet("Portland") { |line| puts greeting + line }
+puts tally(5)
+mutable log = ""
+each_upto(3) { |index| log = log + "#{index}." }
+puts log
+each_upto(2) do |outer|
+  each_upto(2) { |inner| puts outer * 10 + inner }
+end
