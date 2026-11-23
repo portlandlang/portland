@@ -1,0 +1,35 @@
+#!/bin/sh
+# Lint the implementation's Portland source (#510): compiler/ and core/, by
+# the rules in compiler/linting.pdx. The linter is written in Portland and
+# runs on the seed.
+#
+#   script/lint                 the implementation's files
+#   script/lint FILE.pdx ...    the files named
+#
+# A finding is a line naming the file and the line; a run with nothing to
+# fix says ok. With PDX set to a built seed, that seed runs the linter and
+# none is built.
+set -e
+invoked_from=$(pwd)
+cd "$(dirname "$0")/.."
+
+. script/lib/rust.sh
+
+if [ -z "$PDX" ]; then
+  cargo build --quiet --package portland-seed --bin pdx
+  PDX=target/debug/pdx
+fi
+
+if [ $# -eq 0 ]; then
+  exec "$PDX" compiler/lint.pdx compiler/*.pdx core/*.pdx
+fi
+
+# The files named are relative to where the script was called from.
+for path in "$@"; do
+  case "$path" in
+    /*) set -- "$@" "$path" ;;
+    *) set -- "$@" "$invoked_from/$path" ;;
+  esac
+  shift
+done
+exec "$PDX" compiler/lint.pdx "$@"

@@ -57,7 +57,8 @@ Prose goes stale when it says something the code later stops doing and nothing n
 
 |                        |                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------- |
-| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, then the doc checks; `--fast` skips the two whole-suite tests (about 15s instead of a minute) |
+| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, `script/lint`, then the doc checks; `--fast` skips the two whole-suite tests (about 15s instead of a minute) |
+| `script/lint [file…]`  | Portland's own linter, written in Portland, over `compiler/` and `core/` — or only the files named; `script/test` runs it |
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |

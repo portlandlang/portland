@@ -1298,6 +1298,50 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
     }
 }
 
+/// `lint.pdx` — Portland's linter (#510): each finding is a line naming
+/// the file and the line, and a run with any refuses. A line of code at
+/// the left margin inside a list or a def is one; a comment there, and
+/// the words and brackets that close or divide a statement, are not.
+#[test]
+fn portland_lint_finds_a_line_at_the_margin_inside_a_statement() {
+    let driver = format!("{}/../compiler/lint.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("lint_margin_sample.pdx");
+    std::fs::write(
+        &sample,
+        "LIST = [\n  1,\n2,\n  3\n]\n\n# A comment at the margin is fine.\ndef shown(value)\n  if value > 1\n    puts value\nputs \"stray\"\n  end\nend\n\nif 1 < 2\n  puts 1\nelse\n  puts 2\nend\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !output.status.success(),
+        "a file with findings should refuse"
+    );
+    let path = sample.display();
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!(
+            "{path}:3: this line is inside the statement that opens on line 1, and is not indented under it\n{path}:11: this line is inside the statement that opens on line 8, and is not indented under it\n"
+        )
+    );
+    let clean = std::env::temp_dir().join("lint_clean_sample.pdx");
+    std::fs::write(
+        &clean,
+        "LIST = [\n  1,\n  2\n]\n\ndef shown(value)\n  puts value\nend\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&clean)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "a clean file should pass");
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), "ok\n");
+}
+
 /// `pin.pdx` — the native build's types (#445): a def's parameters pinned
 /// from its call sites, a recursive answer assumed and checked, and a
 /// `mutable` local keeping its type through a loop. A def that cannot be
