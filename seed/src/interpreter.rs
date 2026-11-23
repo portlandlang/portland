@@ -6094,6 +6094,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     .iter()
                     .take_while(|parameter| parameter.default.is_none())
                     .count()
+            && block.is_some() == Self::method_yields(&method)
         {
             let handed = block.map(|block| {
                 std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
@@ -9907,6 +9908,14 @@ impl<W: std::io::Write> Interpreter<W> {
                     .and_then(|methods| methods.get(name))
             })
             .cloned()
+    }
+
+    /// Whether a method's body yields anywhere: a core method takes a
+    /// block exactly when it does. Read off the body's debug form, which
+    /// names every `yield` in it as `Yield(` — crude, and enough for the
+    /// core's own source, which is the only code asked.
+    fn method_yields(method: &Method) -> bool {
+        format!("{:?}", method.body).contains("Yield(")
     }
 
     /// Whether a name is a builtin type's, which a core file may define

@@ -140,10 +140,18 @@ end
 # written for: one with a count of arguments it does not take goes on to
 # the host's arm, whose refusal for that shape stands. A struct's own
 # method takes every call, and refuses a wrong count itself.
-def method_takes_call?(receiver, method, arguments)
+def method_takes_call?(receiver, method, arguments, block_given)
   return true if receiver in ["__struct__", *]
   required = method.parameters.count { (it in AssignmentNode) ? it.value.nil? : true }
-  arguments.length >= required && arguments.length <= method.parameters.length
+  return false unless arguments.length >= required && arguments.length <= method.parameters.length
+  # It takes a block exactly when its body yields.
+  block_given == method.body.any? { yields_inside?(it) }
+end
+
+# Whether a `yield` is written anywhere inside a node.
+def yields_inside?(node)
+  return true if node in YieldNode
+  children_of(node).any? { yields_inside?(it) }
 end
 
 # Whose method is being run, for its refusals, and the fields it sees
@@ -3650,7 +3658,7 @@ def evaluate_method_call(node, mutable bindings)
   end
   # Struct methods dispatch before builtins and field access (#27).
   own = struct_method_for(receiver, node.name, bindings)
-  return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil? || !method_takes_call?(receiver, own, arguments)
+  return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil? || !method_takes_call?(receiver, own, arguments, false)
   # A struct answers its own field before any builtin arm can — the seed's
   # order: `with`, its methods, its fields, then only the four names every
   # value answers. A guest struct is a tagged host array, so this order is
@@ -4361,7 +4369,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # A struct's own method takes the block first (#110), as the seed's
   # dispatch order has it; its `yield` reaches the block.
   own = struct_method_for(receiver, node.name, scope)
-  return invoke_struct_method_with_block(receiver, own, arguments, block, scope) unless own.nil? || !method_takes_call?(receiver, own, arguments)
+  return invoke_struct_method_with_block(receiver, own, arguments, block, scope) unless own.nil? || !method_takes_call?(receiver, own, arguments, true)
   # An Enumerable struct (#110) walks through its own `each`: the elements
   # it yields, then the array's arm.
   if (receiver in ["__struct__", *]) && enumerable_name?(node.name) && struct_enumerable?(receiver, scope)
