@@ -1,0 +1,15 @@
+# `/` and `%` between Integers (#479): division rounds toward negative
+# infinity and the remainder takes the divisor's sign, as Ruby's do.
+
+puts 7 / 2
+puts((0 - 7) / 2)
+puts 7 / (0 - 2)
+puts((0 - 7) / (0 - 2))
+puts((0 - 6) / 2)
+puts 7 % 3
+puts((0 - 7) % 3)
+puts 7 % (0 - 3)
+puts((0 - 7) % (0 - 3))
+smallest = 0 - 9223372036854775807 - 1
+puts smallest % (0 - 1)
+puts smallest / 2

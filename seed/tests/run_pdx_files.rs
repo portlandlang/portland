@@ -1393,8 +1393,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — an array on line 1 is unbuilt (#443)"),
         ),
         (
-            "puts 3 / 2\n",
-            format!("{compiles} — the operator '/' on line 1 is unbuilt (#443)"),
+            "puts 2 ** 3\n",
+            format!("{compiles} — the operator '**' on line 1 is unbuilt (#443)"),
         ),
         (
             "[1].each { puts it }\n",

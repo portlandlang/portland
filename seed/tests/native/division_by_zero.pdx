@@ -1,0 +1,6 @@
+# A zero divisor refuses, in the seed's sentence, after what came before it.
+
+def share(total, parts) = total / parts
+
+puts share(10, 2)
+puts share(10, 0)

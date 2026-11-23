@@ -53,6 +53,36 @@ struct IntermediateArithmetic
   right
 end
 
+# `/` or `%` between two Integers: rounding toward negative infinity, the
+# remainder taking the divisor's sign, and refusing a zero divisor.
+struct IntermediateDivision
+  type
+  operator
+  left
+  right
+end
+
+# `-value`, refusing on the one Integer that has no negation.
+struct IntermediateNegation
+  type
+  value
+end
+
+# `&&` or `||` between two Booleans. The right side is computed only when
+# it decides the answer.
+struct IntermediateLogical
+  type
+  operator
+  left
+  right
+end
+
+# `!value`.
+struct IntermediateNot
+  type
+  value
+end
+
 # A comparison between two values of one type, answering a Boolean.
 struct IntermediateComparison
   type
@@ -110,6 +140,15 @@ struct IntermediateLoop
   body
 end
 
+# `break` and `next` in a loop: out of it, and on to its next turn.
+struct IntermediateBreak
+  line
+end
+
+struct IntermediateNext
+  line
+end
+
 # A way out of a function, with the value it answers, or with none where
 # the function answers nothing.
 struct IntermediateReturn
@@ -133,6 +172,9 @@ struct LoweringContext
   answers
   arities
   procedure
+  # Whether the statement in hand is inside a loop, where `break` and
+  # `next` have somewhere to go.
+  looping
 end
 
 # Statements lowered, and the bindings in scope after them.
@@ -155,7 +197,7 @@ def lower_program(nodes)
 panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false)
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -225,8 +267,14 @@ def lower_statement(statement, bindings, context)
     Lowered.new(nodes: [IntermediateStore.new(name: name, value: lowered)], bindings: after)
   in WhileNode(condition:, body:)
     test = lower_condition(condition, bindings, context)
-    inner = lower_statements(body, bindings, context)
+    inner = lower_statements(body, bindings, context.with(looping: true))
     Lowered.new(nodes: [IntermediateLoop.new(condition: test, body: inner.nodes)], bindings: inner.bindings)
+  in BreakNode
+    refuse_native("a break outside a while", statement) unless context.looping
+    Lowered.new(nodes: [IntermediateBreak.new(line: statement.line)], bindings: bindings)
+  in NextNode
+    refuse_native("a next outside a while", statement) unless context.looping
+    Lowered.new(nodes: [IntermediateNext.new(line: statement.line)], bindings: bindings)
   in IfNode(condition:, then_body:, else_body:)
     test = lower_condition(condition, bindings, context)
     taken = lower_statements((then_body or []), bindings, context)
@@ -275,6 +323,10 @@ def lower_value(node, bindings, context)
     first = lower_value(left, bindings, context)
     second = lower_value(right, bindings, context)
     return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && first.type == ["string"] && second.type == ["string"]
+    if %w[/ %].include?(operator)
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
+      return IntermediateDivision.new(type: ["integer"], operator: operator, left: first, right: second)
+    end
     if %w[+ - *].include?(operator)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
       return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
@@ -290,6 +342,17 @@ def lower_value(node, bindings, context)
     called = lower_call(node, name, arguments, bindings, context)
     panic("#{name} answers nothing, so there is no value to read from it on line #{node.line}") if called.type == NOTHING
     called
+  in LogicalNode(operator:, left:, right:)
+    refuse_native("the operator '#{operator}'", node) unless %w[&& ||].include?(operator)
+    first = lower_condition(left, bindings, context)
+    second = lower_condition(right, bindings, context)
+    IntermediateLogical.new(type: ["boolean"], operator: operator, left: first, right: second)
+  in UnaryNode(operator: "-", operand:)
+    negated = lower_value(operand, bindings, context)
+    refuse_native("'-' before #{with_article(negated.type)}", node) unless negated.type == ["integer"]
+    IntermediateNegation.new(type: ["integer"], value: negated)
+  in UnaryNode(operator: "!", operand:)
+    IntermediateNot.new(type: ["boolean"], value: lower_condition(operand, bindings, context))
   # `to_s`, which is what interpolation asks of each piece: a String is
   # itself, and an Integer is written out.
   in MethodCallNode(receiver:, name: "to_s", arguments: [], block: nil)
@@ -365,6 +428,8 @@ def render_statements(statements, indent)
     in IntermediateReturn(value:) then lines << (value.nil? ? "#{indent}return" : "#{indent}return #{render_value(value)}")
     in IntermediatePrint(value:) then lines << "#{indent}print #{render_value(value)}"
     in IntermediateEvaluate(value:) then lines << "#{indent}evaluate #{render_value(value)}"
+    in IntermediateBreak then lines << "#{indent}break"
+    in IntermediateNext then lines << "#{indent}next"
     in IntermediateLoop(condition:, body:)
       lines << "#{indent}while #{render_value(condition)}"
       lines += render_statements(body, indent + "  ")
@@ -387,6 +452,10 @@ def render_value(value)
   in IntermediateLocal(name:) then name
   in IntermediateArithmetic(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
   in IntermediateComparison(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
+  in IntermediateDivision(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
+  in IntermediateLogical(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
+  in IntermediateNegation(value: negated) then "(- #{render_value(negated)})"
+  in IntermediateNot(value: inverted) then "(! #{render_value(inverted)})"
   in IntermediateCall(name:, arguments:) then "(call #{([name] + arguments.map { render_value(it) }).join(" ")})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"

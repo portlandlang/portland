@@ -1,0 +1,7 @@
+# Unary minus, which the smallest Integer has no answer for.
+
+value = 5
+puts(-value)
+puts(-(0 - 3))
+smallest = 0 - 9223372036854775807 - 1
+puts(-smallest)

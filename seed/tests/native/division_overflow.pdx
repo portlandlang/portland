@@ -1,0 +1,4 @@
+# The one quotient that does not fit: the smallest Integer over -1.
+
+smallest = 0 - 9223372036854775807 - 1
+puts smallest / (0 - 1)

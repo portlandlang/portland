@@ -1,0 +1,30 @@
+# `&&`, `||`, and `!` between Booleans (#479). The right side runs only
+# when it decides the answer, which `noisy` shows by printing.
+
+def noisy(answer)
+  puts 99
+  answer
+end
+
+def mark(flag)
+  if flag
+    1
+  else
+    0
+  end
+end
+
+puts mark(true && true)
+puts mark(true && false)
+puts mark(false || true)
+puts mark(false || false)
+puts mark(!true)
+puts mark(!(1 < 2) || 3 > 2)
+puts mark(false && noisy(true))
+puts mark(true || noisy(false))
+puts mark(true && noisy(true))
+puts mark(false || noisy(false))
+value = 5
+if value > 3 && value < 9 && !(value == 6)
+  puts 7
+end
