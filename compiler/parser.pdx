@@ -1797,8 +1797,8 @@ end
 # The interpolations of a double-quoted lexeme, each lexed and scanned as a
 # token range of its own — which recurses through a string inside a string.
 def interpolation_names_it?(lexeme)
-  return false if lexeme.slice(0, 1) == "'"
-  characters = lexeme.slice(1, lexeme.length - 2).chars
+  return false if lexeme.start_with?("'")
+  characters = lexable_characters(unquoted(lexeme))
   mutable index = 0
   while index < characters.length
     character = characters[index]
@@ -2361,10 +2361,21 @@ def read_inner_source(characters, start)
   Step.new(node: inner, position: index)
 end
 
+# A quoted lexeme without its quotes. The opening quote can share a
+# character with a combining mark or a joiner written after it (ADR 0038),
+# so a lexeme that is not all single bytes is cut by codepoint (#322).
+def unquoted(lexeme)
+  return lexeme.slice(1, lexeme.length - 2) if lexeme.length == lexeme.bytesize
+  codes = lexeme.codepoints
+  codes.slice(1, codes.length - 2).map { it.chr(Encoding::UTF_8) }.join("")
+end
+
 def string_expression(lexeme, line: nil)
-  content = lexeme.slice(1, lexeme.length - 2)
-  characters = content.chars
-  if lexeme.slice(0, 1) == "'"
+  content = unquoted(lexeme)
+  # Walked as the lexer walks: a brace that closes an interpolation can
+  # share a character with a mark written after it.
+  characters = lexable_characters(content)
+  if lexeme.start_with?("'")
     mutable result = ""
     mutable index = 0
     while index < characters.length
@@ -2397,6 +2408,11 @@ def string_expression(lexeme, line: nil)
       parts << string_node(literal, line: line) unless literal.empty?
       literal = ""
       inner = read_inner_source(characters, index + 2)
+      # An empty interpolation adds nothing, as in Ruby (#306).
+      if inner.node.strip.empty?
+        index = inner.position
+        next
+      end
       inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
       parts << method_call_node(inner_step.node, "to_s", [], nil)
       index = inner.position
@@ -2420,17 +2436,20 @@ end
 # stays raw for the engine — a backslash escape is the pattern's own — and
 # only `#{...}` is read here, as in a string, each piece joined by `+`.
 def regex_expression(lexeme, line: nil)
-  mutable flags_start = lexeme.length
-  while flags_start > 0 && "imxo".include?(lexeme.slice(flags_start - 1, 1))
+  # Walked as the lexer walks, so a mark written after the opening
+  # delimiter does not hide it (#322).
+  letters = lexable_characters(lexeme)
+  mutable flags_start = letters.length
+  while flags_start > 0 && "imxo".include?(letters[flags_start - 1])
     flags_start -= 1
   end
-  flags = lexeme.slice(flags_start, lexeme.length - flags_start)
+  flags = letters.slice(flags_start, letters.length - flags_start).join("")
   if flags.include?("o")
     panic "the 'o' flag interpolates a pattern once, which Portland does not spell — drop the flag; a constant pattern is built once anyway"
   end
-  slashed = lexeme.slice(0, 1) == "/"
+  slashed = letters.first == "/"
   body_start = slashed ? 1 : 3
-  characters = lexeme.slice(body_start, flags_start - 1 - body_start).chars
+  characters = letters.slice(body_start, flags_start - 1 - body_start)
   mutable parts = []
   mutable literal = ""
   mutable index = 0
@@ -2447,12 +2466,24 @@ def regex_expression(lexeme, line: nil)
         literal << following
       end
       index += 2
+      # `\c` takes the character after it as the one to control, so a
+      # `\c#` before a brace is a control escape and a literal brace, as
+      # Ruby reads it, never an interpolation (#346).
+      if following == "c" && index < characters.length
+        literal << characters[index]
+        index += 1
+      end
       next
     end
     if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
       parts << string_node(literal, line: line) unless literal.empty?
       literal = ""
       inner = read_inner_source(characters, index + 2)
+      # An empty interpolation adds nothing, as in Ruby (#306).
+      if inner.node.strip.empty?
+        index = inner.position
+        next
+      end
       inner_step = parse_expression(lex(inner.node, first_line: line or 1), 0)
       parts << method_call_node(inner_step.node, "to_s", [], nil)
       index = inner.position
@@ -2471,27 +2502,41 @@ def regex_expression(lexeme, line: nil)
   RegexNode.new(kind: "regex", flags: flags, source: chain, line: line)
 end
 
-# Re-encode a decoded string for sexp display.
+# Re-encode a decoded string for sexp display and for `inspect`, as the
+# seed's `quoted` does. It walks codepoints, not characters: a CR LF is
+# one character, and each half is escaped on its own (#345).
 def encode_string(text)
   mutable result = "\""
-  characters = text.chars
-  characters.each_with_index do |character, index|
-    following = characters.slice(index + 1, 1).join("")
-    # A `#` that would open an interpolation is escaped, as Ruby's inspect
-    # escapes it before `{`, `$`, and `@`.
-    opens_interpolation = character == "#" && (following == "{" || following == "$" || following == "@")
-    encoded = case character
-    when "\\" then "\\\\"
-    when "\"" then "\\\""
-    when "\n" then "\\n"
-    when "\r" then "\\r"
-    when "\t" then "\\t"
-    else
-      opens_interpolation ? "\\#" : character
-    end
-    result << encoded
+  codes = text.codepoints
+  codes.each_with_index do |code, index|
+    following = index + 1 < codes.length ? codes[index + 1] : 0
+    result << encoded_codepoint(code, following)
   end
   result + "\""
+end
+
+# One codepoint as `inspect` writes it: Ruby's named escapes, a `#` that
+# would open an interpolation (before `{`, `$`, and `@`), and every other
+# character that does not print — the controls and the two Unicode line
+# separators — as `\uXXXX`.
+def encoded_codepoint(code, following)
+  case code
+  when 7 then "\\a"
+  when 8 then "\\b"
+  when 9 then "\\t"
+  when 10 then "\\n"
+  when 11 then "\\v"
+  when 12 then "\\f"
+  when 13 then "\\r"
+  when 27 then "\\e"
+  when 34 then "\\\""
+  when 92 then "\\\\"
+  when 35
+    following == 123 || following == 36 || following == 64 ? "\\#" : "#"
+  else
+    unprintable = code < 32 || (code >= 127 && code <= 159) || code == 8232 || code == 8233
+    unprintable ? "\\u" + code.to_s(16).upcase.rjust(4, "0") : code.chr(Encoding::UTF_8)
+  end
 end
 
 # — statements —
@@ -3040,11 +3085,16 @@ def parse_parameter_list(tokens, mutable position, parens)
         parameters << keyword_parameter_node(name, nil, line: name_line)
       else
         default = parse_expression(tokens, position)
+        # A default that does not parse is the refusal, carried up whole.
+        return default if default.node in ErrorNode
         parameters << keyword_parameter_node(name, default.node, line: name_line)
         position = default.position
       end
     elsif operator_at?(tokens, position, %w[=])
       default = parse_expression(tokens, position + 1)
+      # A default that does not parse is the refusal, carried up whole: a
+      # parameter holding an error node crashed the evaluator (#348).
+      return default if default.node in ErrorNode
       parameters << if rebindable
         mutable_assignment_node(name, default.node, line: name_line)
       else
@@ -3353,6 +3403,12 @@ def parse_array_pattern(tokens, mutable position)
           rest_name = tokens[position].text
           position += 1
         end
+        # More after the rest is Ruby's find pattern, `[*, x, *]`, or a rest
+        # in the middle; neither is built, and the refusal says the rule —
+        # the seed's sentence (#357).
+        if operator_at?(tokens, position, %w[,])
+          return Step.new(node: error_node("a * rest must end an array pattern"), position: position)
+        end
         break
       end
       element = parse_pattern(tokens, position)
@@ -3579,7 +3635,9 @@ def parse_struct(tokens, mutable position)
     # Ruby's class macros — `validates :email`, `format :json` — are calls
     # in a type body, where Portland only declares (#135): nothing runs at
     # definition time. The seed's sentence.
-    if position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1])
+    # A visibility word with a symbol after it (`private_constant :NAME`)
+    # is ADR 0076's marker, read below, not a macro.
+    if position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1]) && !visibility_word?(tokens[position].text)
       refusal = "'#{tokens[position].text} #{tokens[position + 1].text}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def" if refusal.nil?
       position = skip_newlines_at(tokens, skip_line_at(tokens, position))
       next
@@ -3613,11 +3671,30 @@ def parse_struct(tokens, mutable position)
   mutable methods = []
   mutable nested = []
   mutable type_functions = []
-  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || type_constant_at?(tokens, position) || (position < tokens.length && tokens[position].identifier? && visibility_word?(tokens[position].text))
+  while keyword_at?(tokens, position, %w[alias class def enum include struct]) || type_constant_at?(tokens, position) || (position < tokens.length && tokens[position].identifier?)
     if type_constant_at?(tokens, position)
       constant = parse_type_constant(tokens, position)
       constants << constant.node
       position = skip_newlines_at(tokens, constant.position)
+    elsif tokens[position].identifier? && !visibility_word?(tokens[position].text)
+      # A field after an include or a nested type (#302): fields sit
+      # anywhere before the first method — the seed's rule, in its
+      # sentences and its order of asking.
+      if tokens[position].text != "attr_reader" && position + 1 < tokens.length && type_body_call_argument?(tokens[position + 1])
+        return Step.new(node: error_node("'#{tokens[position].text} #{tokens[position + 1].text}' is a call in a type body, where Portland only declares — nothing runs at definition time; move it into a def"), position: position + 1)
+      end
+      unless methods.empty? && type_functions.empty?
+        return Step.new(node: error_node("fields come before methods in struct #{name}"), position: position + 1)
+      end
+      if tokens[position].text == "attr_reader"
+        declared = parse_attr_reader(tokens, position + 1, name)
+        return declared if declared.node in ErrorNode
+        fields += declared.node
+        position = skip_newlines_at(tokens, declared.position)
+      else
+        fields << tokens[position].text
+        position = skip_newlines_at(tokens, position + 1)
+      end
     elsif tokens[position].identifier?
       marker = parse_visibility_marker(tokens, position)
       return marker if marker.node in ErrorNode

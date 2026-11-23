@@ -114,9 +114,10 @@ context "String#slice with Regexp, index" do
     expect("hello there".slice(/(what?)/, 1)).to be_nil
   end
 
-  # The negative index past the captures waits on #315.
   specify "returns nil if the index is larger than the number of captures" do
     expect("hello there".slice(/hello (.)/, 2)).to be_nil
+    # A negative index reaches the captures only, never the whole match.
+    expect("hello there".slice(/hello (.)/, -2)).to be_nil
   end
 
   specify "returns nil if there is no capture for the given index" do

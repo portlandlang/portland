@@ -98,6 +98,19 @@ pub fn constant_name(name: &str) -> bool {
 /// A numeric literal's digits, underscores shed — the lexer has already
 /// refused any underscore not sitting between digits (#71) — and a base
 /// prefix folded: `0x`, `0b`, `0o`, either case (#72, ADR 0050).
+/// A method named for one of Ruby's implicit conversions (ADR 0036) would
+/// never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
+/// definition refuses, naming the conversion that is read (#341).
+fn refuse_implicit_conversion(name: &str) {
+    let survivor = match name {
+        "to_ary" => "to_a",
+        "to_int" => "to_i",
+        "to_str" => "to_s",
+        _ => return,
+    };
+    panic!("{name} is Ruby's implicit conversion, which nothing here calls — define {survivor}");
+}
+
 fn integer_literal(text: &str) -> i64 {
     let plain = text.replace('_', "");
     let base = match plain.get(..2) {
@@ -312,6 +325,10 @@ fn string_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
                 if !literal.is_empty() {
                     parts.push(Expression::String(std::mem::take(&mut literal)));
                 }
+                // An empty interpolation adds nothing, as in Ruby (#306).
+                if content[inner_start..inner_end].trim().is_empty() {
+                    continue;
+                }
                 let inner = expression_from(&content[inner_start..inner_end], it_frames);
                 parts.push(Expression::MethodCall {
                     arguments: Vec::new(),
@@ -374,6 +391,15 @@ fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
             // is the bare character in the source, as Ruby reads it.
             '\\' => match characters.next() {
                 Some((_, '/')) if slashed => literal.push('/'),
+                // `\c` takes the character after it as the one to control,
+                // so `\c#` before a brace is a control escape and a literal
+                // brace, as Ruby reads it, never an interpolation (#346).
+                Some((_, 'c')) => {
+                    literal.push_str("\\c");
+                    if let Some((_, controlled)) = characters.next() {
+                        literal.push(controlled);
+                    }
+                }
                 Some((_, escaped)) => {
                     literal.push('\\');
                     literal.push(escaped);
@@ -409,6 +435,10 @@ fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
                 };
                 if !literal.is_empty() {
                     parts.push(Expression::String(std::mem::take(&mut literal)));
+                }
+                // An empty interpolation adds nothing, as in Ruby (#306).
+                if body[inner_start..inner_end].trim().is_empty() {
+                    continue;
                 }
                 let inner = expression_from(&body[inner_start..inner_end], it_frames);
                 parts.push(Expression::MethodCall {
@@ -1559,6 +1589,7 @@ impl<'source> Parser<'source> {
                     ) {
                         panic!("{method_name} is reserved on structs");
                     }
+                    refuse_implicit_conversion(method_name);
                     if type_taken {
                         panic!(
                             "{method_name} is defined on {name} instances and on the type — rename one"
@@ -1853,6 +1884,7 @@ impl<'source> Parser<'source> {
                 ) {
                     panic!("{method_name} is reserved on structs, so a trait cannot carry it");
                 }
+                refuse_implicit_conversion(method_name);
                 if methods.iter().any(|existing| {
                     matches!(existing, Statement::MethodDefinition { name, .. } if name == method_name)
                 }) {

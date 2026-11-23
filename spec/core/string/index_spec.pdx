@@ -26,6 +26,21 @@ context "String#index" do
 end
 
 context "String#index with String" do
+  specify "behaves the same as String#index(char) for one-character strings" do
+    "blablabla hello cruel world...!".split("").uniq.each do |str|
+      chr = str[0]
+      expect(str.index(str)).to eq(str.index(chr))
+
+      0.upto(str.size + 1) do |start|
+        expect(str.index(str, start)).to eq(str.index(chr, start))
+      end
+
+      (-str.size - 1).upto(-1) do |start|
+        expect(str.index(str, start)).to eq(str.index(chr, start))
+      end
+    end
+  end
+
   specify "returns the index of the first occurrence of the given substring" do
     expect("blablabla".index("")).to eq(0)
     expect("blablabla".index("b")).to eq(0)
@@ -43,17 +58,74 @@ context "String#index with String" do
     expect("blablabla".index("ablabla")).to eq(2)
   end
 
-  # The rows with a start position wait on #316.
+  specify "starts the search at the given offset" do
+    expect("blablabla".index("bl", 0)).to eq(0)
+    expect("blablabla".index("bl", 1)).to eq(3)
+    expect("blablabla".index("bl", 2)).to eq(3)
+    expect("blablabla".index("bl", 3)).to eq(3)
+
+    expect("blablabla".index("bla", 0)).to eq(0)
+    expect("blablabla".index("bla", 1)).to eq(3)
+    expect("blablabla".index("bla", 2)).to eq(3)
+    expect("blablabla".index("bla", 3)).to eq(3)
+
+    expect("blablabla".index("blab", 0)).to eq(0)
+    expect("blablabla".index("blab", 1)).to eq(3)
+    expect("blablabla".index("blab", 2)).to eq(3)
+    expect("blablabla".index("blab", 3)).to eq(3)
+
+    expect("blablabla".index("la", 1)).to eq(1)
+    expect("blablabla".index("la", 2)).to eq(4)
+    expect("blablabla".index("la", 3)).to eq(4)
+    expect("blablabla".index("la", 4)).to eq(4)
+
+    expect("blablabla".index("lab", 1)).to eq(1)
+    expect("blablabla".index("lab", 2)).to eq(4)
+    expect("blablabla".index("lab", 3)).to eq(4)
+    expect("blablabla".index("lab", 4)).to eq(4)
+
+    expect("blablabla".index("ab", 2)).to eq(2)
+    expect("blablabla".index("ab", 3)).to eq(5)
+    expect("blablabla".index("ab", 4)).to eq(5)
+    expect("blablabla".index("ab", 5)).to eq(5)
+
+    expect("blablabla".index("", 0)).to eq(0)
+    expect("blablabla".index("", 1)).to eq(1)
+    expect("blablabla".index("", 2)).to eq(2)
+    expect("blablabla".index("", 7)).to eq(7)
+    expect("blablabla".index("", 8)).to eq(8)
+    expect("blablabla".index("", 9)).to eq(9)
+  end
+
+  specify "starts the search at offset + self.length if offset is negative" do
+    str = "blablabla"
+
+    ["bl", "bla", "blab", "la", "lab", "ab", ""].each do |needle|
+      (-str.length .. -1).each do |offset|
+        expect(str.index(needle, offset)).to eq(str.index(needle, offset + str.length))
+      end
+    end
+  end
+
   specify "returns nil if the substring isn't found" do
     expect("blablabla".index("B")).to be_nil
     expect("blablabla".index("z")).to be_nil
     expect("blablabla".index("BLA")).to be_nil
     expect("blablabla".index("blablablabla")).to be_nil
+    expect("blablabla".index("", 10)).to be_nil
+
+    expect("hello".index("he", 1)).to be_nil
+    expect("hello".index("he", 2)).to be_nil
     expect("I’ve got a multibyte character.\n".index("\n\n")).to be_nil
   end
 
   specify "returns the character index of a multibyte character" do
     expect("ありがとう".index("が")).to eq(2)
+  end
+
+  specify "returns the character index after offset" do
+    expect("われわれ".index("わ", 1)).to eq(2)
+    expect("ありがとうありがとう".index("が", 3)).to eq(7)
   end
 
   specify "returns the character index after a partial first match" do
@@ -155,5 +227,22 @@ context "String#index with Regexp" do
 
   specify "treats the offset as a character index" do
     expect("われわわれ".index(/わ/, 3)).to eq(3)
+  end
+
+  specify "behaves the same as String#index(string) for escaped string regexps" do
+    ["blablabla", "hello cruel world...!"].each do |str|
+      ["", "b", "bla", "lab", "o c", "d."].each do |needle|
+        regexp = Regexp.new(Regexp.escape(needle))
+        expect(str.index(regexp)).to eq(str.index(needle))
+
+        0.upto(str.size + 1) do |start|
+          expect(str.index(regexp, start)).to eq(str.index(needle, start))
+        end
+
+        (-str.size - 1).upto(-1) do |start|
+          expect(str.index(regexp, start)).to eq(str.index(needle, start))
+        end
+      end
+    end
   end
 end

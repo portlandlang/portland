@@ -152,7 +152,8 @@ def check_program_with(nodes, source, file, imports, sharpened)
   annotated = check_annotations(nodes, source, scope, [])
   found = check_requires(nodes, false, scope, annotated)
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
-  in_source_order(check_body(nodes, scope, walked.last))
+  hidden = check_private_constant_names(nodes, "", scope, walked.last)
+  in_source_order(check_body(nodes, scope, hidden))
 end
 
 # Refusals in the order the source has them: by line, with the walk's own
@@ -732,6 +733,7 @@ def check_node(node, scope, mutable found)
   in StructDefNode(methods:, nested:, type_functions:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs", scope, found)
     found = check_reserved(type_functions, %w[failure? nil? some? with], "is reserved on structs", scope, found)
+    found = check_implicit_conversions(methods, scope, found)
     # Inside the type's own methods (ADR 0076): protected calls on another
     # value of the type pass, and its private constants are in reach.
     within = scope.with(home: qualified_under(scope.home, node.name), inside: node.name)
@@ -740,6 +742,7 @@ def check_node(node, scope, mutable found)
     check_body(nested, within, found)
   in TraitDefNode(methods:)
     found = check_reserved(methods, %w[failure? new nil? some? with], "is reserved on structs, so a trait cannot carry it", scope, found)
+    found = check_implicit_conversions(methods, scope, found)
     check_methods(methods, scope, found)
   # A module's bare names may reach its own defs by lexical scope (ADR
   # 0021), which the globals do not hold — so names are not judged inside.
@@ -1067,6 +1070,12 @@ def check_pattern(pattern, scope, mutable found)
     end
     found
   in StructPatternNode(fields:)
+    # A trait is not a type a value has, so as a pattern it would match
+    # nothing, silently; it refuses instead (#300) — the seed's sentence.
+    named = pattern.name.split("::").last or pattern.name
+    if scope.traits.any? { it.name == named }
+      found = noted(found, ["sentence", "'in #{pattern.name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include #{pattern.name}"], locate(pattern, scope))
+    end
     fields.each do |field|
       found = check_pattern(field[1], scope, found)
     end
@@ -1086,6 +1095,20 @@ end
 # pass different lists. Aliases need no case of their own: a struct or
 # trait alias desugars at parse into a clone of the def it points at, so
 # the clone walks through here like any def.
+# A method named for one of Ruby's implicit conversions (ADR 0036) would
+# never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
+# definition refuses, naming the conversion that is read (#341) — the
+# seed's sentence.
+def check_implicit_conversions(methods, scope, mutable found)
+  methods.each do |method|
+    next unless method in DefNode
+    survivor = alias_survivor(method.name)
+    next if survivor.nil?
+    found = noted(found, ["sentence", "#{method.name} is Ruby's implicit conversion, which nothing here calls — define #{survivor}"], locate(method, scope))
+  end
+  found
+end
+
 def check_reserved(methods, names, wording, scope, mutable found)
   methods.each do |method|
     next unless method in DefNode
@@ -1572,6 +1595,50 @@ def declared_visibilities(nodes)
     table << [declaration.name, marked] unless marked.empty?
   end
   table
+end
+
+# `private_constant` hides a constant its own module or struct defines
+# (#301): a name it does not define is a typo that would leave the
+# intended constant public, so it refuses, where Ruby raises NameError. A
+# constant is a SCREAMING_CASE binding or a type declared in the body.
+def check_private_constant_names(nodes, home, scope, mutable found)
+  nodes.each do |node|
+    if node in ModuleDefNode
+      owner = qualified_under(home, node.path.join("::"))
+      defined = constants_defined_in(node.body)
+      node.body.each do |statement|
+        next unless statement in PrivateConstantNode
+        statement.names.each do |name|
+          found = noted(found, ["sentence", undefined_private_constant(name, owner)], locate(statement, scope)) unless defined.include?(name)
+        end
+      end
+      found = check_private_constant_names(node.body, owner, scope, found)
+    elsif node in StructDefNode
+      owner = qualified_under(home, node.name)
+      defined = constants_defined_in(node.constants + node.nested)
+      node.private_constants.each do |name|
+        found = noted(found, ["sentence", undefined_private_constant(name, owner)], locate(node, scope)) unless defined.include?(name)
+      end
+      found = check_private_constant_names(node.nested, owner, scope, found)
+    end
+  end
+  found
+end
+
+def undefined_private_constant(name, owner)
+  "private_constant names #{name}, which #{owner} does not define — it hides a constant #{owner} defines"
+end
+
+# The constants a body defines by name: its SCREAMING_CASE bindings and
+# the types and modules declared in it.
+def constants_defined_in(statements)
+  mutable names = []
+  statements.each do |statement|
+    names << statement.name if constant_declaration?(statement)
+    names << statement.name if (statement in StructDefNode) || (statement in EnumDefNode) || (statement in TraitDefNode)
+    names << module_name(statement) if statement in ModuleDefNode
+  end
+  names
 end
 
 # The constants `private_constant` hid, qualified under their namespace: a

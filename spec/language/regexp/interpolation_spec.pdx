@@ -50,4 +50,9 @@ context "Regexps with interpolation" do
     re = /foo/i
     expect(/#{re} bar/m).to eq(/(?i-mx:foo) bar/m)
   end
+
+  specify "gives precedence to escape sequences over substitution" do
+    str = "J"
+    expect(/\c#{str}/.to_s.include?("{str}")).to be_true
+  end
 end

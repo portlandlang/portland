@@ -28,4 +28,8 @@ context "Symbol#end_with?" do
   specify "works for multibyte strings" do
     expect(:"céréale".end_with?("réale")).to eq(true)
   end
+
+  specify "answers false when given no candidates" do
+    expect(:hello.end_with?()).to be_false
+  end
 end

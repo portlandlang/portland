@@ -4,6 +4,14 @@
 
 require_relative "../../spec_helper"
 
+struct DisjointSetLike
+  items
+
+  include Enumerable
+
+  def each = items.each { yield it }
+end
+
 context "Set#disjoint?" do
   specify "tell whether the two share a member" do
     expect(Set[1, 2].disjoint?(Set[2, 3])).to be_false
@@ -12,5 +20,15 @@ context "Set#disjoint?" do
 
   specify "take any enumerable" do
     expect(Set[1, 2].disjoint?(3..4)).to be_true
+  end
+
+  describe "when comparing to a Set-like object" do
+    specify "returns false when a Set has at least one element in common with a Set-like object" do
+      expect(Set[1, 2].disjoint?(DisjointSetLike.new(items: [2, 3]))).to be_false
+    end
+
+    specify "returns true when a Set has no element in common with a Set-like object" do
+      expect(Set[1, 2].disjoint?(DisjointSetLike.new(items: [3, 4]))).to be_true
+    end
   end
 end

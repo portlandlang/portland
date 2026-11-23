@@ -1176,7 +1176,8 @@ def evaluate_binary(node, bindings)
   # A set's algebra and its subset orderings (ADR 0082), the seed's arms;
   # equality and the refusals stay the host's below.
   if left in ["__set__", *]
-    answered = set_binary(node.operator, value_at(left, 1), right)
+    lent = (node.operator == "+" || node.operator == "-") ? lent_to_a_set(right, right_step.bindings) : right
+    answered = set_binary(node.operator, value_at(left, 1), lent)
     return outcome([slot_value(answered)], right_step.bindings) unless answered.empty?
   end
   result = case node.operator
@@ -1287,6 +1288,11 @@ def evaluate_math(name, arguments)
   expected = if %w[atan2 hypot ldexp].include?(name) then 2 elsif name == "log" then "1..2" else 1 end
   unless (name == "log" && (given == 1 || given == 2)) || given == expected
     panic("wrong number of arguments (given #{given}, expected #{expected})")
+  end
+  # A guest value that is no number refuses in Ruby's words with its own
+  # type's name, where the host would name a tagged shape an Array (#330).
+  arguments.each do |argument|
+    panic("can't convert #{value_type_label(argument)} into Float") if guest_tagged?(argument)
   end
   first = value_at(arguments, 0)
   second = value_at(arguments, 1)
@@ -1830,6 +1836,14 @@ def elementwise?(left, right, strict)
   same
 end
 
+# What a value lends a set where a set takes any enumerable (#340,
+# docs/ruby/sets.md): a struct that includes Enumerable stands for the
+# elements its `each` yields, and anything else for itself.
+def lent_to_a_set(value, bindings)
+  return value unless (value in ["__struct__", *]) && struct_enumerable?(value, bindings)
+  enumerable_elements(value, bindings)
+end
+
 # The members an enumerable lends a set (ADR 0082): an array's elements, a
 # set's members, a range's integers, a hash's pairs — Ruby's reading of
 # each. Anything else refuses, `context` leading the sentence — the seed's.
@@ -1837,7 +1851,7 @@ def set_operand(value, context)
   return value if plain_array?(value)
   return value_at(value, 1) if value in ["__set__", *]
   return value.to_a if (value in Range) || (value in Hash)
-  panic("#{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got #{shorten(render_inspect(value))}")
+  panic("#{context} takes an enumerable — a Set, an Array, a Range, a Hash, or a struct that includes Enumerable — got #{shorten(render_inspect(value))}")
 end
 
 # The subset family compares sets only, as Ruby's does.
@@ -2078,6 +2092,67 @@ def replacement_for_host(replacement)
   pairs.to_h
 end
 
+# What a method answers for a pattern argument (ADR 0066). A regex asks
+# each element whether it matches (#298) through the block forms, since
+# the question has to read a guest symbol by its name; every other
+# pattern goes to the host's own `when` rule.
+def pattern_answer(receiver, name, pattern)
+  # A range goes to the host whatever the pattern, so it answers or
+  # refuses as the seed does.
+  if (pattern in Regexp) && !(receiver in Range)
+    elements = receiver.to_a
+    return case name
+           when "all?"         then elements.all? { regex_matches_element?(pattern, it) }
+           when "any?"         then elements.any? { regex_matches_element?(pattern, it) }
+           when "grep"         then elements.select { regex_matches_element?(pattern, it) }
+           when "grep_v"       then elements.reject { regex_matches_element?(pattern, it) }
+           when "none?"        then elements.none? { regex_matches_element?(pattern, it) }
+           when "one?"         then elements.one? { regex_matches_element?(pattern, it) }
+           when "slice_before" then elements.slice_before { regex_matches_element?(pattern, it) }
+           else elements.slice_after { regex_matches_element?(pattern, it) }
+           end
+  end
+  case name
+  when "all?"         then receiver.all?(pattern)
+  when "any?"         then receiver.any?(pattern)
+  when "grep"         then receiver.grep(pattern)
+  when "grep_v"       then receiver.grep_v(pattern)
+  when "none?"        then receiver.none?(pattern)
+  when "one?"         then receiver.one?(pattern)
+  when "slice_before" then receiver.slice_before(pattern)
+  else receiver.slice_after(pattern)
+  end
+end
+
+# A regex's `===`: a match on a string or on a symbol's name, false for
+# anything else, as the seed's is.
+def regex_matches_element?(pattern, element)
+  return pattern.match?(element) if element in String
+  return pattern.match?(value_at(element, 1)) if element in ["__symbol__", *]
+  false
+end
+
+# The pieces `lines` and `each_line` cut a string into, given a separator
+# or `chomp:` (#313): the host's own cut, the arguments read here first so
+# each refusal is the seed's sentence with the guest's rendering.
+def separated_lines(text, name, arguments, keyword_values)
+  panic("'#{name}' takes 0 to 1 arguments, got #{arguments.length}") if arguments.length > 1
+  mutable chomp = false
+  keyword_values.each do |pair|
+    label = pair[0]
+    flag = value_at(pair, 1)
+    panic("'#{name}' does not take #{label}: — chomp: is its one keyword") unless label == "chomp"
+    panic("'#{name}' takes true or false for chomp:, got #{render_inspect(flag)}") unless flag in Boolean
+    chomp = flag
+  end
+  return text.lines(chomp: chomp) if arguments.empty?
+  separator = value_at(arguments, 0)
+  panic("'#{name}' takes a String for its separator, got #{render_inspect(separator)}") unless separator in String
+  # Said here so the sentence names the method that was written.
+  panic("'#{name}' with an empty separator is Ruby's paragraph mode, which is unbuilt — split on the blank lines: split(/\\n{2,}/)") if separator.empty?
+  text.lines(separator, chomp: chomp)
+end
+
 # A line for `puts` and `warn`: Ruby's rule, a text already ending in a
 # newline gets no second one.
 def lined(text) = text.end_with?("\n") ? text : "#{text}\n"
@@ -2268,10 +2343,12 @@ end
 # has no escape here, on purpose — the recorded divergence class no
 # literally-written program has met.
 def word_array_elements(lexeme)
-  opener = lexeme.slice(2, 1)
-  closer = lexeme.slice(lexeme.length - 1, 1)
-  content = lexeme.slice(3, lexeme.length - 4)
-  characters = content.chars
+  # Walked as the lexer walks, so a mark written after the opener, or
+  # after a space between words, does not hide it (#322).
+  letters = lexable_characters(lexeme)
+  opener = letters.slice(2, 1).join("")
+  closer = letters.slice(letters.length - 1, 1).join("")
+  characters = letters.slice(3, letters.length - 4)
   mutable words = []
   mutable current = ""
   mutable started = false
@@ -2568,7 +2645,7 @@ def evaluate_builtin_type_function(node, mutable bindings)
   # repeats dropped; a block maps each member first, as Ruby's does.
   if type_name == "Set" && node.name == "new"
     panic("Set.new takes 0 or 1 argument, got #{arguments.length}") if arguments.length > 1
-    candidates = arguments.empty? ? [] : set_operand(value_at(arguments, 0), "Set.new")
+    candidates = arguments.empty? ? [] : set_operand(lent_to_a_set(value_at(arguments, 0), bindings), "Set.new")
     return mapped_guest_set(node, candidates, bindings)
   end
   return outcome([guest_set(arguments)], bindings) if type_name == "Set" && node.name == "[]"
@@ -2578,6 +2655,12 @@ def evaluate_builtin_type_function(node, mutable bindings)
   # `Complex.polar` and `Complex.rectangular` (ADR 0085), the host's own.
   if type_name == "Complex" && %w[polar rect rectangular].include?(node.name)
     panic("Complex.#{node.name} takes 1 or 2 arguments, got #{arguments.length}") unless arguments.length == 1 || arguments.length == 2
+    # A guest value that is no number refuses here in the seed's sentence,
+    # every argument written as the guest writes it, before the host could
+    # show a symbol's or a struct's tagged shape (#330).
+    if arguments.any? { guest_tagged?(it) }
+      panic("Complex.#{node.name} takes numbers, got #{arguments.map { render_inspect(it) }.join(", ")}")
+    end
     first = value_at(arguments, 0)
     built = if node.name == "polar"
       arguments.length == 1 ? Complex.polar(first) : Complex.polar(first, value_at(arguments, 1))
@@ -3385,14 +3468,20 @@ def evaluate_method_call(node, mutable bindings)
   # without reading it (#264), the seed's guard: a struct's own methods and
   # `with`, and the builtins that take one, read their own.
   unless keyword_values.empty? || (receiver in ["__struct__", *])
-    takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures")
+    takes_one = (plain_array?(receiver) && %w[sample shuffle].include?(node.name)) || ((receiver in MatchData) && node.name == "named_captures") || ((receiver in String) && %w[each_line lines].include?(node.name))
     panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
   end
   # Two values between brackets (ADR 0091): a match answers the slice of
-  # its groups, the host's own; any other receiver refuses in the seed's
-  # sentence, an array and a string pointed at `slice`.
+  # its groups, the host's own, and a string its own slice; any other
+  # receiver refuses in the seed's sentence, an array pointed at `slice`.
   if node.name == "[]" && arguments.length == 2
     return outcome([receiver[value_at(arguments, 0), value_at(arguments, 1)]], bindings) if receiver in MatchData
+    # A string reads two values as its `slice` does (#314): a start and a
+    # length, or a pattern and a group.
+    if receiver in String
+      second = (value_at(arguments, 0) in Regexp) ? host_group_key(value_at(arguments, 1)) : value_at(arguments, 1)
+      return outcome([receiver.slice(value_at(arguments, 0), second)], bindings)
+    end
     panic(two_value_index_sentence(receiver, arguments))
   end
   # A set (ADR 0082): its own names answer here, a mutator names the
@@ -3404,7 +3493,8 @@ def evaluate_method_call(node, mutable bindings)
     refuse_set_mutator(node.name)
     if node.block.nil? && set_own_name?(node.name)
       check_builtin_count(receiver, node.name, arguments.length)
-      return outcome([set_own_answer(node.name, value_at(receiver, 1), arguments)], bindings)
+      lent = %w[difference disjoint? intersect? intersection union].include?(node.name) ? arguments.map { lent_to_a_set(it, bindings) } : arguments
+      return outcome([set_own_answer(node.name, value_at(receiver, 1), lent)], bindings)
     end
     return evaluate_set_block_call(node, receiver, arguments, bindings) if node.block.some? && %w[classify to_set].include?(node.name)
     if node.name == "classify"
@@ -3416,6 +3506,33 @@ def evaluate_method_call(node, mutable bindings)
       panic("no method #{node.name} on this value — the compiler may be missing a builtin the seed has")
     end
     receiver = value_at(receiver, 1)
+  end
+  # `lines` and `each_line` with a separator or `chomp:` (#313): the host
+  # cuts the pieces, and with a block each is handed over through `each`'s
+  # own walk and the string comes back.
+  # `lines` takes no block: one beside it goes on to the general refusal.
+  if (receiver in String) && %w[each_line lines].include?(node.name) && !(arguments.empty? && keyword_values.empty?) && (node.block.nil? || node.name == "each_line")
+    pieces = separated_lines(receiver, node.name, arguments, keyword_values)
+    return outcome([pieces], bindings) if node.block.nil?
+    walking = method_call_node(node.receiver, "each", [], node.block, line: node.line)
+    walked = evaluate_block_call(walking, pieces, [], bindings)
+    return walked unless walked.signal == "none"
+    return outcome([receiver], walked.bindings)
+  end
+  # `split` with a block (#318), Ruby's: each piece the blockless call
+  # would answer is handed over through `each`'s own walk, and the string
+  # comes back.
+  if (receiver in String) && node.name == "split" && node.block.some?
+    check_builtin_count(receiver, node.name, arguments.length)
+    pieces = case arguments.length
+             when 0 then receiver.split
+             when 1 then receiver.split(value_at(arguments, 0))
+             else receiver.split(arguments[0], arguments[1])
+             end
+    walking = method_call_node(node.receiver, "each", [], node.block, line: node.line)
+    walked = evaluate_block_call(walking, pieces, [], bindings)
+    return walked unless walked.signal == "none"
+    return outcome([receiver], walked.bindings)
   end
   return set_rewrapped(original, node.name, evaluate_block_call(node, receiver, arguments, bindings)) if node.block.some?
   # `sample(random:)` and `shuffle(random:)` (ADR 0065): the one keyword a
@@ -3521,6 +3638,7 @@ def evaluate_method_call(node, mutable bindings)
   # A builtin called with the wrong count says so before any host arm can
   # fail on a missing argument with the wrong words (#88).
   check_builtin_count(receiver, node.name, arguments.length)
+  refuse_guest_argument(receiver, node.name, arguments)
   result = case node.name
   when "nil?" then receiver.nil?
   when "some?" then receiver.some?
@@ -3653,7 +3771,8 @@ def evaluate_method_call(node, mutable bindings)
   when "strip" then receiver.strip
   when "lstrip" then receiver.lstrip
   when "rstrip" then receiver.rstrip
-  when "chomp" then receiver.chomp
+  when "chomp" then arguments.empty? ? receiver.chomp : receiver.chomp(value_at(arguments, 0))
+  when "ascii_only?" then receiver.ascii_only?
   when "capitalize" then receiver.capitalize
   when "swapcase" then receiver.swapcase
   when "lines" then receiver.lines
@@ -3729,6 +3848,9 @@ def evaluate_method_call(node, mutable bindings)
   when "tally" then receiver.tally
   when "zip" then receiver.zip(value_at(arguments, 0))
   when "each_slice" then receiver.each_slice(value_at(arguments, 0))
+  # Without a block, each element beside its index: the finished
+  # collection, where Ruby answers an enumerator (#338).
+  when "each_with_index" then receiver.each_with_index
   when "each_cons" then receiver.each_cons(value_at(arguments, 0))
   # Guest-aware (#105): a guest symbol, struct, or enum case is a tagged
   # array here, which the host's flatten would open. An array flattens all
@@ -3752,7 +3874,15 @@ def evaluate_method_call(node, mutable bindings)
   when "clamp" then arguments.length == 1 ? receiver.clamp(value_at(arguments, 0)) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
   # A range steps by a stride; an integer steps to a limit, by one or by a
   # stride (#109) — the host answers both.
-  when "step" then arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
+  # A range steps by one when no stride is given (#333).
+  when "step"
+    if arguments.empty?
+      receiver.step
+    elsif arguments.length == 2
+      receiver.step(value_at(arguments, 0), value_at(arguments, 1))
+    else
+      receiver.step(value_at(arguments, 0))
+    end
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   # No separator, or a nil one, joins with nothing between (#142, #104).
@@ -3776,6 +3906,9 @@ def evaluate_method_call(node, mutable bindings)
   when "slice"
     if receiver in Hash
       arguments.reduce({}) { |kept, key| kept.merge(receiver.slice(key)) }
+    elsif (receiver in String) && arguments.length == 1 && (value_at(arguments, 0) in String)
+      # A String pattern (#314): the pattern where the string holds it.
+      receiver.slice(value_at(arguments, 0))
     elsif (receiver in String) && (value_at(arguments, 0) in Regexp)
       # A pattern alone (ADR 0086) is the match's text or nil; with a group
       # by number or name, that group's.
@@ -3797,15 +3930,17 @@ def evaluate_method_call(node, mutable bindings)
   when "overlap?" then receiver.overlap?(value_at(arguments, 0))
   # Bare `any?` on a hash asks whether it holds a pair (#105); with a
   # pattern (ADR 0065), the predicates, grep, and the slices ask the
-  # host's `when` rule — a range covers, anything else asks `==`.
-  when "any?" then arguments.empty? ? receiver.any? : receiver.any?(value_at(arguments, 0))
-  when "all?" then receiver.all?(value_at(arguments, 0))
-  when "none?" then receiver.none?(value_at(arguments, 0))
-  when "one?" then receiver.one?(value_at(arguments, 0))
-  when "grep" then receiver.grep(value_at(arguments, 0))
-  when "grep_v" then receiver.grep_v(value_at(arguments, 0))
-  when "slice_before" then receiver.slice_before(value_at(arguments, 0))
-  when "slice_after" then receiver.slice_after(value_at(arguments, 0))
+  # host's `when` rule — a range covers, a regex matches, anything else
+  # asks `==`.
+  when "any?" then arguments.empty? ? receiver.any? : pattern_answer(receiver, "any?", value_at(arguments, 0))
+  # With neither a block nor a pattern, each of these three is the host's
+  # bare call, which refuses as the seed does: handing over a missing
+  # pattern as nil made them answer, wrongly (#337).
+  when "all?" then arguments.empty? ? receiver.all? : pattern_answer(receiver, "all?", value_at(arguments, 0))
+  when "none?" then arguments.empty? ? receiver.none? : pattern_answer(receiver, "none?", value_at(arguments, 0))
+  when "one?" then arguments.empty? ? receiver.one? : pattern_answer(receiver, "one?", value_at(arguments, 0))
+  when "grep", "grep_v", "slice_before", "slice_after"
+    pattern_answer(receiver, node.name, value_at(arguments, 0))
   when "has_value?", "value?" then receiver.has_value?(value_at(arguments, 0))
   when "key" then receiver.key(value_at(arguments, 0))
   # Ruby's implicit-conversion protocol names are false aliases (ADR 0036,
@@ -3914,6 +4049,9 @@ def builtin_type_of(value)
   return ["regexp"] if value in Regexp
   return ["matchdata"] if value in MatchData
   return ["set"] if value in ["__set__", *]
+  # A range has a row in the table too, so a wrong count on one refuses
+  # here as it does on the seed, and is never dropped (#332).
+  return ["range", ["unknown"]] if value in Range
   return ["rational"] if value in Rational
   return ["complex"] if value in Complex
   nil
@@ -3924,6 +4062,52 @@ end
 # The tower's constructors take numbers (ADR 0085); a guest value that is
 # not one — a symbol, a string, nil — refuses here with its guest rendering,
 # before the host's constructor could show its tagged shape.
+# A guest value the host holds as a tagged array: a symbol, a struct, an
+# enum case, a set, or a type.
+def guest_tagged?(value)
+  value in ["__symbol__", *] | ["__struct__", *] | ["__enum_case__", *] | ["__set__", *] | ["__type__", *]
+end
+
+# The number and string methods that read a guest value themselves, or
+# refuse one in a sentence of their own: equality and ordering, the
+# pattern questions and a slice by a group's name, the forms that name a
+# normalization or a type, and the methods whose argument is converted in
+# Ruby's words.
+GUEST_READING_METHODS = %w[!= !~ == === =~ <=> [] chr delete encode end_with? eql? equal? gsub instance_of? is_a? kind_of? match match? scan slice squeeze start_with? sub tr tr_s unicode_normalize unicode_normalized?]
+
+# A number or string method handed a guest value it does not take (#330):
+# the seed's sentence, each value written as the guest writes it, said here
+# before the host could print a symbol's or a struct's tagged shape. A
+# struct asked a pattern's question refuses the same way.
+def refuse_guest_argument(receiver, name, arguments)
+  written = arguments.map { render_inspect(it) }.join(", ")
+  if (name == "=~" || name == "!~") && (receiver in ["__struct__", *])
+    panic("undefined method #{name} for #{render_inspect(receiver)} with [#{written}]")
+  end
+  scalar = (receiver in Integer) || (receiver in Float) || (receiver in Rational) || (receiver in Complex) || (receiver in String)
+  return unless scalar && arguments.any? { guest_tagged?(it) }
+  # `between?` orders the receiver against each bound, and `clamp` the
+  # bounds against each other first; the pair that does not order is the
+  # one the seed names.
+  if name == "between?" || name == "clamp"
+    first = value_at(arguments, 0)
+    unordered = arguments.find { guest_tagged?(it) }
+    against = (name == "clamp" && !guest_tagged?(first)) ? first : receiver
+    panic("cannot apply '<=>' to #{render_inspect(against)} and #{render_inspect(unordered)}")
+  end
+  # The two families Ruby's own words refuse: a candidate that is no
+  # string, and a pattern that is neither a string nor a regex.
+  if (receiver in String) && (name == "start_with?" || name == "end_with?")
+    candidate = arguments.find { guest_tagged?(it) }
+    panic("no implicit conversion of #{value_type_label(candidate)} into String")
+  end
+  if (receiver in String) && (name == "sub" || name == "gsub") && guest_tagged?(value_at(arguments, 0))
+    panic("wrong argument type #{value_type_label(value_at(arguments, 0))} (expected Regexp)")
+  end
+  return if GUEST_READING_METHODS.include?(name)
+  panic("undefined method #{name} for #{render_inspect(receiver)} with [#{written}]")
+end
+
 def refuse_non_number(name, arguments)
   arguments.each do |argument|
     next if (argument in Integer) || (argument in Float) || (argument in Rational) || (argument in Complex)
@@ -3961,7 +4145,10 @@ def check_builtin_count(receiver, name, given)
   low = value_at(arity, 0)
   high = value_at(arity, 1)
   return if given >= low && given <= high
-  expected = if low == high then low.to_s else "#{low} to #{high}" end
+  # An open-ended count (`dig/1+`) has no upper bound to name (#338).
+  open_ended = high == 9223372036854775807
+  bounded = if low == high then low.to_s else "#{low} to #{high}" end
+  expected = if open_ended then "#{low} or more" else bounded end
   panic("#{spelled(name)} takes #{expected} #{arguments_word(expected)}, got #{given}")
 end
 
@@ -4067,10 +4254,13 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # match, given it, and the call answers the block's result as a maybe —
   # the host's `first` lifts a nil result to the present nil — or nil when
   # nothing matched and the block never ran.
-  if (receiver in Regexp) && node.name == "match"
+  # A pattern, a string, and a symbol all take it (#319); a symbol is read
+  # by its name.
+  if ((receiver in Regexp) || (receiver in String) || (receiver in ["__symbol__", *])) && node.name == "match"
     check_builtin_count(receiver, node.name, arguments.length)
-    subject = pattern_operand(receiver, value_at(arguments, 0))
-    found = arguments.length == 2 ? receiver.match(subject, value_at(arguments, 1)) : receiver.match(subject)
+    matcher = (receiver in ["__symbol__", *]) ? value_at(receiver, 1) : receiver
+    subject = pattern_operand(matcher, value_at(arguments, 0))
+    found = arguments.length == 2 ? matcher.match(subject, value_at(arguments, 1)) : matcher.match(subject)
     return outcome([nil], scope) if found.nil?
     step = run_guest_block(block, [found], scope)
     scope = compacted_since(entry, step.bindings)
@@ -4503,7 +4693,13 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # Ruby's Numeric#step with a block (#109): the host's walk handed over
   # one value at a time, the receiver answered.
   when "step"
-    walked = arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
+    walked = if arguments.empty?
+      receiver.step
+    elsif arguments.length == 2
+      receiver.step(value_at(arguments, 0), value_at(arguments, 1))
+    else
+      receiver.step(value_at(arguments, 0))
+    end
     walked.each do |value|
       step = run_guest_block(block, [value], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4711,6 +4907,9 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
   when "find", "detect"
+    # Ruby's `find(ifnone)` takes a proc, which waits on #77; with any
+    # argument beside the block it refuses, as on the seed (#336).
+    panic("undefined block-taking method #{node.name}") unless arguments.empty?
     result = receiver.find do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4749,6 +4948,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     outcome([result], scope)
   when "min"
+    check_builtin_count(receiver, node.name, arguments.length)
     result = receiver.min do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4756,6 +4956,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     end
     outcome([result], scope)
   when "max"
+    check_builtin_count(receiver, node.name, arguments.length)
     result = receiver.max do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4829,7 +5030,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # the guest block answers for each. A pattern beside a block on the
   # predicates refuses rather than letting one silently win.
   when "grep", "grep_v"
-    matched = node.name == "grep" ? receiver.grep(value_at(arguments, 0)) : receiver.grep_v(value_at(arguments, 0))
+    matched = pattern_answer(receiver, node.name, value_at(arguments, 0))
     results = matched.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -4961,7 +5162,10 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([runs], scope)
   when "flat_map", "collect_concat"
-    results = receiver.flat_map do |element|
+    # The opening is the evaluator's own, one level and only where the
+    # block answered an array: the host's flat_map would open a struct or a
+    # symbol too, each being a tagged array to it (#341).
+    answers = receiver.map do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
       if step.signal != "none"
@@ -4972,10 +5176,20 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
       slot_value(step.value)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
+    mutable results = []
+    answers.each do |answer|
+      if plain_array?(answer)
+        results += answer
+      else
+        results << answer
+      end
+    end
     outcome([results], scope)
   else
-    puts "evaluator: cannot evaluate block method #{node.name} yet"
-    outcome([], scope)
+    # A block form this evaluator has no arm for refuses, in the seed's
+    # sentence (#336): printing a notice and answering nothing let the
+    # program run on with a value it never computed.
+    panic("undefined block-taking method #{node.name}")
   end
 end
 
@@ -4995,6 +5209,17 @@ def keyword_value_for(keyword_values, parameter, scope)
   end
   default = evaluate_expression(parameter.default, scope)
   slot_value(default.value)
+end
+
+# A function's parameter named for a method shadows it, the no-shadow
+# rule of language.md — the seed's sentence, asked where the seed asks it,
+# on a function's call and not on a struct method's (#348).
+def refuse_shadowing_parameters(parameters, scope)
+  parameters.each do |parameter|
+    held = lookup(scope, parameter.name)
+    next unless (!held.empty? && held.first[1] == "method") || builtin_method?(parameter.name)
+    panic("parameter #{parameter.name} shadows method #{parameter.name} — rename one")
+  end
 end
 
 # Bind parameters onto a scope, left to right so defaults can reference
@@ -5057,6 +5282,7 @@ def invoke_with_block(payload, arguments, keyword_values, block, fields_target, 
   # While a defined `new` runs, `fields(...)` is its raw constructor
   # (ADR 0031); the marker rides the scope and dies at the next boundary.
   scope = [["__fields__", "fields", fields_target]] + scope unless fields_target.nil?
+  refuse_shadowing_parameters(parameters, scope)
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   # A `next` reaching a boundary escaped every loop that could have owned
@@ -5108,7 +5334,9 @@ def evaluate_yield(node, mutable bindings)
   # A gathering block (#110) keeps what it is handed — one value as itself,
   # several as an array, as Ruby's Enumerable packs them — and answers nil.
   if block == "__collector__"
-    item = values.length == 1 ? value_at(values, 0) : values
+    # A bare `yield` hands over nothing, which gathers as nil, Ruby's
+    # reading (#341).
+    item = values.empty? ? nil : (values.length == 1 ? value_at(values, 0) : values)
     return Outcome.new(value: [nil], bindings: [["__block__", "block", ["__collector__", written_in + [item]]]] + bindings, signal: "none", target: nil)
   end
   result = run_guest_block(block, values, written_in)

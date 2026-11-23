@@ -45,4 +45,8 @@ context "Symbol#start_with?" do
     expect(:"12test".start_with?(trailing)).to eq(false)
     expect(:test12.start_with?(trailing)).to eq(false)
   end
+
+  specify "answers false when given no candidates" do
+    expect(:hello.start_with?()).to be_false
+  end
 end

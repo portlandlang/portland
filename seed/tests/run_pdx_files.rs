@@ -851,6 +851,10 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "def area in a trait body is always defined — 'unless' cannot guard it; put the condition inside the method",
         ),
         (
+            "answer = case [1, 2]\nin [*, found, *] then found\nelse 0\nend\np answer\n",
+            "a * rest must end an array pattern",
+        ),
+        (
             "trait Sexp\n  def self.of\n    1\n  end\nend\n",
             "a trait cannot define def self.of — a type function lives on the struct that includes it",
         ),
@@ -1223,6 +1227,17 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
         ),
         // ADR 0047 shape 4 — an operator on operands it cannot take, the
         // legal pairs being the seed's own match arms read as types.
+        (
+            // #301: `private_constant` names a constant its module defines.
+            "module Config\n  FOO = 1\n  private_constant :MISSING\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "private_constant names MISSING, which Config does not define — it hides a constant Config defines",
+        ),
+        (
+            "struct Token\n  kind\n  KINDS = %w[word mark]\n  private_constant :KINDZ\nend\nputs \"reached the end\"\n",
+            "reached the end\n",
+            "private_constant names KINDZ, which Token does not define — it hides a constant Token defines",
+        ),
         (
             "count = 3\nif false\n  label = \"total: \" + count\nend\nputs \"reached the end\"\n",
             "reached the end\n",
@@ -1758,10 +1773,6 @@ fn a_match_takes_two_values_between_brackets() {
             "an Array takes one index between brackets — with two, write slice(1, 2)",
         ),
         (
-            "p \"haystack\"[/(a)(y)/, 1]\n",
-            "a String takes one index between brackets — with two, write slice(/(a)(y)/, 1)",
-        ),
-        (
             "table = {\"a\" => 1}\np table[\"a\", 2]\n",
             "a Hash takes one index between brackets, got 2",
         ),
@@ -1893,6 +1904,281 @@ fn a_suffixed_literal_starts_a_paren_less_argument() {
         "suffixed_argument.pdx",
         "p 3r\np 2i\np 1.5r\nfound = [1, 2].include? 3r\np found\n",
         "(3/1)\n(0+2i)\n(3/2)\nfalse\n",
+    );
+}
+
+/// `private_constant` among a struct's fields, before any def, is read as
+/// the marker it is on both oracles (#301), and may hide a nested type.
+#[test]
+fn private_constant_sits_among_a_structs_fields() {
+    assert_both_print(
+        "private_constant_in_fields.pdx",
+        "struct Token\n  kind\n  KINDS = %w[word mark]\n  private_constant :KINDS\n\n  def known? = KINDS.include?(kind)\nend\nmodule Config\n  struct Helper\n    name\n  end\n  private_constant :Helper\nend\nputs Token.new(kind: \"word\").known?\n",
+        "true\n",
+    );
+}
+
+/// A struct's fields sit anywhere before its first method (#302): after an
+/// `include` or a nested type on both oracles, and a field after a def
+/// refuses on both in one sentence.
+#[test]
+fn a_structs_fields_may_follow_an_include_or_a_nested_type() {
+    assert_both_print(
+        "fields_after_include.pdx",
+        "trait Basic\n  def greet = \"hi\"\nend\nstruct Child\n  first\n  include Basic\n  second\n  enum Kind\n    :small\n  end\n  attr_reader :third\nend\nchild = Child.new(first: 1, second: 2, third: 3)\nputs child.greet\nputs child.first + child.second + child.third\n",
+        "hi\n6\n",
+    );
+    let cases = [(
+        "struct Child\n  def greet = \"hi\"\n  name\nend\n",
+        "fields come before methods in struct Child",
+    )];
+    assert_both_oracles_refuse("field_after_method.pdx", None, &cases);
+}
+
+/// `inspect` escapes what does not print (#345): Ruby's named control
+/// escapes, `\\uXXXX` for the rest, a CR LF as its two halves — the same
+/// text on both oracles, inside a collection too.
+#[test]
+fn inspect_escapes_control_characters_on_both_oracles() {
+    assert_both_print(
+        "inspect_controls.pdx",
+        "p \"a\\r\\nb\"\np 7.chr\np 27.chr\np 0.chr\np 127.chr\nputs inspect([1.chr, \"x\"])\np 8232.chr(Encoding::UTF_8)\n",
+        "\"a\\r\\nb\"\n\"\\a\"\n\"\\e\"\n\"\\u0000\"\n\"\\u007F\"\n[\"\\u0001\", \"x\"]\n\"\\u2028\"\n",
+    );
+}
+
+/// A trait name in a `case/in` pattern refuses on both oracles (#300):
+/// no value is of a trait's type, so the arm could only ever miss.
+#[test]
+fn a_trait_name_as_a_pattern_refuses_on_both_oracles() {
+    let cases = [(
+        "trait Basic\n  def greet = \"hi\"\nend\nstruct Child\n  name\n  include Basic\nend\nanswer = case Child.new(name: \"x\")\nin Basic then \"basic\"\nelse \"other\"\nend\nputs answer\n",
+        "'in Basic' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include Basic",
+    )];
+    assert_both_oracles_refuse("trait_pattern.pdx", None, &cases);
+}
+
+/// `begin`, `end`, and `offset` on a match refuse a negative index in
+/// Ruby's words on both oracles (#392); `[]` still counts one back.
+#[test]
+fn a_matchs_positions_refuse_a_negative_index() {
+    let found = "found = /(h)(e)/.match(\"hello\")\n";
+    assert_both_print(
+        "match_negative_index.pdx",
+        &format!("{found}p found[-1]\np found.begin(2)\n"),
+        "\"e\"\n1\n",
+    );
+    let cases = [
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.begin(-1)\n",
+            "index -1 out of matches",
+        ),
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.end(-1)\n",
+            "index -1 out of matches",
+        ),
+        (
+            "found = /(h)(e)/.match(\"hello\")\np found.offset(-2)\n",
+            "index -2 out of matches",
+        ),
+    ];
+    assert_both_oracles_refuse("match_negative_position.pdx", None, &cases);
+}
+
+/// A count given to `max` or `min` refuses on both oracles in one
+/// sentence, with or without a comparator block (#332): the hosted
+/// evaluator checks a range's argument count as it does an array's.
+#[test]
+fn a_count_to_max_or_min_refuses_on_both_oracles() {
+    let cases = [
+        ("p((1..10).max(2))\n", "'max' takes 0 arguments, got 1"),
+        ("p((1..10).min(2))\n", "'min' takes 0 arguments, got 1"),
+        (
+            "p((1..10).max(2) { |left, right| left <=> right })\n",
+            "'max' takes 0 arguments, got 1",
+        ),
+        (
+            "p([3, 1].min(2) { |left, right| left <=> right })\n",
+            "'min' takes 0 arguments, got 1",
+        ),
+    ];
+    assert_both_oracles_refuse("counted_extreme.pdx", None, &cases);
+}
+
+/// A refusal about a guest value names it as the guest writes it on both
+/// oracles (#330): the hosted evaluator says the seed's sentence before the
+/// host could print a symbol's or a struct's tagged shape.
+#[test]
+fn refusals_render_guest_values_alike_on_both_oracles() {
+    let cases = [
+        (
+            "struct Plain\n  name\nend\np Complex.rectangular(:sym)\n",
+            "Complex.rectangular takes numbers, got :sym",
+        ),
+        (
+            "struct Plain\n  name\nend\np Complex.polar(Plain.new(name: \"x\"))\n",
+            "Complex.polar takes numbers, got Plain(name: \"x\")",
+        ),
+        (
+            "struct Plain\n  name\nend\np Complex(20).fdiv(:sym)\n",
+            "undefined method fdiv for (20+0i) with [:sym]",
+        ),
+        (
+            "struct Plain\n  name\nend\np 3.gcd(:sym)\n",
+            "undefined method gcd for 3 with [:sym]",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".index(Plain.new(name: \"x\"))\n",
+            "undefined method index for \"a\" with [Plain(name: \"x\")]",
+        ),
+        (
+            "struct Plain\n  name\nend\np(Plain.new(name: \"x\") !~ /x/)\n",
+            "undefined method !~ for Plain(name: \"x\") with [/x/]",
+        ),
+        (
+            "struct Plain\n  name\nend\np 3.clamp(1, :b)\n",
+            "cannot apply '<=>' to 1 and :b",
+        ),
+        (
+            "struct Plain\n  name\nend\np Math.sqrt(:sym)\n",
+            "can't convert Symbol into Float",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".start_with?(:sym)\n",
+            "no implicit conversion of Symbol into String",
+        ),
+        (
+            "struct Plain\n  name\nend\np \"a\".sub(Plain.new(name: \"x\"), \"y\")\n",
+            "wrong argument type Plain (expected Regexp)",
+        ),
+    ];
+    assert_both_oracles_refuse("guest_value_refusal.pdx", None, &cases);
+}
+
+/// `all?`, `none?`, and `one?` with neither a block nor a pattern refuse on
+/// both oracles in one sentence (#337): the hosted evaluator once handed
+/// the missing pattern over as nil and answered.
+#[test]
+fn the_bare_predicates_refuse_on_both_oracles() {
+    let cases = [
+        (
+            "p([true, true].all?)\n",
+            "undefined method all? for [true, true] with []",
+        ),
+        (
+            "p([true, true].none?)\n",
+            "undefined method none? for [true, true] with []",
+        ),
+        (
+            "p([true, false].one?)\n",
+            "undefined method one? for [true, false] with []",
+        ),
+    ];
+    assert_both_oracles_refuse("bare_predicates.pdx", None, &cases);
+}
+
+/// A block form neither implementation builds refuses on both in one
+/// sentence (#336): the hosted evaluator once printed a notice, answered
+/// nothing, and ran on.
+#[test]
+fn an_unbuilt_block_form_refuses_on_both_oracles() {
+    let cases = [
+        (
+            "p([1, 2, 3, 4].uniq { it >= 2 ? 1 : 0 })\n",
+            "undefined block-taking method uniq",
+        ),
+        (
+            "p([1, 2, 3, 4].each_slice(2) { |slice| slice })\n",
+            "undefined block-taking method each_slice",
+        ),
+        (
+            "p([1, 1].tally { |item| item })\n",
+            "undefined block-taking method tally",
+        ),
+        (
+            "p([1, 2, 3].find(42) { false })\n",
+            "undefined block-taking method find",
+        ),
+    ];
+    assert_both_oracles_refuse("unbuilt_block_form.pdx", None, &cases);
+}
+
+/// A function's parameter named for a method refuses on both oracles
+/// (#348), a default or a keyword parameter included; a struct method's
+/// parameter is not asked, on either.
+#[test]
+fn a_parameter_named_for_a_method_refuses_on_both_oracles() {
+    assert_both_print(
+        "parameter_beside_struct_method.pdx",
+        "def helper = 1\nstruct Point\n  size\n\n  def grow(helper) = helper\nend\np Point.new(size: 1).grow(2)\n",
+        "2\n",
+    );
+    let cases = [
+        (
+            "def bar = 1\ndef foo(bar = bar())\n  bar\nend\np foo\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def bar = 1\ndef foo(bar)\n  bar\nend\np foo(2)\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def bar = 1\ndef foo(bar: 2)\n  bar\nend\np foo\n",
+            "parameter bar shadows method bar — rename one",
+        ),
+        (
+            "def run(puts) = puts\np run(1)\n",
+            "parameter puts shadows method puts — rename one",
+        ),
+    ];
+    assert_both_oracles_refuse("parameter_shadows_method.pdx", None, &cases);
+}
+
+/// A string whose first character is a combining mark or a zero-width
+/// joiner lexes on both oracles (#322): a mark written after a quote, or
+/// after an interpolation's closing brace, shares a character with it, and
+/// the hosted lexer once lost the quote.
+#[test]
+fn a_string_may_begin_with_a_combining_mark_on_both_oracles() {
+    assert_both_print(
+        "combining_mark_string.pdx",
+        "mark = \"\u{36f}\"\np mark.length\njoined = \"\u{200d}q\"\np joined.length\nsingle = '\u{36f}single'\np single.length\nname = \"pdx\"\nputs \"\u{36f}#{name}\u{36f}\"\np :\"\u{36f}s\"\np(/\u{36f}+x/i.match?(\"\u{36f}\u{36f}X\"))\np(%w[\u{36f} a].length)\n",
+        "1\n2\n7\n\u{36f}pdx\u{36f}\n:\"\u{36f}s\"\ntrue\n2\n",
+    );
+}
+
+/// `flat_map` opens one level of what the block answers and leaves a
+/// struct whole, a bare `yield` gathers as nil, and a struct that defines
+/// an implicit conversion refuses at the definition, on both oracles (#341).
+#[test]
+fn flat_map_a_bare_yield_and_a_defined_to_ary_agree_on_both_oracles() {
+    assert_both_print(
+        "flat_map_struct.pdx",
+        "struct Thing\n  name\nend\nstruct Bare\n  first\n\n  include Enumerable\n\n  def each\n    yield\n    yield 1\n  end\nend\nthing = Thing.new(name: \"t\")\np([1, 2].flat_map { |number| number == 1 ? thing : [number] })\np([1, [2, [3]]].flat_map { it })\np(Bare.new(first: 1).to_a)\n",
+        "[Thing(name: \"t\"), 2]\n[1, 2, [3]]\n[nil, 1]\n",
+    );
+    let cases = [
+        (
+            "struct Wrap\n  items\n\n  def to_ary = items\nend\n",
+            "to_ary is Ruby's implicit conversion, which nothing here calls — define to_a",
+        ),
+        (
+            "trait Texty\n  def to_str = \"t\"\nend\n",
+            "to_str is Ruby's implicit conversion, which nothing here calls — define to_s",
+        ),
+    ];
+    assert_both_oracles_refuse("defined_implicit_conversion.pdx", None, &cases);
+}
+
+/// A string reads two values between brackets as its `slice` does, and a
+/// String pattern in either spelling answers the pattern or nil, on both
+/// oracles (#314).
+#[test]
+fn a_string_takes_two_values_between_brackets() {
+    assert_both_print(
+        "string_two_value_index.pdx",
+        "text = \"hello\"\np text[1, 2]\np text[/l(.)/, 1]\np text[9, 2]\np text[\"lo\"]\np text[\"xyz\"]\np text.slice(\"lo\")\n",
+        "\"el\"\n\"l\"\n\"\"\n\"lo\"\nnil\n\"lo\"\n",
     );
 }
 

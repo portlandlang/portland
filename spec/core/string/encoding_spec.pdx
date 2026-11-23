@@ -10,4 +10,15 @@ context "String#encoding" do
     expect("a".encoding).to eq(Encoding::UTF_8)
     expect("".encoding).to eq(Encoding::UTF_8)
   end
+
+  specify "returns UTF-8 if self isn't US-ASCII only" do
+    text = "䁶ؙ"
+    expect(text.ascii_only?).to be_false
+    expect(text.encoding).to eq(Encoding::UTF_8)
+  end
+
+  specify "knows a string that is US-ASCII only" do
+    expect("@".ascii_only?).to be_true
+    expect("".ascii_only?).to be_true
+  end
 end
