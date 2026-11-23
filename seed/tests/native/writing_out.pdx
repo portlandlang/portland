@@ -1,0 +1,37 @@
+# An array and a Boolean written out (#501): `puts`, `p`, `inspect`, and
+# interpolation, each as the seed writes it. A String in source form goes
+# between quotes with the language's escapes.
+def describe(numbers) = "holds #{numbers}"
+
+numbers = [3, 8, 12]
+names = ["ada", "say \"hi\"", "tab\there", "line\nbreak", "back\\slash", "hash \#{x}", "café", "🇺🇸"]
+flags = [true, false]
+rows = [[1, 2], [], [3]]
+puts numbers
+p(numbers)
+puts names
+p(flags)
+p(rows)
+puts "#{numbers} and #{flags}"
+puts numbers.to_s
+puts inspect(numbers)
+puts true
+puts 1 < 2
+p(true)
+p(42)
+p("text")
+puts inspect("text")
+puts inspect(42)
+puts true.to_s
+puts "flag: #{1 > 2}"
+p(names.length)
+puts inspect(names)
+puts "text".to_s
+puts describe(numbers)
+mutable gathered = []
+names.each { |name| gathered << inspect(name) }
+puts gathered
+p(gathered)
+mutable nothing = [1]
+p([nothing, nothing])
+p([["a"], []])
