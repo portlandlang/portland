@@ -5116,6 +5116,17 @@ def keyword_value_for(keyword_values, parameter, scope)
   slot_value(default.value)
 end
 
+# A function's parameter named for a method shadows it, the no-shadow
+# rule of language.md — the seed's sentence, asked where the seed asks it,
+# on a function's call and not on a struct method's (#348).
+def refuse_shadowing_parameters(parameters, scope)
+  parameters.each do |parameter|
+    held = lookup(scope, parameter.name)
+    next unless (!held.empty? && held.first[1] == "method") || builtin_method?(parameter.name)
+    panic("parameter #{parameter.name} shadows method #{parameter.name} — rename one")
+  end
+end
+
 # Bind parameters onto a scope, left to right so defaults can reference
 # earlier ones.
 def bind_parameters(parameters, arguments, keyword_values, mutable scope)
@@ -5176,6 +5187,7 @@ def invoke_with_block(payload, arguments, keyword_values, block, fields_target, 
   # While a defined `new` runs, `fields(...)` is its raw constructor
   # (ADR 0031); the marker rides the scope and dies at the next boundary.
   scope = [["__fields__", "fields", fields_target]] + scope unless fields_target.nil?
+  refuse_shadowing_parameters(parameters, scope)
   scope = bind_parameters(parameters, arguments, keyword_values, scope)
   result = run_body(body, scope)
   # A `next` reaching a boundary escaped every loop that could have owned
