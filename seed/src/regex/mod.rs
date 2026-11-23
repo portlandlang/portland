@@ -127,6 +127,15 @@ impl Regex {
             .expect("an unbounded search cannot run out of budget")
     }
 
+    /// Whether the pattern matches starting exactly at the byte offset
+    /// `start`, with `\G` standing at `global`. A backward search needs the
+    /// two apart: Ruby's `rindex` tries each start from the given position
+    /// down, and `\G` stays at that position throughout.
+    pub fn matches_at(&self, text: &str, start: usize, global: usize) -> bool {
+        let mut matcher = vm::Matcher::new(&self.program, text, u64::MAX);
+        matches!(matcher.match_at(start, global), Ok(Some(_)))
+    }
+
     /// `search_from` with a ceiling on the matcher's steps, refusing with
     /// Onigmo's `match-stack limit over` when it is reached; what a test
     /// harness uses so a pathological case cannot run away.
