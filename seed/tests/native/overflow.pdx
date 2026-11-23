@@ -1,0 +1,15 @@
+# Arithmetic is checked (ADR 0070): what was printed before the overflow
+# stays printed, and the refusal is the seed's sentence and exit status.
+
+def grow(start)
+  mutable value = start
+  mutable turns = 0
+  while turns < 70
+    value = value * 2
+    turns += 1
+  end
+  value
+end
+
+puts 1
+puts grow(3)

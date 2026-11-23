@@ -1,0 +1,12 @@
+# Calls and integer arithmetic, nothing else: the native spike's first
+# target (#443). It says nothing about strings, collections, or memory.
+
+def fib(n)
+  if n < 2
+    n
+  else
+    fib(n - 1) + fib(n - 2)
+  end
+end
+
+puts fib(30)

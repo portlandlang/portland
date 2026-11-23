@@ -1,0 +1,29 @@
+# An `if` run for its arms, with and without an `else`, an `elsif` chain
+# read for its value, and `unless`.
+
+def size_of(number)
+  if number > 100
+    3
+  elsif number > 10
+    2
+  else
+    1
+  end
+end
+
+puts size_of(5)
+puts size_of(50)
+puts size_of(500)
+
+count = size_of(50)
+if count == 2
+  puts 20
+else
+  puts 30
+end
+if count == 9
+  puts 90
+end
+unless count == 9
+  puts 91
+end

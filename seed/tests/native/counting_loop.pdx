@@ -1,0 +1,14 @@
+# The spike's second target (#443): a `while` loop over `mutable` locals,
+# each keeping its type through the loop.
+
+def sum_to(limit)
+  mutable total = 0
+  mutable index = 1
+  while index <= limit
+    total += index
+    index += 1
+  end
+  total
+end
+
+puts sum_to(100000)

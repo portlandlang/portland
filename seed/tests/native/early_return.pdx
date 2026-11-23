@@ -1,0 +1,17 @@
+# A `return` behind a guard, in a def that calls itself.
+
+def countdown(from)
+  return 0 if from < 1
+  countdown(from - 1)
+end
+
+def clamped(number)
+  return 10 if number > 10
+  return 0 if number < 0
+  number
+end
+
+puts countdown(5)
+puts clamped(50)
+puts clamped(0 - 3)
+puts clamped(7)

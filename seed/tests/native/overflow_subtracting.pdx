@@ -1,0 +1,6 @@
+# A subtraction past the smallest Integer refuses, and a negative operand
+# is written as the seed writes it.
+
+smallest = 0 - 9223372036854775807
+puts smallest
+puts smallest - 5

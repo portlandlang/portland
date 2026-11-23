@@ -1,0 +1,13 @@
+# A `mutable` local rebound at the top level, in a loop, and in a branch.
+
+mutable total = 1
+total = total + 1
+total += 3
+mutable step = 0
+while step < 4
+  if step == 2
+    total = total * 10
+  end
+  step += 1
+end
+puts total

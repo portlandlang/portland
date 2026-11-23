@@ -1,0 +1,17 @@
+# The six comparisons, each read by an `if`.
+
+def mark(flag)
+  if flag
+    1
+  else
+    0
+  end
+end
+
+puts mark(1 < 2)
+puts mark(2 <= 2)
+puts mark(3 > 4)
+puts mark(4 >= 5)
+puts mark(5 == 5)
+puts mark(5 != 5)
+puts mark(true == false)

@@ -4,6 +4,8 @@
 #   script/build fib.pdx        writes target/portland/fib.ll and
 #                               target/portland/fib, and prints the binary's path
 #
+# With PDX set to a built seed, that seed runs the compiler and none is built.
+#
 # The compiler, running on the seed, checks the program and writes LLVM IR
 # as text; Apple's clang, found through xcrun so it is the active Xcode's,
 # compiles that. The compiler cannot run a process itself (#179), which is
@@ -27,13 +29,18 @@ root=$(pwd)
 . script/lib/rust.sh
 . script/lib/macos.sh
 
-cargo build --quiet
+# PDX names a seed already built, as the tests do from inside cargo;
+# without it the seed is built here.
+if [ -z "$PDX" ]; then
+  cargo build --quiet --package portland-seed --bin pdx
+  PDX=target/debug/pdx
+fi
 name=$(basename "$program" .pdx)
 output=$root/target/portland
 mkdir -p "$output"
 # A stale .ll from an earlier build must not be compiled when this one refuses.
 rm -f "$output/$name.ll" "$output/$name"
-target/debug/pdx compiler/build.pdx "$program" "$output/$name.ll"
+"$PDX" compiler/build.pdx "$program" "$output/$name.ll"
 # The IR names no target, so clang supplies the host's and would warn that it did.
 xcrun clang -O2 -Wno-override-module -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll"
 echo "$output/$name"
