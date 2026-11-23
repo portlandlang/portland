@@ -1970,6 +1970,12 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
     elements.iter().take(parameters.len()).cloned().collect()
 }
 
+/// What `strip`, `lstrip`, and `rstrip` take off an end: whitespace, and
+/// NUL, which Ruby counts with it.
+fn strippable(character: char) -> bool {
+    character.is_whitespace() || character == '\0'
+}
+
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
 /// while they last; from the first float — or a float init — the rest go
 /// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
@@ -8137,9 +8143,16 @@ impl<W: std::io::Write> Interpreter<W> {
                 other.type_name()
             ),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
-            (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
-            (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),
-            (Value::String(text), "rstrip", []) => Value::String(text.trim_end().to_string()),
+            // NUL strips with the whitespace, as in Ruby (#344).
+            (Value::String(text), "strip", []) => {
+                Value::String(text.trim_matches(strippable).to_string())
+            }
+            (Value::String(text), "lstrip", []) => {
+                Value::String(text.trim_start_matches(strippable).to_string())
+            }
+            (Value::String(text), "rstrip", []) => {
+                Value::String(text.trim_end_matches(strippable).to_string())
+            }
             // One trailing line ending comes off — `\r\n` as a unit, else one
             // `\n` or `\r` — and a string without one passes through whole.
             (Value::String(text), "chomp", []) => {
