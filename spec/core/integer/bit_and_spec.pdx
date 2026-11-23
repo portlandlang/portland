@@ -15,6 +15,7 @@ context "Integer#&" do
     expect(1.shift_left(33).bit_and(-1)).to eq(1.shift_left(33))
     expect(-1.bit_and(1.shift_left(33))).to eq(1.shift_left(33))
     expect((-(1.shift_left(33)) - 1).bit_and(5)).to eq(5)
+    expect(5.bit_and(-(1.shift_left(33)) - 1)).to eq(5)
   end
 
   specify "returns self bitwise AND other when both operands are negative" do

@@ -8,4 +8,23 @@ context "Range#step" do
   specify "Range#step walks in strides" do
     expect((1..9).step(3).to_a).to eq([1, 4, 7])
   end
+
+  describe "when no block is given" do
+    describe "returned Enumerator" do
+      describe "size" do
+        specify "returns the ceil of range size divided by the number of steps" do
+          expect((1..10).step(4).size).to eq(3)
+          expect((1..10).step(3).size).to eq(4)
+          expect((1..10).step(2).size).to eq(5)
+          expect((1..10).step(1).size).to eq(10)
+          expect((-5..5).step(2).size).to eq(6)
+          expect((1...10).step(4).size).to eq(3)
+          expect((1...10).step(3).size).to eq(3)
+          expect((1...10).step(2).size).to eq(5)
+          expect((1...10).step(1).size).to eq(9)
+          expect((-5...5).step(2).size).to eq(5)
+        end
+      end
+    end
+  end
 end

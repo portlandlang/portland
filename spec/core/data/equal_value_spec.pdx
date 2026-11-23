@@ -27,4 +27,21 @@ context "Data#==" do
     expect(a == DataSpecs::Measure.new(amount: 42, unit: "mi")).to eq(false)
     expect(a == Movie.new(title: "42", year: 1)).to eq(false)
   end
+
+  specify "returns true if the other is the same object" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(measure == measure).to be_true
+  end
+
+  specify "returns true if the other has all the same fields" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    twin = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(measure == twin).to be_true
+  end
+
+  specify "returns false if the other is a different object or has different fields" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    other = DataSpecs::Measure.new(amount: 42, unit: "mi")
+    expect(measure == other).to be_false
+  end
 end

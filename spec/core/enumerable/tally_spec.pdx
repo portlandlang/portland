@@ -4,6 +4,16 @@
 
 require_relative "../../spec_helper"
 
+struct TallyNumerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+
 context "Enumerable#tally" do
   specify "tally counts into a hash, keys in first-seen order" do
     expect(%w[a b a].tally).to eq({"a" => 2, "b" => 1})
@@ -11,5 +21,14 @@ context "Enumerable#tally" do
 
   specify "answer as on an array" do
     expect(Set[1, 1, 2].tally).to eq({1 => 1, 2 => 1})
+  end
+
+  specify "returns a hash with counts according to the value" do
+    words = TallyNumerous.new(list: ["foo", "bar", "foo", "baz"])
+    expect(words.tally).to eq({"foo" => 2, "bar" => 1, "baz" => 1})
+  end
+
+  specify "returns an empty hash for empty enumerables" do
+    expect(TallyNumerous.new(list: []).tally).to eq({})
   end
 end

@@ -8,4 +8,99 @@ context "Complex#fdiv" do
   specify "divides exactly where the parts are exact" do
     expect(inspect(Complex(1, 2).fdiv(2))).to eq("(0.5+1.0i)")
   end
+
+  specify "accepts a numeric argument" do
+    expect(Complex(20).fdiv(2)).to be_an_instance_of(Complex)
+    expect(Complex(20).fdiv(2.0)).to be_an_instance_of(Complex)
+  end
+
+  specify "accepts a negative numeric argument" do
+    expect(Complex(20).fdiv(-2)).to be_an_instance_of(Complex)
+    expect(Complex(20).fdiv(-2.0)).to be_an_instance_of(Complex)
+  end
+
+  specify "sets the real part to NaN if self's real part is NaN" do
+    expect(Complex(Float::NAN).fdiv(2).real.nan?).to be_true
+  end
+
+  specify "sets the imaginary part to NaN if self's imaginary part is NaN" do
+    expect(Complex(2, Float::NAN).fdiv(2).imag.nan?).to be_true
+  end
+
+  specify "sets the real and imaginary part to NaN if self's real and imaginary parts are NaN" do
+    expect(Complex(Float::NAN, Float::NAN).fdiv(2).imag.nan?).to be_true
+    expect(Complex(Float::NAN, Float::NAN).fdiv(2).real.nan?).to be_true
+  end
+
+  specify "sets the real and imaginary part to NaN if self's real part and the argument are both NaN" do
+    expect(Complex(Float::NAN, 2).fdiv(Float::NAN).imag.nan?).to be_true
+    expect(Complex(Float::NAN, 2).fdiv(Float::NAN).real.nan?).to be_true
+  end
+
+  specify "sets the real and imaginary part to NaN if self's real part, self's imaginary part, and the argument are NaN" do
+    expect(Complex(Float::NAN, Float::NAN).fdiv(Float::NAN).imag.nan?).to be_true
+    expect(Complex(Float::NAN, Float::NAN).fdiv(Float::NAN).real.nan?).to be_true
+  end
+
+  specify "sets the real part to NaN and the imaginary part to NaN if self's imaginary part, self's real part, and the argument are Infinity" do
+    expect(Complex(Float::INFINITY, Float::INFINITY).fdiv(Float::INFINITY).real.nan?).to be_true
+    expect(Complex(Float::INFINITY, Float::INFINITY).fdiv(Float::INFINITY).imag.nan?).to be_true
+  end
+end
+
+FDIV_NUMBERS = [1, -1, 5.43, -5.43, 10, -10, 99872.2918710, -99872.2918710]
+
+context "Complex#fdiv with no imaginary part" do
+  specify "returns a Complex number" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each do |other|
+        expect(Complex(real).fdiv(other)).to be_an_instance_of(Complex)
+      end
+    end
+  end
+
+  specify "sets the real part to self's real part fdiv'd with the argument" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each do |other|
+        expect(Complex(real).fdiv(other).real).to eq(real.fdiv(other))
+      end
+    end
+  end
+
+  specify "sets the imaginary part to 0.0" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each do |other|
+        expect(Complex(real).fdiv(other).imaginary).to eq(0.0)
+      end
+    end
+  end
+end
+
+context "Complex#fdiv with an imaginary part" do
+  specify "returns a Complex number" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each_with_index do |other, index|
+        imaginary = FDIV_NUMBERS[index == 0 ? -1 : index - 1]
+        expect(Complex(real, imaginary).fdiv(other)).to be_an_instance_of(Complex)
+      end
+    end
+  end
+
+  specify "sets the real part to self's real part fdiv'd with the argument" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each_with_index do |other, index|
+        imaginary = FDIV_NUMBERS[index == 0 ? -1 : index - 1]
+        expect(Complex(real, imaginary).fdiv(other).real).to eq(real.fdiv(other))
+      end
+    end
+  end
+
+  specify "sets the imaginary part to the imaginary part fdiv'd with the argument" do
+    FDIV_NUMBERS.each do |real|
+      FDIV_NUMBERS.each_with_index do |other, index|
+        imaginary = FDIV_NUMBERS[index == 0 ? -1 : index - 1]
+        expect(Complex(real, imaginary).fdiv(other).imag).to eq(imaginary.fdiv(other))
+      end
+    end
+  end
 end
