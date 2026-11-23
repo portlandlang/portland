@@ -313,7 +313,7 @@ def lower_program(nodes)
     elsif found.reason != "nothing calls it"
       definition = definitions.find { it.name == found.name }
       line = definition.nil? ? "" : " on line #{definition.line}"
-panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
+      panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
   context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false, answer: nil, pinned: pinned.bindings)
