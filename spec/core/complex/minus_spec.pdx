@@ -8,4 +8,18 @@ context "Complex#-" do
   specify "adds, subtracts, and multiplies part by part" do
     expect(Complex(1, 2) - Complex(3, 4)).to eq(Complex(-2, -2))
   end
+
+  describe "with Complex" do
+    specify "subtracts both the real and imaginary components" do
+      expect(Complex(1, 2) - Complex(10, 20)).to eq(Complex(1 - 10, 2 - 20))
+      expect(Complex(1.5, 2.1) - Complex(100.2, -30.3)).to eq(Complex(1.5 - 100.2, 2.1 - (-30.3)))
+    end
+  end
+
+  describe "with Integer" do
+    specify "subtracts the real number from the real component of self" do
+      expect(Complex(1, 2) - 50).to eq(Complex(-49, 2))
+      expect(Complex(1, 2) - 50.5).to eq(Complex(-49.5, 2))
+    end
+  end
 end

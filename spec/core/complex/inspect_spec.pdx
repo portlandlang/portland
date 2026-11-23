@@ -13,4 +13,17 @@ context "Complex#inspect" do
     expect(inspect(Complex(Float::INFINITY, 0))).to eq("(Infinity+0i)")
     expect(inspect(Complex(1, Float::NAN))).to eq("(1+NaN*i)")
   end
+
+  specify "returns (${real}+${image}i) for positive imaginary parts" do
+    expect(inspect(Complex(1))).to eq("(1+0i)")
+    expect(inspect(Complex(7))).to eq("(7+0i)")
+    expect(inspect(Complex(-1, 4))).to eq("(-1+4i)")
+    expect(inspect(Complex(-7, 6.7))).to eq("(-7+6.7i)")
+  end
+
+  specify "returns (${real}-${image}i) for negative imaginary parts" do
+    expect(inspect(Complex(0, -1))).to eq("(0-1i)")
+    expect(inspect(Complex(-1, -4))).to eq("(-1-4i)")
+    expect(inspect(Complex(-7, -6.7))).to eq("(-7-6.7i)")
+  end
 end

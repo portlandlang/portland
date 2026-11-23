@@ -4,6 +4,14 @@
 
 require_relative "../../spec_helper"
 
+struct InitializeSetLike
+  items
+
+  include Enumerable
+
+  def each = items.each { yield it }
+end
+
 context "Set#initialize" do
   specify "adds every element of the passed array" do
     built = Set.new([1, 2, 3])
@@ -44,5 +52,32 @@ context "Set#initialize" do
     from_set = Set.new(Set.new) { it * it }
     expect(from_array.size).to eq(0)
     expect(from_set.size).to eq(0)
+  end
+
+  specify "should initialize with empty set and block" do
+    built = Set.new(Set.new) { |element| element * element }
+    expect(built.size).to eql(0)
+  end
+
+  specify "should initialize with set and block" do
+    original = Set.new([1, 2])
+    built = Set.new(original) { |element| element + 2 }
+    expect(built.size).to eql(2)
+    expect(built).to contain(3)
+    expect(built).to contain(4)
+  end
+
+  specify "should initialize with just block" do
+    built = Set.new { |element| element * element }
+    expect(built.size).to eql(0)
+    expect(built).to eql(Set.new)
+  end
+
+  specify "adds all elements of the passed Enumerable to self" do
+    built = Set.new(InitializeSetLike.new(items: [1, 2, 3]))
+    expect(built.size).to eql(3)
+    expect(built).to contain(1)
+    expect(built).to contain(2)
+    expect(built).to contain(3)
   end
 end

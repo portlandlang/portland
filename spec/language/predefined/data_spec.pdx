@@ -1,0 +1,55 @@
+# `__END__` alone on a line ends the program text, and `DATA` is the text
+# after it in the file that is run (ADR 0092). From ruby/spec
+# language/predefined/data_spec.rb.
+#
+# What stays upstream, and why, is this file's entry in spec/ruby_spec.yml.
+# The rows that need a second program — no `__END__` in the file that is
+# run, nothing after it, no newline after it — are pinned on both
+# implementations by seed/tests/run_pdx_files.rs.
+
+require_relative "../../spec_helper"
+
+require_relative "../../fixtures/language/predefined/data4"
+
+def data_read_inside_a_def = DATA
+
+struct DataReader
+  label
+
+  def text = DATA
+end
+
+context "The DATA constant" do
+  specify "exists when the main script contains __END__" do
+    expect(DATA).to eq("data 1\n<<~NOT a heredoc\n\"not a string\n")
+  end
+
+  specify "does not change when an included files also has a __END__" do
+    expect(data_read_by_the_required_file).to eq(DATA)
+  end
+
+  specify "is a String" do
+    expect(DATA.class).to eq(String)
+  end
+
+  specify "answers itself to read, Ruby's commonest spelling" do
+    expect(DATA.read).to eq(DATA)
+  end
+
+  specify "reads by line with the String's own lines and each_line" do
+    expect(DATA.lines.first).to eq("data 1\n")
+    mutable seen = []
+    DATA.each_line { seen << it }
+    expect(seen).to eq(DATA.lines)
+  end
+
+  specify "has a def's reach, as a constant does" do
+    expect(data_read_inside_a_def).to eq(DATA)
+    expect(DataReader.new(label: "reader").text).to eq(DATA)
+  end
+end
+
+__END__
+data 1
+<<~NOT a heredoc
+"not a string

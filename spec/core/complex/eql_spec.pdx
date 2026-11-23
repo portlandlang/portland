@@ -9,4 +9,20 @@ context "Complex#eql?" do
     expect(Complex(1, 0).eql?(1)).to be_false
     expect(Complex(1, 2).eql?(Complex(1.0, 2.0))).to be_false
   end
+
+  specify "returns true when the respective parts are of the same classes and self == other" do
+    expect(Complex(1, 2).eql?(Complex(1, 2))).to be_true
+  end
+
+  specify "returns false when the real parts are of different classes" do
+    expect(Complex(1).eql?(Complex(1.0))).to be_false
+  end
+
+  specify "returns false when the imaginary parts are of different classes" do
+    expect(Complex(1, 2).eql?(Complex(1, 2.0))).to be_false
+  end
+
+  specify "returns false when self == other is false" do
+    expect(Complex(1, 2).eql?(Complex(2, 3))).to be_false
+  end
 end
