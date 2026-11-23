@@ -187,8 +187,8 @@ end
 # checked in this process — the spec harness checks a hundred specs that
 # share one helper — as [key, declarations] pairs, `nil` while a file is
 # in progress; the updated memo comes back.
-def check_closure(path, checked, load_path)
-  check_closure_with(path, checked, false, load_path)
+def check_closure(path, checked, load_path, core: nil)
+  check_closure_with(path, checked, false, load_path, core)
 end
 
 # Run mode (ADR 0049 §4): the closure is a closed world, so the entry
@@ -196,11 +196,14 @@ end
 # agrees on is read at that type inside its body (ADR 0048 ruling 4).
 # Only the entry's defs: a required file is a library by nature, and its
 # defs may have callers outside this closure.
-def check_program_closure(path, checked, load_path)
-  check_closure_with(path, checked, true, load_path)
+def check_program_closure(path, checked, load_path, core: nil)
+  check_closure_with(path, checked, true, load_path, core)
 end
 
-def check_closure_with(path, mutable checked, sharpen, load_path)
+# `core` is the core's nodes where the caller has already parsed them — a
+# driver that checks many files parses the core once (#477) — and is read
+# here otherwise.
+def check_closure_with(path, mutable checked, sharpen, load_path, core)
   resolution = resolve_closure(path, checked, [], false, load_path)
   checked = value_at_checked(resolution, 0)
   files = value_at_checked(resolution, 1)
@@ -208,12 +211,12 @@ def check_closure_with(path, mutable checked, sharpen, load_path)
   sharpened = if sharpen && entry.some? then sharpen_parameters(entry, files) else [] end
   # The core is loaded ahead of every program (ADR 0093), so what it
   # declares is in scope in every file, as a required file's would be.
-  loaded = core_nodes
-  core = declarations_of(core_declaring_nodes(loaded)).with(builtins: core_function_names(loaded))
+  loaded = core or core_nodes
+  core_declared = declarations_of(core_declaring_nodes(loaded)).with(builtins: core_function_names(loaded))
   mutable found = []
   files.each do |file|
     own = if entry.some? && file.path == entry.path then sharpened else [] end
-    found += check_program_with(file.nodes, file.source, file.named, merge_declarations(file.imports, core), own)
+    found += check_program_with(file.nodes, file.source, file.named, merge_declarations(file.imports, core_declared), own)
   end
   report(found)
   checked
