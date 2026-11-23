@@ -1324,14 +1324,15 @@ fn portland_pin_dumps_types_pinned_from_call_sites() {
 }
 
 /// Pinning reaches through one def into another, reads an early return,
-/// and declines what it cannot settle (#445): a local rebound to another
-/// type, and two defs that call each other.
+/// settles two defs that call each other (#462), and declines what it
+/// cannot settle (#445): a local rebound to another type, and a def with
+/// no way out that does not call itself.
 #[test]
 fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
     let sample = std::env::temp_dir().join("pinning_reach_sample.pdx");
     std::fs::write(
         &sample,
-        "def double(value) = value * 2\n\ndef quadruple(value) = double(double(value))\n\ndef countdown(from)\n  return 0 if from < 1\n  countdown(from - 1)\nend\n\ndef shifty(start)\n  mutable held = start\n  held = held < 3\n  held\nend\n\ndef even?(number)\n  return true if number == 0\n  odd?(number - 1)\nend\n\ndef odd?(number)\n  return false if number == 0\n  even?(number - 1)\nend\n\nmutable changing = 1\nchanging = \"text\"\nputs quadruple(3)\nputs countdown(5)\nshifty(1)\neven?(4)\n",
+        "def double(value) = value * 2\n\ndef quadruple(value) = double(double(value))\n\ndef countdown(from)\n  return 0 if from < 1\n  countdown(from - 1)\nend\n\ndef shifty(start)\n  mutable held = start\n  held = held < 3\n  held\nend\n\ndef even?(number)\n  return true if number == 0\n  odd?(number - 1)\nend\n\ndef odd?(number)\n  return false if number == 0\n  even?(number - 1)\nend\n\ndef spin(count) = spin(count + 1)\n\nmutable changing = 1\nchanging = \"text\"\nputs quadruple(3)\nputs countdown(5)\nshifty(1)\neven?(4)\nspin(1)\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/pin.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1343,7 +1344,7 @@ fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
     assert!(output.status.success(), "pin.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "def double(value: Integer) # -> Integer\ndef quadruple(value: Integer) # -> Integer\ndef countdown(from: Integer) # -> Integer\ndef shifty(start: Integer): not pinned — its answer is Unknown\ndef even?(number: Integer): not pinned — its answer is Unknown\ndef odd?(number: Integer): not pinned — its answer is Unknown\nchanging: Unknown\n"
+        "def double(value: Integer) # -> Integer\ndef quadruple(value: Integer) # -> Integer\ndef countdown(from: Integer) # -> Integer\ndef shifty(start: Integer): not pinned — its answer is Unknown\ndef even?(number: Integer) # -> Boolean\ndef odd?(number: Integer) # -> Boolean\ndef spin(count: Integer): not pinned — its answer is Unknown\nchanging: Unknown\n"
     );
 }
 

@@ -1,0 +1,24 @@
+# Two defs that call each other (#462): each one's answer is read from the
+# way out that does not go through the other.
+
+def even?(number)
+  return true if number == 0
+  odd?(number - 1)
+end
+
+def odd?(number)
+  return false if number == 0
+  even?(number - 1)
+end
+
+def mark(flag)
+  if flag
+    1
+  else
+    0
+  end
+end
+
+puts mark(even?(10))
+puts mark(odd?(10))
+puts mark(even?(7))
