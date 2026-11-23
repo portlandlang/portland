@@ -3234,9 +3234,9 @@ core/string/chilled_string_spec.rb:
   link: docs/ruby/mutability.md
 core/string/chomp_spec.rb:
   pdx: [spec/core/string/chomp_spec.pdx]
-  status: partial_planned
-  reason: "chomp with a separator waits on #343; chomp! and the $/, copy-identity, subclass, encoding, and to_str rows stay upstream (ADR 0015, ADR 0069, ADR 0036)."
-  link: https://github.com/portlandlang/portland/issues/343
+  status: partial_intentional
+  reason: "chomp! and the $/, copy-identity, subclass, encoding, and to_str rows stay upstream (ADR 0015, ADR 0069, ADR 0036)."
+  link: docs/ruby/mutability.md
 core/string/chop_spec.rb:
   pdx: [spec/core/string/chop_spec.pdx]
 core/string/chr_spec.rb:
@@ -3328,9 +3328,9 @@ core/string/empty_spec.rb:
   pdx: [spec/core/string/empty_spec.pdx]
 core/string/encoding_spec.rb:
   pdx: [spec/core/string/encoding_spec.pdx]
-  status: partial_planned
-  reason: "A string is UTF-8, always (ADR 0069), so the US-ASCII, BINARY, force_encoding, encode!, and default-encoding rows describe tags Portland has none of, and Encoding::UTF_8 is a name, not an Encoding object; the non-ASCII row waits on ascii_only?, #343."
-  link: https://github.com/portlandlang/portland/issues/343
+  status: partial_intentional
+  reason: "A string is UTF-8, always (ADR 0069), so the US-ASCII, BINARY, force_encoding, encode!, and default-encoding rows describe tags Portland has none of, and Encoding::UTF_8 is a name, not an Encoding object."
+  link: docs/adr/0069-2026-11-03-strings-are-utf-8-always.md
 core/string/end_with_spec.rb:
   pdx: [spec/core/string/end_with_spec.pdx]
   status: partial_intentional

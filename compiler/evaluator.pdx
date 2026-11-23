@@ -3750,7 +3750,8 @@ def evaluate_method_call(node, mutable bindings)
   when "strip" then receiver.strip
   when "lstrip" then receiver.lstrip
   when "rstrip" then receiver.rstrip
-  when "chomp" then receiver.chomp
+  when "chomp" then arguments.empty? ? receiver.chomp : receiver.chomp(value_at(arguments, 0))
+  when "ascii_only?" then receiver.ascii_only?
   when "capitalize" then receiver.capitalize
   when "swapcase" then receiver.swapcase
   when "lines" then receiver.lines
