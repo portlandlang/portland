@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`\+` in a `sub` or `gsub` replacement is the last group that matched** ([#310](https://github.com/portlandlang/portland/issues/310)) — it was copied literally, a wrong value on both implementations: `"hello!".gsub(/(.)(.)/, '\+')` was `"\+\+\+"` and is `"el!"`, Ruby's. The last group is the highest-numbered one that took part in the match, and nothing where the pattern has no groups. The hosted evaluator rides the seed's expansion, so one arm covers both.
+  - ruby/spec rows activated: the `\+` rows of `core/string/sub` and `core/string/gsub`; both manifest entries drop their #310 clause.
 - **The passing rows #288's audit found are ported** ([#349](https://github.com/portlandlang/portland/issues/349)) — upstream rows that give Ruby's answer on both implementations, each under its upstream name, with each manifest entry trimmed to what stays upstream and the issue or ledger page that holds it. Lines that need a bignum are dropped, since integers are 64-bit (ADR 0070).
   - `core/complex` and `core/rational/plus_spec.rb`: the arithmetic, equality, comparison, power, `fdiv`, `finite?`, `infinite?`, `integer?`, `real?`, `polar`, `rectangular`, `rationalize`, and rendering rows. `Complex#inspect` rows are spelled `inspect(complex)` (ADR 0026).
   - `core/float`: the plain `ceil`, `floor`, `truncate`, and `round` rows, `finite?` on negative infinity and NaN, and the ordinary, NaN, and infinity rows of the four comparisons.

@@ -560,6 +560,19 @@ pub fn expand_replacement(replacement: &str, found: &Found) -> String {
             Some('`') => expanded.push_str(found.pre_match()),
             Some('\'') => expanded.push_str(found.post_match()),
             Some('\\') => expanded.push('\\'),
+            // `\+` is the last group that took part in the match, Ruby's
+            // rule: the highest-numbered one with text, and nothing where
+            // the pattern has no groups or none matched (#310).
+            Some('+') => {
+                let last = (1..found.spans.len())
+                    .rev()
+                    .find(|group| found.spans[*group].is_some());
+                if let Some(group) = last
+                    && let Value::String(text) = found.group_value(group)
+                {
+                    expanded.push_str(&text);
+                }
+            }
             Some('k') if characters.peek() == Some(&'<') => {
                 characters.next();
                 let mut name = String::new();

@@ -30,6 +30,23 @@ context "String#sub with pattern, replacement" do
     expect("hello".sub("l", '\0\0')).to eq("helllo")
   end
 
+  specify "replaces \\+ with the last paren that actually matched" do
+    greeting = "hello!"
+
+    expect(greeting.sub(/(.)(.)/, '\+')).to eq("ello!")
+    expect(greeting.sub(/(.)(.)+/, '\+')).to eq("!")
+    expect(greeting.sub(/(.)()/, '\+')).to eq("ello!")
+    expect(greeting.sub(/(.)(.{20})?/, '<\+>')).to eq("<h>ello!")
+
+    letters = "ABCDEFGHIJKL"
+    twelve = /#{"(.)" * 12}/
+    expect(letters.sub(twelve, '\+')).to eq("L")
+  end
+
+  specify "treats \\+ as an empty string if there was no captures" do
+    expect("hello!".sub(/./, '\+')).to eq("ello!")
+  end
+
   specify "hand the block the matched text" do
     expect("hello".sub(/l+/) { |text| text.upcase }).to eq("heLLo")
   end
