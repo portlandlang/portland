@@ -1,0 +1,64 @@
+# nil written as a value, and a def that answers a maybe (#505).
+def first_big(numbers)
+  mutable found = nil
+  numbers.each do |number|
+    found = number if found.nil? && number > 5
+  end
+  found
+end
+
+def checked(number)
+  return nil if number < 0
+  number * 2
+end
+
+def label(number)
+  if number > 0
+    "positive"
+  end
+end
+
+def named(number)
+  return "none" if number == 0
+  label(number)
+end
+
+def must(number)
+  panic("negative: #{number}") if number < 0
+  number
+end
+
+def strict(number)
+  return number if number > 0
+  panic("not positive")
+end
+
+p(first_big([3, 8, 12]))
+p(first_big([1]))
+p(checked(4))
+p(checked(-4))
+p(label(1))
+p(label(-1))
+p(named(0))
+p(named(2))
+p(named(-2))
+puts must(3)
+puts strict(2)
+mutable best = 0
+best = nil
+p(best)
+best = 7
+p(best)
+mutable latest = nil
+p(latest)
+latest = "text"
+p(latest)
+latest = nil
+p(latest.nil?)
+choice = if 1 < 2 then 5 end
+p(choice)
+other = if 2 < 1 then "yes" end
+p(other)
+doubled = checked(5) || 0
+puts doubled
+puts checked(6) + 1
