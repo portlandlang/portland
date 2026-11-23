@@ -43,7 +43,9 @@
 # the block's own slots are. A def that yields takes two more parameters,
 # the block's function and its frame, and a `yield` calls the one with
 # the other. A block cannot be held in a value, so the frame never
-# outlives the call it was built for and nothing is put on the heap.
+# outlives the call it was built for and nothing is put on the heap. A
+# block that yields carries what its writer was handed, the function and
+# the frame, in two more places at the end of its own frame (#495).
 # Counting is a call's: what is yielded is handed to the block, whose
 # parameter slot then holds it, and what the block answers is handed
 # back.
@@ -140,27 +142,37 @@ def llvm_function(function, prefix)
   named = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
   # A def that yields is handed its block: the function, and the frame
   # to call it with.
-  parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_FRAME}"]
+  parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_BLOCK_FRAME}"]
   header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters.join(", ")}) {"
-  llvm_routine(header, [], function.parameters, function.locals, function.body, prefix, entry)
+  llvm_routine(header, [], false, function.parameters, function.locals, function.body, prefix, entry)
 end
 
-# The names a def's block and its frame arrive under, and the frame a
-# block's own function is handed. No local can be named with a dot first.
+# The names the block a function was handed and that block's frame go
+# by, and the frame a block's own function is handed. No local can be
+# named with a dot first.
 LLVM_BLOCK = "%\".block\""
+LLVM_BLOCK_FRAME = "%\".block.frame\""
 LLVM_FRAME = "%\".frame\""
 
 # A function's lines under a header written by the caller: a def's, the
 # entry function's, or a block's. A block's captures are read out of its
-# frame first, each as the address of a slot that lives in its writer.
-def llvm_routine(header, captures, parameters, locals, body, prefix, entry)
+# frame first, each as the address of a slot that lives in its writer,
+# and after them, where the block yields, what its writer was handed.
+def llvm_routine(header, captures, onward, parameters, locals, body, prefix, entry)
   held = (parameters + locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
   mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
+  shape = llvm_frame_shape(captures, onward)
   mutable position = 0
   captures.each do |capture|
-    place = llvm_named(emitter, "getelementptr [#{captures.length} x ptr], ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
+    place = llvm_named(emitter, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
     emitter = llvm_line(place.emitter, "#{llvm_slot(capture[0])} = load ptr, ptr #{place.operand}")
     position += 1
+  end
+  if onward
+    function = llvm_named(emitter, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
+    loaded = llvm_line(function.emitter, "#{LLVM_BLOCK} = load ptr, ptr #{function.operand}")
+    frame = llvm_named(loaded, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position + 1}")
+    emitter = llvm_line(frame.emitter, "#{LLVM_BLOCK_FRAME} = load ptr, ptr #{frame.operand}")
   end
   (parameters + locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
@@ -193,19 +205,31 @@ def llvm_block(emitter, block)
   name = "@\"portland.block.#{emitter.prefix}.#{number}\""
   named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
   header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
-  written = llvm_routine(header, block.captures, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
-  mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
-  return LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr null") if block.captures.empty?
-  frame = "%\"frame.#{number}\""
-  shape = "[#{block.captures.length} x ptr]"
-  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
-  mutable position = 0
-  block.captures.each do |capture|
-    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
-    position += 1
+    written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
+    mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
+    return LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr null") if block.captures.empty? && !block.onward
+    frame = "%\"frame.#{number}\""
+    shape = llvm_frame_shape(block.captures, block.onward)
+    current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
+    mutable position = 0
+    block.captures.each do |capture|
+      place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+      current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
+      position += 1
+    end
+    if block.onward
+      function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+      stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
+      carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
+      current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
+    end
+    LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr #{frame}")
   end
-  LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr #{frame}")
+
+  # A frame's shape: a place for each captured slot's address, and two more
+  # where the block yields.
+  def llvm_frame_shape(captures, onward)
+    "[#{captures.length + (onward ? 2 : 0)} x ptr]"
 end
 
 # Every String this function's slots hold, released: written before each
@@ -374,7 +398,7 @@ def llvm_value(emitter, value)
   # and then what is yielded.
   in IntermediateYield(type:, arguments:)
     mutable current = emitter
-    mutable operands = ["ptr #{LLVM_FRAME}"]
+    mutable operands = ["ptr #{LLVM_BLOCK_FRAME}"]
     arguments.each do |argument|
       written = llvm_value(current, argument)
       current = written.emitter

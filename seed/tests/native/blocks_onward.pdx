@@ -1,0 +1,45 @@
+# A block that yields onward, and one that leaves early (#495): a `yield`
+# written inside a block reaches the block its writer was handed, and
+# `next` ends the block's turn.
+def each_upto(limit)
+  mutable index = 0
+  while index < limit
+    yield(index)
+    index += 1
+  end
+end
+
+def each_even_upto(limit)
+  each_upto(limit) do |index|
+    yield(index) if index.even?
+  end
+end
+
+def doubled_upto(limit)
+  each_even_upto(limit) do |even|
+    each_upto(2) { |turn| yield(even * 10 + turn) }
+  end
+end
+
+def named(label)
+  each_upto(2) { |index| yield(label + index.to_s) }
+end
+
+each_even_upto(7) do |number|
+  next if number == 2
+  puts number
+end
+mutable total = 0
+doubled_upto(5) { |number| total += number }
+puts total
+named("row ") { |line| puts line }
+each_upto(4) do |index|
+  mutable inner = 0
+  while inner < 3
+    inner += 1
+    next if inner == 2
+    puts index * 10 + inner
+  end
+  next if index < 3
+  puts "last"
+end
