@@ -1,0 +1,31 @@
+# A def that answers nothing (#463): one ending in `puts`, one ending in a
+# loop, one ending in a call to another such def, and a bare `return` as
+# the early way out.
+
+def show(number)
+  puts number
+end
+
+def count_up(limit)
+  mutable index = 1
+  while index <= limit
+    show(index)
+    index += 1
+  end
+end
+
+def show_small(number)
+  return if number > 10
+  show(number)
+end
+
+def show_twice(number)
+  show(number)
+  show(number)
+end
+
+show(7)
+count_up(3)
+show_small(50)
+show_small(5)
+show_twice(9)

@@ -1319,7 +1319,7 @@ fn portland_pin_dumps_types_pinned_from_call_sites() {
     assert!(output.status.success(), "pin.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "def fib(n: Integer) # -> Integer\ndef sum_to(limit: Integer) # -> Integer\ndef small?(number: Integer) # -> Boolean\ndef twice: not pinned — value is an Integer at one call and a Float at another\ndef unused: not pinned — nothing calls it\ndef shown(value: Integer): not pinned — its answer is Unknown\nanswer: Integer\nflag: Boolean\n"
+        "def fib(n: Integer) # -> Integer\ndef sum_to(limit: Integer) # -> Integer\ndef small?(number: Integer) # -> Boolean\ndef twice: not pinned — value is an Integer at one call and a Float at another\ndef unused: not pinned — nothing calls it\ndef shown(value: Integer) # -> nothing\nanswer: Integer\nflag: Boolean\n"
     );
 }
 
@@ -1403,6 +1403,10 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
         (
             "puts 1 < 2\n",
             format!("{compiles} — puts of a Boolean on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "def show(number)\n  puts number\nend\nvalue = show(1)\n",
+            "show answers nothing, so there is no value to read from it on line 4".to_string(),
         ),
         (
             "def twice(value) = value + value\ntwice(1)\ntwice(1.5)\n",
