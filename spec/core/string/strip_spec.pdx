@@ -8,4 +8,9 @@ context "String#strip" do
   specify "String#strip takes whitespace off both ends" do
     expect("  rose  ".strip).to eq("rose")
   end
+
+  specify "returns a copy of self without leading and trailing NULL bytes and whitespace" do
+    null = 0.chr
+    expect((" " + null + " goodbye " + null + " ").strip).to eq("goodbye")
+  end
 end

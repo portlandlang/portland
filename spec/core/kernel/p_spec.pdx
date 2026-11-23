@@ -9,8 +9,8 @@
 # reassignment, `output_to_fd`, `$_`, the separator globals, splatted
 # arguments, the IO-first-argument forms of printf, the `to_int` and `to_str`
 # mocks, and warn's uplevel and category keywords. A mock with its own
-# `inspect` or `to_s` is a struct that defines it (#282); one inside an array
-# waits on #285, held as a pending.
+# `inspect` or `to_s` is a struct that defines it (#282), inside an array
+# too (#285).
 
 require_relative "../../spec_helper"
 
@@ -31,7 +31,7 @@ context "Kernel#p" do
   end
 
   # The same row's `p([o])` line: an element's own `inspect` (#285).
-  pending "prints obj.inspect followed by system record separator for each argument given, inside an array (#285)" do
+  specify "prints obj.inspect followed by system record separator for each argument given, inside an array" do
     gadget = InspectorGadget.new(name: "Inspector Gadget")
     expect(System.capture_standard_output { p([gadget]) }).to eq("[Next time, Gadget, NEXT TIME!]\n")
   end

@@ -50,6 +50,8 @@ spec_paths.each do |path|
   # Each spec is a program about to run — run mode, so its own defs are
   # read with what every caller passes (ADR 0049 §4).
   checked = check_program_closure(path, checked, default_load_path(path, []))
-  scope = [["__file__", "file", path]] + already_loaded + harness.bindings
+  # A spec run direct is the file that is run, so its own `__END__` text is
+  # its `DATA` here too (ADR 0092).
+  scope = [["__file__", "file", path]] + data_bindings(data_section(source)) + already_loaded + harness.bindings
   run_body(program, scope)
 end

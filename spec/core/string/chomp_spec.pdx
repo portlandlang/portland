@@ -11,6 +11,28 @@ context "String#chomp" do
     expect("rose".chomp).to eq("rose")
   end
 
+  describe "when passed no argument" do
+    specify "does not modify a String with no trailing carriage return or newline" do
+      expect("abc".chomp).to eq("abc")
+    end
+
+    specify "removes one trailing newline" do
+      expect("abc\n\n".chomp).to eq("abc\n")
+    end
+
+    specify "removes one trailing carriage return" do
+      expect("abc\r\r".chomp).to eq("abc\r")
+    end
+
+    specify "removes one trailing carriage return, newline pair" do
+      expect("abc\r\n\r\n".chomp).to eq("abc\r\n")
+    end
+
+    specify "returns an empty String when self is empty" do
+      expect("".chomp).to eq("")
+    end
+  end
+
   describe "when passed ''" do
     specify "removes a final newline" do
       expect("abc\n".chomp("")).to eq("abc")
