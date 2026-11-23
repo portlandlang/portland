@@ -43,7 +43,7 @@ Prose goes stale when it says something the code later stops doing and nothing n
 
 **Never name a count or an exact timing.** Not lines of code, spec examples, spec files, open issues, manifest entries, or checks, and not "0.02s" or "15ms". A count is true for one commit. An approximate timing that makes a point ("about a minute") is fine. `script/docs/check counts_and_timings` flags a written-out number of files, lines, examples, rows, issues, or entries, and an exact timing; spelled-out numbers are left to you.
 
-**No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; [#291](https://github.com/portlandlang/portland/issues/291) tracks it", not "doesn't work yet". `script/docs/check time_words` flags these in the docs and manifest, and the unambiguous ones in comments, unless the clause names an issue.
+**No time-relative words.** "today", "currently", "now", "for now", "so far", "yet", "not yet", "recently", and "current" all age silently. Say what is true without a clock, and tie a pending state to the issue that ends it: "refuses; #N tracks it", with the issue's number and link, not "doesn't work yet". `script/docs/check time_words` flags these in the docs and manifest, and the unambiguous ones in comments, unless the clause names an issue.
 
 **Before closing an issue, run `script/mentions N`** and bring every claim that waited on it up to date in the same change.
 

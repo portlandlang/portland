@@ -17,4 +17,15 @@ context "Integer#even?" do
     expect((-2).even?).to be_true
     expect((-1).even?).to be_false
   end
+
+  describe "fixnum" do
+    specify "returns true for a Fixnum when it is an even number" do
+      expect((-2).even?).to be_true
+      expect((-1).even?).to be_false
+
+      expect(0.even?).to be_true
+      expect(1.even?).to be_false
+      expect(2.even?).to be_true
+    end
+  end
 end

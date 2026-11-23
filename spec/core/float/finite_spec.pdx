@@ -9,4 +9,12 @@ context "Float#finite?" do
     expect(1.0.finite?).to be_true
     expect((1.0 / 0.0).finite?).to be_false
   end
+
+  specify "returns false for negative infinity" do
+    expect((-Float::INFINITY).finite?).to be_false
+  end
+
+  specify "returns false for NaN" do
+    expect(Float::NAN.finite?).to be_false
+  end
 end
