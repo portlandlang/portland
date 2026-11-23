@@ -406,13 +406,15 @@ impl Found {
     }
 
     /// A group by an index value: a number, counted from the end when
-    /// negative; a name as a string or a symbol.
+    /// negative; a name as a string or a symbol. A negative number reaches
+    /// the captures only, Ruby's rule: one that counts back to the whole
+    /// match, or past it, names no group (#315).
     pub fn group_of(&self, index: &Value) -> Result<Option<usize>, String> {
         match index {
             Value::Integer(number) => {
                 let count = self.spans.len() as i64;
                 let position = if *number < 0 { count + number } else { *number };
-                if position < 0 || position >= count {
+                if position < 0 || position >= count || (*number < 0 && position == 0) {
                     return Ok(None);
                 }
                 Ok(Some(position as usize))

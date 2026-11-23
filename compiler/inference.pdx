@@ -549,7 +549,7 @@ def call_answer(receiver, node, types)
   case name
   when "length", "size", "count", "index", "find_index", "rindex", "gcd", "lcm", "succ", "pred", "next", "abs", "magnitude", "sum", "to_i", "floor", "ceil", "round", "truncate", "div", "ceildiv"
     synthesize_numeric_answer(receiver, name, arguments_empty: node.arguments.empty?)
-  # What `pow` and `fdiv` answer depends on the argument (#294).
+  # What `pow` and `fdiv` answer varies with the argument's type (#294).
   when "pow"
     return power_answer(receiver, synthesize(node.arguments.first, types)) if node.arguments.length == 1
     # The modular form, `pow(exponent, modulus)`, is whole numbers only.
