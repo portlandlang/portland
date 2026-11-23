@@ -57,4 +57,8 @@ context "String#start_with?" do
     expect("12test".start_with?(trailing)).to be_false
     expect("test12".start_with?(trailing)).to be_false
   end
+
+  specify "answers false when given no candidates" do
+    expect("hello".start_with?()).to be_false
+  end
 end
