@@ -9,8 +9,8 @@
 # reassignment, `output_to_fd`, `$_`, the separator globals, splatted
 # arguments, the IO-first-argument forms of printf, the `to_int` and `to_str`
 # mocks, and warn's uplevel and category keywords. A mock with its own
-# `inspect` or `to_s` is a struct that defines it (#282); one inside an array
-# waits on #285, held as a pending.
+# `inspect` or `to_s` is a struct that defines it (#282), inside an array
+# too (#285).
 #
 # `pp` is `p` here, with no library to load; upstream runs the row in a
 # child `ruby` to see the load, and this reads the same output in process.

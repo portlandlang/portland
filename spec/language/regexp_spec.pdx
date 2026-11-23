@@ -75,4 +75,65 @@ context "Literal Regexps" do
     expect(found(/[[:lower:]]/, "𐓘")).to eq(["𐓘"])
     expect(found(/[[:upper:]]/, "𐒰")).to eq(["𐒰"])
   end
+
+  specify "allows unescaped / to be used with %r" do
+    expect(%r[/].to_s).to eq(/\//.to_s)
+  end
+
+  specify "supports | (alternations)" do
+    expect(/a|b/.match("a").to_a).to eq(["a"])
+  end
+
+  specify "supports (?> ) (embedded subexpression)" do
+    expect(/(?>foo)(?>bar)/.match("foobar").to_a).to eq(["foobar"])
+    expect(/(?>foo*)obar/.match("foooooooobar")).to be_nil
+  end
+
+  specify "supports (?# )" do
+    expect(/foo(?#comment)bar/.match("foobar").to_a).to eq(["foobar"])
+    expect(/foo(?#)bar/.match("foobar").to_a).to eq(["foobar"])
+  end
+
+  specify "supports (?<= ) (positive lookbehind)" do
+    expect(/foo.(?<=\d)/.match("fooA foo1").to_a).to eq(["foo1"])
+  end
+
+  specify "supports (?<! ) (negative lookbehind)" do
+    expect(/foo.(?<!\d)/.match("foo1 fooA").to_a).to eq(["fooA"])
+  end
+
+  specify "supports \\g (named backreference)" do
+    expect(/(?<foo>foo.)bar\g<foo>/.match("foo1barfoo2").to_a).to eq(["foo1barfoo2", "foo2"])
+  end
+
+  specify "supports character class composition" do
+    expect(/[a-z&&[^a-c]]+/.match("abcdef").to_a).to eq(["def"])
+    expect(/[a-z&&[^d-i&&[^d-f]]]+/.match("abcdefghi").to_a).to eq(["abcdef"])
+  end
+
+  specify "supports possessive quantifiers" do
+    expect(/fooA++bar/.match("fooAAAbar").to_a).to eq(["fooAAAbar"])
+
+    expect(/fooA++Abar/.match("fooAAAbar")).to be_nil
+    expect(/fooA?+Abar/.match("fooAAAbar")).to be_nil
+    expect(/fooA*+Abar/.match("fooAAAbar")).to be_nil
+  end
+
+  specify "supports conditional regular expressions with positional capture groups" do
+    pattern = /\A(foo)?(?(1)(T)|(F))\z/
+
+    expect(pattern).to match('fooT')
+    expect(pattern).to match('F')
+    expect(pattern).not_to match('fooF')
+    expect(pattern).not_to match('T')
+  end
+
+  specify "supports conditional regular expressions with named capture groups" do
+    pattern = /\A(?<word>foo)?(?(<word>)(T)|(F))\z/
+
+    expect(pattern).to match('fooT')
+    expect(pattern).to match('F')
+    expect(pattern).not_to match('fooF')
+    expect(pattern).not_to match('T')
+  end
 end
