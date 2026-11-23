@@ -21,13 +21,6 @@ struct LintFinding
   message
 end
 
-# Whether a line at the margin is one that belongs there: empty, a comment,
-# or a word or bracket that closes or divides the statement around it.
-def margin_allowed?(text)
-  return true if text.empty? || text.start_with?("#")
-  MARGIN_WORDS.any? { |word| text == word || text.start_with?(word + " ") || text.start_with?(word + ")") || text.start_with?(word + ",") }
-end
-
 # A line of code at the left margin inside a definition or a list: every
 # line between where one top-level statement opens and the next one does is
 # part of the first, and is indented under it.
@@ -64,4 +57,11 @@ def lint_source(path, source)
   unparsed = lint_parse(path, nodes)
   return unparsed unless unparsed.empty?
   lint_margins(path, source, nodes)
+end
+
+# Whether a line at the margin is one that belongs there: empty, a comment,
+# or a word or bracket that closes or divides the statement around it.
+def margin_allowed?(text)
+  return true if text.empty? || text.start_with?("#")
+  MARGIN_WORDS.any? { |word| text == word || text.start_with?(word + " ") || text.start_with?(word + ")") || text.start_with?(word + ",") }
 end

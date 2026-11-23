@@ -27,6 +27,38 @@
 
 require_relative "inference"
 
+# A name bound to a type: new names are added, a rebinding to the same type
+# changes nothing, and a rebinding to another type leaves the name unknown.
+# An array whose elements are not known yet is the same array once they
+# are: an empty literal, named by its first append.
+EMPTY_ARRAY = ["array", ["unknown"]]
+
+# What a def that produces no value answers. `puts` produces none (#185),
+# so a def that ends in one has nothing to hand back, and neither has a
+# def that ends in a loop or in a call to such a def. It is a type only
+# here: inference has no word for it, and a program cannot hold one.
+NOTHING = ["nothing"]
+
+# The name a `yield` is read under: a keyword, so no local has it.
+YIELD = "yield"
+
+# What a walk over statements has gathered: the bindings in scope, and the
+# calls seen, each as [def name, argument types, what the block it was
+# handed answers or nil]. A `yield` is gathered the same way, under the
+# name `yield`, with what it hands over.
+struct PinWalk
+  bindings
+  calls
+end
+
+# A yielding def's block: the types of what it is yielded, in order, and
+# the type it answers, or the reason the two could not be pinned.
+struct PinnedBlock
+  parameters
+  answer
+  reason
+end
+
 # One def's pinned types: its parameters as [name, type] pairs and its
 # answer, or the reason it could not be pinned.
 struct PinnedDef
@@ -41,14 +73,6 @@ struct PinnedDef
   def pinned? = reason.nil?
 end
 
-# A yielding def's block: the types of what it is yielded, in order, and
-# the type it answers, or the reason the two could not be pinned.
-struct PinnedBlock
-  parameters
-  answer
-  reason
-end
-
 # A whole program's pinned types: its defs in written order, and its
 # top-level bindings as [name, type] pairs in first-appearance order.
 struct PinnedProgram
@@ -56,78 +80,113 @@ struct PinnedProgram
   bindings
 end
 
-# What a walk over statements has gathered: the bindings in scope, and the
-# calls seen, each as [def name, argument types, what the block it was
-# handed answers or nil]. A `yield` is gathered the same way, under the
-# name `yield`, with what it hands over.
-struct PinWalk
-  bindings
-  calls
-end
-
-def pin_program(nodes)
-  definitions = nodes.select { it in DefNode }
-  statements = nodes.reject { it in DefNode }
-  names = definitions.map { it.name }
-  unpinned = definitions.map { |definition| PinnedDef.new(name: definition.name, parameters: [], answer: ["unknown"], reason: "nothing calls it", block: nil) }
-  # Two passes. The first pins from the arguments whose types are known,
-  # since `double(double(3))` cannot say its outer argument until `double`
-  # itself is pinned. The second holds every call to what was pinned: an
-  # argument still unknown, or of another type, unpins the def it is
-  # handed to, and whatever leaned on that def after it.
-  reached = settle_pins(definitions, statements, names, unpinned, false)
-  pinned = settle_pins(definitions, statements, names, reached, true)
-  answers = pinned_answers(pinned)
-  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
-  PinnedProgram.new(defs: pinned, bindings: walk.bindings.reverse)
-end
-
-# Rounds of pinning until one changes nothing. Each round can settle the
-# defs the last round's pins reach, so the rounds needed are bounded by
-# how many defs there are.
-def settle_pins(definitions, statements, names, starting, strict)
-  mutable pinned = starting
-  mutable round = 0
-  while round <= definitions.length + 1
-    answers = pinned_answers(pinned)
-    mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
-    definitions.each do |definition|
-      found = pinned.find { it.name == definition.name }
-      next if found.nil? || found.parameters.length != definition.parameters.length
-      inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
-      walk = walk.with(calls: inner.calls)
-    end
-    settled = definitions.map { |definition| pin_definition(definition, walk.calls, answers, names, strict) }
-    break if settled == pinned
-    pinned = settled
-    round += 1
+# Every way out of a body, each with the type it answers: the early
+# returns, and the last statement — an `if` there counting once per arm.
+def answer_candidates(body, parameters, answers, names)
+  mutable walk = PinWalk.new(bindings: parameters, calls: [])
+  mutable found = []
+  mutable last = [["nil"]]
+  body.each do |statement|
+    scope = walk.bindings + answers
+    found += return_types_in(statement, scope)
+    last = value_candidates(statement, scope)
+    walk = pin_statement(statement, walk, answers, names)
   end
-  pinned
+  found + last
 end
 
-# The pinned defs' answers as bindings, the way inference keeps a def's
-# return under its name. Beside them, what each yielding def hands its
-# block, under a key no name can spell: a call site needs that to read
-# its block before the def's own answer is settled, since the answer may
-# wait on the block's.
-def pinned_answers(pinned)
-  answers = pinned.select { it.pinned? }.map { [it.name, it.answer] }
-  yielded = pinned.reject { it.block.nil? }.map { [block_key(it.name), it.block.parameters] }
-  # Everything pinning reads, it reads the way the native build runs it
-  # (#503): the name that says so rides with the answers into every scope.
-  answers + yielded + [[NATIVE_READING, ["boolean"]]]
+def answers_nothing?(body, answers)
+  last = body.last
+  return false if last.nil?
+  return true if last in WhileNode
+  # An `if` whose arms each end in what produces no value, a missing
+  # `else` among them, has none to hand back either.
+  if last in IfNode
+    other = last.else_body or []
+    return answers_nothing?((last.then_body or []), answers) && (other.empty? || answers_nothing?(other, answers))
+  end
+  # A `yield` hands back what the block does.
+  if last in YieldNode
+    handed = answers.find { it[0] == YIELD }
+    return handed.some? && type_at(handed, 1) == NOTHING
+  end
+  return false unless last in CallNode
+  return true if last.name == "puts"
+  found = answers.find { it[0] == last.name }
+  found.some? && type_at(found, 1) == NOTHING
+end
+
+# What a block answers: nothing where it ends in what produces no value,
+# and otherwise what its body does, read as a def's is. A block that
+# answers nil, or a value or nil, is taken as one run for what it does,
+# since the native build holds no maybe to read its answer into (#491).
+def block_answer(body, bindings, answers, names)
+  return NOTHING if answers_nothing?(body, answers)
+  found = body_answer(body, bindings, answers, names)
+  return NOTHING if found == ["nil"] || (found in ["maybe", *])
+  found
 end
 
 def block_key(name) = "#{name}&"
 
-# The name a `yield` is read under: a keyword, so no local has it.
-YIELD = "yield"
+# What a body answers: its last statement and its early returns, as
+# inference's synthesize_body rules, but with bindings that keep their type.
+def body_answer(body, parameters, answers, names)
+  mutable walk = PinWalk.new(bindings: parameters, calls: [])
+  mutable early = []
+  mutable last = ["nil"]
+  body.each do |statement|
+    scope = walk.bindings + answers
+    early += return_types_in(statement, scope)
+    last = statement_answer(statement, scope)
+    walk = pin_statement(statement, walk, answers, names)
+  end
+  # A body that ends in `panic` hands nothing back that way, so its
+  # answer is what its returns say (#505).
+  ending = body.last
+  return merge_answers(early) if (ending in CallNode) && ending.name == "panic" && !early.empty?
+  merge_answers(early + [last])
+end
 
-# The answers a def's own body is read with: the program's, and what its
-# block answers where it yields.
-def yielding_answers(answers, block)
-  return answers if block.nil?
-  answers + [[YIELD, block.answer]]
+# Whether a type says everything a code generator needs: no unknown in it.
+def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
+
+# The one type a body's ways out answer together. Where they are one
+# value's type, with nil or a maybe of it among them, that is a maybe of
+# the value (#505): `return "none"` beside a last expression that is a
+# String or nil. Otherwise inference's own rule stands.
+def merge_answers(candidates)
+  values = unique_types(candidates.reject { it == ["nil"] }.map { (it in ["maybe", *]) ? type_at(it, 1) : it })
+  return merge_candidates(candidates) unless values.length == 1
+  candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
+end
+
+# A call that hands one of the program's defs a block (#493). The block's
+# parameters are bound to what the def yields, as far as that is pinned;
+# its body is walked for the calls inside it; and what it answers is
+# gathered with the call. A name the block binds first is the block's
+# own, so the bindings after are the ones before, less nothing and with
+# whatever the block rebound.
+def pin_block_call(node, walk, answers, names)
+  mutable current = walk
+  node.arguments.each do |argument|
+    current = pin_statement(argument, current, answers, names)
+  end
+  scope = current.bindings + answers
+  arguments = node.arguments.map { synthesize(it, scope) }
+  yielded = answers.find { it[0] == block_key(node.name) }
+  mutable inner = current.bindings
+  mutable index = 0
+  node.block.parameters.each do |parameter|
+    type = yielded.nil? ? nil : type_at(type_at(yielded, 1), index)
+    inner = [[parameter, (type or ["unknown"])]] + inner
+    index += 1
+  end
+  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
+  answer = block_answer(node.block.body, inner, answers, names)
+  outer = current.bindings.length
+  kept = walked.bindings.slice(walked.bindings.length - outer, outer)
+  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer]])
 end
 
 # One def against the calls gathered: its parameters from their arguments,
@@ -160,6 +219,113 @@ def pin_definition(definition, calls, answers, names, strict)
   answer = solved_answer(definition, parameters, yielding_answers(answers, block), names, strict)
   return PinnedDef.new(name: definition.name, parameters: parameters, answer: answer, reason: "its answer is #{render_type(answer)}", block: block) unless concrete?(answer)
   PinnedDef.new(name: definition.name, parameters: parameters, answer: answer, reason: nil, block: block)
+end
+
+# The calls to the program's defs anywhere inside an expression, each with
+# its arguments' types as the bindings in scope give them.
+def pin_expression(node, walk, answers, names)
+  return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
+  return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
+  mutable current = walk
+  if (node in CallNode) && names.include?(node.name)
+    scope = current.bindings + answers
+    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil]])
+  end
+  if node in YieldNode
+    scope = current.bindings + answers
+    current = current.with(calls: current.calls + [[YIELD, node.values.map { synthesize(it, scope) }, nil]])
+  end
+  # A def with no parameters is called by its bare name, which parses as a
+  # name and not as a call; a local of that name would be the local.
+  if (node in IdentifierNode) && names.include?(node.name) && current.bindings.none? { it[0] == node.name }
+    current = current.with(calls: current.calls + [[node.name, [], nil]])
+  end
+  children_of(node).each do |child|
+    current = pin_statement(child, current, answers, names)
+  end
+  current
+end
+
+def pin_program(nodes)
+  definitions = nodes.select { it in DefNode }
+  statements = nodes.reject { it in DefNode }
+  names = definitions.map { it.name }
+  unpinned = definitions.map { |definition| PinnedDef.new(name: definition.name, parameters: [], answer: ["unknown"], reason: "nothing calls it", block: nil) }
+  # Two passes. The first pins from the arguments whose types are known,
+  # since `double(double(3))` cannot say its outer argument until `double`
+  # itself is pinned. The second holds every call to what was pinned: an
+  # argument still unknown, or of another type, unpins the def it is
+  # handed to, and whatever leaned on that def after it.
+  reached = settle_pins(definitions, statements, names, unpinned, false)
+  pinned = settle_pins(definitions, statements, names, reached, true)
+  answers = pinned_answers(pinned)
+  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  PinnedProgram.new(defs: pinned, bindings: walk.bindings.reverse)
+end
+
+# One statement: the calls inside it are recorded with the bindings above
+# it, and what it binds is in scope below. A loop's and a branch's bodies
+# are walked in place, so a name bound above them keeps its type inside
+# and after.
+def pin_statement(statement, walk, answers, names)
+  case statement
+  in AssignmentNode(name:, value:)
+    return walk if value.nil?
+    seen = pin_expression(value, walk, answers, names)
+    seen.with(bindings: rebound(seen.bindings, name, synthesize(value, seen.bindings + answers)))
+  in WhileNode(condition:, body:)
+    pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+  in IfNode(condition:, then_body:, else_body:)
+    after_condition = pin_expression(condition, walk, answers, names)
+    after_then = pin_statements((then_body or []), after_condition, answers, names)
+    pin_statements((else_body or []), after_then, answers, names)
+  else
+    pin_expression(statement, walk, answers, names)
+  end
+end
+
+def pin_statements(statements, walk, answers, names)
+  mutable current = walk
+  statements.each do |statement|
+    current = pin_statement(statement, current, answers, names)
+  end
+  current
+end
+
+# A block handed to a method of a value (#497), as `each` on an array.
+# Its parameters are bound by the receiver's type, the way inference
+# binds them; its body is walked for the calls inside it and for what it
+# rebinds; and a name it binds first is its own.
+def pin_walk(node, walk, answers, names)
+  mutable current = pin_statement(node.receiver, walk, answers, names)
+  node.arguments.each do |argument|
+    current = pin_statement(argument, current, answers, names)
+  end
+  scope = current.bindings + answers
+  receiver = synthesize(node.receiver, scope)
+  arguments = node.arguments.map { synthesize(it, scope) }
+  mutable inner = current.bindings
+  mutable index = 0
+  node.block.parameters.each do |parameter|
+    inner = [[parameter, block_parameter_type(receiver, index, node.name, arguments, parameter_count: node.block.parameters.length)]] + inner
+    index += 1
+  end
+  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
+  outer = current.bindings.length
+  walked.with(bindings: walked.bindings.slice(walked.bindings.length - outer, outer))
+end
+
+# The pinned defs' answers as bindings, the way inference keeps a def's
+# return under its name. Beside them, what each yielding def hands its
+# block, under a key no name can spell: a call site needs that to read
+# its block before the def's own answer is settled, since the answer may
+# wait on the block's.
+def pinned_answers(pinned)
+  answers = pinned.select { it.pinned? }.map { [it.name, it.answer] }
+  yielded = pinned.reject { it.block.nil? }.map { [block_key(it.name), it.block.parameters] }
+  # Everything pinning reads, it reads the way the native build runs it
+  # (#503): the name that says so rides with the answers into every scope.
+  answers + yielded + [[NATIVE_READING, ["boolean"]]]
 end
 
 # A yielding def's block, from the calls gathered and the def's own
@@ -199,236 +365,6 @@ def pinned_block(definition, parameters, sites, answers, names, strict)
   PinnedBlock.new(parameters: types, answer: answer, reason: reason)
 end
 
-# Whether a body yields anywhere, the blocks written in it included: a
-# `yield` inside one reaches the def's own block.
-def yields?(body)
-  body.any? { (it in YieldNode) || yields?(children_of(it)) }
-end
-
-# A def's answer with its parameters pinned. Read plainly first. Where
-# that is unknown — the def calls itself, or one that calls it back — the
-# answer is read from the ways out of its body that are known: for `fib`,
-# the arm that answers `n`. The other defs' answers so far are in
-# `answers`, this def's own among them, so a pair that call each other
-# settle over a few rounds. Strict, an answer found that way is held to
-# the whole body, which must then answer it.
-def solved_answer(definition, parameters, answers, names, strict)
-  return NOTHING if answers_nothing?(definition.body, answers)
-  plain = body_answer(definition.body, parameters, answers.reject { it[0] == definition.name }, names)
-  return plain if concrete?(plain)
-  known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
-  return ["unknown"] unless known.length == 1
-  found = known.first or ["unknown"]
-  return found unless strict
-  whole = body_answer(definition.body, parameters, [[definition.name, found]] + answers.reject { it[0] == definition.name }, names)
-  whole == found ? found : ["unknown"]
-end
-
-# What a def that produces no value answers. `puts` produces none (#185),
-# so a def that ends in one has nothing to hand back, and neither has a
-# def that ends in a loop or in a call to such a def. It is a type only
-# here: inference has no word for it, and a program cannot hold one.
-NOTHING = ["nothing"]
-
-def answers_nothing?(body, answers)
-  last = body.last
-  return false if last.nil?
-  return true if last in WhileNode
-  # An `if` whose arms each end in what produces no value, a missing
-  # `else` among them, has none to hand back either.
-  if last in IfNode
-    other = last.else_body or []
-    return answers_nothing?((last.then_body or []), answers) && (other.empty? || answers_nothing?(other, answers))
-  end
-  # A `yield` hands back what the block does.
-  if last in YieldNode
-    handed = answers.find { it[0] == YIELD }
-    return handed.some? && type_at(handed, 1) == NOTHING
-  end
-  return false unless last in CallNode
-  return true if last.name == "puts"
-  found = answers.find { it[0] == last.name }
-  found.some? && type_at(found, 1) == NOTHING
-end
-
-# A pinned type as the dump and the refusals write it.
-def render_pinned_type(type) = type == NOTHING ? "nothing" : render_type(type)
-
-# Every way out of a body, each with the type it answers: the early
-# returns, and the last statement — an `if` there counting once per arm.
-def answer_candidates(body, parameters, answers, names)
-  mutable walk = PinWalk.new(bindings: parameters, calls: [])
-  mutable found = []
-  mutable last = [["nil"]]
-  body.each do |statement|
-    scope = walk.bindings + answers
-    found += return_types_in(statement, scope)
-    last = value_candidates(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
-  end
-  found + last
-end
-
-def value_candidates(node, scope)
-  return [statement_answer(node, scope)] unless node in IfNode
-  taken = node.then_body or []
-  other = node.else_body or []
-  first = taken.last
-  second = other.last
-  (first.nil? ? [["nil"]] : value_candidates(first, scope)) + (second.nil? ? [["nil"]] : value_candidates(second, scope))
-end
-
-# What a body answers: its last statement and its early returns, as
-# inference's synthesize_body rules, but with bindings that keep their type.
-def body_answer(body, parameters, answers, names)
-  mutable walk = PinWalk.new(bindings: parameters, calls: [])
-  mutable early = []
-  mutable last = ["nil"]
-  body.each do |statement|
-    scope = walk.bindings + answers
-    early += return_types_in(statement, scope)
-    last = statement_answer(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
-  end
-  # A body that ends in `panic` hands nothing back that way, so its
-  # answer is what its returns say (#505).
-  ending = body.last
-  return merge_answers(early) if (ending in CallNode) && ending.name == "panic" && !early.empty?
-  merge_answers(early + [last])
-end
-
-# The one type a body's ways out answer together. Where they are one
-# value's type, with nil or a maybe of it among them, that is a maybe of
-# the value (#505): `return "none"` beside a last expression that is a
-# String or nil. Otherwise inference's own rule stands.
-def merge_answers(candidates)
-  values = unique_types(candidates.reject { it == ["nil"] }.map { (it in ["maybe", *]) ? type_at(it, 1) : it })
-  return merge_candidates(candidates) unless values.length == 1
-  candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
-end
-
-def pin_statements(statements, walk, answers, names)
-  mutable current = walk
-  statements.each do |statement|
-    current = pin_statement(statement, current, answers, names)
-  end
-  current
-end
-
-# One statement: the calls inside it are recorded with the bindings above
-# it, and what it binds is in scope below. A loop's and a branch's bodies
-# are walked in place, so a name bound above them keeps its type inside
-# and after.
-def pin_statement(statement, walk, answers, names)
-  case statement
-  in AssignmentNode(name:, value:)
-    return walk if value.nil?
-    seen = pin_expression(value, walk, answers, names)
-    seen.with(bindings: rebound(seen.bindings, name, synthesize(value, seen.bindings + answers)))
-  in WhileNode(condition:, body:)
-    pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
-  in IfNode(condition:, then_body:, else_body:)
-    after_condition = pin_expression(condition, walk, answers, names)
-    after_then = pin_statements((then_body or []), after_condition, answers, names)
-    pin_statements((else_body or []), after_then, answers, names)
-  else
-    pin_expression(statement, walk, answers, names)
-  end
-end
-
-# The calls to the program's defs anywhere inside an expression, each with
-# its arguments' types as the bindings in scope give them.
-def pin_expression(node, walk, answers, names)
-  return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
-  return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
-  mutable current = walk
-  if (node in CallNode) && names.include?(node.name)
-    scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil]])
-  end
-  if node in YieldNode
-    scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[YIELD, node.values.map { synthesize(it, scope) }, nil]])
-  end
-  # A def with no parameters is called by its bare name, which parses as a
-  # name and not as a call; a local of that name would be the local.
-  if (node in IdentifierNode) && names.include?(node.name) && current.bindings.none? { it[0] == node.name }
-    current = current.with(calls: current.calls + [[node.name, [], nil]])
-  end
-  children_of(node).each do |child|
-    current = pin_statement(child, current, answers, names)
-  end
-  current
-end
-
-# A call that hands one of the program's defs a block (#493). The block's
-# parameters are bound to what the def yields, as far as that is pinned;
-# its body is walked for the calls inside it; and what it answers is
-# gathered with the call. A name the block binds first is the block's
-# own, so the bindings after are the ones before, less nothing and with
-# whatever the block rebound.
-def pin_block_call(node, walk, answers, names)
-  mutable current = walk
-  node.arguments.each do |argument|
-    current = pin_statement(argument, current, answers, names)
-  end
-  scope = current.bindings + answers
-  arguments = node.arguments.map { synthesize(it, scope) }
-  yielded = answers.find { it[0] == block_key(node.name) }
-  mutable inner = current.bindings
-  mutable index = 0
-  node.block.parameters.each do |parameter|
-    type = yielded.nil? ? nil : type_at(type_at(yielded, 1), index)
-    inner = [[parameter, (type or ["unknown"])]] + inner
-    index += 1
-  end
-  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
-  answer = block_answer(node.block.body, inner, answers, names)
-  outer = current.bindings.length
-  kept = walked.bindings.slice(walked.bindings.length - outer, outer)
-  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer]])
-end
-
-# A block handed to a method of a value (#497), as `each` on an array.
-# Its parameters are bound by the receiver's type, the way inference
-# binds them; its body is walked for the calls inside it and for what it
-# rebinds; and a name it binds first is its own.
-def pin_walk(node, walk, answers, names)
-  mutable current = pin_statement(node.receiver, walk, answers, names)
-  node.arguments.each do |argument|
-    current = pin_statement(argument, current, answers, names)
-  end
-  scope = current.bindings + answers
-  receiver = synthesize(node.receiver, scope)
-  arguments = node.arguments.map { synthesize(it, scope) }
-  mutable inner = current.bindings
-  mutable index = 0
-  node.block.parameters.each do |parameter|
-    inner = [[parameter, block_parameter_type(receiver, index, node.name, arguments, parameter_count: node.block.parameters.length)]] + inner
-    index += 1
-  end
-  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
-  outer = current.bindings.length
-  walked.with(bindings: walked.bindings.slice(walked.bindings.length - outer, outer))
-end
-
-# What a block answers: nothing where it ends in what produces no value,
-# and otherwise what its body does, read as a def's is. A block that
-# answers nil, or a value or nil, is taken as one run for what it does,
-# since the native build holds no maybe to read its answer into (#491).
-def block_answer(body, bindings, answers, names)
-  return NOTHING if answers_nothing?(body, answers)
-  found = body_answer(body, bindings, answers, names)
-  return NOTHING if found == ["nil"] || (found in ["maybe", *])
-  found
-end
-
-# A name bound to a type: new names are added, a rebinding to the same type
-# changes nothing, and a rebinding to another type leaves the name unknown.
-# An array whose elements are not known yet is the same array once they
-# are: an empty literal, named by its first append.
-EMPTY_ARRAY = ["array", ["unknown"]]
-
 def rebound(bindings, name, type)
   found = bindings.find { it[0] == name }
   return [[name, type]] + bindings if found.nil?
@@ -442,23 +378,6 @@ def rebound(bindings, name, type)
   widened = type == ["nil"] ? maybe_of(held) : (held == ["nil"] ? maybe_of(type) : (type == ["maybe", held] ? type : nil))
   return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
   bindings.map { it[0] == name ? [name, ["unknown"]] : it }
-end
-
-def unique_types(types)
-  mutable unique = []
-  types.each do |type|
-    unique << type unless unique.include?(type)
-  end
-  unique
-end
-
-# Whether a type says everything a code generator needs: no unknown in it.
-def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
-
-def with_article(type)
-  rendered = render_type(type)
-  article = %w[A E I O U].include?(rendered.slice(0, 1)) ? "an" : "a"
-  "#{article} #{rendered}"
 end
 
 # The dump's lines, one per def and then one per top-level binding.
@@ -486,4 +405,85 @@ def render_pinned_block(block)
   answer = "-> #{render_pinned_type(block.answer)}"
   return "{ #{answer} }" if block.parameters.empty?
   "{ |#{block.parameters.map { render_type(it) }.join(", ")}| #{answer} }"
+end
+
+# A pinned type as the dump and the refusals write it.
+def render_pinned_type(type) = type == NOTHING ? "nothing" : render_type(type)
+
+# Rounds of pinning until one changes nothing. Each round can settle the
+# defs the last round's pins reach, so the rounds needed are bounded by
+# how many defs there are.
+def settle_pins(definitions, statements, names, starting, strict)
+  mutable pinned = starting
+  mutable round = 0
+  while round <= definitions.length + 1
+    answers = pinned_answers(pinned)
+    mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+    definitions.each do |definition|
+      found = pinned.find { it.name == definition.name }
+      next if found.nil? || found.parameters.length != definition.parameters.length
+      inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
+      walk = walk.with(calls: inner.calls)
+    end
+    settled = definitions.map { |definition| pin_definition(definition, walk.calls, answers, names, strict) }
+    break if settled == pinned
+    pinned = settled
+    round += 1
+  end
+  pinned
+end
+
+# A def's answer with its parameters pinned. Read plainly first. Where
+# that is unknown — the def calls itself, or one that calls it back — the
+# answer is read from the ways out of its body that are known: for `fib`,
+# the arm that answers `n`. The other defs' answers so far are in
+# `answers`, this def's own among them, so a pair that call each other
+# settle over a few rounds. Strict, an answer found that way is held to
+# the whole body, which must then answer it.
+def solved_answer(definition, parameters, answers, names, strict)
+  return NOTHING if answers_nothing?(definition.body, answers)
+  plain = body_answer(definition.body, parameters, answers.reject { it[0] == definition.name }, names)
+  return plain if concrete?(plain)
+  known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
+  return ["unknown"] unless known.length == 1
+  found = known.first or ["unknown"]
+  return found unless strict
+  whole = body_answer(definition.body, parameters, [[definition.name, found]] + answers.reject { it[0] == definition.name }, names)
+  whole == found ? found : ["unknown"]
+end
+
+def unique_types(types)
+  mutable unique = []
+  types.each do |type|
+    unique << type unless unique.include?(type)
+  end
+  unique
+end
+
+def value_candidates(node, scope)
+  return [statement_answer(node, scope)] unless node in IfNode
+  taken = node.then_body or []
+  other = node.else_body or []
+  first = taken.last
+  second = other.last
+  (first.nil? ? [["nil"]] : value_candidates(first, scope)) + (second.nil? ? [["nil"]] : value_candidates(second, scope))
+end
+
+def with_article(type)
+  rendered = render_type(type)
+  article = %w[A E I O U].include?(rendered.slice(0, 1)) ? "an" : "a"
+  "#{article} #{rendered}"
+end
+
+# The answers a def's own body is read with: the program's, and what its
+# block answers where it yields.
+def yielding_answers(answers, block)
+  return answers if block.nil?
+  answers + [[YIELD, block.answer]]
+end
+
+# Whether a body yields anywhere, the blocks written in it included: a
+# `yield` inside one reaches the def's own block.
+def yields?(body)
+  body.any? { (it in YieldNode) || yields?(children_of(it)) }
 end

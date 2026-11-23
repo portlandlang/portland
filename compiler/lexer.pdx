@@ -3,6 +3,20 @@
 #
 # A library: require_relative "lexer", then call lex(source).
 # To dump tokens from the command line, see tokenize.pdx.
+#
+# — heredocs (ADR 0020) —
+#
+# Squiggly `<<~SQL` only, expanded into an ordinary string literal before
+# the scan, mirroring the seed. Structurally different from the seed's
+# implementation on purpose; only in/out equivalence matters.
+
+# The line that ends a program's text (ADR 0092), Ruby's spelling.
+END_MARKER = "__END__"
+
+struct HeredocLine
+  text
+  consumed
+end
 
 struct Token
   kind
@@ -53,18 +67,6 @@ struct Token
   end
 end
 
-def digit?(character)
-  "0123456789".include?(character)
-end
-
-def name_start?(character)
-  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".include?(character)
-end
-
-def name_character?(character)
-  name_start?(character) || digit?(character)
-end
-
 # Printable ASCII, plus the whitespace a line can hold.
 def ascii?(character)
   " !\"\#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\t\n".include?(character)
@@ -72,6 +74,32 @@ end
 
 def base_letter?(character)
   "xXbBoO".include?(character)
+end
+
+def blank?(character)
+  character == " " || character == "\t" || character == "\n"
+end
+
+# Ruby reads `017` as octal fifteen, a trap inherited from C (#72, ADR 0050).
+# Portland refuses the leading zero and names both readings.
+def check_leading_zero(text, kind)
+  letters = text.chars
+  return unless letters.first == "0" && letters.length > 1 && (digit?(letters[1]) || letters[1] == "_")
+  mutable index = 0
+  while index < letters.length && (letters[index] == "0" || letters[index] == "_")
+    index += 1
+  end
+  mutable rest = ""
+  while index < letters.length
+    rest << letters[index]
+    index += 1
+  end
+  if kind == "float"
+    written = rest.start_with?(".") ? "0#{rest}" : rest
+    panic "'#{text}' has a leading zero — write #{written}"
+  end
+  rest = "0" if rest.empty?
+  panic "'#{text}' has a leading zero — write 0o#{rest} for octal or #{rest} for decimal"
 end
 
 # A prefixed integer literal's digits must suit its base, sit at least one
@@ -108,324 +136,22 @@ def check_prefixed_literal(text)
   end
 end
 
-# Ruby reads `017` as octal fifteen, a trap inherited from C (#72, ADR 0050).
-# Portland refuses the leading zero and names both readings.
-def check_leading_zero(text, kind)
-  letters = text.chars
-  return unless letters.first == "0" && letters.length > 1 && (digit?(letters[1]) || letters[1] == "_")
-  mutable index = 0
-  while index < letters.length && (letters[index] == "0" || letters[index] == "_")
-    index += 1
-  end
-  mutable rest = ""
-  while index < letters.length
-    rest << letters[index]
-    index += 1
-  end
-  if kind == "float"
-    written = rest.start_with?(".") ? "0#{rest}" : rest
-    panic "'#{text}' has a leading zero — write #{written}"
-  end
-  rest = "0" if rest.empty?
-  panic "'#{text}' has a leading zero — write 0o#{rest} for octal or #{rest} for decimal"
-end
-
-def keyword?(word)
-  %w[alias and break case class def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
-end
-
-# The removed Ruby spellings and their rewrites (#135): each a sentence in
-# ADR 0047's voice — the fact, a dash, the rewrite its ledger page names —
-# the seed's words. The lexer asks for the words that were Ruby keywords,
-# the checker and evaluator for a name nothing defines and a method no
-# value has, so a Rubyist porting by hand reads the rewrite where the
-# parser's words were. Nil for a name that is simply not defined. The
-# table lives here, in the one file every other loads first, so the
-# refusal renderer can read it without a cycle in the requires.
-def retired_sentence(name)
-  case name
-  when "for" then "'for' is not a Portland loop — walk the collection with 'each'"
-  when "BEGIN", "END" then "'#{name}' has no Portland meaning — a program runs top to bottom; write the statements where they go"
-  when "begin", "rescue", "ensure" then "'#{name}' has no Portland meaning — a fallible call answers a failure; handle it with 'or' or 'case/in'"
-  when "raise" then "'raise' has no Portland meaning — return a failure; the caller handles it with 'or' or 'case/in'"
-  # The ledger names no rewrite for these; the fact stands alone.
-  when "retry", "redo", "undef", "defined?", "__method__", "is_a?", "kind_of?", "instance_of?" then "'#{name}' has no Portland meaning"
-  when "send", "public_send", "__send__", "respond_to?" then "'#{name}' has no Portland meaning — the runtime is closed; call the method by name"
-  when "extend" then "'extend' has no Portland meaning — a module's def is already callable as 'Module.name' (ADR 0021)"
-  when "eval", "instance_eval", "class_eval", "define_method", "method_missing", "instance_variable_get", "instance_variable_set", "const_get", "singleton_class"
-    "'#{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
-  when "proc", "lambda", "Proc" then "'#{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
-  when "alias_method" then "'alias_method' is spelled 'alias' here — 'alias new old', two bare names"
-  # `attr_reader` is a spelling of the field list inside a type body (ADR
-  # 0075); this is its sentence everywhere else. The setters mutate, and
-  # what mutable state is waits on #103.
-  when "attr_reader" then "'attr_reader' declares fields, so it belongs in a struct or class body — a field is read by its bare name"
-  when "attr_writer", "attr_accessor" then "'#{name}' makes a setter, and values never mutate here (ADR 0015) — declare the field with 'attr_reader' or its bare name, and build changed values with 'with'"
-  when "Thread", "Mutex", "Queue", "Fiber", "Ractor", "ConditionVariable" then "'#{name}' has no Portland meaning — run independent work in a 'together' block"
-  when "Object", "BasicObject", "Kernel", "Class", "Module" then "'#{name}' has no Portland meaning — there is no root class; a struct stands alone"
-  when "fetch" then "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'"
-  when "default", "default_proc" then "'#{name}' has no Portland meaning — a hash has no default (ADR 0063); a lookup answers a maybe, so write 'hash[key] or fallback'"
-  when "push", "pop", "shift", "unshift", "append", "prepend", "insert", "delete_at", "delete_if", "keep_if", "clear", "concat", "replace", "fill"
-    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
-  when "map!", "collect!", "select!", "filter!", "reject!", "sort!", "sort_by!", "uniq!", "compact!", "flatten!", "reverse!", "shuffle!", "rotate!", "slice!", "upcase!", "downcase!", "capitalize!", "swapcase!", "strip!", "lstrip!", "rstrip!", "chomp!", "chop!", "squeeze!", "gsub!", "sub!", "tr!", "delete!", "succ!", "next!", "merge!", "transform_values!", "transform_keys!"
-    stem = name.chop
-    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — '#{stem}' answers the new value; bind it"
-  when "hash" then "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)"
-  when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
-  # `Data.define` is a spelling of `struct` at a constant's top level (ADR
-  # 0084); anywhere else it is the runtime class-building Portland does not do.
-  when "Data" then "'Data.define' builds a type at runtime, which Portland does not do — write 'Name = Data.define(:a, :b)' at the top level, which declares 'struct Name' (ADR 0084)"
-  # Portland's own placeholders, retired when the floor module arrived.
-  when "argv" then "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)"
-  when "read_file" then "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)"
-  when "write_file" then "'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)"
-  else nil
-  end
-end
-
-# The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
-# the word follows a dot — `range.begin` is a method, as Ruby's is.
-def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_writer begin defined? ensure extend for redo rescue retry undef].include?(word)
-
-def two_character_operator?(pair)
-  %w[== != <= >= && || += -= *= /= %= => &. << .. :: ** =~ !~].include?(pair)
-end
-
-# `...`, `<<~`, `||=`, and `<=>` — the three-character operators (ADRs
-# 0019, 0020, 0043, 0054).
-def three_character_operator?(triple)
-  %w[... <<~ ||= <=> ===].include?(triple)
-end
-
-# `?` joined for the ternary (#83): a `?` that is not a name's suffix
-# stands alone. The identifier and symbol arms claim `ready?` and `:ok?`
-# before the operator arm ever sees the character.
-def one_character_operator?(character)
-  "(){}[],.:+-*/%<>=!|&^~?".include?(character)
-end
-
-# Does the colon at `index` open a symbol (ADR 0023)?
-#
-# Not when it is `::`, and not when it is glued to a name on its left —
-# `name:` is a keyword-argument label. That one rule gives `name:"pdx"`
-# Ruby's own reading, a label and a string.
-def symbol_start?(characters, index)
-  return false if characters[index + 1] == ":"
-  return false if index > 0 && (name_character?(characters[index - 1]) || characters[index - 1] == "?" || characters[index - 1] == "!")
-
-  after = characters[index + 1]
-  return false if after.nil?
-
-  name_start?(after) || after == "\""
-end
-
-# Read a plain quoted lexeme (single-quoted, or a string nested inside an
-# interpolation); backslash escapes the next character.
-def read_simple_string(characters, start, quote)
-  mutable text = characters[start]
-  mutable index = start + 1
-  while index < characters.length
-    character = characters[index]
-    if character == "\\"
-      text << character
-      text << characters[index + 1] if index + 1 < characters.length
-      index += 2
-      next
-    end
-    text << character
-    index += 1
-    return text if character == quote
-  end
-  text
-end
-
-# Read a '#{...}' interpolation, tracking brace depth and nested strings.
-def read_interpolation(characters, start)
-  mutable text = '#{'
-  mutable index = start + 2
-  mutable depth = 1
-  while index < characters.length && depth > 0
-    character = characters[index]
-    if character == "{"
-      depth += 1
-    elsif character == "}"
-      depth -= 1
-    elsif character == "\""
-      nested = read_simple_string(characters, index, "\"")
-      text << nested
-      index += entries_spanned(characters, index, nested)
-      next
-    end
-    text << character
-    index += 1
-  end
-  text
-end
-
-# — regex literals (ADR 0086) —
-#
-# Whether a `/` here opens a regex literal: yes at the start and after
-# anything an operand cannot follow — an operator, an opener, a comma, a
-# newline, a keyword like `if` or `when`; no after a value, a closer, or a
-# name, where it divides. Mirrors the seed's `regex_begins`.
-def regex_begins?(tokens)
-  return true if tokens.empty?
-  previous = tokens.last
-  return false if %w[identifier integer float rational imaginary string symbol word_array symbol_array regex].include?(previous.kind)
-  return !%w[end self nil true false].include?(previous.text) if previous.kind == "keyword"
-  return !%w[) \] }].include?(previous.text) if previous.kind == "operator"
-  true
-end
-
-# `puts /x/`: a name, a space, and a `/` with none after it.
-def glued_to_a_name?(tokens, characters, index)
-  return false if tokens.empty? || tokens.last.kind != "identifier"
-  return false unless index > 0 && blank?(characters[index - 1])
-  return false if index + 1 >= characters.length
-  following = characters[index + 1]
-  !(blank?(following) || following == "=")
-end
-
-# The flag letters after a closing delimiter, `i`, `m`, `x`, or `o`.
-def read_regex_flags(characters, start)
-  mutable flags = ""
-  mutable index = start
-  while index < characters.length && "imxo".include?(characters[index])
-    flags << characters[index]
-    index += 1
-  end
-  flags
-end
-
-# `/.../flags`: the body raw — a backslash escapes the next character for
-# the engine's own reading, and an interpolation may hold a slash.
-def read_regex(characters, start)
-  mutable text = "/"
-  mutable index = start + 1
-  while index < characters.length
-    character = characters[index]
-    if character == "\\"
-      text << character
-      text << characters[index + 1] if index + 1 < characters.length
-      index += 2
-      next
-    end
-    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
-      inner = read_interpolation(characters, index)
-      text << inner
-      index += entries_spanned(characters, index, inner)
-      next
-    end
-    text << character
-    index += 1
-    return text + read_regex_flags(characters, index) if character == "/"
-  end
-  panic "unterminated regex starting at byte #{start}"
-end
-
-# `%r{...}flags`: `%w[]`'s delimiters and balancing, the body raw.
-def read_percent_regex(characters, start)
-  opener = start + 2 < characters.length ? characters[start + 2] : ""
-  panic "unterminated %r literal starting at byte #{start}" if opener.empty?
-  unless "[({".include?(opener)
-    panic "'%r#{opener}' is not a Portland delimiter — write %r[], %r(), or %r{}"
-  end
-  closer = closer_of(opener)
-  mutable text = "%r#{opener}"
-  mutable index = start + 3
-  mutable depth = 0
-  while index < characters.length
-    character = characters[index]
-    if character == "\\"
-      text << character
-      text << characters[index + 1] if index + 1 < characters.length
-      index += 2
-      next
-    end
-    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
-      inner = read_interpolation(characters, index)
-      text << inner
-      index += entries_spanned(characters, index, inner)
-      next
-    end
-    text << character
-    index += 1
-    if character == opener
-      depth += 1
-    elsif character == closer
-      return text + read_regex_flags(characters, index) if depth == 0
-      depth -= 1
-    end
-  end
-  panic "unterminated %r#{opener}#{closer} starting at byte #{start}"
-end
-
-# Read a double-quoted lexeme: escapes and interpolation included.
-def read_double_quoted(characters, start)
-  mutable text = characters[start]
-  mutable index = start + 1
-  while index < characters.length
-    character = characters[index]
-    if character == "\\"
-      text << character
-      text << characters[index + 1] if index + 1 < characters.length
-      index += 2
-      next
-    end
-    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
-      inner = read_interpolation(characters, index)
-      text << inner
-      index += entries_spanned(characters, index, inner)
-      next
-    end
-    text << character
-    index += 1
-    return text if character == "\""
-  end
-  text
-end
-
-# The `%` literal family (ADR 0051): `%w` and `%i` with `[]`, `()`, or
-# `{}`. ADR 0030: a backslash escapes the next character, and unescaped
-# delimiters balance, so only an unescaped closer at depth zero closes.
-# Escapes stay raw in the token text — unescaping is the evaluator's job, as
-# it is the seed's parser's.
-def read_word_array(characters, start)
-  letter = characters[start + 1]
-  opener = start + 2 < characters.length ? characters[start + 2] : ""
-  panic "unterminated %#{letter} literal starting at byte #{start}" if opener.empty?
-  unless "[({".include?(opener)
-    panic "'%#{letter}#{opener}' is not a Portland delimiter — write %#{letter}[], %#{letter}(), or %#{letter}{}"
-  end
-  closer = closer_of(opener)
-  mutable text = "%#{letter}#{opener}"
-  mutable index = start + 3
-  mutable depth = 0
-  while index < characters.length
-    character = characters[index]
-    text << character
-    index += 1
-    if character == "\\"
-      if index < characters.length
-        text << characters[index]
-        index += 1
-      end
-    elsif character == opener
-      depth += 1
-    elsif character == closer
-      return text if depth == 0
-      depth -= 1
-    end
-  end
-  text
-end
-
 def closer_of(opener)
   case opener
   when "[" then "]"
   when "(" then ")"
   else "}"
   end
+end
+
+# The text after a source's `__END__` line (ADR 0092), or nil when it has
+# none: `DATA`'s value in the file that is run. The lexer finds the line,
+# since only it knows a string or a heredoc from program text.
+def data_section(raw_source)
+  return nil unless raw_source.include?(END_MARKER)
+  found = lex(raw_source, keep_data: true).select { it.kind == "data" }
+  token = found.first or return nil
+  token.text
 end
 
 # Whether a `%` begins one of the family's declined members (ADR 0051): a
@@ -444,10 +170,6 @@ def declined_percent_literal?(characters, index)
   index == 0 || blank?(characters[index - 1])
 end
 
-def blank?(character)
-  character == " " || character == "\t" || character == "\n"
-end
-
 # One sentence per declined member, in ADR 0047's voice: the spelling as
 # written, a dash, the Portland form.
 def declined_percent_sentence(spelling)
@@ -462,124 +184,8 @@ def declined_percent_sentence(spelling)
   "'#{spelling}' is not a Portland literal — #{next_step}"
 end
 
-# — heredocs (ADR 0020) —
-#
-# Squiggly `<<~SQL` only, expanded into an ordinary string literal before
-# the scan, mirroring the seed. Structurally different from the seed's
-# implementation on purpose; only in/out equivalence matters.
-
-struct HeredocLine
-  text
-  consumed
-end
-
-def leading_spaces(line)
-  characters = line.chars
-  mutable count = 0
-  while count < characters.length && characters[count] == " "
-    count += 1
-  end
-  count
-end
-
-def trimmed(line)
-  characters = line.chars
-  mutable start = 0
-  while start < characters.length && characters[start] == " "
-    start += 1
-  end
-  mutable finish = characters.length
-  while finish > start && characters[finish - 1] == " "
-    finish -= 1
-  end
-  mutable result = ""
-  mutable index = start
-  while index < finish
-    result << characters[index]
-    index += 1
-  end
-  result
-end
-
-# Ruby's plain and dash openers (#135): squiggly is the one opener here,
-# and the rewrite is named — with its one caveat, since `<<~` strips the
-# content's common indentation. The seed's sentences.
-def refuse_other_heredoc(line, start)
-  characters = line.chars
-  return unless characters[start] == "<" && characters[start + 1] == "<"
-  dash = characters[start + 2] == "-"
-  opener_end = dash ? start + 3 : start + 2
-  first = characters[opener_end] or ""
-  quoted = first == "\"" || first == "'"
-  return unless quoted || "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(first)
-  mutable name_end = quoted ? opener_end + 1 : opener_end
-  while name_end < characters.length && name_character?(characters[name_end])
-    name_end += 1
-  end
-  mutable name = characters.slice(quoted ? opener_end + 1 : opener_end, name_end - (quoted ? opener_end + 1 : opener_end)).join("")
-  name = first + name + first if quoted
-  opener = dash ? "<<-" : "<<"
-  kind = dash ? "dash" : "plain"
-  panic "'#{opener}#{name}' is a #{kind} heredoc — write '<<~#{name}'; the content's common indentation is stripped"
-end
-
-# The terminator name right after `<<~`, or "" when this is not an opener.
-def heredoc_terminator(line, start)
-  characters = line.chars
-  return "" unless characters[start] == "<" && characters[start + 1] == "<" && characters[start + 2] == "~"
-  mutable index = start + 3
-  # `<<~'HERE'` reads its body raw, `<<~"HERE"` interpolates like the bare
-  # form; the answer carries the quote as its last character so the caller
-  # can tell the three apart.
-  mutable quote = ""
-  if characters[index] == "'" || characters[index] == "\""
-    quote = characters[index]
-    index += 1
-  end
-  mutable name = ""
-  while index < characters.length && name_character?(characters[index])
-    name << characters[index]
-    index += 1
-  end
-  return "" if name.empty?
-  # A quoted terminator closes on the same line, as the seed requires.
-  if !quote.empty? && (index >= characters.length || characters[index] != quote)
-    panic("unterminated heredoc terminator quote in `<<~#{quote}#{name}`")
-  end
-  name + quote
-end
-
-# Body lines up to the terminator, dedented and encoded as a literal.
-def read_heredoc_body(lines, start, terminator, interpolating)
-  mutable body = []
-  mutable index = start
-  while index < lines.length && trimmed(lines[index]) != terminator
-    body << lines[index]
-    index += 1
-  end
-  common = heredoc_indentation(body)
-  mutable encoded = ""
-  body.each do |line|
-    encoded << encode_heredoc_line(line, common, interpolating)
-  end
-  literal = if interpolating
-    "\"" + encoded + "\""
-  else
-    "'" + encoded + "'"
-  end
-  HeredocLine.new(text: literal, consumed: index - start + 1)
-end
-
-def heredoc_indentation(body)
-  mutable common = 1000000
-  body.each do |line|
-    unless trimmed(line).empty?
-      spaces = leading_spaces(line)
-      common = spaces if spaces < common
-    end
-  end
-  return 0 if common == 1000000
-  common
+def digit?(character)
+  "0123456789".include?(character)
 end
 
 def encode_heredoc_line(line, common, interpolating)
@@ -603,6 +209,30 @@ def encode_heredoc_line(line, common, interpolating)
   end
   encoded << "\n"
   encoded
+end
+
+# Whether `__END__` starts at `index` and is the whole of its line: at the
+# line's first column, with a newline or the end of the source after it, as
+# Ruby requires.
+def end_marker_at?(characters, index)
+  return false unless index == 0 || characters[index - 1] == "\n"
+  return false unless characters.slice(index, END_MARKER.length).join("") == END_MARKER
+  after = index + END_MARKER.length
+  after >= characters.length || characters[after] == "\n"
+end
+
+# How many of the lexer's characters, from `start`, a lexeme read from
+# them spans. The lexeme's own length can be less: a cluster split for the
+# lexer (see lexable_characters) joins up again in the text.
+def entries_spanned(characters, start, text)
+  wanted = text.bytesize
+  mutable seen = 0
+  mutable index = start
+  while seen < wanted && index < characters.length
+    seen += characters[index].bytesize
+    index += 1
+  end
+  index - start
 end
 
 # Escape the body's own quotes, leaving an interpolation's code — and any
@@ -703,23 +333,6 @@ def expand_heredoc_line(lines, line_index)
   HeredocLine.new(text: result, consumed: consumed)
 end
 
-# Past a quoted literal, so its contents can't be mistaken for code.
-def skip_literal(characters, start)
-  quote = characters[start]
-  mutable index = start + 1
-  while index < characters.length
-    if characters[index] == "\\"
-      index += 2
-      next
-    end
-    if characters[index] == quote
-      return index + 1
-    end
-    index += 1
-  end
-  characters.length
-end
-
 def expand_heredocs(source)
   # Every line, trailing blanks included, so the rejoined source keeps its
   # length and every token its line (Ruby's split drops trailing empties
@@ -746,75 +359,64 @@ def expand_heredocs(source)
   output.join("\n")
 end
 
-# `first_line` is where the count starts: 1 for a file, and a string's own
-# line for the source inside its interpolation, which is lexed on its own
-# (#98 — an identifier inside `"#{greeting}"` points at the right line).
-# Source as Ruby reads it (#138): every `\r\n` is a newline, inside strings
-# and heredocs too — the seed's `normalize_line_endings`. A `\r\n` is one
-# character here (ADR 0038: CR LF is a single grapheme cluster), so the swap
-# is one map.
-def normalize_line_endings(source)
-  return source unless source.include?("\r\n")
-
-  source.chars.map { it == "\r\n" ? "\n" : it }.join("")
+# `puts /x/`: a name, a space, and a `/` with none after it.
+def glued_to_a_name?(tokens, characters, index)
+  return false if tokens.empty? || tokens.last.kind != "identifier"
+  return false unless index > 0 && blank?(characters[index - 1])
+  return false if index + 1 >= characters.length
+  following = characters[index + 1]
+  !(blank?(following) || following == "=")
 end
 
-# The characters the lexer walks. A character is a grapheme (ADR 0038), so
-# a combining mark or a joiner written straight after an ASCII character —
-# most often a string's opening quote — clusters with it and hides it. Such
-# a cluster is handed over as the ASCII character and then the rest, which
-# is how the seed's lexer, walking codepoints, has always seen it (#322).
-# Text that is all single bytes has no such cluster and is not searched.
-def lexable_characters(source)
-  return source.chars if source.length == source.bytesize
-  mutable characters = []
-  source.chars.each do |character|
-    codes = character.codepoints
-    if codes.length == 1 || codes.first > 127
-      characters << character
-    else
-      characters << codes.first.chr
-      characters << codes.drop(1).map { it.chr(Encoding::UTF_8) }.join("")
+def heredoc_indentation(body)
+  mutable common = 1000000
+  body.each do |line|
+    unless trimmed(line).empty?
+      spaces = leading_spaces(line)
+      common = spaces if spaces < common
     end
   end
-  characters
+  return 0 if common == 1000000
+  common
 end
 
-# How many of the lexer's characters, from `start`, a lexeme read from
-# them spans. The lexeme's own length can be less: a cluster split for the
-# lexer (see lexable_characters) joins up again in the text.
-def entries_spanned(characters, start, text)
-  wanted = text.bytesize
-  mutable seen = 0
-  mutable index = start
-  while seen < wanted && index < characters.length
-    seen += characters[index].bytesize
+# The terminator name right after `<<~`, or "" when this is not an opener.
+def heredoc_terminator(line, start)
+  characters = line.chars
+  return "" unless characters[start] == "<" && characters[start + 1] == "<" && characters[start + 2] == "~"
+  mutable index = start + 3
+  # `<<~'HERE'` reads its body raw, `<<~"HERE"` interpolates like the bare
+  # form; the answer carries the quote as its last character so the caller
+  # can tell the three apart.
+  mutable quote = ""
+  if characters[index] == "'" || characters[index] == "\""
+    quote = characters[index]
     index += 1
   end
-  index - start
+  mutable name = ""
+  while index < characters.length && name_character?(characters[index])
+    name << characters[index]
+    index += 1
+  end
+  return "" if name.empty?
+  # A quoted terminator closes on the same line, as the seed requires.
+  if !quote.empty? && (index >= characters.length || characters[index] != quote)
+    panic("unterminated heredoc terminator quote in `<<~#{quote}#{name}`")
+  end
+  name + quote
 end
 
-# The line that ends a program's text (ADR 0092), Ruby's spelling.
-END_MARKER = "__END__"
-
-# Whether `__END__` starts at `index` and is the whole of its line: at the
-# line's first column, with a newline or the end of the source after it, as
-# Ruby requires.
-def end_marker_at?(characters, index)
-  return false unless index == 0 || characters[index - 1] == "\n"
-  return false unless characters.slice(index, END_MARKER.length).join("") == END_MARKER
-  after = index + END_MARKER.length
-  after >= characters.length || characters[after] == "\n"
+def keyword?(word)
+  %w[alias and break case class def do else elsif end enum false if in include loop meanwhile module mutable next nil not or return self struct then together trait true unless until when while yield].include?(word)
 end
 
-# The text after a source's `__END__` line (ADR 0092), or nil when it has
-# none: `DATA`'s value in the file that is run. The lexer finds the line,
-# since only it knows a string or a heredoc from program text.
-def data_section(raw_source)
-  return nil unless raw_source.include?(END_MARKER)
-  found = lex(raw_source, keep_data: true).select { it.kind == "data" }
-  token = found.first or return nil
-  token.text
+def leading_spaces(line)
+  characters = line.chars
+  mutable count = 0
+  while count < characters.length && characters[count] == " "
+    count += 1
+  end
+  count
 end
 
 # With `keep_data`, the text after an `__END__` line rides out as a last
@@ -1141,3 +743,400 @@ def lex(raw_source, first_line: 1, keep_data: false)
   tokens
 end
 
+# The characters the lexer walks. A character is a grapheme (ADR 0038), so
+# a combining mark or a joiner written straight after an ASCII character —
+# most often a string's opening quote — clusters with it and hides it. Such
+# a cluster is handed over as the ASCII character and then the rest, which
+# is how the seed's lexer, walking codepoints, has always seen it (#322).
+# Text that is all single bytes has no such cluster and is not searched.
+def lexable_characters(source)
+  return source.chars if source.length == source.bytesize
+  mutable characters = []
+  source.chars.each do |character|
+    codes = character.codepoints
+    if codes.length == 1 || codes.first > 127
+      characters << character
+    else
+      characters << codes.first.chr
+      characters << codes.drop(1).map { it.chr(Encoding::UTF_8) }.join("")
+    end
+  end
+  characters
+end
+
+def name_character?(character)
+  name_start?(character) || digit?(character)
+end
+
+def name_start?(character)
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".include?(character)
+end
+
+# `first_line` is where the count starts: 1 for a file, and a string's own
+# line for the source inside its interpolation, which is lexed on its own
+# (#98 — an identifier inside `"#{greeting}"` points at the right line).
+# Source as Ruby reads it (#138): every `\r\n` is a newline, inside strings
+# and heredocs too — the seed's `normalize_line_endings`. A `\r\n` is one
+# character here (ADR 0038: CR LF is a single grapheme cluster), so the swap
+# is one map.
+def normalize_line_endings(source)
+  return source unless source.include?("\r\n")
+
+  source.chars.map { it == "\r\n" ? "\n" : it }.join("")
+end
+
+# `?` joined for the ternary (#83): a `?` that is not a name's suffix
+# stands alone. The identifier and symbol arms claim `ready?` and `:ok?`
+# before the operator arm ever sees the character.
+def one_character_operator?(character)
+  "(){}[],.:+-*/%<>=!|&^~?".include?(character)
+end
+
+# Read a double-quoted lexeme: escapes and interpolation included.
+def read_double_quoted(characters, start)
+  mutable text = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
+      text << inner
+      index += entries_spanned(characters, index, inner)
+      next
+    end
+    text << character
+    index += 1
+    return text if character == "\""
+  end
+  text
+end
+
+# Body lines up to the terminator, dedented and encoded as a literal.
+def read_heredoc_body(lines, start, terminator, interpolating)
+  mutable body = []
+  mutable index = start
+  while index < lines.length && trimmed(lines[index]) != terminator
+    body << lines[index]
+    index += 1
+  end
+  common = heredoc_indentation(body)
+  mutable encoded = ""
+  body.each do |line|
+    encoded << encode_heredoc_line(line, common, interpolating)
+  end
+  literal = if interpolating
+    "\"" + encoded + "\""
+  else
+    "'" + encoded + "'"
+  end
+  HeredocLine.new(text: literal, consumed: index - start + 1)
+end
+
+# Read a '#{...}' interpolation, tracking brace depth and nested strings.
+def read_interpolation(characters, start)
+  mutable text = '#{'
+  mutable index = start + 2
+  mutable depth = 1
+  while index < characters.length && depth > 0
+    character = characters[index]
+    if character == "{"
+      depth += 1
+    elsif character == "}"
+      depth -= 1
+    elsif character == "\""
+      nested = read_simple_string(characters, index, "\"")
+      text << nested
+      index += entries_spanned(characters, index, nested)
+      next
+    end
+    text << character
+    index += 1
+  end
+  text
+end
+
+# `%r{...}flags`: `%w[]`'s delimiters and balancing, the body raw.
+def read_percent_regex(characters, start)
+  opener = start + 2 < characters.length ? characters[start + 2] : ""
+  panic "unterminated %r literal starting at byte #{start}" if opener.empty?
+  unless "[({".include?(opener)
+    panic "'%r#{opener}' is not a Portland delimiter — write %r[], %r(), or %r{}"
+  end
+  closer = closer_of(opener)
+  mutable text = "%r#{opener}"
+  mutable index = start + 3
+  mutable depth = 0
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
+      text << inner
+      index += entries_spanned(characters, index, inner)
+      next
+    end
+    text << character
+    index += 1
+    if character == opener
+      depth += 1
+    elsif character == closer
+      return text + read_regex_flags(characters, index) if depth == 0
+      depth -= 1
+    end
+  end
+  panic "unterminated %r#{opener}#{closer} starting at byte #{start}"
+end
+
+# `/.../flags`: the body raw — a backslash escapes the next character for
+# the engine's own reading, and an interpolation may hold a slash.
+def read_regex(characters, start)
+  mutable text = "/"
+  mutable index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    if character == "#" && index + 1 < characters.length && characters[index + 1] == "{"
+      inner = read_interpolation(characters, index)
+      text << inner
+      index += entries_spanned(characters, index, inner)
+      next
+    end
+    text << character
+    index += 1
+    return text + read_regex_flags(characters, index) if character == "/"
+  end
+  panic "unterminated regex starting at byte #{start}"
+end
+
+# The flag letters after a closing delimiter, `i`, `m`, `x`, or `o`.
+def read_regex_flags(characters, start)
+  mutable flags = ""
+  mutable index = start
+  while index < characters.length && "imxo".include?(characters[index])
+    flags << characters[index]
+    index += 1
+  end
+  flags
+end
+
+# Read a plain quoted lexeme (single-quoted, or a string nested inside an
+# interpolation); backslash escapes the next character.
+def read_simple_string(characters, start, quote)
+  mutable text = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    text << character
+    index += 1
+    return text if character == quote
+  end
+  text
+end
+
+# The `%` literal family (ADR 0051): `%w` and `%i` with `[]`, `()`, or
+# `{}`. ADR 0030: a backslash escapes the next character, and unescaped
+# delimiters balance, so only an unescaped closer at depth zero closes.
+# Escapes stay raw in the token text — unescaping is the evaluator's job, as
+# it is the seed's parser's.
+def read_word_array(characters, start)
+  letter = characters[start + 1]
+  opener = start + 2 < characters.length ? characters[start + 2] : ""
+  panic "unterminated %#{letter} literal starting at byte #{start}" if opener.empty?
+  unless "[({".include?(opener)
+    panic "'%#{letter}#{opener}' is not a Portland delimiter — write %#{letter}[], %#{letter}(), or %#{letter}{}"
+  end
+  closer = closer_of(opener)
+  mutable text = "%#{letter}#{opener}"
+  mutable index = start + 3
+  mutable depth = 0
+  while index < characters.length
+    character = characters[index]
+    text << character
+    index += 1
+    if character == "\\"
+      if index < characters.length
+        text << characters[index]
+        index += 1
+      end
+    elsif character == opener
+      depth += 1
+    elsif character == closer
+      return text if depth == 0
+      depth -= 1
+    end
+  end
+  text
+end
+
+# Ruby's plain and dash openers (#135): squiggly is the one opener here,
+# and the rewrite is named — with its one caveat, since `<<~` strips the
+# content's common indentation. The seed's sentences.
+def refuse_other_heredoc(line, start)
+  characters = line.chars
+  return unless characters[start] == "<" && characters[start + 1] == "<"
+  dash = characters[start + 2] == "-"
+  opener_end = dash ? start + 3 : start + 2
+  first = characters[opener_end] or ""
+  quoted = first == "\"" || first == "'"
+  return unless quoted || "ABCDEFGHIJKLMNOPQRSTUVWXYZ".include?(first)
+  mutable name_end = quoted ? opener_end + 1 : opener_end
+  while name_end < characters.length && name_character?(characters[name_end])
+    name_end += 1
+  end
+  mutable name = characters.slice(quoted ? opener_end + 1 : opener_end, name_end - (quoted ? opener_end + 1 : opener_end)).join("")
+  name = first + name + first if quoted
+  opener = dash ? "<<-" : "<<"
+  kind = dash ? "dash" : "plain"
+  panic "'#{opener}#{name}' is a #{kind} heredoc — write '<<~#{name}'; the content's common indentation is stripped"
+end
+
+# — regex literals (ADR 0086) —
+#
+# Whether a `/` here opens a regex literal: yes at the start and after
+# anything an operand cannot follow — an operator, an opener, a comma, a
+# newline, a keyword like `if` or `when`; no after a value, a closer, or a
+# name, where it divides. Mirrors the seed's `regex_begins`.
+def regex_begins?(tokens)
+  return true if tokens.empty?
+  previous = tokens.last
+  return false if %w[identifier integer float rational imaginary string symbol word_array symbol_array regex].include?(previous.kind)
+  return !%w[end self nil true false].include?(previous.text) if previous.kind == "keyword"
+  return !%w[) \] }].include?(previous.text) if previous.kind == "operator"
+  true
+end
+
+# The Ruby keywords and perlisms the lexer refuses on sight (#135), unless
+# the word follows a dot — `range.begin` is a method, as Ruby's is.
+def reserved_word?(word) = %w[BEGIN END __method__ attr_accessor attr_writer begin defined? ensure extend for redo rescue retry undef].include?(word)
+
+# The removed Ruby spellings and their rewrites (#135): each a sentence in
+# ADR 0047's voice — the fact, a dash, the rewrite its ledger page names —
+# the seed's words. The lexer asks for the words that were Ruby keywords,
+# the checker and evaluator for a name nothing defines and a method no
+# value has, so a Rubyist porting by hand reads the rewrite where the
+# parser's words were. Nil for a name that is simply not defined. The
+# table lives here, in the one file every other loads first, so the
+# refusal renderer can read it without a cycle in the requires.
+def retired_sentence(name)
+  case name
+  when "for" then "'for' is not a Portland loop — walk the collection with 'each'"
+  when "BEGIN", "END" then "'#{name}' has no Portland meaning — a program runs top to bottom; write the statements where they go"
+  when "begin", "rescue", "ensure" then "'#{name}' has no Portland meaning — a fallible call answers a failure; handle it with 'or' or 'case/in'"
+  when "raise" then "'raise' has no Portland meaning — return a failure; the caller handles it with 'or' or 'case/in'"
+  # The ledger names no rewrite for these; the fact stands alone.
+  when "retry", "redo", "undef", "defined?", "__method__", "is_a?", "kind_of?", "instance_of?" then "'#{name}' has no Portland meaning"
+  when "send", "public_send", "__send__", "respond_to?" then "'#{name}' has no Portland meaning — the runtime is closed; call the method by name"
+  when "extend" then "'extend' has no Portland meaning — a module's def is already callable as 'Module.name' (ADR 0021)"
+  when "eval", "instance_eval", "class_eval", "define_method", "method_missing", "instance_variable_get", "instance_variable_set", "const_get", "singleton_class"
+    "'#{name}' has no Portland meaning — the runtime is closed; what you read in the source is what runs, so write it out"
+  when "proc", "lambda", "Proc" then "'#{name}' has no Portland meaning — hand a block to a method, and it calls the block with 'yield'"
+  when "alias_method" then "'alias_method' is spelled 'alias' here — 'alias new old', two bare names"
+  # `attr_reader` is a spelling of the field list inside a type body (ADR
+  # 0075); this is its sentence everywhere else. The setters mutate, and
+  # what mutable state is waits on #103.
+  when "attr_reader" then "'attr_reader' declares fields, so it belongs in a struct or class body — a field is read by its bare name"
+  when "attr_writer", "attr_accessor" then "'#{name}' makes a setter, and values never mutate here (ADR 0015) — declare the field with 'attr_reader' or its bare name, and build changed values with 'with'"
+  when "Thread", "Mutex", "Queue", "Fiber", "Ractor", "ConditionVariable" then "'#{name}' has no Portland meaning — run independent work in a 'together' block"
+  when "Object", "BasicObject", "Kernel", "Class", "Module" then "'#{name}' has no Portland meaning — there is no root class; a struct stands alone"
+  when "fetch" then "'fetch' retires here — '[]' answers a maybe; write 'hash[key] or fallback'"
+  when "default", "default_proc" then "'#{name}' has no Portland meaning — a hash has no default (ADR 0063); a lookup answers a maybe, so write 'hash[key] or fallback'"
+  when "push", "pop", "shift", "unshift", "append", "prepend", "insert", "delete_at", "delete_if", "keep_if", "clear", "concat", "replace", "fill"
+    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — bind the new value to a name instead"
+  when "map!", "collect!", "select!", "filter!", "reject!", "sort!", "sort_by!", "uniq!", "compact!", "flatten!", "reverse!", "shuffle!", "rotate!", "slice!", "upcase!", "downcase!", "capitalize!", "swapcase!", "strip!", "lstrip!", "rstrip!", "chomp!", "chop!", "squeeze!", "gsub!", "sub!", "tr!", "delete!", "succ!", "next!", "merge!", "transform_values!", "transform_keys!"
+    stem = name.chop
+    "'#{name}' mutates its receiver, and values never mutate here (ADR 0015) — '#{stem}' answers the new value; bind it"
+  when "hash" then "'hash' has no Portland meaning — a value is a hash key by 'eql?', and its digest is never exposed (ADR 0059)"
+  when "freeze", "frozen?", "dup", "clone" then "'#{name}' has nothing to do — values never mutate here (ADR 0015); drop the call"
+  # `Data.define` is a spelling of `struct` at a constant's top level (ADR
+  # 0084); anywhere else it is the runtime class-building Portland does not do.
+  when "Data" then "'Data.define' builds a type at runtime, which Portland does not do — write 'Name = Data.define(:a, :b)' at the top level, which declares 'struct Name' (ADR 0084)"
+  # Portland's own placeholders, retired when the floor module arrived.
+  when "argv" then "'argv' is spelled 'System.arguments' here — the floor module's first member (ADR 0068)"
+  when "read_file" then "'read_file' is spelled 'System.read_file' here — the floor module's second member (ADR 0068)"
+  when "write_file" then "'write_file' is spelled 'System.write_file' here — the floor module's third member (ADR 0068)"
+  else nil
+  end
+end
+
+# Past a quoted literal, so its contents can't be mistaken for code.
+def skip_literal(characters, start)
+  quote = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    if characters[index] == "\\"
+      index += 2
+      next
+    end
+    if characters[index] == quote
+      return index + 1
+    end
+    index += 1
+  end
+  characters.length
+end
+
+# Does the colon at `index` open a symbol (ADR 0023)?
+#
+# Not when it is `::`, and not when it is glued to a name on its left —
+# `name:` is a keyword-argument label. That one rule gives `name:"pdx"`
+# Ruby's own reading, a label and a string.
+def symbol_start?(characters, index)
+  return false if characters[index + 1] == ":"
+  return false if index > 0 && (name_character?(characters[index - 1]) || characters[index - 1] == "?" || characters[index - 1] == "!")
+
+  after = characters[index + 1]
+  return false if after.nil?
+
+  name_start?(after) || after == "\""
+end
+
+# `...`, `<<~`, `||=`, and `<=>` — the three-character operators (ADRs
+# 0019, 0020, 0043, 0054).
+def three_character_operator?(triple)
+  %w[... <<~ ||= <=> ===].include?(triple)
+end
+
+def trimmed(line)
+  characters = line.chars
+  mutable start = 0
+  while start < characters.length && characters[start] == " "
+    start += 1
+  end
+  mutable finish = characters.length
+  while finish > start && characters[finish - 1] == " "
+    finish -= 1
+  end
+  mutable result = ""
+  mutable index = start
+  while index < finish
+    result << characters[index]
+    index += 1
+  end
+  result
+end
+
+def two_character_operator?(pair)
+  %w[== != <= >= && || += -= *= /= %= => &. << .. :: ** =~ !~].include?(pair)
+end
