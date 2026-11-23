@@ -9,4 +9,14 @@ context "Array#flatten" do
     expect([[1], [2, 3]].flatten).to eq([1, 2, 3])
     expect([[1, [2]], [[[3]]]].flatten).to eq([1, 2, 3])
   end
+
+  specify "returns a one-dimensional flattening recursively" do
+    expect([[[1, [2, 3]],[2, 3, [4, [4, [5, 5]], [1, 2, 3]]], [4]], []].flatten).to eq([1, 2, 3, 2, 3, 4, 4, 5, 5, 1, 2, 3, 4])
+  end
+
+  specify "is not destructive" do
+    nested = [1, [2, 3]]
+    nested.flatten
+    expect(nested).to eq([1, [2, 3]])
+  end
 end

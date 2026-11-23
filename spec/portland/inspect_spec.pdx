@@ -7,6 +7,27 @@ struct Badge
   label
 end
 
+# A struct with its own `inspect` and `to_s`, and one that holds it (#285).
+struct Gadget
+  name
+
+  def inspect
+    "ci"
+  end
+
+  def to_s
+    "cs"
+  end
+end
+
+struct Wrapper
+  inner
+end
+
+enum Shelf
+  :holding(item:)
+end
+
 context "inspect" do
   describe "on the value kinds" do
     specify "and a struct as its constructor would read" do
@@ -14,4 +35,56 @@ context "inspect" do
     end
   end
 
+  describe "on a struct that defines inspect" do
+    specify "answers the struct's own" do
+      expect(inspect(Gadget.new(name: "g"))).to eq("ci")
+    end
+
+    specify "renders it by its own inside an array, a hash, and a set" do
+      gadget = Gadget.new(name: "g")
+      expect(inspect([gadget])).to eq("[ci]")
+      expect(inspect({gadget => gadget})).to eq("{ci => ci}")
+      expect(inspect({key: gadget})).to eq("{key: ci}")
+      expect(inspect(Set[gadget])).to eq("Set[ci]")
+    end
+
+    specify "renders it by its own as another struct's field" do
+      expect(inspect(Wrapper.new(inner: Gadget.new(name: "g")))).to eq("Wrapper(inner: ci)")
+    end
+
+    specify "renders it by its own at any depth" do
+      gadget = Gadget.new(name: "g")
+      expect(inspect([[gadget], {key: [gadget]}])).to eq("[[ci], {key: [ci]}]")
+      expect(inspect(:holding(item: gadget))).to eq(":holding(item: ci)")
+      expect(inspect(failure(gadget))).to eq("failure(ci)")
+    end
+
+    specify "is what p writes for a collection that holds it" do
+      gadget = Gadget.new(name: "g")
+      expect(System.capture_standard_output { p([gadget]) }).to eq("[ci]\n")
+    end
+  end
+
+  describe "a collection's to_s" do
+    specify "is its inspect, each struct by its own inspect" do
+      gadget = Gadget.new(name: "g")
+      expect([gadget].to_s).to eq("[ci]")
+      expect("#{[gadget]}").to eq("[ci]")
+      expect(System.capture_standard_output { puts([gadget]) }).to eq("[ci]\n")
+    end
+
+    specify "is a struct's fields for a struct without a to_s" do
+      wrapper = Wrapper.new(inner: Gadget.new(name: "g"))
+      expect(wrapper.to_s).to eq("Wrapper(inner: ci)")
+      expect("#{wrapper}").to eq("Wrapper(inner: ci)")
+    end
+  end
+
+  describe "join" do
+    specify "renders each struct by its own to_s" do
+      gadget = Gadget.new(name: "g")
+      expect([gadget].join(",")).to eq("cs")
+      expect([1, [gadget]].join("-")).to eq("1-cs")
+    end
+  end
 end

@@ -53,3 +53,9 @@ context "Enumerable#grep_v" do
     end
   end
 end
+
+context "Enumerable#grep_v with a Regexp" do
+  specify "correctly handles non-string elements" do
+    expect([:a, "b", "z", :c, 42, nil].grep_v(/[a-d]/)).to eq(["z", 42, nil])
+  end
+end
