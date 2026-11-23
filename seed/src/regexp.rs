@@ -323,6 +323,12 @@ impl Pattern {
         self.anchored().search_from(text, at).is_some()
     }
 
+    /// Whether the pattern matches right at a byte offset of `text` with
+    /// `\G` standing at another: a backward search's question.
+    pub fn matches_start_from(&self, text: &str, at: usize, global: usize) -> bool {
+        self.compiled.matches_at(text, at, global)
+    }
+
     /// Every match in `text`, non-overlapping — the next search begins
     /// where a match ended, one character on when it was empty — Ruby's
     /// `scan` positions.
@@ -728,10 +734,14 @@ pub fn index_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value {
 }
 
 /// `rindex(pattern, from)`: the position of the last match starting at
-/// or before `from`, as a maybe.
+/// or before `from`, as a maybe. A position past the end is the end, as
+/// the String form reads it, and `\G` stands at `from` for every start
+/// tried — Ruby's rules both (#317).
 pub fn rindex_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value {
+    let count = text.graphemes(true).count() as i64;
     let limit = match from {
         None => text.len(),
+        Some(position) if position > count => text.len(),
         Some(position) => match byte_at(text, position) {
             Some(byte) => byte,
             None => return Value::Nil,
@@ -746,7 +756,7 @@ pub fn rindex_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value 
         starts.push(text.len());
     }
     for start in starts.into_iter().rev() {
-        if pattern.matches_start(text, start) {
+        if pattern.matches_start_from(text, start, limit) {
             return Value::Integer(text[..start].graphemes(true).count() as i64);
         }
     }

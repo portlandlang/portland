@@ -3449,9 +3449,9 @@ core/string/reverse_spec.rb:
   pdx: [spec/core/string/reverse_spec.pdx]
 core/string/rindex_spec.rb:
   pdx: [spec/core/string/rindex_spec.pdx]
-  status: partial_planned
-  reason: "A Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/317
+  status: partial_intentional
+  reason: "The $~, to_str, to_int, ?char, and encoding rows stay behind by design."
+  link: docs/ruby/regex.md
 core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
 core/string/rpartition_spec.rb:

@@ -233,3 +233,42 @@ context "String#rindex with object" do
     expect("aaa".rindex(/aa/)).to eq(1)
   end
 end
+
+context "String#rindex with Regexp" do
+  specify "behaves the same as String#rindex(string) for escaped string regexps" do
+    ["blablabla", "hello cruel world...!"].each do |text|
+      ["", "b", "bla", "lab", "o c", "d."].each do |needle|
+        pattern = Regexp.new(Regexp.escape(needle))
+        expect(text.rindex(pattern)).to eq(text.rindex(needle))
+
+        0.upto(text.size + 1) do |start|
+          expect(text.rindex(pattern, start)).to eq(text.rindex(needle, start))
+        end
+
+        (-text.size - 1).upto(-1) do |start|
+          expect(text.rindex(pattern, start)).to eq(text.rindex(needle, start))
+        end
+      end
+    end
+  end
+
+  specify "supports \\G which matches at the given start offset" do
+    expect("helloYOU.".rindex(/YOU\G/, 8)).to eq(5)
+    expect("helloYOU.".rindex(/YOU\G/)).to be_nil
+
+    position = "helloYOUall!".index("YOU")
+    pattern = /YOU.+\G.+/
+    # The # marks where \G will match.
+    [
+      ["helloYOU#all.", nil],
+      ["helloYOUa#ll.", position],
+      ["helloYOUal#l.", position],
+      ["helloYOUall#.", position],
+      ["helloYOUall.#", nil]
+    ].each do |marked, expected|
+      start = marked.index("#")
+      text = marked.delete("#")
+      expect(text.rindex(pattern, start)).to eq(expected)
+    end
+  end
+end
