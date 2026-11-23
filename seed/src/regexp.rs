@@ -882,27 +882,29 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
             }
             Some(Value::array(picked))
         }
-        (Value::MatchData(found), "begin", [index]) => Some(match group_or_refuse(found, index) {
+        (Value::MatchData(found), "begin", [index]) => Some(match positioned_group(found, index) {
             Some(group) => found.begin_of(group),
             None => {
                 crate::interpreter::refusal("arguments");
                 panic!("index {} out of matches", index.shown())
             }
         }),
-        (Value::MatchData(found), "end", [index]) => Some(match group_or_refuse(found, index) {
+        (Value::MatchData(found), "end", [index]) => Some(match positioned_group(found, index) {
             Some(group) => found.end_of(group),
             None => {
                 crate::interpreter::refusal("arguments");
                 panic!("index {} out of matches", index.shown())
             }
         }),
-        (Value::MatchData(found), "offset", [index]) => Some(match group_or_refuse(found, index) {
-            Some(group) => Value::array(vec![found.begin_of(group), found.end_of(group)]),
-            None => {
-                crate::interpreter::refusal("arguments");
-                panic!("index {} out of matches", index.shown())
-            }
-        }),
+        (Value::MatchData(found), "offset", [index]) => {
+            Some(match positioned_group(found, index) {
+                Some(group) => Value::array(vec![found.begin_of(group), found.end_of(group)]),
+                None => {
+                    crate::interpreter::refusal("arguments");
+                    panic!("index {} out of matches", index.shown())
+                }
+            })
+        }
         // A match's slices are its groups' (ADR 0091, #214): a range or a
         // start and a length answers an array, empty past either end as an
         // array's slice is (ADR 0019), where Ruby answers nil.
@@ -1080,6 +1082,15 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         }
         _ => None,
     }
+}
+
+/// The group `begin`, `end`, and `offset` ask about. A negative index
+/// names none of them, as in Ruby, though `[]` counts one back (#392).
+fn positioned_group(found: &Found, index: &Value) -> Option<usize> {
+    if matches!(index, Value::Integer(number) if *number < 0) {
+        return None;
+    }
+    group_or_refuse(found, index)
 }
 
 fn group_or_refuse(found: &Found, index: &Value) -> Option<usize> {
