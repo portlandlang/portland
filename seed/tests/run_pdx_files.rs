@@ -1430,6 +1430,79 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
     }
 }
 
+/// `build.pdx` — the native build's driver (#447): a program inside the
+/// slice is written out as LLVM IR text, each def a function of machine
+/// integers with its arithmetic checked for overflow.
+#[test]
+fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
+    let sample = std::env::temp_dir().join("build_sample.pdx");
+    let written = std::env::temp_dir().join("build_sample.ll");
+    let _ = std::fs::remove_file(&written);
+    std::fs::write(
+        &sample,
+        "def fib(n)\n  if n < 2\n    n\n  else\n    fib(n - 1) + fib(n - 2)\n  end\nend\n\ndef small?(number) = number < 10\n\nputs fib(30)\nflag = small?(3)\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/build.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .arg(&written)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "build.pdx should run");
+    let text = std::fs::read_to_string(&written).expect("build.pdx should write the IR");
+    for expected in [
+        "define i64 @\"portland.fib\"(i64 %\"n\") {",
+        "define i1 @\"portland.small?\"(i64 %\"number\") {",
+        "define i32 @main() {",
+        "call {i64, i1} @llvm.sadd.with.overflow.i64(",
+        "call void @portland.overflow(",
+        "c\"%lld %s %lld overflows the 64-bit integers\\0A\\00\"",
+        "call i32 (ptr, ...) @printf(ptr @.integer_line, i64 ",
+    ] {
+        assert!(text.contains(expected), "expected {expected:?} in:\n{text}");
+    }
+    assert!(
+        !text.contains("target triple"),
+        "the IR should name no target"
+    );
+}
+
+/// A program the native build refuses writes nothing (#447): one outside
+/// the slice in the build's own sentence, and one the checker refuses in
+/// the checker's.
+#[test]
+fn portland_build_writes_nothing_when_it_refuses() {
+    let cases = [
+        (
+            "puts \"hi\"\n",
+            "the native build compiles integers, comparisons, if, while, def, and puts of an Integer — a string on line 1 is unbuilt (#443)",
+        ),
+        ("count = 1\nputs missing\n", "'missing' is not defined"),
+    ];
+    let driver = format!("{}/../compiler/build.pdx", env!("CARGO_MANIFEST_DIR"));
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("build_refusal_case.pdx");
+        let written = std::env::temp_dir().join("build_refusal_case.ll");
+        let _ = std::fs::remove_file(&written);
+        std::fs::write(&sample, source).expect("failed to write probe file");
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&driver)
+            .arg(&sample)
+            .arg(&written)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!output.status.success(), "{source:?} should refuse");
+        assert!(!written.exists(), "{source:?} should write no IR");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(expected),
+            "expected {expected:?}, got: {stderr}"
+        );
+    }
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.

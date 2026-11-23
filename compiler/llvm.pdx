@@ -1,0 +1,222 @@
+# The native build's printer (#447): the intermediate representation
+# written out as LLVM IR text, for `clang` to compile.
+#
+# This is the part of the spike meant to be replaced: MLIR is the plan for
+# the backend (#5), and what carries over to it is the representation this
+# reads, not the text this writes (ADR 0094).
+#
+# The shapes are plain on purpose. An Integer is an `i64` and a Boolean an
+# `i1`. Every parameter and local has a stack slot, written by a store and
+# read by a load; LLVM turns the slots into registers itself. `+`, `-`, and
+# `*` go through LLVM's overflow-checking intrinsics, and an overflow says
+# the seed's sentence on standard error and exits as the seed does (ADR
+# 0070). `puts` and that refusal call libc directly: there is no runtime.
+# No target is named, so `clang` supplies the host's.
+
+require_relative "intermediate_representation"
+
+# The text so far: its lines, the next number for a temporary or a label,
+# and the label of the block being written, which a value chosen between
+# two arms has to name.
+struct LlvmEmitter
+  lines
+  counter
+  block
+end
+
+# A value written: the text so far, and how to refer to the value.
+struct LlvmValue
+  emitter
+  operand
+end
+
+LLVM_PRELUDE = [
+  "@.integer_line = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"",
+  "@.overflow = private unnamed_addr constant [44 x i8] c\"%lld %s %lld overflows the 64-bit integers\\0A\\00\"",
+  "@.plus = private unnamed_addr constant [2 x i8] c\"+\\00\"",
+  "@.minus = private unnamed_addr constant [2 x i8] c\"-\\00\"",
+  "@.times = private unnamed_addr constant [2 x i8] c\"*\\00\"",
+  "",
+  "declare i32 @printf(ptr, ...)",
+  "declare i32 @dprintf(i32, ptr, ...)",
+  "declare void @exit(i32)",
+  "declare {i64, i1} @llvm.sadd.with.overflow.i64(i64, i64)",
+  "declare {i64, i1} @llvm.ssub.with.overflow.i64(i64, i64)",
+  "declare {i64, i1} @llvm.smul.with.overflow.i64(i64, i64)",
+  "",
+  "define internal void @portland.overflow(i64 %left, ptr %operator, i64 %right) {",
+  "  call i32 (i32, ptr, ...) @dprintf(i32 2, ptr @.overflow, i64 %left, ptr %operator, i64 %right)",
+  "  call void @exit(i32 1)",
+  "  unreachable",
+  "}"
+]
+
+# A whole program as LLVM IR text.
+def llvm_text(program)
+  mutable lines = LLVM_PRELUDE
+  program.functions.each do |function|
+    lines += [""] + llvm_function(function)
+  end
+  lines.join("\n") + "\n"
+end
+
+def llvm_function(function)
+  entry = function.name == "main"
+  parameters = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }.join(", ")
+  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters}) {"
+  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry")
+  (function.parameters + function.locals).each do |slot|
+    emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
+  end
+  function.parameters.each do |parameter|
+    type = llvm_type(type_at(parameter, 1))
+    emitter = llvm_line(emitter, "store #{type} #{llvm_local(parameter[0])}, ptr #{llvm_slot(parameter[0])}")
+  end
+  emitter = llvm_statements(emitter, function.body)
+  # Every path through a def has returned by here; the entry function
+  # falls off its end and answers success.
+  emitter = llvm_line(emitter, entry ? "ret i32 0" : "unreachable")
+  emitter.lines + ["}"]
+end
+
+def llvm_statements(emitter, statements)
+  mutable current = emitter
+  statements.each do |statement|
+    current = llvm_statement(current, statement)
+  end
+  current
+end
+
+def llvm_statement(emitter, statement)
+  case statement
+  in IntermediateStore(name:, value:)
+    written = llvm_value(emitter, value)
+    llvm_line(written.emitter, "store #{llvm_type(value.type)} #{written.operand}, ptr #{llvm_slot(name)}")
+  in IntermediateReturn(value:)
+    written = llvm_value(emitter, value)
+    returned = llvm_line(written.emitter, "ret #{llvm_type(value.type)} #{written.operand}")
+    # Whatever is written after a return needs a block of its own to sit
+    # in, though nothing reaches it.
+    llvm_label(returned, "after#{returned.counter}")
+  in IntermediatePrint(value:)
+    written = llvm_value(emitter, value)
+    llvm_line(written.emitter, "call i32 (ptr, ...) @printf(ptr @.integer_line, i64 #{written.operand})")
+  in IntermediateEvaluate(value:)
+    llvm_value(emitter, value).emitter
+  in IntermediateLoop(condition:, body:)
+    number = emitter.counter
+    started = llvm_label(llvm_line(emitter, "br label %loop#{number}.test"), "loop#{number}.test")
+    test = llvm_value(started, condition)
+    branched = llvm_line(test.emitter, "br i1 #{test.operand}, label %loop#{number}.body, label %loop#{number}.done")
+    walked = llvm_statements(llvm_label(branched, "loop#{number}.body"), body)
+    llvm_label(llvm_line(walked, "br label %loop#{number}.test"), "loop#{number}.done")
+  in IntermediateBranch(condition:, then_body:, else_body:)
+    test = llvm_value(emitter, condition)
+    number = test.emitter.counter
+    branched = llvm_line(test.emitter, "br i1 #{test.operand}, label %if#{number}.then, label %if#{number}.else")
+    taken = llvm_statements(llvm_label(branched, "if#{number}.then"), then_body)
+    other = llvm_statements(llvm_label(llvm_line(taken, "br label %if#{number}.done"), "if#{number}.else"), else_body)
+    llvm_label(llvm_line(other, "br label %if#{number}.done"), "if#{number}.done")
+  end
+end
+
+def llvm_value(emitter, value)
+  case value
+  in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
+  in IntermediateLocal(type:, name:)
+    llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
+  in IntermediateArithmetic(operator:, left:, right:)
+    first = llvm_value(emitter, left)
+    second = llvm_value(first.emitter, right)
+    llvm_checked(second.emitter, operator, first.operand, second.operand)
+  in IntermediateComparison(operator:, left:, right:)
+    first = llvm_value(emitter, left)
+    second = llvm_value(first.emitter, right)
+    llvm_named(second.emitter, "icmp #{llvm_comparison(operator)} #{llvm_type(left.type)} #{first.operand}, #{second.operand}")
+  in IntermediateCall(type:, name:, arguments:)
+    mutable current = emitter
+    mutable operands = []
+    arguments.each do |argument|
+      written = llvm_value(current, argument)
+      current = written.emitter
+      operands << "#{llvm_type(argument.type)} #{written.operand}"
+    end
+    llvm_named(current, "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})")
+  in IntermediateChoice(type:, condition:, then_value:, else_value:)
+    test = llvm_value(emitter, condition)
+    number = test.emitter.counter
+    branched = llvm_line(test.emitter, "br i1 #{test.operand}, label %choice#{number}.then, label %choice#{number}.else")
+    taken = llvm_value(llvm_label(branched, "choice#{number}.then"), then_value)
+    # An arm can open blocks of its own, so the block it ends in is asked
+    # for, not assumed.
+    taken_block = taken.emitter.block
+    other = llvm_value(llvm_label(llvm_line(taken.emitter, "br label %choice#{number}.done"), "choice#{number}.else"), else_value)
+    other_block = other.emitter.block
+    joined = llvm_label(llvm_line(other.emitter, "br label %choice#{number}.done"), "choice#{number}.done")
+    llvm_named(joined, "phi #{llvm_type(type)} [ #{taken.operand}, %#{taken_block} ], [ #{other.operand}, %#{other_block} ]")
+  end
+end
+
+# One checked operation: the intrinsic answers the result and whether it
+# overflowed, and an overflow leaves through the refusal.
+def llvm_checked(emitter, operator, left, right)
+  intrinsic = case operator
+              when "+" then "sadd"
+              when "-" then "ssub"
+              else "smul"
+              end
+  symbol = case operator
+           when "+" then "@.plus"
+           when "-" then "@.minus"
+           else "@.times"
+           end
+  pair = llvm_named(emitter, "call {i64, i1} @llvm.#{intrinsic}.with.overflow.i64(i64 #{left}, i64 #{right})")
+  flag = llvm_named(pair.emitter, "extractvalue {i64, i1} #{pair.operand}, 1")
+  number = flag.emitter.counter
+  branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %overflow#{number}, label %checked#{number}")
+  refused = llvm_line(llvm_label(branched, "overflow#{number}"), "call void @portland.overflow(i64 #{left}, ptr #{symbol}, i64 #{right})")
+  resumed = llvm_label(llvm_line(refused, "unreachable"), "checked#{number}")
+  llvm_named(resumed, "extractvalue {i64, i1} #{pair.operand}, 0")
+end
+
+# An instruction whose result gets the next temporary's name.
+def llvm_named(emitter, instruction)
+  name = "%t#{emitter.counter}"
+  LlvmValue.new(emitter: emitter.with(lines: emitter.lines + ["  #{name} = #{instruction}"], counter: emitter.counter + 1), operand: name)
+end
+
+def llvm_line(emitter, instruction)
+  emitter.with(lines: emitter.lines + ["  #{instruction}"])
+end
+
+# A block opened. The counter moves on so no two labels share a number.
+def llvm_label(emitter, label)
+  emitter.with(lines: emitter.lines + ["#{label}:"], counter: emitter.counter + 1, block: label)
+end
+
+def llvm_type(type)
+  case type
+  in ["integer"] then "i64"
+  in ["boolean"] then "i1"
+  else panic("llvm.pdx: no machine type for #{render_type(type)}")
+  end
+end
+
+def llvm_comparison(operator)
+  case operator
+  when "<" then "slt"
+  when "<=" then "sle"
+  when ">" then "sgt"
+  when ">=" then "sge"
+  when "==" then "eq"
+  else "ne"
+  end
+end
+
+# A def's name as LLVM's. Quoted, since a Portland name may end in `?`, and
+# prefixed, so a def named for a libc function is its own.
+def llvm_function_name(name) = "@\"portland.#{name}\""
+
+def llvm_local(name) = "%\"#{name}\""
+
+def llvm_slot(name) = "%\"#{name}.slot\""
