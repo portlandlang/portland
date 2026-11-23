@@ -1453,8 +1453,8 @@ core/integer/even_spec.rb:
 core/integer/exponent_spec.rb:
   pdx: [spec/core/integer/exponent_spec.pdx]
   status: partial_planned
-  reason: "A Rational power waits on #290 and coerce on #155; integers are 64-bit, so results past 2⁶³ refuse; 0 ** -1 and a non-numeric power refuse where Ruby raises."
-  link: https://github.com/portlandlang/portland/issues/290
+  reason: "coerce waits on #155; integers are 64-bit, so results past 2⁶³ refuse; 0 ** -1 and a non-numeric power refuse where Ruby raises."
+  link: https://github.com/portlandlang/portland/issues/155
 core/integer/gcd_spec.rb:
   pdx: [spec/core/integer/gcd_spec.pdx]
 core/integer/gt_spec.rb:
@@ -1504,8 +1504,8 @@ core/integer/plus_spec.rb:
 core/integer/pow_spec.rb:
   pdx: [spec/core/integer/pow_spec.pdx]
   status: partial_planned
-  reason: "No coercion protocol (#155); the Rational exponent rows are ported but for \"returns Rational when power is Rational\", which waits on #290, and the rest of the shared exponent rows are not yet ported."
-  link: https://github.com/portlandlang/portland/issues/290
+  reason: "No coercion protocol (#155); the Rational exponent rows are ported, and the rest of the shared exponent rows are #380's to port."
+  link: https://github.com/portlandlang/portland/issues/155
 core/integer/pred_spec.rb:
   pdx: [spec/core/integer/pred_spec.pdx]
 core/integer/rationalize_spec.rb:
