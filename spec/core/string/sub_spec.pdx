@@ -54,4 +54,130 @@ context "String#sub with pattern, replacement" do
   specify "take the flags" do
     expect("a\nb".sub(/a.b/m, "X")).to eq("X")
   end
+
+  specify "returns a copy of self with all occurrences of pattern replaced with replacement" do
+    expect("hello".sub(/[aeiou]/, "*")).to eq("h*llo")
+    expect("hello".sub(//, ".")).to eq(".hello")
+  end
+
+  specify 'supports \G which matches at the beginning of the string' do
+    expect("hello world!".sub(/\Ghello/, "hi")).to eq("hi world!")
+  end
+
+  specify "supports /i for ignoring case" do
+    expect("Hello".sub(/h/i, "j")).to eq("jello")
+    expect("hello".sub(/H/i, "j")).to eq("jello")
+  end
+
+  specify "replaces \\1 sequences with the regexp's corresponding capture" do
+    text = "hello"
+
+    expect(text.sub(/([aeiou])/, '<\1>')).to eq("h<e>llo")
+    expect(text.sub(/(.)/, '\1\1')).to eq("hhello")
+
+    expect(text.sub(/.(.?)/, '<\0>(\1)')).to eq("<he>(e)llo")
+
+    expect(text.sub(/.(.)+/, '\1')).to eq("o")
+
+    letters = "ABCDEFGHIJKL"
+    pattern = /#{"(.)" * 12}/
+    expect(letters.sub(pattern, '\1')).to eq("A")
+    expect(letters.sub(pattern, '\9')).to eq("I")
+    # Only the first 9 captures can be accessed in MRI
+    expect(letters.sub(pattern, '\10')).to eq("A0")
+  end
+
+  specify 'treats \1 sequences without corresponding captures as empty strings' do
+    text = "hello!"
+
+    expect(text.sub("", '<\1>')).to eq("<>hello!")
+    expect(text.sub("h", '<\1>')).to eq("<>ello!")
+
+    expect(text.sub(//, '<\1>')).to eq("<>hello!")
+    expect(text.sub(/./, '\1\2\3')).to eq("ello!")
+    expect(text.sub(/.(.{20})?/, '\1')).to eq("ello!")
+  end
+
+  specify 'replaces \& and \0 with the complete match' do
+    text = "hello!"
+
+    expect(text.sub("", '<\0>')).to eq("<>hello!")
+    expect(text.sub("", '<\&>')).to eq("<>hello!")
+    expect(text.sub("he", '<\0>')).to eq("<he>llo!")
+    expect(text.sub("he", '<\&>')).to eq("<he>llo!")
+    expect(text.sub("l", '<\0>')).to eq("he<l>lo!")
+    expect(text.sub("l", '<\&>')).to eq("he<l>lo!")
+
+    expect(text.sub(//, '<\0>')).to eq("<>hello!")
+    expect(text.sub(//, '<\&>')).to eq("<>hello!")
+    expect(text.sub(/../, '<\0>')).to eq("<he>llo!")
+    expect(text.sub(/../, '<\&>')).to eq("<he>llo!")
+    expect(text.sub(/(.)./, '<\0>')).to eq("<he>llo!")
+  end
+
+  specify 'replaces \` with everything before the current match' do
+    text = "hello!"
+
+    expect(text.sub("", '<\`>')).to eq("<>hello!")
+    expect(text.sub("h", '<\`>')).to eq("<>ello!")
+    expect(text.sub("l", '<\`>')).to eq("he<he>lo!")
+    expect(text.sub("!", '<\`>')).to eq("hello<hello>")
+
+    expect(text.sub(//, '<\`>')).to eq("<>hello!")
+    expect(text.sub(/..o/, '<\`>')).to eq("he<he>!")
+  end
+
+  specify "replaces \\' with everything after the current match" do
+    text = "hello!"
+
+    expect(text.sub("", '<\\\'>')).to eq("<hello!>hello!")
+    expect(text.sub("h", '<\\\'>')).to eq("<ello!>ello!")
+    expect(text.sub("ll", '<\\\'>')).to eq("he<o!>o!")
+    expect(text.sub("!", '<\\\'>')).to eq("hello<>")
+
+    expect(text.sub(//, '<\\\'>')).to eq("<hello!>hello!")
+    expect(text.sub(/../, '<\\\'>')).to eq("<llo!>llo!")
+  end
+
+  specify 'replaces \\\\\\+ with \\\\+' do
+    expect("x".sub(/x/, '\\\+')).to eq("\\+")
+  end
+
+  specify 'maps \\\\ in replacement to \\' do
+    expect("hello".sub(/./, '\\\\')).to eq('\\ello')
+  end
+
+  specify 'leaves unknown \x escapes in replacement untouched' do
+    expect("hello".sub(/./, '\\x')).to eq('\\xello')
+    expect("hello".sub(/./, '\\y')).to eq('\\yello')
+  end
+
+  specify 'leaves \ at the end of replacement untouched' do
+    expect("hello".sub(/./, 'hah\\')).to eq('hah\\ello')
+  end
+
+  specify 'replaces \\\\\\1 with \\1' do
+    expect("ababa".sub(/(b)/, '\\\1')).to eq("a\\1aba")
+  end
+
+  specify 'replaces \\\\\\\\1 with \\1' do
+    expect("ababa".sub(/(b)/, '\\\\1')).to eq("a\\1aba")
+  end
+
+  specify 'replaces \\\\\\\\\\1 with \\' do
+    expect("ababa".sub(/(b)/, '\\\\\1')).to eq("a\\baba")
+  end
+end
+
+context "String#sub with pattern and block" do
+  # Upstream's second line gathers the block's arguments with a splat,
+  # which Portland does not have (ADR 0014).
+  specify "returns a copy of self with the first occurrences of pattern replaced with the block's return value" do
+    expect("hi".sub(/./) { |text| text + " " }).to eq("h i")
+  end
+
+  specify 'doesn\'t interpolate special sequences like \1 for the block\'s return value' do
+    replacement = '\& \0 \1 \` \\\' \+ \\\\ foo'
+    expect("hello".sub(/(.+)/) { replacement }).to eq(replacement)
+  end
 end

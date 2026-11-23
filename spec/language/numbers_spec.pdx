@@ -3,8 +3,8 @@
 # From ruby/spec language/numbers_spec.rb. What stays behind: `0377` as octal
 # (ADR 0050 refuses a leading zero, naming both readings — `0o377` is the
 # spelling); a prefixed literal with an `r` or `i` suffix (`0xffr`, which
-# refuses); the bignum and long-decimal `r` rows, past 64 bits; the decimal
-# `r` and `i` rows, unported; and the three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
+# refuses); the bignum and long-decimal `r` rows, past 64 bits; and the
+# three syntax-error rows, since a spec never refuses — `_4_2` is an undefined
 # name here as there, and `.75` a parse refusal.
 
 # Up one, because `require_relative` resolves against this file's own
@@ -91,5 +91,29 @@ context "A number literal" do
     expect(0x10.to_s).to eq("16")
     expect(0b100.even?).to be_true
     expect(0o17 == 15).to be_true
+  end
+
+  specify "can be an integer literal with trailing 'r' to represent a Rational" do
+    expect(3r).to eq(Rational(3, 1))
+    expect(-3r).to eq(Rational(-3, 1))
+  end
+
+  specify "can be an float literal with trailing 'r' to represent a Rational in a canonical form" do
+    expect(1.0r).to eq(Rational(1, 1))
+  end
+
+  specify "can be a decimal literal with trailing 'r' to represent a Rational" do
+    expect(0.3r).to eq(Rational(3, 10))
+    expect(-0.3r).to eq(Rational(-3, 10))
+  end
+
+  specify "can be an integer literal with trailing 'i' to represent a Complex" do
+    expect(5i).to eq(Complex(0, 5))
+    expect(-5i).to eq(Complex(0, -5))
+  end
+
+  specify "can be a decimal literal with trailing 'i' to represent a Complex" do
+    expect(0.6i).to eq(Complex(0, 0.6))
+    expect(-0.6i).to eq(Complex(0, -0.6))
   end
 end

@@ -21,4 +21,21 @@ context "Data#eql?" do
     a = DataSpecs::Measure.new(amount: 42, unit: "km")
     expect(a.eql?(DataSpecs::Measure.new(amount: 42.0, unit: "km"))).to eq(false)
   end
+
+  specify "returns true if the other is the same object" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(measure.eql?(measure)).to be_true
+  end
+
+  specify "returns true if the other has all the same fields" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    twin = DataSpecs::Measure.new(amount: 42, unit: "km")
+    expect(measure.eql?(twin)).to be_true
+  end
+
+  specify "returns false if the other is a different object or has different fields" do
+    measure = DataSpecs::Measure.new(amount: 42, unit: "km")
+    other = DataSpecs::Measure.new(amount: 42, unit: "mi")
+    expect(measure.eql?(other)).to be_false
+  end
 end

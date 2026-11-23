@@ -75,4 +75,79 @@ context "Regexps with repetition" do
     expect(found(/(a*)?/, "")).to eq(["", ""])
     expect(found(/(a*)*/, "")).to eq(["", ""])
   end
+
+  specify "supports * (0 or more of previous subexpression)" do
+    expect(/a*/.match("aaa").to_a).to eq(["aaa"])
+    expect(/a*/.match("bbb").to_a).to eq([""])
+    expect(/<.*>/.match("<a>foo</a>").to_a).to eq(["<a>foo</a>"])
+  end
+
+  specify "supports *? (0 or more of previous subexpression - lazy)" do
+    expect(/a*?/.match("aaa").to_a).to eq([""])
+    expect(/<.*?>/.match("<a>foo</a>").to_a).to eq(["<a>"])
+  end
+
+  specify "supports + (1 or more of previous subexpression)" do
+    expect(/a+/.match("aaa").to_a).to eq(["aaa"])
+    expect(/a+/.match("bbb")).to be_nil
+    expect(/<.+>/.match("<a>foo</a>").to_a).to eq(["<a>foo</a>"])
+  end
+
+  specify "supports +? (0 or more of previous subexpression - lazy)" do
+    expect(/a+?/.match("aaa").to_a).to eq(["a"])
+    expect(/<.+?>/.match("<a>foo</a>").to_a).to eq(["<a>"])
+  end
+
+  specify "supports {m,n} (m to n of previous subexpression)" do
+    expect(/a{2,4}/.match("aaaaaa").to_a).to eq(["aaaa"])
+    expect(/<.{1,}>/.match("<a>foo</a>").to_a).to eq(["<a>foo</a>"])
+  end
+
+  specify "supports {m,n}? (m to n of previous subexpression) - lazy)" do
+    expect(/<.{1,}?>/.match("<a>foo</a>").to_a).to eq(["<a>"])
+    expect(/.([0-9]){3,5}?foo/.match("9876543210foo").to_a).to eq(["543210foo", "0"])
+  end
+
+  specify "supports ? (0 or 1 of previous subexpression)" do
+    expect(/a?/.match("aaa").to_a).to eq(["a"])
+    expect(/a?/.match("bbb").to_a).to eq([""])
+  end
+
+  specify "handles incomplete range quantifiers" do
+    expect(/a{}/.match("a{}")[0]).to eq("a{}")
+    expect(/a{,}/.match("a{,}")[0]).to eq("a{,}")
+    expect(/a{1/.match("a{1")[0]).to eq("a{1")
+    expect(/a{1,2/.match("a{1,2")[0]).to eq("a{1,2")
+    expect(/a{,5}/.match("aaa")[0]).to eq("aaa")
+  end
+
+  specify "lets us use quantifiers on assertions" do
+    expect(/a^?b/.match("ab")[0]).to eq("ab")
+    expect(/a$?b/.match("ab")[0]).to eq("ab")
+    expect(/a\A?b/.match("ab")[0]).to eq("ab")
+    expect(/a\Z?b/.match("ab")[0]).to eq("ab")
+    expect(/a\z?b/.match("ab")[0]).to eq("ab")
+    expect(/a\G?b/.match("ab")[0]).to eq("ab")
+    expect(/a\b?b/.match("ab")[0]).to eq("ab")
+    expect(/a\B?b/.match("ab")[0]).to eq("ab")
+    expect(/a(?=c)?b/.match("ab")[0]).to eq("ab")
+    expect(/a(?!=b)?b/.match("ab")[0]).to eq("ab")
+    expect(/a(?<=c)?b/.match("ab")[0]).to eq("ab")
+    expect(/a(?<!a)?b/.match("ab")[0]).to eq("ab")
+  end
+
+  specify "does not delete optional assertions" do
+    expect(/(?=(a))?/.match("a").to_a).to eq([ "", "a" ])
+  end
+
+  specify "treats ? after {n} quantifier as another quantifier, not as non-greedy marker" do
+    expect(/a{2}?/.match("").to_a).to eq([""])
+  end
+
+  specify "matches zero-width capture groups in optional iterations of loops" do
+    expect(/()?/.match("").to_a).to eq(["", ""])
+    expect(/(a*)?/.match("").to_a).to eq(["", ""])
+    expect(/(a*)*/.match("").to_a).to eq(["", ""])
+    expect(/(?:a|()){500,1000}/.match("a" * 500).to_a).to eq(["a" * 500, ""])
+  end
 end
