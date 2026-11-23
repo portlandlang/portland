@@ -1298,6 +1298,55 @@ fn the_checker_refuses_what_the_seed_cannot_see() {
     }
 }
 
+/// `pin.pdx` — the native build's types (#445): a def's parameters pinned
+/// from its call sites, a recursive answer assumed and checked, and a
+/// `mutable` local keeping its type through a loop. A def that cannot be
+/// pinned is named with the reason. The checker reads none of this.
+#[test]
+fn portland_pin_dumps_types_pinned_from_call_sites() {
+    let sample = std::env::temp_dir().join("pinning_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def fib(n)\n  if n < 2\n    n\n  else\n    fib(n - 1) + fib(n - 2)\n  end\nend\n\ndef sum_to(limit)\n  mutable total = 0\n  mutable index = 1\n  while index <= limit\n    total += index\n    index += 1\n  end\n  total\nend\n\ndef small?(number) = number < 10\n\ndef twice(value) = value + value\n\ndef unused(value) = value\n\ndef shown(value)\n  puts value\nend\n\nanswer = fib(30)\nputs answer\nputs sum_to(1000)\nflag = small?(answer)\ntwice(1)\ntwice(1.5)\nshown(answer)\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/pin.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "pin.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "def fib(n: Integer) # -> Integer\ndef sum_to(limit: Integer) # -> Integer\ndef small?(number: Integer) # -> Boolean\ndef twice: not pinned — value is an Integer at one call and a Float at another\ndef unused: not pinned — nothing calls it\ndef shown(value: Integer): not pinned — its answer is Unknown\nanswer: Integer\nflag: Boolean\n"
+    );
+}
+
+/// Pinning reaches through one def into another, reads an early return,
+/// and declines what it cannot settle (#445): a local rebound to another
+/// type, and two defs that call each other.
+#[test]
+fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
+    let sample = std::env::temp_dir().join("pinning_reach_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def double(value) = value * 2\n\ndef quadruple(value) = double(double(value))\n\ndef countdown(from)\n  return 0 if from < 1\n  countdown(from - 1)\nend\n\ndef shifty(start)\n  mutable held = start\n  held = held < 3\n  held\nend\n\ndef even?(number)\n  return true if number == 0\n  odd?(number - 1)\nend\n\ndef odd?(number)\n  return false if number == 0\n  even?(number - 1)\nend\n\nmutable changing = 1\nchanging = \"text\"\nputs quadruple(3)\nputs countdown(5)\nshifty(1)\neven?(4)\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/pin.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "pin.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "def double(value: Integer) # -> Integer\ndef quadruple(value: Integer) # -> Integer\ndef countdown(from: Integer) # -> Integer\ndef shifty(start: Integer): not pinned — its answer is Unknown\ndef even?(number: Integer): not pinned — its answer is Unknown\ndef odd?(number: Integer): not pinned — its answer is Unknown\nchanging: Unknown\n"
+    );
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.
