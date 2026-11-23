@@ -1,7 +1,6 @@
 # Splitting a string at a match, three ways (#106), from ruby/spec
-# core/string/{partition,rpartition}_spec.rb. The multibyte row asks for
-# "@" as a string where upstream asks /@/. What stays upstream, and why, is
-# each file's entry in spec/ruby_spec.yml.
+# core/string/{partition,rpartition}_spec.rb. What stays upstream, and why,
+# is each file's entry in spec/ruby_spec.yml.
 
 require_relative "../../spec_helper"
 
@@ -13,6 +12,10 @@ context "String#partition with String" do
   specify "always returns 3 elements" do
     expect("hello".partition("x")).to eq(["hello", "", ""])
     expect("hello".partition("hello")).to eq(["", "hello", ""])
+  end
+
+  specify "accepts regexp" do
+    expect("hello!".partition(/l./)).to eq(["he", "ll", "o!"])
   end
 
   specify "partition splits around the first match" do

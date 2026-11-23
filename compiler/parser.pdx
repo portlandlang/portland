@@ -2899,12 +2899,12 @@ def parse_def(tokens, mutable position)
     parameters = parameter_step.node
     position = parameter_step.position
   end
-  # `def foo = expr` — the endless def (#82): one guarded statement, no
-  # `end`. Parens are required around any parameters, which falls out
+  # `def foo = expr` — the endless def (#82): one statement, no `end`; a
+  # modifier after it guards the definition, as Ruby reads it (#238). Parens are required around any parameters, which falls out
   # rather than being enforced: after a bare list an `=` was already a
   # default (Ruby's own carve-out).
   if (had_parens || parameters.empty?) && operator_at?(tokens, position, %w[=])
-    body_step = parse_statement_with_guard(tokens, position + 1)
+    body_step = parse_statement(tokens, position + 1)
     return Step.new(node: def_node(name, parameters, [body_step.node], type_function, line: line), position: body_step.position)
   end
   body = parse_body(tokens, position, %w[end])
@@ -2912,6 +2912,16 @@ def parse_def(tokens, mutable position)
     return Step.new(node: def_node(name, parameters, body.node, type_function, line: line), position: body.position + 1)
   end
   Step.new(node: error_node("expected end to close def #{name}"), position: body.position)
+end
+
+# A struct's and a trait's methods are a fixed set, so a modifier after a
+# `def` in either body has no definition to guard (#238): the refusal's
+# Step, or nil when no modifier follows.
+def guarded_definition_refusal(tokens, method, owner)
+  return nil unless method.node in DefNode
+  return nil unless keyword_at?(tokens, method.position, %w[if unless while until])
+  modifier = tokens[method.position].text
+  Step.new(node: error_node("def #{method.node.name} in a #{owner} body is always defined — '#{modifier}' cannot guard it; put the condition inside the method"), position: method.position)
 end
 
 # Parameter names: `name`, `name = default`, and Ruby-3-style keyword
@@ -3541,6 +3551,8 @@ def parse_struct(tokens, mutable position)
       position = skip_newlines_at(tokens, position)
     elsif keyword_at?(tokens, position, %w[def])
       method = parse_def(tokens, position + 1)
+      guarded = guarded_definition_refusal(tokens, method, "struct")
+      return guarded unless guarded.nil?
       # One namespace serves instances and the type (ADR 0031): the same
       # name on both sides is a collision, not overloading. The wordings
       # are the seed's.
@@ -3791,6 +3803,8 @@ def parse_trait(tokens, mutable position)
       next
     end
     method = parse_def(tokens, position + 1)
+    guarded = guarded_definition_refusal(tokens, method, "trait")
+    return guarded unless guarded.nil?
     # A trait is instance behavior with no state (ADR 0028); a type
     # function has no instance, so it cannot ride one (ADR 0031).
     if (method.node in DefNode) && method.node.type_function

@@ -538,7 +538,9 @@ impl<'source> Parser<'source> {
                 };
                 panic!("`def self.` belongs inside a struct body — write def {name}");
             }
-            return definition;
+            // A modifier after a `def` guards the definition itself, as
+            // Ruby reads it: `def x = 1 if false` defines nothing (#238).
+            return self.postfix_modifier(definition);
         }
         if self.peek_is_keyword("enum") {
             return self.enum_definition();
@@ -1120,6 +1122,18 @@ impl<'source> Parser<'source> {
         })
     }
 
+    /// A struct's and a trait's methods are a fixed set, so a modifier after
+    /// a `def` in either body has no definition to guard (#238).
+    fn refuse_guarded_definition(&self, name: &str, owner: &str) {
+        for modifier in ["if", "unless", "while", "until"] {
+            if self.peek_is_keyword(modifier) {
+                panic!(
+                    "def {name} in a {owner} body is always defined — '{modifier}' cannot guard it; put the condition inside the method"
+                );
+            }
+        }
+    }
+
     /// The second value answers "was this `def self.name`?" — a type
     /// function (ADR 0031). Each context decides what that means: a struct
     /// body registers it on the type, a module body accepts it as a plain
@@ -1154,16 +1168,16 @@ impl<'source> Parser<'source> {
         } else {
             (Vec::new(), Vec::new())
         };
-        // `def foo = expr` — the endless def (#82): the body is one guarded
-        // statement, no `end`. Parens are required around any parameters,
+        // `def foo = expr` — the endless def (#82): the body is one
+        // statement, no `end`; a modifier after it guards the definition,
+        // as Ruby reads it (#238). Parens are required around any parameters,
         // which falls out rather than being enforced: after a bare list an
         // `=` was already a default (Ruby's own carve-out).
         if (had_parens || parameters.is_empty() && keyword_parameters.is_empty())
             && self.peek_kind() == Some(TokenKind::Equal)
         {
             self.position += 1; // the `=`
-            let statement = self.simple_statement();
-            let body = vec![self.postfix_modifier(statement)];
+            let body = vec![self.simple_statement()];
             return (
                 Statement::MethodDefinition {
                     body,
@@ -1489,6 +1503,7 @@ impl<'source> Parser<'source> {
                 else {
                     unreachable!()
                 };
+                self.refuse_guarded_definition(method_name, "struct");
                 if fields.contains(method_name) {
                     panic!(
                         "{method_name} is a field of {name} — a name is a field or a method, never both"
@@ -1802,6 +1817,7 @@ impl<'source> Parser<'source> {
                 else {
                     unreachable!()
                 };
+                self.refuse_guarded_definition(method_name, "trait");
                 // A trait is instance behavior with no state (ADR 0028); a
                 // type function has no instance, so it cannot ride one.
                 if type_function {
@@ -4154,6 +4170,32 @@ mod tests {
         parse(
             "struct Token\n  kind\n\n  def self.of\n    1\n  end\n\n  def self.of\n    2\n  end\nend\n",
         );
+    }
+
+    /// #238: the modifier guards the definition, so the statement is the
+    /// `if` and the `def` sits inside it.
+    #[test]
+    fn a_modifier_after_a_def_guards_the_definition() {
+        for source in [
+            "def answer = 42 if false\n",
+            "def answer\n  42\nend if false\n",
+        ] {
+            let statements = parse(source).statements;
+            let [Statement::Expression(Expression::If { then_body, .. })] = statements.as_slice()
+            else {
+                panic!("expected one if statement, got {statements:?}");
+            };
+            assert!(matches!(
+                then_body.as_slice(),
+                [Statement::MethodDefinition { .. }]
+            ));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "def area in a struct body is always defined — 'if' cannot guard it")]
+    fn refuses_a_modifier_after_a_def_in_a_struct_body() {
+        parse("struct Circle\n  radius\n\n  def area = radius if true\nend\n");
     }
 
     #[test]
