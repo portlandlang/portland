@@ -1,0 +1,26 @@
+# `break` and `next` in a `while`, a loop inside a loop, and `until`.
+
+mutable count = 0
+while true
+  count += 1
+  next if count == 2
+  break if count > 4
+  puts count
+end
+
+mutable outer = 0
+while outer < 3
+  outer += 1
+  mutable inner = 0
+  while true
+    inner += 1
+    break if inner > outer
+    next if inner == 2
+    puts outer * 10 + inner
+  end
+end
+
+until count > 7
+  count += 1
+end
+puts count

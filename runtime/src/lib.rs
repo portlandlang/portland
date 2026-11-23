@@ -219,6 +219,62 @@ pub extern "C" fn portland_exit_check() {
     }
 }
 
+/// A refusal the program itself earned, as the seed words it: what was
+/// written so far, then the sentence on standard error, and the status
+/// the seed exits with.
+fn refuse_program(sentence: &str) -> ! {
+    unsafe {
+        libc::fflush(__stdoutp);
+    }
+    eprintln!("{sentence}");
+    std::process::exit(1);
+}
+
+/// `left / right` between Integers, rounding toward negative infinity as
+/// Ruby's does. A zero divisor and the one quotient that does not fit
+/// refuse in the seed's sentences (ADR 0070).
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_divide(left: i64, right: i64) -> i64 {
+    if right == 0 {
+        refuse_program("divided by 0");
+    }
+    let Some(quotient) = left.checked_div(right) else {
+        refuse_program(&format!("{left} / {right} overflows the 64-bit integers"));
+    };
+    // Rust rounds toward zero; where the signs differ and the division is
+    // inexact, the floor is one below.
+    if left % right != 0 && ((left < 0) != (right < 0)) {
+        quotient - 1
+    } else {
+        quotient
+    }
+}
+
+/// `left % right` between Integers: the remainder takes the divisor's
+/// sign, as Ruby's does, so it pairs with the division above.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_modulo(left: i64, right: i64) -> i64 {
+    if right == 0 {
+        refuse_program("divided by 0");
+    }
+    // The smallest Integer over -1 has no remainder, and asking the
+    // machine for it traps.
+    let remainder = left.checked_rem(right).unwrap_or(0);
+    if remainder != 0 && ((remainder < 0) != (right < 0)) {
+        remainder + right
+    } else {
+        remainder
+    }
+}
+
+/// `-number`, which the smallest Integer has no answer for.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_negate(number: i64) -> i64 {
+    number
+        .checked_neg()
+        .unwrap_or_else(|| refuse_program(&format!("-({number}) overflows the 64-bit integers")))
+}
+
 /// A refusal of the runtime's own: what was written so far, then the
 /// sentence on standard error, and a status no Portland program exits with.
 fn refuse(sentence: &str) -> ! {
@@ -259,6 +315,22 @@ mod tests {
             portland_release(number);
         }
         assert_eq!(live_strings(), before);
+    }
+
+    #[test]
+    fn division_floors_and_the_remainder_takes_the_divisors_sign() {
+        assert_eq!(portland_integer_divide(7, 2), 3);
+        assert_eq!(portland_integer_divide(-7, 2), -4);
+        assert_eq!(portland_integer_divide(7, -2), -4);
+        assert_eq!(portland_integer_divide(-7, -2), 3);
+        assert_eq!(portland_integer_divide(-6, 2), -3);
+        assert_eq!(portland_integer_modulo(7, 3), 1);
+        assert_eq!(portland_integer_modulo(-7, 3), 2);
+        assert_eq!(portland_integer_modulo(7, -3), -2);
+        assert_eq!(portland_integer_modulo(-7, -3), -1);
+        assert_eq!(portland_integer_modulo(i64::MIN, -1), 0);
+        assert_eq!(portland_integer_negate(5), -5);
+        assert_eq!(portland_integer_negate(i64::MAX), i64::MIN + 1);
     }
 
     #[test]

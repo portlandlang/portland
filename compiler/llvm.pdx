@@ -53,6 +53,9 @@ struct LlvmEmitter
   # The parameters and locals that hold a String, each released on every
   # way out of the function.
   held
+  # The loops being written, innermost first, by the number in their
+  # labels: where `break` and `next` go.
+  loops
 end
 
 # A value written: the text so far, and how to refer to the value.
@@ -75,6 +78,9 @@ LLVM_PRELUDE = [
 "declare ptr @portland_string_concat(ptr, ptr)",
 "declare ptr @portland_string_from_integer(i64)",
 "declare zeroext i1 @portland_string_equal(ptr, ptr)",
+"declare i64 @portland_integer_divide(i64, i64)",
+"declare i64 @portland_integer_modulo(i64, i64)",
+"declare i64 @portland_integer_negate(i64)",
 "declare void @portland_retain(ptr)",
 "declare void @portland_release(ptr)",
 "declare void @portland_exit_check()",
@@ -110,7 +116,7 @@ def llvm_function(function, prefix)
   parameters = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }.join(", ")
   header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters}) {"
   held = (function.parameters + function.locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
-  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held)
+  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [])
   (function.parameters + function.locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
   end
@@ -194,8 +200,17 @@ def llvm_statement(emitter, statement)
     started = llvm_label(llvm_line(emitter, "br label %loop#{number}.test"), "loop#{number}.test")
     test = llvm_value(started, condition)
     branched = llvm_line(test.emitter, "br i1 #{test.operand}, label %loop#{number}.body, label %loop#{number}.done")
-    walked = llvm_statements(llvm_label(branched, "loop#{number}.body"), body)
-    llvm_label(llvm_line(walked, "br label %loop#{number}.test"), "loop#{number}.done")
+    inside = llvm_label(branched, "loop#{number}.body")
+    walked = llvm_statements(inside.with(loops: [number] + inside.loops), body)
+    llvm_label(llvm_line(walked.with(loops: emitter.loops), "br label %loop#{number}.test"), "loop#{number}.done")
+  # Out of the innermost loop, or on to its next turn. Whatever is written
+  # after either needs a block of its own, though nothing reaches it.
+  in IntermediateBreak
+    left = llvm_line(emitter, "br label %loop#{emitter.loops.first}.done")
+    llvm_label(left, "after#{left.counter}")
+  in IntermediateNext
+    left = llvm_line(emitter, "br label %loop#{emitter.loops.first}.test")
+    llvm_label(left, "after#{left.counter}")
   in IntermediateBranch(condition:, then_body:, else_body:)
     test = llvm_value(emitter, condition)
     number = test.emitter.counter
@@ -240,6 +255,30 @@ def llvm_value(emitter, value)
       return llvm_named(released, "xor i1 #{equal.operand}, true")
     end
     llvm_named(second.emitter, "icmp #{llvm_comparison(operator)} #{llvm_type(left.type)} #{first.operand}, #{second.operand}")
+  in IntermediateDivision(operator:, left:, right:)
+    first = llvm_value(emitter, left)
+    second = llvm_value(first.emitter, right)
+    function = operator == "/" ? "portland_integer_divide" : "portland_integer_modulo"
+    llvm_named(second.emitter, "call i64 @#{function}(i64 #{first.operand}, i64 #{second.operand})")
+  in IntermediateNegation(value: negated)
+    written = llvm_value(emitter, negated)
+    llvm_named(written.emitter, "call i64 @portland_integer_negate(i64 #{written.operand})")
+  in IntermediateNot(value: inverted)
+    written = llvm_value(emitter, inverted)
+    llvm_named(written.emitter, "xor i1 #{written.operand}, true")
+  in IntermediateLogical(operator:, left:, right:)
+    first = llvm_value(emitter, left)
+    number = first.emitter.counter
+    # `&&` goes on to its right side when the left is true, `||` when it is
+    # false; otherwise the left side is already the answer.
+    decided = operator == "&&" ? "false" : "true"
+    targets = operator == "&&" ? "label %logic#{number}.right, label %logic#{number}.done" : "label %logic#{number}.done, label %logic#{number}.right"
+    first_block = first.emitter.block
+    branched = llvm_line(first.emitter, "br i1 #{first.operand}, #{targets}")
+    second = llvm_value(llvm_label(branched, "logic#{number}.right"), right)
+    second_block = second.emitter.block
+    joined = llvm_label(llvm_line(second.emitter, "br label %logic#{number}.done"), "logic#{number}.done")
+    llvm_named(joined, "phi i1 [ #{decided}, %#{first_block} ], [ #{second.operand}, %#{second_block} ]")
   in IntermediateCall(type:, name:, arguments:)
     mutable current = emitter
     mutable operands = []
