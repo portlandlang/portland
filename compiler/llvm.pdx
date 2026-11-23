@@ -79,7 +79,7 @@ require_relative "intermediate_representation"
 # The text so far: its lines, the next number for a temporary or a label,
 # and the label of the block being written, which a value chosen between
 # two arms has to name.
-struct LlvmEmitter
+struct LLVMEmitter
   lines
   counter
   block
@@ -104,7 +104,7 @@ end
 
 # Two operands written, each as a plain value: the text so far, and how
 # to refer to each.
-struct LlvmPair
+struct LLVMPair
   emitter
   left
   right
@@ -112,14 +112,14 @@ end
 
 # A block written and its frame built: the text so far, the block's
 # function, and the frame to call it with.
-struct LlvmHanded
+struct LLVMHanded
   emitter
   function
   frame
 end
 
 # A value written: the text so far, and how to refer to the value.
-struct LlvmValue
+struct LLVMValue
   emitter
   operand
 end
@@ -130,35 +130,35 @@ LLVM_PRELUDE = [
   "@.plus = private unnamed_addr constant [2 x i8] c\"+\\00\"",
   "@.minus = private unnamed_addr constant [2 x i8] c\"-\\00\"",
   "@.times = private unnamed_addr constant [2 x i8] c\"*\\00\"",
-"@.empty_array = private constant { i64, i64, i64, i64 } { i64 -1, i64 0, i64 0, i64 0 }",
+  "@.empty_array = private constant { i64, i64, i64, i64 } { i64 -1, i64 0, i64 0, i64 0 }",
   "",
   "declare i32 @printf(ptr, ...)",
   "declare i32 @dprintf(i32, ptr, ...)",
   "declare void @exit(i32)",
-"declare void @portland_puts_string(ptr)",
-"declare ptr @portland_string_concat(ptr, ptr)",
-"declare ptr @portland_string_from_integer(i64)",
-"declare ptr @portland_string_from_boolean(i1 zeroext)",
-"declare ptr @portland_string_inspect(ptr)",
-"declare ptr @portland_array_to_string(ptr)",
-"declare zeroext i1 @portland_string_equal(ptr, ptr)",
-"declare i64 @portland_integer_divide(i64, i64)",
-"declare i64 @portland_integer_modulo(i64, i64)",
-"declare i64 @portland_integer_negate(i64)",
-"declare i64 @portland_integer_abs(i64)",
-"declare i64 @portland_integer_succ(i64)",
-"declare i64 @portland_integer_pred(i64)",
-"declare i64 @portland_string_length(ptr)",
-"declare ptr @portland_array_new(i64, i64)",
-"declare ptr @portland_array_append(ptr, i64, i64)",
-"declare void @portland_array_release(ptr)",
-"declare void @portland_panic(ptr)",
-"declare void @portland_refuse_nil_method(ptr)",
-"declare void @portland_refuse_nil_puts()",
-"declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
-"declare void @portland_retain(ptr)",
-"declare void @portland_release(ptr)",
-"declare void @portland_exit_check()",
+  "declare void @portland_puts_string(ptr)",
+  "declare ptr @portland_string_concat(ptr, ptr)",
+  "declare ptr @portland_string_from_integer(i64)",
+  "declare ptr @portland_string_from_boolean(i1 zeroext)",
+  "declare ptr @portland_string_inspect(ptr)",
+  "declare ptr @portland_array_to_string(ptr)",
+  "declare zeroext i1 @portland_string_equal(ptr, ptr)",
+  "declare i64 @portland_integer_divide(i64, i64)",
+  "declare i64 @portland_integer_modulo(i64, i64)",
+  "declare i64 @portland_integer_negate(i64)",
+  "declare i64 @portland_integer_abs(i64)",
+  "declare i64 @portland_integer_succ(i64)",
+  "declare i64 @portland_integer_pred(i64)",
+  "declare i64 @portland_string_length(ptr)",
+  "declare ptr @portland_array_new(i64, i64)",
+  "declare ptr @portland_array_append(ptr, i64, i64)",
+  "declare void @portland_array_release(ptr)",
+  "declare void @portland_panic(ptr)",
+  "declare void @portland_refuse_nil_method(ptr)",
+  "declare void @portland_refuse_nil_puts()",
+  "declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
+  "declare void @portland_retain(ptr)",
+  "declare void @portland_release(ptr)",
+  "declare void @portland_exit_check()",
   "declare {i64, i1} @llvm.sadd.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.ssub.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.smul.with.overflow.i64(i64, i64)",
@@ -209,7 +209,7 @@ LLVM_FRAME = "%\".frame\""
 # and after them, where the block yields, what its writer was handed.
 def llvm_routine(header, captures, onward, parameters, locals, body, prefix, entry)
   held = (parameters + locals).select { llvm_counted?(type_at(it, 1)) }
-  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
+  mutable emitter = LLVMEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
   shape = llvm_frame_shape(captures, onward)
   mutable position = 0
   captures.each do |capture|
@@ -256,7 +256,7 @@ def llvm_block(emitter, block)
   header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
   written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
   mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
-  return LlvmHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
+  return LLVMHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
   frame = "%\"frame.#{number}\""
   shape = llvm_frame_shape(block.captures, block.onward)
   current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
@@ -272,7 +272,7 @@ def llvm_block(emitter, block)
     carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
     current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
   end
-  LlvmHanded.new(emitter: current, function: name, frame: frame)
+  LLVMHanded.new(emitter: current, function: name, frame: frame)
 end
 
 # A frame's shape: a place for each captured slot's address, and two more
@@ -339,7 +339,7 @@ end
 # A maybe opened (#503): its value where there is one. Where there is
 # none, the block writes the refusal, which does not come back.
 def llvm_opened(emitter, type, operand)
-  return LlvmValue.new(emitter: emitter, operand: operand) unless type in ["maybe", *]
+  return LLVMValue.new(emitter: emitter, operand: operand) unless type in ["maybe", *]
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
   number = flag.emitter.counter
   branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %open#{number}.some, label %open#{number}.none")
@@ -385,28 +385,28 @@ def llvm_operands(emitter, operator, left_type, left, right_type, right)
     other = llvm_source(named.emitter, llvm_plain(left_type), first.operand)
     llvm_line(other.emitter, "call void @portland_refuse_nil_operand(ptr #{named.operand}, ptr #{other.operand}, ptr null)")
   end
-  LlvmPair.new(emitter: second.emitter, left: first.operand, right: second.operand)
+  LLVMPair.new(emitter: second.emitter, left: first.operand, right: second.operand)
 end
 
 # Whether there is a value: a maybe's flag, and always so for anything
 # else. What was asked is released once it has answered.
 def llvm_presence(emitter, type, name, operand)
   unless type in ["maybe", *]
-    return LlvmValue.new(emitter: llvm_drop(emitter, type, operand), operand: name == "some?" ? "true" : "false")
+    return LLVMValue.new(emitter: llvm_drop(emitter, type, operand), operand: name == "some?" ? "true" : "false")
   end
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
   released = llvm_drop(flag.emitter, type, operand)
-  return LlvmValue.new(emitter: released, operand: flag.operand) if name == "some?"
+  return LLVMValue.new(emitter: released, operand: flag.operand) if name == "some?"
   llvm_named(released, "xor i1 #{flag.operand}, true")
 end
 
 # A side of `==` as a flag and a value: a maybe's own, and for anything
 # else, there and itself.
 def llvm_sides(emitter, type, operand)
-  return LlvmPair.new(emitter: emitter, left: "true", right: operand) unless type in ["maybe", *]
+  return LLVMPair.new(emitter: emitter, left: "true", right: operand) unless type in ["maybe", *]
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
   held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-  LlvmPair.new(emitter: held.emitter, left: flag.operand, right: held.operand)
+  LLVMPair.new(emitter: held.emitter, left: flag.operand, right: held.operand)
 end
 
 # Whether two values of one plain type are equal. A String's `==` is
@@ -431,7 +431,7 @@ def llvm_equal_maybes(emitter, left_type, left, right_type, right)
   flags = llvm_named(llvm_label(llvm_line(values.emitter, "br label %same#{number}.done"), "same#{number}.flags"), "icmp eq i1 #{first.left}, #{second.left}")
   joined = llvm_label(llvm_line(flags.emitter, "br label %same#{number}.done"), "same#{number}.done")
   equal = llvm_named(joined, "phi i1 [ #{values.operand}, %#{values_block} ], [ #{flags.operand}, %same#{number}.flags ]")
-  LlvmValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
+  LLVMValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
 end
 
 # A maybe in its source form: its value's, or `nil`. Only the arm taken
@@ -534,20 +534,20 @@ def llvm_value(emitter, value)
   in IntermediateConstant(type: ["string"], value: text) then llvm_literal(emitter, text)
   # nil, held as a maybe, is the maybe that is not there; a bare `nil`
   # no one holds is nothing at all.
-  in IntermediateConstant(type: ["maybe", *]) then LlvmValue.new(emitter: emitter, operand: "zeroinitializer")
-  in IntermediateConstant(type: ["nil"]) then LlvmValue.new(emitter: emitter, operand: "null")
-  in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
+  in IntermediateConstant(type: ["maybe", *]) then LLVMValue.new(emitter: emitter, operand: "zeroinitializer")
+  in IntermediateConstant(type: ["nil"]) then LLVMValue.new(emitter: emitter, operand: "null")
+  in IntermediateConstant(value: literal) then LLVMValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
     loaded = llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
     # The slot keeps its hold; whoever reads gets one of their own.
-    LlvmValue.new(emitter: llvm_retain(loaded.emitter, type, loaded.operand), operand: loaded.operand)
+    LLVMValue.new(emitter: llvm_retain(loaded.emitter, type, loaded.operand), operand: loaded.operand)
   in IntermediateConcat(left:, right:)
     first = llvm_value(emitter, left)
     second = llvm_value(first.emitter, right)
     sides = llvm_operands(second.emitter, "+", left.type, first.operand, right.type, second.operand)
     joined = llvm_named(sides.emitter, "call ptr @portland_string_concat(ptr #{sides.left}, ptr #{sides.right})")
     released = llvm_drop(llvm_drop(joined.emitter, ["string"], sides.left), ["string"], sides.right)
-    LlvmValue.new(emitter: released, operand: joined.operand)
+    LLVMValue.new(emitter: released, operand: joined.operand)
   # A value written out: a new String the runtime makes. An array asked
   # is released once it has answered, as a String inspected is.
   in IntermediateText(value: shown)
@@ -555,7 +555,7 @@ def llvm_value(emitter, value)
     return llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})") if shown.type == ["integer"]
     return llvm_named(written.emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{written.operand})") if shown.type == ["boolean"]
     made = llvm_named(written.emitter, "call ptr @portland_array_to_string(ptr #{written.operand})")
-    LlvmValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
+    LLVMValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateInspect(value: shown)
     written = llvm_value(emitter, shown)
     made = if shown.type in ["maybe", *]
@@ -563,7 +563,7 @@ def llvm_value(emitter, value)
     else
       llvm_named(written.emitter, "call ptr @portland_string_inspect(ptr #{written.operand})")
     end
-    LlvmValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
+    LLVMValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateArithmetic(operator:, left:, right:)
     first = llvm_value(emitter, left)
     second = llvm_value(first.emitter, right)
@@ -584,7 +584,7 @@ def llvm_value(emitter, value)
     if plain == ["string"]
       equal = llvm_same(sides.emitter, plain, sides.left, sides.right)
       released = llvm_drop(llvm_drop(equal.emitter, ["string"], sides.left), ["string"], sides.right)
-      return LlvmValue.new(emitter: released, operand: equal.operand) if operator == "=="
+      return LLVMValue.new(emitter: released, operand: equal.operand) if operator == "=="
       return llvm_named(released, "xor i1 #{equal.operand}, true")
     end
     llvm_named(sides.emitter, "icmp #{llvm_comparison(operator)} #{llvm_type(plain)} #{sides.left}, #{sides.right}")
@@ -641,7 +641,7 @@ def llvm_value(emitter, value)
     number = flag.emitter.counter
     branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %default#{number}.some, label %default#{number}.none")
     there = llvm_label(branched, "default#{number}.some")
-    kept = (type in ["maybe", *]) ? LlvmValue.new(emitter: there, operand: written.operand) : llvm_named(there, "extractvalue #{llvm_type(held.type)} #{written.operand}, 1")
+    kept = (type in ["maybe", *]) ? LLVMValue.new(emitter: there, operand: written.operand) : llvm_named(there, "extractvalue #{llvm_type(held.type)} #{written.operand}, 1")
     other = llvm_value(llvm_label(llvm_line(kept.emitter, "br label %default#{number}.done"), "default#{number}.none"), fallback)
     other_block = other.emitter.block
     joined = llvm_label(llvm_line(other.emitter, "br label %default#{number}.done"), "default#{number}.done")
@@ -670,7 +670,7 @@ def llvm_value(emitter, value)
     chosen = llvm_named(joined, "phi #{llvm_type(element)} [ #{read.operand}, %#{read_block} ], [ #{llvm_zero(element)}, %#{before} ]")
     flagged = llvm_named(chosen.emitter, "insertvalue #{llvm_type(type)} zeroinitializer, i1 #{inside.operand}, 0")
     made = llvm_named(flagged.emitter, "insertvalue #{llvm_type(type)} #{flagged.operand}, #{llvm_type(element)} #{chosen.operand}, 1")
-    LlvmValue.new(emitter: llvm_drop(made.emitter, array.type, held.operand), operand: made.operand)
+    LLVMValue.new(emitter: llvm_drop(made.emitter, array.type, held.operand), operand: made.operand)
   in IntermediateCall(type:, name:, arguments:, block:)
     mutable current = emitter
     mutable operands = []
@@ -686,12 +686,12 @@ def llvm_value(emitter, value)
     end
     call = "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})"
     # A call that answers nothing has no result to name.
-    return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
+    return LLVMValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
   # A literal: an array with room for its elements, each appended in
   # order. The empty one is the constant every `[]` starts as.
   in IntermediateArray(type:, elements:)
-    return LlvmValue.new(emitter: emitter, operand: "@.empty_array") if elements.empty?
+    return LLVMValue.new(emitter: emitter, operand: "@.empty_array") if elements.empty?
     held = type_at(type, 1)
     mutable made = llvm_named(emitter, "call ptr @portland_array_new(i64 #{llvm_array_kind(held)}, i64 #{elements.length})")
     elements.each do |element|
@@ -723,7 +723,7 @@ def llvm_value(emitter, value)
     following = llvm_named(called, "add i64 #{index.operand}, 1")
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
     finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
-    LlvmValue.new(emitter: finished, operand: walked.operand)
+    LLVMValue.new(emitter: finished, operand: walked.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
   in IntermediateYield(type:, arguments:)
@@ -735,7 +735,7 @@ def llvm_value(emitter, value)
       operands << "#{llvm_type(argument.type)} #{written.operand}"
     end
     call = "call #{llvm_type(type)} #{LLVM_BLOCK}(#{operands.join(", ")})"
-    return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
+    return LLVMValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     test = llvm_value(emitter, condition)
@@ -767,7 +767,7 @@ end
 # the array takes over.
 def llvm_append(emitter, array, type, operand)
   word = case type
-         in ["integer"] then LlvmValue.new(emitter: emitter, operand: operand)
+         in ["integer"] then LLVMValue.new(emitter: emitter, operand: operand)
          in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
          else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
          end
@@ -784,7 +784,7 @@ def llvm_element(emitter, type, slot)
     return llvm_named(word.emitter, "trunc i64 #{word.operand} to i1")
   end
   read = llvm_named(emitter, "load ptr, ptr #{slot}")
-  LlvmValue.new(emitter: llvm_line(read.emitter, "call void @portland_retain(ptr #{read.operand})"), operand: read.operand)
+  LLVMValue.new(emitter: llvm_line(read.emitter, "call void @portland_retain(ptr #{read.operand})"), operand: read.operand)
 end
 
 # A String literal: its block written into the binary as a constant. The
@@ -794,7 +794,7 @@ def llvm_literal(emitter, text)
   length = text.bytesize
   shape = "{ i64, i64, [#{length} x i8] }"
   constant = "#{name} = private unnamed_addr constant #{shape} { i64 -1, i64 #{length}, [#{length} x i8] c\"#{llvm_bytes(text)}\" }"
-  LlvmValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
+  LLVMValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
 end
 
 # A text's bytes as LLVM writes them between quotes: a printable ASCII
@@ -818,13 +818,13 @@ def llvm_method(emitter, type, name, operand)
     place = llvm_named(emitter, "getelementptr i64, ptr #{operand}, i64 1")
     length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
     released = llvm_drop(length.emitter, type, operand)
-    return LlvmValue.new(emitter: released, operand: length.operand) unless name == "empty?"
+    return LLVMValue.new(emitter: released, operand: length.operand) unless name == "empty?"
     return llvm_named(released, "icmp eq i64 #{length.operand}, 0")
   end
   if type == ["string"]
     counted = llvm_named(emitter, "call i64 @portland_string_length(ptr #{operand})")
     released = llvm_drop(counted.emitter, ["string"], operand)
-    return LlvmValue.new(emitter: released, operand: counted.operand) unless name == "empty?"
+    return LLVMValue.new(emitter: released, operand: counted.operand) unless name == "empty?"
     return llvm_named(released, "icmp eq i64 #{counted.operand}, 0")
   end
   case name
@@ -866,7 +866,7 @@ end
 # An instruction whose result gets the next temporary's name.
 def llvm_named(emitter, instruction)
   name = "%t#{emitter.counter}"
-  LlvmValue.new(emitter: emitter.with(lines: emitter.lines + ["  #{name} = #{instruction}"], counter: emitter.counter + 1), operand: name)
+  LLVMValue.new(emitter: emitter.with(lines: emitter.lines + ["  #{name} = #{instruction}"], counter: emitter.counter + 1), operand: name)
 end
 
 def llvm_line(emitter, instruction)
