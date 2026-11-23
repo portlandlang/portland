@@ -1,0 +1,78 @@
+# A maybe (#503): a value that may be nil, a flag beside it saying which.
+def pick(numbers, index) = numbers[index]
+
+def width_of(numbers, index)
+  found = numbers[index]
+  return 0 if found.nil?
+  found + 100
+end
+
+numbers = [3, 8, 12]
+first = numbers[0]
+p(first)
+p(numbers[9])
+p(numbers[-1])
+p(numbers[-3])
+p(numbers[-4])
+p(numbers.first)
+p(numbers.last)
+puts numbers.last + 1
+puts numbers[1] * numbers[2]
+width = numbers[7] || 0
+puts width
+kept = numbers[1] || 0
+puts kept
+if first.nil?
+  puts "empty"
+else
+  puts first + 1
+end
+puts first.some?
+puts numbers[5].nil?
+puts numbers[0] == 3
+puts numbers[0] == 4
+puts numbers[5] == nil
+puts numbers[0] != nil
+puts nil == numbers[9]
+puts numbers[0] == numbers[-3]
+puts numbers[7] == numbers[8]
+puts numbers[0] != numbers[1]
+p(pick(numbers, 2))
+p(pick(numbers, 20))
+puts width_of(numbers, 1)
+puts width_of(numbers, 10)
+puts "first is #{first}"
+puts numbers[1].even?
+names = ["ada", "grace"]
+name = names[1]
+p(name)
+p(names[5])
+puts name
+puts name.length
+puts names[0] + "!"
+puts names[0] == "ada"
+puts names[9] == "ada"
+other = names[9] || "nobody"
+puts other
+chain = names[9] || names[0]
+p(chain)
+rows = [[1, 2], [3]]
+row = rows[1]
+p(row)
+p(rows[4])
+puts row.length
+mutable best = numbers[0]
+best = numbers[2]
+p(best)
+best = 99
+p(best)
+best = numbers[50]
+p(best)
+flags = [true, false]
+p(flags[1])
+p(flags[2])
+puts flags[0] == true
+empty = numbers[9] || numbers[10]
+p(empty)
+puts inspect(names[0])
+puts inspect(names[7])

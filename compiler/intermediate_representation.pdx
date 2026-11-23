@@ -164,6 +164,37 @@ struct IntermediateWalk
   block
 end
 
+# `array[index]`, `first`, and `last` (#503): the element as a maybe, nil
+# past either end. A negative index counts from the end.
+struct IntermediateIndex
+  type
+  array
+  index
+end
+
+# A maybe used where its value is needed, opened when the line runs: the
+# value where there is one, and otherwise the seed's refusal for nil
+# asked that method, `puts` among them by its own name.
+struct IntermediateOpen
+  type
+  value
+  name
+end
+
+# `maybe || fallback`: the value where there is one, and otherwise the
+# fallback, which is computed only then.
+struct IntermediateDefault
+  type
+  value
+  fallback
+end
+
+# A plain value bound where a maybe is held: a maybe that is there.
+struct IntermediateSome
+  type
+  value
+end
+
 # A `yield`: a call of the block the function was handed.
 struct IntermediateYield
   type
@@ -385,11 +416,14 @@ def lower_statement(statement, bindings, context)
     return lower_append(statement, value, bindings, context) if value in AppendNode
     lowered = settled_empty(lower_value(value, bindings, context), name, bindings, context)
     found = bindings.find { it[0] == name }
-    if found.some? && type_at(found, 1) != lowered.type
-      refuse_native("#{name} rebound from #{with_article(type_at(found, 1))} to #{with_article(lowered.type)}", statement)
+    # A local that holds a maybe takes a plain value as a maybe that is there.
+    stored = found.some? && type_at(found, 1) == ["maybe", lowered.type] ? IntermediateSome.new(type: type_at(found, 1), value: lowered) : lowered
+    if found.some? && type_at(found, 1) != stored.type
+      refuse_native("#{name} rebound from #{with_article(type_at(found, 1))} to #{with_article(stored.type)}", statement)
     end
-    after = found.nil? ? [[name, lowered.type]] + bindings : bindings
-    Lowered.new(nodes: [IntermediateStore.new(name: name, value: lowered)], bindings: after)
+    refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
+    after = found.nil? ? [[name, stored.type]] + bindings : bindings
+    Lowered.new(nodes: [IntermediateStore.new(name: name, value: stored)], bindings: after)
   in WhileNode(condition:, body:)
     test = lower_condition(condition, bindings, context)
     inner = lower_statements(body, bindings, context.with(looping: true))
@@ -423,7 +457,9 @@ def lower_statement(statement, bindings, context)
   in CallNode(name: "puts", arguments:, block:)
     refuse_native("puts with a block", statement) unless block.nil?
     refuse_native("puts of anything but one value", statement) unless arguments.length == 1
-    value = lower_value(arguments[0], bindings, context)
+    handed = lower_value(arguments[0], bindings, context)
+    # A maybe is opened, and nil refuses as the seed's `puts` does.
+    value = (handed.type in ["maybe", *]) ? IntermediateOpen.new(type: type_at(handed.type, 1), value: handed, name: "puts") : handed
     # An Integer is printed as it is; everything else as its text.
     shown = value.type == ["integer"] ? value : written_out(value, statement)
     Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
@@ -480,6 +516,8 @@ end
 # A value as `puts`, `to_s`, and interpolation write it: a String is
 # itself, and an Integer, a Boolean, or an array is written out.
 def written_out(value, node)
+  # A maybe is opened first, and nil refuses as the seed's `to_s` does.
+  return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
   return value if value.type == ["string"]
   writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *])
   refuse_native("writing out #{with_article(value.type)}", node) unless writable
@@ -487,11 +525,16 @@ def written_out(value, node)
 end
 
 # A value in its source form, as `inspect` and `p` write it: a String
-# between quotes, and everything else as it is written out.
+# between quotes, a maybe as its value or `nil`, and everything else as
+# it is written out.
 def inspected(value, node)
-  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"]
+  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in ["maybe", *])
   written_out(value, node)
 end
+
+# A type with a maybe opened: what an operation that needs the value
+# works on.
+def plain_of(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
 
 def lower_condition(node, bindings, context)
   value = lower_value(node, bindings, context)
@@ -523,24 +566,41 @@ def lower_value(node, bindings, context)
     refuse_native("an array of #{render_type(first)}", node) unless native_type?(["array", first])
     IntermediateArray.new(type: ["array", first], elements: values)
   in BinaryNode(operator:, left:, right:)
+    # `== nil` asks whether a value is there (#503).
+    if %w[== !=].include?(operator) && ((left in NilNode) || (right in NilNode))
+      asked = lower_value((left in NilNode) ? right : left, bindings, context)
+      absent = IntermediateMethod.new(type: ["boolean"], receiver: asked, name: "nil?")
+      return operator == "==" ? absent : IntermediateNot.new(type: ["boolean"], value: absent)
+    end
     first = lower_value(left, bindings, context)
     second = lower_value(right, bindings, context)
-    return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && first.type == ["string"] && second.type == ["string"]
+    # A maybe on either side is opened when the line runs, so the operator
+    # is read on the values. `==` and `!=` alone compare a maybe as it is.
+    before = plain_of(first.type)
+    after = plain_of(second.type)
+    return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && before == ["string"] && after == ["string"]
     if %w[/ %].include?(operator)
-      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateDivision.new(type: ["integer"], operator: operator, left: first, right: second)
     end
     if %w[+ - *].include?(operator)
-      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
     end
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
-    refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
-    refuse_native("'#{operator}' between Booleans", node) if first.type == ["boolean"] && !%w[== !=].include?(operator)
-    refuse_native("'#{operator}' between arrays", node) if first.type in ["array", *]
+    refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
+    refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between arrays", node) if before in ["array", *]
     # Strings are equal or not (ADR 0038); ordering them is unbuilt.
-    refuse_native("'#{operator}' between Strings", node) if first.type == ["string"] && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between Strings", node) if before == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
+  # `array[index]` (#503): the element, or nil past either end.
+  in IndexNode(receiver:, index:)
+    held = lower_value(receiver, bindings, context)
+    refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ["array", *]
+    position = lower_value(index, bindings, context)
+    refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == ["integer"]
+    IntermediateIndex.new(type: ["maybe", type_at(held.type, 1)], array: held, index: position)
   in CallNode(name:, arguments:)
     # `inspect(value)` (#501), where the program has no def of that name.
     if name == "inspect" && arguments.length == 1 && node.block.nil? && context.arities.none? { it[0] == name }
@@ -555,7 +615,16 @@ def lower_value(node, bindings, context)
     yielded
   in LogicalNode(operator:, left:, right:)
     refuse_native("the operator '#{operator}'", node) unless %w[&& ||].include?(operator)
-    first = lower_condition(left, bindings, context)
+    first = lower_value(left, bindings, context)
+    # `maybe || fallback` (#503): the value, or the fallback where there
+    # is none. The fallback is a value of the same type, or another maybe.
+    if operator == "||" && (first.type in ["maybe", *])
+      fallback = lower_value(right, bindings, context)
+      fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
+      refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
+      return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
+    end
+    refuse_native("a condition that is #{with_article(first.type)}", left) unless first.type == ["boolean"]
     second = lower_condition(right, bindings, context)
     IntermediateLogical.new(type: ["boolean"], operator: operator, left: first, right: second)
   in UnaryNode(operator: "-", operand:)
@@ -577,7 +646,14 @@ def lower_value(node, bindings, context)
     IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, context))
   in MethodCallNode(receiver:, name:, arguments: [], block: nil)
     asked = lower_value(receiver, bindings, context)
-    answer = native_method_answer(asked.type, name)
+    # Whether a value is there, asked of anything (#503).
+    return IntermediateMethod.new(type: ["boolean"], receiver: asked, name: name) if %w[nil? some?].include?(name)
+    if (asked.type in ["array", *]) && %w[first last].include?(name)
+      position = IntermediateConstant.new(type: ["integer"], value: name == "first" ? 0 : -1)
+      return IntermediateIndex.new(type: ["maybe", type_at(asked.type, 1)], array: asked, index: position)
+    end
+    # Every other method is asked of the value, a maybe opened for it.
+    answer = native_method_answer(plain_of(asked.type), name)
     refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node) if answer.nil?
     IntermediateMethod.new(type: answer, receiver: asked, name: name)
   in IfNode(condition:, then_body:, else_body:)
@@ -627,11 +703,17 @@ def native_method_answer(type, name)
   nil
 end
 
-# The types the native build holds: an Integer, a Boolean, a String, and
-# an array of any of those or of such arrays (#497, #499).
+# The types the native build holds: an Integer, a Boolean, a String, an
+# array of any of those or of such arrays (#497, #499), and a maybe of
+# any of them (#503). An array holds no maybe.
 def native_type?(type)
+  return native_value?(type_at(type, 1)) if type in ["maybe", *]
+  native_value?(type)
+end
+
+def native_value?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
-  (type in ["array", *]) && native_type?(type_at(type, 1))
+  (type in ["array", *]) && native_value?(type_at(type, 1))
 end
 
 # What to call a node the slice does not hold, in the refusal.
@@ -717,6 +799,10 @@ def render_value(value)
     "(call #{([name] + arguments.map { render_value(it) } + handed).join(" ")})"
   in IntermediateYield(arguments:) then "(yield#{arguments.map { " #{render_value(it)}" }.join("")})"
   in IntermediateArray(elements:) then "(array#{elements.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateIndex(array:, index:) then "([] #{render_value(array)} #{render_value(index)})"
+  in IntermediateOpen(value: held, name:) then "(open #{render_value(held)} #{name})"
+  in IntermediateDefault(value: held, fallback:) then "(|| #{render_value(held)} #{render_value(fallback)})"
+  in IntermediateSome(value: held) then "(some #{render_value(held)})"
   in IntermediateWalk(array:, block:) then "(each #{render_value(array)} #{render_handed_block(block)})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"

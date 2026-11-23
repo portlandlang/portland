@@ -1,0 +1,3 @@
+# nil on the right of an operator refuses as the seed does (#503).
+numbers = [3, 8]
+puts 1 + numbers[9]

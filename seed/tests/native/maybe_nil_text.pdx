@@ -1,0 +1,4 @@
+# nil beside a String refuses with the String in its source form (#503).
+names = ["ada"]
+puts names[0] + "!"
+puts "say \"hi\" " + names[9]

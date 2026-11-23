@@ -1,0 +1,4 @@
+# A method asked of nil refuses by its name (#503).
+numbers = [3, 8]
+puts numbers[1].even?
+puts numbers[9].even?
