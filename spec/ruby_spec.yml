@@ -844,13 +844,13 @@ core/enumerable/each_slice_spec.rb:
   link: https://github.com/portlandlang/portland/issues/418
 core/enumerable/flat_map_spec.rb:
   pdx: [spec/core/enumerable/flat_map_spec.pdx]
-  status: partial_planned
-  reason: "The to_ary rows stay upstream (ADR 0036) and the enumerator rows with them (ADR 0055); a struct answered by the block waits on #341."
-  link: https://github.com/portlandlang/portland/issues/341
+  status: partial_intentional
+  reason: "The to_ary rows stay upstream (ADR 0036) and the enumerator rows with them (ADR 0055)."
+  link: docs/adr/0036-2026-08-18-the-famous-twins-ship.md
 core/enumerable/tally_spec.rb:
   pdx: [spec/core/enumerable/tally_spec.pdx]
   status: partial_planned
-  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, a bare yield on #341, and an ignored block on #418."
+  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, and an ignored block on #418."
   link: https://github.com/portlandlang/portland/issues/342
 
 # — core/false —

@@ -2147,6 +2147,29 @@ fn a_string_may_begin_with_a_combining_mark_on_both_oracles() {
     );
 }
 
+/// `flat_map` opens one level of what the block answers and leaves a
+/// struct whole, a bare `yield` gathers as nil, and a struct that defines
+/// an implicit conversion refuses at the definition, on both oracles (#341).
+#[test]
+fn flat_map_a_bare_yield_and_a_defined_to_ary_agree_on_both_oracles() {
+    assert_both_print(
+        "flat_map_struct.pdx",
+        "struct Thing\n  name\nend\nstruct Bare\n  first\n\n  include Enumerable\n\n  def each\n    yield\n    yield 1\n  end\nend\nthing = Thing.new(name: \"t\")\np([1, 2].flat_map { |number| number == 1 ? thing : [number] })\np([1, [2, [3]]].flat_map { it })\np(Bare.new(first: 1).to_a)\n",
+        "[Thing(name: \"t\"), 2]\n[1, 2, [3]]\n[nil, 1]\n",
+    );
+    let cases = [
+        (
+            "struct Wrap\n  items\n\n  def to_ary = items\nend\n",
+            "to_ary is Ruby's implicit conversion, which nothing here calls — define to_a",
+        ),
+        (
+            "trait Texty\n  def to_str = \"t\"\nend\n",
+            "to_str is Ruby's implicit conversion, which nothing here calls — define to_s",
+        ),
+    ];
+    assert_both_oracles_refuse("defined_implicit_conversion.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

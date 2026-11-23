@@ -4297,10 +4297,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 // as itself, several as an array, as Ruby's Enumerable packs
                 // them — and answers nil.
                 if handed.borrow().collects {
-                    let item = if arguments.len() == 1 {
-                        arguments.into_iter().next().unwrap_or(Value::Nil)
-                    } else {
-                        Value::array(arguments)
+                    // A bare `yield` hands over nothing, which gathers as
+                    // nil, Ruby's reading (#341).
+                    let item = match arguments.len() {
+                        0 => Value::Nil,
+                        1 => arguments.into_iter().next().unwrap_or(Value::Nil),
+                        _ => Value::array(arguments),
                     };
                     self.collected.push(item);
                     return Some(Value::Nil);
