@@ -118,6 +118,10 @@ def synthesize(node, types)
   in IfNode then synthesize_if(node, types)
   in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
+  # A `yield` is what the block answers, which only the native build's
+  # pinning says (#493), under a name no local can have. The checker
+  # binds none, and reads unknown.
+  in YieldNode then synthesize_name("yield", types)
   else
     ["unknown"]
   end

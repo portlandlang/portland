@@ -2232,13 +2232,13 @@ def parse_identifier_primary(tokens, position, name)
     # A bare name followed by `do` is a call handed a block, which
     # `yield` reaches from inside the method.
     block = parse_block(tokens, after + 1, false)
-    Step.new(node: call_with_block_node(name, [], block.node), position: block.position)
+    Step.new(node: call_with_block_node(name, [], block.node, line: line_at(tokens, position)), position: block.position)
   elsif operator_at?(tokens, after, %w[{]) && !braces_could_be_a_hash?(tokens, after)
     # ADR 0024, in expression position: a `{` the peek has ruled out as a
     # hash is this call's block. Where it could be a hash the never-guess
     # menu still owns it, so this branch declines and the caller reports.
     block = parse_block(tokens, after + 1, true)
-    Step.new(node: call_with_block_node(name, [], block.node), position: block.position)
+    Step.new(node: call_with_block_node(name, [], block.node, line: line_at(tokens, position)), position: block.position)
   else
     Step.new(node: identifier_node(name, line: line_at(tokens, position)), position: after)
   end
@@ -2593,7 +2593,7 @@ def parse_statement(tokens, position)
   if token.identifier? && operator_at?(tokens, position + 1, %w[{])
     unless braces_could_be_a_hash?(tokens, position + 1)
       block = parse_block(tokens, position + 2, true)
-      return Step.new(node: call_with_block_node(token.text, [], block.node), position: block.position)
+      return Step.new(node: call_with_block_node(token.text, [], block.node, line: line_at(tokens, position)), position: block.position)
     end
     return Step.new(node: error_node(brace_after_name_message(token.text, tokens, position + 1)), position: skip_line_at(tokens, position))
   end
