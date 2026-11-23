@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The third native slice is decided** ([#491](https://github.com/portlandlang/portland/issues/491), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a block as its own function handed its writer's locals, an array laid out by its element type, a maybe as a flag beside its value, and the order they are built in. The core holds at Array until the native build can compile a method written in it. A decision record.
 - **A misbehaving block is refused in one sentence per fault** ([#484](https://github.com/portlandlang/portland/issues/484)) — `select block must produce true or false` read as though `select` itself must, the value after it was printed in Rust's debug form by every method still written in Rust, and a method written in the core could not name itself when its block answered nothing.
   - A block read as a verdict that answers anything else is refused as `select's block must answer true or false, got 1`, the value as `inspect` shows it, by every method that takes such a block on both implementations.
   - A block that answers nothing where its answer is read is refused as `sum's block produced no value`, naming the method the block was handed to. A `yield` in a def or in a core method says the same.

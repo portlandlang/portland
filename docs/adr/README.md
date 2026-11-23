@@ -107,6 +107,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0093](0093-2026-11-22-the-core-is-portland-source.md) — The core is Portland source, loaded before every program
 - [0094](0094-2026-11-22-a-native-spike-through-llvm-ir-text.md) — A native spike: `fib(30)` through LLVM IR as text
 - [0095](0095-2026-11-23-native-strings-a-runtime-and-reference-counting.md) — Native Strings, a runtime crate, and reference counting
+- [0096](0096-2026-11-23-native-blocks-arrays-and-maybes.md) — Native blocks, arrays, and maybes
 
 <!-- /generated -->
 
