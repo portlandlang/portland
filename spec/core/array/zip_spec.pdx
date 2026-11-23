@@ -8,4 +8,12 @@ context "Array#zip" do
   specify "zip pairs elements by position" do
     expect([1, 2].zip([3, 4])).to eq([[1, 3], [2, 4]])
   end
+
+  specify "returns an array of arrays containing corresponding elements of each array" do
+    expect([1, 2, 3, 4].zip(["a", "b", "c", "d", "e"])).to eq([[1, "a"], [2, "b"], [3, "c"], [4, "d"]])
+  end
+
+  specify "fills in missing values with nil" do
+    expect([1, 2, 3, 4, 5].zip(["a", "b", "c", "d"])).to eq([[1, "a"], [2, "b"], [3, "c"], [4, "d"], [5, nil]])
+  end
 end

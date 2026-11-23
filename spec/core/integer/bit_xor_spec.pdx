@@ -14,6 +14,7 @@ context "Integer#^" do
     expect(1.shift_left(33).bit_xor(-1)).to eq(-8589934593)
     expect(-1.bit_xor(1.shift_left(33))).to eq(-8589934593)
     expect((-(1.shift_left(33)) - 1).bit_xor(5)).to eq(-8589934598)
+    expect(5.bit_xor(-(1.shift_left(33)) - 1)).to eq(-8589934598)
   end
 
   specify "returns self bitwise XOR other when both operands are negative" do
