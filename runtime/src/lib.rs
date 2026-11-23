@@ -130,6 +130,31 @@ pub extern "C" fn portland_string_from_integer(number: i64) -> *mut StringBlock 
     string_from(&[number.to_string().as_bytes()])
 }
 
+/// Whether two Strings are equal, which for a String is canonical
+/// equivalence (ADR 0038): `é` as one code point equals `é` as `e` and a
+/// combining accent. Equal bytes are equal Strings, and are the short
+/// path; otherwise the two are compared in normalized form, by the same
+/// crate the seed compares with.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_equal(
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> bool {
+    use unicode_normalization::UnicodeNormalization;
+    unsafe {
+        let (first, second) = (bytes_of(left), bytes_of(right));
+        if first == second {
+            return true;
+        }
+        let first = std::str::from_utf8_unchecked(first);
+        let second = std::str::from_utf8_unchecked(second);
+        first.nfc().eq(second.nfc())
+    }
+}
+
 /// One more name holds this String. A literal is not counted, and neither
 /// is the absence of a String: a local not yet bound.
 ///
@@ -228,6 +253,22 @@ mod tests {
             portland_release(number);
         }
         assert_eq!(live_strings(), before);
+    }
+
+    #[test]
+    fn equality_is_canonical() {
+        let composed = string_from(&["caf\u{e9}".as_bytes()]);
+        let decomposed = string_from(&["cafe\u{301}".as_bytes()]);
+        let other = string_from(&["cafe".as_bytes()]);
+        unsafe {
+            assert!(portland_string_equal(composed, composed));
+            assert!(portland_string_equal(composed, decomposed));
+            assert!(portland_string_equal(decomposed, composed));
+            assert!(!portland_string_equal(composed, other));
+            portland_release(composed);
+            portland_release(decomposed);
+            portland_release(other);
+        }
     }
 
     #[test]

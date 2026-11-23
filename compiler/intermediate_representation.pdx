@@ -282,9 +282,8 @@ def lower_value(node, bindings, context)
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
     refuse_native("'#{operator}' between Booleans", node) if first.type == ["boolean"] && !%w[== !=].include?(operator)
-    # A String's `==` is canonical equivalence (ADR 0038), never a
-    # comparison of two addresses.
-    refuse_native("'#{operator}' between Strings", node) if first.type == ["string"]
+    # Strings are equal or not (ADR 0038); ordering them is unbuilt.
+    refuse_native("'#{operator}' between Strings", node) if first.type == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   in CallNode(name:, arguments:, block:)
     refuse_native("a block", node) unless block.nil?

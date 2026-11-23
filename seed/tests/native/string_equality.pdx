@@ -1,0 +1,24 @@
+# `==` and `!=` between Strings (#466): equality is canonical equivalence
+# (ADR 0038), so the two spellings of one character are one String.
+
+def mark(flag)
+  if flag
+    1
+  else
+    0
+  end
+end
+
+composed = "café"
+decomposed = "café"
+puts mark(composed == decomposed)
+puts mark(decomposed == composed)
+puts mark(composed != decomposed)
+puts mark(composed == "cafe")
+puts mark("a" + "b" == "ab")
+puts mark("ab" != "ab")
+puts mark("" == "")
+name = "Portland"
+if name == "Port" + "land"
+  puts "same"
+end

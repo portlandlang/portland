@@ -6,6 +6,9 @@ members = ["crate", "runtime", "seed"]
 # cannot carry different versions of one crate (ADR 0095).
 [workspace.dependencies]
 libc = "0.2.191"
+# The Unicode floor for ADR 0038, shared so that a String is equal to
+# another on the seed exactly when it is in a native binary.
+unicode-normalization = "0.1.26"
 
 # The seed is an interpreter, and every test shells out to it: the suite's
 # time is the seed's speed, not the tests'. Measured 2026-10-26 (#180), the

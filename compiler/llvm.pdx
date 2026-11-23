@@ -74,6 +74,7 @@ LLVM_PRELUDE = [
 "declare void @portland_puts_string(ptr)",
 "declare ptr @portland_string_concat(ptr, ptr)",
 "declare ptr @portland_string_from_integer(i64)",
+"declare zeroext i1 @portland_string_equal(ptr, ptr)",
 "declare void @portland_retain(ptr)",
 "declare void @portland_release(ptr)",
 "declare void @portland_exit_check()",
@@ -230,6 +231,14 @@ def llvm_value(emitter, value)
   in IntermediateComparison(operator:, left:, right:)
     first = llvm_value(emitter, left)
     second = llvm_value(first.emitter, right)
+    if left.type == ["string"]
+      # A String's `==` is canonical equivalence (ADR 0038), the runtime's
+      # to say, and never a comparison of two addresses.
+      equal = llvm_named(second.emitter, "call zeroext i1 @portland_string_equal(ptr #{first.operand}, ptr #{second.operand})")
+      released = llvm_drop(llvm_drop(equal.emitter, ["string"], first.operand), ["string"], second.operand)
+      return LlvmValue.new(emitter: released, operand: equal.operand) if operator == "=="
+      return llvm_named(released, "xor i1 #{equal.operand}, true")
+    end
     llvm_named(second.emitter, "icmp #{llvm_comparison(operator)} #{llvm_type(left.type)} #{first.operand}, #{second.operand}")
   in IntermediateCall(type:, name:, arguments:)
     mutable current = emitter
