@@ -4,9 +4,11 @@
 # `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
 # positions counted in graphemes (ADR 0038).
 #
-# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
-# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
-# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# From ruby/spec core/matchdata/*. Upstream: `deconstruct` and
+# `deconstruct_keys` (`case/in` on a match waits for a pull), the rows where
+# a slice past the groups answers nil (it is empty here, ADR 0091; those
+# are in spec/portland/regex/matchdata_slice_spec.pdx), the `nil..nil`
+# range, the byte-offset family, `dup`,
 # `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
 # coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
 
@@ -22,6 +24,41 @@ context "MatchData#values_at" do
     md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
     expect(md.values_at(5)).to eq([nil])
     expect(md.values_at(-6)).to eq([nil])
+  end
+
+  specify "returns an array containing each value given by the elements of the range" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(0..2)).to eq(%w[HX1138 H X])
+  end
+
+  specify "fills with nil values for range elements larger than the captured values number" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(0..5)).to eq(["HX1138", "H", "X", "113", "8", nil])
+  end
+
+  specify "supports endless Range" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(0..)).to eq(%w[HX1138 H X 113 8])
+  end
+
+  specify "supports beginningless Range" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(..2)).to eq(%w[HX1138 H X])
+  end
+
+  specify "returns an empty Array when Range is empty" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(2..0)).to eq([])
+  end
+
+  specify "supports multiple integer Ranges" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(1..2, 2..3)).to eq(%w[H X X 113])
+  end
+
+  specify "supports mixing integer Ranges and Integers" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138: The Movie") or panic("no match")
+    expect(md.values_at(1..2, 4)).to eq(%w[H X 8])
   end
 
   specify "slices captures with the given names" do
