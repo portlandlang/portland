@@ -3367,9 +3367,9 @@ core/string/include_spec.rb:
   pdx: [spec/core/string/include_spec.pdx]
 core/string/index_spec.rb:
   pdx: [spec/core/string/index_spec.pdx]
-  status: partial_planned
-  reason: "A String with a start position, and the escaped-regexp row that compares against it, wait on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/316
+  status: partial_intentional
+  reason: "The $~, to_str, to_int, subclass, and encoding rows stay behind by design."
+  link: docs/ruby/regex.md
 core/string/initialize_spec.rb:
   status: skipped
   reason: "There is no String class object; a string is a literal, and String.new has no spelling."
