@@ -253,8 +253,35 @@ pub struct ArrayBlock {
     kind: i64,
 }
 
-/// A slot that is the value itself, as an Integer is: nothing to release.
-pub const WORDS: i64 = 0;
+/// The kinds of slot. An Integer and a Boolean are the value itself, a
+/// plain word with nothing to release. A String and an array are counted
+/// pointers, which the array holds once each.
+pub const INTEGERS: i64 = 0;
+pub const BOOLEANS: i64 = 1;
+pub const STRINGS: i64 = 2;
+pub const ARRAYS: i64 = 3;
+
+/// Every element of an array of counted pointers gains a holder, or
+/// loses one. An array of plain words owes its elements nothing.
+///
+/// # Safety
+/// `array` points at an array whose elements are what its kind says.
+unsafe fn each_counted(array: *mut ArrayBlock, held: bool) {
+    unsafe {
+        let kind = (*array).kind;
+        if kind != STRINGS && kind != ARRAYS {
+            return;
+        }
+        for index in 0..(*array).length as usize {
+            let element = elements_of(array).add(index).read();
+            match (kind, held) {
+                (STRINGS, false) => portland_release(element as *mut StringBlock),
+                (ARRAYS, false) => portland_array_release(element as *mut ArrayBlock),
+                _ => portland_retain(element as *mut StringBlock),
+            }
+        }
+    }
+}
 
 /// How many arrays made at run time are alive, kept by the debug build.
 static LIVE_ARRAYS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
@@ -340,34 +367,40 @@ unsafe fn with_room(array: *mut ArrayBlock, kind: i64) -> *mut ArrayBlock {
             (*moved).capacity = roomier as i64;
             return moved;
         }
+        // The copy holds each element as the original does.
         let copy = array_with(kind, (length * 2).max(SMALLEST_ROOM));
         std::ptr::copy_nonoverlapping(elements_of(array), elements_of(copy), length);
         (*copy).length = length as i64;
+        each_counted(copy, true);
         portland_array_release(array);
         copy
     }
 }
 
-/// `array << value` where the element is a plain word: the array with
-/// the value after its last element, held once, in exchange for the
-/// caller's hold on `array`.
+/// `array << value`: the array with the value after its last element,
+/// held once, in exchange for the caller's hold on `array`. The value is
+/// one word: an Integer, a Boolean, or a counted pointer, whose hold the
+/// array takes over. `kind` says which, for an array made here.
 ///
 /// # Safety
-/// `array` points at a live array of plain words, and the caller holds it.
+/// `array` is null or points at a live array of that kind which the
+/// caller holds, and a counted `value` points at a live block the caller
+/// holds.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn portland_array_append_word(
+pub unsafe extern "C" fn portland_array_append(
     array: *mut ArrayBlock,
     value: i64,
+    kind: i64,
 ) -> *mut ArrayBlock {
     unsafe {
         // A local on a path that never bound it holds nothing, which
         // grows as the empty array does.
         let array = if array.is_null() {
-            array_with(WORDS, SMALLEST_ROOM)
+            array_with(kind, SMALLEST_ROOM)
         } else {
             array
         };
-        let grown = with_room(array, WORDS);
+        let grown = with_room(array, kind);
         let length = (*grown).length as usize;
         elements_of(grown).add(length).write(value);
         (*grown).length = (length + 1) as i64;
@@ -393,6 +426,7 @@ pub unsafe extern "C" fn portland_array_release(array: *mut ArrayBlock) {
         }
         (*array).count -= 1;
         if (*array).count == 0 {
+            each_counted(array, false);
             if cfg!(debug_assertions) {
                 // Left readable as freed, as a String is, so a second
                 // release is caught above.
@@ -550,10 +584,10 @@ mod tests {
     fn an_array_held_once_grows_where_it_is_and_one_held_elsewhere_is_copied() {
         let _counting = COUNTING.lock().unwrap();
         let before = live_arrays();
-        let mut box_of = portland_array_new(WORDS, 0);
+        let mut box_of = portland_array_new(INTEGERS, 0);
         unsafe {
             for number in 1..=9 {
-                box_of = portland_array_append_word(box_of, number);
+                box_of = portland_array_append(box_of, number, INTEGERS);
             }
             assert_eq!(words_of(box_of), (1..=9).collect::<Vec<i64>>());
             assert_eq!(live_arrays(), before + 1, "growing makes no second array");
@@ -561,7 +595,7 @@ mod tests {
             // first name's array is as it was.
             portland_retain(box_of.cast());
             let other = box_of;
-            let grown = portland_array_append_word(box_of, 10);
+            let grown = portland_array_append(box_of, 10, INTEGERS);
             assert_eq!(words_of(other).len(), 9);
             assert_eq!(words_of(grown).len(), 10);
             assert_eq!(live_arrays(), before + 2);
@@ -572,6 +606,36 @@ mod tests {
     }
 
     #[test]
+    fn an_array_holds_each_counted_element_once() {
+        let _counting = COUNTING.lock().unwrap();
+        let (strings, arrays) = (live_strings(), live_arrays());
+        unsafe {
+            let mut names = portland_array_new(STRINGS, 0);
+            for number in 0..6 {
+                names = portland_array_append(
+                    names,
+                    portland_string_from_integer(number) as i64,
+                    STRINGS,
+                );
+            }
+            assert_eq!(live_strings(), strings + 6);
+            // A copy holds every element too, so freeing the first array
+            // frees none of them.
+            portland_retain(names.cast());
+            let grown =
+                portland_array_append(names, portland_string_from_integer(6) as i64, STRINGS);
+            portland_array_release(names);
+            assert_eq!(live_strings(), strings + 7);
+            // An array of arrays frees what it holds, all the way down.
+            let rows = portland_array_append(portland_array_new(ARRAYS, 1), grown as i64, ARRAYS);
+            assert_eq!(live_arrays(), arrays + 2);
+            portland_array_release(rows);
+        }
+        assert_eq!(live_strings(), strings);
+        assert_eq!(live_arrays(), arrays);
+    }
+
+    #[test]
     fn the_empty_literal_is_never_written_to() {
         let _counting = COUNTING.lock().unwrap();
         let before = live_arrays();
@@ -579,11 +643,11 @@ mod tests {
             count: LITERAL,
             length: 0,
             capacity: 0,
-            kind: WORDS,
+            kind: INTEGERS,
         };
         let empty = std::ptr::addr_of_mut!(literal);
         unsafe {
-            let first = portland_array_append_word(empty, 7);
+            let first = portland_array_append(empty, 7, INTEGERS);
             assert_eq!(words_of(first), vec![7]);
             assert_eq!((*empty).count, LITERAL);
             assert_eq!((*empty).length, 0);

@@ -52,8 +52,11 @@
 #
 # An array is a pointer to a block the runtime lays out (ADR 0096): a
 # count, a length, a capacity, what kind of slot it holds, and then its
-# elements, one word each. It is counted exactly as a String is, by the
-# same rules above. `[]` is one empty array written into the binary,
+# elements, one word each. An Integer or a Boolean element is the word; a
+# String or an array element is a counted pointer, which the array holds
+# once and the runtime releases when the array is freed, going by the
+# kind written on it. It is counted exactly as a String is, by the same
+# rules above. `[]` is one empty array written into the binary,
 # never freed and never written to. `<<` hands the runtime the local's
 # own hold and stores what comes back, so an array only that local holds
 # is grown where it is, and one another name holds is copied first.
@@ -127,7 +130,7 @@ LLVM_PRELUDE = [
 "declare i64 @portland_integer_pred(i64)",
 "declare i64 @portland_string_length(ptr)",
 "declare ptr @portland_array_new(i64, i64)",
-"declare ptr @portland_array_append_word(ptr, i64)",
+"declare ptr @portland_array_append(ptr, i64, i64)",
 "declare void @portland_array_release(ptr)",
 "declare void @portland_retain(ptr)",
 "declare void @portland_release(ptr)",
@@ -300,7 +303,7 @@ def llvm_statement(emitter, statement)
   in IntermediateAppend(name:, value:)
     written = llvm_value(emitter, value)
     held = llvm_named(written.emitter, "load ptr, ptr #{llvm_slot(name)}")
-    grown = llvm_named(held.emitter, "call ptr @portland_array_append_word(ptr #{held.operand}, i64 #{written.operand})")
+    grown = llvm_append(held.emitter, held.operand, value.type, written.operand)
     llvm_line(grown.emitter, "store ptr #{grown.operand}, ptr #{llvm_slot(name)}")
   in IntermediateReturn(value:)
     returned = if value.nil?
@@ -430,12 +433,13 @@ def llvm_value(emitter, value)
     llvm_named(current, call)
   # A literal: an array with room for its elements, each appended in
   # order. The empty one is the constant every `[]` starts as.
-  in IntermediateArray(elements:)
+  in IntermediateArray(type:, elements:)
     return LlvmValue.new(emitter: emitter, operand: "@.empty_array") if elements.empty?
-    mutable made = llvm_named(emitter, "call ptr @portland_array_new(i64 0, i64 #{elements.length})")
+    held = type_at(type, 1)
+    mutable made = llvm_named(emitter, "call ptr @portland_array_new(i64 #{llvm_array_kind(held)}, i64 #{elements.length})")
     elements.each do |element|
       written = llvm_value(made.emitter, element)
-      made = llvm_named(written.emitter, "call ptr @portland_array_append_word(ptr #{made.operand}, i64 #{written.operand})")
+      made = llvm_append(written.emitter, made.operand, held, written.operand)
     end
     made
   # `each`: the length is read once, since the array cannot change under
@@ -457,7 +461,7 @@ def llvm_value(emitter, value)
     inside = llvm_label(llvm_line(more.emitter, "br i1 #{more.operand}, label %walk#{number}.body, label %walk#{number}.done"), "walk#{number}.body")
     offset = llvm_named(inside, "add i64 #{index.operand}, 4")
     slot = llvm_named(offset.emitter, "getelementptr i64, ptr #{walked.operand}, i64 #{offset.operand}")
-    read = llvm_named(slot.emitter, "load #{element}, ptr #{slot.operand}")
+    read = llvm_element(slot.emitter, type_at(type, 1), slot.operand)
     called = llvm_line(read.emitter, "call void #{handed.function}(ptr #{handed.frame}, #{element} #{read.operand})")
     following = llvm_named(called, "add i64 #{index.operand}, 1")
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
@@ -489,6 +493,41 @@ def llvm_value(emitter, value)
     joined = llvm_label(llvm_line(other.emitter, "br label %choice#{number}.done"), "choice#{number}.done")
     llvm_named(joined, "phi #{llvm_type(type)} [ #{taken.operand}, %#{taken_block} ], [ #{other.operand}, %#{other_block} ]")
   end
+end
+
+# The kind the runtime writes on an array, by what an element is.
+def llvm_array_kind(type)
+  case type
+  in ["integer"] then 0
+  in ["boolean"] then 1
+  in ["string"] then 2
+  else 3
+  end
+end
+
+# One element appended. A slot is a word: an Integer as it is, a Boolean
+# widened to one, and a String or an array as its address, whose hold
+# the array takes over.
+def llvm_append(emitter, array, type, operand)
+  word = case type
+         in ["integer"] then LlvmValue.new(emitter: emitter, operand: operand)
+         in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
+         else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
+         end
+  llvm_named(word.emitter, "call ptr @portland_array_append(ptr #{array}, i64 #{word.operand}, i64 #{llvm_array_kind(type)})")
+end
+
+# One element read out of its slot, for whoever asked to hold: a Boolean
+# narrowed back from its word, and a String or an array retained, since
+# the array keeps its own hold.
+def llvm_element(emitter, type, slot)
+  return llvm_named(emitter, "load i64, ptr #{slot}") if type == ["integer"]
+  if type == ["boolean"]
+    word = llvm_named(emitter, "load i64, ptr #{slot}")
+    return llvm_named(word.emitter, "trunc i64 #{word.operand} to i1")
+  end
+  read = llvm_named(emitter, "load ptr, ptr #{slot}")
+  LlvmValue.new(emitter: llvm_line(read.emitter, "call void @portland_retain(ptr #{read.operand})"), operand: read.operand)
 end
 
 # A String literal: its block written into the binary as a constant. The

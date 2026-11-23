@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A native array holds Strings, Booleans, and arrays** ([#499](https://github.com/portlandlang/portland/issues/499), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — the element types whose values were already native. A String or an array as an element is a counted pointer the array holds once: it takes the hold on an append, retains each element when it is copied, and releases each when it is freed, going by the kind of slot written on its block. A Boolean is a plain word, as an Integer is. An empty array among arrays is one of them.
 - **A native program holds an array of Integers** ([#497](https://github.com/portlandlang/portland/issues/497), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a literal, `<<`, `each` with a block, `length`, `size`, and `empty?` build natively, and an array is passed to a def and answered by one.
   - An array is a counted block in the `runtime` crate, counted as a String is; the debug runtime refuses a leaked array or one released too often.
   - `<<` keeps the language's rule that values never mutate: an array one name holds is grown where it is, and one another name holds is copied first, so `other = box` then `box << 6` leaves `other` as it was.

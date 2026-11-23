@@ -450,7 +450,9 @@ def lower_append(statement, append, bindings, context)
   found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
   held = type_at(found, 1)
   refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
-  value = lower_value(append.value, bindings, context)
+  written = lower_value(append.value, bindings, context)
+  # An empty array appended to an array of arrays is one of its elements.
+  value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
   type = ["array", value.type]
   refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
   refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
@@ -479,9 +481,12 @@ def lower_value(node, bindings, context)
   in ArrayNode(elements:)
     values = elements.map { lower_value(it, bindings, context) }
     return IntermediateArray.new(type: EMPTY_ARRAY, elements: []) if values.empty?
-    first = values[0].type
+    # An empty array among arrays is one of them, whatever they hold.
+    named = values.find { it.type != EMPTY_ARRAY }
+    first = named.nil? ? EMPTY_ARRAY : named.type
     values.each do |value|
-      refuse_native("an array holding #{with_article(first)} and #{with_article(value.type)}", node) unless value.type == first
+      fits = value.type == first || (value.type == EMPTY_ARRAY && (first in ["array", *]))
+      refuse_native("an array holding #{with_article(first)} and #{with_article(value.type)}", node) unless fits
     end
     refuse_native("an array of #{render_type(first)}", node) unless native_type?(["array", first])
     IntermediateArray.new(type: ["array", first], elements: values)
@@ -591,10 +596,10 @@ def native_method_answer(type, name)
 end
 
 # The types the native build holds: an Integer, a Boolean, a String, and
-# an array of Integers (#497).
+# an array of any of those or of such arrays (#497, #499).
 def native_type?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
-  type == ["array", ["integer"]]
+  (type in ["array", *]) && native_type?(type_at(type, 1))
 end
 
 # What to call a node the slice does not hold, in the refusal.
