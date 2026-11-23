@@ -2077,6 +2077,32 @@ fn the_bare_predicates_refuse_on_both_oracles() {
     assert_both_oracles_refuse("bare_predicates.pdx", None, &cases);
 }
 
+/// A block form neither implementation builds refuses on both in one
+/// sentence (#336): the hosted evaluator once printed a notice, answered
+/// nothing, and ran on.
+#[test]
+fn an_unbuilt_block_form_refuses_on_both_oracles() {
+    let cases = [
+        (
+            "p([1, 2, 3, 4].uniq { it >= 2 ? 1 : 0 })\n",
+            "undefined block-taking method uniq",
+        ),
+        (
+            "p([1, 2, 3, 4].each_slice(2) { |slice| slice })\n",
+            "undefined block-taking method each_slice",
+        ),
+        (
+            "p([1, 1].tally { |item| item })\n",
+            "undefined block-taking method tally",
+        ),
+        (
+            "p([1, 2, 3].find(42) { false })\n",
+            "undefined block-taking method find",
+        ),
+    ];
+    assert_both_oracles_refuse("unbuilt_block_form.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

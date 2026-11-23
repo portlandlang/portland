@@ -53,7 +53,7 @@ core/array/count_spec.rb:
 core/array/find_spec.rb:
   pdx: [spec/core/array/find_spec.pdx]
   status: partial_planned
-  reason: "The ifnone proc waits on #77, and find with an argument on #336. Enumerators and mutation mid-walk stay out."
+  reason: "The ifnone proc waits on #77, so find with an argument refuses. Enumerators and mutation mid-walk stay out."
   link: https://github.com/portlandlang/portland/issues/77
 core/array/first_spec.rb:
   pdx: [spec/core/array/first_spec.pdx]
@@ -87,13 +87,13 @@ core/array/sort_spec.rb:
 core/array/uniq_spec.rb:
   pdx: [spec/core/array/uniq_spec.pdx]
   status: partial_planned
-  reason: "uniq with a block refuses on the seed and answers nil hosted (#336); uniq! stays behind since values never mutate, with the hash-mock and subclass rows."
-  link: https://github.com/portlandlang/portland/issues/336
+  reason: "uniq with a block waits on #418; uniq! stays behind since values never mutate, with the hash-mock and subclass rows."
+  link: https://github.com/portlandlang/portland/issues/418
 core/array/zip_spec.rb:
   pdx: [spec/core/array/zip_spec.pdx]
   status: partial_planned
-  reason: "zip with a block waits on #336; to_ary, each-only arguments, infinite enumerators, and subclasses stay out."
-  link: https://github.com/portlandlang/portland/issues/336
+  reason: "zip with a block waits on #418; to_ary, each-only arguments, infinite enumerators, and subclasses stay out."
+  link: https://github.com/portlandlang/portland/issues/418
 core/array/take_spec.rb:
   pdx: [spec/core/array/take_spec.pdx]
   status: partial_intentional
@@ -840,8 +840,8 @@ core/enumerable/to_set_spec.rb:
 core/enumerable/each_slice_spec.rb:
   pdx: [spec/core/enumerable/each_slice_spec.pdx]
   status: partial_planned
-  reason: "each_slice answers the slices as an array, so the enumerator and its nil size stay upstream (ADR 0055); the block form waits on #336, and the early break with a value on #303."
-  link: https://github.com/portlandlang/portland/issues/336
+  reason: "each_slice answers the slices as an array, so the enumerator and its nil size stay upstream (ADR 0055); the block form waits on #418, and the early break with a value on #303."
+  link: https://github.com/portlandlang/portland/issues/418
 core/enumerable/flat_map_spec.rb:
   pdx: [spec/core/enumerable/flat_map_spec.pdx]
   status: partial_planned
@@ -850,7 +850,7 @@ core/enumerable/flat_map_spec.rb:
 core/enumerable/tally_spec.rb:
   pdx: [spec/core/enumerable/tally_spec.pdx]
   status: partial_planned
-  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, a bare yield on #341, and an ignored block on #336."
+  reason: "A hash has no default (ADR 0063) and values never mutate (ADR 0015), so the default, frozen, identity, and to_hash rows stay upstream; tally with a hash waits on #342, a bare yield on #341, and an ignored block on #418."
   link: https://github.com/portlandlang/portland/issues/342
 
 # — core/false —
