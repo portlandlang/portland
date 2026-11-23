@@ -4103,10 +4103,13 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # match, given it, and the call answers the block's result as a maybe —
   # the host's `first` lifts a nil result to the present nil — or nil when
   # nothing matched and the block never ran.
-  if (receiver in Regexp) && node.name == "match"
+  # A pattern, a string, and a symbol all take it (#319); a symbol is read
+  # by its name.
+  if ((receiver in Regexp) || (receiver in String) || (receiver in ["__symbol__", *])) && node.name == "match"
     check_builtin_count(receiver, node.name, arguments.length)
-    subject = pattern_operand(receiver, value_at(arguments, 0))
-    found = arguments.length == 2 ? receiver.match(subject, value_at(arguments, 1)) : receiver.match(subject)
+    matcher = (receiver in ["__symbol__", *]) ? value_at(receiver, 1) : receiver
+    subject = pattern_operand(matcher, value_at(arguments, 0))
+    found = arguments.length == 2 ? matcher.match(subject, value_at(arguments, 1)) : matcher.match(subject)
     return outcome([nil], scope) if found.nil?
     step = run_guest_block(block, [found], scope)
     scope = compacted_since(entry, step.bindings)

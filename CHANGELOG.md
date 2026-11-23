@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`match` takes a block on a string and a symbol, and `Symbol#match?` a position** ([#319](https://github.com/portlandlang/portland/issues/319)) — `"a12".match(/(\d+)/) { |found| found[1] }` refused on the seed and, hosted, printed `cannot evaluate block method match yet` and answered nil; only a Regexp receiver took the block. A string and a symbol take it on both, the block running only on a match and its answer coming back as a maybe. `:string.match?(/str/i, 1)` refused on arity on the seed and answered hosted; a symbol's `match` and `match?` take a position as a string's do. The builtin table's string and symbol rows read `match/1-2&`, and the symbol's `match?/1-2`.
+  - ruby/spec rows activated: "returns the block result" of `core/string/match` and `core/symbol/match`, and "takes matching position as the 2nd argument" of `core/symbol/match`.
 - **`\c` before `#{` in a regex is a control escape** ([#346](https://github.com/portlandlang/portland/issues/346)) — `/\c#{str}/` interpolated `str` on both implementations, a silently different pattern; Ruby reads `\c#` as a control escape and `{str}` as literal text. Both parsers let `\c` take the character after it, so the `#` is the character controlled and no interpolation opens.
   - ruby/spec rows activated: "gives precedence to escape sequences over substitution" of `language/regexp/interpolation`.
 

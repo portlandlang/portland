@@ -1080,6 +1080,10 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         (Value::Symbol(symbol_name), "match" | "=~" | "match?" | "!~", [Value::Regex(_)]) => {
             method(&Value::String(symbol_name.clone()), name, arguments)
         }
+        // With a position too, as a string takes one (#319).
+        (Value::Symbol(symbol_name), "match" | "match?", [Value::Regex(_), Value::Integer(_)]) => {
+            method(&Value::String(symbol_name.clone()), name, arguments)
+        }
         _ => None,
     }
 }

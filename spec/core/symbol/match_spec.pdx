@@ -43,3 +43,18 @@ context "Symbol#match?" do
     expect(:string.match?(/STRING/)).to eq(false)
   end
 end
+
+context "Symbol#match" do
+  describe "when passed a block" do
+    specify "returns the block result" do
+      expect(:abc.match(/./) { :result }).to eq(:result)
+    end
+  end
+end
+
+context "Symbol#match?" do
+  specify "takes matching position as the 2nd argument" do
+    expect(:string.match?(/str/i, 0)).to be_true
+    expect(:string.match?(/str/i, 1)).to be_false
+  end
+end
