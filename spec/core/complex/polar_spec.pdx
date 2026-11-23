@@ -20,6 +20,20 @@ context "Complex.polar" do
     expect(Complex.polar(50, 60)).to be_close(Complex(-47.6206490207578, -15.2405310551108), TOLERANCE)
     expect(Complex.polar(-10, -20)).to be_close(Complex(-4.08082061813392, 9.12945250727628), TOLERANCE)
   end
+
+  specify "computes the real values of the real & imaginary parts from the polar form" do
+    quarter = Complex.polar(1.0 + 0.0i, Math::PI / 2 + 0.0i)
+    expect(quarter.real).to be_close(0.0, TOLERANCE)
+    expect(quarter.imag).to be_close(1.0, TOLERANCE)
+    expect(quarter.real.real?).to be_true
+    expect(quarter.imag.real?).to be_true
+
+    whole = Complex.polar(1 + 0.0i)
+    expect(whole.real).to be_close(1.0, TOLERANCE)
+    expect(whole.imag).to be_close(0.0, TOLERANCE)
+    expect(whole.real.real?).to be_true
+    expect(whole.imag.real?).to be_true
+  end
 end
 
 context "Complex#polar" do

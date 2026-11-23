@@ -1058,6 +1058,31 @@ pub fn complex_function(arguments: &[Value]) -> Value {
 /// `Complex.polar(r, theta)` and `Complex.rectangular(a, b)`, the two type
 /// functions; one argument leaves the other at zero.
 pub fn complex_type_function(name: &str, arguments: &[Value]) -> Option<Value> {
+    // A Complex whose imaginary part is zero, exact or Float, stands for
+    // its real part, as in Ruby (#327) — but `polar` given one such
+    // argument answers it whole, Ruby's own carve-out.
+    let zero_imaginary = |value: &Value| {
+        matches!(value, Value::Complex { .. }) && {
+            let (_, imaginary) = complex_parts(value);
+            exact_zero(&imaginary) || matches!(imaginary, Value::Float(part) if part == 0.0)
+        }
+    };
+    if let ("polar", [only]) = (name, arguments)
+        && zero_imaginary(only)
+    {
+        return Some(only.clone());
+    }
+    let taken: Vec<Value> = arguments
+        .iter()
+        .map(|value| {
+            if zero_imaginary(value) {
+                complex_parts(value).0
+            } else {
+                value.clone()
+            }
+        })
+        .collect();
+    let arguments = taken.as_slice();
     let real_parts: Vec<&Value> = arguments.iter().filter(|value| is_real(value)).collect();
     if real_parts.len() != arguments.len() {
         panic!(

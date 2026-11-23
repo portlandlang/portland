@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`Complex.polar` and `Complex.rectangular` take a Complex whose imaginary part is zero** ([#327](https://github.com/portlandlang/portland/issues/327)) — `Complex.rectangular(1.0+0i, 2+0.0i)` refused with `takes numbers, got …` on both implementations; Ruby takes each argument's real part and answers `(1.0+2i)`. A zero imaginary part, exact or Float, stands for its real part, and `polar` given one such argument answers it whole, as Ruby's does. A nonzero imaginary part still refuses.
+  - ruby/spec rows activated: "computes the real values of the real & imaginary parts from the polar form" and "ignores the imaginary part if it is zero".
 - **`Complex#to_r` takes a Float zero imaginary part** ([#328](https://github.com/portlandlang/portland/issues/328)) — `Complex(0, 0.0).to_r` refused with `can't convert 0+0.0i into Rational`, Ruby's wording before 3.4; Ruby 3.4 and later answer the real part's Rational, and so do both implementations. `to_f`, `to_i`, and `rationalize` still want an exact zero, as Ruby 4.0.9's do.
   - ruby/spec rows activated: "returns a Rational" of `core/complex/to_r`, whose entry is `partial_intentional`.
 - **A literal with an `r` or `i` suffix starts a paren-less argument** ([#354](https://github.com/portlandlang/portland/issues/354)) — `p 3r` refused on both implementations as a missing newline: the rule for what may begin a paren-less argument listed integers and floats and left the rational and imaginary literals out. Both parsers count them, after a command (`p 3r`) and after a dotted call (`list.include? 3r`). A leading minus is still the ambiguity it is for any number: `p -3r` refuses naming `p(-3r)` and `p - 3r`.
