@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-22, one question at a time; tracked on [#443](https://github.com/portlandlang/portland/issues/443)). Unbuilt: the steps are [#444](https://github.com/portlandlang/portland/issues/444), [#445](https://github.com/portlandlang/portland/issues/445), [#446](https://github.com/portlandlang/portland/issues/446), [#447](https://github.com/portlandlang/portland/issues/447), and [#448](https://github.com/portlandlang/portland/issues/448).
+- **Status:** Accepted (ruled by the deciding user 2026-11-22, one question at a time; tracked on [#443](https://github.com/portlandlang/portland/issues/443)). Built 2026-11-23 in [#444](https://github.com/portlandlang/portland/issues/444), [#445](https://github.com/portlandlang/portland/issues/445), [#446](https://github.com/portlandlang/portland/issues/446), [#447](https://github.com/portlandlang/portland/issues/447), and [#448](https://github.com/portlandlang/portland/issues/448); `script/build` took `--unoptimized` in review, a build being optimized otherwise.
 - **Date:** 2026-11-22
 - **Issue:** [#443](https://github.com/portlandlang/portland/issues/443)
 
