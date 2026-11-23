@@ -1,0 +1,5 @@
+# `succ` past the largest Integer refuses, in the seed's sentence.
+
+largest = 9223372036854775807
+puts largest.pred
+puts largest.succ

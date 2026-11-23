@@ -267,6 +267,46 @@ pub extern "C" fn portland_integer_modulo(left: i64, right: i64) -> i64 {
     }
 }
 
+/// `number.abs`, which the smallest Integer has no answer for.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_abs(number: i64) -> i64 {
+    number
+        .checked_abs()
+        .unwrap_or_else(|| refuse_program(&format!("{number}.abs overflows the 64-bit integers")))
+}
+
+/// `number.succ`, one past the largest Integer refusing.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_succ(number: i64) -> i64 {
+    number
+        .checked_add(1)
+        .unwrap_or_else(|| refuse_program(&format!("{number}.succ overflows the 64-bit integers")))
+}
+
+/// `number.pred`, one before the smallest Integer refusing.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_pred(number: i64) -> i64 {
+    number
+        .checked_sub(1)
+        .unwrap_or_else(|| refuse_program(&format!("{number}.pred overflows the 64-bit integers")))
+}
+
+/// A String's length, which counts characters, and a character is a
+/// grapheme cluster (ADR 0038): a flag is one, and so is a letter with a
+/// combining accent. Counted by the crate the seed counts with.
+///
+/// # Safety
+/// `text` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_length(text: *const StringBlock) -> i64 {
+    use unicode_segmentation::UnicodeSegmentation;
+    unsafe {
+        std::str::from_utf8_unchecked(bytes_of(text))
+            .graphemes(true)
+            .count() as i64
+    }
+}
+
 /// `-number`, which the smallest Integer has no answer for.
 #[unsafe(no_mangle)]
 pub extern "C" fn portland_integer_negate(number: i64) -> i64 {
@@ -331,6 +371,30 @@ mod tests {
         assert_eq!(portland_integer_modulo(i64::MIN, -1), 0);
         assert_eq!(portland_integer_negate(5), -5);
         assert_eq!(portland_integer_negate(i64::MAX), i64::MIN + 1);
+    }
+
+    #[test]
+    fn a_strings_length_counts_grapheme_clusters() {
+        let _counting = COUNTING.lock().unwrap();
+        let cases = [
+            ("", 0),
+            ("abc", 3),
+            ("h\u{e9}llo", 5),
+            ("e\u{301}x", 2),
+            ("\u{1F1FA}\u{1F1F8}", 1),
+        ];
+        for (written, expected) in cases {
+            let text = string_from(&[written.as_bytes()]);
+            assert_eq!(
+                unsafe { portland_string_length(text) },
+                expected,
+                "{written:?}"
+            );
+            unsafe { portland_release(text) };
+        }
+        assert_eq!(portland_integer_abs(-7), 7);
+        assert_eq!(portland_integer_succ(-7), -6);
+        assert_eq!(portland_integer_pred(-7), -8);
     }
 
     #[test]

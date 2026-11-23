@@ -29,4 +29,4 @@ rustyline = "19.0.0"
 # and when two strings are equal (canonical equivalence). Prior art over
 # inventing (principle 10) — these are the reference implementations.
 unicode-normalization = { workspace = true }
-unicode-segmentation = "1.13.3"
+unicode-segmentation = { workspace = true }

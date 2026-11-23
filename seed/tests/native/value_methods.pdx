@@ -1,0 +1,36 @@
+# Methods a value answers with no arguments (#481): an Integer's `abs`,
+# `succ`, `pred`, and its questions; a String's `length`, `size`, and
+# `empty?`. A String's length counts grapheme clusters (ADR 0038), so a
+# flag is one character and so is a letter with a combining accent.
+
+def mark(flag)
+  if flag
+    1
+  else
+    0
+  end
+end
+
+value = 0 - 7
+puts value.abs
+puts 7.abs
+puts value.succ
+puts value.next
+puts value.pred
+puts mark(4.even?)
+puts mark(4.odd?)
+puts mark(value.odd?)
+puts mark(0.zero?)
+puts mark(value.negative?)
+puts mark(value.positive?)
+
+text = "héllo 🇺🇸"
+puts text.length
+puts text.size
+decomposed = "éx"
+puts decomposed.length
+puts "".length
+puts(("ab" + "cd").length)
+puts mark("".empty?)
+puts mark(text.empty?)
+puts "#{text.length} characters"
