@@ -10,7 +10,14 @@
 # read by a load; LLVM turns the slots into registers itself. `+`, `-`, and
 # `*` go through LLVM's overflow-checking intrinsics, and an overflow says
 # the seed's sentence on standard error and exits as the seed does (ADR
-# 0070). `puts` and that refusal call libc directly: there is no runtime.
+# 0070). `puts` of an Integer and that refusal call libc directly.
+#
+# A String is a pointer to a block the runtime crate lays out (ADR 0095):
+# a reference count, a byte length, and the text's UTF-8 bytes. A literal
+# is that block written into the binary as a constant, with the count the
+# runtime reads as "never freed". What a String needs done to it is a call
+# into the runtime, each function there named `portland_…`.
+#
 # No target is named, so `clang` supplies the host's.
 
 require_relative "intermediate_representation"
@@ -22,6 +29,10 @@ struct LlvmEmitter
   lines
   counter
   block
+  # The constants this function's String literals became, written at the
+  # top of the module, and the prefix that keeps their names its own.
+  globals
+  prefix
 end
 
 # A value written: the text so far, and how to refer to the value.
@@ -40,6 +51,7 @@ LLVM_PRELUDE = [
   "declare i32 @printf(ptr, ...)",
   "declare i32 @dprintf(i32, ptr, ...)",
   "declare void @exit(i32)",
+"declare void @portland_puts_string(ptr)",
   "declare {i64, i1} @llvm.sadd.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.ssub.with.overflow.i64(i64, i64)",
   "declare {i64, i1} @llvm.smul.with.overflow.i64(i64, i64)",
@@ -53,18 +65,25 @@ LLVM_PRELUDE = [
 
 # A whole program as LLVM IR text.
 def llvm_text(program)
-  mutable lines = LLVM_PRELUDE
+  mutable globals = []
+  mutable bodies = []
+  mutable index = 0
   program.functions.each do |function|
-    lines += [""] + llvm_function(function)
+    written = llvm_function(function, "f#{index}")
+    globals += written.globals
+    bodies += [""] + written.lines + ["}"]
+    index += 1
   end
-  lines.join("\n") + "\n"
+  (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
 end
 
-def llvm_function(function)
+# One function, as the emitter that wrote it: its lines, and the
+# constants its String literals became.
+def llvm_function(function, prefix)
   entry = function.name == "main"
   parameters = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }.join(", ")
   header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters}) {"
-  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry")
+  mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix)
   (function.parameters + function.locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
   end
@@ -75,8 +94,7 @@ def llvm_function(function)
   emitter = llvm_statements(emitter, function.body)
   # Every path through a def has returned by here; the entry function
   # falls off its end and answers success.
-  emitter = llvm_line(emitter, entry ? "ret i32 0" : "unreachable")
-  emitter.lines + ["}"]
+  llvm_line(emitter, entry ? "ret i32 0" : "unreachable")
 end
 
 def llvm_statements(emitter, statements)
@@ -104,6 +122,7 @@ def llvm_statement(emitter, statement)
     llvm_label(returned, "after#{returned.counter}")
   in IntermediatePrint(value:)
     written = llvm_value(emitter, value)
+    return llvm_line(written.emitter, "call void @portland_puts_string(ptr #{written.operand})") if value.type == ["string"]
     llvm_line(written.emitter, "call i32 (ptr, ...) @printf(ptr @.integer_line, i64 #{written.operand})")
   in IntermediateEvaluate(value:)
     llvm_value(emitter, value).emitter
@@ -126,6 +145,7 @@ end
 
 def llvm_value(emitter, value)
   case value
+  in IntermediateConstant(type: ["string"], value: text) then llvm_literal(emitter, text)
   in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
     llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
@@ -162,6 +182,28 @@ def llvm_value(emitter, value)
     joined = llvm_label(llvm_line(other.emitter, "br label %choice#{number}.done"), "choice#{number}.done")
     llvm_named(joined, "phi #{llvm_type(type)} [ #{taken.operand}, %#{taken_block} ], [ #{other.operand}, %#{other_block} ]")
   end
+end
+
+# A String literal: its block written into the binary as a constant. The
+# count is the runtime's `LITERAL`, so no release ever frees it.
+def llvm_literal(emitter, text)
+  name = "@.text.#{emitter.prefix}.#{emitter.counter}"
+  length = text.bytesize
+  shape = "{ i64, i64, [#{length} x i8] }"
+  constant = "#{name} = private unnamed_addr constant #{shape} { i64 -1, i64 #{length}, [#{length} x i8] c\"#{llvm_bytes(text)}\" }"
+  LlvmValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
+end
+
+# A text's bytes as LLVM writes them between quotes: a printable ASCII
+# character as itself, and every other byte, the quote and the backslash
+# among them, as a backslash and two hex digits.
+def llvm_bytes(text)
+  digits = "0123456789ABCDEF"
+  written = text.bytes.map do |byte|
+    plain = byte >= 32 && byte <= 126 && byte != 34 && byte != 92
+    plain ? byte.chr : "\\" + digits.slice(byte / 16, 1) + digits.slice(byte % 16, 1)
+  end
+  written.join("")
 end
 
 # One checked operation: the intrinsic answers the result and whether it
@@ -205,6 +247,7 @@ def llvm_type(type)
   case type
   in ["integer"] then "i64"
   in ["boolean"] then "i1"
+  in ["string"] then "ptr"
   in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
   end

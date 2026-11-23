@@ -8,9 +8,9 @@
 # This is that form, and it is Portland's own: the LLVM printer (#447)
 # reads it, and so would an MLIR printer after it.
 #
-# The slice is small on purpose (#443): Integer and Boolean values, `+`,
-# `-`, `*`, the comparisons, bindings, `if`, `while`, `def`, calls, and
-# `puts` of an Integer. Anything else refuses here, by name, before a line
+# The slice is small on purpose (#443, #461): Integer, Boolean, and String
+# values, `+`, `-`, `*`, the comparisons, bindings, `if`, `while`, `def`,
+# calls, and `puts` of an Integer or a String. Anything else refuses here, by name, before a line
 # of output exists.
 
 require_relative "pinning"
@@ -33,7 +33,7 @@ end
 
 # The values. Each carries the type it produces.
 
-# A literal: an Integer's digits, or `true` or `false`.
+# A literal: an Integer's digits, `true` or `false`, or a String's text.
 struct IntermediateConstant
   type
   value
@@ -103,7 +103,7 @@ struct IntermediateReturn
   value
 end
 
-# `puts` of one Integer.
+# `puts` of one Integer or one String.
 struct IntermediatePrint
   value
 end
@@ -230,7 +230,7 @@ def lower_statement(statement, bindings, context)
     refuse_native("puts with a block", statement) unless block.nil?
     refuse_native("puts of anything but one value", statement) unless arguments.length == 1
     value = lower_value(arguments[0], bindings, context)
-    refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"]
+    refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"] || value.type == ["string"]
     Lowered.new(nodes: [IntermediatePrint.new(value: value)], bindings: bindings)
   in CallNode(name:, arguments:, block:)
     # A call made for what it does: one to a def that answers nothing may
@@ -253,6 +253,7 @@ def lower_value(node, bindings, context)
   case node
   in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
   in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
+  in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
   in IdentifierNode(name:)
     found = bindings.find { it[0] == name }
     return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
@@ -267,6 +268,9 @@ def lower_value(node, bindings, context)
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
     refuse_native("'#{operator}' between Booleans", node) if first.type == ["boolean"] && !%w[== !=].include?(operator)
+    # A String's `==` is canonical equivalence (ADR 0038), never a
+    # comparison of two addresses.
+    refuse_native("'#{operator}' between Strings", node) if first.type == ["string"]
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   in CallNode(name:, arguments:, block:)
     refuse_native("a block", node) unless block.nil?
@@ -293,12 +297,11 @@ def lower_call(node, name, arguments, bindings, context)
   IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: arguments.map { lower_value(it, bindings, context) })
 end
 
-def native_type?(type) = type == ["integer"] || type == ["boolean"]
+def native_type?(type) = type == ["integer"] || type == ["boolean"] || type == ["string"]
 
 # What to call a node the slice does not hold, in the refusal.
 def native_name_of(node)
   case node
-  in StringNode then "a string"
   in FloatNode then "a float"
   in ArrayNode then "an array"
   in HashNode then "a hash"
@@ -317,7 +320,7 @@ end
 # does compile, then what it met and where.
 def refuse_native(what, node)
   line = node.nil? ? "" : " on line #{node.line}"
-  panic("the native build compiles integers, comparisons, if, while, def, and puts of an Integer — #{what}#{line} is unbuilt (#443)")
+  panic("the native build compiles integers, strings, comparisons, if, while, def, and puts — #{what}#{line} is unbuilt (#443)")
 end
 
 # The dump: one line per function and statement, values as S-expressions.

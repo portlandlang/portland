@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crate", "seed"]
+members = ["crate", "runtime", "seed"]
+
+# What the seed and the runtime both use is pinned here, once, so the two
+# cannot carry different versions of one crate (ADR 0095).
+[workspace.dependencies]
+libc = "0.2.191"
 
 # The seed is an interpreter, and every test shells out to it: the suite's
 # time is the seed's speed, not the tests'. Measured 2026-10-26 (#180), the

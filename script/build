@@ -24,8 +24,10 @@
 # by name and nothing is written.
 set -e
 optimization=-O2
+runtime_profile=release
 if [ "$1" = "--unoptimized" ]; then
   optimization=-O0
+  runtime_profile=debug
   shift
 fi
 if [ $# -ne 1 ]; then
@@ -49,6 +51,15 @@ if [ -z "$PDX" ]; then
   cargo build --quiet --package portland-seed --bin pdx
   PDX=target/debug/pdx
 fi
+# The runtime every native program is linked with (ADR 0095): the release
+# build beside an optimized program, and the debug build, with its checks
+# on, beside an unoptimized one.
+if [ "$runtime_profile" = release ]; then
+  cargo build --quiet --package portland-runtime --release
+else
+  cargo build --quiet --package portland-runtime
+fi
+runtime=$root/target/$runtime_profile/libportland_runtime.a
 name=$(basename "$program" .pdx)
 output=$root/target/portland
 mkdir -p "$output"
@@ -56,5 +67,5 @@ mkdir -p "$output"
 rm -f "$output/$name.ll" "$output/$name"
 "$PDX" compiler/build.pdx "$program" "$output/$name.ll"
 # The IR names no target, so clang supplies the host's and would warn that it did.
-xcrun clang "$optimization" -Wno-override-module -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll"
+xcrun clang "$optimization" -Wno-override-module -Wl,-dead_strip -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll" "$runtime"
 echo "$output/$name"

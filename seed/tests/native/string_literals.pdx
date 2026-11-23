@@ -1,0 +1,26 @@
+# A String literal (#464): bound, passed to a def, answered from one,
+# chosen by an `if`, and written by `puts`, which adds a line ending only
+# where the text has none.
+
+def greeting = "hello"
+
+def louder(text) = text
+
+def pick(flag)
+  if flag
+    "yes"
+  else
+    "no"
+  end
+end
+
+name = "Portland"
+puts name
+puts greeting
+puts louder("passed")
+puts pick(1 < 2)
+puts pick(2 < 1)
+puts "ends in a newline\n"
+puts ""
+puts "café 🌹 \"quoted\" back\\slash\ttab"
+puts 7
