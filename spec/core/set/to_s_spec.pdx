@@ -11,4 +11,12 @@ context "Set#to_s" do
     expect(Set["1", "2"].to_s.include?('", "')).to be_true
     expect(Set[:a, "b", Set["c"]].to_s).to eq('Set[:a, "b", Set["c"]]')
   end
+
+  specify "returns a String representation of self" do
+    expect(Set[].to_s).to be_a(String)
+    expect(Set[nil, false, true].to_s).to be_a(String)
+    expect(Set[1, 2, 3].to_s).to be_a(String)
+    expect(Set["1", "2", "3"].to_s).to be_a(String)
+    expect(Set[:a, "b", Set["c"]].to_s).to be_a(String)
+  end
 end
