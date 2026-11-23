@@ -152,6 +152,7 @@ LLVM_PRELUDE = [
 "declare ptr @portland_array_new(i64, i64)",
 "declare ptr @portland_array_append(ptr, i64, i64)",
 "declare void @portland_array_release(ptr)",
+"declare void @portland_panic(ptr)",
 "declare void @portland_refuse_nil_method(ptr)",
 "declare void @portland_refuse_nil_puts()",
 "declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
@@ -474,6 +475,12 @@ def llvm_statement(emitter, statement)
     held = llvm_named(written.emitter, "load ptr, ptr #{llvm_slot(name)}")
     grown = llvm_append(held.emitter, held.operand, value.type, written.operand)
     llvm_line(grown.emitter, "store ptr #{grown.operand}, ptr #{llvm_slot(name)}")
+  # The runtime says the message and does not come back. Whatever is
+  # written after needs a block of its own, though nothing reaches it.
+  in IntermediatePanic(value:)
+    written = llvm_value(emitter, value)
+    stopped = llvm_line(llvm_line(written.emitter, "call void @portland_panic(ptr #{written.operand})"), "unreachable")
+    llvm_label(stopped, "after#{stopped.counter}")
   in IntermediateReturn(value:)
     returned = if value.nil?
       llvm_line(llvm_release_held(emitter), "ret void")
@@ -525,6 +532,10 @@ end
 def llvm_value(emitter, value)
   case value
   in IntermediateConstant(type: ["string"], value: text) then llvm_literal(emitter, text)
+  # nil, held as a maybe, is the maybe that is not there; a bare `nil`
+  # no one holds is nothing at all.
+  in IntermediateConstant(type: ["maybe", *]) then LlvmValue.new(emitter: emitter, operand: "zeroinitializer")
+  in IntermediateConstant(type: ["nil"]) then LlvmValue.new(emitter: emitter, operand: "null")
   in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
     loaded = llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")

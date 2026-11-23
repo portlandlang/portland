@@ -290,7 +290,21 @@ def body_answer(body, parameters, answers, names)
     last = statement_answer(statement, scope)
     walk = pin_statement(statement, walk, answers, names)
   end
-  merge_candidates(early + [last])
+  # A body that ends in `panic` hands nothing back that way, so its
+  # answer is what its returns say (#505).
+  ending = body.last
+  return merge_answers(early) if (ending in CallNode) && ending.name == "panic" && !early.empty?
+  merge_answers(early + [last])
+end
+
+# The one type a body's ways out answer together. Where they are one
+# value's type, with nil or a maybe of it among them, that is a maybe of
+# the value (#505): `return "none"` beside a last expression that is a
+# String or nil. Otherwise inference's own rule stands.
+def merge_answers(candidates)
+  values = unique_types(candidates.reject { it == ["nil"] }.map { (it in ["maybe", *]) ? type_at(it, 1) : it })
+  return merge_candidates(candidates) unless values.length == 1
+  candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
 end
 
 def pin_statements(statements, walk, answers, names)
@@ -421,6 +435,12 @@ def rebound(bindings, name, type)
   return bindings if type_at(found, 1) == type
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
   return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
+  # A name that holds nil at one binding and a value at another holds a
+  # maybe of that value (#505), whichever came first.
+  held = type_at(found, 1)
+  return bindings if held == ["maybe", type] || (type == ["nil"] && (held in ["maybe", *]))
+  widened = type == ["nil"] ? maybe_of(held) : (held == ["nil"] ? maybe_of(type) : (type == ["maybe", held] ? type : nil))
+  return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
   bindings.map { it[0] == name ? [name, ["unknown"]] : it }
 end
 

@@ -1,0 +1,9 @@
+# panic stops the program with its message, as the seed does (#505).
+def must(number)
+  panic("negative: #{number}") if number < 0
+  number
+end
+
+puts must(3)
+puts must(-3)
+puts "unreached"

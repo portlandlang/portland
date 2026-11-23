@@ -1448,6 +1448,15 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "empty = []\nputs empty.length\n",
             format!("{compiles} — an array that is never given an element, empty on line 2 is unbuilt (#443)"),
         ),
+        // nil that nothing holds as a maybe (#505).
+        (
+            "nothing = nil\np(nothing)\n",
+            format!("{compiles} — a binding of a Nil on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "panic(5)\n",
+            format!("{compiles} — panic of an Integer on line 1 is unbuilt (#443)"),
+        ),
         // A maybe outside the first step (#503).
         (
             "numbers = [1, 2]\nputs numbers[\"a\"]\n",

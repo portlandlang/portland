@@ -637,6 +637,17 @@ unsafe fn named_in_refusal(text: *const StringBlock) -> String {
     unsafe { std::str::from_utf8_unchecked(bytes_of(text)).to_string() }
 }
 
+/// `panic(message)`: the program stops with what it was told to say, as
+/// the seed stops.
+///
+/// # Safety
+/// `message` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_panic(message: *const StringBlock) -> ! {
+    let message = unsafe { named_in_refusal(message) };
+    refuse_program(&message);
+}
+
 /// A method asked of nil (ADR 0096): a maybe was used where its value
 /// was needed and had none. The seed's sentence.
 ///
