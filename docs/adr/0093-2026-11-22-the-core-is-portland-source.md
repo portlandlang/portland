@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-22 on [#211](https://github.com/portlandlang/portland/issues/211), one question at a time). Decision 6 is provisional and may change after the Ruby corpus research. The loader is built ([#436](https://github.com/portlandlang/portland/issues/436), 2026-11-23), with `putc` the first function written in core. Unbuilt: the declaration form and its refusal are [#437](https://github.com/portlandlang/portland/issues/437), and the first type moved is [#438](https://github.com/portlandlang/portland/issues/438).
+- **Status:** Accepted (ruled by the deciding user 2026-11-22 on [#211](https://github.com/portlandlang/portland/issues/211), one question at a time). Decision 6 is provisional and may change after the Ruby corpus research. The loader is built ([#436](https://github.com/portlandlang/portland/issues/436), 2026-11-23), with `putc` the first function written in core. The declaration form and its refusal are built ([#437](https://github.com/portlandlang/portland/issues/437), 2026-11-23), with Array's first methods written in core; what moving them costs is measured on [#438](https://github.com/portlandlang/portland/issues/438).
 - **Date:** 2026-11-22
 - **Issue:** [#211](https://github.com/portlandlang/portland/issues/211)
 

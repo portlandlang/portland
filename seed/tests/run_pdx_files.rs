@@ -1777,6 +1777,65 @@ fn the_debug_runtime_refuses_a_leak_and_a_release_too_many() {
     }
 }
 
+/// In the core, `class Array` is the builtin array (ADR 0093, #437): the
+/// methods `core/array.pdx` and the trait it includes define are what an
+/// array answers on both implementations, and a call they were not written
+/// for goes on to the floor, whose refusal stands.
+#[test]
+fn a_method_the_core_defines_for_a_builtin_type_runs_on_both_oracles() {
+    assert_both_print(
+        "core_array_methods.pdx",
+        "list = [1, 2, 3, 4]\np(list.map { |number| number * 2 })\np(list.collect { it + 1 })\np(list.select { |number| number > 2 })\np(list.filter { it > 3 })\np(list.find_all { it < 2 })\np(list.reject { it > 2 })\np(list.find { it > 2 })\np(list.detect { it > 9 })\np(list.empty?)\nempty = []\np(empty.empty?)\npairs = [[1, 2], [3, 4]]\np(pairs.map { |left, right| left + right })\nstopped = list.map do |number|\n  break if number == 3\n  number\nend\np(stopped)\n",
+        "[2, 4, 6, 8]\n[2, 3, 4, 5]\n[3, 4]\n[4]\n[1]\n[1, 2]\n3\nnil\nfalse\ntrue\n[3, 7]\nnil\n",
+    );
+    let cases = [
+        (
+            "list = [1, 2]\np(list.select { it })\n",
+            "select block must produce true or false, got 1",
+        ),
+        (
+            "list = [1, 2]\np(list.reject { it })\n",
+            "reject block must produce true or false, got 1",
+        ),
+        (
+            "list = [1, 2]\np(list.find { it })\n",
+            "find block must produce true or false, got 1",
+        ),
+        (
+            "list = [1, 2]\nskipped = list.map do |number|\n  next if number == 2\n  number\nend\n",
+            "the block produced no value",
+        ),
+        (
+            "list = [1, 2, 3]\np(list.find(42) { false })\n",
+            "undefined block-taking method find",
+        ),
+    ];
+    assert_both_oracles_refuse("core_array_refusal.pdx", None, &cases);
+}
+
+/// A program cannot reopen a core type (ADR 0093, #437): a struct named
+/// for one refuses on both implementations, naming the closed runtime and
+/// the rewrites. A struct of that name inside a module is another name.
+#[test]
+fn a_program_cannot_reopen_a_core_type() {
+    assert_both_print(
+        "core_type_in_a_module.pdx",
+        "module Shapes\n  struct Array\n    items\n  end\nend\nputs Shapes::Array.new(items: 1).items\n",
+        "1\n",
+    );
+    let cases = [
+        (
+            "class Array\n  def second = self[1]\nend\n",
+            "'Array' is a core type, and the runtime is closed, so a program cannot reopen it — write a trait, a struct that holds an Array, or a function",
+        ),
+        (
+            "struct Hash\n  pairs\nend\n",
+            "'Hash' is a core type, and the runtime is closed, so a program cannot reopen it — write a trait, a struct that holds a Hash, or a function",
+        ),
+    ];
+    assert_both_oracles_refuse("core_type_reopened.pdx", None, &cases);
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.

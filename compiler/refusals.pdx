@@ -38,6 +38,7 @@
 # values for nouns — edited by hand there, since the seed never learns
 # this file.
 
+require_relative "core"
 require_relative "inference"
 
 # A refusal noted for the report: the checker's walk threads a list of
@@ -108,6 +109,7 @@ def render_refusal(refusal)
   # runtime sentences, said at build with the line beneath.
   in ["redefined", name] then sentence("#{spelled(name)} is already defined", "rename one")
   in ["builtin", name] then sentence("#{spelled(name)} is a builtin", "rename yours")
+  in ["core_type", name] then core_type_sentence(name)
   in ["constant_rebound", name] then sentence("#{spelled(name)} is a constant", "it is bound once")
   in ["constant_mutable", name] then sentence("#{spelled(name)} is a constant", "a constant cannot be mutable")
   in ["lone_capital", name] then sentence("#{spelled(name)} is a single capital", "spell a constant with two characters or more, a local in lowercase")

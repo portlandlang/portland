@@ -1,0 +1,79 @@
+# What a type that can walk its elements answers, written over `each`
+# (ADR 0093). A core type includes this and supplies `each`; the methods
+# here are then its own.
+
+trait Enumerable
+  # Each element as the block answers for it.
+  def map
+    mutable gathered = []
+    self.each { |element| gathered << yield(element) }
+    gathered
+  end
+
+  def collect
+    mutable gathered = []
+    self.each { |element| gathered << yield(element) }
+    gathered
+  end
+
+  # The elements the block answers true for.
+  def select
+    mutable gathered = []
+    self.each do |element|
+      kept = yield(element)
+      panic("select block must produce true or false, got #{inspect(kept)}") unless kept in Boolean
+      gathered << element if kept
+    end
+    gathered
+  end
+
+  def filter
+    mutable gathered = []
+    self.each do |element|
+      kept = yield(element)
+      panic("select block must produce true or false, got #{inspect(kept)}") unless kept in Boolean
+      gathered << element if kept
+    end
+    gathered
+  end
+
+  def find_all
+    mutable gathered = []
+    self.each do |element|
+      kept = yield(element)
+      panic("select block must produce true or false, got #{inspect(kept)}") unless kept in Boolean
+      gathered << element if kept
+    end
+    gathered
+  end
+
+  # The elements the block answers false for.
+  def reject
+    mutable gathered = []
+    self.each do |element|
+      dropped = yield(element)
+      panic("reject block must produce true or false, got #{inspect(dropped)}") unless dropped in Boolean
+      gathered << element unless dropped
+    end
+    gathered
+  end
+
+  # The first element the block answers true for, or nil.
+  def find
+    self.each do |element|
+      found = yield(element)
+      panic("find block must produce true or false, got #{inspect(found)}") unless found in Boolean
+      return element if found
+    end
+    nil
+  end
+
+  def detect
+    self.each do |element|
+      found = yield(element)
+      panic("find block must produce true or false, got #{inspect(found)}") unless found in Boolean
+      return element if found
+    end
+    nil
+  end
+end
