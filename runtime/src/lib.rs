@@ -233,12 +233,18 @@ fn refuse(sentence: &str) -> ! {
 mod tests {
     use super::*;
 
+    /// The tally of live Strings is one number for the whole process, and
+    /// tests run side by side, so each test that makes a String holds this
+    /// while it counts.
+    static COUNTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn text_of(text: *const StringBlock) -> String {
         String::from_utf8(unsafe { bytes_of(text) }.to_vec()).unwrap()
     }
 
     #[test]
     fn a_made_string_is_held_once_and_freed_by_its_last_release() {
+        let _counting = COUNTING.lock().unwrap();
         let before = live_strings();
         let number = portland_string_from_integer(-42);
         assert_eq!(text_of(number), "-42");
@@ -257,6 +263,7 @@ mod tests {
 
     #[test]
     fn equality_is_canonical() {
+        let _counting = COUNTING.lock().unwrap();
         let composed = string_from(&["caf\u{e9}".as_bytes()]);
         let decomposed = string_from(&["cafe\u{301}".as_bytes()]);
         let other = string_from(&["cafe".as_bytes()]);
