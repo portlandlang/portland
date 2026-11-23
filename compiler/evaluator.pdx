@@ -3852,7 +3852,15 @@ def evaluate_method_call(node, mutable bindings)
   when "clamp" then arguments.length == 1 ? receiver.clamp(value_at(arguments, 0)) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
   # A range steps by a stride; an integer steps to a limit, by one or by a
   # stride (#109) — the host answers both.
-  when "step" then arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
+  # A range steps by one when no stride is given (#333).
+  when "step"
+    if arguments.empty?
+      receiver.step
+    elsif arguments.length == 2
+      receiver.step(value_at(arguments, 0), value_at(arguments, 1))
+    else
+      receiver.step(value_at(arguments, 0))
+    end
   when "to_f" then receiver.to_f
   # `join` shows each element the way `to_s` would (#39), the seed's rule.
   # No separator, or a nil one, joins with nothing between (#142, #104).
@@ -4660,7 +4668,13 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # Ruby's Numeric#step with a block (#109): the host's walk handed over
   # one value at a time, the receiver answered.
   when "step"
-    walked = arguments.length == 2 ? receiver.step(value_at(arguments, 0), value_at(arguments, 1)) : receiver.step(value_at(arguments, 0))
+    walked = if arguments.empty?
+      receiver.step
+    elsif arguments.length == 2
+      receiver.step(value_at(arguments, 0), value_at(arguments, 1))
+    else
+      receiver.step(value_at(arguments, 0))
+    end
     walked.each do |value|
       step = run_guest_block(block, [value], scope)
       scope = compacted_since(entry, step.bindings)
