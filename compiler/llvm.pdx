@@ -50,6 +50,16 @@
 # parameter slot then holds it, and what the block answers is handed
 # back.
 #
+# An array is a pointer to a block the runtime lays out (ADR 0096): a
+# count, a length, a capacity, what kind of slot it holds, and then its
+# elements, one word each. It is counted exactly as a String is, by the
+# same rules above. `[]` is one empty array written into the binary,
+# never freed and never written to. `<<` hands the runtime the local's
+# own hold and stores what comes back, so an array only that local holds
+# is grown where it is, and one another name holds is copied first.
+# `each` is a loop written where the call is, calling the block's
+# function once for each element.
+#
 # No target is named, so `clang` supplies the host's.
 
 require_relative "intermediate_representation"
@@ -65,8 +75,8 @@ struct LlvmEmitter
   # top of the module, and the prefix that keeps their names its own.
   globals
   prefix
-  # The parameters and locals that hold a String, each released on every
-  # way out of the function.
+  # The parameters and locals that hold a counted value, a String or an
+  # array, as [name, type]: each released on every way out of the function.
   held
   # The loops being written, innermost first, by the number in their
   # labels: where `break` and `next` go.
@@ -78,6 +88,14 @@ struct LlvmEmitter
   # The blocks written in this function, each a finished function's
   # lines, written out after it.
   routines
+end
+
+# A block written and its frame built: the text so far, the block's
+# function, and the frame to call it with.
+struct LlvmHanded
+  emitter
+  function
+  frame
 end
 
 # A value written: the text so far, and how to refer to the value.
@@ -92,6 +110,7 @@ LLVM_PRELUDE = [
   "@.plus = private unnamed_addr constant [2 x i8] c\"+\\00\"",
   "@.minus = private unnamed_addr constant [2 x i8] c\"-\\00\"",
   "@.times = private unnamed_addr constant [2 x i8] c\"*\\00\"",
+"@.empty_array = private constant { i64, i64, i64, i64 } { i64 -1, i64 0, i64 0, i64 0 }",
   "",
   "declare i32 @printf(ptr, ...)",
   "declare i32 @dprintf(i32, ptr, ...)",
@@ -107,6 +126,9 @@ LLVM_PRELUDE = [
 "declare i64 @portland_integer_succ(i64)",
 "declare i64 @portland_integer_pred(i64)",
 "declare i64 @portland_string_length(ptr)",
+"declare ptr @portland_array_new(i64, i64)",
+"declare ptr @portland_array_append_word(ptr, i64)",
+"declare void @portland_array_release(ptr)",
 "declare void @portland_retain(ptr)",
 "declare void @portland_release(ptr)",
 "declare void @portland_exit_check()",
@@ -159,7 +181,7 @@ LLVM_FRAME = "%\".frame\""
 # frame first, each as the address of a slot that lives in its writer,
 # and after them, where the block yields, what its writer was handed.
 def llvm_routine(header, captures, onward, parameters, locals, body, prefix, entry)
-  held = (parameters + locals).select { type_at(it, 1) == ["string"] }.map { it[0] }
+  held = (parameters + locals).select { llvm_counted?(type_at(it, 1)) }
   mutable emitter = LlvmEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
   shape = llvm_frame_shape(captures, onward)
   mutable position = 0
@@ -177,10 +199,10 @@ def llvm_routine(header, captures, onward, parameters, locals, body, prefix, ent
   (parameters + locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
   end
-  # A local that holds a String starts empty, so releasing it before it is
-  # bound does nothing.
+  # A local that holds a counted value starts empty, so releasing it before
+  # it is bound does nothing.
   locals.each do |local|
-    emitter = llvm_line(emitter, "store ptr null, ptr #{llvm_slot(local[0])}") if type_at(local, 1) == ["string"]
+    emitter = llvm_line(emitter, "store ptr null, ptr #{llvm_slot(local[0])}") if llvm_counted?(type_at(local, 1))
   end
   parameters.each do |parameter|
     type = llvm_type(type_at(parameter, 1))
@@ -198,55 +220,59 @@ def llvm_routine(header, captures, onward, parameters, locals, body, prefix, ent
   finished.with(lines: finished.lines.slice(0, 2) + finished.frames + finished.lines.slice(2, finished.lines.length - 2))
 end
 
-# A block handed to a call: its function written, and its frame built.
-# The operand is the two arguments the call hands over.
+# A block handed over: its function written, and its frame built.
 def llvm_block(emitter, block)
   number = emitter.counter
   name = "@\"portland.block.#{emitter.prefix}.#{number}\""
   named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
   header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
-    written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
-    mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
-    return LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr null") if block.captures.empty? && !block.onward
-    frame = "%\"frame.#{number}\""
-    shape = llvm_frame_shape(block.captures, block.onward)
-    current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
-    mutable position = 0
-    block.captures.each do |capture|
-      place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-      current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
-      position += 1
-    end
-    if block.onward
-      function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-      stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
-      carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
-      current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
-    end
-    LlvmValue.new(emitter: current, operand: "ptr #{name}, ptr #{frame}")
+  written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
+  mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
+  return LlvmHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
+  frame = "%\"frame.#{number}\""
+  shape = llvm_frame_shape(block.captures, block.onward)
+  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
+  mutable position = 0
+  block.captures.each do |capture|
+    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
+    position += 1
   end
-
-  # A frame's shape: a place for each captured slot's address, and two more
-  # where the block yields.
-  def llvm_frame_shape(captures, onward)
-    "[#{captures.length + (onward ? 2 : 0)} x ptr]"
+  if block.onward
+    function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+    stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
+    carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
+    current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
+  end
+  LlvmHanded.new(emitter: current, function: name, frame: frame)
 end
 
-# Every String this function's slots hold, released: written before each
-# way out.
+# A frame's shape: a place for each captured slot's address, and two more
+# where the block yields.
+def llvm_frame_shape(captures, onward)
+  "[#{captures.length + (onward ? 2 : 0)} x ptr]"
+end
+
+# Every counted value this function's slots hold, released: written
+# before each way out.
 def llvm_release_held(emitter)
   mutable current = emitter
-  emitter.held.each do |name|
-    loaded = llvm_named(current, "load ptr, ptr #{llvm_slot(name)}")
-    current = llvm_line(loaded.emitter, "call void @portland_release(ptr #{loaded.operand})")
+  emitter.held.each do |slot|
+    loaded = llvm_named(current, "load ptr, ptr #{llvm_slot(slot[0])}")
+    current = llvm_drop(loaded.emitter, type_at(slot, 1), loaded.operand)
   end
   current
 end
 
-# A value that was handed over and is done with: released if it is a String.
+# Whether a value of this type is a pointer to a counted block.
+def llvm_counted?(type) = type == ["string"] || (type in ["array", *])
+
+# A value that was handed over and is done with: released if it is
+# counted, by the runtime function for what it is.
 def llvm_drop(emitter, type, operand)
-  return emitter unless type == ["string"]
-  llvm_line(emitter, "call void @portland_release(ptr #{operand})")
+  return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
+  return llvm_line(emitter, "call void @portland_array_release(ptr #{operand})") if type in ["array", *]
+  emitter
 end
 
 def llvm_statements(emitter, statements)
@@ -261,13 +287,21 @@ def llvm_statement(emitter, statement)
   case statement
   in IntermediateStore(name:, value:)
     written = llvm_value(emitter, value)
-    if value.type == ["string"]
-      # The slot takes the new String and lets go of the one it held.
+    if llvm_counted?(value.type)
+      # The slot takes the new value and lets go of the one it held.
       previous = llvm_named(written.emitter, "load ptr, ptr #{llvm_slot(name)}")
       stored = llvm_line(previous.emitter, "store ptr #{written.operand}, ptr #{llvm_slot(name)}")
-      return llvm_drop(stored, ["string"], previous.operand)
+      return llvm_drop(stored, value.type, previous.operand)
     end
     llvm_line(written.emitter, "store #{llvm_type(value.type)} #{written.operand}, ptr #{llvm_slot(name)}")
+  # The value is computed first, since it may read the array. Then the
+  # slot's own hold goes to the runtime, with nothing retained, and what
+  # comes back is the slot's.
+  in IntermediateAppend(name:, value:)
+    written = llvm_value(emitter, value)
+    held = llvm_named(written.emitter, "load ptr, ptr #{llvm_slot(name)}")
+    grown = llvm_named(held.emitter, "call ptr @portland_array_append_word(ptr #{held.operand}, i64 #{written.operand})")
+    llvm_line(grown.emitter, "store ptr #{grown.operand}, ptr #{llvm_slot(name)}")
   in IntermediateReturn(value:)
     returned = if value.nil?
       llvm_line(llvm_release_held(emitter), "ret void")
@@ -322,7 +356,7 @@ def llvm_value(emitter, value)
   in IntermediateConstant(value: literal) then LlvmValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
     loaded = llvm_named(emitter, "load #{llvm_type(type)}, ptr #{llvm_slot(name)}")
-    return loaded unless type == ["string"]
+    return loaded unless llvm_counted?(type)
     # The slot keeps its hold; whoever reads gets one of their own.
     LlvmValue.new(emitter: llvm_line(loaded.emitter, "call void @portland_retain(ptr #{loaded.operand})"), operand: loaded.operand)
   in IntermediateConcat(left:, right:)
@@ -388,12 +422,47 @@ def llvm_value(emitter, value)
     if block.some?
       handed = llvm_block(current, block)
       current = handed.emitter
-      operands << handed.operand
+      operands << "ptr #{handed.function}, ptr #{handed.frame}"
     end
     call = "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})"
     # A call that answers nothing has no result to name.
     return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
+  # A literal: an array with room for its elements, each appended in
+  # order. The empty one is the constant every `[]` starts as.
+  in IntermediateArray(elements:)
+    return LlvmValue.new(emitter: emitter, operand: "@.empty_array") if elements.empty?
+    mutable made = llvm_named(emitter, "call ptr @portland_array_new(i64 0, i64 #{elements.length})")
+    elements.each do |element|
+      written = llvm_value(made.emitter, element)
+      made = llvm_named(written.emitter, "call ptr @portland_array_append_word(ptr #{made.operand}, i64 #{written.operand})")
+    end
+    made
+  # `each`: the length is read once, since the array cannot change under
+  # the walk, and the block's function is called for each element in
+  # turn. The place the walk keeps its index is made at the top of the
+  # function, as a frame is. The array is answered still held.
+  in IntermediateWalk(type:, array:, block:)
+    walked = llvm_value(emitter, array)
+    handed = llvm_block(walked.emitter, block)
+    number = handed.emitter.counter
+    turn = "%\"walk.#{number}\""
+    element = llvm_type(type_at(type, 1))
+    reserved = handed.emitter.with(frames: handed.emitter.frames + ["  #{turn} = alloca i64"])
+    place = llvm_named(reserved, "getelementptr i64, ptr #{walked.operand}, i64 1")
+    length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
+    started = llvm_label(llvm_line(llvm_line(length.emitter, "store i64 0, ptr #{turn}"), "br label %walk#{number}.test"), "walk#{number}.test")
+    index = llvm_named(started, "load i64, ptr #{turn}")
+    more = llvm_named(index.emitter, "icmp slt i64 #{index.operand}, #{length.operand}")
+    inside = llvm_label(llvm_line(more.emitter, "br i1 #{more.operand}, label %walk#{number}.body, label %walk#{number}.done"), "walk#{number}.body")
+    offset = llvm_named(inside, "add i64 #{index.operand}, 4")
+    slot = llvm_named(offset.emitter, "getelementptr i64, ptr #{walked.operand}, i64 #{offset.operand}")
+    read = llvm_named(slot.emitter, "load #{element}, ptr #{slot.operand}")
+    called = llvm_line(read.emitter, "call void #{handed.function}(ptr #{handed.frame}, #{element} #{read.operand})")
+    following = llvm_named(called, "add i64 #{index.operand}, 1")
+    stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
+    finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
+    LlvmValue.new(emitter: finished, operand: walked.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
   in IntermediateYield(type:, arguments:)
@@ -448,6 +517,14 @@ end
 # runtime's; a question about an Integer's sign or parity is one
 # instruction or two. A String asked is released once it has answered.
 def llvm_method(emitter, type, name, operand)
+  # An array's length is the second word of its block.
+  if type in ["array", *]
+    place = llvm_named(emitter, "getelementptr i64, ptr #{operand}, i64 1")
+    length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
+    released = llvm_drop(length.emitter, type, operand)
+    return LlvmValue.new(emitter: released, operand: length.operand) unless name == "empty?"
+    return llvm_named(released, "icmp eq i64 #{length.operand}, 0")
+  end
   if type == ["string"]
     counted = llvm_named(emitter, "call i64 @portland_string_length(ptr #{operand})")
     released = llvm_drop(counted.emitter, ["string"], operand)
@@ -510,6 +587,7 @@ def llvm_type(type)
   in ["integer"] then "i64"
   in ["boolean"] then "i1"
   in ["string"] then "ptr"
+  in ["array", *] then "ptr"
   in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
   end

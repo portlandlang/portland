@@ -158,8 +158,11 @@ pub unsafe extern "C" fn portland_string_equal(
 /// One more name holds this String. A literal is not counted, and neither
 /// is the absence of a String: a local not yet bound.
 ///
+/// An array is retained through this too: every counted block begins with
+/// its count, and a retain reads nothing else.
+///
 /// # Safety
-/// `text` is null or points at a live String.
+/// `text` is null or points at a live String or a live array.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn portland_retain(text: *mut StringBlock) {
     unsafe {
@@ -202,8 +205,8 @@ pub unsafe extern "C" fn portland_release(text: *mut StringBlock) {
 }
 
 /// The end of a program that ran to its last line: in the debug build,
-/// every String made at run time must have been freed. One that was not
-/// means the compiler missed a release.
+/// every String and every array made at run time must have been freed.
+/// One that was not means the compiler missed a release.
 #[unsafe(no_mangle)]
 pub extern "C" fn portland_exit_check() {
     if cfg!(debug_assertions) && live_strings() != 0 {
@@ -216,6 +219,188 @@ pub extern "C" fn portland_exit_check() {
         refuse(&format!(
             "{count} {noun} still held when the program ended — the native build missed a release (#465)"
         ));
+    }
+    if cfg!(debug_assertions) && live_arrays() != 0 {
+        let count = live_arrays();
+        let noun = if count == 1 {
+            "array was"
+        } else {
+            "arrays were"
+        };
+        refuse(&format!(
+            "{count} {noun} still held when the program ended — the native build missed a release (#497)"
+        ));
+    }
+}
+
+/// An array as a native program holds it (ADR 0096): a pointer to this
+/// header, with its elements straight after it, one word each.
+///
+/// The plain layout, as a String's is. Values never mutate, so an array
+/// that two names hold is never changed under either: `<<` grows an array
+/// held once where it is, and copies one held elsewhere first.
+#[repr(C)]
+pub struct ArrayBlock {
+    /// How many names hold this array, or `LITERAL` for the empty array
+    /// every `[]` starts as, which is part of the binary.
+    count: i64,
+    /// How many elements it holds.
+    length: i64,
+    /// How many it has room for before it must move.
+    capacity: i64,
+    /// What a slot holds, which says what freeing the array owes its
+    /// elements.
+    kind: i64,
+}
+
+/// A slot that is the value itself, as an Integer is: nothing to release.
+pub const WORDS: i64 = 0;
+
+/// How many arrays made at run time are alive, kept by the debug build.
+static LIVE_ARRAYS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// The arrays made at run time and not yet freed: zero in a release
+/// build, which does not keep the tally.
+pub fn live_arrays() -> i64 {
+    LIVE_ARRAYS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The memory an array with room for `capacity` elements takes.
+fn array_layout(capacity: usize) -> std::alloc::Layout {
+    std::alloc::Layout::from_size_align(
+        std::mem::size_of::<ArrayBlock>() + capacity * std::mem::size_of::<i64>(),
+        std::mem::align_of::<ArrayBlock>(),
+    )
+    .expect("an array's size fits the address space")
+}
+
+/// Where an array's elements begin.
+///
+/// # Safety
+/// `array` points at an `ArrayBlock`.
+unsafe fn elements_of(array: *mut ArrayBlock) -> *mut i64 {
+    unsafe { array.add(1).cast::<i64>() }
+}
+
+/// A new, empty array with room for `capacity` elements, held once.
+fn array_with(kind: i64, capacity: usize) -> *mut ArrayBlock {
+    unsafe {
+        let block = std::alloc::alloc(array_layout(capacity)).cast::<ArrayBlock>();
+        if block.is_null() {
+            std::alloc::handle_alloc_error(array_layout(capacity));
+        }
+        block.write(ArrayBlock {
+            count: 1,
+            length: 0,
+            capacity: capacity as i64,
+            kind,
+        });
+        if cfg!(debug_assertions) {
+            LIVE_ARRAYS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        block
+    }
+}
+
+/// A new, empty array with room for what a literal is about to put in
+/// it, held once.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_array_new(kind: i64, capacity: i64) -> *mut ArrayBlock {
+    array_with(kind, capacity.max(0) as usize)
+}
+
+/// The least room a grown array is given.
+const SMALLEST_ROOM: usize = 4;
+
+/// An array ready to take one more element, held once, in exchange for
+/// the caller's hold on `array`. One held once is the same array, moved
+/// if it was full. One held elsewhere, the empty literal among them, is
+/// left as it was and answered by a copy.
+///
+/// # Safety
+/// `array` points at a live array, and the caller holds it.
+unsafe fn with_room(array: *mut ArrayBlock, kind: i64) -> *mut ArrayBlock {
+    unsafe {
+        let length = (*array).length as usize;
+        let capacity = (*array).capacity as usize;
+        if (*array).count == 1 {
+            if length < capacity {
+                return array;
+            }
+            let roomier = (capacity * 2).max(SMALLEST_ROOM);
+            let moved = std::alloc::realloc(
+                array.cast(),
+                array_layout(capacity),
+                array_layout(roomier).size(),
+            )
+            .cast::<ArrayBlock>();
+            if moved.is_null() {
+                std::alloc::handle_alloc_error(array_layout(roomier));
+            }
+            (*moved).capacity = roomier as i64;
+            return moved;
+        }
+        let copy = array_with(kind, (length * 2).max(SMALLEST_ROOM));
+        std::ptr::copy_nonoverlapping(elements_of(array), elements_of(copy), length);
+        (*copy).length = length as i64;
+        portland_array_release(array);
+        copy
+    }
+}
+
+/// `array << value` where the element is a plain word: the array with
+/// the value after its last element, held once, in exchange for the
+/// caller's hold on `array`.
+///
+/// # Safety
+/// `array` points at a live array of plain words, and the caller holds it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_append_word(
+    array: *mut ArrayBlock,
+    value: i64,
+) -> *mut ArrayBlock {
+    unsafe {
+        // A local on a path that never bound it holds nothing, which
+        // grows as the empty array does.
+        let array = if array.is_null() {
+            array_with(WORDS, SMALLEST_ROOM)
+        } else {
+            array
+        };
+        let grown = with_room(array, WORDS);
+        let length = (*grown).length as usize;
+        elements_of(grown).add(length).write(value);
+        (*grown).length = (length + 1) as i64;
+        grown
+    }
+}
+
+/// One name fewer holds this array, and the last one frees it. The
+/// empty literal is not counted, and neither is a local not yet bound.
+///
+/// # Safety
+/// `array` is null or points at an array that has not been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_release(array: *mut ArrayBlock) {
+    unsafe {
+        if array.is_null() || (*array).count == LITERAL {
+            return;
+        }
+        if cfg!(debug_assertions) && (*array).count <= 0 {
+            refuse(
+                "an array was released more times than it was held — the native build counted wrong (#497)",
+            );
+        }
+        (*array).count -= 1;
+        if (*array).count == 0 {
+            if cfg!(debug_assertions) {
+                // Left readable as freed, as a String is, so a second
+                // release is caught above.
+                LIVE_ARRAYS.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+            std::alloc::dealloc(array.cast(), array_layout((*array).capacity as usize));
+        }
     }
 }
 
@@ -355,6 +540,58 @@ mod tests {
             portland_release(number);
         }
         assert_eq!(live_strings(), before);
+    }
+
+    fn words_of(array: *mut ArrayBlock) -> Vec<i64> {
+        unsafe { std::slice::from_raw_parts(elements_of(array), (*array).length as usize).to_vec() }
+    }
+
+    #[test]
+    fn an_array_held_once_grows_where_it_is_and_one_held_elsewhere_is_copied() {
+        let _counting = COUNTING.lock().unwrap();
+        let before = live_arrays();
+        let mut box_of = portland_array_new(WORDS, 0);
+        unsafe {
+            for number in 1..=9 {
+                box_of = portland_array_append_word(box_of, number);
+            }
+            assert_eq!(words_of(box_of), (1..=9).collect::<Vec<i64>>());
+            assert_eq!(live_arrays(), before + 1, "growing makes no second array");
+            // A second name holds it, so an append answers a copy and the
+            // first name's array is as it was.
+            portland_retain(box_of.cast());
+            let other = box_of;
+            let grown = portland_array_append_word(box_of, 10);
+            assert_eq!(words_of(other).len(), 9);
+            assert_eq!(words_of(grown).len(), 10);
+            assert_eq!(live_arrays(), before + 2);
+            portland_array_release(other);
+            portland_array_release(grown);
+        }
+        assert_eq!(live_arrays(), before);
+    }
+
+    #[test]
+    fn the_empty_literal_is_never_written_to() {
+        let _counting = COUNTING.lock().unwrap();
+        let before = live_arrays();
+        let mut literal = ArrayBlock {
+            count: LITERAL,
+            length: 0,
+            capacity: 0,
+            kind: WORDS,
+        };
+        let empty = std::ptr::addr_of_mut!(literal);
+        unsafe {
+            let first = portland_array_append_word(empty, 7);
+            assert_eq!(words_of(first), vec![7]);
+            assert_eq!((*empty).count, LITERAL);
+            assert_eq!((*empty).length, 0);
+            portland_array_release(empty);
+            portland_array_release(first);
+            portland_array_release(std::ptr::null_mut());
+        }
+        assert_eq!(live_arrays(), before);
     }
 
     #[test]

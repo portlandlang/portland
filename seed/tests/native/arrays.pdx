@@ -1,0 +1,57 @@
+# An array of Integers (#497): a counted block in the runtime, grown where
+# it is when one name holds it and copied first when another does.
+def sum(numbers)
+  mutable total = 0
+  numbers.each { |number| total += number }
+  total
+end
+
+def upto(limit)
+  mutable gathered = []
+  mutable index = 0
+  while index < limit
+    gathered << index
+    index += 1
+  end
+  gathered
+end
+
+def show(numbers)
+  numbers.each { |number| puts number }
+end
+
+numbers = [3, 8, 12]
+puts sum(numbers)
+puts numbers.length
+puts numbers.size
+show(upto(3))
+puts sum(upto(5))
+empty = upto(0)
+puts empty.length
+if empty.empty?
+  puts "nothing in it"
+end
+mutable box = [1]
+other = box
+box << 2
+box << 3
+puts box.length
+puts other.length
+show(box)
+computed = [numbers.length, sum(numbers), 1 + 1]
+show(computed)
+numbers.each do |outer|
+  [1, 2].each { |inner| puts outer * inner }
+end
+upto(2).each { |number| puts number + 100 }
+mutable growing = []
+growing << 7
+growing << growing.length
+puts sum(growing)
+mutable long = []
+mutable count = 0
+while count < 100
+  long << count * count
+  count += 1
+end
+puts sum(long)
