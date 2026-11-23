@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **`\c` before `#{` in a regex is a control escape** ([#346](https://github.com/portlandlang/portland/issues/346)) — `/\c#{str}/` interpolated `str` on both implementations, a silently different pattern; Ruby reads `\c#` as a control escape and `{str}` as literal text. Both parsers let `\c` take the character after it, so the `#` is the character controlled and no interpolation opens.
+  - ruby/spec rows activated: "gives precedence to escape sequences over substitution" of `language/regexp/interpolation`.
+
 - **A range takes a pattern argument** ([#402](https://github.com/portlandlang/portland/issues/402)) — `(1..3).grep(2)` refused on both implementations as `undefined method grep for 1..3`, though ADR 0066 gives the pattern forms to ranges. A range walks its elements for `all?`, `any?`, `none?`, `one?`, `grep`, `grep_v`, `slice_before`, and `slice_after`, as an array of them answers: `(1..3).grep(2..5)` is `[2, 3]`. A range that cannot be walked, endless or of strings, refuses in the sentences it already had.
 - **`MatchData#begin`, `end`, and `offset` refuse a negative index** ([#392](https://github.com/portlandlang/portland/issues/392)) — `found.begin(-1)` counted back from the last capture and answered on both implementations, a value where Ruby raises IndexError. The three refuse in Ruby's words, `index -1 out of matches`, as they did for an index past the captures; `found[-1]` and `values_at(-1)` count back, as Ruby's do.
 - **`start_with?` and `end_with?` with no candidates answer false** ([#371](https://github.com/portlandlang/portland/issues/371)) — `"x".start_with?()` refused on arity on both implementations where Ruby answers false, on a string and on a symbol. Both answer false, and the builtin table's four entries read `start_with?/0+` and `end_with?/0+`.

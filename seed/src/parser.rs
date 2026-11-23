@@ -378,6 +378,15 @@ fn regex_expression(text: &str, it_frames: &mut Vec<ItFrame>) -> Expression {
             // is the bare character in the source, as Ruby reads it.
             '\\' => match characters.next() {
                 Some((_, '/')) if slashed => literal.push('/'),
+                // `\c` takes the character after it as the one to control,
+                // so `\c#` before a brace is a control escape and a literal
+                // brace, as Ruby reads it, never an interpolation (#346).
+                Some((_, 'c')) => {
+                    literal.push_str("\\c");
+                    if let Some((_, controlled)) = characters.next() {
+                        literal.push(controlled);
+                    }
+                }
                 Some((_, escaped)) => {
                     literal.push('\\');
                     literal.push(escaped);
