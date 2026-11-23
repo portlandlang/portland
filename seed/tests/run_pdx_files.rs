@@ -1857,6 +1857,7 @@ fn a_slash_after_a_suffixed_literal_divides_on_both_oracles() {
         "suffixed_division.pdx",
         "third = 1r / 3\np(third)\np(2i / 2)\np(3r / 2 / 3)\n",
         "(1/3)\n(0+1i)\n(1/2)\n",
+    );
 }
 
 /// A literal with an `r` or `i` suffix starts a paren-less argument on
