@@ -1,0 +1,343 @@
+# The native build's intermediate representation (#446): a program inside
+# the native slice, lowered from the checked AST with every value's type
+# written on it.
+#
+# The AST says what was written and inference says what it can prove; a
+# code generator needs neither. It needs functions with typed parameters,
+# typed locals, and a body in which every operation says what it produces.
+# This is that form, and it is Portland's own: the LLVM printer (#447)
+# reads it, and so would an MLIR printer after it.
+#
+# The slice is small on purpose (#443): Integer and Boolean values, `+`,
+# `-`, `*`, the comparisons, bindings, `if`, `while`, `def`, calls, and
+# `puts` of an Integer. Anything else refuses here, by name, before a line
+# of output exists.
+
+require_relative "pinning"
+
+# A program: its functions in written order, the top-level statements last
+# as the entry function, `main`.
+struct IntermediateProgram
+  functions
+end
+
+# A function: parameters and locals as [name, type] pairs, the type it
+# answers, and its statements.
+struct IntermediateFunction
+  name
+  parameters
+  answer
+  locals
+  body
+end
+
+# The values. Each carries the type it produces.
+
+# A literal: an Integer's digits, or `true` or `false`.
+struct IntermediateConstant
+  type
+  value
+end
+
+# A parameter or a local, read.
+struct IntermediateLocal
+  type
+  name
+end
+
+# `+`, `-`, or `*` between two Integers, refusing on overflow (ADR 0070).
+struct IntermediateArithmetic
+  type
+  operator
+  left
+  right
+end
+
+# A comparison between two values of one type, answering a Boolean.
+struct IntermediateComparison
+  type
+  operator
+  left
+  right
+end
+
+# A call to one of the program's functions.
+struct IntermediateCall
+  type
+  name
+  arguments
+end
+
+# An `if` read for its value: one value per arm, and only the arm taken is
+# computed.
+struct IntermediateChoice
+  type
+  condition
+  then_value
+  else_value
+end
+
+# The statements.
+
+# A local bound or rebound.
+struct IntermediateStore
+  name
+  value
+end
+
+# An `if` run for what its arms do.
+struct IntermediateBranch
+  condition
+  then_body
+  else_body
+end
+
+struct IntermediateLoop
+  condition
+  body
+end
+
+struct IntermediateReturn
+  value
+end
+
+# `puts` of one Integer.
+struct IntermediatePrint
+  value
+end
+
+# A value computed and dropped: a call made for what it does.
+struct IntermediateEvaluate
+  value
+end
+
+# What lowering needs beside the statement in hand: the functions' answers
+# as bindings, and their parameter counts by name.
+struct LoweringContext
+  answers
+  arities
+end
+
+# Statements lowered, and the bindings in scope after them.
+struct Lowered
+  nodes
+  bindings
+end
+
+def lower_program(nodes)
+  pinned = pin_program(nodes)
+  definitions = nodes.select { it in DefNode }
+  statements = nodes.reject { it in DefNode }
+  mutable called = []
+  pinned.defs.each do |found|
+    if found.pinned?
+      called << found
+    elsif found.reason != "nothing calls it"
+      definition = definitions.find { it.name == found.name }
+      line = definition.nil? ? "" : " on line #{definition.line}"
+panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
+    end
+  end
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] })
+  mutable functions = []
+  called.each do |found|
+    definition = definitions.find { it.name == found.name }
+    next if definition.nil?
+    functions << lower_function(definition, found, context)
+  end
+  entry = lower_statements(statements, [], context)
+  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes)
+  IntermediateProgram.new(functions: functions)
+end
+
+# A def: its statements, the last one read for its value, since a def
+# answers its last expression.
+def lower_function(definition, found, context)
+  refuse_native("a def answering #{with_article(found.answer)}", definition) unless native_type?(found.answer)
+  found.parameters.each do |parameter|
+    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
+  end
+  leading = definition.body.slice(0, definition.body.length - 1)
+  last = definition.body.last
+  refuse_native("a def with an empty body", definition) if last.nil?
+  lowered = lower_statements(leading, found.parameters, context)
+  closing = if last in ReturnNode
+    lower_statement(last, lowered.bindings, context)
+  else
+    value = lower_value(last, lowered.bindings, context)
+    refuse_native("a def whose last expression is #{with_article(value.type)} where it answers #{with_article(found.answer)}", last) unless value.type == found.answer
+    Lowered.new(nodes: [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
+  end
+  locals = closing.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
+  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes + closing.nodes)
+end
+
+def lower_statements(statements, bindings, context)
+  mutable nodes = []
+  mutable current = bindings
+  statements.each do |statement|
+    lowered = lower_statement(statement, current, context)
+    nodes += lowered.nodes
+    current = lowered.bindings
+  end
+  Lowered.new(nodes: nodes, bindings: current)
+end
+
+def lower_statement(statement, bindings, context)
+  case statement
+  in AssignmentNode(name:, value:)
+    refuse_native("a parameter declared mutable", statement) if value.nil?
+    lowered = lower_value(value, bindings, context)
+    found = bindings.find { it[0] == name }
+    if found.some? && type_at(found, 1) != lowered.type
+      refuse_native("#{name} rebound from #{with_article(type_at(found, 1))} to #{with_article(lowered.type)}", statement)
+    end
+    after = found.nil? ? [[name, lowered.type]] + bindings : bindings
+    Lowered.new(nodes: [IntermediateStore.new(name: name, value: lowered)], bindings: after)
+  in WhileNode(condition:, body:)
+    test = lower_condition(condition, bindings, context)
+    inner = lower_statements(body, bindings, context)
+    Lowered.new(nodes: [IntermediateLoop.new(condition: test, body: inner.nodes)], bindings: inner.bindings)
+  in IfNode(condition:, then_body:, else_body:)
+    test = lower_condition(condition, bindings, context)
+    taken = lower_statements((then_body or []), bindings, context)
+    other = lower_statements((else_body or []), taken.bindings, context)
+    Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
+  in ReturnNode(value:)
+    refuse_native("a return with no value", statement) if value.nil?
+    Lowered.new(nodes: [IntermediateReturn.new(value: lower_value(value, bindings, context))], bindings: bindings)
+  in CallNode(name: "puts", arguments:, block:)
+    refuse_native("puts with a block", statement) unless block.nil?
+    refuse_native("puts of anything but one value", statement) unless arguments.length == 1
+    value = lower_value(arguments[0], bindings, context)
+    refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"]
+    Lowered.new(nodes: [IntermediatePrint.new(value: value)], bindings: bindings)
+  else
+    Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_value(statement, bindings, context))], bindings: bindings)
+  end
+end
+
+def lower_condition(node, bindings, context)
+  value = lower_value(node, bindings, context)
+  refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == ["boolean"]
+  value
+end
+
+# An expression, as a value with its type.
+def lower_value(node, bindings, context)
+  case node
+  in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
+  in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
+  in IdentifierNode(name:)
+    found = bindings.find { it[0] == name }
+    return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
+    lower_call(node, name, [], bindings, context)
+  in BinaryNode(operator:, left:, right:)
+    first = lower_value(left, bindings, context)
+    second = lower_value(right, bindings, context)
+    if %w[+ - *].include?(operator)
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == ["integer"] && second.type == ["integer"]
+      return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
+    end
+    refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
+    refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
+    refuse_native("'#{operator}' between Booleans", node) if first.type == ["boolean"] && !%w[== !=].include?(operator)
+    IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
+  in CallNode(name:, arguments:, block:)
+    refuse_native("a block", node) unless block.nil?
+    lower_call(node, name, arguments, bindings, context)
+  in IfNode(condition:, then_body:, else_body:)
+    taken = then_body or []
+    other = else_body or []
+    refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length == 1
+    first = lower_value(taken[0], bindings, context)
+    second = lower_value(other[0], bindings, context)
+    refuse_native("an if whose arms are #{with_article(first.type)} and #{with_article(second.type)}", node) unless first.type == second.type
+    IntermediateChoice.new(type: first.type, condition: lower_condition(condition, bindings, context), then_value: first, else_value: second)
+  else
+    refuse_native(native_name_of(node), node)
+  end
+end
+
+def lower_call(node, name, arguments, bindings, context)
+  arity = context.arities.find { it[0] == name }
+  refuse_native("a call to #{name}", node) if arity.nil?
+  answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
+  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: arguments.map { lower_value(it, bindings, context) })
+end
+
+def native_type?(type) = type == ["integer"] || type == ["boolean"]
+
+# What to call a node the slice does not hold, in the refusal.
+def native_name_of(node)
+  case node
+  in StringNode then "a string"
+  in FloatNode then "a float"
+  in ArrayNode then "an array"
+  in HashNode then "a hash"
+  in NilNode then "nil"
+  in MethodCallNode(name:) then "a call with a dot, .#{name}"
+  in LogicalNode(operator:) then "the operator '#{operator}'"
+  in UnaryNode(operator:) then "the operator '#{operator}'"
+  in WhileNode then "a while read for its value"
+  in AssignmentNode then "a binding read for its value"
+  in ReturnNode then "a return read for its value"
+  else "this (#{node.kind})"
+  end
+end
+
+# The one refusal for everything outside the slice: what the native build
+# does compile, then what it met and where.
+def refuse_native(what, node)
+  line = node.nil? ? "" : " on line #{node.line}"
+  panic("the native build compiles integers, comparisons, if, while, def, and puts of an Integer — #{what}#{line} is unbuilt (#443)")
+end
+
+# The dump: one line per function and statement, values as S-expressions.
+def render_intermediate(program)
+  mutable lines = []
+  program.functions.each do |function|
+    parameters = function.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
+    lines << "function #{function.name}(#{parameters}) -> #{render_type(function.answer)}"
+    function.locals.each do |local|
+      lines << "  local #{local[0]}: #{render_type(type_at(local, 1))}"
+    end
+    lines += render_statements(function.body, "  ")
+  end
+  lines
+end
+
+def render_statements(statements, indent)
+  mutable lines = []
+  statements.each do |statement|
+    case statement
+    in IntermediateStore(name:, value:) then lines << "#{indent}store #{name} #{render_value(value)}"
+    in IntermediateReturn(value:) then lines << "#{indent}return #{render_value(value)}"
+    in IntermediatePrint(value:) then lines << "#{indent}print #{render_value(value)}"
+    in IntermediateEvaluate(value:) then lines << "#{indent}evaluate #{render_value(value)}"
+    in IntermediateLoop(condition:, body:)
+      lines << "#{indent}while #{render_value(condition)}"
+      lines += render_statements(body, indent + "  ")
+    in IntermediateBranch(condition:, then_body:, else_body:)
+      lines << "#{indent}if #{render_value(condition)}"
+      lines += render_statements(then_body, indent + "  ")
+      unless else_body.empty?
+        lines << "#{indent}else"
+        lines += render_statements(else_body, indent + "  ")
+      end
+    end
+  end
+  lines
+end
+
+def render_value(value)
+  case value
+  in IntermediateConstant(value: literal) then literal.to_s
+  in IntermediateLocal(name:) then name
+  in IntermediateArithmetic(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
+  in IntermediateComparison(operator:, left:, right:) then "(#{operator} #{render_value(left)} #{render_value(right)})"
+  in IntermediateCall(name:, arguments:) then "(call #{([name] + arguments.map { render_value(it) }).join(" ")})"
+  in IntermediateChoice(type:, condition:, then_value:, else_value:)
+    "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
+  end
+end

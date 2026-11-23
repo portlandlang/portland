@@ -1347,6 +1347,89 @@ fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
     );
 }
 
+/// `intermediate.pdx` — the native build's intermediate representation
+/// (#446): a program inside the slice, each function with its typed
+/// parameters and locals, each statement on a line, each value an
+/// S-expression. The top-level statements are `main`.
+#[test]
+fn portland_intermediate_dumps_a_program_inside_the_native_slice() {
+    let sample = std::env::temp_dir().join("intermediate_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def fib(n)\n  if n < 2\n    n\n  else\n    fib(n - 1) + fib(n - 2)\n  end\nend\n\ndef sum_to(limit)\n  mutable total = 0\n  mutable index = 1\n  while index <= limit\n    total += index\n    index += 1\n  end\n  total\nend\n\ndef countdown(from)\n  return 0 if from < 1\n  countdown(from - 1)\nend\n\nanswer = fib(30)\nputs answer\nputs sum_to(1000)\nif answer > 100\n  puts countdown(3)\nend\n",
+    )
+    .unwrap();
+    let driver = format!(
+        "{}/../compiler/intermediate.pdx",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "intermediate.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "function fib(n: Integer) -> Integer\n  return (if Integer (< n 2) n (+ (call fib (- n 1)) (call fib (- n 2))))\nfunction sum_to(limit: Integer) -> Integer\n  local total: Integer\n  local index: Integer\n  store total 0\n  store index 1\n  while (<= index limit)\n    store total (+ total index)\n    store index (+ index 1)\n  return total\nfunction countdown(from: Integer) -> Integer\n  if (< from 1)\n    return 0\n  return (call countdown (- from 1))\nfunction main() -> Nil\n  local answer: Integer\n  store answer (call fib 30)\n  print answer\n  print (call sum_to 1000)\n  if (> answer 100)\n    print (call countdown 3)\n"
+    );
+}
+
+/// A program outside the native slice refuses before anything is written
+/// (#446), in one sentence that says what the build compiles and names
+/// what it met; a def whose calls disagree is named with the reason.
+#[test]
+fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
+    let compiles =
+        "the native build compiles integers, comparisons, if, while, def, and puts of an Integer";
+    let cases = [
+        (
+            "puts \"hi\"\n",
+            format!("{compiles} — a string on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "list = [1, 2]\n",
+            format!("{compiles} — an array on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "puts 3 / 2\n",
+            format!("{compiles} — the operator '/' on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "[1].each { puts it }\n",
+            format!("{compiles} — a call with a dot, .each on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "puts 1 < 2\n",
+            format!("{compiles} — puts of a Boolean on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "def twice(value) = value + value\ntwice(1)\ntwice(1.5)\n",
+            "the native build needs one type for every value — def twice on line 1 has none: value is an Integer at one call and a Float at another".to_string(),
+        ),
+    ];
+    let driver = format!(
+        "{}/../compiler/intermediate.pdx",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("intermediate_refusal_case.pdx");
+        std::fs::write(&sample, source).expect("failed to write probe file");
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&driver)
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(!output.status.success(), "{source:?} should refuse");
+        assert!(output.stdout.is_empty(), "{source:?} should write nothing");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(&expected),
+            "expected {expected:?}, got: {stderr}"
+        );
+    }
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.
