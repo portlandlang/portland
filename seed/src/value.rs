@@ -342,12 +342,16 @@ impl Value {
     /// express keep the rocket, which is where this parts company with Ruby:
     /// Ruby prints `{"odd key": 1}`, Portland prints `{:"odd key" => 1}`,
     /// because Portland's quoted-label form does not exist.
-    fn pair_source(key: &Value, value: &Value) -> String {
+    fn pair_source(
+        key: &Value,
+        value: &Value,
+        own: &mut dyn FnMut(&Value) -> Option<String>,
+    ) -> String {
         match key {
             Value::Symbol(name) if Value::symbol_source(name) == format!(":{name}") => {
-                format!("{name}: {}", value.inspect())
+                format!("{name}: {}", value.inspect_with(own))
             }
-            other => format!("{} => {}", other.inspect(), value.inspect()),
+            other => format!("{} => {}", other.inspect_with(own), value.inspect_with(own)),
         }
     }
 
@@ -479,9 +483,29 @@ impl Value {
 
     /// The value as source (ADR 0026).
     pub fn inspect(&self) -> String {
+        self.inspect_with(&mut |_| None)
+    }
+
+    /// The value as source, where `own` may answer a value's rendering in
+    /// place of this one — the interpreter's way to a struct's own
+    /// `inspect` (#285), which only it can call. `own` is asked about this
+    /// value and about every value inside it.
+    pub fn inspect_with(&self, own: &mut dyn FnMut(&Value) -> Option<String>) -> String {
+        match own(self) {
+            Some(rendering) => rendering,
+            None => self.inspect_inside_with(own),
+        }
+    }
+
+    /// This value's own source form, with `own` asked only about the
+    /// values inside it.
+    pub fn inspect_inside_with(&self, own: &mut dyn FnMut(&Value) -> Option<String>) -> String {
         match self {
             Value::Array(elements) => {
-                let inner: Vec<String> = elements.iter().map(|element| element.inspect()).collect();
+                let inner: Vec<String> = elements
+                    .iter()
+                    .map(|element| element.inspect_with(own))
+                    .collect();
                 format!("[{}]", inner.join(", "))
             }
             // The spelling that builds one from the same seed; where it has
@@ -494,14 +518,17 @@ impl Value {
             Value::Rational { .. } | Value::Complex { .. } => crate::tower::inspect(self),
             // Ruby 4's spelling, which is also the constructor's.
             Value::Set(members) => {
-                let inner: Vec<String> = members.iter().map(Value::inspect).collect();
+                let inner: Vec<String> = members
+                    .iter()
+                    .map(|member| member.inspect_with(own))
+                    .collect();
                 format!("Set[{}]", inner.join(", "))
             }
             Value::Boolean(value) => value.to_string(),
             Value::EnumCase { name, payload } => {
                 let inner: Vec<String> = payload
                     .iter()
-                    .map(|(label, value)| format!("{label}: {}", value.inspect()))
+                    .map(|(label, value)| format!("{label}: {}", value.inspect_with(own)))
                     .collect();
                 format!("{}({})", Value::symbol_source(name), inner.join(", "))
             }
@@ -509,7 +536,7 @@ impl Value {
             Value::Hash(pairs) => {
                 let inner: Vec<String> = pairs
                     .iter()
-                    .map(|(key, value)| Value::pair_source(key, value))
+                    .map(|(key, value)| Value::pair_source(key, value, own))
                     .collect();
                 format!("{{{}}}", inner.join(", "))
             }
@@ -523,19 +550,21 @@ impl Value {
             } => {
                 let start = start
                     .as_ref()
-                    .map_or(String::new(), |start| start.inspect());
-                let end = end.as_ref().map_or(String::new(), |end| end.inspect());
+                    .map_or(String::new(), |start| start.inspect_with(own));
+                let end = end
+                    .as_ref()
+                    .map_or(String::new(), |end| end.inspect_with(own));
                 format!("{start}{}{end}", if *exclusive { "..." } else { ".." })
             }
-            Value::Some(inner) => format!("some({})", inner.inspect()),
-            Value::Failure(inner) => format!("failure({})", inner.inspect()),
+            Value::Some(inner) => format!("some({})", inner.inspect_with(own)),
+            Value::Failure(inner) => format!("failure({})", inner.inspect_with(own)),
             Value::String(value) => quoted(value),
             Value::Symbol(name) => Value::symbol_source(name),
             Value::Type(name) => name.clone(),
             Value::Struct { fields, name } => {
                 let inner: Vec<String> = fields
                     .iter()
-                    .map(|(field, value)| format!("{field}: {}", value.inspect()))
+                    .map(|(field, value)| format!("{field}: {}", value.inspect_with(own)))
                     .collect();
                 format!("{name}({})", inner.join(", "))
             }

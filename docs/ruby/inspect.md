@@ -38,7 +38,7 @@ As Ruby's ([ADR 0060](../adr/0060-2026-10-25-a-collections-to-s-is-its-inspect.m
 
 ## A struct's own `to_s` and `inspect`
 
-A struct that defines `to_s` is written with it by `puts`, `print`, `warn`, and interpolation, and one that defines `inspect` is written with it by `p` and `pp`, as Ruby's are ([#282](https://github.com/portlandlang/portland/issues/282)). Either must answer a String, or the write refuses. A struct inside a collection still renders in the default form, `Gadget(name: "g")`, where Ruby calls the element's own `inspect` ([#285](https://github.com/portlandlang/portland/issues/285)).
+A struct that defines `to_s` is written with it by `puts`, `print`, `warn`, and interpolation, and one that defines `inspect` is written with it by `p` and `pp`, as Ruby's are ([#282](https://github.com/portlandlang/portland/issues/282)). Either must answer a String, or the write refuses. A struct inside something else renders by its own method too ([#285](https://github.com/portlandlang/portland/issues/285)): an array, a hash's keys and values, a set, and another struct's fields call each struct's own `inspect`, at any depth, so `p([gadget])` is `[ci]` where `gadget` inspects as `ci`, and `inspect(value)` answers the same text `p` writes. `join` calls each element's own `to_s`, as Ruby's does. `puts([gadget])` prints `[ci]` where Ruby prints the element's `to_s`, since a collection's `to_s` is its `inspect`. A struct with an `inspect` and no `to_s` writes its default form, `Gadget(name: "g")`, under `puts` and interpolation, as Ruby's default `to_s` is not its `inspect`.
 
 ## Migrating
 

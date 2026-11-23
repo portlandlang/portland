@@ -66,4 +66,41 @@ context "Regexps with escape characters" do
     expect(found(/あ/, "あ")).to eq(["あ"])
     expect(found(/\u{3042 3044}/, "あい")).to eq(["あい"])
   end
+
+  specify "supports quoting meta-characters via escape sequence" do
+    expect(/\(/.match("(").to_a).to eq(["("])
+    expect(/\)/.match(")").to_a).to eq([")"])
+    expect(/\[/.match("[").to_a).to eq(["["])
+    expect(/\]/.match("]").to_a).to eq(["]"])
+    expect(/\{/.match("{").to_a).to eq(["{"])
+    expect(/\}/.match("}").to_a).to eq(["}"])
+    expect(/\</.match("<").to_a).to eq(["<"])
+    expect(/\>/.match(">").to_a).to eq([">"])
+    # alternation separator
+    expect(/\|/.match("|").to_a).to eq(["|"])
+    # quantifiers
+    expect(/\?/.match("?").to_a).to eq(["?"])
+    expect(/\./.match(".").to_a).to eq(["."])
+    expect(/\*/.match("*").to_a).to eq(["*"])
+    expect(/\+/.match("+").to_a).to eq(["+"])
+    # line anchors
+    expect(/\^/.match("^").to_a).to eq(["^"])
+    expect(/\$/.match("$").to_a).to eq(["$"])
+  end
+
+  specify "allows any character to be escaped" do
+    expect(/\y/.match("y").to_a).to eq(["y"])
+  end
+
+  specify "handles control escapes with \\C-x syntax" do
+    expect(/\C-*\C-J\C-j/.match("\n\n\n")[0]).to eq("\n\n\n")
+  end
+
+  specify "supports the \\K keep operator" do
+    expect(/a\Kb/.match("ab")[0]).to eq("b")
+  end
+
+  specify "supports the \\R line break escape" do
+    expect(/\R/.match("\n")[0]).to eq("\n")
+  end
 end
