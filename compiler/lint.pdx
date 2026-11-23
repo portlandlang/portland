@@ -1,0 +1,16 @@
+# Lint Portland files (#510): how each is written, by the rules in
+# linting.pdx. Each finding is a line naming the file and the line; a file
+# with nothing to fix says nothing, and a run with nothing to fix says ok.
+#
+# Usage: pdx compiler/lint.pdx <file.pdx> [more.pdx ...]
+
+require_relative "linting"
+
+mutable findings = []
+System.arguments.each do |path|
+  source = System.read_file(path) or panic "lint.pdx: cannot read #{path}"
+  findings += lint_source(path, source)
+end
+findings.each { puts "#{it.path}:#{it.line}: #{it.message}" }
+panic("lint.pdx: #{findings.length} to fix") unless findings.empty?
+puts "ok"

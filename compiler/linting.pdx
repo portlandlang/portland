@@ -1,0 +1,67 @@
+# The linter's rules (#510): how a `.pdx` file is written, read off the
+# compiler's own lexer and parser, so a file is read as the language reads
+# it and never by pattern.
+#
+# It reports and changes nothing. A formatter needs a tree that keeps every
+# comment and column, which the parser's does not.
+#
+# A rule is a def that takes a file's path, its text, and its top-level
+# nodes, and answers its findings. `lint_source` runs each in turn.
+
+require_relative "parser"
+
+# What may stand at the left margin inside a statement that runs over
+# several lines: the words and brackets that close one or divide it.
+MARGIN_WORDS = ["end", "else", "elsif", "when", "in", "]", "}", ")"]
+
+# One thing to fix: the file, the line, and what is wrong with it.
+struct LintFinding
+  path
+  line
+  message
+end
+
+# Whether a line at the margin is one that belongs there: empty, a comment,
+# or a word or bracket that closes or divides the statement around it.
+def margin_allowed?(text)
+  return true if text.empty? || text.start_with?("#")
+  MARGIN_WORDS.any? { |word| text == word || text.start_with?(word + " ") || text.start_with?(word + ")") || text.start_with?(word + ",") }
+end
+
+# A line of code at the left margin inside a definition or a list: every
+# line between where one top-level statement opens and the next one does is
+# part of the first, and is indented under it.
+def lint_margins(path, source, nodes)
+  lines = source.split("\n")
+  opened = nodes.map { it.line }.reject { it.nil? }
+  mutable findings = []
+  mutable index = 0
+  while index < opened.length
+    first = opened[index] or 0
+    following = opened[index + 1] or lines.length + 1
+    mutable number = first + 1
+    while number < following
+      text = lines[number - 1] or ""
+      indented = text.start_with?(" ") || text.start_with?("\t")
+      unless indented || margin_allowed?(text)
+        findings << LintFinding.new(path: path, line: number, message: "this line is inside the statement that opens on line #{first}, and is not indented under it")
+      end
+      number += 1
+    end
+    index += 1
+  end
+  findings
+end
+
+# A file that does not parse cannot be read for anything else.
+def lint_parse(path, nodes)
+  nodes.select { it.kind == "error" }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse") }
+end
+
+# Every finding in one file's text.
+def lint_source(path, source)
+  nodes = parse_program(lex(source))
+  unparsed = lint_parse(path, nodes)
+  return unparsed unless unparsed.empty?
+  lint_margins(path, source, nodes)
+end
