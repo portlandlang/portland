@@ -66,6 +66,9 @@ fi
 step "unit tests — seed/src"
 cargo test --package portland-seed --quiet --lib
 
+step "runtime unit tests — runtime/src/lib.rs: what every native program is linked with"
+cargo test --package portland-runtime --quiet
+
 step "integration tests — seed/tests/run_pdx_files.rs"
 cargo test --package portland-seed --quiet --test run_pdx_files
 
