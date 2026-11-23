@@ -10,6 +10,9 @@ end
 def box(width, height: width)
   width * height
 end
+def pair(first:, second:)
+  [first, second]
+end
 
 context "Keyword arguments" do
   specify "fill in a declared default" do
@@ -23,5 +26,14 @@ context "Keyword arguments" do
   specify "may default to an earlier parameter" do
     expect(box(3)).to eq(9)
     expect(box(3, height: 2)).to eq(6)
+  end
+
+  describe "omitted values" do
+    specify "accepts short notation 'key' for 'key: value' syntax" do
+      first = 1
+      second = 2
+
+      expect(pair(first:, second:)).to eq([1, 2])
+    end
   end
 end
