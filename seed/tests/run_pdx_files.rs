@@ -1441,16 +1441,16 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a break in a block on line 5 is unbuilt (#443)"),
         ),
         (
-            "def run\n  yield\nend\nrun do\n  next\nend\n",
-            format!("{compiles} — a next in a block on line 5 is unbuilt (#443)"),
+            "def run\n  yield(1) + 1\nend\nputs(run do |number|\n  next if number == 1\n  number\nend)\n",
+            format!("{compiles} — a next in a block that answers a value on line 5 is unbuilt (#443)"),
         ),
         (
             "def run\n  yield\nend\ndef first\n  run { return 1 }\n  2\nend\nputs first\n",
             format!("{compiles} — a return in a block on line 5 is unbuilt (#443)"),
         ),
         (
-            "def run\n  yield\nend\ndef outer\n  run { yield }\nend\nouter { puts 1 }\n",
-            format!("{compiles} — a yield in a block on line 5 is unbuilt (#443)"),
+            "def run\n  yield\nend\nrun { yield }\n",
+            format!("{compiles} — a yield outside a def on line 4 is unbuilt (#443)"),
         ),
         (
             "def plain(number) = number + 1\nputs(plain(1) { 2 })\n",

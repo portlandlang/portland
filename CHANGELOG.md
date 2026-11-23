@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A native block yields onward, and leaves early with `next`** ([#495](https://github.com/portlandlang/portland/issues/495), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a `yield` written inside a block reaches the block its writer was handed, which is what a walk written over another walk is made of: the block's frame carries that block and its frame beside the locals. `next` in a block that answers nothing ends the block's turn. `break` and `return` inside a block still refuse by name.
 - **A native program yields to a block** ([#493](https://github.com/portlandlang/portland/issues/493), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a def that yields and a call that hands it a block build natively. The block is a function of its own, handed a frame holding the address of each of its writer's locals, which it reads and rebinds where they live; nothing is put on the heap.
   - Pinning reads a block with its def: the block's parameters take the types of what the def yields, and a `yield` is read as what the block answers. Where the calls of one def hand it blocks that answer different types, the block answers nothing, since blocks run for what they do end in whatever they end in.
   - A def or a block that ends in a binding answers what it bound, and one that ends in an `if` whose arms produce no value answers nothing.

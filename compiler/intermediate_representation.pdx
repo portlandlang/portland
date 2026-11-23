@@ -46,6 +46,9 @@ struct IntermediateBlock
   locals
   body
   captures
+  # Whether the block yields (#495): a `yield` written inside it reaches
+  # the block its writer was handed, which it then carries.
+  onward
 end
 
 # The values. Each carries the type it produces.
@@ -212,9 +215,8 @@ struct LoweringContext
   blocks
   # The block the function being lowered is handed, where it yields.
   yielding
-  # Whether the statement in hand is inside a block, where `return`,
-  # `yield`, and a `break` or `next` outside a loop reach past the
-  # block's own function.
+  # Whether the statement in hand is inside a block, where `return` and
+  # a `break` outside a loop reach past the block's own function.
   inside_block
 end
 
@@ -311,15 +313,16 @@ def lower_block(block, handed, bindings, context)
   end
   captures = bindings.reject { |binding| parameters.any? { it[0] == binding[0] } }
   start = parameters.reverse + captures
-  inside = context.with(procedure: handed.answer == NOTHING, looping: false, yielding: nil, inside_block: true)
+  # A `yield` inside the block is its writer's, so what the writer was
+  # handed stays what a `yield` reaches.
+  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true)
   lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
   locals = lowered.bindings.slice(0, lowered.bindings.length - start.length)
-  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: captures)
+  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: captures, onward: yields?(block.body))
 end
 
 # A `yield`: what it hands over, and the type the block answers.
 def lower_yield(node, bindings, context)
-  refuse_native("a yield in a block", node) if context.inside_block
   handed = context.yielding or refuse_native("a yield outside a def", node)
   arguments = node.values.map { lower_value(it, bindings, context) }
   IntermediateYield.new(type: handed.answer, arguments: arguments)
@@ -356,7 +359,12 @@ def lower_statement(statement, bindings, context)
     refuse_native("a break outside a while", statement) unless context.looping
     Lowered.new(nodes: [IntermediateBreak.new(line: statement.line)], bindings: bindings)
   in NextNode
-    refuse_native("a next in a block", statement) if context.inside_block && !context.looping
+    # In a block and outside any loop of its own, `next` ends the block's
+    # turn: a way out of its function (#495).
+    if context.inside_block && !context.looping
+      refuse_native("a next in a block that answers a value", statement) unless context.procedure
+      return Lowered.new(nodes: [IntermediateReturn.new(value: nil)], bindings: bindings)
+    end
     refuse_native("a next outside a while", statement) unless context.looping
     Lowered.new(nodes: [IntermediateNext.new(line: statement.line)], bindings: bindings)
   in IfNode(condition:, then_body:, else_body:)
