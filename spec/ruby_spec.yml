@@ -3332,13 +3332,13 @@ core/string/each_grapheme_cluster_spec.rb:
 core/string/each_line_spec.rb:
   pdx: [spec/core/string/each_line_spec.pdx]
   status: partial_planned
-  reason: "each_line takes no separator or chomp argument (#313), and the multibyte row is #323's to port; without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
+  reason: "each_line takes no separator or chomp argument (#313); without a block it is an enumerator in Ruby and nothing here (ADR 0055)."
   link: https://github.com/portlandlang/portland/issues/313
 core/string/element_reference_spec.rb:
   pdx: [spec/core/string/element_reference_spec.pdx]
   status: partial_planned
-  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the $~ rows go with the match globals. The passing Regexp rows are #323's to port, the two-argument and string-pattern forms wait on #314, and a negative group past the captures on #315."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "A slice past the end answers the empty string, never nil (ADR 0019), and a negative length refuses; the $~ rows go with the match globals. The two-argument and string-pattern forms wait on #314, the Regexp rows with an index or a group name among them, which spec/core/string/slice_spec.pdx holds in the slice spelling; a negative group past the captures waits on #315."
+  link: https://github.com/portlandlang/portland/issues/314
 core/string/empty_spec.rb:
   pdx: [spec/core/string/empty_spec.pdx]
 core/string/encoding_spec.rb:
@@ -3374,8 +3374,8 @@ core/string/grapheme_clusters_spec.rb:
 core/string/gsub_spec.rb:
   pdx: [spec/core/string/gsub_spec.pdx]
   status: partial_planned
-  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and gsub! rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The \\+ escape waits on #310, the hash replacement on #311, a block beside a replacement on #312, and a struct's own to_s as a block's value on #370; the $~, to_str, encoding, and gsub! rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/310
 core/string/hex_spec.rb:
   pdx: [spec/core/string/hex_spec.pdx]
 core/string/include_spec.rb:
@@ -3383,8 +3383,8 @@ core/string/include_spec.rb:
 core/string/index_spec.rb:
   pdx: [spec/core/string/index_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp and String rows are #323's to port; a String with a start position waits on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "A String with a start position, and the escaped-regexp row that compares against it, wait on #316; the $~, to_str, to_int, subclass, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/316
 core/string/initialize_spec.rb:
   status: skipped
   reason: "There is no String class object; a string is a literal, and String.new has no spelling."
@@ -3441,9 +3441,9 @@ core/string/ord_spec.rb:
   pdx: [spec/core/string/ord_spec.pdx]
 core/string/partition_spec.rb:
   pdx: [spec/core/string/partition_spec.pdx]
-  status: partial_planned
-  reason: "The regexp row passes and is #323's to port; the $1 row goes with the match globals, a block beside the argument is checked, not ignored, and the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
-  link: https://github.com/portlandlang/portland/issues/323
+  status: partial_intentional
+  reason: "The $1 row goes with the match globals, a block beside the argument is checked, not ignored, and the to_str, subclass, and encoding rows have no meaning with one UTF-8 String type."
+  link: docs/ruby/regex.md
 core/string/plus_spec.rb:
   pdx: [spec/core/string/plus_spec.pdx]
 core/string/prepend_spec.rb:
@@ -3459,15 +3459,15 @@ core/string/reverse_spec.rb:
 core/string/rindex_spec.rb:
   pdx: [spec/core/string/rindex_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp rows are #323's to port; a Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "A Regexp past the end and \\G in a backward search wait on #317; the $~, to_str, to_int, ?char, and encoding rows stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/317
 core/string/rjust_spec.rb:
   pdx: [spec/core/string/rjust_spec.pdx]
 core/string/rpartition_spec.rb:
   pdx: [spec/core/string/rpartition_spec.pdx]
-  status: partial_planned
-  reason: "The regexp rows pass and are #323's to port; the $~ row goes with the match globals, and the identity, to_str, and encoding rows have no meaning here."
-  link: https://github.com/portlandlang/portland/issues/323
+  status: partial_intentional
+  reason: "The $~ row goes with the match globals, and the identity, to_str, and encoding rows have no meaning here."
+  link: docs/ruby/regex.md
 core/string/rstrip_spec.rb:
   pdx: [spec/core/string/rstrip_spec.pdx]
   status: partial_planned
@@ -3492,8 +3492,8 @@ core/string/slice_spec.rb:
 core/string/split_spec.rb:
   pdx: [spec/core/string/split_spec.pdx]
   status: partial_planned
-  reason: "The passing Regexp rows are #323's to port; split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/318
 core/string/squeeze_spec.rb:
   pdx: [spec/core/string/squeeze_spec.pdx]
   status: partial_intentional
@@ -3502,8 +3502,8 @@ core/string/squeeze_spec.rb:
 core/string/start_with_spec.rb:
   pdx: [spec/core/string/start_with_spec.pdx]
   status: partial_planned
-  reason: "The passing regex rows are #323's to port; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte rows have no meaning with one UTF-8 String type."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/string/string_spec.rb:
   status: skipped
   reason: "Kernel#String is the implicit-conversion protocol's entry point, and to_str is a false alias that refuses naming to_s (ADR 0036); to_s is the spelling."
@@ -3516,8 +3516,8 @@ core/string/strip_spec.rb:
 core/string/sub_spec.rb:
   pdx: [spec/core/string/sub_spec.pdx]
   status: partial_planned
-  reason: "The passing regex and escape rows are #323's to port; the \\+ escape waits on #310, the hash replacement on #311, and a block beside a replacement on #312; the $~, to_str, encoding, and sub! rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The \\+ escape waits on #310, the hash replacement on #311, a block beside a replacement on #312, and a struct's own to_s as a block's value on #370; the $~, to_str, encoding, and sub! rows, and a block's arguments gathered by a splat, stay behind by design."
+  link: https://github.com/portlandlang/portland/issues/310
 core/string/succ_spec.rb:
   pdx: [spec/core/string/succ_spec.pdx]
 core/string/swapcase_spec.rb:
@@ -3765,8 +3765,8 @@ core/symbol/empty_spec.rb:
 core/symbol/end_with_spec.rb:
   pdx: [spec/core/symbol/end_with_spec.pdx]
   status: partial_planned
-  reason: "The several-candidate and multibyte rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036)."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), and the encoding and invalid-byte rows have no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/symbol/id2name_spec.rb:
   pdx: [spec/core/symbol/id2name_spec.pdx]
   status: partial_intentional
@@ -3785,8 +3785,8 @@ core/symbol/length_spec.rb:
 core/symbol/match_spec.rb:
   pdx: [spec/core/symbol/match_spec.pdx]
   status: partial_planned
-  reason: "=~ answers the match, not an index, and the $1 rows go with the match globals; the passing match and match? rows are #323's to port, and match with a block and match? with a position wait on #319."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "=~ answers the match, not an index, and the $1 and Regexp.last_match rows go with the match globals; match with a block and match? with a position wait on #319."
+  link: https://github.com/portlandlang/portland/issues/319
 core/symbol/name_spec.rb:
   pdx: [spec/core/symbol/name_spec.pdx]
   status: partial_intentional
@@ -3805,8 +3805,8 @@ core/symbol/size_spec.rb:
 core/symbol/start_with_spec.rb:
   pdx: [spec/core/symbol/start_with_spec.pdx]
   status: partial_planned
-  reason: "The several-candidate and regex rows pass and are #323's to port; no to_str conversion of the argument (ADR 0036), and the last_match row goes with the match globals."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "No candidates at all waits on #371; no to_str conversion of the argument (ADR 0036), the last_match row goes with the match globals, and the invalid-byte row has no meaning with one UTF-8 String type."
+  link: https://github.com/portlandlang/portland/issues/371
 core/symbol/succ_spec.rb:
   pdx: [spec/core/symbol/succ_spec.pdx]
 core/symbol/swapcase_spec.rb:
@@ -4519,13 +4519,10 @@ language/regexp/back-references_spec.rb:
 language/regexp/character_classes_spec.rb:
   pdx: [spec/language/regexp/character_classes_spec.pdx]
   status: partial_planned
-  reason: "The passing class, POSIX-bracket, and property rows are #323's to port; the rows that spell characters with \\u, \\0, and \\x escapes wait on #304, the /u rows on #321, and the eval rows stay behind."
-  link: https://github.com/portlandlang/portland/issues/323
+  reason: "The rows that spell characters with \\u, \\0, \\x, \\f, and \\v escapes wait on #304, the /u rows on #321, and the eval rows stay behind."
+  link: https://github.com/portlandlang/portland/issues/304
 language/regexp/empty_checks_spec.rb:
   pdx: [spec/language/regexp/empty_checks_spec.pdx]
-  status: partial_planned
-  reason: "Every row passes; the ones not in the pdx spec are #323's to port."
-  link: https://github.com/portlandlang/portland/issues/323
 language/regexp/encoding_spec.rb:
   status: skipped
   reason: "Every string and pattern is UTF-8 here (ADR 0069); the encoding rows have nothing to specify."
