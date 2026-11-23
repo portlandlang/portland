@@ -1150,7 +1150,18 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
             ("rectangular" | "rect", []) => Value::array(vec![real.clone(), imaginary.clone()]),
             ("conjugate" | "conj", []) => complex(real.clone(), real_negate(imaginary)),
             ("to_c", []) => receiver.clone(),
-            ("to_r", []) => to_rational(&real_of_complex(receiver, "Rational"), "to_r"),
+            // `to_r` alone takes a Float zero imaginary part too, as Ruby
+            // does from 3.4 (#328); `to_f`, `to_i`, and `rationalize` keep
+            // the exact-zero rule, as Ruby's do.
+            ("to_r", []) => {
+                let (real, imaginary) = complex_parts(receiver);
+                let zero = exact_zero(&imaginary)
+                    || matches!(imaginary, Value::Float(part) if part == 0.0);
+                if !zero {
+                    panic!("can't convert {receiver} into Rational");
+                }
+                to_rational(&real, "to_r")
+            }
             ("rationalize", []) => rationalize(&real_of_complex(receiver, "Rational"), None),
             ("rationalize", [epsilon]) => {
                 rationalize(&real_of_complex(receiver, "Rational"), Some(epsilon))
