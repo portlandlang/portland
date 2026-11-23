@@ -1644,6 +1644,72 @@ fn a_case_in_on_a_parameter_narrows_its_contract() {
     );
 }
 
+/// The core is carried in the binary (ADR 0093, #436): every file under
+/// `core/` answers `System.core_source` with its own text, on the seed and
+/// hosted, and a name the binary does not hold refuses on both.
+#[test]
+fn the_core_is_embedded_and_core_source_hands_it_over() {
+    let directory = format!("{}/../core", env!("CARGO_MANIFEST_DIR"));
+    let mut names: Vec<String> = std::fs::read_dir(&directory)
+        .expect("core/ should exist")
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.ends_with(".pdx"))
+        .collect();
+    names.sort();
+    assert!(
+        names.contains(&"core.pdx".to_string()),
+        "core/core.pdx is the entry file"
+    );
+    for name in &names {
+        let text = std::fs::read_to_string(format!("{directory}/{name}")).unwrap();
+        assert_both_print(
+            "core_source.pdx",
+            &format!("print System.core_source({name:?})\n"),
+            &text,
+        );
+    }
+    let cases = [
+        (
+            "System.core_source(\"missing.pdx\")\n",
+            "System.core_source: the core has no file named \"missing.pdx\"",
+        ),
+        (
+            "System.core_source(3)\n",
+            "System.core_source takes a String, got 3",
+        ),
+        (
+            "System.core_source\n",
+            "System.core_source takes 1 argument, got 0",
+        ),
+    ];
+    assert_both_oracles_refuse("core_source_refusal.pdx", None, &cases);
+}
+
+/// `putc` is written in Portland, in `core/kernel.pdx`, and loaded ahead of
+/// the program by both implementations (ADR 0093, #436): an Integer's low
+/// byte, a String's first code point, and the argument answered. A function
+/// the core defines is as fixed as a builtin.
+#[test]
+fn a_function_the_core_defines_runs_on_both_oracles() {
+    assert_both_print(
+        "core_putc.pdx",
+        "first = putc(65)\nputc(\"\\n\")\nputc(\"\u{e9}a\")\nputc(233)\nputc(321)\nputc(0 - 191)\nputc(\"\")\nputs \"\"\np first\np putc(\"word\")\n",
+        "A\n\u{e9}\u{e9}AA\n65\nw\"word\"\n",
+    );
+    let cases = [
+        (
+            "putc(:sym)\n",
+            "putc takes an integer or a string, got :sym",
+        ),
+        ("putc(1, 2)\n", "putc expects 1 argument, got 2"),
+        (
+            "def putc(value) = 7\n",
+            "'putc' is a builtin — rename yours",
+        ),
+    ];
+    assert_both_oracles_refuse("core_putc_refusal.pdx", None, &cases);
+}
+
 /// `types.pdx` — inference's debug dump (#9 increment 3a, ADR 0040):
 /// synthesis only, silent by doctrine, and this is the one place a type is
 /// visible. The rendering is a tool surface, not ratified error vocabulary.
@@ -6668,7 +6734,9 @@ fn output_wrappers_on_both_oracles() {
         None,
         &[
             ("putc(nil)\n", "putc takes an integer or a string, got nil"),
-            ("putc(1, 2)\n", "putc takes 1 argument, got 2"),
+            // `putc` is a def in the core (ADR 0093), so its count is refused
+            // in the sentence every def's is.
+            ("putc(1, 2)\n", "putc expects 1 argument, got 2"),
             ("print(nil)\n", "print got nil — handle the nil case first"),
             ("warn(nil)\n", "warn got nil — handle the nil case first"),
             ("x = puts(\"a\")\n", "assignment to x produced no value"),

@@ -96,13 +96,17 @@ end
 # is where `require "name"` looks (ADR 0077).
 def evaluate_program(nodes, path, arguments, load_path, data: nil)
   starting = [["__file__", "file", path], ["__arguments__", "arguments", arguments], ["__load_path__", "load_path", load_path]] + data_bindings(data) + builtin_constants
-  # The core runs first, in the program's own environment (ADR 0093), and
-  # the names it defined ride the bindings as `__core__`: a program that
-  # defines one is told it is a builtin.
+  run_body(nodes, with_core(starting))
+end
+
+# The bindings a program starts with once the core has run in them (ADR
+# 0093). The names the core defined ride along as `__core__`: a program
+# that defines one is told it is a builtin. Every driver that builds a
+# program's first bindings itself starts them here.
+def with_core(starting)
   core = core_nodes
   loaded = run_body(core, starting)
-  return loaded unless loaded.signal == "none"
-  run_body(nodes, [["__core__", "core", core_function_names(core)]] + loaded.bindings)
+  [["__core__", "core", core_function_names(core)]] + loaded.bindings
 end
 
 # Whether the core defined a function by this name.

@@ -1,0 +1,4 @@
+# Nothing but starting up: what every run pays before its first line,
+# which includes loading the core (ADR 0093). Watch it as files move in.
+
+puts "started"
