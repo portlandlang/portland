@@ -807,7 +807,9 @@ impl<'source> Parser<'source> {
             TokenKind::Bang
             | TokenKind::Float
             | TokenKind::Identifier
+            | TokenKind::Imaginary
             | TokenKind::Integer
+            | TokenKind::Rational
             | TokenKind::String
             | TokenKind::Symbol
             | TokenKind::SymbolArray
@@ -986,7 +988,9 @@ impl<'source> Parser<'source> {
             TokenKind::Bang
             | TokenKind::Float
             | TokenKind::Identifier
+            | TokenKind::Imaginary
             | TokenKind::Integer
+            | TokenKind::Rational
             | TokenKind::String
             | TokenKind::Symbol
             | TokenKind::SymbolArray
@@ -1654,6 +1658,8 @@ impl<'source> Parser<'source> {
                         | TokenKind::String
                         | TokenKind::Integer
                         | TokenKind::Float
+                        | TokenKind::Rational
+                        | TokenKind::Imaginary
                         | TokenKind::Identifier
                         | TokenKind::SymbolArray
                         | TokenKind::WordArray
@@ -3831,7 +3837,9 @@ impl<'source> Parser<'source> {
                 next.kind,
                 TokenKind::Float
                     | TokenKind::Identifier
+                    | TokenKind::Imaginary
                     | TokenKind::Integer
+                    | TokenKind::Rational
                     | TokenKind::String
                     | TokenKind::Symbol
                     | TokenKind::SymbolArray
