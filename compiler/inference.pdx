@@ -334,6 +334,8 @@ end
 
 def synthesize_bare_call(node, types)
   return ["string"] if (node.name == "format" || node.name == "sprintf") && synthesize_name(node.name, types) == ["unknown"]
+  # `inspect(value)` answers a value's source form, a String (#501).
+  return ["string"] if node.name == "inspect" && node.arguments.length == 1 && synthesize_name(node.name, types) == ["unknown"]
   # The tower's constructors (ADR 0085) answer their values, not the type
   # a bare `Rational` names.
   return ["rational"] if node.name == "Rational" && synthesize_name(node.name, types) == ["type", "Rational"]

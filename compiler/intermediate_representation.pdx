@@ -118,8 +118,16 @@ struct IntermediateConcat
   right
 end
 
-# An Integer written out as a String, as interpolation writes one.
+# An Integer, a Boolean, or an array written out as a String, as `puts`,
+# `to_s`, and interpolation write one. An array's is its source form.
 struct IntermediateText
+  type
+  value
+end
+
+# A String in its source form, between quotes with its escapes: what
+# `inspect` and `p` write.
+struct IntermediateInspect
   type
   value
 end
@@ -416,8 +424,16 @@ def lower_statement(statement, bindings, context)
     refuse_native("puts with a block", statement) unless block.nil?
     refuse_native("puts of anything but one value", statement) unless arguments.length == 1
     value = lower_value(arguments[0], bindings, context)
-    refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"] || value.type == ["string"]
-    Lowered.new(nodes: [IntermediatePrint.new(value: value)], bindings: bindings)
+    # An Integer is printed as it is; everything else as its text.
+    shown = value.type == ["integer"] ? value : written_out(value, statement)
+    Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
+  # `p` of one value (#501): its source form on a line.
+  in CallNode(name: "p", arguments:, block:)
+    refuse_native("p with a block", statement) unless block.nil?
+    refuse_native("p of anything but one value", statement) unless arguments.length == 1
+    value = lower_value(arguments[0], bindings, context)
+    shown = value.type == ["integer"] ? value : inspected(value, statement)
+    Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
   in CallNode(name:, arguments:)
     # A call made for what it does: one to a def that answers nothing may
     # stand here, and nowhere a value is read.
@@ -459,6 +475,22 @@ def lower_append(statement, append, bindings, context)
   # An empty array no append had named yet is named by this one.
   after = bindings.map { it[0] == append.name ? [append.name, type] : it }
   Lowered.new(nodes: [IntermediateAppend.new(name: append.name, type: type, value: value)], bindings: after)
+end
+
+# A value as `puts`, `to_s`, and interpolation write it: a String is
+# itself, and an Integer, a Boolean, or an array is written out.
+def written_out(value, node)
+  return value if value.type == ["string"]
+  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *])
+  refuse_native("writing out #{with_article(value.type)}", node) unless writable
+  IntermediateText.new(type: ["string"], value: value)
+end
+
+# A value in its source form, as `inspect` and `p` write it: a String
+# between quotes, and everything else as it is written out.
+def inspected(value, node)
+  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"]
+  written_out(value, node)
 end
 
 def lower_condition(node, bindings, context)
@@ -510,6 +542,10 @@ def lower_value(node, bindings, context)
     refuse_native("'#{operator}' between Strings", node) if first.type == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   in CallNode(name:, arguments:)
+    # `inspect(value)` (#501), where the program has no def of that name.
+    if name == "inspect" && arguments.length == 1 && node.block.nil? && context.arities.none? { it[0] == name }
+      return inspected(lower_value(arguments[0], bindings, context), node)
+    end
     called = lower_call(node, name, arguments, bindings, context)
     panic("#{name} answers nothing, so there is no value to read from it on line #{node.line}") if called.type == NOTHING
     called
@@ -528,13 +564,9 @@ def lower_value(node, bindings, context)
     IntermediateNegation.new(type: ["integer"], value: negated)
   in UnaryNode(operator: "!", operand:)
     IntermediateNot.new(type: ["boolean"], value: lower_condition(operand, bindings, context))
-  # `to_s`, which is what interpolation asks of each piece: a String is
-  # itself, and an Integer is written out.
+  # `to_s`, which is what interpolation asks of each piece.
   in MethodCallNode(receiver:, name: "to_s", arguments: [], block: nil)
-    written = lower_value(receiver, bindings, context)
-    return written if written.type == ["string"]
-    refuse_native("to_s of #{with_article(written.type)}", node) unless written.type == ["integer"]
-    IntermediateText.new(type: ["string"], value: written)
+    written_out(lower_value(receiver, bindings, context), node)
   # `each` on an array (#497): the block is handed each element, and
   # answers nothing anyone reads.
   in MethodCallNode(receiver:, name: "each", arguments: [], block:)
@@ -689,6 +721,7 @@ def render_value(value)
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"
+  in IntermediateInspect(value: shown) then "(inspect #{render_value(shown)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
   end

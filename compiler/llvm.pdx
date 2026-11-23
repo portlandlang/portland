@@ -121,6 +121,9 @@ LLVM_PRELUDE = [
 "declare void @portland_puts_string(ptr)",
 "declare ptr @portland_string_concat(ptr, ptr)",
 "declare ptr @portland_string_from_integer(i64)",
+"declare ptr @portland_string_from_boolean(i1 zeroext)",
+"declare ptr @portland_string_inspect(ptr)",
+"declare ptr @portland_array_to_string(ptr)",
 "declare zeroext i1 @portland_string_equal(ptr, ptr)",
 "declare i64 @portland_integer_divide(i64, i64)",
 "declare i64 @portland_integer_modulo(i64, i64)",
@@ -368,9 +371,18 @@ def llvm_value(emitter, value)
     joined = llvm_named(second.emitter, "call ptr @portland_string_concat(ptr #{first.operand}, ptr #{second.operand})")
     released = llvm_drop(llvm_drop(joined.emitter, ["string"], first.operand), ["string"], second.operand)
     LlvmValue.new(emitter: released, operand: joined.operand)
-  in IntermediateText(value: number)
-    written = llvm_value(emitter, number)
-    llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})")
+  # A value written out: a new String the runtime makes. An array asked
+  # is released once it has answered, as a String inspected is.
+  in IntermediateText(value: shown)
+    written = llvm_value(emitter, shown)
+    return llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})") if shown.type == ["integer"]
+    return llvm_named(written.emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{written.operand})") if shown.type == ["boolean"]
+    made = llvm_named(written.emitter, "call ptr @portland_array_to_string(ptr #{written.operand})")
+    LlvmValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
+  in IntermediateInspect(value: shown)
+    written = llvm_value(emitter, shown)
+    made = llvm_named(written.emitter, "call ptr @portland_string_inspect(ptr #{written.operand})")
+    LlvmValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateArithmetic(operator:, left:, right:)
     first = llvm_value(emitter, left)
     second = llvm_value(first.emitter, right)

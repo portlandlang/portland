@@ -1428,8 +1428,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a call with a dot, .each_slice on line 1 is unbuilt (#443)"),
         ),
         (
-            "puts 1 < 2\n",
-            format!("{compiles} — puts of a Boolean on line 1 is unbuilt (#443)"),
+            "puts 1.5.to_s\n",
+            format!("{compiles} — a float on line 1 is unbuilt (#443)"),
         ),
         (
             "def show(number)\n  puts number\nend\nvalue = show(1)\n",
