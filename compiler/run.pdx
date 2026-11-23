@@ -22,6 +22,8 @@ program = parse_program(lex(source))
 load_path = default_load_path(path, directories)
 # Run mode: a program about to run is a closed world, so the entry's own
 # defs are read with what every caller passes (ADR 0049 §4).
-check_program_closure(path, [], load_path)
+# The core, parsed once for the checker and the evaluator both (#477).
+core = core_nodes
+check_program_closure(path, [], load_path, core: core)
 # What follows the path is the guest's own: its `System.arguments`.
-evaluate_program(program, path, rest.slice(1, rest.length - 1), load_path, data: data_section(source))
+evaluate_program(program, path, rest.slice(1, rest.length - 1), load_path, data: data_section(source), core: core)
