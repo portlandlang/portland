@@ -7275,6 +7275,22 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.pattern_matches(pattern, element)
                 }))
             }
+            // A range walks its elements for the pattern forms (ADR 0066,
+            // #402), as an array of them would answer.
+            (
+                Value::Range { .. },
+                "all?" | "any?" | "none?" | "one?" | "grep" | "grep_v" | "slice_before"
+                | "slice_after",
+                [pattern],
+            ) => {
+                return self.method_call(
+                    Value::array(range_elements(&receiver)),
+                    name,
+                    vec![pattern.clone()],
+                    Vec::new(),
+                    None,
+                );
+            }
             // A hash walks its pairs for the pattern forms, as for the rest
             // of Ruby's Enumerable (#105).
             (
