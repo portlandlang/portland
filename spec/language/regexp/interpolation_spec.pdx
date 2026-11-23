@@ -35,4 +35,19 @@ context "Regexps with interpolation" do
   specify "interpolate a number through to_s" do
     expect(/x#{1 + 1}y/).to eq(/x2y/)
   end
+
+  specify "allows interpolation of strings" do
+    str = "foo|bar"
+    expect(/#{str}/).to eq(/foo|bar/)
+  end
+
+  specify "allows interpolation of literal regexps" do
+    re = /foo|bar/
+    expect(/#{re}/).to eq(/(?-mix:foo|bar)/)
+  end
+
+  specify "allows interpolation which mixes modifiers" do
+    re = /foo/i
+    expect(/#{re} bar/m).to eq(/(?i-mx:foo) bar/m)
+  end
 end

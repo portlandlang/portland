@@ -15,4 +15,31 @@ context "Float#<" do
     expect(-0.12 < 100).to be_true
     expect(1.5 < 0x4fffffff).to be_true
   end
+
+  specify "returns true if self is less than other" do
+    expect(71.3 < 91.8).to be_true
+    expect(192.6 < -500).to be_false
+    expect(-0.12 < 0x4fffffff).to be_true
+  end
+
+  specify "returns false if one side is NaN" do
+    [1.0, 42].each { |number|
+      expect(Float::NAN < number).to be_false
+      expect(number < Float::NAN).to be_false
+    }
+  end
+
+  specify "handles positive infinity" do
+    [1.0, 42].each { |number|
+      expect(Float::INFINITY < number).to be_false
+      expect(number < Float::INFINITY).to be_true
+    }
+  end
+
+  specify "handles negative infinity" do
+    [1.0, 42].each { |number|
+      expect((-Float::INFINITY) < number).to be_true
+      expect(number < (-Float::INFINITY)).to be_false
+    }
+  end
 end
