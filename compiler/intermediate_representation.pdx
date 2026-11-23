@@ -97,6 +97,8 @@ struct IntermediateLoop
   body
 end
 
+# A way out of a function, with the value it answers, or with none where
+# the function answers nothing.
 struct IntermediateReturn
   value
 end
@@ -112,10 +114,12 @@ struct IntermediateEvaluate
 end
 
 # What lowering needs beside the statement in hand: the functions' answers
-# as bindings, and their parameter counts by name.
+# as bindings, their parameter counts by name, and whether the function
+# being lowered answers nothing, where a bare `return` is its way out.
 struct LoweringContext
   answers
   arities
+  procedure
 end
 
 # Statements lowered, and the bindings in scope after them.
@@ -138,7 +142,7 @@ def lower_program(nodes)
 panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] })
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -153,6 +157,7 @@ end
 # A def: its statements, the last one read for its value, since a def
 # answers its last expression.
 def lower_function(definition, found, context)
+  return lower_procedure(definition, found, context) if found.answer == NOTHING
   refuse_native("a def answering #{with_article(found.answer)}", definition) unless native_type?(found.answer)
   found.parameters.each do |parameter|
     refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
@@ -170,6 +175,17 @@ def lower_function(definition, found, context)
   end
   locals = closing.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
   IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes + closing.nodes)
+end
+
+# A def that answers nothing: every statement is run for what it does,
+# and the function hands nothing back.
+def lower_procedure(definition, found, context)
+  found.parameters.each do |parameter|
+    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
+  end
+  lowered = lower_statements(definition.body, found.parameters, context.with(procedure: true))
+  locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
+  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: NOTHING, locals: locals.reverse, body: lowered.nodes + [IntermediateReturn.new(value: nil)])
 end
 
 def lower_statements(statements, bindings, context)
@@ -204,6 +220,10 @@ def lower_statement(statement, bindings, context)
     other = lower_statements((else_body or []), taken.bindings, context)
     Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
   in ReturnNode(value:)
+    if context.procedure
+      refuse_native("a return with a value in a def that answers nothing", statement) unless value.nil?
+      return Lowered.new(nodes: [IntermediateReturn.new(value: nil)], bindings: bindings)
+    end
     refuse_native("a return with no value", statement) if value.nil?
     Lowered.new(nodes: [IntermediateReturn.new(value: lower_value(value, bindings, context))], bindings: bindings)
   in CallNode(name: "puts", arguments:, block:)
@@ -212,6 +232,11 @@ def lower_statement(statement, bindings, context)
     value = lower_value(arguments[0], bindings, context)
     refuse_native("puts of #{with_article(value.type)}", statement) unless value.type == ["integer"]
     Lowered.new(nodes: [IntermediatePrint.new(value: value)], bindings: bindings)
+  in CallNode(name:, arguments:, block:)
+    # A call made for what it does: one to a def that answers nothing may
+    # stand here, and nowhere a value is read.
+    refuse_native("a block", statement) unless block.nil?
+    Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_call(statement, name, arguments, bindings, context))], bindings: bindings)
   else
     Lowered.new(nodes: [IntermediateEvaluate.new(value: lower_value(statement, bindings, context))], bindings: bindings)
   end
@@ -245,7 +270,9 @@ def lower_value(node, bindings, context)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   in CallNode(name:, arguments:, block:)
     refuse_native("a block", node) unless block.nil?
-    lower_call(node, name, arguments, bindings, context)
+    called = lower_call(node, name, arguments, bindings, context)
+    panic("#{name} answers nothing, so there is no value to read from it on line #{node.line}") if called.type == NOTHING
+    called
   in IfNode(condition:, then_body:, else_body:)
     taken = then_body or []
     other = else_body or []
@@ -298,7 +325,7 @@ def render_intermediate(program)
   mutable lines = []
   program.functions.each do |function|
     parameters = function.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
-    lines << "function #{function.name}(#{parameters}) -> #{render_type(function.answer)}"
+    lines << "function #{function.name}(#{parameters}) -> #{render_pinned_type(function.answer)}"
     function.locals.each do |local|
       lines << "  local #{local[0]}: #{render_type(type_at(local, 1))}"
     end
@@ -312,7 +339,7 @@ def render_statements(statements, indent)
   statements.each do |statement|
     case statement
     in IntermediateStore(name:, value:) then lines << "#{indent}store #{name} #{render_value(value)}"
-    in IntermediateReturn(value:) then lines << "#{indent}return #{render_value(value)}"
+    in IntermediateReturn(value:) then lines << (value.nil? ? "#{indent}return" : "#{indent}return #{render_value(value)}")
     in IntermediatePrint(value:) then lines << "#{indent}print #{render_value(value)}"
     in IntermediateEvaluate(value:) then lines << "#{indent}evaluate #{render_value(value)}"
     in IntermediateLoop(condition:, body:)

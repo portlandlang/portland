@@ -93,8 +93,12 @@ def llvm_statement(emitter, statement)
     written = llvm_value(emitter, value)
     llvm_line(written.emitter, "store #{llvm_type(value.type)} #{written.operand}, ptr #{llvm_slot(name)}")
   in IntermediateReturn(value:)
-    written = llvm_value(emitter, value)
-    returned = llvm_line(written.emitter, "ret #{llvm_type(value.type)} #{written.operand}")
+    returned = if value.nil?
+      llvm_line(emitter, "ret void")
+    else
+      written = llvm_value(emitter, value)
+      llvm_line(written.emitter, "ret #{llvm_type(value.type)} #{written.operand}")
+    end
     # Whatever is written after a return needs a block of its own to sit
     # in, though nothing reaches it.
     llvm_label(returned, "after#{returned.counter}")
@@ -141,7 +145,10 @@ def llvm_value(emitter, value)
       current = written.emitter
       operands << "#{llvm_type(argument.type)} #{written.operand}"
     end
-    llvm_named(current, "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})")
+    call = "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})"
+    # A call that answers nothing has no result to name.
+    return LlvmValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
+    llvm_named(current, call)
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     test = llvm_value(emitter, condition)
     number = test.emitter.counter
@@ -198,6 +205,7 @@ def llvm_type(type)
   case type
   in ["integer"] then "i64"
   in ["boolean"] then "i1"
+  in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
   end
 end

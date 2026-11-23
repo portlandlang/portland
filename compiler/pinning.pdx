@@ -128,6 +128,7 @@ end
 # settle over a few rounds. Strict, an answer found that way is held to
 # the whole body, which must then answer it.
 def solved_answer(definition, parameters, answers, names, strict)
+  return NOTHING if answers_nothing?(definition.body, answers)
   plain = body_answer(definition.body, parameters, answers.reject { it[0] == definition.name }, names)
   return plain if concrete?(plain)
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
@@ -137,6 +138,25 @@ def solved_answer(definition, parameters, answers, names, strict)
   whole = body_answer(definition.body, parameters, [[definition.name, found]] + answers.reject { it[0] == definition.name }, names)
   whole == found ? found : ["unknown"]
 end
+
+# What a def that produces no value answers. `puts` produces none (#185),
+# so a def that ends in one has nothing to hand back, and neither has a
+# def that ends in a loop or in a call to such a def. It is a type only
+# here: inference has no word for it, and a program cannot hold one.
+NOTHING = ["nothing"]
+
+def answers_nothing?(body, answers)
+  last = body.last
+  return false if last.nil?
+  return true if last in WhileNode
+  return false unless last in CallNode
+  return true if last.name == "puts"
+  found = answers.find { it[0] == last.name }
+  found.some? && type_at(found, 1) == NOTHING
+end
+
+# A pinned type as the dump and the refusals write it.
+def render_pinned_type(type) = type == NOTHING ? "nothing" : render_type(type)
 
 # Every way out of a body, each with the type it answers: the early
 # returns, and the last statement — an `if` there counting once per arm.
@@ -238,7 +258,7 @@ def unique_types(types)
 end
 
 # Whether a type says everything a code generator needs: no unknown in it.
-def concrete?(type) = !render_type(type).include?("Unknown")
+def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
 
 def with_article(type)
   rendered = render_type(type)
@@ -253,7 +273,7 @@ def render_pinned(program)
     rendered = pinned.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
     signature = pinned.parameters.empty? ? "def #{pinned.name}" : "def #{pinned.name}(#{rendered})"
     if pinned.pinned?
-      lines << "#{signature} # -> #{render_type(pinned.answer)}"
+      lines << "#{signature} # -> #{render_pinned_type(pinned.answer)}"
     else
       lines << "#{signature}: not pinned — #{pinned.reason}"
     end
