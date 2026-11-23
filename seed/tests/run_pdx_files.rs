@@ -1773,10 +1773,6 @@ fn a_match_takes_two_values_between_brackets() {
             "an Array takes one index between brackets — with two, write slice(1, 2)",
         ),
         (
-            "p \"haystack\"[/(a)(y)/, 1]\n",
-            "a String takes one index between brackets — with two, write slice(/(a)(y)/, 1)",
-        ),
-        (
             "table = {\"a\" => 1}\np table[\"a\", 2]\n",
             "a Hash takes one index between brackets, got 2",
         ),
@@ -2172,6 +2168,18 @@ fn flat_map_a_bare_yield_and_a_defined_to_ary_agree_on_both_oracles() {
         ),
     ];
     assert_both_oracles_refuse("defined_implicit_conversion.pdx", None, &cases);
+}
+
+/// A string reads two values between brackets as its `slice` does, and a
+/// String pattern in either spelling answers the pattern or nil, on both
+/// oracles (#314).
+#[test]
+fn a_string_takes_two_values_between_brackets() {
+    assert_both_print(
+        "string_two_value_index.pdx",
+        "text = \"hello\"\np text[1, 2]\np text[/l(.)/, 1]\np text[9, 2]\np text[\"lo\"]\np text[\"xyz\"]\np text.slice(\"lo\")\n",
+        "\"el\"\n\"l\"\n\"\"\n\"lo\"\nnil\n\"lo\"\n",
+    );
 }
 
 /// The output functions write a struct's own `to_s`, and `p` its own

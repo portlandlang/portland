@@ -3472,10 +3472,16 @@ def evaluate_method_call(node, mutable bindings)
     panic("'#{node.name}' takes no keyword arguments, got #{value_at(keyword_values, 0)[0]}:") unless takes_one
   end
   # Two values between brackets (ADR 0091): a match answers the slice of
-  # its groups, the host's own; any other receiver refuses in the seed's
-  # sentence, an array and a string pointed at `slice`.
+  # its groups, the host's own, and a string its own slice; any other
+  # receiver refuses in the seed's sentence, an array pointed at `slice`.
   if node.name == "[]" && arguments.length == 2
     return outcome([receiver[value_at(arguments, 0), value_at(arguments, 1)]], bindings) if receiver in MatchData
+    # A string reads two values as its `slice` does (#314): a start and a
+    # length, or a pattern and a group.
+    if receiver in String
+      second = (value_at(arguments, 0) in Regexp) ? host_group_key(value_at(arguments, 1)) : value_at(arguments, 1)
+      return outcome([receiver.slice(value_at(arguments, 0), second)], bindings)
+    end
     panic(two_value_index_sentence(receiver, arguments))
   end
   # A set (ADR 0082): its own names answer here, a mutator names the
@@ -3900,6 +3906,9 @@ def evaluate_method_call(node, mutable bindings)
   when "slice"
     if receiver in Hash
       arguments.reduce({}) { |kept, key| kept.merge(receiver.slice(key)) }
+    elsif (receiver in String) && arguments.length == 1 && (value_at(arguments, 0) in String)
+      # A String pattern (#314): the pattern where the string holds it.
+      receiver.slice(value_at(arguments, 0))
     elsif (receiver in String) && (value_at(arguments, 0) in Regexp)
       # A pattern alone (ADR 0086) is the match's text or nil; with a group
       # by number or name, that group's.
