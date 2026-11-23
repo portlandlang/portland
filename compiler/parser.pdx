@@ -69,6 +69,17 @@ struct AliasNode
   end
 end
 
+struct AliasNode
+  kind
+  new_name
+  old_name
+  line
+
+  def sexp
+    "(alias " + new_name + " " + old_name + ")"
+  end
+end
+
 struct AlternativePatternNode
   kind
   options
