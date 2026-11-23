@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A native program yields to a block** ([#493](https://github.com/portlandlang/portland/issues/493), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a def that yields and a call that hands it a block build natively. The block is a function of its own, handed a frame holding the address of each of its writer's locals, which it reads and rebinds where they live; nothing is put on the heap.
+  - Pinning reads a block with its def: the block's parameters take the types of what the def yields, and a `yield` is read as what the block answers. Where the calls of one def hand it blocks that answer different types, the block answers nothing, since blocks run for what they do end in whatever they end in.
+  - A def or a block that ends in a binding answers what it bound, and one that ends in an `if` whose arms produce no value answers nothing.
+  - `break`, `next`, `return`, and `yield` written inside a block refuse at build by name, as does a block handed to a def that does not yield.
+  - A call with a block and no arguments carries its line in the compiler's syntax tree, which a refusal naming it needs.
 - **The third native slice is decided** ([#491](https://github.com/portlandlang/portland/issues/491), [ADR 0096](docs/adr/0096-2026-11-23-native-blocks-arrays-and-maybes.md)) — a block as its own function handed its writer's locals, an array laid out by its element type, a maybe as a flag beside its value, and the order they are built in. The core holds at Array until the native build can compile a method written in it. A decision record.
 - **A misbehaving block is refused in one sentence per fault** ([#484](https://github.com/portlandlang/portland/issues/484)) — `select block must produce true or false` read as though `select` itself must, the value after it was printed in Rust's debug form by every method still written in Rust, and a method written in the core could not name itself when its block answered nothing.
   - A block read as a verdict that answers anything else is refused as `select's block must answer true or false, got 1`, the value as `inspect` shows it, by every method that takes such a block on both implementations.
