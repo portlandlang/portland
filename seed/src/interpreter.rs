@@ -6965,6 +6965,16 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
+                // A replacement beside a block (#312): Ruby ignores the
+                // block silently, so the pair refuses rather than letting
+                // one win, as a pattern beside a block does (ADR 0066).
+                (Value::String(_), "sub" | "gsub", [_, _]) => {
+                    panic!("'{name}' takes a replacement or a block, not both")
+                }
+                (Value::String(_), "sub" | "gsub", []) => {
+                    refusal("arity");
+                    panic!("'{name}' takes 1 to 2 arguments, got 0")
+                }
                 (receiver, name, _) => {
                     if let Some(survivor) = alias_survivor(name) {
                         refusal("alias");

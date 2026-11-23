@@ -4359,6 +4359,10 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
   # empty pattern matches at every character boundary, so its pieces are the
   # characters with an empty piece at either end.
   when "sub", "gsub"
+    # A replacement beside a block refuses (#312) rather than letting one
+    # silently win — the seed's sentences.
+    panic("'#{node.name}' takes a replacement or a block, not both") if arguments.length == 2
+    panic("'#{node.name}' takes 1 to 2 arguments, got 0") if arguments.empty?
     pattern = value_at(arguments, 0)
     # A pattern (ADR 0086): the host finds each match and hands its text to
     # the guest block; once the block signals, the rest run as nothing.
