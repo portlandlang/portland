@@ -534,6 +534,89 @@ pub extern "C" fn portland_integer_negate(number: i64) -> i64 {
         .unwrap_or_else(|| refuse_program(&format!("-({number}) overflows the 64-bit integers")))
 }
 
+/// A Boolean written out, for `puts` and interpolation: a new String,
+/// held once.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_string_from_boolean(value: bool) -> *mut StringBlock {
+    string_from(&[if value { b"true" } else { b"false" }])
+}
+
+/// A text as source, between quotes, in the language's closed escape
+/// set: `\\`, `\"`, `\n`, `\r`, `\t`, the named controls, `\#` where a
+/// `#` would otherwise open an interpolation, and `\uXXXX` for every
+/// other character that does not print. Everything else is written as
+/// it is. The seed writes the same form, and a fixture holds the two
+/// together.
+fn quoted(text: &str) -> String {
+    let mut result = String::from("\"");
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '\\' => result.push_str("\\\\"),
+            '"' => result.push_str("\\\""),
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            '\u{7}' => result.push_str("\\a"),
+            '\u{8}' => result.push_str("\\b"),
+            '\u{b}' => result.push_str("\\v"),
+            '\u{c}' => result.push_str("\\f"),
+            '\u{1b}' => result.push_str("\\e"),
+            '#' if matches!(characters.peek(), Some('{' | '$' | '@')) => result.push_str("\\#"),
+            unprintable
+                if unprintable.is_control() || matches!(unprintable, '\u{2028}' | '\u{2029}') =>
+            {
+                result.push_str(&format!("\\u{:04X}", unprintable as u32));
+            }
+            printable => result.push(printable),
+        }
+    }
+    result.push('"');
+    result
+}
+
+/// `inspect` of a String: its source form, as a new String held once.
+///
+/// # Safety
+/// `text` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_inspect(text: *const StringBlock) -> *mut StringBlock {
+    unsafe { string_from(&[quoted(std::str::from_utf8_unchecked(bytes_of(text))).as_bytes()]) }
+}
+
+/// An array's source form, each element written by the kind on its
+/// block, an array inside an array by its own.
+///
+/// # Safety
+/// `array` points at a live array whose elements are what its kind says.
+unsafe fn array_source(array: *mut ArrayBlock) -> String {
+    unsafe {
+        let mut written = Vec::with_capacity((*array).length as usize);
+        for index in 0..(*array).length as usize {
+            let element = elements_of(array).add(index).read();
+            written.push(match (*array).kind {
+                BOOLEANS => (element != 0).to_string(),
+                STRINGS => quoted(std::str::from_utf8_unchecked(bytes_of(
+                    element as *const StringBlock,
+                ))),
+                ARRAYS => array_source(element as *mut ArrayBlock),
+                _ => element.to_string(),
+            });
+        }
+        format!("[{}]", written.join(", "))
+    }
+}
+
+/// An array written out, which for an array is its source form whether
+/// `puts`, `inspect`, or interpolation asks: a new String, held once.
+///
+/// # Safety
+/// `array` points at a live array.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_to_string(array: *mut ArrayBlock) -> *mut StringBlock {
+    unsafe { string_from(&[array_source(array).as_bytes()]) }
+}
+
 /// A refusal of the runtime's own: what was written so far, then the
 /// sentence on standard error, and a status no Portland program exits with.
 fn refuse(sentence: &str) -> ! {
@@ -633,6 +716,46 @@ mod tests {
         }
         assert_eq!(live_strings(), strings);
         assert_eq!(live_arrays(), arrays);
+    }
+
+    #[test]
+    fn an_array_is_written_out_in_its_source_form() {
+        let _counting = COUNTING.lock().unwrap();
+        unsafe {
+            let mut names = portland_array_new(STRINGS, 0);
+            for written in [
+                "ada",
+                "say \"hi\"",
+                "tab\there",
+                "#{x}",
+                "bell\u{7}",
+                "\u{2028}",
+            ] {
+                names = portland_array_append(
+                    names,
+                    string_from(&[written.as_bytes()]) as i64,
+                    STRINGS,
+                );
+            }
+            let source = portland_array_to_string(names);
+            assert_eq!(
+                text_of(source),
+                "[\"ada\", \"say \\\"hi\\\"\", \"tab\\there\", \"\\#{x}\", \"bell\\a\", \"\\u2028\"]"
+            );
+            portland_release(source);
+            let mut flags = portland_array_new(BOOLEANS, 0);
+            flags = portland_array_append(flags, 1, BOOLEANS);
+            flags = portland_array_append(flags, 0, BOOLEANS);
+            let rows = portland_array_append(portland_array_new(ARRAYS, 1), flags as i64, ARRAYS);
+            let source = portland_array_to_string(rows);
+            assert_eq!(text_of(source), "[[true, false]]");
+            portland_release(source);
+            portland_array_release(rows);
+            portland_array_release(names);
+            let truth = portland_string_from_boolean(true);
+            assert_eq!(text_of(truth), "true");
+            portland_release(truth);
+        }
     }
 
     #[test]
