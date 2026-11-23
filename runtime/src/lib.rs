@@ -130,6 +130,31 @@ pub extern "C" fn portland_string_from_integer(number: i64) -> *mut StringBlock 
     string_from(&[number.to_string().as_bytes()])
 }
 
+/// Whether two Strings are equal, which for a String is canonical
+/// equivalence (ADR 0038): `é` as one code point equals `é` as `e` and a
+/// combining accent. Equal bytes are equal Strings, and are the short
+/// path; otherwise the two are compared in normalized form, by the same
+/// crate the seed compares with.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_equal(
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> bool {
+    use unicode_normalization::UnicodeNormalization;
+    unsafe {
+        let (first, second) = (bytes_of(left), bytes_of(right));
+        if first == second {
+            return true;
+        }
+        let first = std::str::from_utf8_unchecked(first);
+        let second = std::str::from_utf8_unchecked(second);
+        first.nfc().eq(second.nfc())
+    }
+}
+
 /// One more name holds this String. A literal is not counted, and neither
 /// is the absence of a String: a local not yet bound.
 ///
@@ -208,12 +233,18 @@ fn refuse(sentence: &str) -> ! {
 mod tests {
     use super::*;
 
+    /// The tally of live Strings is one number for the whole process, and
+    /// tests run side by side, so each test that makes a String holds this
+    /// while it counts.
+    static COUNTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn text_of(text: *const StringBlock) -> String {
         String::from_utf8(unsafe { bytes_of(text) }.to_vec()).unwrap()
     }
 
     #[test]
     fn a_made_string_is_held_once_and_freed_by_its_last_release() {
+        let _counting = COUNTING.lock().unwrap();
         let before = live_strings();
         let number = portland_string_from_integer(-42);
         assert_eq!(text_of(number), "-42");
@@ -228,6 +259,23 @@ mod tests {
             portland_release(number);
         }
         assert_eq!(live_strings(), before);
+    }
+
+    #[test]
+    fn equality_is_canonical() {
+        let _counting = COUNTING.lock().unwrap();
+        let composed = string_from(&["caf\u{e9}".as_bytes()]);
+        let decomposed = string_from(&["cafe\u{301}".as_bytes()]);
+        let other = string_from(&["cafe".as_bytes()]);
+        unsafe {
+            assert!(portland_string_equal(composed, composed));
+            assert!(portland_string_equal(composed, decomposed));
+            assert!(portland_string_equal(decomposed, composed));
+            assert!(!portland_string_equal(composed, other));
+            portland_release(composed);
+            portland_release(decomposed);
+            portland_release(other);
+        }
     }
 
     #[test]

@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled by the deciding user 2026-11-23, one question at a time; tracked on [#461](https://github.com/portlandlang/portland/issues/461)). Unbuilt: the steps are [#462](https://github.com/portlandlang/portland/issues/462), [#463](https://github.com/portlandlang/portland/issues/463), [#464](https://github.com/portlandlang/portland/issues/464), [#465](https://github.com/portlandlang/portland/issues/465), and [#466](https://github.com/portlandlang/portland/issues/466).
+- **Status:** Accepted (ruled by the deciding user 2026-11-23, one question at a time; tracked on [#461](https://github.com/portlandlang/portland/issues/461)). Built 2026-11-23 in [#462](https://github.com/portlandlang/portland/issues/462), [#463](https://github.com/portlandlang/portland/issues/463), [#464](https://github.com/portlandlang/portland/issues/464), [#465](https://github.com/portlandlang/portland/issues/465), and [#466](https://github.com/portlandlang/portland/issues/466).
 - **Date:** 2026-11-23
 - **Issue:** [#461](https://github.com/portlandlang/portland/issues/461)
 
