@@ -8,4 +8,12 @@ context "Complex#integer?" do
   specify "the predicates" do
     expect(Complex(1, 2).integer?).to be_false
   end
+
+  specify "returns false for a Complex with no imaginary part" do
+    expect(Complex(20).integer?).to be_false
+  end
+
+  specify "returns false for a Complex with an imaginary part" do
+    expect(Complex(20,3).integer?).to be_false
+  end
 end

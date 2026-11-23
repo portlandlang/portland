@@ -31,4 +31,55 @@ context "Regexps with back-references" do
   specify "allows forward references" do
     expect(found(/(?:(\2)|(.))+/, "aa")).to eq(["aa", "a", "a"])
   end
+
+  specify "supports <n> (backreference to previous group match)" do
+    expect(/(foo.)\1/.match("foo1foo1").to_a).to eq(["foo1foo1", "foo1"])
+    expect(/(foo.)\1/.match("foo1foo2")).to be_nil
+  end
+
+  specify "resets nested <n> backreference before match of outer subexpression" do
+    expect(/(a\1?){2}/.match("aaaa").to_a).to eq(["aa", "a"])
+  end
+
+  specify "does not reset enclosed capture groups" do
+    expect(/((a)|(b))+/.match("ab").captures).to eq([ "b", "a", "b" ])
+  end
+
+  specify "can match an optional quote, followed by content, followed by a matching quote, as the whole string" do
+    expect(/^("|)(.*)\1$/.match('x').to_a).to eq(["x", "", "x"])
+  end
+
+  specify "allows forward references" do
+    expect(/(?:(\2)|(.))+/.match("aa").to_a).to eq([ "aa", "a", "a" ])
+  end
+
+  specify "fails when trying to match a backreference to an unmatched capture group" do
+    expect(/\1()/.match("")).to be_nil
+    expect(/(?:(a)|b)\1/.match("b")).to be_nil
+  end
+
+  specify "ignores backreferences > 1000" do
+    expect(/\99999/.match("99999")[0]).to eq("99999")
+  end
+
+  specify "allows numeric conditional backreferences" do
+    expect(/(a)(?(1)a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?(<1>)a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?('1')a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+  end
+
+  specify "allows negative numeric backreferences" do
+    expect(/(a)\k<-1>/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)\g<-1>/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?(<-1>)a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?('-1')a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+  end
+
+  specify "delimited numeric backreferences can start with 0" do
+    expect(/(a)\k<01>/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)\g<01>/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?(01)a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?(<01>)a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+    expect(/(a)(?('01')a|b)/.match("aa").to_a).to eq([ "aa", "a" ])
+  end
 end

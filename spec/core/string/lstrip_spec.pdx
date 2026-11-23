@@ -8,4 +8,10 @@ context "String#lstrip" do
   specify "String#lstrip and #rstrip take one end each" do
     expect("  rose".lstrip).to eq("rose")
   end
+
+  specify "strips leading \\0" do
+    null = 0.chr
+    expect((null + "hello").lstrip).to eq("hello")
+    expect((null + " " + null + "hello" + null + " " + null).lstrip).to eq("hello" + null + " " + null)
+  end
 end

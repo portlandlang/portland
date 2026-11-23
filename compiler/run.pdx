@@ -24,4 +24,4 @@ load_path = default_load_path(path, directories)
 # defs are read with what every caller passes (ADR 0049 §4).
 check_program_closure(path, [], load_path)
 # What follows the path is the guest's own: its `System.arguments`.
-evaluate_program(program, path, rest.slice(1, rest.length - 1), load_path)
+evaluate_program(program, path, rest.slice(1, rest.length - 1), load_path, data: data_section(source))
