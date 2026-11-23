@@ -1,0 +1,63 @@
+# Each of these leaks or frees twice if a release is misplaced (#465), and
+# the debug runtime refuses either: a String built up in a loop, one
+# answered early, one rebound, one passed through several defs, one built
+# and dropped, and one chosen by an `if`.
+
+def stars(count)
+  mutable line = ""
+  mutable index = 0
+  while index < count
+    line = line + "*"
+    index += 1
+  end
+  line
+end
+
+def describe(number)
+  return "none" if number < 1
+  prefix = "some: "
+  return prefix + "one" if number == 1
+  prefix + "#{number}"
+end
+
+def wrap(text) = "[" + text + "]"
+
+def wrap_twice(text) = wrap(wrap(text))
+
+def announce(text)
+  unused = text + "!"
+  puts text
+end
+
+def pick(flag, first, second)
+  if flag
+    first + "!"
+  else
+    second
+  end
+end
+
+puts stars(5)
+puts describe(0)
+puts describe(1)
+puts describe(7)
+puts wrap_twice("inner")
+
+mutable held = "first"
+held = held + " second"
+held = "third"
+held = held
+puts held
+
+announce("made " + "and passed")
+"built " + "and dropped"
+wrap("answered and dropped")
+puts pick(1 < 2, "left", "right")
+puts pick(2 < 1, "left", "right")
+
+mutable round = 0
+while round < 3
+  note = "round #{round}"
+  puts note
+  round += 1
+end
