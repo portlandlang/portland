@@ -10,6 +10,10 @@ fi
 
 brew bundle check > /dev/null 2>&1 || brew bundle
 
+# The macOS .macos-version names: a machine behind it stops here.
+. script/lib/macos.sh
+macos_check
+
 . script/lib/rust.sh
 # The Rust rust-toolchain.toml pins, with its components; with no name given,
 # rustup installs the toolchain that file selects.
