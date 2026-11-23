@@ -297,7 +297,7 @@ fn set_operand(value: &Value, context: &str) -> Vec<Value> {
             .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
             .collect(),
         other => panic!(
-            "{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got {}",
+            "{context} takes an enumerable — a Set, an Array, a Range, a Hash, or a struct that includes Enumerable — got {}",
             other.shown()
         ),
     }
@@ -3951,7 +3951,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // A set's algebra and its subset orderings (ADR 0082).
                 if let Value::Set(members) = &left
-                    && let Some(answer) = set_binary(members, *operator, &right)
+                    && let Some(answer) = {
+                        let lent =
+                            if matches!(operator, BinaryOperator::Add | BinaryOperator::Subtract) {
+                                self.lent_to_a_set(&right)
+                            } else {
+                                right.clone()
+                            };
+                        set_binary(members, *operator, &lent)
+                    }
                 {
                     return Some(answer);
                 }
@@ -4895,7 +4903,23 @@ impl<W: std::io::Write> Interpreter<W> {
     /// Ruby's), by count and fill, by count and a block handed each index,
     /// or copied from an array.
     /// `Set.new`, `Set.new(enumerable)`, and either with a block (ADR 0082).
+    /// What a value lends a set where a set takes any enumerable (#340,
+    /// docs/ruby/sets.md): a struct that includes Enumerable stands for the
+    /// elements its `each` yields, and anything else for itself.
+    fn lent_to_a_set(&mut self, value: &Value) -> Value {
+        if let Value::Struct { name, .. } = value
+            && self.structs.get(name).is_some_and(|info| info.enumerable)
+        {
+            return Value::array(self.enumerable_elements(value));
+        }
+        value.clone()
+    }
+
     fn set_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
+        let arguments: Vec<Value> = arguments
+            .iter()
+            .map(|argument| self.lent_to_a_set(argument))
+            .collect();
         let candidates = match arguments.as_slice() {
             [] => Vec::new(),
             [source] => set_operand(source, "Set.new"),
@@ -5627,6 +5651,17 @@ impl<W: std::io::Write> Interpreter<W> {
         // table's refusal.
         if let Value::Set(members) = &receiver {
             let members = members.clone();
+            let arguments = if matches!(
+                name,
+                "difference" | "disjoint?" | "intersect?" | "intersection" | "union"
+            ) {
+                arguments
+                    .iter()
+                    .map(|argument| self.lent_to_a_set(argument))
+                    .collect()
+            } else {
+                arguments.clone()
+            };
             if let Some(answered) = self.set_method(&members, name, &arguments, block) {
                 return answered;
             }

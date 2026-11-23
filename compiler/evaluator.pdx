@@ -1176,7 +1176,8 @@ def evaluate_binary(node, bindings)
   # A set's algebra and its subset orderings (ADR 0082), the seed's arms;
   # equality and the refusals stay the host's below.
   if left in ["__set__", *]
-    answered = set_binary(node.operator, value_at(left, 1), right)
+    lent = (node.operator == "+" || node.operator == "-") ? lent_to_a_set(right, right_step.bindings) : right
+    answered = set_binary(node.operator, value_at(left, 1), lent)
     return outcome([slot_value(answered)], right_step.bindings) unless answered.empty?
   end
   result = case node.operator
@@ -1835,6 +1836,14 @@ def elementwise?(left, right, strict)
   same
 end
 
+# What a value lends a set where a set takes any enumerable (#340,
+# docs/ruby/sets.md): a struct that includes Enumerable stands for the
+# elements its `each` yields, and anything else for itself.
+def lent_to_a_set(value, bindings)
+  return value unless (value in ["__struct__", *]) && struct_enumerable?(value, bindings)
+  enumerable_elements(value, bindings)
+end
+
 # The members an enumerable lends a set (ADR 0082): an array's elements, a
 # set's members, a range's integers, a hash's pairs — Ruby's reading of
 # each. Anything else refuses, `context` leading the sentence — the seed's.
@@ -1842,7 +1851,7 @@ def set_operand(value, context)
   return value if plain_array?(value)
   return value_at(value, 1) if value in ["__set__", *]
   return value.to_a if (value in Range) || (value in Hash)
-  panic("#{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got #{shorten(render_inspect(value))}")
+  panic("#{context} takes an enumerable — a Set, an Array, a Range, a Hash, or a struct that includes Enumerable — got #{shorten(render_inspect(value))}")
 end
 
 # The subset family compares sets only, as Ruby's does.
@@ -2615,7 +2624,7 @@ def evaluate_builtin_type_function(node, mutable bindings)
   # repeats dropped; a block maps each member first, as Ruby's does.
   if type_name == "Set" && node.name == "new"
     panic("Set.new takes 0 or 1 argument, got #{arguments.length}") if arguments.length > 1
-    candidates = arguments.empty? ? [] : set_operand(value_at(arguments, 0), "Set.new")
+    candidates = arguments.empty? ? [] : set_operand(lent_to_a_set(value_at(arguments, 0), bindings), "Set.new")
     return mapped_guest_set(node, candidates, bindings)
   end
   return outcome([guest_set(arguments)], bindings) if type_name == "Set" && node.name == "[]"
@@ -3457,7 +3466,8 @@ def evaluate_method_call(node, mutable bindings)
     refuse_set_mutator(node.name)
     if node.block.nil? && set_own_name?(node.name)
       check_builtin_count(receiver, node.name, arguments.length)
-      return outcome([set_own_answer(node.name, value_at(receiver, 1), arguments)], bindings)
+      lent = %w[difference disjoint? intersect? intersection union].include?(node.name) ? arguments.map { lent_to_a_set(it, bindings) } : arguments
+      return outcome([set_own_answer(node.name, value_at(receiver, 1), lent)], bindings)
     end
     return evaluate_set_block_call(node, receiver, arguments, bindings) if node.block.some? && %w[classify to_set].include?(node.name)
     if node.name == "classify"
