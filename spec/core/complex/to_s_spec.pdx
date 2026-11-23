@@ -9,4 +9,42 @@ context "Complex#to_s" do
     expect(Complex(1, 2).to_s).to eq("1+2i")
     expect(Complex(1.0, 2).to_s).to eq("1.0+2i")
   end
+
+  describe "when self's real component is 0" do
+    specify "returns both the real and imaginary component even when the real is 0" do
+      expect(Complex(0, 5).to_s).to eq("0+5i")
+      expect(Complex(0, -3.2).to_s).to eq("0-3.2i")
+    end
+  end
+
+  specify "returns self as String" do
+    expect(Complex(1, 5).to_s).to eq("1+5i")
+    expect(Complex(-2.5, 1.5).to_s).to eq("-2.5+1.5i")
+
+    expect(Complex(1, -5).to_s).to eq("1-5i")
+    expect(Complex(-2.5, -1.5).to_s).to eq("-2.5-1.5i")
+
+    expect(Complex(1, 0).to_s).to eq("1+0i")
+    expect(Complex(1, -0).to_s).to eq("1+0i")
+  end
+
+  specify "returns 1+0.0i for Complex(1, 0.0)" do
+    expect(Complex(1, 0.0).to_s).to eq("1+0.0i")
+  end
+
+  specify "returns 1-0.0i for Complex(1, -0.0)" do
+    expect(Complex(1, -0.0).to_s).to eq("1-0.0i")
+  end
+
+  specify "returns 1+Infinity*i for Complex(1, Infinity)" do
+    expect(Complex(1, Float::INFINITY).to_s).to eq("1+Infinity*i")
+  end
+
+  specify "returns 1-Infinity*i for Complex(1, -Infinity)" do
+    expect(Complex(1, -Float::INFINITY).to_s).to eq("1-Infinity*i")
+  end
+
+  specify "returns 1+NaN*i for Complex(1, NaN)" do
+    expect(Complex(1, Float::NAN).to_s).to eq("1+NaN*i")
+  end
 end

@@ -4,8 +4,50 @@
 
 require_relative "../../spec_helper"
 
+struct EachSliceNumerous
+  list
+
+  include Enumerable
+
+  def each
+    list.each { |item| yield item }
+  end
+end
+
+struct EachSliceYieldsMulti
+  first
+
+  include Enumerable
+
+  def each
+    yield 1, 2
+    yield 3, 4, 5
+    yield 6, 7, 8, 9
+  end
+end
+
 context "Enumerable#each_slice" do
   specify "each_slice chunks and flat_map opens one level" do
     expect([1, 2, 3, 4].each_slice(2).to_a).to eq([[1, 2], [3, 4]])
+  end
+
+  specify "gathers whole arrays as elements when each yields multiple" do
+    multi = EachSliceYieldsMulti.new(first: 1)
+    expect(multi.each_slice(2).to_a).to eq([[[1, 2], [3, 4, 5]], [[6, 7, 8, 9]]])
+  end
+
+  describe "when no block is given" do
+    specify "returns the ceil of Enumerable size divided by the argument value" do
+      numbers = EachSliceNumerous.new(list: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      expect(numbers.each_slice(10).size).to eq(1)
+      expect(numbers.each_slice(9).size).to eq(2)
+      expect(numbers.each_slice(3).size).to eq(4)
+      expect(numbers.each_slice(2).size).to eq(5)
+      expect(numbers.each_slice(1).size).to eq(10)
+    end
+
+    specify "returns 0 when the Enumerable is empty" do
+      expect(EachSliceNumerous.new(list: []).each_slice(10).size).to eq(0)
+    end
   end
 end

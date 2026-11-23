@@ -18,4 +18,17 @@ context "Integer#odd?" do
     expect((-2).odd?).to be_false
     expect((-1).odd?).to be_true
   end
+
+  describe "fixnum" do
+    specify "returns true when self is an odd number" do
+      expect((-2).odd?).to be_false
+      expect((-1).odd?).to be_true
+
+      expect(0.odd?).to be_false
+      expect(1.odd?).to be_true
+      expect(2.odd?).to be_false
+
+
+    end
+  end
 end

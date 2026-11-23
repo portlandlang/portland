@@ -323,6 +323,12 @@ impl Pattern {
         self.anchored().search_from(text, at).is_some()
     }
 
+    /// Whether the pattern matches right at a byte offset of `text` with
+    /// `\G` standing at another: a backward search's question.
+    pub fn matches_start_from(&self, text: &str, at: usize, global: usize) -> bool {
+        self.compiled.matches_at(text, at, global)
+    }
+
     /// Every match in `text`, non-overlapping — the next search begins
     /// where a match ended, one character on when it was empty — Ruby's
     /// `scan` positions.
@@ -406,13 +412,15 @@ impl Found {
     }
 
     /// A group by an index value: a number, counted from the end when
-    /// negative; a name as a string or a symbol.
+    /// negative; a name as a string or a symbol. A negative number reaches
+    /// the captures only, Ruby's rule: one that counts back to the whole
+    /// match, or past it, names no group (#315).
     pub fn group_of(&self, index: &Value) -> Result<Option<usize>, String> {
         match index {
             Value::Integer(number) => {
                 let count = self.spans.len() as i64;
                 let position = if *number < 0 { count + number } else { *number };
-                if position < 0 || position >= count {
+                if position < 0 || position >= count || (*number < 0 && position == 0) {
                     return Ok(None);
                 }
                 Ok(Some(position as usize))
@@ -445,6 +453,13 @@ impl Found {
             Some((_, end)) => Value::Integer(self.position(end)),
             None => Value::Nil,
         }
+    }
+
+    /// The whole match, then every group: what `to_a` answers.
+    pub fn groups(&self) -> Vec<Value> {
+        (0..self.spans.len())
+            .map(|group| self.group_value(group))
+            .collect()
     }
 
     pub fn captures(&self) -> Vec<Value> {
@@ -553,6 +568,19 @@ pub fn expand_replacement(replacement: &str, found: &Found) -> String {
             Some('`') => expanded.push_str(found.pre_match()),
             Some('\'') => expanded.push_str(found.post_match()),
             Some('\\') => expanded.push('\\'),
+            // `\+` is the last group that took part in the match, Ruby's
+            // rule: the highest-numbered one with text, and nothing where
+            // the pattern has no groups or none matched (#310).
+            Some('+') => {
+                let last = (1..found.spans.len())
+                    .rev()
+                    .find(|group| found.spans[*group].is_some());
+                if let Some(group) = last
+                    && let Value::String(text) = found.group_value(group)
+                {
+                    expanded.push_str(&text);
+                }
+            }
             Some('k') if characters.peek() == Some(&'<') => {
                 characters.next();
                 let mut name = String::new();
@@ -706,10 +734,14 @@ pub fn index_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value {
 }
 
 /// `rindex(pattern, from)`: the position of the last match starting at
-/// or before `from`, as a maybe.
+/// or before `from`, as a maybe. A position past the end is the end, as
+/// the String form reads it, and `\G` stands at `from` for every start
+/// tried — Ruby's rules both (#317).
 pub fn rindex_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value {
+    let count = text.graphemes(true).count() as i64;
     let limit = match from {
         None => text.len(),
+        Some(position) if position > count => text.len(),
         Some(position) => match byte_at(text, position) {
             Some(byte) => byte,
             None => return Value::Nil,
@@ -724,7 +756,7 @@ pub fn rindex_of(text: &str, pattern: &Rc<Pattern>, from: Option<i64>) -> Value 
         starts.push(text.len());
     }
     for start in starts.into_iter().rev() {
-        if pattern.matches_start(text, start) {
+        if pattern.matches_start_from(text, start, limit) {
             return Value::Integer(text[..start].graphemes(true).count() as i64);
         }
     }
@@ -831,41 +863,71 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         (Value::MatchData(found), "size" | "length", []) => {
             Some(Value::Integer(found.spans.len() as i64))
         }
-        (Value::MatchData(found), "to_a", []) => Some(Value::array(
-            (0..found.spans.len())
-                .map(|group| found.group_value(group))
-                .collect(),
-        )),
-        (Value::MatchData(found), "values_at", indices) => Some(Value::array(
-            indices
-                .iter()
-                .map(|index| match group_or_refuse(found, index) {
-                    Some(group) => found.group_value(group),
-                    None => Value::Nil,
-                })
-                .collect(),
-        )),
-        (Value::MatchData(found), "begin", [index]) => Some(match group_or_refuse(found, index) {
+        (Value::MatchData(found), "to_a", []) => Some(Value::array(found.groups())),
+        // A range picks its run of groups as an array's `values_at` does,
+        // nil past the end (#214); a number or a name picks one group.
+        (Value::MatchData(found), "values_at", indices) => {
+            let groups = found.groups();
+            let mut picked = Vec::new();
+            for index in indices {
+                match index {
+                    Value::Range { .. } => {
+                        crate::interpreter::values_at_position(&groups, index, &mut picked)
+                    }
+                    _ => picked.push(match group_or_refuse(found, index) {
+                        Some(group) => found.group_value(group),
+                        None => Value::Nil,
+                    }),
+                }
+            }
+            Some(Value::array(picked))
+        }
+        (Value::MatchData(found), "begin", [index]) => Some(match positioned_group(found, index) {
             Some(group) => found.begin_of(group),
             None => {
                 crate::interpreter::refusal("arguments");
                 panic!("index {} out of matches", index.shown())
             }
         }),
-        (Value::MatchData(found), "end", [index]) => Some(match group_or_refuse(found, index) {
+        (Value::MatchData(found), "end", [index]) => Some(match positioned_group(found, index) {
             Some(group) => found.end_of(group),
             None => {
                 crate::interpreter::refusal("arguments");
                 panic!("index {} out of matches", index.shown())
             }
         }),
-        (Value::MatchData(found), "offset", [index]) => Some(match group_or_refuse(found, index) {
-            Some(group) => Value::array(vec![found.begin_of(group), found.end_of(group)]),
-            None => {
-                crate::interpreter::refusal("arguments");
-                panic!("index {} out of matches", index.shown())
-            }
-        }),
+        (Value::MatchData(found), "offset", [index]) => {
+            Some(match positioned_group(found, index) {
+                Some(group) => Value::array(vec![found.begin_of(group), found.end_of(group)]),
+                None => {
+                    crate::interpreter::refusal("arguments");
+                    panic!("index {} out of matches", index.shown())
+                }
+            })
+        }
+        // A match's slices are its groups' (ADR 0091, #214): a range or a
+        // start and a length answers an array, empty past either end as an
+        // array's slice is (ADR 0019), where Ruby answers nil.
+        (Value::MatchData(found), "[]", [range @ Value::Range { .. }]) => {
+            let groups = found.groups();
+            let (from, to) = crate::interpreter::slice_bounds(range, groups.len());
+            Some(Value::array(groups[from..to].to_vec()))
+        }
+        (Value::MatchData(found), "[]", [Value::Integer(start), Value::Integer(length)]) => {
+            Some(Value::array(crate::interpreter::run_from(
+                &found.groups(),
+                *start,
+                *length,
+            )))
+        }
+        (Value::MatchData(_), "[]", [start, length]) => {
+            crate::interpreter::refusal("arguments");
+            panic!(
+                "a match's [start, length] takes two integers, got {} and {}",
+                start.shown(),
+                length.shown()
+            )
+        }
         (Value::MatchData(found), "[]", [index]) => Some(match group_or_refuse(found, index) {
             Some(group) => found.group_value(group),
             None => Value::Nil,
@@ -958,7 +1020,9 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
                 None => Value::Nil,
             })
         }
-        (Value::String(text), "slice" | "[]", [Value::Regex(pattern), group]) => {
+        // By name only: `text[/pattern/, group]` is a string's two-value
+        // index, which refuses toward this spelling (#314).
+        (Value::String(text), "slice", [Value::Regex(pattern), group]) => {
             Some(match pattern.search(text) {
                 Some(found) => match group_or_refuse(&found, group) {
                     Some(group) => found.group_value(group),
@@ -1018,6 +1082,15 @@ pub fn method(receiver: &Value, name: &str, arguments: &[Value]) -> Option<Value
         }
         _ => None,
     }
+}
+
+/// The group `begin`, `end`, and `offset` ask about. A negative index
+/// names none of them, as in Ruby, though `[]` counts one back (#392).
+fn positioned_group(found: &Found, index: &Value) -> Option<usize> {
+    if matches!(index, Value::Integer(number) if *number < 0) {
+        return None;
+    }
+    group_or_refuse(found, index)
 }
 
 fn group_or_refuse(found: &Found, index: &Value) -> Option<usize> {
