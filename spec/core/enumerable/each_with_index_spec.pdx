@@ -86,4 +86,9 @@ context "Enumerable#each_with_index" do
     expect(pairs).to eq([[:a, 0], [:b, 1]])
     expect(answer).to eq(members)
   end
+
+  specify "answers each element beside its index when given no block" do
+    expect(["a", "b"].each_with_index).to eq([["a", 0], ["b", 1]])
+    expect([[1, 2]].each_with_index.to_a).to eq([[[1, 2], 0]])
+  end
 end
