@@ -48,10 +48,74 @@
 # threads a list of what it found — `found`, in and out of every check —
 # and the closure refuses once at the end with the whole report, in
 # source order, each file in dependency order. Nothing panics mid-walk.
+#
+# — the whole-program door (#94, ADR 0049) —
+#
+# A program is an entry file and everything `require_relative` pulls in,
+# transitively, resolved as the runtime resolves it (paths.pdx). Each file
+# is checked once, in dependency order, with the declarations of its
+# transitive requires in view; a required file's locals never cross; a
+# computed require path is an edge the walk declines; a cycle finds the
+# file it came from still in progress and takes nothing from it, which is
+# what the runtime's load-once does too.
+#
+# — sharpening (ADR 0048 ruling 4, ADR 0049 §4) —
+#
+# In run mode every caller of the entry file's defs is in view. A
+# parameter every caller passes the same fully known type is read at that
+# type inside its body, and the ordinary shapes reach a place they could
+# not see. Callers that disagree, a parameter no one passes, an unknown
+# anywhere, a def defined twice, a call with the wrong count — each leaves
+# the parameter at its default's type or unknown, exactly as outside run
+# mode.
+#
+# Each inference-backed check reads a type off inference and refuses
+# through the renderer, and
+# each fires only where the type is fully known: an unknown anywhere in it
+# is a decline. The seed says the same sentences at runtime, with the
+# value where these say the type.
+#
+# — coverage and reachability (ADR 0035) —
+#
+# These checks read the arms alone: each refuses only where it can
+# *prove* non-coverage over a set the arms themselves establish, and stays
+# silent where it merely cannot prove coverage (ADR 0035 §1). Inference
+# widens where coverage applies — check_maybe_coverage and
+# check_boolean_coverage read the set off the subject's type; it does not
+# gate whether these exist.
 
 require_relative "core"
 require_relative "paths"
 require_relative "refusals"
+
+# What one file declares for the files that require it (#94): the same
+# six lists a Scope carries program-wide, without the locals — a required
+# file's locals stay unknown to its requirer on purpose (#95).
+struct Declarations
+  arities
+  # The functions the core defined (ADR 0093): as fixed as a builtin, so a
+  # file that defines one is told it is a builtin's name.
+  builtins
+  constants
+  contracts
+  enums
+  globals
+  # The constants `private_constant` hid, qualified, and each struct's
+  # private and protected methods (ADR 0076).
+  private_constants
+  shapes
+  traits
+  visibilities
+end
+
+# One file of a resolved closure (#94): what to check it with.
+struct Resolved
+  imports
+  named
+  nodes
+  path
+  source
+end
 
 # What the walk carries into every node: the program's enum declarations,
 # and — for the inference-backed checks (ADR 0047) — the types it knows.
@@ -81,107 +145,389 @@ struct Scope
   visibilities
 end
 
-# One file of a resolved closure (#94): what to check it with.
-struct Resolved
-  imports
-  named
-  nodes
-  path
-  source
-end
-
-# What one file declares for the files that require it (#94): the same
-# six lists a Scope carries program-wide, without the locals — a required
-# file's locals stay unknown to its requirer on purpose (#95).
-struct Declarations
-  arities
-  # The functions the core defined (ADR 0093): as fixed as a builtin, so a
-  # file that defines one is told it is a builtin's name.
-  builtins
-  constants
-  contracts
-  enums
-  globals
-  # The constants `private_constant` hid, qualified, and each struct's
-  # private and protected methods (ADR 0076).
-  private_constants
-  shapes
-  traits
-  visibilities
-end
-
-# Every enum declaration in the program, as [name, labels] pairs — all of
-# them, not just the textually-earlier ones: a build reads the whole file
-# before judging any line of it.
-def declared_cases(nodes)
-  mutable declarations = []
-  nodes.each do |node|
-    declarations += declarations_in(node)
+# The parameters of one def every caller agrees on. A caller that omits an
+# optional parameter passes its default; a caller with the wrong count, or
+# one whose argument fails the parameter's contract, is a refusal at its
+# own call site — the better sentence, where the mistake was made — and
+# disqualifies the parameter here, so the body never refuses first with
+# a lesser one.
+def agreed_parameters(node, calls, declarations)
+  return [] if calls.empty?
+  globals = declarations.globals
+  positional = node.parameters.reject { it in KeywordParameterNode }
+  mutable pairs = []
+  node.parameters.each do |parameter|
+    contract = parameter_entry(parameter, node.body, globals)
+    mutable seen = []
+    mutable disqualified = false
+    calls.each do |call|
+      passed = argument_passed(parameter, positional.index(parameter), call, globals)
+      disqualified = true if passed.nil? || !satisfies?(passed, contract, declarations)
+      seen << passed unless passed.nil? || seen.include?(passed)
+    end
+    next if disqualified || seen.length != 1
+    agreed = seen.first or ["unknown"]
+    next unless known?(agreed)
+    pairs << [parameter.name, agreed]
   end
-  declarations
+  pairs
 end
 
-def declarations_in(node)
+# A dotted demand is answered by the method set; `==` and `!=` by every
+# value; an index by a string, array, or hash; any other operator is a
+# builtin's to decide with its right operand, so a builtin is taken to
+# answer it, and a struct — which has no operators — is not.
+def answers_demand?(type, methods, demand)
+  return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
+  return true if demand == "==" || demand == "!="
+  return (type == ["string"]) || (type in ["array", *]) || (type in ["hash", *]) if demand == "[]"
+  !(type in ["struct", *])
+end
+
+# The method set an argument's type states whole: a declared struct's
+# (declared_shapes), or a builtin's (the table, #88). Nil for anything
+# else — a maybe, an unknown, a struct declared elsewhere.
+def argument_methods(type, scope)
+  return nil unless known?(type)
+  if type in ["struct", *]
+    shape = scope.shapes.find { it[0] == type_at(type, 1) }
+    return nil if shape.nil?
+    return value_at_checked(shape, 1)
+  end
+  builtin_methods(type)
+end
+
+# What one call passes for one parameter: by position, by label for a
+# keyword parameter, the default's type when omitted — or nil where the
+# call cannot be paired with it.
+def argument_passed(parameter, position, call, globals)
+  positional_types = value_at_checked(call, 1)
+  keyword_types = value_at_checked(call, 2)
+  if parameter in KeywordParameterNode
+    given = keyword_types.find { it[0] == parameter.name }
+    return value_at_checked(given, 1) unless given.nil?
+    return parameter_type(parameter, globals) if parameter.default.some?
+    return nil
+  end
+  return nil if position.nil?
+  return value_at_checked(positional_types, position) if position < positional_types.length
+  return parameter_type(parameter, globals) if (parameter in AssignmentNode) && parameter.value.some?
+  nil
+end
+
+def arm_case_name(pattern)
+  return pattern.value if pattern in SymbolNode
+  return pattern.name if pattern in EnumCasePatternNode
+  nil
+end
+
+def bind_local(scope, name, type)
+  scope.with(locals: [[name, type]] + scope.locals)
+end
+
+# The bindings a statement leaves for the statements after it — inference's
+# bind_after, writing the locals and reading the globals beside them.
+def bind_statement(node, scope)
+  scope.with(locals: bind_after(node, scope.locals, scope.globals))
+end
+
+# A block keeps the locals around it and binds its parameters from the
+# receiver's type, as inference does — an array lends its element, a hash
+# its key then value, a range integers, anything else unknown.
+def block_scope(node, receiver, scope)
+  mutable bound = scope
+  argument_types = node.arguments.map { synthesize(it, known_types(scope)) }
+  node.block.parameters.each_with_index do |parameter, index|
+    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: node.block.parameters.length)
+    bound = bind_local(bound, parameter, bound_type)
+  end
+  bound
+end
+
+# The Booleans a pattern matches: both for a capture or the type's name,
+# its own for a literal, none for a literal of another type, and nil for
+# a pattern whose reach depends on a value the checker does not have.
+def booleans_taken(pattern)
+  case pattern
+  in BooleanNode(value:) then [value]
+  in IdentifierNode then %w[true false]
+  in NilNode | IntegerNode | FloatNode | StringNode | SymbolNode then []
+  in BindingPatternNode then booleans_taken(pattern.pattern)
+  in AlternativePatternNode(options:)
+    mutable taken = []
+    options.each do |option|
+      reach = booleans_taken(option)
+      return nil if reach.nil?
+      taken += reach
+    end
+    taken
+  in StructPatternNode(name:, fields:)
+    return %w[true false] if name == "Boolean" && fields.empty?
+    nil
+  else
+    nil
+  end
+end
+
+# The seed's own list (`builtin_name`): the bare functions every program
+# can call without defining — and `fields`, which outside `def self.new`
+# has a designed refusal of its own (ADR 0031) that the runtime keeps.
+def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf puts rand require require_relative some sprintf srand warn].include?(name)
+
+# A builtin type's name, as a `when` value or a `===` pattern tests for it
+# (#151): a type, not a value, so not a name to find defined.
+def builtin_type_name?(node)
+  (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(node.name)
+end
+
+# Every bare call in a body with its argument types — [name, positional
+# types, [[label, type]]] — read with the scoping the checks use: a def
+# body from its parameters, a loop or block body with its rebindings
+# forgotten, a nested body's captures unknown. Struct, trait, and module
+# bodies are skipped, since a bare call inside them may reach their own
+# defs first. Narrowing is not applied — a maybe stays a maybe here,
+# which can only make callers disagree.
+def calls_in(nodes, mutable locals, globals, mutable found)
+  nodes.each do |node|
+    found = calls_in_node(node, locals, globals, found)
+    locals = bind_after(node, locals, globals)
+  end
+  found
+end
+
+def calls_in_block(node, receiver, locals, globals, found)
+  block = node.block
+  return found if block.nil?
+  argument_types = node.arguments.map { synthesize(it, locals + globals) }
+  mutable inner = locals
+  block.parameters.each_with_index do |parameter, index|
+    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: block.parameters.length)
+    inner = [[parameter, bound_type]] + inner
+  end
+  calls_in(block.body, forget_types(inner, assigned_names_in_body(block.body)), globals, found)
+end
+
+def calls_in_node(node, locals, globals, mutable found)
+  return found if node.nil?
   case node
-  in EnumDefNode
-    mutable found = []
-    node.cases.each do |declared|
-      # The third element is the owning enum: membership needs only the
-      # case, coverage (ADR 0035) needs the set it belongs to.
-      found << [declared.name, declared.labels, node.name]
+  in DefNode
+    mutable inner = []
+    node.parameters.each do |parameter|
+      inner = [[parameter.name, parameter_type(parameter, globals)]] + inner
+    end
+    calls_in(node.body, inner, globals, found)
+  in StructDefNode | TraitDefNode | ModuleDefNode then found
+  in WhileNode(condition:, body:)
+    found = calls_in_node(condition, locals, globals, found)
+    calls_in(body, forget_types(locals, assigned_names_in_body(body)), globals, found)
+  in IfNode(condition:, then_body:, else_body:)
+    found = calls_in_node(condition, locals, globals, found)
+    found = calls_in(then_body or [], locals, globals, found)
+    calls_in(else_body or [], locals, globals, found)
+  in CaseNode(subject:, branches:, else_body:)
+    found = calls_in_node(subject, locals, globals, found)
+    branches.each do |branch|
+      found = calls_in(branch.values, locals, globals, found)
+      found = calls_in(branch.body, locals, globals, found)
+    end
+    calls_in(else_body or [], locals, globals, found)
+  in CaseInNode(subject:, branches:, else_body:)
+    found = calls_in_node(subject, locals, globals, found)
+    branches.each do |branch|
+      captured = bind_unknowns(locals, pattern_names(branch.pattern))
+      found = calls_in_node(branch.guard, captured, globals, found) unless branch.guard.nil?
+      found = calls_in(branch.body, captured, globals, found)
+    end
+    calls_in(else_body or [], locals, globals, found)
+  in CallNode(name:, arguments:, block:)
+    mutable positional = []
+    mutable keywords = []
+    arguments.each do |argument|
+      found = calls_in_node(argument, locals, globals, found)
+      if argument in KeywordArgumentNode
+        keywords << [argument.label, synthesize(argument.value, locals + globals)]
+      else
+        positional << synthesize(argument, locals + globals)
+      end
+    end
+    found << [name, positional, keywords]
+    calls_in_block(node, ["unknown"], locals, globals, found)
+  in MethodCallNode | SafeMethodCallNode
+    found = calls_in_node(node.receiver, locals, globals, found)
+    node.arguments.each do |argument|
+      found = calls_in_node(argument, locals, globals, found)
+    end
+    calls_in_block(node, synthesize(node.receiver, locals + globals), locals, globals, found)
+  else
+    children_of(node).each do |child|
+      found = calls_in_node(child, locals, globals, found)
     end
     found
-  in ModuleDefNode(body:) then declared_cases(body)
-  in StructDefNode(nested:) then declared_cases(nested)
-  else
-    []
   end
 end
 
-# The one-file entry point: refuse with everything found, or stay silent.
-def check_program(nodes, source)
-  report(check_program_with(nodes, source, nil, empty_declarations, []))
+def cases_named(enums, name)
+  enums.select { it[0] == name }
 end
 
-# One file, with what its requires declare in view (#94): its own
-# declarations first, so a name declared on both sides resolves to its own.
-# Answers what it found, in source order.
-def check_program_with(nodes, source, file, imports, sharpened)
-  own = declarations_of(nodes)
-  whole = merge_declarations(own, imports)
-  # A bare name is judged (#98) only where every name the file can see is
-  # in view: a require the walk could not resolve may declare anything.
-  judging = nodes.none? { computed_require?(it) }
-  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: [], private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
-  annotated = check_annotations(nodes, source, scope, [])
-  found = check_requires(nodes, false, scope, annotated)
-  walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
-  hidden = check_private_constant_names(nodes, "", scope, walked.last)
-  in_source_order(check_body(nodes, scope, hidden))
+def cases_of(enums, enum_name)
+  enums.select { value_at_checked(it, 2) == enum_name }.map { it[0] }
 end
 
-# Refusals in the order the source has them: by line, with the walk's own
-# order breaking ties and standing in where a node carries no line. One
-# integer key per entry, since the sort need not be stable.
-def in_source_order(found)
-  mutable keyed = []
-  found.each_with_index do |entry, index|
-    location = type_at(entry, 1)
-    line = if location.nil? then 0 else location.first end
-    keyed << [line * 100000 + index, entry]
+# Shape 5 — an annotation that lies (ADR 0041 §5; the words are ADR
+# 0047's). A top-level def's `# -> Type` is read off the source the way
+# the dump reads it and compared, as text, with the rendering of the
+# return inference computed — the annotation grammar *is* the dump's
+# rendering (ADR 0041 §4), so byte equality is the rule. Agreement and an
+# unknown answer are both silence; only a known disagreement refuses.
+def check_annotations(nodes, source, scope, mutable found)
+  nodes.each do |node|
+    next unless node in DefNode
+    written = annotation_for(source, node.name)
+    next if written.nil?
+    computed = synthesize_name(node.name, scope.globals)
+    next unless known?(computed)
+    next if render_type(computed) == written
+    found = noted(found, ["annotation", node.name, computed, written], locate(node, scope))
   end
-  keyed.sort_by { it.first }.map { type_at(it, 1) }
+  found
 end
 
-# — the whole-program door (#94, ADR 0049) —
-#
-# A program is an entry file and everything `require_relative` pulls in,
-# transitively, resolved as the runtime resolves it (paths.pdx). Each file
-# is checked once, in dependency order, with the declarations of its
-# transitive requires in view; a required file's locals never cross; a
-# computed require path is an edge the walk declines; a cycle finds the
-# file it came from still in progress and takes nothing from it, which is
-# what the runtime's load-once does too.
+def check_argument(call, argument, entry, scope, found)
+  def_name = call.name
+  return found unless entry in ["needs", *]
+  demands = type_at(entry, 1)
+  type = synthesize(argument, known_types(scope))
+  methods = argument_methods(type, scope)
+  return found if methods.nil?
+  missing = demands.reject { answers_demand?(type, methods, it) }
+  return found if missing.empty?
+  spelling = spell_node(argument)
+  return found if spelling.nil?
+  noted(found, ["contract", spelling, type, def_name, wanted_by(demands, missing, scope)], locate(call, scope))
+end
+
+# The sixth wording, the seed's own moved to build time (ADR 0034 §2,
+# ADR 0047): a bare call to a top-level def with the wrong number of
+# positional arguments. Keyword arguments stand outside the count, as in
+# the seed; inside a struct's methods no bare call is judged (method_scope).
+def check_arity(node, scope, found)
+  arity = scope.arities.find { it[0] == node.name }
+  return found if arity.nil?
+  # A refused argument is not an argument to count (#202).
+  return found if node.arguments.any? { it in ErrorNode }
+  required = value_at_checked(arity, 1)
+  total = value_at_checked(arity, 2)
+  given = node.arguments.reject { it in KeywordArgumentNode }.length
+  return found if given >= required && given <= total
+  expected = if required == total then required.to_s else "#{required} to #{total}" end
+  noted(found, ["arity", node.name, expected, given], locate(node, scope))
+end
+
+# A block body may run many times or never, so — like a loop's — it is
+# walked with the names it rebinds already forgotten.
+def check_block(node, receiver, scope, found)
+  block = node.block
+  return found if block.nil?
+  entered = block_scope(node, receiver, scope)
+  check_body(block.body, forget(entered, assigned_names_in_body(block.body)), found)
+end
+
+# A body is walked in order, each statement seen with the bindings the
+# statements above it left behind. Every walk function takes what has
+# been found so far and answers it with its own findings appended.
+def check_body(nodes, mutable scope, mutable found)
+  nodes.each do |node|
+    found = check_node(node, scope, found)
+    scope = bind_statement(node, scope)
+  end
+  found
+end
+
+# Coverage widened by inference (ADR 0035 §1): a subject inference knows
+# to be a Boolean is true or false and nothing else, so the unguarded arms
+# must take both whatever they reveal. An arm whose reach cannot be read
+# off its pattern — a pin, say — leaves the question open, and an open
+# question is silence.
+def check_boolean_coverage(node, scope, found)
+  subject = synthesize(node.subject, known_types(scope))
+  return found unless subject == ["boolean"]
+  left_out = uncovered_booleans(unguarded_arms(node).map { it.pattern })
+  return found if left_out.nil? || left_out.empty?
+  noted(found, ["coverage", left_out.join(", ")], locate(node, scope))
+end
+
+# Shape 2 for builtin receivers (#88): the seed's own answers, tabled in
+# inference.pdx from its behavior. A fully known builtin type whose table
+# lacks the name refuses; anything without a table declines.
+def check_builtin_method(node, receiver, scope, found)
+  return found unless known?(receiver)
+  # `found[start, length]` (ADR 0091) parses as a call of `[]`, which no
+  # table lists: a match answers it, and the run refuses it for any other
+  # receiver in a sentence that names `slice`.
+  return found if node.name == "[]"
+  methods = builtin_methods(receiver)
+  return found if methods.nil?
+  return found if methods.include?(node.name)
+  # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
+  survivor = alias_survivor(node.name)
+  return noted(found, ["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
+  # A removed Ruby method names its rewrite (#135): `fetch`, `push`,
+  # `freeze`, `send`, and kin.
+  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
+  spelling = spell_node(node.receiver)
+  return found if spelling.nil?
+  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
+end
+
+def check_call(node, scope, mutable found)
+  found = check_defined(node.name, node, scope, found)
+  found = check_body(node.arguments, scope, found)
+  found = check_arity(node, scope, found)
+  found = check_contracts(node, scope, found)
+  check_block(node, ["unknown"], scope, found)
+end
+
+def check_case(node, scope, mutable found)
+  found = check_node(node.subject, scope, found)
+  node.branches.each do |branch|
+    found = check_body(branch.values.reject { builtin_type_name?(it) }, scope, found)
+    found = check_body(branch.body, scope, found)
+  end
+  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
+  found
+end
+
+def check_case_in(node, scope, mutable found)
+  found = check_node(node.subject, scope, found)
+  mutable nil_seen = false
+  node.branches.each do |branch|
+    found = check_pattern(branch.pattern, scope, found)
+    arm = with_proof(scope, arm_bindings(node, branch, nil_seen, known_types(scope)))
+    found = check_node(branch.guard, arm, found) unless branch.guard.nil?
+    found = check_body(branch.body, arm, found)
+    nil_seen = true if nil_arm?(branch)
+  end
+  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
+  found = check_unreachable_arms(node, scope, found)
+  return found unless node.else_body.nil?
+  found = check_maybe_coverage(node, scope, found)
+  found = check_boolean_coverage(node, scope, found)
+  check_coverage(node, scope, found)
+end
+
+# `in :paid(on:)` naming an undeclared case — the seed says nothing and the
+# pattern silently never matches, which is how a typo becomes a branch that
+# cannot fire. The first refusal with no oracle behind it (ADR 0034 §3).
+def check_case_pattern(pattern, scope, mutable found)
+  if cases_named(scope.enums, pattern.name).empty?
+    found = noted(found, ["sentence", "in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}"], locate(pattern, scope))
+  end
+  pattern.payload.each do |entry|
+    found = check_pattern(entry[1], scope, found)
+  end
+  found
+end
 
 # Check the closure of `path`. `checked` is the memo of files already
 # checked in this process — the spec harness checks a hundred specs that
@@ -189,15 +535,6 @@ end
 # in progress; the updated memo comes back.
 def check_closure(path, checked, load_path, core: nil)
   check_closure_with(path, checked, false, load_path, core)
-end
-
-# Run mode (ADR 0049 §4): the closure is a closed world, so the entry
-# file's own defs have every caller in view, and a parameter every caller
-# agrees on is read at that type inside its body (ADR 0048 ruling 4).
-# Only the entry's defs: a required file is a library by nature, and its
-# defs may have callers outside this closure.
-def check_program_closure(path, checked, load_path, core: nil)
-  check_closure_with(path, checked, true, load_path, core)
 end
 
 # `core` is the core's nodes where the caller has already parsed them — a
@@ -222,513 +559,194 @@ def check_closure_with(path, mutable checked, sharpen, load_path, core)
   checked
 end
 
-# Resolve a closure into the files to check, children before parents, and
-# what each is checked with. `checked` is the memo of files already
-# checked in this process — the spec harness checks a hundred specs that
-# share one helper — as [key, exports] pairs, `nil` while a file is in
-# progress. Answers [checked, files]. `required` says whether some file
-# requires this one — then the program spans more than one file and a
-# refusal here names its file (ADR 0049 §5); an entry names its file only
-# when it requires something itself.
-def resolve_closure(path, mutable checked, mutable files, required, load_path)
-  key = canonical_path(path)
-  return [checked, files] if checked.any? { it[0] == key }
-  source = System.read_file(path) or panic "check: cannot read #{path}"
-  nodes = parse_program(lex(source))
-  checked = [[key, nil]] + checked
-  requires = required_files(nodes, path, load_path)
-  mutable imports = empty_declarations
-  requires.each do |name|
-    resolution = resolve_closure(name, checked, files, true, load_path)
-    checked = value_at_checked(resolution, 0)
-    files = value_at_checked(resolution, 1)
-    found = checked.find { it[0] == canonical_path(name) }
-    declared = if found.nil? then nil else value_at_checked(found, 1) end
-    imports = merge_declarations(imports, declared) unless declared.nil?
-  end
-  named = if required || !requires.empty? then path else nil end
-  files << Resolved.new(imports: imports, named: named, nodes: nodes, path: path, source: source)
-  exported = merge_declarations(declarations_of(nodes), imports)
-  [[[key, exported]] + checked.reject { it[0] == key }, files]
+# Shape 1 — a condition that is not a boolean, Ruby's truthiness reflex.
+# A boolean passes; an unknown declines; anything else refuses, and a
+# maybe alone carries the one honest rewrite.
+def check_condition(construct, node, scope, found)
+  condition = node.condition
+  type = synthesize(condition, known_types(scope))
+  return found if type == ["boolean"]
+  return found unless known?(type)
+  noted(found, ["condition", construct, type, spell_node(condition)], locate(node, scope))
 end
 
-# The files a program's top-level `require_relative "name"` and
-# `require "name"` lines name, in order (ADR 0077). Only a literal string
-# resolves; anything else is declined. A `require` the load path cannot
-# place is left to the runtime's refusal, and a core name is no file.
-def required_files(nodes, path, load_path)
-  mutable found = []
-  nodes.each do |node|
-    next unless node in CallNode
-    next unless node.name == "require_relative" || node.name == "require"
-    next unless node.arguments.length == 1
-    argument = node.arguments.first
-    next unless argument in StringNode
-    if node.name == "require_relative"
-      found << required_path_from(path, argument.value)
-      next
-    end
-    placed = require_on_load_path(argument.value, load_path)
-    found << placed unless placed.nil?
+# `:paid(on: x)` — the seed's three runtime refusals, made at build time
+# with the same words (ADR 0034 §2). The seed reaches them only when the
+# line runs; this reaches them because the line was written.
+def check_construction(node, scope, mutable found)
+  declarations = cases_named(scope.enums, node.name)
+  return noted(found, ["sentence", "no enum declares a case :#{node.name}"], locate(node, scope)) if declarations.empty?
+  labels = value_at_checked(declarations.first, 1)
+  declarations.each do |declaration|
+    return noted(found, ["sentence", "two enums declare :#{node.name} with different payloads — the seed cannot tell them apart"], locate(node, scope)) unless value_at_checked(declaration, 1) == labels
+  end
+  given = node.payload.map { it.label }
+  unless given == labels
+    wanted = labels.map { it + ":" }.join(", ")
+    return noted(found, ["sentence", "`:#{node.name}` takes (#{wanted})"], locate(node, scope))
+  end
+  node.payload.each do |argument|
+    found = check_node(argument.value, scope, found)
   end
   found
 end
 
-# Where `require name` lands (ADR 0077 §2): the first directory on the path
-# holding exactly one of the name's candidate files; nil for a core name,
-# a name found nowhere, or a name two files answer to.
-def require_on_load_path(name, load_path)
-  return nil if core_require_name?(name)
-  mutable found = nil
-  load_path.each do |directory|
-    next unless found.nil?
-    hits = require_candidates(name, directory).reject { System.read_file(it).failure? }
-    # Two files answering one name refuse here, before anything is checked
-    # or run — the evaluator's sentence, said first.
-    panic("cannot load '#{name}' — both #{hits.join(" and ")} are on the load path; keep one") if hits.length > 1
-    found = hits.first unless hits.empty?
+# ADR 0048's call-site refusal — a call handing a def something its body
+# cannot use. The argument's type, the struct's declared method set, and
+# the body's demand all come from the file in hand, so this is provable
+# per file where caller flow (#94) is not. Struct arguments only, until
+# the method table (#88) says what a builtin answers. Each parameter is
+# paired with its argument by position, or by label for a keyword one.
+def check_contracts(node, scope, mutable found)
+  contract = scope.contracts.find { it[0] == node.name }
+  return found if contract.nil?
+  positional = node.arguments.reject { it in KeywordArgumentNode }
+  mutable position = 0
+  value_at_checked(contract, 1).each do |parameter|
+    keyword = value_at_checked(parameter, 1)
+    argument = if keyword then keyword_argument(node, parameter[0]) else positional[position] end
+    position += 1 unless keyword
+    next if argument.nil?
+    found = check_argument(node, argument, value_at_checked(parameter, 2), scope, found)
   end
   found
 end
 
-# A `require` or `require_relative` whose path is not a literal string.
-def computed_require?(node)
-  return false unless node in CallNode
-  return false unless node.name == "require_relative" || node.name == "require"
-  return true unless node.arguments.length == 1
-  !(node.arguments.first in StringNode)
+def check_coverage(node, scope, mutable found)
+  arms = unguarded_arms(node)
+  return found if arms.empty?
+  found = check_enum_coverage(node, arms, scope, found)
+  check_range_coverage(node, arms, scope, found)
 end
 
-# `require` and `require_relative` take a string literal at a file's top
-# level (ADR 0077 §3) — or a module body's, as static a place — so the build
-# sees every file it links. Inside a def, a block, or a branch, or with a
-# computed name, they refuse naming the rewrite; the seed says the same
-# sentence when the line is reached.
-def check_requires(nodes, inside, scope, mutable found)
-  nodes.each do |node|
-    case node
-    in CallNode(name:, arguments:, block:)
-      if name == "require" || name == "require_relative"
-        if inside
-          found = noted(found, ["sentence", "'#{name}' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there"], locate(node, scope))
-        elsif arguments.length != 1 || !(arguments.first in StringNode)
-          found = noted(found, ["sentence", "'#{name}' takes a string literal — write #{name} \"name\" at the top of the file, so the build sees every file it links"], locate(node, scope))
-        end
-      end
-      found = check_requires(arguments, inside, scope, found)
-      found = check_requires(block_body(block), true, scope, found)
-    in MethodCallNode(receiver:, arguments:, block:)
-      found = check_requires([receiver] + arguments, inside, scope, found)
-      found = check_requires(block_body(block), true, scope, found)
-    in SafeMethodCallNode(receiver:, arguments:, block:)
-      found = check_requires([receiver] + arguments, inside, scope, found)
-      found = check_requires(block_body(block), true, scope, found)
-    in AssignmentNode(value:) then found = check_requires([value], inside, scope, found)
-    in ModuleDefNode(body:) then found = check_requires(body, inside, scope, found)
-    in StructDefNode(methods:, type_functions:, nested:) then found = check_requires(methods + type_functions + nested, true, scope, found)
-    in TraitDefNode(methods:) then found = check_requires(methods, true, scope, found)
-    in DefNode(body:) then found = check_requires(body, true, scope, found)
-    in IfNode(condition:, then_body:, else_body:)
-      found = check_requires([condition], inside, scope, found)
-      found = check_requires((then_body or []) + (else_body or []), true, scope, found)
-    in WhileNode(condition:, body:)
-      found = check_requires([condition], inside, scope, found)
-      found = check_requires(body, true, scope, found)
-    else
-      found = check_requires(children_of(node), true, scope, found)
-    end
-  end
-  found
-end
-
-def declarations_of(written)
-  nodes = with_guarded_definitions(written)
-  Declarations.new(arities: declared_arities(nodes), builtins: [], constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
-end
-
-# A def under a top-level condition or loop is defined when that statement
-# runs (ADR 0090), which the checker cannot know. It declares what a
-# top-level def declares, each one listed after the statement that holds
-# it, so a call to it reads as a call to a defined method.
-def with_guarded_definitions(nodes)
-  mutable declaring = []
-  nodes.each do |node|
-    declaring << node
-    declaring += guarded_definitions(node)
-  end
-  declaring
-end
-
-def guarded_definitions(node)
-  held = guarded_statements(node)
-  mutable definitions = []
-  held.each do |statement|
-    definitions << statement if statement in DefNode
-    definitions += guarded_definitions(statement)
-  end
-  definitions
-end
-
-def guarded_statements(node)
-  return (node.then_body or []) + (node.else_body or []) if node in IfNode
-  return node.body if node in WhileNode
-  []
-end
-
-def empty_declarations = Declarations.new(arities: [], builtins: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
-
-def merge_declarations(first, second)
-  Declarations.new(arities: first.arities + second.arities, builtins: first.builtins + second.builtins, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
-end
-
-# Where a refusal points (#89): the node's line and that line of the
-# source, for the renderer to print beneath the sentence — or nil, and no
-# location, for a node built by a desugar with no token in hand.
-def locate(node, scope)
-  line = line_of(node)
-  return nil if line.nil?
-  text = value_at_checked(scope.source, line - 1) or ""
-  [line, text.chomp, scope.file]
-end
-
-# Every node kind carries its line (the ruling of 2026-09-24: the first
-# token that begins the node, #362). It is nil only on a node a desugar
-# built with no token in hand.
-def line_of(node) = node.line
-
-# Every top-level def's parameters with their contracts (ADR 0048), as
-# [name, parameters] where each parameter is [name, keyword?, entry] and
-# an entry is a default's type or ["needs", demands]. A name defined twice
-# is left out, as for arities.
-def declared_contracts(nodes)
-  defs = nodes.select { it in DefNode }
-  types = scan_program(nodes)
-  mutable contracts = []
-  defs.each do |node|
-    next if defs.select { it.name == node.name }.length > 1
-    parameters = node.parameters.map { [it.name, (it in KeywordParameterNode), parameter_entry(it, node.body, types)] }
-    contracts << [node.name, parameters]
-  end
-  contracts
-end
-
-# Every top-level def's positional arity, as [name, required, total] —
-# the seed's own count: parameters up to the first default are required,
-# keyword parameters stand outside the count. A name defined twice is
-# left out (a second def silently wins at runtime, #70's open question).
-def declared_arities(nodes)
-  defs = nodes.select { it in DefNode }
-  mutable arities = []
-  defs.each do |node|
-    next if defs.select { it.name == node.name }.length > 1
-    positional = node.parameters.reject { it in KeywordParameterNode }
-    required = positional.select { required_parameter?(it) }.length
-    arities << [node.name, required, positional.length]
-  end
-  arities
-end
-
-# A bare name, or a `mutable` one with no default, must be passed.
-def required_parameter?(parameter)
-  return true if parameter in IdentifierNode
-  (parameter in AssignmentNode) && parameter.value.nil?
-end
-
-# Shape 5 — an annotation that lies (ADR 0041 §5; the words are ADR
-# 0047's). A top-level def's `# -> Type` is read off the source the way
-# the dump reads it and compared, as text, with the rendering of the
-# return inference computed — the annotation grammar *is* the dump's
-# rendering (ADR 0041 §4), so byte equality is the rule. Agreement and an
-# unknown answer are both silence; only a known disagreement refuses.
-def check_annotations(nodes, source, scope, mutable found)
-  nodes.each do |node|
-    next unless node in DefNode
-    written = annotation_for(source, node.name)
-    next if written.nil?
-    computed = synthesize_name(node.name, scope.globals)
-    next unless known?(computed)
-    next if render_type(computed) == written
-    found = noted(found, ["annotation", node.name, computed, written], locate(node, scope))
-  end
-  found
-end
-
-# Every struct's instance method set, as [name, methods] pairs: its
-# fields, its defs (alias clones included, since they arrive as defs), the
-# defs of each trait it includes, the five every struct answers, and
-# Ruby's Struct views and walks (#114). A
-# struct is left out where the tree cannot state its set whole — its name
-# declared twice anywhere (a nested struct sharing a top-level one's), or
-# an included trait not declared exactly once in this file, which may
-# well live in a required one.
-def declared_shapes(nodes)
-  structs = struct_declarations_in(nodes)
-  traits = trait_declarations_in(nodes)
-  mutable shapes = []
-  structs.each do |declaration|
-    name = declaration.name
-    next if structs.select { it.name == name }.length > 1
-    methods = shape_methods(declaration, traits)
-    shapes << [name, methods] unless methods.nil?
-  end
-  shapes
-end
-
-def shape_methods(declaration, traits)
-  mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields
-  methods += def_names(declaration.methods)
-  declaration.includes.each do |trait_name|
-    # The builtin trait (ADR 0054) adds the two derived methods; the four
-    # orderings are operators, not names.
-    if trait_name == "Comparable"
-      methods += %w[between? clamp]
-      next
-    end
-    # The other builtin trait (#110): Ruby's Enumerable over the struct's
-    # own `each`, as far as the array arms carry it.
-    if trait_name == "Enumerable"
-      methods += %w[all? any? chunk chunk_while collect collect_concat compact count cycle detect drop drop_while each_cons each_slice each_with_index entries filter filter_map find find_all find_index first flat_map grep grep_v group_by include? inject map max max_by member? min min_by minmax minmax_by none? one? partition reduce reject reverse_each select slice_after slice_before slice_when sort sort_by sum take take_while tally to_a to_h uniq zip]
-      next
-    end
-    matching = traits.select { it.name == trait_name }
-    return nil unless matching.length == 1
-    methods += def_names(matching.first.methods)
-  end
-  methods
-end
-
-def def_names(methods)
-  mutable names = []
-  methods.each do |method|
-    names << method.name if method in DefNode
-  end
-  names
-end
-
-def struct_declarations_in(nodes)
-  mutable found = []
-  nodes.each do |node|
-    if node in StructDefNode
-      found << node
-      found += struct_declarations_in(node.nested)
-    elsif node in ModuleDefNode
-      found += struct_declarations_in(node.body)
-    end
-  end
-  found
-end
-
-def trait_declarations_in(nodes)
-  mutable found = []
-  nodes.each do |node|
-    if node in TraitDefNode
-      found << node
-    elsif node in ModuleDefNode
-      found += trait_declarations_in(node.body)
-    elsif node in StructDefNode
-      found += trait_declarations_in(node.nested)
-    end
-  end
-  found
-end
-
-# The program-wide names, in the shape inference reads: struct and enum
-# types first (their order never matters), then the top-level defs' return
-# types in source order — a def that calls a later def reads that call as
-# unknown, which is a decline, not a wrong answer.
-def declared_globals(nodes)
-  mutable globals = []
-  nodes.each do |node|
-    globals = register_struct(node, globals) if node in StructDefNode
-    globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
-    # A module's name is a name a bare reference may use as a receiver
-    # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
-    globals = [[module_name(node), ["module", module_name(node)]]] + globals if node in ModuleDefNode
-  end
-  nodes.each do |node|
-    globals = [[node.name, synthesize_def_return(node, globals)]] + globals if node in DefNode
-    # A top-level SCREAMING_CASE binding is a constant (ADR 0053): a def's
-    # reach, so every def in the program reads it at its value's type.
-    globals = [[node.name, synthesize(node.value, globals)]] + globals if constant_declaration?(node)
-    # A top-level `alias new old` (ADR 0039) is a second name for the def,
-    # answering what the def answers — found by the corpus, where a tour
-    # fixture's alias read as a name nothing defined (#98).
-    globals = [[node.new_name, synthesize_name(node.old_name, globals)]] + globals if node in AliasNode
-  end
-  globals
-end
-
-def constant_declaration?(node)
-  return false unless node in AssignmentNode
-  return false if node.value.nil?
-  constant_name?(node.name)
-end
-
-# — one definition per name (#70, ADR 0052), and constants (#97, ADR 0053) —
+# — the inference-backed checks (ADR 0047) —
 #
-# A top-level def, struct, enum, trait, alias, or constant is declared once
-# across the program, and a builtin's name is never taken. A module body is
-# walked with its names qualified, so `A::x` twice refuses and `module A`
-# reopened does not. Answers [seen, found]: the names declared so far, and
-# the refusals.
-def check_redefinitions(nodes, home, scope, mutable seen, mutable found)
-  nodes.each do |node|
-    if node in ModuleDefNode
-      walked = check_redefinitions(node.body, qualified_under(home, node.path.join("::")), scope, seen, found)
-      seen = walked.first
-      found = walked.last
-      next
-    end
-    if (node in AssignmentNode) && home.empty? && lone_capital?(node.name)
-      found = noted(found, ["lone_capital", node.name], locate(node, scope))
-      next
-    end
-    name = declared_name(node)
-    next if name.nil?
-    qualified = qualified_under(home, name)
-    # `seen` holds [name, kind] pairs, since a constant bound again says
-    # "bound once" and a constant named after a def says "already defined"
-    # — the seed's two sentences, in the seed's order.
-    if node in AssignmentNode
-      if node.rebindable
-        found = noted(found, ["constant_mutable", name], locate(node, scope))
-      elsif seen.any? { it[0] == qualified && it[1] == "constant" }
-        found = noted(found, ["constant_rebound", name], locate(node, scope))
-      elsif seen.any? { it[0] == qualified }
-        found = noted(found, ["redefined", name], locate(node, scope))
-      end
-      seen = seen + [[qualified, "constant"]]
-    else
-      # `fields` is the one builtin with a designed refusal of its own
-      # (ADR 0031), which the runtime keeps — the seed's list, not this
-      # file's, says which names are never taken.
-      if (node in StructDefNode) && home.empty? && core_type_name?(name)
-        # A program cannot reopen a core type (ADR 0093).
-        found = noted(found, ["core_type", name], locate(node, scope))
-      elsif (builtin_function?(name) && name != "fields") || seen.any? { it[0] == qualified && it[1] == "builtin" }
-        found = noted(found, ["builtin", name], locate(node, scope))
-      elsif seen.any? { it[0] == qualified }
-        found = noted(found, ["redefined", name], locate(node, scope))
-      end
-      seen = seen + [[qualified, "declaration"]]
-    end
+# The seventh wording (#98, ratified 2026-09-24): a bare name that no
+# local, def, builtin, type, enum, or module answers. Provable only where
+# every name the file can see is in view — never inside a struct's or
+# module's body, whose own defs a bare name reaches first, and never in a
+# file with a require the walk could not resolve.
+def check_defined(name, node, scope, found)
+  return found unless scope.judging
+  return found if scope.locals.any? { it[0] == name }
+  return found if scope.globals.any? { it[0] == name }
+  return found if builtin_function?(name)
+  # `DATA` is defined when the file that is run has an `__END__` line (ADR
+  # 0092), which a file checked on its own cannot know; the run refuses it
+  # by name where there is none.
+  return found if name == "DATA"
+  # A builtin type's bare name is the type as a value (ADR 0074).
+  return found if %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(name)
+  # A removed Ruby spelling names its rewrite instead (#135).
+  return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
+  noted(found, ["undefined", name], locate(node, scope))
+end
+
+# An enum is established by a payload-carrying arm and by nothing else
+# (ADR 0035 §2): a payload-free case is simply a symbol, and symbols are
+# legal everywhere, so plain-symbol arms are never second-guessed.
+def check_enum_coverage(node, arms, scope, found)
+  enums = scope.enums
+  anchor = arms.find { it.pattern in EnumCasePatternNode }
+  return found if anchor.nil?
+  owner = enum_owning(enums, anchor.pattern.name)
+  return found if owner.nil?
+  mutable covered = []
+  arms.each do |branch|
+    name = arm_case_name(branch.pattern)
+    return found if name.nil?
+    covered << name
   end
-  [seen, found]
+  missing = cases_of(enums, owner).reject { covered.include?(it) }
+  return found if missing.empty?
+  named = missing.map { ":" + it }.join(", ")
+  noted(found, ["sentence", "case/in does not cover #{named} — add the arm, or an else"], locate(node, scope))
 end
 
-# What a program's requires declare, as [name, kind] pairs for the walk
-# above: every global, with the constants among them marked.
-def imported_names(imports)
-  imports.globals.map do |global|
-    name = global.first
-    kind = if imports.builtins.include?(name) then "builtin" elsif imports.constants.include?(name) then "constant" else "declaration" end
-    [name, kind]
-  end
-end
-
-# The names a file's top-level and module-body constants take, qualified.
-def declared_constants(nodes, home)
-  mutable names = []
-  nodes.each do |node|
-    names += declared_constants(node.body, qualified_under(home, node.path.join("::"))) if node in ModuleDefNode
-    # A type's constants (#145), and its nested types', live under it.
-    names += declared_constants(node.constants + node.nested, qualified_under(home, node.name)) if node in StructDefNode
-    names << qualified_under(home, node.name) if constant_declaration?(node)
-  end
-  names
-end
-
-# What a statement declares, or nil: a def, an alias's new name, a struct,
-# an enum, a trait, or a SCREAMING_CASE binding.
-def declared_name(node)
-  case node
-  in DefNode(name:) then name
-  in AliasNode(new_name:) then new_name
-  in StructDefNode(name:) then name
-  in EnumDefNode(name:) then name
-  in TraitDefNode(name:) then name
-  in AssignmentNode(name:) then constant_name?(name) ? name : nil
-  else nil
-  end
-end
-
-def qualified_under(home, name) = home.empty? ? name : "#{home}::#{name}"
-
-# A module's first path segment: `module A::B` is reached as `A`.
-def module_name(node)
-  first = node.path.first or ""
-  first
-end
-
-# A body is walked in order, each statement seen with the bindings the
-# statements above it left behind. Every walk function takes what has
-# been found so far and answers it with its own findings appended.
-def check_body(nodes, mutable scope, mutable found)
-  nodes.each do |node|
-    found = check_node(node, scope, found)
-    scope = bind_statement(node, scope)
+# Family three (#86): the reserved names, one list in one place. The seed
+# refuses these at parse — its refusals stay, as the runtime preview — and
+# the compiler keeps one list, since separate copies drift: a name missing
+# from one copy goes unchecked wherever that copy is read. `new` is reserved on instances
+# and definable as a type function (ADR 0031), which is why the two calls
+# pass different lists. Aliases need no case of their own: a struct or
+# trait alias desugars at parse into a clone of the def it points at, so
+# the clone walks through here like any def.
+# A method named for one of Ruby's implicit conversions (ADR 0036) would
+# never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
+# definition refuses, naming the conversion that is read (#341) — the
+# seed's sentence.
+def check_implicit_conversions(methods, scope, mutable found)
+  methods.each do |method|
+    next unless method in DefNode
+    survivor = alias_survivor(method.name)
+    next if survivor.nil?
+    found = noted(found, ["sentence", "#{method.name} is Ruby's implicit conversion, which nothing here calls — define #{survivor}"], locate(method, scope))
   end
   found
 end
 
-# The bindings a statement leaves for the statements after it — inference's
-# bind_after, writing the locals and reading the globals beside them.
-def bind_statement(node, scope)
-  scope.with(locals: bind_after(node, scope.locals, scope.globals))
+# ADR 0035's tripwire, fired by ADR 0047 once narrowing existed: over a
+# subject inference knows to be a maybe, the unguarded arms must take nil
+# — an `in nil` arm, or a bare capture — and the present case — a bare
+# capture, or a pattern every present value matches: the plain type's
+# name, or a struct pattern of it whose fields are all captures. The
+# absent case is named first, being the one people forget.
+def check_maybe_coverage(node, scope, mutable found)
+  subject = synthesize(node.subject, known_types(scope))
+  return found unless subject in ["maybe", *]
+  return found unless known?(subject)
+  patterns = unguarded_arms(node).map { it.pattern }
+  found = noted(found, ["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
+  inner = type_at(subject, 1)
+  return found if patterns.any? { covers_present?(it, inner) }
+  # A present Boolean is true or false, so arms that take both between
+  # them cover the present case, and arms that provably take one leave
+  # the other, named.
+  left_out = if inner == ["boolean"] then uncovered_booleans(patterns) else nil end
+  return found if left_out in []
+  return noted(found, ["coverage", left_out.first], locate(node, scope)) if left_out.some? && left_out.length == 1
+  noted(found, ["coverage", "the present case"], locate(node, scope))
 end
 
-def bind_local(scope, name, type)
-  scope.with(locals: [[name, type]] + scope.locals)
+# Shape 3 — a maybe used as plain: ADR 0005's static half. At runtime a
+# present value answers any method and only the absent path fails; here
+# the type says the absent path exists, so anything but the predicates
+# and `to_s` refuses until one of the narrowing forms has handled nil.
+# `&.` is the other answer and is never this node. The receiver must be
+# spellable, since the hint is written from it.
+def check_maybe_method(node, receiver, scope, found)
+  return found unless receiver in ["maybe", *]
+  return found unless known?(receiver)
+  return found if %w[eql? failure? nil? some? to_s].include?(node.name)
+  spelling = spell_node(node.receiver)
+  return found if spelling.nil?
+  noted(found, ["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
 end
 
-# A branch's scope: the pairs a condition proved, before the locals.
-def with_proof(scope, pairs)
-  scope.with(locals: pairs + scope.locals)
+def check_method_call(node, scope, mutable found)
+  # A builtin type's name is defined as a type function's receiver and
+  # nowhere else (ADR 0058): `Array.new(3)` passes, a bare `Array` is
+  # still undefined.
+  found = check_node(node.receiver, scope, found) unless builtin_type_function?(node, known_types(scope))
+  found = check_body(node.arguments, scope, found)
+  receiver = synthesize(node.receiver, known_types(scope))
+  found = check_maybe_method(node, receiver, scope, found) if node in MethodCallNode
+  found = check_struct_method(node, receiver, scope, found) if node in MethodCallNode
+  found = check_visibility(node, receiver, scope, found) if node in MethodCallNode
+  found = check_builtin_method(node, receiver, scope, found) if node in MethodCallNode
+  check_block(node, receiver, scope, found)
 end
 
-# The names a nested body rebinds are unknown wherever that body may have
-# run — inference's forget_types, over the scope's locals.
-def forget(scope, names)
-  scope.with(locals: forget_types(scope.locals, names))
-end
-
-# What inference may read at this point: the body's own bindings, then
-# the program's. The no-shadow rule keeps the two from ever overlapping.
-def known_types(scope) = scope.locals + scope.globals
-
-# A def cannot see the locals around it — its body starts from its
-# parameters alone (a default lends its type, as in inference).
-def def_scope(node, scope)
-  agreed = scope.sharpened.find { it[0] == node.name }
-  agreed_pairs = if agreed.nil? then [] else value_at_checked(agreed, 1) end
-  mutable locals = []
-  node.parameters.each do |parameter|
-    sharpened = agreed_pairs.find { it[0] == parameter.name }
-    type = if sharpened.nil? then parameter_type(parameter, scope.globals) else value_at_checked(sharpened, 1) end
-    locals = [[parameter.name, type]] + locals
+def check_methods(methods, scope, mutable found)
+  methods.each do |method|
+    if method in DefNode
+      found = check_parameters(method.parameters, method_scope(method, scope), found)
+      found = check_body(method.body, method_scope(method, scope), found)
+    else
+      found = check_node(method, scope, found)
+    end
   end
-  scope.with(locals: locals)
-end
-
-# A struct's or trait's method body: parameters only, and no top-level
-# def returns either — a bare call inside a struct may reach the struct's
-# own methods before the program's, which this increment does not model.
-def method_scope(node, scope)
-  type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
-  def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
-end
-
-# A block keeps the locals around it and binds its parameters from the
-# receiver's type, as inference does — an array lends its element, a hash
-# its key then value, a range integers, anything else unknown.
-def block_scope(node, receiver, scope)
-  mutable bound = scope
-  argument_types = node.arguments.map { synthesize(it, known_types(scope)) }
-  node.block.parameters.each_with_index do |parameter, index|
-    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: node.block.parameters.length)
-    bound = bind_local(bound, parameter, bound_type)
-  end
-  bound
+  found
 end
 
 # The walk. Dispatch mirrors the evaluator's, but visits everything —
@@ -839,6 +857,63 @@ def check_node(node, scope, mutable found)
   end
 end
 
+# The logical operators' operands. `&&` takes booleans on both sides. `||`
+# is logical or on a boolean, whose right must be one too, and the or-guard
+# on a maybe. ADR 0007's two never-guess refusals (#219), held until
+# narrowing proved itself (ADR 0040), fire where the left is fully known
+# and can be spelled: a `Boolean?` left, whose nil and false are two
+# different noes `||` cannot tell apart, and a left that can never be
+# absent, whose right side never runs. A nil left is always absent, so it
+# is neither.
+def check_operands(node, scope, mutable found)
+  types = known_types(scope)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  if node.operator == "&&"
+    found = noted(found, ["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
+    found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+  end
+  return found unless node.operator == "||"
+  if left == ["boolean"]
+    found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+    return found
+  end
+  return found unless known?(left)
+  spelling = spell_node(node.left)
+  return found if spelling.nil?
+  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == ["maybe", ["boolean"]]
+  return found if (left in ["maybe", *]) || left == ["nil"]
+  noted(found, ["dead_or", spelling, left], locate(node, scope))
+end
+
+# Shape 4 — an operator on operands it cannot take. The legal pairs are
+# the seed's own match arms, read as types: numbers with numbers for the
+# arithmetic and ordering operators, string with string and array with
+# array for `+`, string or array times an integer, and anything at all for
+# `==` and `!=`. Both operands must be plain builtin values for the
+# refusal to fire — a maybe is transparent at runtime (some(x) is x) and a
+# struct or enum is not this shape's to judge — so everything else
+# declines.
+def check_operator(node, scope, found)
+  types = known_types(scope)
+  left = synthesize(node.left, types)
+  right = synthesize(node.right, types)
+  return found unless plain_value?(left) && plain_value?(right)
+  return found if operator_takes?(node.operator, left, right)
+  # `"%d" % x` is Ruby's formatting operator; here formatting is a function
+  # (ADR 0067), and the refusal names it, as the seed's does.
+  return noted(found, ["string_percent"], locate(node, scope)) if node.operator == "%" && left == ["string"]
+  noted(found, ["operator", node.operator, left, right], locate(node, scope))
+end
+
+def check_pairs(pairs, scope, mutable found)
+  pairs.each do |pair|
+    found = check_node(pair.key, scope, found)
+    found = check_node(pair.value, scope, found)
+  end
+  found
+end
+
 def check_parameters(parameters, scope, mutable found)
   parameters.each do |parameter|
     if parameter in KeywordParameterNode
@@ -850,218 +925,24 @@ def check_parameters(parameters, scope, mutable found)
   found
 end
 
-# A `together` block's lines run in order (ADR 0029), so a plain line's
-# binding is in view for the lines below it, as in any body.
-def check_together(lines, mutable scope, mutable found)
-  lines.each do |line|
-    found = if line in TaskLineNode
-      check_node(line.value, scope, found)
-    else
-      check_node(line, scope, found)
-    end
-    scope = bind_statement(line, scope)
+# A constant `private_constant` hid (ADR 0076) is readable by its bare name
+# inside its namespace, and by its path from inside too; a path from
+# outside refuses at build time, where Ruby raises NameError.
+def check_path(node, scope, found)
+  written = node.parts.join("::")
+  # A path is read from where it stands: as written, or under any
+  # enclosing namespace (ADR 0021), outermost last.
+  mutable candidates = [written]
+  mutable home = scope.home
+  until home.empty?
+    candidates << "#{home}::#{written}"
+    home = home.include?("::") ? home.slice(0, home.rindex("::")) : ""
   end
-  found
-end
-
-def check_case(node, scope, mutable found)
-  found = check_node(node.subject, scope, found)
-  node.branches.each do |branch|
-    found = check_body(branch.values.reject { builtin_type_name?(it) }, scope, found)
-    found = check_body(branch.body, scope, found)
-  end
-  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
-  found
-end
-
-# A builtin type's name, as a `when` value or a `===` pattern tests for it
-# (#151): a type, not a value, so not a name to find defined.
-def builtin_type_name?(node)
-  (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(node.name)
-end
-
-def check_case_in(node, scope, mutable found)
-  found = check_node(node.subject, scope, found)
-  mutable nil_seen = false
-  node.branches.each do |branch|
-    found = check_pattern(branch.pattern, scope, found)
-    arm = with_proof(scope, arm_bindings(node, branch, nil_seen, known_types(scope)))
-    found = check_node(branch.guard, arm, found) unless branch.guard.nil?
-    found = check_body(branch.body, arm, found)
-    nil_seen = true if nil_arm?(branch)
-  end
-  found = check_body(node.else_body, scope, found) unless node.else_body.nil?
-  found = check_unreachable_arms(node, scope, found)
-  return found unless node.else_body.nil?
-  found = check_maybe_coverage(node, scope, found)
-  found = check_boolean_coverage(node, scope, found)
-  check_coverage(node, scope, found)
-end
-
-# ADR 0035's tripwire, fired by ADR 0047 once narrowing existed: over a
-# subject inference knows to be a maybe, the unguarded arms must take nil
-# — an `in nil` arm, or a bare capture — and the present case — a bare
-# capture, or a pattern every present value matches: the plain type's
-# name, or a struct pattern of it whose fields are all captures. The
-# absent case is named first, being the one people forget.
-def check_maybe_coverage(node, scope, mutable found)
-  subject = synthesize(node.subject, known_types(scope))
-  return found unless subject in ["maybe", *]
-  return found unless known?(subject)
-  patterns = unguarded_arms(node).map { it.pattern }
-  found = noted(found, ["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
-  inner = type_at(subject, 1)
-  return found if patterns.any? { covers_present?(it, inner) }
-  # A present Boolean is true or false, so arms that take both between
-  # them cover the present case, and arms that provably take one leave
-  # the other, named.
-  left_out = if inner == ["boolean"] then uncovered_booleans(patterns) else nil end
-  return found if left_out in []
-  return noted(found, ["coverage", left_out.first], locate(node, scope)) if left_out.some? && left_out.length == 1
-  noted(found, ["coverage", "the present case"], locate(node, scope))
-end
-
-# Coverage widened by inference (ADR 0035 §1): a subject inference knows
-# to be a Boolean is true or false and nothing else, so the unguarded arms
-# must take both whatever they reveal. An arm whose reach cannot be read
-# off its pattern — a pin, say — leaves the question open, and an open
-# question is silence.
-def check_boolean_coverage(node, scope, found)
-  subject = synthesize(node.subject, known_types(scope))
-  return found unless subject == ["boolean"]
-  left_out = uncovered_booleans(unguarded_arms(node).map { it.pattern })
-  return found if left_out.nil? || left_out.empty?
-  noted(found, ["coverage", left_out.join(", ")], locate(node, scope))
-end
-
-# Which of true and false the patterns leave untaken, or nil when one of
-# them cannot be read.
-def uncovered_booleans(patterns)
-  mutable taken = []
-  patterns.each do |pattern|
-    reach = booleans_taken(pattern)
-    return nil if reach.nil?
-    taken += reach
-  end
-  %w[true false].reject { taken.include?(it) }
-end
-
-# The Booleans a pattern matches: both for a capture or the type's name,
-# its own for a literal, none for a literal of another type, and nil for
-# a pattern whose reach depends on a value the checker does not have.
-def booleans_taken(pattern)
-  case pattern
-  in BooleanNode(value:) then [value]
-  in IdentifierNode then %w[true false]
-  in NilNode | IntegerNode | FloatNode | StringNode | SymbolNode then []
-  in BindingPatternNode then booleans_taken(pattern.pattern)
-  in AlternativePatternNode(options:)
-    mutable taken = []
-    options.each do |option|
-      reach = booleans_taken(option)
-      return nil if reach.nil?
-      taken += reach
-    end
-    taken
-  in StructPatternNode(name:, fields:)
-    return %w[true false] if name == "Boolean" && fields.empty?
-    nil
-  else
-    nil
-  end
-end
-
-def covers_nil?(pattern)
-  case pattern
-  in NilNode | IdentifierNode then true
-  in AlternativePatternNode(options:) then options.any? { covers_nil?(it) }
-  else
-    false
-  end
-end
-
-def covers_present?(pattern, inner)
-  case pattern
-  in IdentifierNode then true
-  in AlternativePatternNode(options:) then options.any? { covers_present?(it, inner) }
-  # `in Integer` and `in User(name:)` are one node: a name with fields. Bare,
-  # it matches every value of the named type, builtin or struct; with
-  # fields, every value whose named struct it is when each field is a
-  # plain capture.
-  in StructPatternNode(name:, fields:)
-    return false unless render_type(inner) == name
-    fields.all? { it[1] in IdentifierNode }
-  else
-    false
-  end
-end
-
-def check_methods(methods, scope, mutable found)
-  methods.each do |method|
-    if method in DefNode
-      found = check_parameters(method.parameters, method_scope(method, scope), found)
-      found = check_body(method.body, method_scope(method, scope), found)
-    else
-      found = check_node(method, scope, found)
-    end
-  end
-  found
-end
-
-def check_call(node, scope, mutable found)
-  found = check_defined(node.name, node, scope, found)
-  found = check_body(node.arguments, scope, found)
-  found = check_arity(node, scope, found)
-  found = check_contracts(node, scope, found)
-  check_block(node, ["unknown"], scope, found)
-end
-
-# The sixth wording, the seed's own moved to build time (ADR 0034 §2,
-# ADR 0047): a bare call to a top-level def with the wrong number of
-# positional arguments. Keyword arguments stand outside the count, as in
-# the seed; inside a struct's methods no bare call is judged (method_scope).
-def check_arity(node, scope, found)
-  arity = scope.arities.find { it[0] == node.name }
-  return found if arity.nil?
-  # A refused argument is not an argument to count (#202).
-  return found if node.arguments.any? { it in ErrorNode }
-  required = value_at_checked(arity, 1)
-  total = value_at_checked(arity, 2)
-  given = node.arguments.reject { it in KeywordArgumentNode }.length
-  return found if given >= required && given <= total
-  expected = if required == total then required.to_s else "#{required} to #{total}" end
-  noted(found, ["arity", node.name, expected, given], locate(node, scope))
-end
-
-def check_method_call(node, scope, mutable found)
-  # A builtin type's name is defined as a type function's receiver and
-  # nowhere else (ADR 0058): `Array.new(3)` passes, a bare `Array` is
-  # still undefined.
-  found = check_node(node.receiver, scope, found) unless builtin_type_function?(node, known_types(scope))
-  found = check_body(node.arguments, scope, found)
-  receiver = synthesize(node.receiver, known_types(scope))
-  found = check_maybe_method(node, receiver, scope, found) if node in MethodCallNode
-  found = check_struct_method(node, receiver, scope, found) if node in MethodCallNode
-  found = check_visibility(node, receiver, scope, found) if node in MethodCallNode
-  found = check_builtin_method(node, receiver, scope, found) if node in MethodCallNode
-  check_block(node, receiver, scope, found)
-end
-
-# A block body may run many times or never, so — like a loop's — it is
-# walked with the names it rebinds already forgotten.
-def check_block(node, receiver, scope, found)
-  block = node.block
-  return found if block.nil?
-  entered = block_scope(node, receiver, scope)
-  check_body(block.body, forget(entered, assigned_names_in_body(block.body)), found)
-end
-
-def check_pairs(pairs, scope, mutable found)
-  pairs.each do |pair|
-    found = check_node(pair.key, scope, found)
-    found = check_node(pair.value, scope, found)
-  end
-  found
+  hidden = candidates.find { scope.private_constants.include?(it) }
+  return found if hidden.nil?
+  owner = hidden.slice(0, hidden.rindex("::"))
+  return found if scope.home == owner || scope.home.start_with?(owner + "::")
+  noted(found, ["sentence", "'#{node.parts.last}' is private to #{owner}"], locate(node, scope))
 end
 
 # Patterns hold sub-patterns and, in two places, expressions.
@@ -1103,518 +984,6 @@ def check_pattern(pattern, scope, mutable found)
   end
 end
 
-# — the checks themselves —
-
-# Family three (#86): the reserved names, one list in one place. The seed
-# refuses these at parse — its refusals stay, as the runtime preview — and
-# the compiler keeps one list, since separate copies drift: a name missing
-# from one copy goes unchecked wherever that copy is read. `new` is reserved on instances
-# and definable as a type function (ADR 0031), which is why the two calls
-# pass different lists. Aliases need no case of their own: a struct or
-# trait alias desugars at parse into a clone of the def it points at, so
-# the clone walks through here like any def.
-# A method named for one of Ruby's implicit conversions (ADR 0036) would
-# never be called: nothing here reads `to_ary`, `to_int`, or `to_str`. The
-# definition refuses, naming the conversion that is read (#341) — the
-# seed's sentence.
-def check_implicit_conversions(methods, scope, mutable found)
-  methods.each do |method|
-    next unless method in DefNode
-    survivor = alias_survivor(method.name)
-    next if survivor.nil?
-    found = noted(found, ["sentence", "#{method.name} is Ruby's implicit conversion, which nothing here calls — define #{survivor}"], locate(method, scope))
-  end
-  found
-end
-
-def check_reserved(methods, names, wording, scope, mutable found)
-  methods.each do |method|
-    next unless method in DefNode
-    found = noted(found, ["sentence", "#{method.name} #{wording}"], locate(method, scope)) if names.include?(method.name)
-  end
-  found
-end
-
-def cases_named(enums, name)
-  enums.select { it[0] == name }
-end
-
-# `:paid(on: x)` — the seed's three runtime refusals, made at build time
-# with the same words (ADR 0034 §2). The seed reaches them only when the
-# line runs; this reaches them because the line was written.
-def check_construction(node, scope, mutable found)
-  declarations = cases_named(scope.enums, node.name)
-  return noted(found, ["sentence", "no enum declares a case :#{node.name}"], locate(node, scope)) if declarations.empty?
-  labels = value_at_checked(declarations.first, 1)
-  declarations.each do |declaration|
-    return noted(found, ["sentence", "two enums declare :#{node.name} with different payloads — the seed cannot tell them apart"], locate(node, scope)) unless value_at_checked(declaration, 1) == labels
-  end
-  given = node.payload.map { it.label }
-  unless given == labels
-    wanted = labels.map { it + ":" }.join(", ")
-    return noted(found, ["sentence", "`:#{node.name}` takes (#{wanted})"], locate(node, scope))
-  end
-  node.payload.each do |argument|
-    found = check_node(argument.value, scope, found)
-  end
-  found
-end
-
-# `in :paid(on:)` naming an undeclared case — the seed says nothing and the
-# pattern silently never matches, which is how a typo becomes a branch that
-# cannot fire. The first refusal with no oracle behind it (ADR 0034 §3).
-def check_case_pattern(pattern, scope, mutable found)
-  if cases_named(scope.enums, pattern.name).empty?
-    found = noted(found, ["sentence", "in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}"], locate(pattern, scope))
-  end
-  pattern.payload.each do |entry|
-    found = check_pattern(entry[1], scope, found)
-  end
-  found
-end
-
-# — sharpening (ADR 0048 ruling 4, ADR 0049 §4) —
-#
-# In run mode every caller of the entry file's defs is in view. A
-# parameter every caller passes the same fully known type is read at that
-# type inside its body, and the ordinary shapes reach a place they could
-# not see. Callers that disagree, a parameter no one passes, an unknown
-# anywhere, a def defined twice, a call with the wrong count — each leaves
-# the parameter at its default's type or unknown, exactly as outside run
-# mode.
-
-# [def_name, [[parameter, type]]] for the entry's top-level defs.
-def sharpen_parameters(entry, files)
-  mutable calls = []
-  files.each do |file|
-    globals = merge_declarations(declarations_of(file.nodes), file.imports).globals
-    calls = calls_in(file.nodes, [], globals, calls)
-  end
-  defs = entry.nodes.select { it in DefNode }
-  entry_declarations = merge_declarations(declarations_of(entry.nodes), entry.imports)
-  mutable sharpened = []
-  defs.each do |node|
-    next if defs.select { it.name == node.name }.length > 1
-    pairs = agreed_parameters(node, calls.select { it[0] == node.name }, entry_declarations)
-    sharpened << [node.name, pairs] unless pairs.empty?
-  end
-  sharpened
-end
-
-# The parameters of one def every caller agrees on. A caller that omits an
-# optional parameter passes its default; a caller with the wrong count, or
-# one whose argument fails the parameter's contract, is a refusal at its
-# own call site — the better sentence, where the mistake was made — and
-# disqualifies the parameter here, so the body never refuses first with
-# a lesser one.
-def agreed_parameters(node, calls, declarations)
-  return [] if calls.empty?
-  globals = declarations.globals
-  positional = node.parameters.reject { it in KeywordParameterNode }
-  mutable pairs = []
-  node.parameters.each do |parameter|
-    contract = parameter_entry(parameter, node.body, globals)
-    mutable seen = []
-    mutable disqualified = false
-    calls.each do |call|
-      passed = argument_passed(parameter, positional.index(parameter), call, globals)
-      disqualified = true if passed.nil? || !satisfies?(passed, contract, declarations)
-      seen << passed unless passed.nil? || seen.include?(passed)
-    end
-    next if disqualified || seen.length != 1
-    agreed = seen.first or ["unknown"]
-    next unless known?(agreed)
-    pairs << [parameter.name, agreed]
-  end
-  pairs
-end
-
-# Whether an argument's type answers a parameter's contract — the same
-# question the call-site check asks (check_argument), asked ahead of it.
-# A type whose method set is not stated whole cannot fail here.
-def satisfies?(type, contract, declarations)
-  return true unless contract in ["needs", *]
-  methods = argument_methods(type, declarations)
-  return true if methods.nil?
-  type_at(contract, 1).all? { answers_demand?(type, methods, it) }
-end
-
-# What one call passes for one parameter: by position, by label for a
-# keyword parameter, the default's type when omitted — or nil where the
-# call cannot be paired with it.
-def argument_passed(parameter, position, call, globals)
-  positional_types = value_at_checked(call, 1)
-  keyword_types = value_at_checked(call, 2)
-  if parameter in KeywordParameterNode
-    given = keyword_types.find { it[0] == parameter.name }
-    return value_at_checked(given, 1) unless given.nil?
-    return parameter_type(parameter, globals) if parameter.default.some?
-    return nil
-  end
-  return nil if position.nil?
-  return value_at_checked(positional_types, position) if position < positional_types.length
-  return parameter_type(parameter, globals) if (parameter in AssignmentNode) && parameter.value.some?
-  nil
-end
-
-# Every bare call in a body with its argument types — [name, positional
-# types, [[label, type]]] — read with the scoping the checks use: a def
-# body from its parameters, a loop or block body with its rebindings
-# forgotten, a nested body's captures unknown. Struct, trait, and module
-# bodies are skipped, since a bare call inside them may reach their own
-# defs first. Narrowing is not applied — a maybe stays a maybe here,
-# which can only make callers disagree.
-def calls_in(nodes, mutable locals, globals, mutable found)
-  nodes.each do |node|
-    found = calls_in_node(node, locals, globals, found)
-    locals = bind_after(node, locals, globals)
-  end
-  found
-end
-
-def calls_in_node(node, locals, globals, mutable found)
-  return found if node.nil?
-  case node
-  in DefNode
-    mutable inner = []
-    node.parameters.each do |parameter|
-      inner = [[parameter.name, parameter_type(parameter, globals)]] + inner
-    end
-    calls_in(node.body, inner, globals, found)
-  in StructDefNode | TraitDefNode | ModuleDefNode then found
-  in WhileNode(condition:, body:)
-    found = calls_in_node(condition, locals, globals, found)
-    calls_in(body, forget_types(locals, assigned_names_in_body(body)), globals, found)
-  in IfNode(condition:, then_body:, else_body:)
-    found = calls_in_node(condition, locals, globals, found)
-    found = calls_in(then_body or [], locals, globals, found)
-    calls_in(else_body or [], locals, globals, found)
-  in CaseNode(subject:, branches:, else_body:)
-    found = calls_in_node(subject, locals, globals, found)
-    branches.each do |branch|
-      found = calls_in(branch.values, locals, globals, found)
-      found = calls_in(branch.body, locals, globals, found)
-    end
-    calls_in(else_body or [], locals, globals, found)
-  in CaseInNode(subject:, branches:, else_body:)
-    found = calls_in_node(subject, locals, globals, found)
-    branches.each do |branch|
-      captured = bind_unknowns(locals, pattern_names(branch.pattern))
-      found = calls_in_node(branch.guard, captured, globals, found) unless branch.guard.nil?
-      found = calls_in(branch.body, captured, globals, found)
-    end
-    calls_in(else_body or [], locals, globals, found)
-  in CallNode(name:, arguments:, block:)
-    mutable positional = []
-    mutable keywords = []
-    arguments.each do |argument|
-      found = calls_in_node(argument, locals, globals, found)
-      if argument in KeywordArgumentNode
-        keywords << [argument.label, synthesize(argument.value, locals + globals)]
-      else
-        positional << synthesize(argument, locals + globals)
-      end
-    end
-    found << [name, positional, keywords]
-    calls_in_block(node, ["unknown"], locals, globals, found)
-  in MethodCallNode | SafeMethodCallNode
-    found = calls_in_node(node.receiver, locals, globals, found)
-    node.arguments.each do |argument|
-      found = calls_in_node(argument, locals, globals, found)
-    end
-    calls_in_block(node, synthesize(node.receiver, locals + globals), locals, globals, found)
-  else
-    children_of(node).each do |child|
-      found = calls_in_node(child, locals, globals, found)
-    end
-    found
-  end
-end
-
-def calls_in_block(node, receiver, locals, globals, found)
-  block = node.block
-  return found if block.nil?
-  argument_types = node.arguments.map { synthesize(it, locals + globals) }
-  mutable inner = locals
-  block.parameters.each_with_index do |parameter, index|
-    bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: block.parameters.length)
-    inner = [[parameter, bound_type]] + inner
-  end
-  calls_in(block.body, forget_types(inner, assigned_names_in_body(block.body)), globals, found)
-end
-
-# — the inference-backed checks (ADR 0047) —
-#
-# The seventh wording (#98, ratified 2026-09-24): a bare name that no
-# local, def, builtin, type, enum, or module answers. Provable only where
-# every name the file can see is in view — never inside a struct's or
-# module's body, whose own defs a bare name reaches first, and never in a
-# file with a require the walk could not resolve.
-def check_defined(name, node, scope, found)
-  return found unless scope.judging
-  return found if scope.locals.any? { it[0] == name }
-  return found if scope.globals.any? { it[0] == name }
-  return found if builtin_function?(name)
-  # `DATA` is defined when the file that is run has an `__END__` line (ADR
-  # 0092), which a file checked on its own cannot know; the run refuses it
-  # by name where there is none.
-  return found if name == "DATA"
-  # A builtin type's bare name is the type as a value (ADR 0074).
-  return found if %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(name)
-  # A removed Ruby spelling names its rewrite instead (#135).
-  return noted(found, ["retired", name], locate(node, scope)) unless retired_sentence(name).nil?
-  noted(found, ["undefined", name], locate(node, scope))
-end
-
-# The seed's own list (`builtin_name`): the bare functions every program
-# can call without defining — and `fields`, which outside `def self.new`
-# has a designed refusal of its own (ADR 0031) that the runtime keeps.
-def builtin_function?(name) = %w[Complex Rational failure fields format inspect p panic pp print printf puts rand require require_relative some sprintf srand warn].include?(name)
-
-# Each reads a type off inference and refuses through the renderer, and
-# each fires only where the type is fully known: an unknown anywhere in it
-# is a decline. The seed says the same sentences at runtime, with the
-# value where these say the type.
-
-# Shape 1 — a condition that is not a boolean, Ruby's truthiness reflex.
-# A boolean passes; an unknown declines; anything else refuses, and a
-# maybe alone carries the one honest rewrite.
-def check_condition(construct, node, scope, found)
-  condition = node.condition
-  type = synthesize(condition, known_types(scope))
-  return found if type == ["boolean"]
-  return found unless known?(type)
-  noted(found, ["condition", construct, type, spell_node(condition)], locate(node, scope))
-end
-
-# The logical operators' operands. `&&` takes booleans on both sides. `||`
-# is logical or on a boolean, whose right must be one too, and the or-guard
-# on a maybe. ADR 0007's two never-guess refusals (#219), held until
-# narrowing proved itself (ADR 0040), fire where the left is fully known
-# and can be spelled: a `Boolean?` left, whose nil and false are two
-# different noes `||` cannot tell apart, and a left that can never be
-# absent, whose right side never runs. A nil left is always absent, so it
-# is neither.
-def check_operands(node, scope, mutable found)
-  types = known_types(scope)
-  left = synthesize(node.left, types)
-  right = synthesize(node.right, types)
-  if node.operator == "&&"
-    found = noted(found, ["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
-    found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
-  end
-  return found unless node.operator == "||"
-  if left == ["boolean"]
-    found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
-    return found
-  end
-  return found unless known?(left)
-  spelling = spell_node(node.left)
-  return found if spelling.nil?
-  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == ["maybe", ["boolean"]]
-  return found if (left in ["maybe", *]) || left == ["nil"]
-  noted(found, ["dead_or", spelling, left], locate(node, scope))
-end
-
-# ADR 0048's call-site refusal — a call handing a def something its body
-# cannot use. The argument's type, the struct's declared method set, and
-# the body's demand all come from the file in hand, so this is provable
-# per file where caller flow (#94) is not. Struct arguments only, until
-# the method table (#88) says what a builtin answers. Each parameter is
-# paired with its argument by position, or by label for a keyword one.
-def check_contracts(node, scope, mutable found)
-  contract = scope.contracts.find { it[0] == node.name }
-  return found if contract.nil?
-  positional = node.arguments.reject { it in KeywordArgumentNode }
-  mutable position = 0
-  value_at_checked(contract, 1).each do |parameter|
-    keyword = value_at_checked(parameter, 1)
-    argument = if keyword then keyword_argument(node, parameter[0]) else positional[position] end
-    position += 1 unless keyword
-    next if argument.nil?
-    found = check_argument(node, argument, value_at_checked(parameter, 2), scope, found)
-  end
-  found
-end
-
-def keyword_argument(node, label)
-  found = node.arguments.find { (it in KeywordArgumentNode) && it.label == label }
-  return nil if found.nil?
-  found.value
-end
-
-def check_argument(call, argument, entry, scope, found)
-  def_name = call.name
-  return found unless entry in ["needs", *]
-  demands = type_at(entry, 1)
-  type = synthesize(argument, known_types(scope))
-  methods = argument_methods(type, scope)
-  return found if methods.nil?
-  missing = demands.reject { answers_demand?(type, methods, it) }
-  return found if missing.empty?
-  spelling = spell_node(argument)
-  return found if spelling.nil?
-  noted(found, ["contract", spelling, type, def_name, wanted_by(demands, missing, scope)], locate(call, scope))
-end
-
-# The method set an argument's type states whole: a declared struct's
-# (declared_shapes), or a builtin's (the table, #88). Nil for anything
-# else — a maybe, an unknown, a struct declared elsewhere.
-def argument_methods(type, scope)
-  return nil unless known?(type)
-  if type in ["struct", *]
-    shape = scope.shapes.find { it[0] == type_at(type, 1) }
-    return nil if shape.nil?
-    return value_at_checked(shape, 1)
-  end
-  builtin_methods(type)
-end
-
-# A dotted demand is answered by the method set; `==` and `!=` by every
-# value; an index by a string, array, or hash; any other operator is a
-# builtin's to decide with its right operand, so a builtin is taken to
-# answer it, and a struct — which has no operators — is not.
-def answers_demand?(type, methods, demand)
-  return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
-  return true if demand == "==" || demand == "!="
-  return (type == ["string"]) || (type in ["array", *]) || (type in ["hash", *]) if demand == "[]"
-  !(type in ["struct", *])
-end
-
-# What the sentence names (ADR 0048 §2): the trait whose method set is
-# exactly the whole contract, else only the demands the argument lacks —
-# the whole contract is in the dump for anyone who wants it.
-def wanted_by(demands, missing, scope)
-  scope.traits.each do |declared|
-    names = def_names(declared.methods).map { "." + it }
-    return ["trait", declared.name] if same_set?(names, demands)
-  end
-  ["demands", missing]
-end
-
-def same_set?(left, right)
-  return false unless left.length == right.length
-  left.all? { right.include?(it) }
-end
-
-# Shape 3 — a maybe used as plain: ADR 0005's static half. At runtime a
-# present value answers any method and only the absent path fails; here
-# the type says the absent path exists, so anything but the predicates
-# and `to_s` refuses until one of the narrowing forms has handled nil.
-# `&.` is the other answer and is never this node. The receiver must be
-# spellable, since the hint is written from it.
-def check_maybe_method(node, receiver, scope, found)
-  return found unless receiver in ["maybe", *]
-  return found unless known?(receiver)
-  return found if %w[eql? failure? nil? some? to_s].include?(node.name)
-  spelling = spell_node(node.receiver)
-  return found if spelling.nil?
-  noted(found, ["unhandled_maybe", spelling, receiver, node.name], locate(node, scope))
-end
-
-# Shape 2 for builtin receivers (#88): the seed's own answers, tabled in
-# inference.pdx from its behavior. A fully known builtin type whose table
-# lacks the name refuses; anything without a table declines.
-def check_builtin_method(node, receiver, scope, found)
-  return found unless known?(receiver)
-  # `found[start, length]` (ADR 0091) parses as a call of `[]`, which no
-  # table lists: a match answers it, and the run refuses it for any other
-  # receiver in a sentence that names `slice`.
-  return found if node.name == "[]"
-  methods = builtin_methods(receiver)
-  return found if methods.nil?
-  return found if methods.include?(node.name)
-  # A false alias keeps the seed's own refusal, moved earlier (ADR 0034 §2).
-  survivor = alias_survivor(node.name)
-  return noted(found, ["alias", node.name, survivor], locate(node, scope)) unless survivor.nil?
-  # A removed Ruby method names its rewrite (#135): `fetch`, `push`,
-  # `freeze`, `send`, and kin.
-  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
-  spelling = spell_node(node.receiver)
-  return found if spelling.nil?
-  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
-end
-
-# Shape 2 — a method the receiver's type does not have, for struct
-# receivers: the one receiver kind whose method set a declaration states
-# completely (declared_shapes). The receiver must be spellable — no
-# spelling, no sentence, so a computed receiver declines.
-def check_struct_method(node, receiver, scope, found)
-  return found unless receiver in ["struct", *]
-  shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
-  return found if shape.nil?
-  return found if value_at_checked(shape, 1).include?(node.name)
-  # Two values between brackets (ADR 0091) refuse when they run, in the
-  # sentence every receiver but a match gets.
-  return found if node.name == "[]"
-  # `value.class` is every struct's (ADR 0074).
-  return found if node.name == "class"
-  # Ruby's Struct lookups by a runtime name (ADR 0062): the fields are
-  # names only, and `to_h` carries the dynamic case — the seed's sentence.
-  if %w[dig values_at deconstruct_keys].include?(node.name)
-    return noted(found, ["sentence", "'#{node.name}' is not a #{type_at(receiver, 1)}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.#{node.name}'"], locate(node, scope))
-  end
-  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
-  spelling = spell_node(node.receiver)
-  return found if spelling.nil?
-  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
-end
-
-# Visibility (ADR 0076): a private method is callable only without a
-# receiver or through `self.`; a protected one also on another value of
-# the type from inside the type's own methods. Which methods a section
-# marked and what type the receiver is are static facts, so the refusal is
-# the build's — where Ruby raises NoMethodError at the call.
-def check_visibility(node, receiver, scope, found)
-  return found unless receiver in ["struct", *]
-  return found if node.receiver in SelfNode
-  type_name = type_at(receiver, 1)
-  marked = scope.visibilities.find { it[0] == type_name }
-  return found if marked.nil?
-  entry = value_at_checked(marked, 1).find { it[0] == node.name }
-  return found if entry.nil?
-  kind = value_at_checked(entry, 1)
-  return found if kind == "protected" && scope.inside == type_name
-  return noted(found, ["sentence", "'#{node.name}' is private to #{type_name}"], locate(node, scope)) if kind == "private"
-  noted(found, ["sentence", "'#{node.name}' is protected — only #{type_name}'s own methods may call it on another #{type_name}"], locate(node, scope))
-end
-
-# A constant `private_constant` hid (ADR 0076) is readable by its bare name
-# inside its namespace, and by its path from inside too; a path from
-# outside refuses at build time, where Ruby raises NameError.
-def check_path(node, scope, found)
-  written = node.parts.join("::")
-  # A path is read from where it stands: as written, or under any
-  # enclosing namespace (ADR 0021), outermost last.
-  mutable candidates = [written]
-  mutable home = scope.home
-  until home.empty?
-    candidates << "#{home}::#{written}"
-    home = home.include?("::") ? home.slice(0, home.rindex("::")) : ""
-  end
-  hidden = candidates.find { scope.private_constants.include?(it) }
-  return found if hidden.nil?
-  owner = hidden.slice(0, hidden.rindex("::"))
-  return found if scope.home == owner || scope.home.start_with?(owner + "::")
-  noted(found, ["sentence", "'#{node.parts.last}' is private to #{owner}"], locate(node, scope))
-end
-
-# Each struct's private and protected methods (ADR 0076), its own and its
-# traits', as [name, [[method, kind], ...]] — read by check_visibility.
-def declared_visibilities(nodes)
-  traits = trait_declarations_in(nodes)
-  mutable table = []
-  struct_declarations_in(nodes).each do |declaration|
-    mutable marked = declaration.visibilities
-    declaration.includes.each do |trait_name|
-      matching = traits.select { it.name == trait_name }
-      marked += matching.first.visibilities if matching.length == 1
-    end
-    table << [declaration.name, marked] unless marked.empty?
-  end
-  table
-end
-
 # `private_constant` hides a constant its own module or struct defines
 # (#301): a name it does not define is a typo that would leave the
 # intended constant public, so it refuses, where Ruby raises NameError. A
@@ -1643,8 +1012,284 @@ def check_private_constant_names(nodes, home, scope, mutable found)
   found
 end
 
-def undefined_private_constant(name, owner)
-  "private_constant names #{name}, which #{owner} does not define — it hides a constant #{owner} defines"
+# The one-file entry point: refuse with everything found, or stay silent.
+def check_program(nodes, source)
+  report(check_program_with(nodes, source, nil, empty_declarations, []))
+end
+
+# Run mode (ADR 0049 §4): the closure is a closed world, so the entry
+# file's own defs have every caller in view, and a parameter every caller
+# agrees on is read at that type inside its body (ADR 0048 ruling 4).
+# Only the entry's defs: a required file is a library by nature, and its
+# defs may have callers outside this closure.
+def check_program_closure(path, checked, load_path, core: nil)
+  check_closure_with(path, checked, true, load_path, core)
+end
+
+# One file, with what its requires declare in view (#94): its own
+# declarations first, so a name declared on both sides resolves to its own.
+# Answers what it found, in source order.
+def check_program_with(nodes, source, file, imports, sharpened)
+  own = declarations_of(nodes)
+  whole = merge_declarations(own, imports)
+  # A bare name is judged (#98) only where every name the file can see is
+  # in view: a require the walk could not resolve may declare anything.
+  judging = nodes.none? { computed_require?(it) }
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: [], private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
+  annotated = check_annotations(nodes, source, scope, [])
+  found = check_requires(nodes, false, scope, annotated)
+  walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
+  hidden = check_private_constant_names(nodes, "", scope, walked.last)
+  in_source_order(check_body(nodes, scope, hidden))
+end
+
+# A range's ends are checked like any expression, then as a pair (ADR
+# 0081): two known values `<=>` cannot order refuse where the range is
+# written — the seed's sentence, with the types in place of the values.
+def check_range(node, scope, mutable found)
+  found = check_node(node.start, scope, found) unless node.start.nil?
+  found = check_node(node.finish, scope, found) unless node.finish.nil?
+  return found if node.start.nil? || node.finish.nil?
+  types = known_types(scope)
+  start = synthesize(node.start, types)
+  finish = synthesize(node.finish, types)
+  return found unless plain_value?(start) && plain_value?(finish)
+  return found if orderable_pair_types?(start, finish)
+  noted(found, ["sentence", "bad value for range — <=> cannot order #{render_type(start)} and #{render_type(finish)}"], locate(node, scope))
+end
+
+# ADR 0019's algorithm: range arms claim the integers, so a beginless first
+# and an endless last with no gaps between is the proof. Overlap is legal,
+# so coverage runs forward as a high-water mark rather than arm to arm.
+def check_range_coverage(node, arms, scope, found)
+  mutable bounds = []
+  arms.each do |branch|
+    pair = range_bounds(branch.pattern)
+    return found if pair.nil?
+    bounds << pair
+  end
+  return found if bounds.empty?
+  beginless = bounds.select { low_of(it).nil? }
+  if beginless.empty?
+    lowest = bounds.map { low_of(it) }.min
+    return noted(found, ["sentence", "case/in leaves ..#{lowest - 1} uncovered — add the arm, or an else"], locate(node, scope))
+  end
+  # An arm open at both ends is the whole line, and needs no walk.
+  return found unless beginless.none? { high_of(it).nil? }
+  mutable covered_to = beginless.map { high_of(it) }.max
+  bounded = bounds.reject { low_of(it).nil? }
+  bounded.sort_by { low_of(it) }.each do |pair|
+    low = low_of(pair)
+    if low > covered_to + 1
+      return noted(found, ["sentence", "case/in leaves #{covered_to + 1}..#{low - 1} uncovered — add the arm, or an else"], locate(node, scope))
+    end
+    high = high_of(pair)
+    return found if high.nil?
+    covered_to = high if high > covered_to
+  end
+  noted(found, ["sentence", "case/in leaves #{covered_to + 1}.. uncovered — add the arm, or an else"], locate(node, scope))
+end
+
+# — one definition per name (#70, ADR 0052), and constants (#97, ADR 0053) —
+#
+# A top-level def, struct, enum, trait, alias, or constant is declared once
+# across the program, and a builtin's name is never taken. A module body is
+# walked with its names qualified, so `A::x` twice refuses and `module A`
+# reopened does not. Answers [seen, found]: the names declared so far, and
+# the refusals.
+def check_redefinitions(nodes, home, scope, mutable seen, mutable found)
+  nodes.each do |node|
+    if node in ModuleDefNode
+      walked = check_redefinitions(node.body, qualified_under(home, node.path.join("::")), scope, seen, found)
+      seen = walked.first
+      found = walked.last
+      next
+    end
+    if (node in AssignmentNode) && home.empty? && lone_capital?(node.name)
+      found = noted(found, ["lone_capital", node.name], locate(node, scope))
+      next
+    end
+    name = declared_name(node)
+    next if name.nil?
+    qualified = qualified_under(home, name)
+    # `seen` holds [name, kind] pairs, since a constant bound again says
+    # "bound once" and a constant named after a def says "already defined"
+    # — the seed's two sentences, in the seed's order.
+    if node in AssignmentNode
+      if node.rebindable
+        found = noted(found, ["constant_mutable", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified && it[1] == "constant" }
+        found = noted(found, ["constant_rebound", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified }
+        found = noted(found, ["redefined", name], locate(node, scope))
+      end
+      seen = seen + [[qualified, "constant"]]
+    else
+      # `fields` is the one builtin with a designed refusal of its own
+      # (ADR 0031), which the runtime keeps — the seed's list, not this
+      # file's, says which names are never taken.
+      if (node in StructDefNode) && home.empty? && core_type_name?(name)
+        # A program cannot reopen a core type (ADR 0093).
+        found = noted(found, ["core_type", name], locate(node, scope))
+      elsif (builtin_function?(name) && name != "fields") || seen.any? { it[0] == qualified && it[1] == "builtin" }
+        found = noted(found, ["builtin", name], locate(node, scope))
+      elsif seen.any? { it[0] == qualified }
+        found = noted(found, ["redefined", name], locate(node, scope))
+      end
+      seen = seen + [[qualified, "declaration"]]
+    end
+  end
+  [seen, found]
+end
+
+# `require` and `require_relative` take a string literal at a file's top
+# level (ADR 0077 §3) — or a module body's, as static a place — so the build
+# sees every file it links. Inside a def, a block, or a branch, or with a
+# computed name, they refuse naming the rewrite; the seed says the same
+# sentence when the line is reached.
+def check_requires(nodes, inside, scope, mutable found)
+  nodes.each do |node|
+    case node
+    in CallNode(name:, arguments:, block:)
+      if name == "require" || name == "require_relative"
+        if inside
+          found = noted(found, ["sentence", "'#{name}' belongs at the top of the file — a program is its require closure, known at build (ADR 0049); move it there"], locate(node, scope))
+        elsif arguments.length != 1 || !(arguments.first in StringNode)
+          found = noted(found, ["sentence", "'#{name}' takes a string literal — write #{name} \"name\" at the top of the file, so the build sees every file it links"], locate(node, scope))
+        end
+      end
+      found = check_requires(arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in MethodCallNode(receiver:, arguments:, block:)
+      found = check_requires([receiver] + arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in SafeMethodCallNode(receiver:, arguments:, block:)
+      found = check_requires([receiver] + arguments, inside, scope, found)
+      found = check_requires(block_body(block), true, scope, found)
+    in AssignmentNode(value:) then found = check_requires([value], inside, scope, found)
+    in ModuleDefNode(body:) then found = check_requires(body, inside, scope, found)
+    in StructDefNode(methods:, type_functions:, nested:) then found = check_requires(methods + type_functions + nested, true, scope, found)
+    in TraitDefNode(methods:) then found = check_requires(methods, true, scope, found)
+    in DefNode(body:) then found = check_requires(body, true, scope, found)
+    in IfNode(condition:, then_body:, else_body:)
+      found = check_requires([condition], inside, scope, found)
+      found = check_requires((then_body or []) + (else_body or []), true, scope, found)
+    in WhileNode(condition:, body:)
+      found = check_requires([condition], inside, scope, found)
+      found = check_requires(body, true, scope, found)
+    else
+      found = check_requires(children_of(node), true, scope, found)
+    end
+  end
+  found
+end
+
+def check_reserved(methods, names, wording, scope, mutable found)
+  methods.each do |method|
+    next unless method in DefNode
+    found = noted(found, ["sentence", "#{method.name} #{wording}"], locate(method, scope)) if names.include?(method.name)
+  end
+  found
+end
+
+# Shape 2 — a method the receiver's type does not have, for struct
+# receivers: the one receiver kind whose method set a declaration states
+# completely (declared_shapes). The receiver must be spellable — no
+# spelling, no sentence, so a computed receiver declines.
+def check_struct_method(node, receiver, scope, found)
+  return found unless receiver in ["struct", *]
+  shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
+  return found if shape.nil?
+  return found if value_at_checked(shape, 1).include?(node.name)
+  # Two values between brackets (ADR 0091) refuse when they run, in the
+  # sentence every receiver but a match gets.
+  return found if node.name == "[]"
+  # `value.class` is every struct's (ADR 0074).
+  return found if node.name == "class"
+  # Ruby's Struct lookups by a runtime name (ADR 0062): the fields are
+  # names only, and `to_h` carries the dynamic case — the seed's sentence.
+  if %w[dig values_at deconstruct_keys].include?(node.name)
+    return noted(found, ["sentence", "'#{node.name}' is not a #{type_at(receiver, 1)}'s — its fields are read by their bare names; for a name decided at runtime, write 'to_h.#{node.name}'"], locate(node, scope))
+  end
+  return noted(found, ["retired", node.name], locate(node, scope)) unless retired_sentence(node.name).nil?
+  spelling = spell_node(node.receiver)
+  return found if spelling.nil?
+  noted(found, ["no_method", spelling, receiver, node.name], locate(node, scope))
+end
+
+# A `together` block's lines run in order (ADR 0029), so a plain line's
+# binding is in view for the lines below it, as in any body.
+def check_together(lines, mutable scope, mutable found)
+  lines.each do |line|
+    found = if line in TaskLineNode
+      check_node(line.value, scope, found)
+    else
+      check_node(line, scope, found)
+    end
+    scope = bind_statement(line, scope)
+  end
+  found
+end
+
+# `!` takes a boolean, and `-` and `+` a number; the seed refuses the rest.
+def check_unary(node, scope, found)
+  operand = synthesize(node.operand, known_types(scope))
+  return found unless plain_value?(operand)
+  return found if node.operator == "!" && operand == ["boolean"]
+  return found if (node.operator == "-" || node.operator == "+") && numeric?(operand)
+  return found unless node.operator == "!" || node.operator == "-" || node.operator == "+"
+  noted(found, ["unary", node.operator, operand], locate(node, scope))
+end
+
+# ADR 0013 §3. Two shapes need no types: everything below a bare capture,
+# and a case already matched whole by an arm above.
+def check_unreachable_arms(node, scope, mutable found)
+  mutable seen_capture = false
+  mutable seen_cases = []
+  unguarded_arms(node).each do |branch|
+    pattern = branch.pattern
+    found = noted(found, ["sentence", "this arm can never match — the capture above binds every subject"], locate(branch, scope)) if seen_capture
+    name = whole_case_name(pattern)
+    unless name.nil?
+      found = noted(found, ["sentence", "in :#{name} can never match — an arm above already matches :#{name}"], locate(branch, scope)) if seen_cases.include?(name)
+      seen_cases << name
+    end
+    seen_capture = true if pattern in IdentifierNode
+  end
+  found
+end
+
+# Visibility (ADR 0076): a private method is callable only without a
+# receiver or through `self.`; a protected one also on another value of
+# the type from inside the type's own methods. Which methods a section
+# marked and what type the receiver is are static facts, so the refusal is
+# the build's — where Ruby raises NoMethodError at the call.
+def check_visibility(node, receiver, scope, found)
+  return found unless receiver in ["struct", *]
+  return found if node.receiver in SelfNode
+  type_name = type_at(receiver, 1)
+  marked = scope.visibilities.find { it[0] == type_name }
+  return found if marked.nil?
+  entry = value_at_checked(marked, 1).find { it[0] == node.name }
+  return found if entry.nil?
+  kind = value_at_checked(entry, 1)
+  return found if kind == "protected" && scope.inside == type_name
+  return noted(found, ["sentence", "'#{node.name}' is private to #{type_name}"], locate(node, scope)) if kind == "private"
+  noted(found, ["sentence", "'#{node.name}' is protected — only #{type_name}'s own methods may call it on another #{type_name}"], locate(node, scope))
+end
+
+# A `require` or `require_relative` whose path is not a literal string.
+def computed_require?(node)
+  return false unless node in CallNode
+  return false unless node.name == "require_relative" || node.name == "require"
+  return true unless node.arguments.length == 1
+  !(node.arguments.first in StringNode)
+end
+
+def constant_declaration?(node)
+  return false unless node in AssignmentNode
+  return false if node.value.nil?
+  constant_name?(node.name)
 end
 
 # The constants a body defines by name: its SCREAMING_CASE bindings and
@@ -1657,6 +1302,148 @@ def constants_defined_in(statements)
     names << module_name(statement) if statement in ModuleDefNode
   end
   names
+end
+
+def covers_nil?(pattern)
+  case pattern
+  in NilNode | IdentifierNode then true
+  in AlternativePatternNode(options:) then options.any? { covers_nil?(it) }
+  else
+    false
+  end
+end
+
+def covers_present?(pattern, inner)
+  case pattern
+  in IdentifierNode then true
+  in AlternativePatternNode(options:) then options.any? { covers_present?(it, inner) }
+  # `in Integer` and `in User(name:)` are one node: a name with fields. Bare,
+  # it matches every value of the named type, builtin or struct; with
+  # fields, every value whose named struct it is when each field is a
+  # plain capture.
+  in StructPatternNode(name:, fields:)
+    return false unless render_type(inner) == name
+    fields.all? { it[1] in IdentifierNode }
+  else
+    false
+  end
+end
+
+def declarations_in(node)
+  case node
+  in EnumDefNode
+    mutable found = []
+    node.cases.each do |declared|
+      # The third element is the owning enum: membership needs only the
+      # case, coverage (ADR 0035) needs the set it belongs to.
+      found << [declared.name, declared.labels, node.name]
+    end
+    found
+  in ModuleDefNode(body:) then declared_cases(body)
+  in StructDefNode(nested:) then declared_cases(nested)
+  else
+    []
+  end
+end
+
+def declarations_of(written)
+  nodes = with_guarded_definitions(written)
+  Declarations.new(arities: declared_arities(nodes), builtins: [], constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
+end
+
+# Every top-level def's positional arity, as [name, required, total] —
+# the seed's own count: parameters up to the first default are required,
+# keyword parameters stand outside the count. A name defined twice is
+# left out (a second def silently wins at runtime, #70's open question).
+def declared_arities(nodes)
+  defs = nodes.select { it in DefNode }
+  mutable arities = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    positional = node.parameters.reject { it in KeywordParameterNode }
+    required = positional.select { required_parameter?(it) }.length
+    arities << [node.name, required, positional.length]
+  end
+  arities
+end
+
+# Every enum declaration in the program, as [name, labels] pairs — all of
+# them, not just the textually-earlier ones: a build reads the whole file
+# before judging any line of it.
+def declared_cases(nodes)
+  mutable declarations = []
+  nodes.each do |node|
+    declarations += declarations_in(node)
+  end
+  declarations
+end
+
+# The names a file's top-level and module-body constants take, qualified.
+def declared_constants(nodes, home)
+  mutable names = []
+  nodes.each do |node|
+    names += declared_constants(node.body, qualified_under(home, node.path.join("::"))) if node in ModuleDefNode
+    # A type's constants (#145), and its nested types', live under it.
+    names += declared_constants(node.constants + node.nested, qualified_under(home, node.name)) if node in StructDefNode
+    names << qualified_under(home, node.name) if constant_declaration?(node)
+  end
+  names
+end
+
+# Every top-level def's parameters with their contracts (ADR 0048), as
+# [name, parameters] where each parameter is [name, keyword?, entry] and
+# an entry is a default's type or ["needs", demands]. A name defined twice
+# is left out, as for arities.
+def declared_contracts(nodes)
+  defs = nodes.select { it in DefNode }
+  types = scan_program(nodes)
+  mutable contracts = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    parameters = node.parameters.map { [it.name, (it in KeywordParameterNode), parameter_entry(it, node.body, types)] }
+    contracts << [node.name, parameters]
+  end
+  contracts
+end
+
+# The program-wide names, in the shape inference reads: struct and enum
+# types first (their order never matters), then the top-level defs' return
+# types in source order — a def that calls a later def reads that call as
+# unknown, which is a decline, not a wrong answer.
+def declared_globals(nodes)
+  mutable globals = []
+  nodes.each do |node|
+    globals = register_struct(node, globals) if node in StructDefNode
+    globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
+    # A module's name is a name a bare reference may use as a receiver
+    # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
+    globals = [[module_name(node), ["module", module_name(node)]]] + globals if node in ModuleDefNode
+  end
+  nodes.each do |node|
+    globals = [[node.name, synthesize_def_return(node, globals)]] + globals if node in DefNode
+    # A top-level SCREAMING_CASE binding is a constant (ADR 0053): a def's
+    # reach, so every def in the program reads it at its value's type.
+    globals = [[node.name, synthesize(node.value, globals)]] + globals if constant_declaration?(node)
+    # A top-level `alias new old` (ADR 0039) is a second name for the def,
+    # answering what the def answers — found by the corpus, where a tour
+    # fixture's alias read as a name nothing defined (#98).
+    globals = [[node.new_name, synthesize_name(node.old_name, globals)]] + globals if node in AliasNode
+  end
+  globals
+end
+
+# What a statement declares, or nil: a def, an alias's new name, a struct,
+# an enum, a trait, or a SCREAMING_CASE binding.
+def declared_name(node)
+  case node
+  in DefNode(name:) then name
+  in AliasNode(new_name:) then new_name
+  in StructDefNode(name:) then name
+  in EnumDefNode(name:) then name
+  in TraitDefNode(name:) then name
+  in AssignmentNode(name:) then constant_name?(name) ? name : nil
+  else nil
+  end
 end
 
 # The constants `private_constant` hid, qualified under their namespace: a
@@ -1677,24 +1464,190 @@ def declared_private_constants(nodes, home)
   names
 end
 
-# Shape 4 — an operator on operands it cannot take. The legal pairs are
-# the seed's own match arms, read as types: numbers with numbers for the
-# arithmetic and ordering operators, string with string and array with
-# array for `+`, string or array times an integer, and anything at all for
-# `==` and `!=`. Both operands must be plain builtin values for the
-# refusal to fire — a maybe is transparent at runtime (some(x) is x) and a
-# struct or enum is not this shape's to judge — so everything else
-# declines.
-def check_operator(node, scope, found)
-  types = known_types(scope)
-  left = synthesize(node.left, types)
-  right = synthesize(node.right, types)
-  return found unless plain_value?(left) && plain_value?(right)
-  return found if operator_takes?(node.operator, left, right)
-  # `"%d" % x` is Ruby's formatting operator; here formatting is a function
-  # (ADR 0067), and the refusal names it, as the seed's does.
-  return noted(found, ["string_percent"], locate(node, scope)) if node.operator == "%" && left == ["string"]
-  noted(found, ["operator", node.operator, left, right], locate(node, scope))
+# Every struct's instance method set, as [name, methods] pairs: its
+# fields, its defs (alias clones included, since they arrive as defs), the
+# defs of each trait it includes, the five every struct answers, and
+# Ruby's Struct views and walks (#114). A
+# struct is left out where the tree cannot state its set whole — its name
+# declared twice anywhere (a nested struct sharing a top-level one's), or
+# an included trait not declared exactly once in this file, which may
+# well live in a required one.
+def declared_shapes(nodes)
+  structs = struct_declarations_in(nodes)
+  traits = trait_declarations_in(nodes)
+  mutable shapes = []
+  structs.each do |declaration|
+    name = declaration.name
+    next if structs.select { it.name == name }.length > 1
+    methods = shape_methods(declaration, traits)
+    shapes << [name, methods] unless methods.nil?
+  end
+  shapes
+end
+
+# Each struct's private and protected methods (ADR 0076), its own and its
+# traits', as [name, [[method, kind], ...]] — read by check_visibility.
+def declared_visibilities(nodes)
+  traits = trait_declarations_in(nodes)
+  mutable table = []
+  struct_declarations_in(nodes).each do |declaration|
+    mutable marked = declaration.visibilities
+    declaration.includes.each do |trait_name|
+      matching = traits.select { it.name == trait_name }
+      marked += matching.first.visibilities if matching.length == 1
+    end
+    table << [declaration.name, marked] unless marked.empty?
+  end
+  table
+end
+
+def def_names(methods)
+  mutable names = []
+  methods.each do |method|
+    names << method.name if method in DefNode
+  end
+  names
+end
+
+# A def cannot see the locals around it — its body starts from its
+# parameters alone (a default lends its type, as in inference).
+def def_scope(node, scope)
+  agreed = scope.sharpened.find { it[0] == node.name }
+  agreed_pairs = if agreed.nil? then [] else value_at_checked(agreed, 1) end
+  mutable locals = []
+  node.parameters.each do |parameter|
+    sharpened = agreed_pairs.find { it[0] == parameter.name }
+    type = if sharpened.nil? then parameter_type(parameter, scope.globals) else value_at_checked(sharpened, 1) end
+    locals = [[parameter.name, type]] + locals
+  end
+  scope.with(locals: locals)
+end
+
+def empty_declarations = Declarations.new(arities: [], builtins: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
+
+def enum_owning(enums, case_name)
+  found = enums.find { it[0] == case_name }
+  return nil if found.nil?
+  value_at_checked(found, 2)
+end
+
+# The names a nested body rebinds are unknown wherever that body may have
+# run — inference's forget_types, over the scope's locals.
+def forget(scope, names)
+  scope.with(locals: forget_types(scope.locals, names))
+end
+
+def guarded_definitions(node)
+  held = guarded_statements(node)
+  mutable definitions = []
+  held.each do |statement|
+    definitions << statement if statement in DefNode
+    definitions += guarded_definitions(statement)
+  end
+  definitions
+end
+
+def guarded_statements(node)
+  return (node.then_body or []) + (node.else_body or []) if node in IfNode
+  return node.body if node in WhileNode
+  []
+end
+
+def high_of(pair)
+  value_at_checked(pair, 1)
+end
+
+# What a program's requires declare, as [name, kind] pairs for
+# `check_redefinitions`: every global, with the constants among them marked.
+def imported_names(imports)
+  imports.globals.map do |global|
+    name = global.first
+    kind = if imports.builtins.include?(name) then "builtin" elsif imports.constants.include?(name) then "constant" else "declaration" end
+    [name, kind]
+  end
+end
+
+# Refusals in the order the source has them: by line, with the walk's own
+# order breaking ties and standing in where a node carries no line. One
+# integer key per entry, since the sort need not be stable.
+def in_source_order(found)
+  mutable keyed = []
+  found.each_with_index do |entry, index|
+    location = type_at(entry, 1)
+    line = if location.nil? then 0 else location.first end
+    keyed << [line * 100000 + index, entry]
+  end
+  keyed.sort_by { it.first }.map { type_at(it, 1) }
+end
+
+def keyword_argument(node, label)
+  found = node.arguments.find { (it in KeywordArgumentNode) && it.label == label }
+  return nil if found.nil?
+  found.value
+end
+
+# Fully known: no unknown at any depth. A refusal never names a type it
+# would have to render as Unknown.
+def known?(type)
+  case type
+  in ["unknown"] then false
+  in ["array", element] then known?(element)
+  in ["hash", key, entry] then known?(key) && known?(entry)
+  in ["maybe", inner] then known?(inner)
+  in ["range", element] then known?(element)
+  else
+    true
+  end
+end
+
+# What inference may read at this point: the body's own bindings, then
+# the program's. The no-shadow rule keeps the two from ever overlapping.
+def known_types(scope) = scope.locals + scope.globals
+
+# Every node kind carries its line (the ruling of 2026-09-24: the first
+# token that begins the node, #362). It is nil only on a node a desugar
+# built with no token in hand.
+def line_of(node) = node.line
+
+def literal_integer(node)
+  return nil if node.nil?
+  return nil unless node in IntegerNode
+  node.value.to_i
+end
+
+# Where a refusal points (#89): the node's line and that line of the
+# source, for the renderer to print beneath the sentence — or nil, and no
+# location, for a node built by a desugar with no token in hand.
+def locate(node, scope)
+  line = line_of(node)
+  return nil if line.nil?
+  text = value_at_checked(scope.source, line - 1) or ""
+  [line, text.chomp, scope.file]
+end
+
+# A bound is absent for a beginless or endless arm, and host indexing lifts
+# a stored nil into a present-but-absent maybe — so both ends are read the
+# raw way, like every other positional read in this file.
+def low_of(pair)
+  value_at_checked(pair, 0)
+end
+
+def merge_declarations(first, second)
+  Declarations.new(arities: first.arities + second.arities, builtins: first.builtins + second.builtins, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
+end
+
+# A struct's or trait's method body: parameters only, and no top-level
+# def returns either — a bare call inside a struct may reach the struct's
+# own methods before the program's, which this increment does not model.
+def method_scope(node, scope)
+  type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
+  def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
+end
+
+# A module's first path segment: `module A::B` is reached as `A`.
+def module_name(node)
+  first = node.path.first or ""
+  first
 end
 
 def operator_takes?(operator, left, right)
@@ -1738,41 +1691,12 @@ def operator_takes?(operator, left, right)
   end
 end
 
-# A range's ends are checked like any expression, then as a pair (ADR
-# 0081): two known values `<=>` cannot order refuse where the range is
-# written — the seed's sentence, with the types in place of the values.
-def check_range(node, scope, mutable found)
-  found = check_node(node.start, scope, found) unless node.start.nil?
-  found = check_node(node.finish, scope, found) unless node.finish.nil?
-  return found if node.start.nil? || node.finish.nil?
-  types = known_types(scope)
-  start = synthesize(node.start, types)
-  finish = synthesize(node.finish, types)
-  return found unless plain_value?(start) && plain_value?(finish)
-  return found if orderable_pair_types?(start, finish)
-  noted(found, ["sentence", "bad value for range — <=> cannot order #{render_type(start)} and #{render_type(finish)}"], locate(node, scope))
-end
-
 # The pairs `<=>` orders (ADR 0054): numbers with numbers, two strings, two
 # symbols, two arrays.
 def orderable_pair_types?(left, right)
   return true if numeric?(left) && numeric?(right)
   return true if left == right && (left == ["string"] || left == ["symbol"])
   (left in ["array", *]) && (right in ["array", *])
-end
-
-# The types a set's algebra takes on the right (ADR 0082): a set, an array,
-# a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ["array", *]) || (type in ["hash", *])
-
-# `!` takes a boolean, and `-` and `+` a number; the seed refuses the rest.
-def check_unary(node, scope, found)
-  operand = synthesize(node.operand, known_types(scope))
-  return found unless plain_value?(operand)
-  return found if node.operator == "!" && operand == ["boolean"]
-  return found if (node.operator == "-" || node.operator == "+") && numeric?(operand)
-  return found unless node.operator == "!" || node.operator == "-" || node.operator == "+"
-  noted(found, ["unary", node.operator, operand], locate(node, scope))
 end
 
 # A fully known builtin value type — never a maybe, struct, or enum.
@@ -1787,151 +1711,7 @@ def plain_value?(type)
   end
 end
 
-# Fully known: no unknown at any depth. A refusal never names a type it
-# would have to render as Unknown.
-def known?(type)
-  case type
-  in ["unknown"] then false
-  in ["array", element] then known?(element)
-  in ["hash", key, entry] then known?(key) && known?(entry)
-  in ["maybe", inner] then known?(inner)
-  in ["range", element] then known?(element)
-  else
-    true
-  end
-end
-
-# — coverage and reachability (ADR 0035) —
-#
-# The checks below read the arms alone: each refuses only where it can
-# *prove* non-coverage over a set the arms themselves establish, and stays
-# silent where it merely cannot prove coverage (ADR 0035 §1). Inference
-# widens where coverage applies — check_maybe_coverage and
-# check_boolean_coverage read the set off the subject's type; it does not
-# gate whether these exist.
-
-# Guarded arms are outside the arithmetic in both directions (ADR 0035 §4):
-# they cover nothing, because the compiler cannot prove an `if`, and they
-# are never called unreachable, because the guard may be the reason they
-# are not.
-def unguarded_arms(node)
-  node.branches.select { it.guard.nil? }
-end
-
-# ADR 0013 §3. Two shapes need no types: everything below a bare capture,
-# and a case already matched whole by an arm above.
-def check_unreachable_arms(node, scope, mutable found)
-  mutable seen_capture = false
-  mutable seen_cases = []
-  unguarded_arms(node).each do |branch|
-    pattern = branch.pattern
-    found = noted(found, ["sentence", "this arm can never match — the capture above binds every subject"], locate(branch, scope)) if seen_capture
-    name = whole_case_name(pattern)
-    unless name.nil?
-      found = noted(found, ["sentence", "in :#{name} can never match — an arm above already matches :#{name}"], locate(branch, scope)) if seen_cases.include?(name)
-      seen_cases << name
-    end
-    seen_capture = true if pattern in IdentifierNode
-  end
-  found
-end
-
-# The case an arm matches *every* instance of — so a later arm naming it is
-# dead. A payload pattern qualifies only when every entry is a plain
-# capture; `in :paid(on: 1)` leaves the other payloads to later arms.
-def whole_case_name(pattern)
-  return pattern.value if pattern in SymbolNode
-  return nil unless pattern in EnumCasePatternNode
-  return nil unless pattern.payload.all? { it[1] in IdentifierNode }
-  pattern.name
-end
-
-def check_coverage(node, scope, mutable found)
-  arms = unguarded_arms(node)
-  return found if arms.empty?
-  found = check_enum_coverage(node, arms, scope, found)
-  check_range_coverage(node, arms, scope, found)
-end
-
-# An enum is established by a payload-carrying arm and by nothing else
-# (ADR 0035 §2): a payload-free case is simply a symbol, and symbols are
-# legal everywhere, so plain-symbol arms are never second-guessed.
-def check_enum_coverage(node, arms, scope, found)
-  enums = scope.enums
-  anchor = arms.find { it.pattern in EnumCasePatternNode }
-  return found if anchor.nil?
-  owner = enum_owning(enums, anchor.pattern.name)
-  return found if owner.nil?
-  mutable covered = []
-  arms.each do |branch|
-    name = arm_case_name(branch.pattern)
-    return found if name.nil?
-    covered << name
-  end
-  missing = cases_of(enums, owner).reject { covered.include?(it) }
-  return found if missing.empty?
-  named = missing.map { ":" + it }.join(", ")
-  noted(found, ["sentence", "case/in does not cover #{named} — add the arm, or an else"], locate(node, scope))
-end
-
-def arm_case_name(pattern)
-  return pattern.value if pattern in SymbolNode
-  return pattern.name if pattern in EnumCasePatternNode
-  nil
-end
-
-def enum_owning(enums, case_name)
-  found = enums.find { it[0] == case_name }
-  return nil if found.nil?
-  value_at_checked(found, 2)
-end
-
-def cases_of(enums, enum_name)
-  enums.select { value_at_checked(it, 2) == enum_name }.map { it[0] }
-end
-
-# ADR 0019's algorithm: range arms claim the integers, so a beginless first
-# and an endless last with no gaps between is the proof. Overlap is legal,
-# so coverage runs forward as a high-water mark rather than arm to arm.
-def check_range_coverage(node, arms, scope, found)
-  mutable bounds = []
-  arms.each do |branch|
-    pair = range_bounds(branch.pattern)
-    return found if pair.nil?
-    bounds << pair
-  end
-  return found if bounds.empty?
-  beginless = bounds.select { low_of(it).nil? }
-  if beginless.empty?
-    lowest = bounds.map { low_of(it) }.min
-    return noted(found, ["sentence", "case/in leaves ..#{lowest - 1} uncovered — add the arm, or an else"], locate(node, scope))
-  end
-  # An arm open at both ends is the whole line, and needs no walk.
-  return found unless beginless.none? { high_of(it).nil? }
-  mutable covered_to = beginless.map { high_of(it) }.max
-  bounded = bounds.reject { low_of(it).nil? }
-  bounded.sort_by { low_of(it) }.each do |pair|
-    low = low_of(pair)
-    if low > covered_to + 1
-      return noted(found, ["sentence", "case/in leaves #{covered_to + 1}..#{low - 1} uncovered — add the arm, or an else"], locate(node, scope))
-    end
-    high = high_of(pair)
-    return found if high.nil?
-    covered_to = high if high > covered_to
-  end
-  noted(found, ["sentence", "case/in leaves #{covered_to + 1}.. uncovered — add the arm, or an else"], locate(node, scope))
-end
-
-# A bound is absent for a beginless or endless arm, and host indexing lifts
-# a stored nil into a present-but-absent maybe — so both ends are read the
-# raw way, like every other positional read in this file.
-def low_of(pair)
-  value_at_checked(pair, 0)
-end
-
-def high_of(pair)
-  value_at_checked(pair, 1)
-end
+def qualified_under(home, name) = home.empty? ? name : "#{home}::#{name}"
 
 # A range arm's closed bounds, or nil where a bound is anything but an
 # integer literal — a computed end is a decline, not a refusal.
@@ -1945,10 +1725,190 @@ def range_bounds(pattern)
   [low, high]
 end
 
-def literal_integer(node)
-  return nil if node.nil?
-  return nil unless node in IntegerNode
-  node.value.to_i
+# Where `require name` lands (ADR 0077 §2): the first directory on the path
+# holding exactly one of the name's candidate files; nil for a core name,
+# a name found nowhere, or a name two files answer to.
+def require_on_load_path(name, load_path)
+  return nil if core_require_name?(name)
+  mutable found = nil
+  load_path.each do |directory|
+    next unless found.nil?
+    hits = require_candidates(name, directory).reject { System.read_file(it).failure? }
+    # Two files answering one name refuse here, before anything is checked
+    # or run — the evaluator's sentence, said first.
+    panic("cannot load '#{name}' — both #{hits.join(" and ")} are on the load path; keep one") if hits.length > 1
+    found = hits.first unless hits.empty?
+  end
+  found
+end
+
+# The files a program's top-level `require_relative "name"` and
+# `require "name"` lines name, in order (ADR 0077). Only a literal string
+# resolves; anything else is declined. A `require` the load path cannot
+# place is left to the runtime's refusal, and a core name is no file.
+def required_files(nodes, path, load_path)
+  mutable found = []
+  nodes.each do |node|
+    next unless node in CallNode
+    next unless node.name == "require_relative" || node.name == "require"
+    next unless node.arguments.length == 1
+    argument = node.arguments.first
+    next unless argument in StringNode
+    if node.name == "require_relative"
+      found << required_path_from(path, argument.value)
+      next
+    end
+    placed = require_on_load_path(argument.value, load_path)
+    found << placed unless placed.nil?
+  end
+  found
+end
+
+# A bare name, or a `mutable` one with no default, must be passed.
+def required_parameter?(parameter)
+  return true if parameter in IdentifierNode
+  (parameter in AssignmentNode) && parameter.value.nil?
+end
+
+# Resolve a closure into the files to check, children before parents, and
+# what each is checked with. `checked` is the memo of files already
+# checked in this process — the spec harness checks a hundred specs that
+# share one helper — as [key, exports] pairs, `nil` while a file is in
+# progress. Answers [checked, files]. `required` says whether some file
+# requires this one — then the program spans more than one file and a
+# refusal here names its file (ADR 0049 §5); an entry names its file only
+# when it requires something itself.
+def resolve_closure(path, mutable checked, mutable files, required, load_path)
+  key = canonical_path(path)
+  return [checked, files] if checked.any? { it[0] == key }
+  source = System.read_file(path) or panic "check: cannot read #{path}"
+  nodes = parse_program(lex(source))
+  checked = [[key, nil]] + checked
+  requires = required_files(nodes, path, load_path)
+  mutable imports = empty_declarations
+  requires.each do |name|
+    resolution = resolve_closure(name, checked, files, true, load_path)
+    checked = value_at_checked(resolution, 0)
+    files = value_at_checked(resolution, 1)
+    found = checked.find { it[0] == canonical_path(name) }
+    declared = if found.nil? then nil else value_at_checked(found, 1) end
+    imports = merge_declarations(imports, declared) unless declared.nil?
+  end
+  named = if required || !requires.empty? then path else nil end
+  files << Resolved.new(imports: imports, named: named, nodes: nodes, path: path, source: source)
+  exported = merge_declarations(declarations_of(nodes), imports)
+  [[[key, exported]] + checked.reject { it[0] == key }, files]
+end
+
+def same_set?(left, right)
+  return false unless left.length == right.length
+  left.all? { right.include?(it) }
+end
+
+# Whether an argument's type answers a parameter's contract — the same
+# question the call-site check asks (check_argument), asked ahead of it.
+# A type whose method set is not stated whole cannot fail here.
+def satisfies?(type, contract, declarations)
+  return true unless contract in ["needs", *]
+  methods = argument_methods(type, declarations)
+  return true if methods.nil?
+  type_at(contract, 1).all? { answers_demand?(type, methods, it) }
+end
+
+# The types a set's algebra takes on the right (ADR 0082): a set, an array,
+# a range, or a hash.
+def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ["array", *]) || (type in ["hash", *])
+
+def shape_methods(declaration, traits)
+  mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields
+  methods += def_names(declaration.methods)
+  declaration.includes.each do |trait_name|
+    # The builtin trait (ADR 0054) adds the two derived methods; the four
+    # orderings are operators, not names.
+    if trait_name == "Comparable"
+      methods += %w[between? clamp]
+      next
+    end
+    # The other builtin trait (#110): Ruby's Enumerable over the struct's
+    # own `each`, as far as the array arms carry it.
+    if trait_name == "Enumerable"
+      methods += %w[all? any? chunk chunk_while collect collect_concat compact count cycle detect drop drop_while each_cons each_slice each_with_index entries filter filter_map find find_all find_index first flat_map grep grep_v group_by include? inject map max max_by member? min min_by minmax minmax_by none? one? partition reduce reject reverse_each select slice_after slice_before slice_when sort sort_by sum take take_while tally to_a to_h uniq zip]
+      next
+    end
+    matching = traits.select { it.name == trait_name }
+    return nil unless matching.length == 1
+    methods += def_names(matching.first.methods)
+  end
+  methods
+end
+
+# [def_name, [[parameter, type]]] for the entry's top-level defs.
+def sharpen_parameters(entry, files)
+  mutable calls = []
+  files.each do |file|
+    globals = merge_declarations(declarations_of(file.nodes), file.imports).globals
+    calls = calls_in(file.nodes, [], globals, calls)
+  end
+  defs = entry.nodes.select { it in DefNode }
+  entry_declarations = merge_declarations(declarations_of(entry.nodes), entry.imports)
+  mutable sharpened = []
+  defs.each do |node|
+    next if defs.select { it.name == node.name }.length > 1
+    pairs = agreed_parameters(node, calls.select { it[0] == node.name }, entry_declarations)
+    sharpened << [node.name, pairs] unless pairs.empty?
+  end
+  sharpened
+end
+
+def struct_declarations_in(nodes)
+  mutable found = []
+  nodes.each do |node|
+    if node in StructDefNode
+      found << node
+      found += struct_declarations_in(node.nested)
+    elsif node in ModuleDefNode
+      found += struct_declarations_in(node.body)
+    end
+  end
+  found
+end
+
+def trait_declarations_in(nodes)
+  mutable found = []
+  nodes.each do |node|
+    if node in TraitDefNode
+      found << node
+    elsif node in ModuleDefNode
+      found += trait_declarations_in(node.body)
+    elsif node in StructDefNode
+      found += trait_declarations_in(node.nested)
+    end
+  end
+  found
+end
+
+# Which of true and false the patterns leave untaken, or nil when one of
+# them cannot be read.
+def uncovered_booleans(patterns)
+  mutable taken = []
+  patterns.each do |pattern|
+    reach = booleans_taken(pattern)
+    return nil if reach.nil?
+    taken += reach
+  end
+  %w[true false].reject { taken.include?(it) }
+end
+
+def undefined_private_constant(name, owner)
+  "private_constant names #{name}, which #{owner} does not define — it hides a constant #{owner} defines"
+end
+
+# Guarded arms are outside the arithmetic in both directions (ADR 0035 §4):
+# they cover nothing, because the compiler cannot prove an `if`, and they
+# are never called unreachable, because the guard may be the reason they
+# are not.
+def unguarded_arms(node)
+  node.branches.select { it.guard.nil? }
 end
 
 # Raw positional read, mirroring the evaluator's value_at: a labels list in
@@ -1959,4 +1919,43 @@ def value_at_checked(list, target_index)
     result = element if index == target_index
   end
   result
+end
+
+# What the sentence names (ADR 0048 §2): the trait whose method set is
+# exactly the whole contract, else only the demands the argument lacks —
+# the whole contract is in the dump for anyone who wants it.
+def wanted_by(demands, missing, scope)
+  scope.traits.each do |declared|
+    names = def_names(declared.methods).map { "." + it }
+    return ["trait", declared.name] if same_set?(names, demands)
+  end
+  ["demands", missing]
+end
+
+# The case an arm matches *every* instance of — so a later arm naming it is
+# dead. A payload pattern qualifies only when every entry is a plain
+# capture; `in :paid(on: 1)` leaves the other payloads to later arms.
+def whole_case_name(pattern)
+  return pattern.value if pattern in SymbolNode
+  return nil unless pattern in EnumCasePatternNode
+  return nil unless pattern.payload.all? { it[1] in IdentifierNode }
+  pattern.name
+end
+
+# A def under a top-level condition or loop is defined when that statement
+# runs (ADR 0090), which the checker cannot know. It declares what a
+# top-level def declares, each one listed after the statement that holds
+# it, so a call to it reads as a call to a defined method.
+def with_guarded_definitions(nodes)
+  mutable declaring = []
+  nodes.each do |node|
+    declaring << node
+    declaring += guarded_definitions(node)
+  end
+  declaring
+end
+
+# A branch's scope: the pairs a condition proved, before the locals.
+def with_proof(scope, pairs)
+  scope.with(locals: pairs + scope.locals)
 end
