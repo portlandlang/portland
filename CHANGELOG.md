@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`bench/walks.pdx` measures the core's array walks** ([#438](https://github.com/portlandlang/portland/issues/438)) — `map`, `select`, `reject`, and `find` over an array, run direct, hosted, and under Ruby: the row to read before another method moves from Rust into `core/`, and after any change to how a block is called.
 - **In the core, `class Array` is the builtin array** ([#437](https://github.com/portlandlang/portland/issues/437), [ADR 0093](docs/adr/0093-2026-11-22-the-core-is-portland-source.md)) — a struct named for a builtin type, in a core file, gives that type its methods: they answer before the floor's own arms, with the value as `self` and a block handed over as to any method. `core/enumerable.pdx` is a trait written over `each`, and `core/array.pdx` includes it: `map`, `collect`, `select`, `filter`, `find_all`, `reject`, `find`, `detect`, and `empty?` on an array are Portland source, run by both implementations. A core method answers the argument counts it was written for; any other goes on to the floor, whose refusal stands.
   - A program's struct named for a core type refuses on both implementations and in the checker: `'Array' is a core type, and the runtime is closed, so a program cannot reopen it — write a trait, a struct that holds an Array, or a function`.
   - A block that answers something other than true or false to `select`, `reject`, or `find` on an array is refused as `select block must produce true or false, got 1`, where the seed printed the value in Rust's debug form.
