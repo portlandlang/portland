@@ -1,6 +1,4 @@
-# From ruby/spec language/regexp/empty_checks_spec.rb.
-#
-# What stays upstream, and why, is this file's entry in spec/ruby_spec.yml.
+# From ruby/spec language/regexp/empty_checks_spec.rb, whole.
 
 require_relative "../../spec_helper"
 
@@ -8,26 +6,132 @@ def found(pattern, text) = (pattern.match(text) or panic("no match for #{inspect
 
 context "empty checks in Regexps" do
   specify "allow extra empty iterations" do
+    expect(found(/()?/, "")).to eq(["", ""])
+    expect(found(/(a*)?/, "")).to eq(["", ""])
+    expect(found(/(a*)*/, "")).to eq(["", ""])
+    # The bounds are high to avoid DFA-based matchers in implementations
+    # and to check backtracking behavior.
+    expect(found(/(?:a|()){500,1000}/, "a" * 500)).to eq(["a" * 500, ""])
+
+    # Variations with non-greedy loops.
     expect(found(/()??/, "")).to eq(["", nil])
     expect(found(/(a*?)?/, "")).to eq(["", ""])
     expect(found(/(a*)??/, "")).to eq(["", nil])
+    expect(found(/(a*?)??/, "")).to eq(["", nil])
     expect(found(/(a*?)*/, "")).to eq(["", ""])
     expect(found(/(a*)*?/, "")).to eq(["", nil])
-  end
-
-  specify "make the pattern proceed past the quantified expression on failure" do
-    expect(found(/(?:|a)*/, "aaa")).to eq([""])
-    expect(found(/(?:()|a)*/, "aaa")).to eq(["", ""])
-    expect(found(/(|a)*/, "aaa")).to eq(["", ""])
-    expect(found(/()\1(?:|a)*/, "aaa")).to eq(["", ""])
-    expect(found(/(?:(?=a)|a)*/, "aaa")).to eq([""])
-    expect(found(/(?:|a)*?/, "aaa")).to eq([""])
-    expect(found(/(|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/(a*?)*?/, "")).to eq(["", nil])
   end
 
   specify "allow empty iterations in the middle of a loop" do
+    # One empty iteration between a's and b's.
     expect(found(/(a|\2b|())*/, "aaabbb")).to eq(["aaabbb", "", ""])
     expect(found(/(a|\2b|()){2,4}/, "aaabbb")).to eq(["aaa", "", ""])
+
+    # Two empty iterations between a's and b's.
+    expect(found(/(a|\2b|\3()|())*/, "aaabbb")).to eq(["aaabbb", "", "", ""])
+    expect(found(/(a|\2b|\3()|()){2,4}/, "aaabbb")).to eq(["aaa", "", nil, ""])
+
+    # Check that the empty iteration correctly updates the loop counter.
+    expect(found(/(a|\2b|()){20,24}/, "a" * 20 + "b" * 5)).to eq(["a" * 20 + "b" * 3, "b", ""])
+
+    # Variations with non-greedy loops.
     expect(found(/(a|\2b|())*?/, "aaabbb")).to eq(["", nil, nil])
+    expect(found(/(a|\2b|()){2,4}/, "aaabbb")).to eq(["aaa", "", ""])
+    expect(found(/(a|\2b|\3()|())*?/, "aaabbb")).to eq(["", nil, nil, nil])
+    expect(found(/(a|\2b|\3()|()){2,4}/, "aaabbb")).to eq(["aaa", "", nil, ""])
+    expect(found(/(a|\2b|()){20,24}/, "a" * 20 + "b" * 5)).to eq(["a" * 20 + "b" * 3, "b", ""])
+  end
+
+  specify "make the Regexp proceed past the quantified expression on failure" do
+    # If the contents of the ()* quantified group are empty (i.e., they fail
+    # the empty check), the loop will abort. It will not try to backtrack
+    # and try other alternatives (e.g. matching the "a") like in other Regexp
+    # dialects such as ECMAScript.
+    expect(found(/(?:|a)*/, "aaa")).to eq([""])
+    expect(found(/(?:()|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/(|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/(()|a)*/, "aaa")).to eq(["", "", ""])
+
+    # Same expressions, but with backreferences, to force the use of non-DFA-based
+    # engines.
+    expect(found(/()\1(?:|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/()\1(?:()|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()\1(|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()\1(()|a)*/, "aaa")).to eq(["", "", "", ""])
+
+    # Variations with other zero-width contents of the quantified
+    # group: backreferences, capture groups, lookarounds
+    expect(found(/()(?:\1|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/()(?:()\1|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()(?:(\1)|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()(?:\1()|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()(\1|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()(()\1|a)*/, "aaa")).to eq(["", "", "", ""])
+    expect(found(/()((\1)|a)*/, "aaa")).to eq(["", "", "", ""])
+    expect(found(/()(\1()|a)*/, "aaa")).to eq(["", "", "", ""])
+
+    expect(found(/(?:(?=a)|a)*/, "aaa")).to eq([""])
+    expect(found(/(?:(?=a)()|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/(?:()(?=a)|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/(?:((?=a))|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/()\1(?:(?=a)|a)*/, "aaa")).to eq(["", ""])
+    expect(found(/()\1(?:(?=a)()|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()\1(?:()(?=a)|a)*/, "aaa")).to eq(["", "", ""])
+    expect(found(/()\1(?:((?=a))|a)*/, "aaa")).to eq(["", "", ""])
+
+    # Variations with non-greedy loops.
+    expect(found(/(?:|a)*?/, "aaa")).to eq([""])
+    expect(found(/(?:()|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/(|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/(()|a)*?/, "aaa")).to eq(["", nil, nil])
+
+    expect(found(/()\1(?:|a)*?/, "aaa")).to eq(["", ""])
+    expect(found(/()\1(?:()|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()\1(|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()\1(()|a)*?/, "aaa")).to eq(["", "", nil, nil])
+
+    expect(found(/()(?:\1|a)*?/, "aaa")).to eq(["", ""])
+    expect(found(/()(?:()\1|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()(?:(\1)|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()(?:\1()|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()(\1|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()(()\1|a)*?/, "aaa")).to eq(["", "", nil, nil])
+    expect(found(/()((\1)|a)*?/, "aaa")).to eq(["", "", nil, nil])
+    expect(found(/()(\1()|a)*?/, "aaa")).to eq(["", "", nil, nil])
+
+    expect(found(/(?:(?=a)|a)*?/, "aaa")).to eq([""])
+    expect(found(/(?:(?=a)()|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/(?:()(?=a)|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/(?:((?=a))|a)*?/, "aaa")).to eq(["", nil])
+    expect(found(/()\1(?:(?=a)|a)*?/, "aaa")).to eq(["", ""])
+    expect(found(/()\1(?:(?=a)()|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()\1(?:()(?=a)|a)*?/, "aaa")).to eq(["", "", nil])
+    expect(found(/()\1(?:((?=a))|a)*?/, "aaa")).to eq(["", "", nil])
+  end
+
+  specify "shouldn't cause the Regexp parser to get stuck in a loop" do
+    expect(found(/(|a|\2b|())*/, "aaabbb")).to eq(["", "", nil])
+    expect(found(/(a||\2b|())*/, "aaabbb")).to eq(["aaa", "", nil])
+    expect(found(/(a|\2b||())*/, "aaabbb")).to eq(["aaa", "", nil])
+    expect(found(/(a|\2b|()|)*/, "aaabbb")).to eq(["aaabbb", "", ""])
+    expect(found(/(()|a|\3b|())*/, "aaabbb")).to eq(["", "", "", nil])
+    expect(found(/(a|()|\3b|())*/, "aaabbb")).to eq(["aaa", "", "", nil])
+    expect(found(/(a|\2b|()|())*/, "aaabbb")).to eq(["aaabbb", "", "", nil])
+    expect(found(/(a|\3b|()|())*/, "aaabbb")).to eq(["aaa", "", "", nil])
+    expect(found(/(a|()|())*/, "aaa")).to eq(["aaa", "", "", nil])
+    expect(found(/^(()|a|())*$/, "aaa")).to eq(["aaa", "", "", nil])
+
+    # Variations with non-greedy loops.
+    expect(found(/(|a|\2b|())*?/, "aaabbb")).to eq(["", nil, nil])
+    expect(found(/(a||\2b|())*?/, "aaabbb")).to eq(["", nil, nil])
+    expect(found(/(a|\2b||())*?/, "aaabbb")).to eq(["", nil, nil])
+    expect(found(/(a|\2b|()|)*?/, "aaabbb")).to eq(["", nil, nil])
+    expect(found(/(()|a|\3b|())*?/, "aaabbb")).to eq(["", nil, nil, nil])
+    expect(found(/(a|()|\3b|())*?/, "aaabbb")).to eq(["", nil, nil, nil])
+    expect(found(/(a|\2b|()|())*?/, "aaabbb")).to eq(["", nil, nil, nil])
+    expect(found(/(a|\3b|()|())*?/, "aaabbb")).to eq(["", nil, nil, nil])
+    expect(found(/(a|()|())*?/, "aaa")).to eq(["", nil, nil, nil])
+    expect(found(/^(()|a|())*?$/, "aaa")).to eq(["aaa", "a", "", nil])
   end
 end

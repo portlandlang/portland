@@ -10,4 +10,18 @@ context "Complex#*" do
     expect(Complex(1, 2) * Complex(3, 4)).to eq(Complex(-5, 10))
     expect(inspect(Complex(1.5, 2.5) * Complex(1, 2))).to eq("(-3.5+5.5i)")
   end
+
+  describe "with Complex" do
+    specify "multiplies according to the usual rule for complex numbers: (a + bi) * (c + di) = ac - bd + (ad + bc)i" do
+      expect(Complex(1, 2) * Complex(10, 20)).to eq(Complex((1 * 10) - (2 * 20), (1 * 20) + (2 * 10)))
+      expect(Complex(1.5, 2.1) * Complex(100.2, -30.3)).to eq(Complex((1.5 * 100.2) - (2.1 * -30.3), (1.5 * -30.3) + (2.1 * 100.2)))
+    end
+  end
+
+  describe "with Integer" do
+    specify "multiplies both parts of self by the given Integer" do
+      expect(Complex(3, 2) * 50).to eq(Complex(150, 100))
+      expect(Complex(-3, 2) * 50.5).to eq(Complex(-151.5, 101))
+    end
+  end
 end

@@ -271,7 +271,7 @@ end
 def regex_begins?(tokens)
   return true if tokens.empty?
   previous = tokens.last
-  return false if %w[identifier integer float string symbol word_array symbol_array regex].include?(previous.kind)
+  return false if %w[identifier integer float rational imaginary string symbol word_array symbol_array regex].include?(previous.kind)
   return !%w[end self nil true false].include?(previous.text) if previous.kind == "keyword"
   return !%w[) \] }].include?(previous.text) if previous.kind == "operator"
   true
@@ -728,6 +728,12 @@ def expand_heredocs(source)
   mutable output = []
   mutable index = 0
   while index < lines.length
+    # Nothing after an `__END__` line is program text (ADR 0092), so
+    # nothing after it is rewritten: the rest passes through as written.
+    if lines[index] == END_MARKER
+      output += lines.slice(index, lines.length - index)
+      break
+    end
     expanded = expand_heredoc_line(lines, index)
     output << expanded.text
     # The body lines a heredoc folded into its literal come back as blank
@@ -788,7 +794,32 @@ def entries_spanned(characters, start, text)
   index - start
 end
 
-def lex(raw_source, first_line: 1)
+# The line that ends a program's text (ADR 0092), Ruby's spelling.
+END_MARKER = "__END__"
+
+# Whether `__END__` starts at `index` and is the whole of its line: at the
+# line's first column, with a newline or the end of the source after it, as
+# Ruby requires.
+def end_marker_at?(characters, index)
+  return false unless index == 0 || characters[index - 1] == "\n"
+  return false unless characters.slice(index, END_MARKER.length).join("") == END_MARKER
+  after = index + END_MARKER.length
+  after >= characters.length || characters[after] == "\n"
+end
+
+# The text after a source's `__END__` line (ADR 0092), or nil when it has
+# none: `DATA`'s value in the file that is run. The lexer finds the line,
+# since only it knows a string or a heredoc from program text.
+def data_section(raw_source)
+  return nil unless raw_source.include?(END_MARKER)
+  found = lex(raw_source, keep_data: true).select { it.kind == "data" }
+  token = found.first or return nil
+  token.text
+end
+
+# With `keep_data`, the text after an `__END__` line rides out as a last
+# token of kind "data"; without, the tokens end where the program does.
+def lex(raw_source, first_line: 1, keep_data: false)
   source = expand_heredocs(normalize_line_endings(raw_source))
   characters = lexable_characters(source)
   mutable tokens = []
@@ -796,6 +827,16 @@ def lex(raw_source, first_line: 1)
   mutable line = first_line
   while index < characters.length
     character = characters[index]
+    # `__END__` alone on a line ends the program text (ADR 0092): nothing
+    # after it is lexed.
+    if character == "_" && end_marker_at?(characters, index)
+      if keep_data
+        after = index + END_MARKER.length + 1
+        text = after < characters.length ? characters.slice(after, characters.length - after).join("") : ""
+        tokens << Token.new(kind: "data", text: text, leading_space: false, line: line)
+      end
+      break
+    end
     if character == " " || character == "\t"
       index += 1
       next
@@ -874,8 +915,14 @@ def lex(raw_source, first_line: 1)
         text << characters[index]
         index += 1
       end
-      check_prefixed_literal(text)
-      tokens << Token.new(kind: "integer", text: text, leading_space: leading, line: line)
+      # Ruby's `r` and `i` suffixes end a prefixed literal too (#291):
+      # neither letter is a digit of any base, so the last one is the
+      # suffix and the digits before it are checked.
+      mutable kind = "integer"
+      kind = "rational" if text.end_with?("r")
+      kind = "imaginary" if text.end_with?("i")
+      check_prefixed_literal(kind == "integer" ? text : text.slice(0, text.length - 1))
+      tokens << Token.new(kind: kind, text: text, leading_space: leading, line: line)
       next
     end
     if digit?(character)

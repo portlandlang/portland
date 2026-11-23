@@ -6,8 +6,8 @@
 # months after it was built. A pending state should name the issue that ends
 # it, so that closed_issue_claims can tell when it goes stale.
 #
-# So a time word passes when its clause cites an issue ("refuses; #291
-# tracks it"), and fails otherwise. Docs read the full list; code comments
+# So a time word passes when its clause cites an issue ("refuses; #N
+# tracks it", with its number), and fails otherwise. Docs read the full list; code comments
 # read only the words that cannot describe a running program, since "the
 # current token" and "names declared so far" are about execution, not the
 # calendar. Quoted and backticked text is someone's output or code; "yet" as
