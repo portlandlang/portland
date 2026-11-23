@@ -8,4 +8,9 @@ context "String#rstrip" do
   specify "String#lstrip and #rstrip take one end each" do
     expect("rose  ".rstrip).to eq("rose")
   end
+
+  specify "returns a copy of self with all trailing whitespace and NULL bytes removed" do
+    null = 0.chr
+    expect((null + " " + null + "hello" + null + " " + null).rstrip).to eq(null + " " + null + "hello")
+  end
 end

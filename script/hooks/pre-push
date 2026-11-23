@@ -7,6 +7,10 @@
 # is, so this hook cannot drift from it.
 #
 # Escape hatch: `git push --no-verify`.
+#
+# It runs in the tree being pushed: `core.hooksPath` points into the main
+# checkout, so from a linked worktree this file's own directory is another
+# tree, and git has exported the worktree's index (#376).
 set -e
-cd "$(dirname "$0")/../.."
+cd "$(git rev-parse --show-toplevel)"
 script/test --fast

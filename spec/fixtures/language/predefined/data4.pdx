@@ -1,0 +1,8 @@
+# A file for spec/language/predefined/data_spec.pdx to load, standing in for
+# ruby/spec's language/predefined/fixtures/data4.rb: a required file with an
+# `__END__` of its own, and a def that reads `DATA` from inside it.
+
+def data_read_by_the_required_file = DATA
+
+__END__
+data 4
