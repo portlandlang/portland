@@ -1515,10 +1515,12 @@ fn seed_refusal_sentence(stderr: &str) -> String {
 }
 
 /// Builds a program with `script/build`, the seed under test running the
-/// compiler, and answers the build's own output.
-fn native_build(program: &std::path::Path) -> std::process::Output {
+/// compiler, and answers the build's own output. `flags` go before the
+/// program, as `--unoptimized` does.
+fn native_build(program: &std::path::Path, flags: &[&str]) -> std::process::Output {
     let script = format!("{}/../script/build", env!("CARGO_MANIFEST_DIR"));
     Command::new(script)
+        .args(flags)
         .arg(program)
         .env("PDX", env!("CARGO_BIN_EXE_pdx"))
         .output()
@@ -1544,36 +1546,41 @@ fn every_native_fixture_matches_the_seed() {
             .arg(&fixture)
             .output()
             .expect("failed to run pdx");
-        let built = native_build(&fixture);
-        assert!(
-            built.status.success(),
-            "{} should build natively: {}",
-            fixture.display(),
-            String::from_utf8_lossy(&built.stderr)
-        );
-        let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
-        let native = Command::new(&binary)
-            .output()
-            .expect("failed to run the native binary");
-        assert_eq!(
-            String::from_utf8_lossy(&native.stdout),
-            String::from_utf8_lossy(&seed.stdout),
-            "{} prints differently natively",
-            fixture.display()
-        );
-        assert_eq!(
-            native.status.code(),
-            seed.status.code(),
-            "{} exits differently natively",
-            fixture.display()
-        );
-        if !seed.status.success() {
+        // Both ways: optimized is what a build produces, and unoptimized
+        // runs every check and every loop turn the compiler wrote.
+        let builds: [&[&str]; 2] = [&[], &["--unoptimized"]];
+        for flags in builds {
+            let built = native_build(&fixture, flags);
+            assert!(
+                built.status.success(),
+                "{} {flags:?} should build natively: {}",
+                fixture.display(),
+                String::from_utf8_lossy(&built.stderr)
+            );
+            let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+            let native = Command::new(&binary)
+                .output()
+                .expect("failed to run the native binary");
             assert_eq!(
-                String::from_utf8_lossy(&native.stderr).trim(),
-                seed_refusal_sentence(&String::from_utf8_lossy(&seed.stderr)),
-                "{} refuses in other words natively",
+                String::from_utf8_lossy(&native.stdout),
+                String::from_utf8_lossy(&seed.stdout),
+                "{} {flags:?} prints differently natively",
                 fixture.display()
             );
+            assert_eq!(
+                native.status.code(),
+                seed.status.code(),
+                "{} {flags:?} exits differently natively",
+                fixture.display()
+            );
+            if !seed.status.success() {
+                assert_eq!(
+                    String::from_utf8_lossy(&native.stderr).trim(),
+                    seed_refusal_sentence(&String::from_utf8_lossy(&seed.stderr)),
+                    "{} {flags:?} refuses in other words natively",
+                    fixture.display()
+                );
+            }
         }
     }
 }
@@ -1585,7 +1592,7 @@ fn every_native_fixture_matches_the_seed() {
 fn a_native_build_that_refuses_leaves_nothing_behind() {
     let sample = std::env::temp_dir().join("native_refusal_probe.pdx");
     std::fs::write(&sample, "puts 1\n").unwrap();
-    let built = native_build(&sample);
+    let built = native_build(&sample, &[]);
     assert!(
         built.status.success(),
         "the probe should build before it is broken"
@@ -1597,7 +1604,7 @@ fn a_native_build_that_refuses_leaves_nothing_behind() {
         "the build should leave both files"
     );
     std::fs::write(&sample, "puts \"hi\"\n").unwrap();
-    let refused = native_build(&sample);
+    let refused = native_build(&sample, &[]);
     assert!(!refused.status.success(), "a string should refuse");
     let stderr = String::from_utf8(refused.stderr).unwrap();
     assert!(
