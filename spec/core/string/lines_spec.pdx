@@ -9,4 +9,34 @@ context "String#lines" do
     expect("a\nb\n".lines).to eq(["a\n", "b\n"])
     expect("a\nb".lines).to eq(["a\n", "b"])
   end
+
+  specify "splits self using the supplied record separator and passes each substring to the block" do
+    expect("one\ntwo\r\nthree".lines("\n")).to eq(["one\n", "two\r\n", "three"])
+  end
+
+  specify "splits on a separator that is not a line ending" do
+    expect("hello\nworld".lines("l")).to eq(["hel", "l", "o\nworl", "d"])
+  end
+
+  specify "accepts a string separator" do
+    expect("hello world".lines("o").to_a).to eq(["hello", " wo", "rld"])
+  end
+
+  describe "when `chomp` keyword argument is passed" do
+    specify "removes new line characters when separator is not specified" do
+      expect("hello \nworld\n".lines(chomp: true)).to eq(["hello ", "world"])
+    end
+
+    specify "removes a carriage return before the line feed" do
+      expect("hello \r\nworld\r\n".lines(chomp: true)).to eq(["hello ", "world"])
+    end
+
+    specify "removes only specified separator" do
+      expect("hello world".lines(" ", chomp: true)).to eq(["hello", "world"])
+    end
+
+    specify "ignores new line characters when separator is specified" do
+      expect("hello\n world\n".lines(" ", chomp: true)).to eq(["hello\n", "world\n"])
+    end
+  end
 end

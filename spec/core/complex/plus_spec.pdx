@@ -10,4 +10,18 @@ context "Complex#+" do
     expect(inspect(Complex(1, 2) + 1.0)).to eq("(2.0+2i)")
     expect(inspect(Complex(1, 2) + Rational(1, 2))).to eq("((3/2)+2i)")
   end
+
+  describe "with Complex" do
+    specify "adds both the real and imaginary components" do
+      expect(Complex(1, 2) + Complex(10, 20)).to eq(Complex(1 + 10, 2 + 20))
+      expect(Complex(1.5, 2.1) + Complex(100.2, -30.3)).to eq(Complex(1.5 + 100.2, 2.1 + (-30.3)))
+    end
+  end
+
+  describe "with Integer" do
+    specify "adds the real number to the real component of self" do
+      expect(Complex(1, 2) + 50).to eq(Complex(51, 2))
+      expect(Complex(1, 2) + 50.5).to eq(Complex(51.5, 2))
+    end
+  end
 end

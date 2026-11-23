@@ -100,6 +100,12 @@ context "String#match" do
     expect(found[0]).to eq("h")
     expect("hello".match(/\Go/)).to be_nil
   end
+
+  describe "when passed a block" do
+    specify "returns the block result" do
+      expect("abc".match(/./) { :result }).to eq(:result)
+    end
+  end
 end
 context "String#match?" do
   specify "returns true when it matches the given regex" do

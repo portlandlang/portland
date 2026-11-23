@@ -153,6 +153,116 @@ fn integer_steps(start: i64, limit: i64, stride: i64) -> Vec<Value> {
     steps
 }
 
+/// The values a range's `step` walks between two numbers (#333), Ruby's:
+/// by one when no stride is given, downward when the stride is negative,
+/// and through floats when the stride or either end is one. `None` where
+/// the ends or the stride are something else, so the arms that walk a
+/// range's elements, and their refusals, still answer. A zero stride
+/// refuses in Ruby's words.
+fn range_steps(range: &Value, strides: &[Value]) -> Option<Vec<Value>> {
+    let stride = match strides {
+        [] => Value::Integer(1),
+        [stride @ (Value::Integer(_) | Value::Float(_))] => stride.clone(),
+        _ => return None,
+    };
+    let (start, end, exclusive) = range_ends(range);
+    let (start, end) = match (start, end) {
+        (
+            Some(start @ (Value::Integer(_) | Value::Float(_))),
+            Some(end @ (Value::Integer(_) | Value::Float(_))),
+        ) => (start, end),
+        _ => return None,
+    };
+    if matches!(stride, Value::Integer(0)) || matches!(stride, Value::Float(zero) if zero == 0.0) {
+        panic!("step can't be 0");
+    }
+    if let (Value::Integer(start), Value::Integer(end), Value::Integer(stride)) =
+        (start, end, &stride)
+    {
+        let mut steps = Vec::new();
+        let mut current = *start;
+        loop {
+            let inside = match (*stride > 0, exclusive) {
+                (true, false) => current <= *end,
+                (true, true) => current < *end,
+                (false, false) => current >= *end,
+                (false, true) => current > *end,
+            };
+            if !inside {
+                break;
+            }
+            steps.push(Value::Integer(current));
+            match current.checked_add(*stride) {
+                Some(next) => current = next,
+                None => break,
+            }
+        }
+        return Some(steps);
+    }
+    Some(
+        float_steps(
+            crate::tower::to_f64(start),
+            crate::tower::to_f64(end),
+            crate::tower::to_f64(&stride),
+            exclusive,
+        )
+        .into_iter()
+        .map(Value::Float)
+        .collect(),
+    )
+}
+
+/// Ruby's float stepping (`ruby_float_step` in numeric.c), step for step:
+/// the count comes from the span over the stride with an error allowance,
+/// so a sum of inexact strides cannot add or lose a last value, and each
+/// value is `start + index * stride`, pinned to the end where it would
+/// pass it. The multiply and add are fused, as CRuby's are on Apple
+/// silicon, which is what makes `(-2.0..0).step(0.1)` read
+/// `-1.0999999999999999` at its tenth value and not `-1.1`.
+fn float_steps(start: f64, end: f64, stride: f64, exclusive: bool) -> Vec<f64> {
+    let mut count = (end - start) / stride;
+    let error =
+        ((start.abs() + end.abs() + (end - start).abs()) / stride.abs() * f64::EPSILON).min(0.5);
+    if stride.is_infinite() {
+        let reached = if stride > 0.0 {
+            start <= end
+        } else {
+            start >= end
+        };
+        return if reached { vec![start] } else { Vec::new() };
+    }
+    if exclusive {
+        if count <= 0.0 {
+            return Vec::new();
+        }
+        count = if count < 1.0 {
+            0.0
+        } else {
+            (count - error).floor()
+        };
+        let next = (count + 1.0).mul_add(stride, start);
+        if (start < end && next < end) || (start > end && next > end) {
+            count += 1.0;
+        }
+    } else {
+        if count < 0.0 {
+            return Vec::new();
+        }
+        count = (count + error).floor();
+    }
+    (0..=count as u64)
+        .map(|index| {
+            let value = (index as f64).mul_add(stride, start);
+            let passed = if stride >= 0.0 {
+                end < value
+            } else {
+                value < end
+            };
+            if passed { end } else { value }
+        })
+        .collect()
+}
+
 /// Ruby 4.1's Range#clamp (#111): each end held inside the bounds, an
 /// absent end or bound leaving the other side alone; the answer excludes
 /// its end when the end it kept was excluded by whichever side supplied
@@ -297,7 +407,7 @@ fn set_operand(value: &Value, context: &str) -> Vec<Value> {
             .map(|(key, value)| Value::array(vec![key.clone(), value.clone()]))
             .collect(),
         other => panic!(
-            "{context} takes an enumerable — a Set, an Array, a Range, or a Hash — got {}",
+            "{context} takes an enumerable — a Set, an Array, a Range, a Hash, or a struct that includes Enumerable — got {}",
             other.shown()
         ),
     }
@@ -599,6 +709,35 @@ fn alias_survivor(name: &str) -> Option<&'static str> {
         "to_str" => Some("to_s"),
         _ => None,
     }
+}
+
+/// `DATA` (ADR 0092): the name of the text after `__END__`.
+const DATA_NAME: &str = "DATA";
+
+/// What Ruby's `DATA`, a File, answers by moving or reading its cursor.
+/// Portland's is a String (ADR 0092), so each refuses by name.
+const DATA_CURSOR_NAMES: [&str; 10] = [
+    "close",
+    "eof",
+    "eof?",
+    "gets",
+    "lineno",
+    "pos",
+    "readline",
+    "readlines",
+    "rewind",
+    "seek",
+];
+
+fn data_cursor_sentence(name: &str) -> String {
+    format!(
+        "DATA is a String, the text after __END__, with no cursor for '{name}' to move — read it whole with DATA or DATA.read, or by line with DATA.lines or DATA.each_line"
+    )
+}
+
+/// `DATA` where the file that is run has no `__END__` line (ADR 0092).
+fn missing_data_sentence() -> &'static str {
+    "DATA is the text after an __END__ line, and the file that is run has none — end the program with __END__ and put the text below it"
 }
 
 /// The constants every program starts with (#152): `Float`'s, Ruby's values
@@ -1941,20 +2080,78 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
     elements.iter().take(parameters.len()).cloned().collect()
 }
 
-/// `join` (#104): each element as `to_s` renders it, a nested array joined
-/// into the same string with the same separator, as Ruby's is. A nil
-/// element refuses as interpolating one does, since nil has no `to_s`
-/// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
-fn joined(elements: &[Value], separator: &str) -> String {
-    elements
-        .iter()
-        .map(|element| match element {
-            Value::Array(inner) => joined(inner, separator),
-            Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
-            other => other.to_string(),
+/// What `strip`, `lstrip`, and `rstrip` take off an end: whitespace, and
+/// NUL, which Ruby counts with it.
+fn strippable(character: char) -> bool {
+    character.is_whitespace() || character == '\0'
+}
+
+/// A trait named where a pattern goes (#300): no value is of a trait's
+/// type, so the arm could never match.
+fn trait_pattern_sentence(name: &str) -> String {
+    format!(
+        "'in {name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include {name}"
+    )
+}
+
+/// The pieces `lines` and `each_line` cut a string into, given a separator
+/// or `chomp:` (#313): each ends with the separator — a line feed by
+/// default — unless `chomp:` takes it off, a carriage return before a line
+/// feed going with it. Ruby's paragraph mode, an empty separator, is
+/// unbuilt and refuses by name.
+fn separated_lines(
+    text: &str,
+    name: &str,
+    arguments: &[Value],
+    keyword_arguments: &[(String, Value)],
+) -> Vec<String> {
+    let separator = match arguments {
+        [] => None,
+        [Value::String(separator)] => Some(separator.as_str()),
+        [other] => panic!(
+            "'{name}' takes a String for its separator, got {}",
+            other.shown()
+        ),
+        _ => {
+            refusal("arity");
+            panic!("'{name}' takes 0 to 1 arguments, got {}", arguments.len())
+        }
+    };
+    let mut chomp = false;
+    for (label, value) in keyword_arguments {
+        match (label.as_str(), value) {
+            ("chomp", Value::Boolean(flag)) => chomp = *flag,
+            ("chomp", other) => panic!(
+                "'{name}' takes true or false for chomp:, got {}",
+                other.shown()
+            ),
+            (other, _) => panic!("'{name}' does not take {other}: — chomp: is its one keyword"),
+        }
+    }
+    if separator == Some("") {
+        panic!(
+            "'{name}' with an empty separator is Ruby's paragraph mode, which is unbuilt — split on the blank lines: split(/\\n{{2,}}/)"
+        );
+    }
+    let pieces: Vec<&str> = match separator {
+        Some(separator) => text.split_inclusive(separator).collect(),
+        None => text.split_inclusive('\n').collect(),
+    };
+    pieces
+        .into_iter()
+        .map(|piece| {
+            if !chomp {
+                return piece.to_string();
+            }
+            match separator {
+                Some(separator) => piece.strip_suffix(separator).unwrap_or(piece).to_string(),
+                None => {
+                    let line = piece.strip_suffix('\n').unwrap_or(piece);
+                    line.strip_suffix('\r').unwrap_or(line).to_string()
+                }
+            }
         })
-        .collect::<Vec<_>>()
-        .join(separator)
+        .collect()
 }
 
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
@@ -2667,6 +2864,9 @@ pub struct Interpreter<W: std::io::Write = std::io::Stdout> {
     /// The program's entry file, whose `lib/` is on the load path (ADR
     /// 0077), and the `-I` directories as written.
     entry_file: Option<std::path::PathBuf>,
+    /// Whether the file that is run has an `__END__` line (ADR 0092), and
+    /// so whether `DATA` is the predefined constant holding its text.
+    has_data: bool,
     load_path: Vec<String>,
     /// How many branch, loop, and block bodies deep the run is — zero at a
     /// file's top level and in a module body, where a require belongs.
@@ -2791,6 +2991,7 @@ impl<W: std::io::Write> Interpreter<W> {
             home_depth: 0,
             current_file: None,
             entry_file: None,
+            has_data: false,
             load_path: Vec::new(),
             nesting: 0,
             loaded: std::collections::HashSet::new(),
@@ -2835,6 +3036,40 @@ impl<W: std::io::Write> Interpreter<W> {
 
     pub fn set_arguments(&mut self, arguments: Vec<String>) {
         self.arguments = arguments;
+    }
+
+    /// `DATA` (ADR 0092): the text after the `__END__` line of the file
+    /// that is run, bound as a top-level constant before its first line
+    /// runs. A required file's text is never handed here, so its `__END__`
+    /// only ends it.
+    pub fn set_data(&mut self, text: String) {
+        self.has_data = true;
+        self.constants
+            .insert(DATA_NAME.to_string(), Value::String(text));
+    }
+
+    /// `DATA.read` is `DATA`, Ruby's commonest spelling of it, and a name
+    /// that moves a File's cursor refuses: the text is a String and has no
+    /// cursor (ADR 0092). `None` where the call is anything else, or where
+    /// `DATA` is not the predefined constant.
+    fn data_call(&self, receiver: &Expression, name: &str, bare: bool) -> Option<Value> {
+        let Expression::Variable(receiver_name) = receiver else {
+            return None;
+        };
+        if !self.has_data
+            || receiver_name != DATA_NAME
+            || !bare
+            || self.variables.contains_key(DATA_NAME)
+        {
+            return None;
+        }
+        if name == "read" {
+            return self.constants.get(DATA_NAME).cloned();
+        }
+        if DATA_CURSOR_NAMES.contains(&name) {
+            panic!("{}", data_cursor_sentence(name));
+        }
+        None
     }
 
     /// `<=>` and the four orderings on a struct (ADR 0054): `<=>` calls the
@@ -3895,7 +4130,15 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // A set's algebra and its subset orderings (ADR 0082).
                 if let Value::Set(members) = &left
-                    && let Some(answer) = set_binary(members, *operator, &right)
+                    && let Some(answer) = {
+                        let lent =
+                            if matches!(operator, BinaryOperator::Add | BinaryOperator::Subtract) {
+                                self.lent_to_a_set(&right)
+                            } else {
+                                right.clone()
+                            };
+                        set_binary(members, *operator, &lent)
+                    }
                 {
                     return Some(answer);
                 }
@@ -3909,6 +4152,10 @@ impl<W: std::io::Write> Interpreter<W> {
                 receiver,
                 safe,
             } => {
+                let bare = arguments.is_empty() && keyword_arguments.is_empty() && block.is_none();
+                if let Some(answer) = self.data_call(receiver, name, bare) {
+                    return Some(answer);
+                }
                 // The builtin types carry Ruby's type functions (ADR 0058):
                 // `Array.new`, `Integer.sqrt`. The name is not a value, and
                 // a struct or local wearing it wins, as everywhere. `System`
@@ -4145,6 +4392,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     if let Some(sentence) = crate::lexer::retired_sentence(name) {
                         panic!("{sentence}");
                     }
+                    if name == DATA_NAME {
+                        panic!("{}", missing_data_sentence());
+                    }
                     panic!("'{name}' is not defined")
                 }
             }
@@ -4226,10 +4476,12 @@ impl<W: std::io::Write> Interpreter<W> {
                 // as itself, several as an array, as Ruby's Enumerable packs
                 // them — and answers nil.
                 if handed.borrow().collects {
-                    let item = if arguments.len() == 1 {
-                        arguments.into_iter().next().unwrap_or(Value::Nil)
-                    } else {
-                        Value::array(arguments)
+                    // A bare `yield` hands over nothing, which gathers as
+                    // nil, Ruby's reading (#341).
+                    let item = match arguments.len() {
+                        0 => Value::Nil,
+                        1 => arguments.into_iter().next().unwrap_or(Value::Nil),
+                        _ => Value::array(arguments),
                     };
                     self.collected.push(item);
                     return Some(Value::Nil);
@@ -4832,7 +5084,23 @@ impl<W: std::io::Write> Interpreter<W> {
     /// Ruby's), by count and fill, by count and a block handed each index,
     /// or copied from an array.
     /// `Set.new`, `Set.new(enumerable)`, and either with a block (ADR 0082).
+    /// What a value lends a set where a set takes any enumerable (#340,
+    /// docs/ruby/sets.md): a struct that includes Enumerable stands for the
+    /// elements its `each` yields, and anything else for itself.
+    fn lent_to_a_set(&mut self, value: &Value) -> Value {
+        if let Value::Struct { name, .. } = value
+            && self.structs.get(name).is_some_and(|info| info.enumerable)
+        {
+            return Value::array(self.enumerable_elements(value));
+        }
+        value.clone()
+    }
+
     fn set_new(&mut self, arguments: Vec<Value>, block: Option<&Block>) -> Option<Value> {
+        let arguments: Vec<Value> = arguments
+            .iter()
+            .map(|argument| self.lent_to_a_set(argument))
+            .collect();
         let candidates = match arguments.as_slice() {
             [] => Vec::new(),
             [source] => set_operand(source, "Set.new"),
@@ -5027,11 +5295,13 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
-    /// A pattern argument's match (ADR 0065): the `when` rule applied to a
-    /// value — a range covers, anything else asks `==`.
+    /// A pattern argument's match (ADR 0066): the `when` rule applied to a
+    /// value — a range covers, a regex matches a string or a symbol as it
+    /// does in `case/in` (#298), anything else asks `==`.
     fn pattern_matches(&mut self, pattern: &Value, element: &Value) -> bool {
         match pattern {
             Value::Range { .. } => self.range_covers(pattern, element),
+            Value::Regex(regex) => crate::regexp::case_matches(regex, element),
             _ => pattern.ruby_equals(element),
         }
     }
@@ -5062,6 +5332,14 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("cannot get the maximum of endless range");
         };
         let top = if exclusive {
+            // Ruby finds an excluded string end's maximum by walking
+            // `succ`, which is unbuilt; that is the sentence a string
+            // range's other walks give (#333).
+            if matches!(end, Value::String(_)) {
+                panic!(
+                    "a string range is not walked here — Ruby's succ walk (\"a\"..\"e\") waits for a pull; write the strings out"
+                );
+            }
             let Value::Integer(end) = end else {
                 panic!("cannot exclude non Integer end value");
             };
@@ -5448,6 +5726,7 @@ impl<W: std::io::Write> Interpreter<W> {
             && !matches!(receiver, Value::Struct { .. } | Value::Type(_))
             && !(matches!(receiver, Value::Array(_)) && matches!(name, "sample" | "shuffle"))
             && !(matches!(receiver, Value::MatchData(_)) && name == "named_captures")
+            && !(matches!(receiver, Value::String(_)) && matches!(name, "each_line" | "lines"))
         {
             panic!("'{name}' takes no keyword arguments, got {label}:");
         }
@@ -5480,6 +5759,46 @@ impl<W: std::io::Write> Interpreter<W> {
         {
             return Some(Self::class_of(&receiver));
         }
+        // `lines` and `each_line` with a separator or `chomp:` (#313), Ruby's:
+        // each piece ends with the separator unless `chomp:` takes it off.
+        // With a block the pieces are handed over and the string comes
+        // back; without one they are the answer.
+        // `lines` takes no block: one beside it falls through to the
+        // general refusal, never run and never ignored.
+        if let Value::String(text) = &receiver
+            && matches!(name, "each_line" | "lines")
+            && (!arguments.is_empty() || !keyword_arguments.is_empty())
+            && (block.is_none() || name == "each_line")
+        {
+            let pieces = separated_lines(text, name, &arguments, &keyword_arguments);
+            let Some(block) = block else {
+                return Some(Value::array(
+                    pieces.into_iter().map(Value::String).collect(),
+                ));
+            };
+            for piece in pieces {
+                self.run_block(block, vec![Value::String(piece)]);
+                if let Some(interrupted) = self.block_interrupt() {
+                    return interrupted;
+                }
+            }
+            return Some(receiver);
+        }
+        // `split` with a block (#318), Ruby's: each piece the blockless
+        // call would answer is handed over, and the string comes back.
+        if let (Value::String(_), "split", Some(block)) = (&receiver, name, block) {
+            let pieces =
+                self.method_call(receiver.clone(), name, arguments.clone(), Vec::new(), None);
+            if let Some(Value::Array(pieces)) = pieces {
+                for piece in pieces.iter().cloned() {
+                    self.run_block(block, vec![piece]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
+            }
+        }
         // The tower's methods (ADR 0085): a rational's and a complex's own,
         // and the names every real answers — before the integer and float
         // arms, so `1.quo(2)` is a rational and `3.to_r` exists.
@@ -5490,11 +5809,15 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `match` with a block (#215), Ruby's: the block runs only on a
         // match, given it, and the call answers the block's result — a maybe,
-        // nil when nothing matched and the block never ran.
+        // nil when nothing matched and the block never ran. A pattern, a
+        // string, and a symbol all take it (#319).
         // Arguments `match` does not take fall through to the general
         // refusals, as they do without a block.
         if let Some(block) = block
-            && matches!(receiver, Value::Regex(_))
+            && matches!(
+                receiver,
+                Value::Regex(_) | Value::String(_) | Value::Symbol(_)
+            )
             && name == "match"
             && let Some(found) = crate::regexp::method(&receiver, name, &arguments)
         {
@@ -5558,6 +5881,17 @@ impl<W: std::io::Write> Interpreter<W> {
         // table's refusal.
         if let Value::Set(members) = &receiver {
             let members = members.clone();
+            let arguments = if matches!(
+                name,
+                "difference" | "disjoint?" | "intersect?" | "intersection" | "union"
+            ) {
+                arguments
+                    .iter()
+                    .map(|argument| self.lent_to_a_set(argument))
+                    .collect()
+            } else {
+                arguments.clone()
+            };
             if let Some(answered) = self.set_method(&members, name, &arguments, block) {
                 return answered;
             }
@@ -5850,6 +6184,22 @@ impl<W: std::io::Write> Interpreter<W> {
             if matches!(name, "to_a" | "entries") && arguments.is_empty() {
                 return Some(Value::array(range_elements(&receiver)));
             }
+            // `step` with a block (#333): each value handed over and the
+            // range answered, as Ruby's does — asked here, before the walk
+            // below turns the range into its elements, which a float
+            // range has none of.
+            if let Some(block) = block
+                && name == "step"
+                && let Some(steps) = range_steps(&receiver, &arguments)
+            {
+                for value in steps {
+                    self.run_block(block, vec![value]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
+            }
             // The walks that answer the range itself, as Ruby's do.
             if let Some(block) = block
                 && matches!(name, "each" | "each_with_index" | "reverse_each")
@@ -6005,7 +6355,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6040,7 +6390,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6548,6 +6898,12 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(sorted))
                 }
+                // A count beside the comparator block is the same wrong
+                // count it is without one, in the same sentence (#332).
+                (Value::Array(_), "min" | "max", counted) if !counted.is_empty() => {
+                    refusal("arity");
+                    panic!("'{name}' takes 0 arguments, got {}", counted.len())
+                }
                 // `min`/`max` by a comparator block (#99): the first of
                 // equals, and absent for an empty array, as without one.
                 (Value::Array(elements), "min" | "max", []) => {
@@ -6916,13 +7272,27 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(receiver)
                 }
+                // A replacement beside a block (#312): Ruby ignores the
+                // block silently, so the pair refuses rather than letting
+                // one win, as a pattern beside a block does (ADR 0066).
+                (Value::String(_), "sub" | "gsub", [_, _]) => {
+                    panic!("'{name}' takes a replacement or a block, not both")
+                }
+                (Value::String(_), "sub" | "gsub", []) => {
+                    refusal("arity");
+                    panic!("'{name}' takes 1 to 2 arguments, got 0")
+                }
                 (receiver, name, _) => {
                     if let Some(survivor) = alias_survivor(name) {
                         refusal("alias");
                         panic!("{name} is spelled {survivor} here");
                     }
+                    // The name alone: a receiver walked as an array by now
+                    // is not the value the program wrote, and the hosted
+                    // evaluator says the same sentence (#336).
+                    let _ = receiver;
                     refusal("missing");
-                    panic!("undefined block-taking method {name} for {receiver:?}")
+                    panic!("undefined block-taking method {name}")
                 }
             };
         }
@@ -6957,10 +7327,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // No separator joins with nothing between, as Ruby's does (#142),
             // and a nil one is none (#104).
             (Value::Array(elements), "join", [] | [Value::Nil]) => {
-                Value::String(joined(elements, ""))
+                Value::String(self.joined(elements, ""))
             }
             (Value::Array(elements), "join", [Value::String(separator)]) => {
-                Value::String(joined(elements, separator))
+                Value::String(self.joined(elements, separator))
             }
             (Value::Array(elements), "last", []) => {
                 elements.last().cloned().map_or(Value::Nil, Value::present)
@@ -7200,6 +7570,22 @@ impl<W: std::io::Write> Interpreter<W> {
                     self.pattern_matches(pattern, element)
                 }))
             }
+            // A range walks its elements for the pattern forms (ADR 0066,
+            // #402), as an array of them would answer.
+            (
+                Value::Range { .. },
+                "all?" | "any?" | "none?" | "one?" | "grep" | "grep_v" | "slice_before"
+                | "slice_after",
+                [pattern],
+            ) => {
+                return self.method_call(
+                    Value::array(range_elements(&receiver)),
+                    name,
+                    vec![pattern.clone()],
+                    Vec::new(),
+                    None,
+                );
+            }
             // A hash walks its pairs for the pattern forms, as for the rest
             // of Ruby's Enumerable (#105).
             (
@@ -7296,6 +7682,14 @@ impl<W: std::io::Write> Interpreter<W> {
             // Strides and extremes walk the same elements `each` walks, so a
             // range without both ends refuses with the same words. The
             // extremes are maybes: an empty range has neither.
+            // A range between two numbers steps as Ruby's does (#333): by
+            // one with no stride, downward by a negative one, through
+            // floats where one is involved.
+            (range @ Value::Range { .. }, "step", strides)
+                if range_steps(range, strides).is_some() =>
+            {
+                Value::array(range_steps(range, strides).expect("checked by the guard"))
+            }
             (range @ Value::Range { .. }, "step", [Value::Integer(stride)]) => {
                 if *stride <= 0 {
                     panic!("step takes a positive stride, got {stride}");
@@ -7406,6 +7800,22 @@ impl<W: std::io::Write> Interpreter<W> {
                 flatten_into(elements, &mut flat);
                 Value::array(flat)
             }
+            // `flatten(level)` opens that many levels, Ruby's: none at
+            // zero, all of them below it (#338).
+            (Value::Array(elements), "flatten", [Value::Integer(depth)]) => {
+                Value::array(flattened_to_depth(elements, *depth))
+            }
+            // A blockless `each_with_index` answers the finished collection
+            // (docs/ruby/enumerators.md): each element beside its index.
+            (Value::Array(elements), "each_with_index", []) => Value::array(
+                elements
+                    .iter()
+                    .enumerate()
+                    .map(|(index, element)| {
+                        Value::array(vec![element.clone(), Value::Integer(index as i64)])
+                    })
+                    .collect(),
+            ),
             (Value::Array(elements), "compact", []) => Value::array(
                 elements
                     .iter()
@@ -7743,7 +8153,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // `start_with?` and `end_with?` take any number of candidates and
             // answer whether one matches, as Ruby's do; a candidate that is
             // not a string refuses in Ruby's words.
-            (Value::String(text), "end_with?", suffixes) if !suffixes.is_empty() => {
+            (Value::String(text), "end_with?", suffixes) => {
                 Value::Boolean(suffixes.iter().any(|suffix| match suffix {
                     Value::String(suffix) => text.ends_with(suffix.as_str()),
                     other => panic!(
@@ -7798,7 +8208,7 @@ impl<W: std::io::Write> Interpreter<W> {
             (Value::String(text), "split", [Value::String(separator), Value::Integer(limit)]) => {
                 split_value(text, Some(separator), *limit)
             }
-            (Value::String(text), "start_with?", prefixes) if !prefixes.is_empty() => {
+            (Value::String(text), "start_with?", prefixes) => {
                 Value::Boolean(prefixes.iter().any(|prefix| match prefix {
                     Value::String(prefix) => text.starts_with(prefix.as_str()),
                     other => panic!(
@@ -8034,14 +8444,75 @@ impl<W: std::io::Write> Interpreter<W> {
                 result.push_str(&text[copied_to..]);
                 Value::String(result)
             }
+            // A hash replacement (#311): each match's text is looked up and
+            // its value's `to_s` written; a match no key holds is replaced
+            // with nothing, Ruby's rule, and a nil value refuses as nil's
+            // `to_s` does.
+            (
+                Value::String(text),
+                "sub" | "gsub",
+                [
+                    pattern @ (Value::Regex(_) | Value::String(_)),
+                    Value::Hash(replacement),
+                ],
+            ) => {
+                let spans: Vec<(usize, usize)> = match pattern {
+                    Value::Regex(pattern) => {
+                        let matches = if name == "gsub" {
+                            pattern.all(text)
+                        } else {
+                            pattern.search(text).into_iter().collect()
+                        };
+                        matches
+                            .iter()
+                            .map(|found| found.spans[0].expect("a match has a whole"))
+                            .collect()
+                    }
+                    Value::String(needle) => matched_spans(text, needle, name == "gsub"),
+                    _ => unreachable!(),
+                };
+                let mut result = String::new();
+                let mut copied_to = 0;
+                for (start, end) in spans {
+                    result.push_str(&text[copied_to..start]);
+                    let matched = Value::String(text[start..end].to_string());
+                    if let Some((_, value)) = replacement.iter().find(|(key, _)| *key == matched) {
+                        if matches!(value, Value::Nil) {
+                            panic!("nil has no method 'to_s' — handle the nil case first");
+                        }
+                        result.push_str(&value.to_string());
+                    }
+                    copied_to = end;
+                }
+                result.push_str(&text[copied_to..]);
+                Value::String(result)
+            }
+            // A pattern beside a replacement that is neither text nor a
+            // hash: the replacement is the argument at fault, in Ruby's
+            // words.
+            (
+                Value::String(_),
+                "sub" | "gsub",
+                [Value::Regex(_) | Value::String(_), replacement],
+            ) => panic!(
+                "no implicit conversion of {} into String",
+                replacement.type_name()
+            ),
             (Value::String(_), "sub" | "gsub", [other, _]) => panic!(
                 "wrong argument type {} (expected Regexp)",
                 other.type_name()
             ),
             (Value::String(text), "upcase", []) => Value::String(text.to_uppercase()),
-            (Value::String(text), "strip", []) => Value::String(text.trim().to_string()),
-            (Value::String(text), "lstrip", []) => Value::String(text.trim_start().to_string()),
-            (Value::String(text), "rstrip", []) => Value::String(text.trim_end().to_string()),
+            // NUL strips with the whitespace, as in Ruby (#344).
+            (Value::String(text), "strip", []) => {
+                Value::String(text.trim_matches(strippable).to_string())
+            }
+            (Value::String(text), "lstrip", []) => {
+                Value::String(text.trim_start_matches(strippable).to_string())
+            }
+            (Value::String(text), "rstrip", []) => {
+                Value::String(text.trim_end_matches(strippable).to_string())
+            }
             // One trailing line ending comes off — `\r\n` as a unit, else one
             // `\n` or `\r` — and a string without one passes through whole.
             (Value::String(text), "chomp", []) => {
@@ -8052,6 +8523,32 @@ impl<W: std::io::Write> Interpreter<W> {
                     .unwrap_or(text);
                 Value::String(trimmed.to_string())
             }
+            // `chomp(separator)` (#343), Ruby's three readings: a line feed
+            // asks what the bare form asks, an empty string takes every
+            // trailing line ending off, and anything else comes off once
+            // where the string ends with it.
+            (Value::String(text), "chomp", [Value::String(separator)]) => {
+                let trimmed = match separator.as_str() {
+                    "\n" => text
+                        .strip_suffix("\r\n")
+                        .or_else(|| text.strip_suffix('\n'))
+                        .or_else(|| text.strip_suffix('\r'))
+                        .unwrap_or(text),
+                    "" => {
+                        let mut rest = text.as_str();
+                        while let Some(shorter) = rest
+                            .strip_suffix("\r\n")
+                            .or_else(|| rest.strip_suffix('\n'))
+                        {
+                            rest = shorter;
+                        }
+                        rest
+                    }
+                    other => text.strip_suffix(other).unwrap_or(text),
+                };
+                Value::String(trimmed.to_string())
+            }
+            (Value::String(text), "ascii_only?", []) => Value::Boolean(text.is_ascii()),
             // Ruby's capitalize moves both ways: the first character up, all
             // the rest down. The first goes to titlecase, so where upcasing
             // one character makes several — ß to SS — only the first stays
@@ -8102,6 +8599,30 @@ impl<W: std::io::Write> Interpreter<W> {
                 .map_or(Value::Nil, |byte_position| {
                     Value::Integer(text[..byte_position].graphemes(true).count() as i64)
                 }),
+            // From a start position, counted in characters and from the end
+            // when negative, as the Regexp form reads one (#316); a position
+            // outside the string finds nothing.
+            (Value::String(text), "index", [Value::String(needle), Value::Integer(from)]) => {
+                let boundaries: Vec<usize> = text
+                    .grapheme_indices(true)
+                    .map(|(at, _)| at)
+                    .chain(std::iter::once(text.len()))
+                    .collect();
+                let count = boundaries.len() as i64 - 1;
+                let position = if *from < 0 { count + from } else { *from };
+                if position < 0 || position > count {
+                    Value::Nil
+                } else {
+                    let start = boundaries[position as usize];
+                    text[start..]
+                        .find(needle.as_str())
+                        .map_or(Value::Nil, |byte_position| {
+                            Value::Integer(
+                                text[..start + byte_position].graphemes(true).count() as i64
+                            )
+                        })
+                }
+            }
             // One character only: Ruby's multi-character count is a
             // character-set count, not a substring count, and following it
             // quietly would be principle 5's exact shape — so more refuses.
@@ -8117,7 +8638,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         .count() as i64,
                 )
             }
-            (receiver, "to_s", []) => Value::String(receiver.to_string()),
+            (receiver, "to_s", []) => Value::String(self.rendered(receiver)),
             // `between?` and `clamp` (ADR 0054): on anything `<=>` orders.
             (receiver, "between?", [low, high]) if orderable(receiver) => {
                 let above_low = self.ordering_of(receiver, low) >= 0;
@@ -8211,8 +8732,12 @@ impl<W: std::io::Write> Interpreter<W> {
                         if arguments.len() < low || arguments.len() > high =>
                     {
                         refusal("arity");
+                        // An open-ended count (`dig/1+`) has no upper bound to
+                        // name (#338).
                         let expected = if low == high {
                             low.to_string()
+                        } else if high == usize::MAX {
+                            format!("{low} or more")
                         } else {
                             format!("{low} to {high}")
                         };
@@ -8976,6 +9501,13 @@ impl<W: std::io::Write> Interpreter<W> {
                     );
                     return if matched { Some(Vec::new()) } else { None };
                 }
+                // A trait is not a type a value has, so as a pattern it
+                // would match nothing, silently; it refuses instead (#300).
+                if Self::resolve(&self.module_path, name, &self.structs).is_none()
+                    && Self::resolve(&self.module_path, name, &self.traits).is_some()
+                {
+                    panic!("{}", trait_pattern_sentence(name));
+                }
                 let Value::Struct {
                     fields,
                     name: struct_name,
@@ -9130,6 +9662,54 @@ impl<W: std::io::Write> Interpreter<W> {
                 panic!("'{method}' answers a String, got {got}")
             }
         }
+    }
+
+    /// A value as source, the way `p` and `inspect` show it (#285): a
+    /// struct that defines `inspect` renders by it wherever it sits — an
+    /// element, a hash key or value, a set member, another struct's field —
+    /// and everything else takes `Value::inspect`'s form.
+    fn inspected(&mut self, value: &Value) -> String {
+        value.inspect_with(&mut |inner| self.own_rendering(inner, "inspect"))
+    }
+
+    /// A value as text, the way `puts`, `to_s`, `join`, and interpolation
+    /// show it (#285): a struct's own `to_s` when it defines one. A
+    /// collection's `to_s` is its `inspect` (ADR 0060), and a struct
+    /// without a `to_s` shows its fields, so the values inside either
+    /// render by their own `inspect`.
+    fn rendered(&mut self, value: &Value) -> String {
+        if let Some(own) = self.own_rendering(value, "to_s") {
+            return own;
+        }
+        match value {
+            Value::Struct { .. } => {
+                value.inspect_inside_with(&mut |inner| self.own_rendering(inner, "inspect"))
+            }
+            Value::Array(_)
+            | Value::EnumCase { .. }
+            | Value::Failure(_)
+            | Value::Hash(_)
+            | Value::Set(_)
+            | Value::Some(_) => self.inspected(value),
+            other => other.to_string(),
+        }
+    }
+
+    /// `join` (#104): each element as `to_s` renders it, a nested array
+    /// joined into the same string with the same separator, as Ruby's is.
+    /// A nil element refuses as interpolating one does, since nil has no
+    /// `to_s` (ADR 0005) — Ruby's silent "" would be the one place nil
+    /// rendered.
+    fn joined(&mut self, elements: &[Value], separator: &str) -> String {
+        let mut parts = Vec::with_capacity(elements.len());
+        for element in elements {
+            parts.push(match element {
+                Value::Array(inner) => self.joined(inner, separator),
+                Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
+                other => self.rendered(other),
+            });
+        }
+        parts.join(separator)
     }
 
     /// Evaluate an expression that must produce a value.
@@ -9411,9 +9991,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // Ruby's rule: a line already ending in a newline gets no
                 // second one.
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_output(&format!("{text}{newline}"))
                     .expect("failed to write output");
@@ -9434,9 +10012,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "print got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 self.emit_standard_output(&text)
                     .expect("failed to write output");
             }
@@ -9500,9 +10076,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "warn got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(line, "to_s")
-                    .unwrap_or_else(|| line.to_string());
+                let text = self.rendered(line);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_error(&format!("{text}{newline}"));
             }
@@ -9534,9 +10108,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // `pp` is `p` here: there is no pretty-printer to defer to (#185).
         if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
-                let inspected = self
-                    .own_rendering(argument, "inspect")
-                    .unwrap_or_else(|| argument.inspect());
+                let inspected = self.inspected(argument);
                 self.emit_standard_output(&format!("{inspected}\n"))
                     .expect("failed to write output");
             }
@@ -9555,7 +10127,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // input, and nil has no methods (ADR 0006).
         if self.lookup_method(name).is_none() && name == "inspect" {
             match arguments.as_slice() {
-                [argument] => return Some(Value::String(argument.inspect())),
+                [argument] => return Some(Value::String(self.inspected(argument))),
                 other => panic!("inspect takes one argument, got {}", other.len()),
             }
         }
