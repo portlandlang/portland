@@ -1382,11 +1382,11 @@ fn portland_intermediate_dumps_a_program_inside_the_native_slice() {
 #[test]
 fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
     let compiles =
-        "the native build compiles integers, comparisons, if, while, def, and puts of an Integer";
+        "the native build compiles integers, strings, comparisons, if, while, def, and puts";
     let cases = [
         (
-            "puts \"hi\"\n",
-            format!("{compiles} — a string on line 1 is unbuilt (#443)"),
+            "puts 1.5\n",
+            format!("{compiles} — a float on line 1 is unbuilt (#443)"),
         ),
         (
             "list = [1, 2]\n",
@@ -1445,7 +1445,7 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
     let _ = std::fs::remove_file(&written);
     std::fs::write(
         &sample,
-        "def fib(n)\n  if n < 2\n    n\n  else\n    fib(n - 1) + fib(n - 2)\n  end\nend\n\ndef small?(number) = number < 10\n\nputs fib(30)\nflag = small?(3)\n",
+        "def fib(n)\n  if n < 2\n    n\n  else\n    fib(n - 1) + fib(n - 2)\n  end\nend\n\ndef small?(number) = number < 10\n\nputs fib(30)\nflag = small?(3)\nputs \"café\"\n",
     )
     .unwrap();
     let driver = format!("{}/../compiler/build.pdx", env!("CARGO_MANIFEST_DIR"));
@@ -1465,6 +1465,8 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
         "call void @portland.overflow(",
         "c\"%lld %s %lld overflows the 64-bit integers\\0A\\00\"",
         "call i32 (ptr, ...) @printf(ptr @.integer_line, i64 ",
+        "{ i64 -1, i64 5, [5 x i8] c\"caf\\C3\\A9\" }",
+        "call void @portland_puts_string(ptr @.text.",
     ] {
         assert!(text.contains(expected), "expected {expected:?} in:\n{text}");
     }
@@ -1481,8 +1483,8 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
 fn portland_build_writes_nothing_when_it_refuses() {
     let cases = [
         (
-            "puts \"hi\"\n",
-            "the native build compiles integers, comparisons, if, while, def, and puts of an Integer — a string on line 1 is unbuilt (#443)",
+            "puts 1.5\n",
+            "the native build compiles integers, strings, comparisons, if, while, def, and puts — a float on line 1 is unbuilt (#443)",
         ),
         ("count = 1\nputs missing\n", "'missing' is not defined"),
     ];
@@ -1608,12 +1610,12 @@ fn a_native_build_that_refuses_leaves_nothing_behind() {
         binary.exists() && text.exists(),
         "the build should leave both files"
     );
-    std::fs::write(&sample, "puts \"hi\"\n").unwrap();
+    std::fs::write(&sample, "puts 1.5\n").unwrap();
     let refused = native_build(&sample, &[]);
-    assert!(!refused.status.success(), "a string should refuse");
+    assert!(!refused.status.success(), "a float should refuse");
     let stderr = String::from_utf8(refused.stderr).unwrap();
     assert!(
-        stderr.contains("a string on line 1 is unbuilt (#443)"),
+        stderr.contains("a float on line 1 is unbuilt (#443)"),
         "expected the native refusal, got: {stderr}"
     );
     assert!(!text.exists(), "a refused build should leave no IR");

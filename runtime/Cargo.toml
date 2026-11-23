@@ -1,0 +1,15 @@
+[package]
+name = "portland-runtime"
+version = "0.0.0"
+edition = "2024"
+description = "What every native Portland program is linked with: memory and the operations its values need."
+license = "MIT"
+publish = false
+
+# A static library, so `clang` links it into the binary the compiler's LLVM
+# IR becomes (ADR 0095). Nothing here comes from the seed.
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = { workspace = true }

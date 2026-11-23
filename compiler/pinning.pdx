@@ -234,6 +234,11 @@ def pin_expression(node, walk, answers, names)
     scope = current.bindings + answers
     current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }]])
   end
+  # A def with no parameters is called by its bare name, which parses as a
+  # name and not as a call; a local of that name would be the local.
+  if (node in IdentifierNode) && names.include?(node.name) && current.bindings.none? { it[0] == node.name }
+    current = current.with(calls: current.calls + [[node.name, []]])
+  end
   children_of(node).each do |child|
     current = pin_statement(child, current, answers, names)
   end
