@@ -24,9 +24,9 @@
 #
 # A fourth column runs the workload built natively by script/build (#448),
 # where it builds: only a slice of the language compiles (#443), and every
-# other bench shows "—". The slice is integers, so that column says nothing
-# about strings, collections, or memory, which is where the cost of a real
-# program will be.
+# other bench shows "—". The workloads that build are integers and calls,
+# so that column says nothing about collections, blocks, or the cost of
+# reference counting, which is where the time of a real program will go.
 
 require "English"
 
@@ -182,5 +182,5 @@ puts format("ruby's startup alone: %.3fs — the floor under every ruby (s) abov
 puts "skipped slow tier: #{skipped.join(", ")} — run `script/bench slow` to include" unless skipped.empty?
 puts "not run under Ruby: #{ruby_skipped.join(", ")}" unless ruby_skipped.empty?
 puts "not run hosted: #{hosted_skipped.join(", ")} — minutes each; run `script/bench slow` to include" unless hosted_skipped.empty?
-puts "native: built by script/build with #{clang_version}, startup included. Only integer workloads build (#443), so the " \
-     "column says nothing about strings, collections, or memory."
+puts "native: built by script/build with #{clang_version}, startup included. The workloads that build are integers and calls, so the " \
+     "column says nothing about collections, blocks, or the cost of reference counting."
