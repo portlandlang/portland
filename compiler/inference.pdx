@@ -26,107 +26,40 @@
 # ["unknown"] is principle 4 wearing a type: anything this increment cannot
 # tell stays unknown, and later increments narrow it. Unknown is never an
 # error — it is the absence of an opinion.
+#
+# — contracts (ADR 0048, step one) —
+#
+# What a body demands of a parameter, read off the body alone: each
+# dotted call on the name with its dot, each operator applied to it bare,
+# an index as '[]' — first-appearance order, no repeats. A default lends
+# its type instead, as it does for returns. Dump-only: nothing here is
+# read by a check yet, and caller flow waits for a whole-program view
+# (#94).
+#
+# — narrowing (ADR 0040 §3, the seven forms) —
+#
+# A condition proves something about a maybe-typed name on each side of a
+# branch: `x.some?` holding makes x its plain type and failing makes it
+# nil; `x.nil?` and `x == nil` the other way round; `!` swaps the sides;
+# `&&` proves both halves when it holds and `||` both when it fails. A
+# proof is [when_true, when_false], each a list of [name, type] pairs
+# bound over the branch that sees it. Only an identifier narrows, since
+# only a name can be rebound — `users.first.nil?` proves nothing about a
+# later `users.first`. The exit guard and the or-guard bind below the
+# statement (bind_after, synthesize_logical); `&.` is synthesize_safe_call;
+# `case/in` over nil is arm_bindings.
+#
+# — what a statement leaves behind —
+#
+# Every body walk here, and the checker's, threads bindings through
+# bind_after. The rule that keeps the walks honest: a name a *nested* body
+# rebinds — a branch, a loop, a block — is unknown after that statement,
+# because whether the body ran is not the tree's to say, and a wrong type
+# is worse than none (principle 4). Found the hard way: `mutable result =
+# nil` rebound inside an `each` read as Nil, and the first refusal built
+# on that read fired on the evaluator's own source.
 
 require_relative "parser"
-
-# The entry points: [name, type] pairs in first-appearance order — the
-# program's top-level bindings, and (3b) its top-level defs' return types.
-# One scan feeds both. A method's name can share the list with the locals
-# because the no-shadow rule already promises a name is never both.
-def infer_program(nodes)
-  ordered_pairs(nodes, scan_program(nodes), "assignment")
-end
-
-def infer_methods(nodes)
-  ordered_pairs(nodes, scan_program(nodes), "def")
-end
-
-def scan_program(nodes)
-  mutable types = []
-  nodes.each do |node|
-    if node in DefNode
-      types = [[node.name, synthesize_def_return(node, types)]] + types
-    elsif node in StructDefNode
-      types = register_struct(node, types)
-    elsif node in EnumDefNode
-      # Recorded so a later increment can hang membership and
-      # exhaustiveness off the name; nothing reads it yet.
-      types = [[node.name, ["enum", node.name]]] + types
-    else
-      types = bind_after(node, types, [])
-    end
-  end
-  types
-end
-
-# A struct declaration binds its name to its type — what `new` is called
-# on — and each type function (`def self.unit`, ADR 0031) under the dotted
-# name `Order.unit`, which no identifier can spell, so the one list holds
-# both. The checker's program-wide scan registers structs the same way.
-def register_struct(node, mutable types)
-  types = [[node.name, ["type", node.name]]] + types
-  node.type_functions.each do |function|
-    next unless function in DefNode
-    types = [[node.name + "." + function.name, synthesize_def_return(function, types)]] + types
-  end
-  types
-end
-
-def ordered_pairs(nodes, types, kind)
-  mutable seen = []
-  mutable ordered = []
-  nodes.each do |node|
-    next unless node.kind == kind
-    next if seen.include?(node.name)
-    seen << node.name
-    found = types.find { it[0] == node.name }
-    ordered << [node.name, type_at(found, 1)]
-  end
-  ordered
-end
-
-# Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
-# checking mode is 3b): every arm answers what it can prove from the node
-# alone plus the bindings already typed.
-def synthesize(node, types)
-  case node
-  in IntegerNode then ["integer"]
-  in FloatNode then ["float"]
-  in RationalNode then ["rational"]
-  in ImaginaryNode then ["complex"]
-  # Interpolation needs no arm: it desugared to a `+` chain of strings at
-  # parse, and the binary rule answers string for string + string.
-  in StringNode then ["string"]
-  in BooleanNode then ["boolean"]
-  in SymbolNode then ["symbol"]
-  in NilNode then ["nil"]
-  in RangeNode then synthesize_range(node, types)
-  in WordArrayNode then ["array", ["string"]]
-  in SymbolArrayNode then ["array", ["symbol"]]
-  in ArrayNode then synthesize_array(node, types)
-  in HashNode then synthesize_hash(node, types)
-  in IdentifierNode then synthesize_identifier(node, types)
-  in BinaryNode then synthesize_binary(node, types)
-  in LogicalNode then synthesize_logical(node, types)
-  in UnaryNode then synthesize_unary(node, types)
-  in MethodCallNode then synthesize_call(node, types)
-  in SafeMethodCallNode then synthesize_safe_call(node, types)
-  # A bare call reaches a def the scan already typed (3b); its name shares
-  # the list with the locals under the no-shadow rule. `format` and
-  # `sprintf` (ADR 0067) answer a string.
-  in CallNode then synthesize_bare_call(node, types)
-  in IfNode then synthesize_if(node, types)
-  in CaseInNode then synthesize_case_in(node, types)
-  in AppendNode then synthesize_append(node, types)
-  # A `yield` is what the block answers, which only the native build's
-  # pinning says (#493), under a name no local can have. The checker
-  # binds none, and reads unknown.
-  in YieldNode then synthesize_name("yield", types)
-  in IndexNode then synthesize_index(node, types)
-  else
-    ["unknown"]
-  end
-end
 
 # The name the native build's pinning reads under (#503): bound by it and
 # by nothing else, and spelled as no local can be. Under it, inference
@@ -137,187 +70,269 @@ end
 # such name, and withholds both opinions.
 NATIVE_READING = "native&"
 
-def native_reading?(types) = types.any? { it[0] == NATIVE_READING }
-
-# A maybe as the native build reads it where its value is needed.
-def opened_natively(type, types)
-  return type unless (type in ["maybe", *]) && native_reading?(types)
-  type_at(type, 1)
+def accumulator_type(argument_types)
+  initial = type_at(argument_types, 0)
+  return ["unknown"] if initial.nil?
+  initial
 end
 
-# `array[index]` under the native reading: the element, or nil past
-# either end.
-def synthesize_index(node, types)
-  return ["unknown"] unless native_reading?(types)
-  receiver = synthesize(node.receiver, types)
-  return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
-  maybe_of(type_at(receiver, 1))
-end
-
-def synthesize_array(node, types)
-  return ["array", ["unknown"]] if node.elements.empty?
-  first = synthesize(node.elements.first, types)
-  mutable uniform = true
-  node.elements.each do |element|
-    uniform = false unless synthesize(element, types) == first
+def add_demands(node, name, mutable found)
+  return found if node.nil?
+  # A `case/in` on the name itself narrows it: what an arm asks, it asks
+  # of the value that arm matched, never of every value the def is handed
+  # (#457).
+  return found if (node in CaseInNode) && names?(node.subject, name)
+  demand = demand_of(node, name)
+  found << demand unless demand.nil? || found.include?(demand)
+  children_of(node).each do |child|
+    found = add_demands(child, name, found)
   end
-  return ["array", first] if uniform
-  ["array", ["unknown"]]
+  found
 end
 
-def synthesize_hash(node, types)
-  return ["hash", ["unknown"], ["unknown"]] if node.pairs.empty?
-  first = node.pairs.first
-  key = synthesize(first.key, types)
-  entry = synthesize(first.value, types)
-  mutable uniform = true
-  node.pairs.each do |pair|
-    uniform = false unless synthesize(pair.key, types) == key
-    uniform = false unless synthesize(pair.value, types) == entry
+# The false aliases (ADR 0036): Ruby's implicit-conversion protocol wears
+# conversion spellings, and each refuses by naming its survivor — the
+# seed's table, so the checker says the seed's sentence where the builtin
+# method table would otherwise call the name missing.
+def alias_survivor(name)
+  case name
+  when "to_ary" then "to_a"
+  when "to_int" then "to_i"
+  when "to_str" then "to_s"
+  else
+    nil
   end
-  return ["hash", key, entry] if uniform
-  ["hash", ["unknown"], ["unknown"]]
 end
 
-# A def's return type (3b): parameters enter as unknown — the hybrid
-# caller-flow half of ADR 0040 is a later increment — except that a
-# default lends its type. The body reads in order; early returns and the
-# last statement must agree, a lone nil among them makes a maybe, and any
-# other disagreement is an opinion withheld.
-def synthesize_def_return(node, mutable types)
-  node.parameters.each do |parameter|
-    types = [[parameter.name, parameter_type(parameter, types)]] + types
+# — return annotations (ADR 0041) —
+#
+# The written annotation for a def, if its signature carries one: the
+# arrow trails the line where the parameter list ends, which a trailing
+# comma or a bare opener continues past (ADR 0045's shapes). Read off the
+# source by line, since the lexer drops comments — the debug-tool version;
+# when annotations want positions too, they become lexer trivia.
+def annotation_for(source, name)
+  lines = source.lines
+  mutable found = nil
+  lines.each_with_index do |line, index|
+    next unless def_line_for?(line, name)
+    found = signature_end_line(lines, index)
   end
-  synthesize_body(node.body, types)
+  return nil if found.nil?
+  marker = found.index("# -> ")
+  return nil if marker.nil?
+  tail = found.slice(marker + 5, found.length - marker - 5)
+  tail.strip
 end
 
-def parameter_type(parameter, types)
-  if (parameter in AssignmentNode) && parameter.value.some?
-    return synthesize(parameter.value, types)
+# What an arm of a `case/in` binds, as pairs to put before the types: a
+# bare capture takes the subject's type — the plain type once an unguarded
+# `in nil` arm above has taken the absent case (the fifth form; `in
+# some(v)` is not a pattern either oracle parses), and an identifier
+# subject narrows alongside it; `in nil` narrows an identifier subject to
+# nil; every other capture is unknown.
+def arm_bindings(node, branch, nil_seen, types)
+  subject = synthesize(node.subject, types)
+  pattern = branch.pattern
+  plain = if (subject in ["maybe", *]) && nil_seen then type_at(subject, 1) else subject end
+  if pattern in IdentifierNode
+    mutable pairs = [[pattern.name, plain]]
+    pairs = [[node.subject.name, plain]] + pairs if node.subject in IdentifierNode
+    return pairs
   end
-  if (parameter in KeywordParameterNode) && parameter.default.some?
-    return synthesize(parameter.default, types)
+  if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in ["maybe", *])
+    return [[node.subject.name, ["nil"]]]
   end
-  ["unknown"]
+  pattern_names(pattern).map { [it, ["unknown"]] }
 end
 
-# A statement body's answer: each statement is read with the bindings the
-# ones above it left (bind_after), early returns join the last statement
-# as candidates, and merge_candidates rules.
-def synthesize_body(body, mutable types)
-  mutable early = []
-  mutable last = ["nil"]
-  body.each do |statement|
-    early += return_types_in(statement, types)
-    last = statement_answer(statement, types)
-    types = bind_after(statement, types, [])
-  end
-  merge_candidates(early + [last])
-end
-
-def statement_answer(statement, types)
-  return synthesize(statement.value, types) if statement in AssignmentNode
-  return return_answer(statement, types) if statement in ReturnNode
-  synthesize(statement, types)
-end
-
-def return_answer(statement, types)
-  return ["nil"] if statement.value.nil?
-  synthesize(statement.value, types)
-end
-
-# Every `return`'s type inside a statement, walking the branching forms.
-def return_types_in(node, types)
+# Every name an assignment or append inside this node binds, at any depth
+# short of a def, struct, trait, or module — those bind their own.
+def assigned_names_in(node)
   case node
-  in ReturnNode then [return_answer(node, types)]
-  in IfNode
-    proof = narrowings(node.condition, types)
-    mutable found = []
-    found += returns_in_body(node.then_body, when_true(proof) + types)
-    found += returns_in_body(node.else_body, when_false(proof) + types)
-    found
-  # A loop body may have run before any statement in it is read again, so
-  # it is walked with its own rebindings already forgotten.
-  in WhileNode then returns_in_body(node.body, forget_types(types, assigned_names_in_body(node.body)))
-  in CaseNode
-    mutable found = []
-    node.branches.each do |branch|
-      found += returns_in_body(branch.body, types)
+  in AssignmentNode(name:, value:)
+    return [name] if value.nil?
+    [name] + assigned_names_in(value)
+  # `box << 3` is rebind sugar — the assignment around it is the binding,
+  # and the append itself names nothing new.
+  in AppendNode(value:) then assigned_names_in(value)
+  in WhileNode(condition:, body:) then assigned_names_in(condition) + assigned_names_in_body(body)
+  in IfNode(condition:, then_body:, else_body:)
+    assigned_names_in(condition) + assigned_names_in_body(then_body) + assigned_names_in_body(else_body)
+  in CaseNode(subject:, branches:, else_body:)
+    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
+    branches.each do |branch|
+      found += assigned_names_in_body(branch.values) + assigned_names_in_body(branch.body)
     end
-    found += returns_in_body(node.else_body, types)
     found
-  in CaseInNode
-    mutable found = []
-    mutable nil_seen = false
-    node.branches.each do |branch|
-      found += returns_in_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
-      nil_seen = true if nil_arm?(branch)
+  in CaseInNode(subject:, branches:, else_body:)
+    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
+    branches.each do |branch|
+      found += assigned_names_in_body(branch.body)
+      found += assigned_names_in(branch.guard) unless branch.guard.nil?
     end
-    found += returns_in_body(node.else_body, types)
+    found
+  in TogetherNode(lines:)
+    mutable found = []
+    lines.each do |line|
+      found += [line.name] + assigned_names_in(line.value) if line in TaskLineNode
+      found += assigned_names_in(line) unless line in TaskLineNode
+    end
+    found
+  in ReturnNode(value:) then assigned_names_in_body([value])
+  in CallNode(arguments:, block:) then assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in MethodCallNode(receiver:, arguments:, block:)
+    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in SafeMethodCallNode(receiver:, arguments:, block:)
+    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
+  in ArrayNode(elements:) then assigned_names_in_body(elements)
+  in HashNode(pairs:)
+    mutable found = []
+    pairs.each do |pair|
+      found += assigned_names_in(pair.key) + assigned_names_in(pair.value)
+    end
+    found
+  in BinaryNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
+  in LogicalNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
+  in UnaryNode(operand:) then assigned_names_in(operand)
+  in IndexNode(receiver:, index:) then assigned_names_in(receiver) + assigned_names_in(index)
+  in IndexUpdateNode(index: update_index, value: update_value)
+    assigned_names_in(update_index) + assigned_names_in(update_value)
+  in SlotCompoundNode(index: compound_index, right: compound_right)
+    assigned_names_in(compound_index) + assigned_names_in(compound_right)
+  in MatchAssertNode(subject:, pattern:) then assigned_names_in(subject) + pattern_names(pattern)
+  in MatchTestNode(subject: test_subject, pattern: test_pattern)
+    assigned_names_in(test_subject) + pattern_names(test_pattern)
+  in KeywordArgumentNode(value:) then assigned_names_in(value)
+  in EnumCaseNode(payload:)
+    mutable found = []
+    payload.each do |argument|
+      found += assigned_names_in(argument.value)
+    end
     found
   else
     []
   end
 end
 
-def returns_in_body(body, mutable types)
+def assigned_names_in_block(block)
+  return [] if block.nil?
+  assigned_names_in_body(block.body)
+end
+
+def assigned_names_in_body(body)
   return [] if body.nil?
   mutable found = []
   body.each do |statement|
-    found += return_types_in(statement, types)
-    types = bind_after(statement, types, [])
+    found += assigned_names_in(statement) unless statement.nil?
   end
   found
 end
 
-# Agreement answers the type; a lone nil among agreeing others makes a
-# maybe (the branch that answers nothing, ADR 0012); anything else is
-# unknown.
-def merge_candidates(candidates)
-  mutable unique = []
-  candidates.each do |candidate|
-    unique << candidate unless unique.include?(candidate)
-  end
-  if unique.length <= 1
-    only = unique.first or ["unknown"]
-    return only
-  end
-  if unique.length == 2 && unique.include?(["nil"])
-    other = unique.find { it != ["nil"] } or ["unknown"]
-    return maybe_of(other)
-  end
-  ["unknown"]
+# The bindings a statement leaves for the statements after it. `locals`
+# is the list written to; `globals` is read alongside it and never
+# written — the checker keeps the two apart, this file's own walks pass
+# one list and an empty other.
+def bind_after(statement, locals, globals)
+  # A match test anywhere in a statement — `hit = scores in [low, high]`,
+  # `if x in [head, tail]` — binds its captures below it (one_line_spec and
+  # capture_spec pin it), as unknowns: whether it hit is not the tree's to say.
+  bind_unknowns(bind_after_core(statement, locals, globals), condition_captures(statement))
 end
 
-def maybe_of(type)
-  return type if (type in ["maybe", *]) || type == ["nil"] || type == ["unknown"]
-  ["maybe", type]
-end
-
-# An if in value position (the ternary desugars here too, ADR 0046):
-# agreeing branches answer their type, an absent or nil branch makes a
-# maybe of the other. Each branch is read under what the condition proved
-# on its side (narrowings).
-def synthesize_if(node, types)
-  proof = narrowings(node.condition, types)
-  yes = branch_answer(node.then_body, when_true(proof) + types)
-  no = branch_answer(node.else_body, when_false(proof) + types)
-  merge_candidates([yes, no])
-end
-
-# A `case/in` in value position: the arms' answers must agree, each arm
-# read with its captures bound (arm_bindings). An absent else answers nil
-# (ADR 0012) — unless an unguarded bare capture makes the arms total.
-def synthesize_case_in(node, types)
-  mutable answers = []
-  mutable nil_seen = false
-  node.branches.each do |branch|
-    answers << synthesize_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
-    nil_seen = true if nil_arm?(branch)
+def bind_after_core(statement, locals, globals)
+  case statement
+  in AssignmentNode(name:, value:)
+    return locals if value.nil?
+    widened = forget_types(locals, assigned_names_in(value))
+    [[name, synthesize(value, widened + globals)]] + widened
+  in AppendNode(name:) then [[name, synthesize(statement, locals + globals)]] + locals
+  in MatchAssertNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
+  in MatchTestNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
+  in TogetherNode(lines:) then bind_unknowns(locals, task_line_names(lines))
+  # An `if` whose one branch always leaves is a guard: what its condition
+  # proved for the branch that stays holds below it (the first form —
+  # `return if x.nil?`, plain x after). A rebinding inside still wins.
+  in IfNode
+    guarded = guard_proof(statement, locals + globals) + locals
+    forget_types(guarded, assigned_names_in(statement))
+  # A `case/in` arm's captures outlive the case (capture_spec pins it), as
+  # unknowns — which arm ran is not the tree's to say.
+  in CaseInNode(branches:)
+    mutable captured = []
+    branches.each do |branch|
+      captured += pattern_names(branch.pattern)
+    end
+    bind_unknowns(forget_types(locals, assigned_names_in(statement)), captured)
+  else
+    forget_types(locals, assigned_names_in(statement))
   end
-  total = node.branches.any? { (it.pattern in IdentifierNode) && it.guard.nil? }
-  answers << branch_answer(node.else_body, types) unless node.else_body.nil? && total
-  merge_candidates(answers)
+end
+
+def bind_unknowns(locals, names)
+  mutable bound = locals
+  names.each do |name|
+    bound = [[name, ["unknown"]]] + bound
+  end
+  bound
+end
+
+def block_body(block)
+  return [] if block.nil?
+  block.body
+end
+
+# A block parameter's type, by the receiver and the method: the element
+# for most, a hash's key then value. `reduce` and `inject` bind the
+# accumulator first — its type is the initial argument's, or unknown
+# without one — and `each_with_index` the element then an integer. Found
+# by a fixture whose `reduce(0) { |count, line| count + … }` read `count`
+# as the element and refused a working `+`.
+def block_parameter_type(receiver, index, name, argument_types, parameter_count: 1)
+  if name == "reduce" || name == "inject"
+    return accumulator_type(argument_types) if index == 0
+    return element_type(receiver) if index == 1
+    return ["unknown"]
+  end
+  if name == "each_with_index"
+    return element_type(receiver) if index == 0
+    return ["integer"] if index == 1
+    return ["unknown"]
+  end
+  if receiver in ["hash", *]
+    # `each_value` and `transform_values` hand the value alone (#105).
+    return type_at(receiver, 2) if index == 0 && (name == "each_value" || name == "transform_values")
+    return type_at(receiver, 1) if index == 0
+    return type_at(receiver, 2) if index == 1
+    return ["unknown"]
+  end
+  # An arrangement handed over by the combinatorics (#104) is an array of
+  # the receiver's elements.
+  if index == 0 && (receiver in ["array", *]) && %w[combination repeated_combination permutation repeated_permutation product].include?(name)
+    return receiver
+  end
+  # A neighbouring pair (#110): chunk_while and slice_when hand two
+  # elements, not one spread.
+  if (receiver in ["array", *]) && (name == "chunk_while" || name == "slice_when")
+    return element_type(receiver) if index <= 1
+    return ["unknown"]
+  end
+  # A spreading block (ADR 0057): two or more parameters over a method
+  # that yields one value take the element's own elements.
+  if parameter_count >= 2
+    element = element_type(receiver)
+    return type_at(element, 1) if element in ["array", *]
+    return ["unknown"]
+  end
+  return ["unknown"] unless index == 0
+  element_type(receiver)
+end
+
+# A body that always leaves: its last statement returns, panics, or steps
+# out of a loop.
+def body_exits?(body)
+  return false if body.nil? || body.empty?
+  exit?(body.last)
 end
 
 def branch_answer(body, types)
@@ -325,225 +340,55 @@ def branch_answer(body, types)
   synthesize_body(body, types)
 end
 
-# `name << value` (3b): the append that first fills an empty literal names
-# its element type — `mutable box = []` then `box << 3` reads as
-# [Integer]. Strings stay strings; a disagreeing element widens back to
-# unknown elements.
-def synthesize_append(node, types)
-  current = synthesize_name(node.name, types)
-  return ["string"] if current == ["string"]
-  value = synthesize(node.value, types)
-  return ["array", value] if current == ["array", ["unknown"]]
-  return current if (current in ["array", *]) && type_at(current, 1) == value
-  return ["array", ["unknown"]] if current in ["array", *]
-  ["unknown"]
+# An entry's arity as [low, high], or nil where the type has no such name.
+def builtin_arity(type, name)
+  table = builtin_table(type)
+  return nil if table.nil?
+  entry = table.find { entry_name(it) == name }
+  return nil if entry.nil?
+  arity = entry.split("/").last.split("&").first
+  # A trailing `+` takes any number from there (`values_at/0+`).
+  return [arity.slice(0, arity.length - 1).to_i, 9223372036854775807] if arity.end_with?("+")
+  bounds = arity.split("-").map { it.to_i }
+  [bounds.first, bounds.last]
 end
 
-def synthesize_identifier(node, types)
-  synthesize_name(node.name, types)
+# The names alone, for membership.
+def builtin_methods(type)
+  table = builtin_table(type)
+  return nil if table.nil?
+  table.map { entry_name(it) }
 end
 
-# A range carries its ends' type (ADR 0081) — the start's, or the end's for
-# a beginless range — which is what its extremes and its walk answer.
-def synthesize_range(node, types)
-  side = node.start.nil? ? node.finish : node.start
-  return ["range", ["unknown"]] if side.nil?
-  ["range", synthesize(side, types)]
-end
-
-def synthesize_name(name, types)
-  found = types.find { it[0] == name }
-  # A builtin type's bare name is the type as a value (ADR 0074).
-  return ["type", name] if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
-  return ["unknown"] if found.nil?
-  type_at(found, 1)
-end
-
-def synthesize_bare_call(node, types)
-  return ["string"] if (node.name == "format" || node.name == "sprintf") && synthesize_name(node.name, types) == ["unknown"]
-  # `inspect(value)` answers a value's source form, a String (#501).
-  return ["string"] if node.name == "inspect" && node.arguments.length == 1 && synthesize_name(node.name, types) == ["unknown"]
-  # The tower's constructors (ADR 0085) answer their values, not the type
-  # a bare `Rational` names.
-  return ["rational"] if node.name == "Rational" && synthesize_name(node.name, types) == ["type", "Rational"]
-  return ["complex"] if node.name == "Complex" && synthesize_name(node.name, types) == ["type", "Complex"]
-  synthesize_name(node.name, types)
-end
-
-# The arithmetic and comparison operators, ADR 0018's shapes: whole numbers
-# stay whole, one float anywhere makes a float, comparisons answer booleans.
-def synthesize_binary(node, types)
-  left = opened_natively(synthesize(node.left, types), types)
-  right = opened_natively(synthesize(node.right, types), types)
-  case node.operator
-  when "==", "!=", "<", "<=", ">", ">=" then ["boolean"]
-  # `<=>` (ADR 0054) answers -1, 0, or 1 on what it orders; a struct's own
-  # `<=>` is a call, and unknown here.
-  when "<=>"
-    return ["integer"] if numeric?(left) && numeric?(right)
-    return ["integer"] if left == ["string"] && right == ["string"]
-    return ["integer"] if left == ["symbol"] && right == ["symbol"]
-    return ["integer"] if (left in ["array", *]) && (right in ["array", *])
-    ["unknown"]
-  when "+", "-", "*", "%"
-    return tower_answer(left, right) if numeric?(left) && numeric?(right)
-    return ["string"] if left == ["string"] && right == ["string"]
-    return left if (left in ["array", *]) && (right in ["array", *])
-    # A set's union and difference answer a set (ADR 0082).
-    return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
-    ["unknown"]
-  when "/"
-    return ["integer"] if left == ["integer"] && right == ["integer"]
-    return tower_answer(left, right) if numeric?(left) && numeric?(right)
-    ["unknown"]
-  when "**"
-    power_answer(left, right)
+# — the builtin method table (#88) —
+#
+# What each builtin receiver answers, with what: `include?/1`, `slice/2`,
+# `first/0-1`, `each/0&` (block-taking). Derived from the seed's *behavior*
+# by script/probe_builtin_methods rather than from a reading of its Rust —
+# run the script and paste, so the seed stays the oracle (principle 7) and
+# the spec suite, which exercises every builtin, stands guard over a name
+# gone missing. The seed reads these same lines at build for its own
+# wordings, so this is the table's one home. The names every value
+# answers are in each list; nil is left out on purpose, the runtime's own
+# sentence handling it.
+def builtin_table(type)
+  case type
+  in ["string"] then %w[!~/1 =~/1 ascii_only?/0 between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0-1 chop/0 chr/0 clamp/1-2 class/0 codepoints/0 count/1 delete/1+ delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0-1& empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1-2 intern/0 length/0 lines/0-1 ljust/1-2 lstrip/0 match/1-2& match?/1-2 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 scan/1& size/0 slice/1-2 some?/0 split/0-2& squeeze/0+ start_with?/0+ strip/0 sub/1-2& succ/0 swapcase/0 to_c/0 to_f/0 to_i/0-1 to_r/0 to_s/0 to_sym/0 tr/2 tr_s/2 unicode_normalize/0-1 unicode_normalized?/0-1 upcase/0 upto/1-2& valid_encoding?/0]
+  in ["integer"] then %w[abs/0 abs2/0 allbits?/1 angle/0 anybits?/1 arg/0 between?/2 bit_and/1 bit_count/0 bit_length/0 bit_not/0 bit_or/1 bit_xor/1 ceil/0-1 ceildiv/1 chr/0-1 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 digits/0-1 div/1 divmod/1 downto/1& eql?/1 even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 i/0 imag/0 imaginary/0 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 nobits?/1 numerator/0 odd?/0 ord/0 phase/0 polar/0 positive?/0 pow/1 pred/0 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0-1 shift_left/1 shift_right/1 size/0 some?/0 step/1-2& succ/0 times/0& to_c/0 to_f/0 to_i/0 to_r/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
+  in ["float"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 prev_float/0 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
+  in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
+  in ["symbol"] then %w[!~/1 =~/1 capitalize/0 class/0 downcase/0 empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 id2name/0 intern/0 length/0 match/1-2& match?/1-2 name/0 next/0 nil?/0 size/0 slice/1-2 some?/0 start_with?/0+ succ/0 swapcase/0 to_s/0 to_sym/0 upcase/0]
+  in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
+  in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
+  in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
+  in ["range", *] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
+  in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
+  in ["rational"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 modulo/1 negative?/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
+  in ["complex"] then %w[abs/0 abs2/0 angle/0 arg/0 class/0 conj/0 conjugate/0 denominator/0 eql?/1 failure?/0 fdiv/1 finite?/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 nil?/0 numerator/0 phase/0 polar/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 zero?/0]
+  in ["regexp"] then %w[!~/1 =~/1 casefold?/0 class/0 eql?/1 failure?/0 match/1-2& match?/1-2 named_captures/0 names/0 nil?/0 options/0 some?/0 source/0 to_s/0]
+  in ["matchdata"] then %w[begin/1 captures/0 class/0 end/1 eql?/1 failure?/0 length/0 match/1 match_length/1 named_captures/0 names/0 nil?/0 offset/1 post_match/0 pre_match/0 regexp/0 size/0 some?/0 string/0 to_a/0 to_s/0 values_at/0+]
   else
-    ["unknown"]
-  end
-end
-
-def synthesize_logical(node, types)
-  left = synthesize(node.left, types)
-  # The right side is read under what the left proved — `x.some? && x + 1`
-  # sees a plain x; `x.nil? || x + 1` likewise.
-  proof = narrowings(node.left, types)
-  right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
-  right = synthesize(node.right, right_types)
-  return left if left == right
-  return ["unknown"] unless left in ["maybe", *]
-  # `maybe or default` answers the plain type when the default is one of
-  # it, and `maybe or return` the plain type outright — below the guard
-  # the name is plain (the third form of ADR 0040 §3). Anything else is
-  # an opinion withheld.
-  inner = type_at(left, 1)
-  return inner if exit?(node.right)
-  return inner if right == inner
-  ["unknown"]
-end
-
-def synthesize_unary(node, types)
-  operand = synthesize(node.operand, types)
-  return ["boolean"] if node.operator == "!"
-  return operand if numeric?(operand)
-  ["unknown"]
-end
-
-# The four floors of the tower (ADR 0085).
-def numeric?(type)
-  type == ["integer"] || type == ["float"] || type == ["rational"] || type == ["complex"]
-end
-
-# The three that order: a complex has no `<`.
-def real_numeric?(type) = numeric?(type) && type != ["complex"]
-
-# Ruby's contagion for two numbers: anything with a complex is a complex, a
-# float wins over a rational, a rational over an integer.
-# What a base raised to an exponent answers, for `**` and `pow` alike
-# (#294). Integer bases with integer exponents stay integers (ADR 0033,
-# edges refuse at runtime), a complex on either side answers a complex,
-# and a float or a rational raised to a whole number keeps its kind. Every
-# other pair depends on the values — a negative base to a fractional
-# power is a complex, a root may be a float — so it answers unknown.
-def power_answer(base, exponent)
-  return ["unknown"] unless numeric?(base) && numeric?(exponent)
-  return ["complex"] if base == ["complex"] || exponent == ["complex"]
-  return base if exponent == ["integer"]
-  ["unknown"]
-end
-
-# What `fdiv` answers: a float between reals, and a complex where a
-# complex is on either side of a float (#294). An integer or a rational
-# divided by a complex refuses when it runs, so it has no type.
-def fdiv_answer(receiver, argument)
-  return ["unknown"] unless numeric?(receiver) && numeric?(argument)
-  return ["complex"] if receiver == ["complex"]
-  return receiver == ["float"] ? ["complex"] : ["unknown"] if argument == ["complex"]
-  ["float"]
-end
-
-def tower_answer(left, right)
-  return ["complex"] if left == ["complex"] || right == ["complex"]
-  return ["float"] if left == ["float"] || right == ["float"]
-  return ["rational"] if left == ["rational"] || right == ["rational"]
-  ["integer"]
-end
-
-# Builtin results, by receiver type and name — the signatures the evaluator
-# already lives by, read back as types. Partial lookups answer maybes
-# (ADR 0040 §3). Unlisted names answer unknown, never an error.
-def synthesize_call(node, types)
-  return type_function_answer(node) if builtin_type_function?(node, types)
-  receiver = synthesize(node.receiver, types)
-  # `nil?` and `some?` are asked of the maybe itself; every other method
-  # is asked of its value.
-  asked = %w[nil? some?].include?(node.name) ? receiver : opened_natively(receiver, types)
-  call_answer(asked, node, types)
-end
-
-# `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
-# form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
-def synthesize_safe_call(node, types)
-  return type_function_answer(node) if builtin_type_function?(node, types)
-  receiver = synthesize(node.receiver, types)
-  plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
-  maybe_of(call_answer(plain, node, types))
-end
-
-# What a type function answers, the same on a plain call and behind `&.`
-# (#181). A name no type function has answers unknown, never an
-# error; the evaluator refuses it.
-def type_function_answer(node) = type_function_answer_for(node.receiver.name, node.name)
-
-# `Math` (ADR 0083): the total functions answer a Float; one that may answer
-# a domain failure is unknown, as every fallible builtin is; `frexp` and
-# `lgamma` answer a pair.
-def math_answer(name)
-  return ["array", ["unknown"]] if name == "frexp" || name == "lgamma"
-  return ["unknown"] if %w[acos acosh asin atanh gamma log log10 log1p log2 sqrt].include?(name)
-  return ["float"] if %w[atan atan2 cbrt cos cosh erf erfc exp expm1 hypot ldexp sin sinh tan tanh asinh].include?(name)
-  ["unknown"]
-end
-
-# The same answers reached through a type value, `value.class.new` (ADR
-# 0074), where there is no receiver node to read the type's name from.
-def type_function_answer_for(type_name, name)
-  return math_answer(name) if type_name == "Math"
-  case name
-  when "sqrt"                              then ["integer"]
-  when "arguments"                         then ["array", ["string"]]
-  when "wall_clock_time", "monotonic_time" then ["integer"]
-  when "entropy"                           then ["array", ["integer"]]
-  # The two captures answer the text the block wrote (#251).
-  when "capture_standard_output", "capture_standard_error" then if type_name == "System" then ["string"] else ["unknown"] end
-  # `JSON.parse` answers the document's shape, which is unknown; the two
-  # writers answer text (ADR 0072).
-  when "generate", "pretty_generate"       then ["string"]
-  # The bracketed type functions: `Set[a, b]` (ADR 0082), and `Array[a, b]`
-  # and `Hash[...]` (ADR 0058, amended, #218).
-  when "[]"
-    case type_name
-    when "Set"   then ["set"]
-    when "Array" then ["array", ["unknown"]]
-    when "Hash"  then ["hash", ["unknown"], ["unknown"]]
-    else ["unknown"]
-    end
-  # `Complex.polar` and `Complex.rectangular` (ADR 0085).
-  when "polar", "rect", "rectangular"     then if type_name == "Complex" then ["complex"] else ["unknown"] end
-  # `Regexp.escape` answers text, `Regexp.union` a pattern (ADR 0086).
-  when "escape", "quote"                  then if type_name == "Regexp" then ["string"] else ["unknown"] end
-  when "union"                            then if type_name == "Regexp" then ["regexp"] else ["unknown"] end
-  when "linear_time?"                     then if type_name == "Regexp" then ["boolean"] else ["unknown"] end
-  when "new"
-    case type_name
-    when "Hash"   then ["hash", ["unknown"], ["unknown"]]
-    when "Random" then ["random"]
-    when "Regexp" then ["regexp"]
-    when "Range"  then ["range", ["unknown"]]
-    when "Set"    then ["set"]
-    else ["array", ["unknown"]]
-    end
-  else ["unknown"]
+    nil
   end
 end
 
@@ -682,12 +527,51 @@ def call_answer(receiver, node, types)
   end
 end
 
-# An array of arrays flattened all the way: an array of the innermost
-# element type.
-def flattened_type(receiver)
-  element = type_at(receiver, 1)
-  return flattened_type(element) if element in ["array", *]
-  ["array", element]
+# A node's direct children — every expression and statement it holds,
+# blocks and branches included, patterns excluded — for a walk that looks
+# for something anywhere inside a body. Defs, structs, traits, and modules
+# are not descended into: their bodies bind their own names.
+def children_of(node)
+  case node
+  in AssignmentNode(value:) then [value]
+  in AppendNode(value:) then [value]
+  in WhileNode(condition:, body:) then [condition] + body
+  in IfNode(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
+  in CaseNode(subject:, branches:, else_body:)
+    mutable found = [subject]
+    branches.each do |branch|
+      found += branch.values + branch.body
+    end
+    found + (else_body or [])
+  in CaseInNode(subject:, branches:, else_body:)
+    mutable found = [subject]
+    branches.each do |branch|
+      found << branch.guard unless branch.guard.nil?
+      found += branch.body
+    end
+    found + (else_body or [])
+  in TogetherNode(lines:) then lines.map { if it in TaskLineNode then it.value else it end }
+  in ReturnNode(value:) then [value]
+  in CallNode(arguments:, block:) then arguments + block_body(block)
+  in MethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
+  in SafeMethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
+  in ArrayNode(elements:) then elements
+  in HashNode(pairs:) then pairs.map { it.key } + pairs.map { it.value }
+  in BinaryNode(left:, right:) then [left, right]
+  in LogicalNode(left:, right:) then [left, right]
+  in UnaryNode(operand:) then [operand]
+  in IndexNode(receiver:, index:) then [receiver, index]
+  in IndexUpdateNode(index: update_index, value: update_value) then [update_index, update_value]
+  in SlotCompoundNode(index: compound_index, right: compound_right) then [compound_index, compound_right]
+  in MatchAssertNode(subject:) then [subject]
+  in MatchTestNode(subject: test_subject) then [test_subject]
+  in KeywordArgumentNode(value:) then [value]
+  in YieldNode(values:) then values
+  in CaseEqualNode(pattern:, subject:) then [pattern, subject]
+  in EnumCaseNode(payload:) then payload.map { it.value }
+  else
+    []
+  end
 end
 
 # The four names every value answers, and nothing else, on a receiver
@@ -715,68 +599,563 @@ def class_answer(receiver)
   end
 end
 
-def universal_answer(name)
-  return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
-  return ["string"] if name == "to_s"
+# `x == nil` and `x != nil`, either way round.
+def comparison_proof(node, types)
+  return no_proof unless node.operator == "==" || node.operator == "!="
+  name = nil_comparison_name(node.left, node.right)
+  return no_proof if name.nil?
+  inner = maybe_inner(name, types)
+  return no_proof if inner.nil?
+  return [[[name, ["nil"]]], [[name, inner]]] if node.operator == "=="
+  [[[name, inner]], [[name, ["nil"]]]]
+end
+
+# The names every match test anywhere in an expression captures.
+def condition_captures(node)
+  return [] if node.nil?
+  mutable names = []
+  names += pattern_names(node.pattern) if node in MatchTestNode
+  children_of(node).each do |child|
+    names += condition_captures(child)
+  end
+  names
+end
+
+def def_line_for?(line, name)
+  stripped = line.strip
+  prefix = "def #{name}"
+  return false unless stripped.start_with?(prefix)
+  return true if stripped == prefix
+  boundary = stripped.slice(prefix.length, 1)
+  boundary == "(" || boundary == " " || boundary == "="
+end
+
+def demand_of(node, name)
+  if (node in MethodCallNode) || (node in SafeMethodCallNode)
+    return "." + node.name if names?(node.receiver, name)
+    return nil
+  end
+  if node in BinaryNode
+    return node.operator if names?(node.left, name) || names?(node.right, name)
+    return nil
+  end
+  return node.operator if (node in UnaryNode) && names?(node.operand, name)
+  return "[]" if (node in IndexNode) && names?(node.receiver, name)
+  nil
+end
+
+def demands_in(nodes, name)
+  mutable found = []
+  nodes.each do |node|
+    found = add_demands(node, name, found)
+  end
+  found
+end
+
+def element_type(receiver)
+  return type_at(receiver, 1) if receiver in ["array", *]
+  return type_at(receiver, 1) if receiver in ["range", *]
   ["unknown"]
 end
 
-def synthesize_numeric_answer(receiver, name, arguments_empty: true)
-  case name
-  when "abs", "magnitude", "succ", "pred", "next", "gcd"
-    # A complex's magnitude is a real: a float off the axes, the part's
-    # own kind on them, so no one type to answer.
-    return ["unknown"] if receiver == ["complex"] && (name == "abs" || name == "magnitude")
-    return receiver if numeric?(receiver)
-    return ["integer"] if name == "gcd"
-    # A string's or a symbol's successor is another of the same (ADR 0071).
-    return receiver if (receiver == ["string"] || receiver == ["symbol"]) && (name == "succ" || name == "next")
-    ["unknown"]
-  when "index", "find_index", "rindex"
-    return ["maybe", ["integer"]] if receiver == ["string"] || (receiver in ["array", *])
-    ["unknown"]
-  when "sum"
-    # Whole numbers stay whole; anything else about the elements is 3b,
-    # and an init (`sum(0.5)`, `sum("")`) is the caller's to say.
-    return ["integer"] if receiver == ["array", ["integer"]] && arguments_empty
-    ["unknown"]
-  when "to_i", "floor", "ceil", "round", "truncate", "div", "ceildiv" then ["integer"]
+def entry_name(entry) = entry.split("/").first
+
+def exit?(node)
+  case node
+  in ReturnNode | BreakNode | NextNode then true
+  in CallNode(name:) then name == "panic"
   else
-    ["integer"]
+    false
   end
 end
 
-def synthesize_text_answer(receiver, name)
-  return ["string"] if name == "to_s" || name == "join" || name == "inspect" || name == "chr"
-  return ["string"] if receiver == ["string"]
-  # A symbol's case changers answer a symbol (ADR 0071).
-  return ["symbol"] if receiver == ["symbol"]
-  return receiver if receiver in ["array", *]
+# What `fdiv` answers: a float between reals, and a complex where a
+# complex is on either side of a float (#294). An integer or a rational
+# divided by a complex refuses when it runs, so it has no type.
+def fdiv_answer(receiver, argument)
+  return ["unknown"] unless numeric?(receiver) && numeric?(argument)
+  return ["complex"] if receiver == ["complex"]
+  return receiver == ["float"] ? ["complex"] : ["unknown"] if argument == ["complex"]
+  ["float"]
+end
+
+# An array of arrays flattened all the way: an array of the innermost
+# element type.
+def flattened_type(receiver)
+  element = type_at(receiver, 1)
+  return flattened_type(element) if element in ["array", *]
+  ["array", element]
+end
+
+# A name already bound, rebound somewhere inside a nested body, is unknown
+# from here on. A name new to that body dies with it (ADR 0001) and needs
+# nothing.
+def forget_types(locals, names)
+  mutable widened = locals
+  names.each do |name|
+    next if locals.none? { it[0] == name }
+    widened = [[name, ["unknown"]]] + widened
+  end
+  widened
+end
+
+# What holds below an `if` whose one branch always leaves: the proof for
+# the branch that stays. Nothing where both leave, or neither.
+def guard_proof(node, types)
+  proof = narrowings(node.condition, types)
+  then_exits = body_exits?(node.then_body)
+  else_exits = body_exits?(node.else_body)
+  return when_false(proof) if then_exits && !else_exits
+  return when_true(proof) if else_exits && !then_exits
+  []
+end
+
+# Each top-level def's parameters, as [name, entry] pairs — an entry is a
+# type where a default gives one, or ["needs", demands].
+def infer_contracts(nodes)
+  types = scan_program(nodes)
+  mutable contracts = []
+  nodes.each do |node|
+    next unless node in DefNode
+    entries = node.parameters.map { [it.name, parameter_entry(it, node.body, types)] }
+    contracts << [node.name, entries]
+  end
+  contracts
+end
+
+def infer_methods(nodes)
+  ordered_pairs(nodes, scan_program(nodes), "def")
+end
+
+# The entry points: [name, type] pairs in first-appearance order — the
+# program's top-level bindings, and (3b) its top-level defs' return types.
+# One scan feeds both. A method's name can share the list with the locals
+# because the no-shadow rule already promises a name is never both.
+def infer_program(nodes)
+  ordered_pairs(nodes, scan_program(nodes), "assignment")
+end
+
+# `Math` (ADR 0083): the total functions answer a Float; one that may answer
+# a domain failure is unknown, as every fallible builtin is; `frexp` and
+# `lgamma` answer a pair.
+def math_answer(name)
+  return ["array", ["unknown"]] if name == "frexp" || name == "lgamma"
+  return ["unknown"] if %w[acos acosh asin atanh gamma log log10 log1p log2 sqrt].include?(name)
+  return ["float"] if %w[atan atan2 cbrt cos cosh erf erfc exp expm1 hypot ldexp sin sinh tan tanh asinh].include?(name)
   ["unknown"]
 end
 
-def synthesize_shape_answer(receiver, name)
-  case name
-  when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection"
-    return receiver if receiver in ["array", *]
-    # A set's algebra answers a set; its Enumerable walks answer arrays
-    # (ADR 0082), as Ruby's do.
-    return receiver if receiver == ["set"] && %w[difference flatten intersection].include?(name)
-    return ["array", ["unknown"]] if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
-    # A hash's compact and slice answer a hash (#105).
-    return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
-    return ["string"] if receiver == ["string"] && name == "slice"
+# The plain type under a maybe-typed name, or nil for anything else.
+def maybe_inner(name, types)
+  found = synthesize_name(name, types)
+  return nil unless found in ["maybe", *]
+  type_at(found, 1)
+end
+
+def maybe_of(type)
+  return type if (type in ["maybe", *]) || type == ["nil"] || type == ["unknown"]
+  ["maybe", type]
+end
+
+# Agreement answers the type; a lone nil among agreeing others makes a
+# maybe (the branch that answers nothing, ADR 0012); anything else is
+# unknown.
+def merge_candidates(candidates)
+  mutable unique = []
+  candidates.each do |candidate|
+    unique << candidate unless unique.include?(candidate)
+  end
+  if unique.length <= 1
+    only = unique.first or ["unknown"]
+    return only
+  end
+  if unique.length == 2 && unique.include?(["nil"])
+    other = unique.find { it != ["nil"] } or ["unknown"]
+    return maybe_of(other)
+  end
+  ["unknown"]
+end
+
+def names?(node, name) = (node in IdentifierNode) && node.name == name
+
+def narrowings(condition, types)
+  proof = proof_of(condition, types)
+  # A match test in a condition — `if x in [head, tail]` — binds its
+  # captures on both sides, since the runtime binds them regardless.
+  captured = condition_captures(condition).map { [it, ["unknown"]] }
+  [captured + when_true(proof), captured + when_false(proof)]
+end
+
+def native_reading?(types) = types.any? { it[0] == NATIVE_READING }
+
+def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
+
+def nil_comparison_name(left, right)
+  return left.name if (left in IdentifierNode) && (right in NilNode)
+  return right.name if (right in IdentifierNode) && (left in NilNode)
+  nil
+end
+
+def no_proof = [[], []]
+
+# The four floors of the tower (ADR 0085).
+def numeric?(type)
+  type == ["integer"] || type == ["float"] || type == ["rational"] || type == ["complex"]
+end
+
+# A maybe as the native build reads it where its value is needed.
+def opened_natively(type, types)
+  return type unless (type in ["maybe", *]) && native_reading?(types)
+  type_at(type, 1)
+end
+
+def ordered_pairs(nodes, types, kind)
+  mutable seen = []
+  mutable ordered = []
+  nodes.each do |node|
+    next unless node.kind == kind
+    next if seen.include?(node.name)
+    seen << node.name
+    found = types.find { it[0] == node.name }
+    ordered << [node.name, type_at(found, 1)]
+  end
+  ordered
+end
+
+def parameter_entry(parameter, body, types)
+  typed = parameter_type(parameter, types)
+  return typed unless typed == ["unknown"]
+  ["needs", demands_in(body, parameter.name)]
+end
+
+def parameter_type(parameter, types)
+  if (parameter in AssignmentNode) && parameter.value.some?
+    return synthesize(parameter.value, types)
+  end
+  if (parameter in KeywordParameterNode) && parameter.default.some?
+    return synthesize(parameter.default, types)
+  end
+  ["unknown"]
+end
+
+# The names a pattern captures. Every capture is a plain identifier, a
+# pin reads rather than binds, and the shapes hold sub-patterns.
+def pattern_names(pattern)
+  case pattern
+  # A `_`-prefixed name binds nothing (ADR 0080).
+  in IdentifierNode(name:) then if name.start_with?("_") then [] else [name] end
+  in BindingPatternNode(pattern: inner, name:) then pattern_names(inner) + [name]
+  in HashPatternNode(pairs:, rest_kind:, rest_name:)
+    mutable found = []
+    pairs.each do |pair|
+      found += pattern_names(pair[1])
+    end
+    found << rest_name if rest_kind == "bind"
+    found
+  in AlternativePatternNode(options:)
+    mutable found = []
+    options.each do |option|
+      found += pattern_names(option)
+    end
+    found
+  in ArrayPatternNode(elements:, rest_name:)
+    mutable found = []
+    elements.each do |element|
+      found += pattern_names(element)
+    end
+    found << rest_name unless rest_name.nil?
+    found
+  in StructPatternNode(fields:)
+    mutable found = []
+    fields.each do |field|
+      found += pattern_names(field[1])
+    end
+    found
+  in EnumCasePatternNode(payload:)
+    mutable found = []
+    payload.each do |entry|
+      found += pattern_names(entry[1])
+    end
+    found
+  else
+    []
+  end
+end
+
+# Ruby's contagion for two numbers: anything with a complex is a complex, a
+# float wins over a rational, a rational over an integer.
+# What a base raised to an exponent answers, for `**` and `pow` alike
+# (#294). Integer bases with integer exponents stay integers (ADR 0033,
+# edges refuse at runtime), a complex on either side answers a complex,
+# and a float or a rational raised to a whole number keeps its kind. Every
+# other pair depends on the values — a negative base to a fractional
+# power is a complex, a root may be a float — so it answers unknown.
+def power_answer(base, exponent)
+  return ["unknown"] unless numeric?(base) && numeric?(exponent)
+  return ["complex"] if base == ["complex"] || exponent == ["complex"]
+  return base if exponent == ["integer"]
+  ["unknown"]
+end
+
+# `x.some?` and `x.nil?` on a maybe-typed name.
+def predicate_proof(node, types)
+  return no_proof unless node.arguments.empty? && node.block.nil?
+  return no_proof unless node.receiver in IdentifierNode
+  name = node.receiver.name
+  inner = maybe_inner(name, types)
+  return no_proof if inner.nil?
+  return [[[name, inner]], [[name, ["nil"]]]] if node.name == "some?"
+  return [[[name, ["nil"]]], [[name, inner]]] if node.name == "nil?"
+  no_proof
+end
+
+def proof_of(condition, types)
+  case condition
+  in MethodCallNode then predicate_proof(condition, types)
+  in BinaryNode then comparison_proof(condition, types)
+  in UnaryNode(operator:, operand:)
+    return no_proof unless operator == "!"
+    proof = proof_of(operand, types)
+    [when_false(proof), when_true(proof)]
+  in LogicalNode(operator:, left:, right:)
+    left_proof = proof_of(left, types)
+    right_proof = proof_of(right, types)
+    return [when_true(left_proof) + when_true(right_proof), []] if operator == "&&"
+    return [[], when_false(left_proof) + when_false(right_proof)] if operator == "||"
+    no_proof
+  else
+    no_proof
+  end
+end
+
+# The three that order: a complex has no `<`.
+def real_numeric?(type) = numeric?(type) && type != ["complex"]
+
+# A struct declaration binds its name to its type — what `new` is called
+# on — and each type function (`def self.unit`, ADR 0031) under the dotted
+# name `Order.unit`, which no identifier can spell, so the one list holds
+# both. The checker's program-wide scan registers structs the same way.
+def register_struct(node, mutable types)
+  types = [[node.name, ["type", node.name]]] + types
+  node.type_functions.each do |function|
+    next unless function in DefNode
+    types = [[node.name + "." + function.name, synthesize_def_return(function, types)]] + types
+  end
+  types
+end
+
+# How a type is written back out, for the debug driver. This rendering is
+# NOT ratified surface — the error-voice decision owns the real spelling —
+# it is the plainest thing that could work in a dump.
+def render_type(type)
+  case type
+  in ["array", element] then "[" + render_type(element) + "]"
+  in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
+  in ["maybe", inner] then render_type(inner) + "?"
+  in ["struct", name] then name
+  in ["type", name] then name
+  in ["enum", name] then name
+  # Ruby's own capitals (ADR 0086).
+  in ["matchdata"] then "MatchData"
+  else
+    label = type_at(type, 0)
+    label.slice(0, 1).upcase + label.slice(1, label.length - 1)
+  end
+end
+
+def return_answer(statement, types)
+  return ["nil"] if statement.value.nil?
+  synthesize(statement.value, types)
+end
+
+# Every `return`'s type inside a statement, walking the branching forms.
+def return_types_in(node, types)
+  case node
+  in ReturnNode then [return_answer(node, types)]
+  in IfNode
+    proof = narrowings(node.condition, types)
+    mutable found = []
+    found += returns_in_body(node.then_body, when_true(proof) + types)
+    found += returns_in_body(node.else_body, when_false(proof) + types)
+    found
+  # A loop body may have run before any statement in it is read again, so
+  # it is walked with its own rebindings already forgotten.
+  in WhileNode then returns_in_body(node.body, forget_types(types, assigned_names_in_body(node.body)))
+  in CaseNode
+    mutable found = []
+    node.branches.each do |branch|
+      found += returns_in_body(branch.body, types)
+    end
+    found += returns_in_body(node.else_body, types)
+    found
+  in CaseInNode
+    mutable found = []
+    mutable nil_seen = false
+    node.branches.each do |branch|
+      found += returns_in_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+      nil_seen = true if nil_arm?(branch)
+    end
+    found += returns_in_body(node.else_body, types)
+    found
+  else
+    []
+  end
+end
+
+def returns_in_body(body, mutable types)
+  return [] if body.nil?
+  mutable found = []
+  body.each do |statement|
+    found += return_types_in(statement, types)
+    types = bind_after(statement, types, [])
+  end
+  found
+end
+
+def scan_program(nodes)
+  mutable types = []
+  nodes.each do |node|
+    if node in DefNode
+      types = [[node.name, synthesize_def_return(node, types)]] + types
+    elsif node in StructDefNode
+      types = register_struct(node, types)
+    elsif node in EnumDefNode
+      # Recorded so a later increment can hang membership and
+      # exhaustiveness off the name; nothing reads it yet.
+      types = [[node.name, ["enum", node.name]]] + types
+    else
+      types = bind_after(node, types, [])
+    end
+  end
+  types
+end
+
+def signature_continues?(line)
+  stripped = line.strip
+  stripped.end_with?(",") || stripped.end_with?("(")
+end
+
+def signature_end_line(lines, mutable index)
+  while index + 1 < lines.length && signature_continues?(lines[index])
+    index += 1
+  end
+  line = lines[index] or ""
+  line
+end
+
+def statement_answer(statement, types)
+  return synthesize(statement.value, types) if statement in AssignmentNode
+  return return_answer(statement, types) if statement in ReturnNode
+  synthesize(statement, types)
+end
+
+# Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
+# checking mode is 3b): every arm answers what it can prove from the node
+# alone plus the bindings already typed.
+def synthesize(node, types)
+  case node
+  in IntegerNode then ["integer"]
+  in FloatNode then ["float"]
+  in RationalNode then ["rational"]
+  in ImaginaryNode then ["complex"]
+  # Interpolation needs no arm: it desugared to a `+` chain of strings at
+  # parse, and the binary rule answers string for string + string.
+  in StringNode then ["string"]
+  in BooleanNode then ["boolean"]
+  in SymbolNode then ["symbol"]
+  in NilNode then ["nil"]
+  in RangeNode then synthesize_range(node, types)
+  in WordArrayNode then ["array", ["string"]]
+  in SymbolArrayNode then ["array", ["symbol"]]
+  in ArrayNode then synthesize_array(node, types)
+  in HashNode then synthesize_hash(node, types)
+  in IdentifierNode then synthesize_identifier(node, types)
+  in BinaryNode then synthesize_binary(node, types)
+  in LogicalNode then synthesize_logical(node, types)
+  in UnaryNode then synthesize_unary(node, types)
+  in MethodCallNode then synthesize_call(node, types)
+  in SafeMethodCallNode then synthesize_safe_call(node, types)
+  # A bare call reaches a def the scan already typed (3b); its name shares
+  # the list with the locals under the no-shadow rule. `format` and
+  # `sprintf` (ADR 0067) answer a string.
+  in CallNode then synthesize_bare_call(node, types)
+  in IfNode then synthesize_if(node, types)
+  in CaseInNode then synthesize_case_in(node, types)
+  in AppendNode then synthesize_append(node, types)
+  # A `yield` is what the block answers, which only the native build's
+  # pinning says (#493), under a name no local can have. The checker
+  # binds none, and reads unknown.
+  in YieldNode then synthesize_name("yield", types)
+  in IndexNode then synthesize_index(node, types)
+  else
     ["unknown"]
-  when "merge"
-    return receiver if receiver in ["hash", *]
+  end
+end
+
+# `name << value` (3b): the append that first fills an empty literal names
+# its element type — `mutable box = []` then `box << 3` reads as
+# [Integer]. Strings stay strings; a disagreeing element widens back to
+# unknown elements.
+def synthesize_append(node, types)
+  current = synthesize_name(node.name, types)
+  return ["string"] if current == ["string"]
+  value = synthesize(node.value, types)
+  return ["array", value] if current == ["array", ["unknown"]]
+  return current if (current in ["array", *]) && type_at(current, 1) == value
+  return ["array", ["unknown"]] if current in ["array", *]
+  ["unknown"]
+end
+
+def synthesize_array(node, types)
+  return ["array", ["unknown"]] if node.elements.empty?
+  first = synthesize(node.elements.first, types)
+  mutable uniform = true
+  node.elements.each do |element|
+    uniform = false unless synthesize(element, types) == first
+  end
+  return ["array", first] if uniform
+  ["array", ["unknown"]]
+end
+
+def synthesize_bare_call(node, types)
+  return ["string"] if (node.name == "format" || node.name == "sprintf") && synthesize_name(node.name, types) == ["unknown"]
+  # `inspect(value)` answers a value's source form, a String (#501).
+  return ["string"] if node.name == "inspect" && node.arguments.length == 1 && synthesize_name(node.name, types) == ["unknown"]
+  # The tower's constructors (ADR 0085) answer their values, not the type
+  # a bare `Rational` names.
+  return ["rational"] if node.name == "Rational" && synthesize_name(node.name, types) == ["type", "Rational"]
+  return ["complex"] if node.name == "Complex" && synthesize_name(node.name, types) == ["type", "Complex"]
+  synthesize_name(node.name, types)
+end
+
+# The arithmetic and comparison operators, ADR 0018's shapes: whole numbers
+# stay whole, one float anywhere makes a float, comparisons answer booleans.
+def synthesize_binary(node, types)
+  left = opened_natively(synthesize(node.left, types), types)
+  right = opened_natively(synthesize(node.right, types), types)
+  case node.operator
+  when "==", "!=", "<", "<=", ">", ">=" then ["boolean"]
+  # `<=>` (ADR 0054) answers -1, 0, or 1 on what it orders; a struct's own
+  # `<=>` is a call, and unknown here.
+  when "<=>"
+    return ["integer"] if numeric?(left) && numeric?(right)
+    return ["integer"] if left == ["string"] && right == ["string"]
+    return ["integer"] if left == ["symbol"] && right == ["symbol"]
+    return ["integer"] if (left in ["array", *]) && (right in ["array", *])
     ["unknown"]
-  when "step" then ["array", ["integer"]]
-  when "to_a", "entries"
-    return receiver if receiver in ["array", *]
-    # A range walks its integers (ADR 0081), so only one over them lists.
-    return ["array", ["integer"]] if receiver == ["range", ["integer"]]
-    return ["array", ["unknown"]] if receiver == ["set"]
+  when "+", "-", "*", "%"
+    return tower_answer(left, right) if numeric?(left) && numeric?(right)
+    return ["string"] if left == ["string"] && right == ["string"]
+    return left if (left in ["array", *]) && (right in ["array", *])
+    # A set's union and difference answer a set (ADR 0082).
+    return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
     ["unknown"]
+  when "/"
+    return ["integer"] if left == ["integer"] && right == ["integer"]
+    return tower_answer(left, right) if numeric?(left) && numeric?(right)
+    ["unknown"]
+  when "**"
+    power_answer(left, right)
   else
     ["unknown"]
   end
@@ -861,81 +1240,222 @@ def synthesize_block_call(node, receiver, types)
   end
 end
 
-# A block parameter's type, by the receiver and the method: the element
-# for most, a hash's key then value. `reduce` and `inject` bind the
-# accumulator first — its type is the initial argument's, or unknown
-# without one — and `each_with_index` the element then an integer. Found
-# by a fixture whose `reduce(0) { |count, line| count + … }` read `count`
-# as the element and refused a working `+`.
-def block_parameter_type(receiver, index, name, argument_types, parameter_count: 1)
-  if name == "reduce" || name == "inject"
-    return accumulator_type(argument_types) if index == 0
-    return element_type(receiver) if index == 1
-    return ["unknown"]
+# A statement body's answer: each statement is read with the bindings the
+# ones above it left (bind_after), early returns join the last statement
+# as candidates, and merge_candidates rules.
+def synthesize_body(body, mutable types)
+  mutable early = []
+  mutable last = ["nil"]
+  body.each do |statement|
+    early += return_types_in(statement, types)
+    last = statement_answer(statement, types)
+    types = bind_after(statement, types, [])
   end
-  if name == "each_with_index"
-    return element_type(receiver) if index == 0
-    return ["integer"] if index == 1
-    return ["unknown"]
-  end
-  if receiver in ["hash", *]
-    # `each_value` and `transform_values` hand the value alone (#105).
-    return type_at(receiver, 2) if index == 0 && (name == "each_value" || name == "transform_values")
-    return type_at(receiver, 1) if index == 0
-    return type_at(receiver, 2) if index == 1
-    return ["unknown"]
-  end
-  # An arrangement handed over by the combinatorics (#104) is an array of
-  # the receiver's elements.
-  if index == 0 && (receiver in ["array", *]) && %w[combination repeated_combination permutation repeated_permutation product].include?(name)
-    return receiver
-  end
-  # A neighbouring pair (#110): chunk_while and slice_when hand two
-  # elements, not one spread.
-  if (receiver in ["array", *]) && (name == "chunk_while" || name == "slice_when")
-    return element_type(receiver) if index <= 1
-    return ["unknown"]
-  end
-  # A spreading block (ADR 0057): two or more parameters over a method
-  # that yields one value take the element's own elements.
-  if parameter_count >= 2
-    element = element_type(receiver)
-    return type_at(element, 1) if element in ["array", *]
-    return ["unknown"]
-  end
-  return ["unknown"] unless index == 0
-  element_type(receiver)
+  merge_candidates(early + [last])
 end
 
-def accumulator_type(argument_types)
-  initial = type_at(argument_types, 0)
-  return ["unknown"] if initial.nil?
-  initial
+# Builtin results, by receiver type and name — the signatures the evaluator
+# already lives by, read back as types. Partial lookups answer maybes
+# (ADR 0040 §3). Unlisted names answer unknown, never an error.
+def synthesize_call(node, types)
+  return type_function_answer(node) if builtin_type_function?(node, types)
+  receiver = synthesize(node.receiver, types)
+  # `nil?` and `some?` are asked of the maybe itself; every other method
+  # is asked of its value.
+  asked = %w[nil? some?].include?(node.name) ? receiver : opened_natively(receiver, types)
+  call_answer(asked, node, types)
 end
 
-def element_type(receiver)
-  return type_at(receiver, 1) if receiver in ["array", *]
-  return type_at(receiver, 1) if receiver in ["range", *]
+# A `case/in` in value position: the arms' answers must agree, each arm
+# read with its captures bound (arm_bindings). An absent else answers nil
+# (ADR 0012) — unless an unguarded bare capture makes the arms total.
+def synthesize_case_in(node, types)
+  mutable answers = []
+  mutable nil_seen = false
+  node.branches.each do |branch|
+    answers << synthesize_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+    nil_seen = true if nil_arm?(branch)
+  end
+  total = node.branches.any? { (it.pattern in IdentifierNode) && it.guard.nil? }
+  answers << branch_answer(node.else_body, types) unless node.else_body.nil? && total
+  merge_candidates(answers)
+end
+
+# A def's return type (3b): parameters enter as unknown — the hybrid
+# caller-flow half of ADR 0040 is a later increment — except that a
+# default lends its type. The body reads in order; early returns and the
+# last statement must agree, a lone nil among them makes a maybe, and any
+# other disagreement is an opinion withheld.
+def synthesize_def_return(node, mutable types)
+  node.parameters.each do |parameter|
+    types = [[parameter.name, parameter_type(parameter, types)]] + types
+  end
+  synthesize_body(node.body, types)
+end
+
+def synthesize_hash(node, types)
+  return ["hash", ["unknown"], ["unknown"]] if node.pairs.empty?
+  first = node.pairs.first
+  key = synthesize(first.key, types)
+  entry = synthesize(first.value, types)
+  mutable uniform = true
+  node.pairs.each do |pair|
+    uniform = false unless synthesize(pair.key, types) == key
+    uniform = false unless synthesize(pair.value, types) == entry
+  end
+  return ["hash", key, entry] if uniform
+  ["hash", ["unknown"], ["unknown"]]
+end
+
+def synthesize_identifier(node, types)
+  synthesize_name(node.name, types)
+end
+
+# An if in value position (the ternary desugars here too, ADR 0046):
+# agreeing branches answer their type, an absent or nil branch makes a
+# maybe of the other. Each branch is read under what the condition proved
+# on its side (narrowings).
+def synthesize_if(node, types)
+  proof = narrowings(node.condition, types)
+  yes = branch_answer(node.then_body, when_true(proof) + types)
+  no = branch_answer(node.else_body, when_false(proof) + types)
+  merge_candidates([yes, no])
+end
+
+# `array[index]` under the native reading: the element, or nil past
+# either end.
+def synthesize_index(node, types)
+  return ["unknown"] unless native_reading?(types)
+  receiver = synthesize(node.receiver, types)
+  return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
+  maybe_of(type_at(receiver, 1))
+end
+
+def synthesize_logical(node, types)
+  left = synthesize(node.left, types)
+  # The right side is read under what the left proved — `x.some? && x + 1`
+  # sees a plain x; `x.nil? || x + 1` likewise.
+  proof = narrowings(node.left, types)
+  right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
+  right = synthesize(node.right, right_types)
+  return left if left == right
+  return ["unknown"] unless left in ["maybe", *]
+  # `maybe or default` answers the plain type when the default is one of
+  # it, and `maybe or return` the plain type outright — below the guard
+  # the name is plain (the third form of ADR 0040 §3). Anything else is
+  # an opinion withheld.
+  inner = type_at(left, 1)
+  return inner if exit?(node.right)
+  return inner if right == inner
   ["unknown"]
 end
 
-# How a type is written back out, for the debug driver. This rendering is
-# NOT ratified surface — the error-voice decision owns the real spelling —
-# it is the plainest thing that could work in a dump.
-def render_type(type)
-  case type
-  in ["array", element] then "[" + render_type(element) + "]"
-  in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
-  in ["maybe", inner] then render_type(inner) + "?"
-  in ["struct", name] then name
-  in ["type", name] then name
-  in ["enum", name] then name
-  # Ruby's own capitals (ADR 0086).
-  in ["matchdata"] then "MatchData"
+def synthesize_name(name, types)
+  found = types.find { it[0] == name }
+  # A builtin type's bare name is the type as a value (ADR 0074).
+  return ["type", name] if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
+  return ["unknown"] if found.nil?
+  type_at(found, 1)
+end
+
+def synthesize_numeric_answer(receiver, name, arguments_empty: true)
+  case name
+  when "abs", "magnitude", "succ", "pred", "next", "gcd"
+    # A complex's magnitude is a real: a float off the axes, the part's
+    # own kind on them, so no one type to answer.
+    return ["unknown"] if receiver == ["complex"] && (name == "abs" || name == "magnitude")
+    return receiver if numeric?(receiver)
+    return ["integer"] if name == "gcd"
+    # A string's or a symbol's successor is another of the same (ADR 0071).
+    return receiver if (receiver == ["string"] || receiver == ["symbol"]) && (name == "succ" || name == "next")
+    ["unknown"]
+  when "index", "find_index", "rindex"
+    return ["maybe", ["integer"]] if receiver == ["string"] || (receiver in ["array", *])
+    ["unknown"]
+  when "sum"
+    # Whole numbers stay whole; anything else about the elements is 3b,
+    # and an init (`sum(0.5)`, `sum("")`) is the caller's to say.
+    return ["integer"] if receiver == ["array", ["integer"]] && arguments_empty
+    ["unknown"]
+  when "to_i", "floor", "ceil", "round", "truncate", "div", "ceildiv" then ["integer"]
   else
-    label = type_at(type, 0)
-    label.slice(0, 1).upcase + label.slice(1, label.length - 1)
+    ["integer"]
   end
+end
+
+# A range carries its ends' type (ADR 0081) — the start's, or the end's for
+# a beginless range — which is what its extremes and its walk answer.
+def synthesize_range(node, types)
+  side = node.start.nil? ? node.finish : node.start
+  return ["range", ["unknown"]] if side.nil?
+  ["range", synthesize(side, types)]
+end
+
+# `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
+# form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
+def synthesize_safe_call(node, types)
+  return type_function_answer(node) if builtin_type_function?(node, types)
+  receiver = synthesize(node.receiver, types)
+  plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
+  maybe_of(call_answer(plain, node, types))
+end
+
+def synthesize_shape_answer(receiver, name)
+  case name
+  when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection"
+    return receiver if receiver in ["array", *]
+    # A set's algebra answers a set; its Enumerable walks answer arrays
+    # (ADR 0082), as Ruby's do.
+    return receiver if receiver == ["set"] && %w[difference flatten intersection].include?(name)
+    return ["array", ["unknown"]] if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
+    # A hash's compact and slice answer a hash (#105).
+    return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
+    return ["string"] if receiver == ["string"] && name == "slice"
+    ["unknown"]
+  when "merge"
+    return receiver if receiver in ["hash", *]
+    ["unknown"]
+  when "step" then ["array", ["integer"]]
+  when "to_a", "entries"
+    return receiver if receiver in ["array", *]
+    # A range walks its integers (ADR 0081), so only one over them lists.
+    return ["array", ["integer"]] if receiver == ["range", ["integer"]]
+    return ["array", ["unknown"]] if receiver == ["set"]
+    ["unknown"]
+  else
+    ["unknown"]
+  end
+end
+
+def synthesize_text_answer(receiver, name)
+  return ["string"] if name == "to_s" || name == "join" || name == "inspect" || name == "chr"
+  return ["string"] if receiver == ["string"]
+  # A symbol's case changers answer a symbol (ADR 0071).
+  return ["symbol"] if receiver == ["symbol"]
+  return receiver if receiver in ["array", *]
+  ["unknown"]
+end
+
+def synthesize_unary(node, types)
+  operand = synthesize(node.operand, types)
+  return ["boolean"] if node.operator == "!"
+  return operand if numeric?(operand)
+  ["unknown"]
+end
+
+def task_line_names(lines)
+  mutable names = []
+  lines.each do |line|
+    names << line.name if line in TaskLineNode
+  end
+  names
+end
+
+def tower_answer(left, right)
+  return ["complex"] if left == ["complex"] || right == ["complex"]
+  return ["float"] if left == ["float"] || right == ["float"]
+  return ["rational"] if left == ["rational"] || right == ["rational"]
+  ["integer"]
 end
 
 # Raw positional read: host indexing lifts nil, and a type cell can hold
@@ -948,579 +1468,59 @@ def type_at(list, target_index)
   result
 end
 
-# — the builtin method table (#88) —
-#
-# What each builtin receiver answers, with what: `include?/1`, `slice/2`,
-# `first/0-1`, `each/0&` (block-taking). Derived from the seed's *behavior*
-# by script/probe_builtin_methods rather than from a reading of its Rust —
-# run the script and paste, so the seed stays the oracle (principle 7) and
-# the spec suite, which exercises every builtin, stands guard over a name
-# gone missing. The seed reads these same lines at build for its own
-# wordings, so this is the table's one home. The names every value
-# answers are in each list; nil is left out on purpose, the runtime's own
-# sentence handling it.
-def builtin_table(type)
-  case type
-  in ["string"] then %w[!~/1 =~/1 ascii_only?/0 between?/2 bytes/0 bytesize/0 capitalize/0 casecmp/1 casecmp?/1 center/1-2 chars/0 chomp/0-1 chop/0 chr/0 clamp/1-2 class/0 codepoints/0 count/1 delete/1+ delete_prefix/1 delete_suffix/1 downcase/0 each_byte/0& each_char/0& each_codepoint/0& each_grapheme_cluster/0& each_line/0-1& empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 grapheme_clusters/0 gsub/1-2& hex/0 include?/1 index/1-2 intern/0 length/0 lines/0-1 ljust/1-2 lstrip/0 match/1-2& match?/1-2 next/0 nil?/0 oct/0 ord/0 partition/1 reverse/0 rindex/1-2 rjust/1-2 rpartition/1 rstrip/0 scan/1& size/0 slice/1-2 some?/0 split/0-2& squeeze/0+ start_with?/0+ strip/0 sub/1-2& succ/0 swapcase/0 to_c/0 to_f/0 to_i/0-1 to_r/0 to_s/0 to_sym/0 tr/2 tr_s/2 unicode_normalize/0-1 unicode_normalized?/0-1 upcase/0 upto/1-2& valid_encoding?/0]
-  in ["integer"] then %w[abs/0 abs2/0 allbits?/1 angle/0 anybits?/1 arg/0 between?/2 bit_and/1 bit_count/0 bit_length/0 bit_not/0 bit_or/1 bit_xor/1 ceil/0-1 ceildiv/1 chr/0-1 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 digits/0-1 div/1 divmod/1 downto/1& eql?/1 even?/0 failure?/0 fdiv/1 floor/0-1 gcd/1 gcdlcm/1 i/0 imag/0 imaginary/0 lcm/1 magnitude/0 modulo/1 negative?/0 next/0 nil?/0 nobits?/1 numerator/0 odd?/0 ord/0 phase/0 polar/0 positive?/0 pow/1 pred/0 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0-1 shift_left/1 shift_right/1 size/0 some?/0 step/1-2& succ/0 times/0& to_c/0 to_f/0 to_i/0 to_r/0 to_s/0-1 truncate/0-1 upto/1& zero?/0]
-  in ["float"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 prev_float/0 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
-  in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
-  in ["symbol"] then %w[!~/1 =~/1 capitalize/0 class/0 downcase/0 empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 id2name/0 intern/0 length/0 match/1-2& match?/1-2 name/0 next/0 nil?/0 size/0 slice/1-2 some?/0 start_with?/0+ succ/0 swapcase/0 to_s/0 to_sym/0 upcase/0]
-  in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
-  in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
-  in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
-  in ["range", *] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
-  in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
-  in ["rational"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 modulo/1 negative?/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
-  in ["complex"] then %w[abs/0 abs2/0 angle/0 arg/0 class/0 conj/0 conjugate/0 denominator/0 eql?/1 failure?/0 fdiv/1 finite?/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 nil?/0 numerator/0 phase/0 polar/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 zero?/0]
-  in ["regexp"] then %w[!~/1 =~/1 casefold?/0 class/0 eql?/1 failure?/0 match/1-2& match?/1-2 named_captures/0 names/0 nil?/0 options/0 some?/0 source/0 to_s/0]
-  in ["matchdata"] then %w[begin/1 captures/0 class/0 end/1 eql?/1 failure?/0 length/0 match/1 match_length/1 named_captures/0 names/0 nil?/0 offset/1 post_match/0 pre_match/0 regexp/0 size/0 some?/0 string/0 to_a/0 to_s/0 values_at/0+]
-  else
-    nil
-  end
-end
+# What a type function answers, the same on a plain call and behind `&.`
+# (#181). A name no type function has answers unknown, never an
+# error; the evaluator refuses it.
+def type_function_answer(node) = type_function_answer_for(node.receiver.name, node.name)
 
-# The names alone, for membership.
-def builtin_methods(type)
-  table = builtin_table(type)
-  return nil if table.nil?
-  table.map { entry_name(it) }
-end
-
-# An entry's arity as [low, high], or nil where the type has no such name.
-def builtin_arity(type, name)
-  table = builtin_table(type)
-  return nil if table.nil?
-  entry = table.find { entry_name(it) == name }
-  return nil if entry.nil?
-  arity = entry.split("/").last.split("&").first
-  # A trailing `+` takes any number from there (`values_at/0+`).
-  return [arity.slice(0, arity.length - 1).to_i, 9223372036854775807] if arity.end_with?("+")
-  bounds = arity.split("-").map { it.to_i }
-  [bounds.first, bounds.last]
-end
-
-def entry_name(entry) = entry.split("/").first
-
-# The false aliases (ADR 0036): Ruby's implicit-conversion protocol wears
-# conversion spellings, and each refuses by naming its survivor — the
-# seed's table, so the checker says the seed's sentence where the table
-# above would otherwise call the name missing.
-def alias_survivor(name)
+# The same answers reached through a type value, `value.class.new` (ADR
+# 0074), where there is no receiver node to read the type's name from.
+def type_function_answer_for(type_name, name)
+  return math_answer(name) if type_name == "Math"
   case name
-  when "to_ary" then "to_a"
-  when "to_int" then "to_i"
-  when "to_str" then "to_s"
-  else
-    nil
-  end
-end
-
-# — contracts (ADR 0048, step one) —
-#
-# What a body demands of a parameter, read off the body alone: each
-# dotted call on the name with its dot, each operator applied to it bare,
-# an index as '[]' — first-appearance order, no repeats. A default lends
-# its type instead, as it does for returns. Dump-only: nothing here is
-# read by a check yet, and caller flow waits for a whole-program view
-# (#94).
-
-# Each top-level def's parameters, as [name, entry] pairs — an entry is a
-# type where a default gives one, or ["needs", demands].
-def infer_contracts(nodes)
-  types = scan_program(nodes)
-  mutable contracts = []
-  nodes.each do |node|
-    next unless node in DefNode
-    entries = node.parameters.map { [it.name, parameter_entry(it, node.body, types)] }
-    contracts << [node.name, entries]
-  end
-  contracts
-end
-
-def parameter_entry(parameter, body, types)
-  typed = parameter_type(parameter, types)
-  return typed unless typed == ["unknown"]
-  ["needs", demands_in(body, parameter.name)]
-end
-
-def demands_in(nodes, name)
-  mutable found = []
-  nodes.each do |node|
-    found = add_demands(node, name, found)
-  end
-  found
-end
-
-def add_demands(node, name, mutable found)
-  return found if node.nil?
-  # A `case/in` on the name itself narrows it: what an arm asks, it asks
-  # of the value that arm matched, never of every value the def is handed
-  # (#457).
-  return found if (node in CaseInNode) && names?(node.subject, name)
-  demand = demand_of(node, name)
-  found << demand unless demand.nil? || found.include?(demand)
-  children_of(node).each do |child|
-    found = add_demands(child, name, found)
-  end
-  found
-end
-
-def demand_of(node, name)
-  if (node in MethodCallNode) || (node in SafeMethodCallNode)
-    return "." + node.name if names?(node.receiver, name)
-    return nil
-  end
-  if node in BinaryNode
-    return node.operator if names?(node.left, name) || names?(node.right, name)
-    return nil
-  end
-  return node.operator if (node in UnaryNode) && names?(node.operand, name)
-  return "[]" if (node in IndexNode) && names?(node.receiver, name)
-  nil
-end
-
-def names?(node, name) = (node in IdentifierNode) && node.name == name
-
-# A node's direct children — every expression and statement it holds,
-# blocks and branches included, patterns excluded — for a walk that looks
-# for something anywhere inside a body. Defs, structs, traits, and modules
-# are not descended into: their bodies bind their own names.
-def children_of(node)
-  case node
-  in AssignmentNode(value:) then [value]
-  in AppendNode(value:) then [value]
-  in WhileNode(condition:, body:) then [condition] + body
-  in IfNode(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
-  in CaseNode(subject:, branches:, else_body:)
-    mutable found = [subject]
-    branches.each do |branch|
-      found += branch.values + branch.body
+  when "sqrt"                              then ["integer"]
+  when "arguments"                         then ["array", ["string"]]
+  when "wall_clock_time", "monotonic_time" then ["integer"]
+  when "entropy"                           then ["array", ["integer"]]
+  # The two captures answer the text the block wrote (#251).
+  when "capture_standard_output", "capture_standard_error" then if type_name == "System" then ["string"] else ["unknown"] end
+  # `JSON.parse` answers the document's shape, which is unknown; the two
+  # writers answer text (ADR 0072).
+  when "generate", "pretty_generate"       then ["string"]
+  # The bracketed type functions: `Set[a, b]` (ADR 0082), and `Array[a, b]`
+  # and `Hash[...]` (ADR 0058, amended, #218).
+  when "[]"
+    case type_name
+    when "Set"   then ["set"]
+    when "Array" then ["array", ["unknown"]]
+    when "Hash"  then ["hash", ["unknown"], ["unknown"]]
+    else ["unknown"]
     end
-    found + (else_body or [])
-  in CaseInNode(subject:, branches:, else_body:)
-    mutable found = [subject]
-    branches.each do |branch|
-      found << branch.guard unless branch.guard.nil?
-      found += branch.body
+  # `Complex.polar` and `Complex.rectangular` (ADR 0085).
+  when "polar", "rect", "rectangular"     then if type_name == "Complex" then ["complex"] else ["unknown"] end
+  # `Regexp.escape` answers text, `Regexp.union` a pattern (ADR 0086).
+  when "escape", "quote"                  then if type_name == "Regexp" then ["string"] else ["unknown"] end
+  when "union"                            then if type_name == "Regexp" then ["regexp"] else ["unknown"] end
+  when "linear_time?"                     then if type_name == "Regexp" then ["boolean"] else ["unknown"] end
+  when "new"
+    case type_name
+    when "Hash"   then ["hash", ["unknown"], ["unknown"]]
+    when "Random" then ["random"]
+    when "Regexp" then ["regexp"]
+    when "Range"  then ["range", ["unknown"]]
+    when "Set"    then ["set"]
+    else ["array", ["unknown"]]
     end
-    found + (else_body or [])
-  in TogetherNode(lines:) then lines.map { if it in TaskLineNode then it.value else it end }
-  in ReturnNode(value:) then [value]
-  in CallNode(arguments:, block:) then arguments + block_body(block)
-  in MethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
-  in SafeMethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
-  in ArrayNode(elements:) then elements
-  in HashNode(pairs:) then pairs.map { it.key } + pairs.map { it.value }
-  in BinaryNode(left:, right:) then [left, right]
-  in LogicalNode(left:, right:) then [left, right]
-  in UnaryNode(operand:) then [operand]
-  in IndexNode(receiver:, index:) then [receiver, index]
-  in IndexUpdateNode(index: update_index, value: update_value) then [update_index, update_value]
-  in SlotCompoundNode(index: compound_index, right: compound_right) then [compound_index, compound_right]
-  in MatchAssertNode(subject:) then [subject]
-  in MatchTestNode(subject: test_subject) then [test_subject]
-  in KeywordArgumentNode(value:) then [value]
-  in YieldNode(values:) then values
-  in CaseEqualNode(pattern:, subject:) then [pattern, subject]
-  in EnumCaseNode(payload:) then payload.map { it.value }
-  else
-    []
+  else ["unknown"]
   end
 end
 
-def block_body(block)
-  return [] if block.nil?
-  block.body
+def universal_answer(name)
+  return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
+  return ["string"] if name == "to_s"
+  ["unknown"]
 end
-
-# — return annotations (ADR 0041) —
-#
-# The written annotation for a def, if its signature carries one: the
-# arrow trails the line where the parameter list ends, which a trailing
-# comma or a bare opener continues past (ADR 0045's shapes). Read off the
-# source by line, since the lexer drops comments — the debug-tool version;
-# when annotations want positions too, they become lexer trivia.
-def annotation_for(source, name)
-  lines = source.lines
-  mutable found = nil
-  lines.each_with_index do |line, index|
-    next unless def_line_for?(line, name)
-    found = signature_end_line(lines, index)
-  end
-  return nil if found.nil?
-  marker = found.index("# -> ")
-  return nil if marker.nil?
-  tail = found.slice(marker + 5, found.length - marker - 5)
-  tail.strip
-end
-
-def def_line_for?(line, name)
-  stripped = line.strip
-  prefix = "def #{name}"
-  return false unless stripped.start_with?(prefix)
-  return true if stripped == prefix
-  boundary = stripped.slice(prefix.length, 1)
-  boundary == "(" || boundary == " " || boundary == "="
-end
-
-def signature_end_line(lines, mutable index)
-  while index + 1 < lines.length && signature_continues?(lines[index])
-    index += 1
-  end
-  line = lines[index] or ""
-  line
-end
-
-def signature_continues?(line)
-  stripped = line.strip
-  stripped.end_with?(",") || stripped.end_with?("(")
-end
-
-# — narrowing (ADR 0040 §3, the seven forms) —
-#
-# A condition proves something about a maybe-typed name on each side of a
-# branch: `x.some?` holding makes x its plain type and failing makes it
-# nil; `x.nil?` and `x == nil` the other way round; `!` swaps the sides;
-# `&&` proves both halves when it holds and `||` both when it fails. A
-# proof is [when_true, when_false], each a list of [name, type] pairs
-# bound over the branch that sees it. Only an identifier narrows, since
-# only a name can be rebound — `users.first.nil?` proves nothing about a
-# later `users.first`. The exit guard and the or-guard bind below the
-# statement (bind_after, synthesize_logical); `&.` is synthesize_safe_call;
-# `case/in` over nil is arm_bindings.
-
-def narrowings(condition, types)
-  proof = proof_of(condition, types)
-  # A match test in a condition — `if x in [head, tail]` — binds its
-  # captures on both sides, since the runtime binds them regardless.
-  captured = condition_captures(condition).map { [it, ["unknown"]] }
-  [captured + when_true(proof), captured + when_false(proof)]
-end
-
-# The names every match test anywhere in an expression captures.
-def condition_captures(node)
-  return [] if node.nil?
-  mutable names = []
-  names += pattern_names(node.pattern) if node in MatchTestNode
-  children_of(node).each do |child|
-    names += condition_captures(child)
-  end
-  names
-end
-
-def proof_of(condition, types)
-  case condition
-  in MethodCallNode then predicate_proof(condition, types)
-  in BinaryNode then comparison_proof(condition, types)
-  in UnaryNode(operator:, operand:)
-    return no_proof unless operator == "!"
-    proof = proof_of(operand, types)
-    [when_false(proof), when_true(proof)]
-  in LogicalNode(operator:, left:, right:)
-    left_proof = proof_of(left, types)
-    right_proof = proof_of(right, types)
-    return [when_true(left_proof) + when_true(right_proof), []] if operator == "&&"
-    return [[], when_false(left_proof) + when_false(right_proof)] if operator == "||"
-    no_proof
-  else
-    no_proof
-  end
-end
-
-def no_proof = [[], []]
-
-def when_true(proof) = type_at(proof, 0)
 
 def when_false(proof) = type_at(proof, 1)
 
-# `x.some?` and `x.nil?` on a maybe-typed name.
-def predicate_proof(node, types)
-  return no_proof unless node.arguments.empty? && node.block.nil?
-  return no_proof unless node.receiver in IdentifierNode
-  name = node.receiver.name
-  inner = maybe_inner(name, types)
-  return no_proof if inner.nil?
-  return [[[name, inner]], [[name, ["nil"]]]] if node.name == "some?"
-  return [[[name, ["nil"]]], [[name, inner]]] if node.name == "nil?"
-  no_proof
-end
-
-# `x == nil` and `x != nil`, either way round.
-def comparison_proof(node, types)
-  return no_proof unless node.operator == "==" || node.operator == "!="
-  name = nil_comparison_name(node.left, node.right)
-  return no_proof if name.nil?
-  inner = maybe_inner(name, types)
-  return no_proof if inner.nil?
-  return [[[name, ["nil"]]], [[name, inner]]] if node.operator == "=="
-  [[[name, inner]], [[name, ["nil"]]]]
-end
-
-def nil_comparison_name(left, right)
-  return left.name if (left in IdentifierNode) && (right in NilNode)
-  return right.name if (right in IdentifierNode) && (left in NilNode)
-  nil
-end
-
-# The plain type under a maybe-typed name, or nil for anything else.
-def maybe_inner(name, types)
-  found = synthesize_name(name, types)
-  return nil unless found in ["maybe", *]
-  type_at(found, 1)
-end
-
-# What holds below an `if` whose one branch always leaves: the proof for
-# the branch that stays. Nothing where both leave, or neither.
-def guard_proof(node, types)
-  proof = narrowings(node.condition, types)
-  then_exits = body_exits?(node.then_body)
-  else_exits = body_exits?(node.else_body)
-  return when_false(proof) if then_exits && !else_exits
-  return when_true(proof) if else_exits && !then_exits
-  []
-end
-
-# A body that always leaves: its last statement returns, panics, or steps
-# out of a loop.
-def body_exits?(body)
-  return false if body.nil? || body.empty?
-  exit?(body.last)
-end
-
-def exit?(node)
-  case node
-  in ReturnNode | BreakNode | NextNode then true
-  in CallNode(name:) then name == "panic"
-  else
-    false
-  end
-end
-
-# What an arm of a `case/in` binds, as pairs to put before the types: a
-# bare capture takes the subject's type — the plain type once an unguarded
-# `in nil` arm above has taken the absent case (the fifth form; `in
-# some(v)` is not a pattern either oracle parses), and an identifier
-# subject narrows alongside it; `in nil` narrows an identifier subject to
-# nil; every other capture is unknown.
-def arm_bindings(node, branch, nil_seen, types)
-  subject = synthesize(node.subject, types)
-  pattern = branch.pattern
-  plain = if (subject in ["maybe", *]) && nil_seen then type_at(subject, 1) else subject end
-  if pattern in IdentifierNode
-    mutable pairs = [[pattern.name, plain]]
-    pairs = [[node.subject.name, plain]] + pairs if node.subject in IdentifierNode
-    return pairs
-  end
-  if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in ["maybe", *])
-    return [[node.subject.name, ["nil"]]]
-  end
-  pattern_names(pattern).map { [it, ["unknown"]] }
-end
-
-def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
-
-# — what a statement leaves behind —
-#
-# Every body walk here, and the checker's, threads bindings through
-# bind_after. The rule that keeps the walks honest: a name a *nested* body
-# rebinds — a branch, a loop, a block — is unknown after that statement,
-# because whether the body ran is not the tree's to say, and a wrong type
-# is worse than none (principle 4). Found the hard way: `mutable result =
-# nil` rebound inside an `each` read as Nil, and the first refusal built
-# on that read fired on the evaluator's own source.
-
-# The bindings a statement leaves for the statements after it. `locals`
-# is the list written to; `globals` is read alongside it and never
-# written — the checker keeps the two apart, this file's own walks pass
-# one list and an empty other.
-def bind_after(statement, locals, globals)
-  # A match test anywhere in a statement — `hit = scores in [low, high]`,
-  # `if x in [head, tail]` — binds its captures below it (one_line_spec and
-  # capture_spec pin it), as unknowns: whether it hit is not the tree's to say.
-  bind_unknowns(bind_after_core(statement, locals, globals), condition_captures(statement))
-end
-
-def bind_after_core(statement, locals, globals)
-  case statement
-  in AssignmentNode(name:, value:)
-    return locals if value.nil?
-    widened = forget_types(locals, assigned_names_in(value))
-    [[name, synthesize(value, widened + globals)]] + widened
-  in AppendNode(name:) then [[name, synthesize(statement, locals + globals)]] + locals
-  in MatchAssertNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
-  in MatchTestNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
-  in TogetherNode(lines:) then bind_unknowns(locals, task_line_names(lines))
-  # An `if` whose one branch always leaves is a guard: what its condition
-  # proved for the branch that stays holds below it (the first form —
-  # `return if x.nil?`, plain x after). A rebinding inside still wins.
-  in IfNode
-    guarded = guard_proof(statement, locals + globals) + locals
-    forget_types(guarded, assigned_names_in(statement))
-  # A `case/in` arm's captures outlive the case (capture_spec pins it), as
-  # unknowns — which arm ran is not the tree's to say.
-  in CaseInNode(branches:)
-    mutable captured = []
-    branches.each do |branch|
-      captured += pattern_names(branch.pattern)
-    end
-    bind_unknowns(forget_types(locals, assigned_names_in(statement)), captured)
-  else
-    forget_types(locals, assigned_names_in(statement))
-  end
-end
-
-def task_line_names(lines)
-  mutable names = []
-  lines.each do |line|
-    names << line.name if line in TaskLineNode
-  end
-  names
-end
-
-def bind_unknowns(locals, names)
-  mutable bound = locals
-  names.each do |name|
-    bound = [[name, ["unknown"]]] + bound
-  end
-  bound
-end
-
-# A name already bound, rebound somewhere inside a nested body, is unknown
-# from here on. A name new to that body dies with it (ADR 0001) and needs
-# nothing.
-def forget_types(locals, names)
-  mutable widened = locals
-  names.each do |name|
-    next if locals.none? { it[0] == name }
-    widened = [[name, ["unknown"]]] + widened
-  end
-  widened
-end
-
-# Every name an assignment or append inside this node binds, at any depth
-# short of a def, struct, trait, or module — those bind their own.
-def assigned_names_in(node)
-  case node
-  in AssignmentNode(name:, value:)
-    return [name] if value.nil?
-    [name] + assigned_names_in(value)
-  # `box << 3` is rebind sugar — the assignment around it is the binding,
-  # and the append itself names nothing new.
-  in AppendNode(value:) then assigned_names_in(value)
-  in WhileNode(condition:, body:) then assigned_names_in(condition) + assigned_names_in_body(body)
-  in IfNode(condition:, then_body:, else_body:)
-    assigned_names_in(condition) + assigned_names_in_body(then_body) + assigned_names_in_body(else_body)
-  in CaseNode(subject:, branches:, else_body:)
-    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
-    branches.each do |branch|
-      found += assigned_names_in_body(branch.values) + assigned_names_in_body(branch.body)
-    end
-    found
-  in CaseInNode(subject:, branches:, else_body:)
-    mutable found = assigned_names_in(subject) + assigned_names_in_body(else_body)
-    branches.each do |branch|
-      found += assigned_names_in_body(branch.body)
-      found += assigned_names_in(branch.guard) unless branch.guard.nil?
-    end
-    found
-  in TogetherNode(lines:)
-    mutable found = []
-    lines.each do |line|
-      found += [line.name] + assigned_names_in(line.value) if line in TaskLineNode
-      found += assigned_names_in(line) unless line in TaskLineNode
-    end
-    found
-  in ReturnNode(value:) then assigned_names_in_body([value])
-  in CallNode(arguments:, block:) then assigned_names_in_body(arguments) + assigned_names_in_block(block)
-  in MethodCallNode(receiver:, arguments:, block:)
-    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
-  in SafeMethodCallNode(receiver:, arguments:, block:)
-    assigned_names_in(receiver) + assigned_names_in_body(arguments) + assigned_names_in_block(block)
-  in ArrayNode(elements:) then assigned_names_in_body(elements)
-  in HashNode(pairs:)
-    mutable found = []
-    pairs.each do |pair|
-      found += assigned_names_in(pair.key) + assigned_names_in(pair.value)
-    end
-    found
-  in BinaryNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
-  in LogicalNode(left:, right:) then assigned_names_in(left) + assigned_names_in(right)
-  in UnaryNode(operand:) then assigned_names_in(operand)
-  in IndexNode(receiver:, index:) then assigned_names_in(receiver) + assigned_names_in(index)
-  in IndexUpdateNode(index: update_index, value: update_value)
-    assigned_names_in(update_index) + assigned_names_in(update_value)
-  in SlotCompoundNode(index: compound_index, right: compound_right)
-    assigned_names_in(compound_index) + assigned_names_in(compound_right)
-  in MatchAssertNode(subject:, pattern:) then assigned_names_in(subject) + pattern_names(pattern)
-  in MatchTestNode(subject: test_subject, pattern: test_pattern)
-    assigned_names_in(test_subject) + pattern_names(test_pattern)
-  in KeywordArgumentNode(value:) then assigned_names_in(value)
-  in EnumCaseNode(payload:)
-    mutable found = []
-    payload.each do |argument|
-      found += assigned_names_in(argument.value)
-    end
-    found
-  else
-    []
-  end
-end
-
-def assigned_names_in_body(body)
-  return [] if body.nil?
-  mutable found = []
-  body.each do |statement|
-    found += assigned_names_in(statement) unless statement.nil?
-  end
-  found
-end
-
-def assigned_names_in_block(block)
-  return [] if block.nil?
-  assigned_names_in_body(block.body)
-end
-
-# The names a pattern captures. Every capture is a plain identifier, a
-# pin reads rather than binds, and the shapes hold sub-patterns.
-def pattern_names(pattern)
-  case pattern
-  # A `_`-prefixed name binds nothing (ADR 0080).
-  in IdentifierNode(name:) then if name.start_with?("_") then [] else [name] end
-  in BindingPatternNode(pattern: inner, name:) then pattern_names(inner) + [name]
-  in HashPatternNode(pairs:, rest_kind:, rest_name:)
-    mutable found = []
-    pairs.each do |pair|
-      found += pattern_names(pair[1])
-    end
-    found << rest_name if rest_kind == "bind"
-    found
-  in AlternativePatternNode(options:)
-    mutable found = []
-    options.each do |option|
-      found += pattern_names(option)
-    end
-    found
-  in ArrayPatternNode(elements:, rest_name:)
-    mutable found = []
-    elements.each do |element|
-      found += pattern_names(element)
-    end
-    found << rest_name unless rest_name.nil?
-    found
-  in StructPatternNode(fields:)
-    mutable found = []
-    fields.each do |field|
-      found += pattern_names(field[1])
-    end
-    found
-  in EnumCasePatternNode(payload:)
-    mutable found = []
-    payload.each do |entry|
-      found += pattern_names(entry[1])
-    end
-    found
-  else
-    []
-  end
-end
+def when_true(proof) = type_at(proof, 0)
