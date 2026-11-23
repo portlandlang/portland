@@ -7,7 +7,7 @@
 # Ruby answers nil for a start outside the string, Portland answers the
 # empty string, and those rows are reworded. A negative length refuses. The
 # to_int conversions (ADR 0036), the bignum rows, subclasses, encodings,
-# slice! (ADR 0015), and the regex and string-pattern rows stay upstream.
+# slice! (ADR 0015), and the string-pattern rows stay upstream.
 
 require_relative "../../spec_helper"
 
@@ -81,5 +81,71 @@ context "String#slice" do
     expect("hello world".slice(6, 5).slice(1, 4)).to eq("orld")
     expect("hello world".slice(6, 5).slice(4, 1)).to eq("d")
     expect("hello world".slice(6, 5).slice(5, 0)).to eq("")
+  end
+end
+
+context "String#slice with Regexp" do
+  specify "returns the matching portion of self" do
+    expect("hello there".slice(/[aeiou](.)\1/)).to eq("ell")
+    expect("".slice(//)).to eq("")
+  end
+
+  specify "returns nil if there is no match" do
+    expect("hello there".slice(/xyz/)).to be_nil
+  end
+end
+
+context "String#slice with Regexp, index" do
+  specify "returns the capture for the given index" do
+    expect("hello there".slice(/[aeiou](.)\1/, 0)).to eq("ell")
+    expect("hello there".slice(/[aeiou](.)\1/, 1)).to eq("l")
+    expect("hello there".slice(/[aeiou](.)\1/, -1)).to eq("l")
+
+    expect("har".slice(/(.)(.)(.)/, 0)).to eq("har")
+    expect("har".slice(/(.)(.)(.)/, 1)).to eq("h")
+    expect("har".slice(/(.)(.)(.)/, 2)).to eq("a")
+    expect("har".slice(/(.)(.)(.)/, 3)).to eq("r")
+    expect("har".slice(/(.)(.)(.)/, -1)).to eq("r")
+    expect("har".slice(/(.)(.)(.)/, -2)).to eq("a")
+    expect("har".slice(/(.)(.)(.)/, -3)).to eq("h")
+  end
+
+  specify "returns nil if there is no match" do
+    expect("hello there".slice(/(what?)/, 1)).to be_nil
+  end
+
+  # The negative index past the captures waits on #315.
+  specify "returns nil if the index is larger than the number of captures" do
+    expect("hello there".slice(/hello (.)/, 2)).to be_nil
+  end
+
+  specify "returns nil if there is no capture for the given index" do
+    expect("hello there".slice(/[aeiou](.)\1/, 2)).to be_nil
+  end
+end
+
+context "String#slice with Regexp, group" do
+  specify "returns the capture for the given name" do
+    expect("hello there".slice(/(?<g>[aeiou](.))/, "g")).to eq("el")
+    expect("hello there".slice(/[aeiou](?<g>.)/, "g")).to eq("l")
+
+    expect("har".slice(/(?<g>(.)(.)(.))/, "g")).to eq("har")
+    expect("har".slice(/(?<h>.)(.)(.)/, "h")).to eq("h")
+    expect("har".slice(/(.)(?<a>.)(.)/, "a")).to eq("a")
+    expect("har".slice(/(.)(.)(?<r>.)/, "r")).to eq("r")
+    expect("har".slice(/(?<h>.)(?<a>.)(?<r>.)/, "r")).to eq("r")
+  end
+
+  specify "returns the last capture for duplicate names" do
+    expect("hello there".slice(/(?<g>h)(?<g>.)/, "g")).to eq("e")
+    expect("hello there".slice(/(?<g>h)(?<g>.)(?<f>.)/, "g")).to eq("e")
+  end
+
+  specify "returns the innermost capture for nested duplicate names" do
+    expect("hello there".slice(/(?<g>h(?<g>.))/, "g")).to eq("e")
+  end
+
+  specify "returns nil if there is no match" do
+    expect("hello there".slice(/(?<whut>what?)/, "whut")).to be_nil
   end
 end
