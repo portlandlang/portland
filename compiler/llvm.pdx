@@ -76,53 +76,14 @@
 
 require_relative "intermediate_representation"
 
-# The text so far: its lines, the next number for a temporary or a label,
-# and the label of the block being written, which a value chosen between
-# two arms has to name.
-struct LLVMEmitter
-  lines
-  counter
-  block
-  # The constants this function's String literals became, written at the
-  # top of the module, and the prefix that keeps their names its own.
-  globals
-  prefix
-  # The parameters and locals that hold a counted value, a String or an
-  # array, as [name, type]: each released on every way out of the function.
-  held
-  # The loops being written, innermost first, by the number in their
-  # labels: where `break` and `next` go.
-  loops
-  # The frames this function builds for the blocks it hands over, as
-  # the lines that make room for them. They are written at the top of
-  # the function, so a call inside a loop takes no more stack each turn.
-  frames
-  # The blocks written in this function, each a finished function's
-  # lines, written out after it.
-  routines
-end
+# The names the block a function was handed and that block's frame go
+# by, and the frame a block's own function is handed. No local can be
+# named with a dot first.
+LLVM_BLOCK = "%\".block\""
 
-# Two operands written, each as a plain value: the text so far, and how
-# to refer to each.
-struct LLVMPair
-  emitter
-  left
-  right
-end
+LLVM_BLOCK_FRAME = "%\".block.frame\""
 
-# A block written and its frame built: the text so far, the block's
-# function, and the frame to call it with.
-struct LLVMHanded
-  emitter
-  function
-  frame
-end
-
-# A value written: the text so far, and how to refer to the value.
-struct LLVMValue
-  emitter
-  operand
-end
+LLVM_FRAME = "%\".frame\""
 
 LLVM_PRELUDE = [
   "@.integer_line = private unnamed_addr constant [6 x i8] c\"%lld\\0A\\00\"",
@@ -170,18 +131,201 @@ LLVM_PRELUDE = [
   "}"
 ]
 
-# A whole program as LLVM IR text.
-def llvm_text(program)
-  mutable globals = []
-  mutable bodies = []
-  mutable index = 0
-  program.functions.each do |function|
-    written = llvm_function(function, "f#{index}")
-    globals += written.globals
-    bodies += [""] + written.lines + ["}"] + written.routines
-    index += 1
+# The text so far: its lines, the next number for a temporary or a label,
+# and the label of the block being written, which a value chosen between
+# two arms has to name.
+struct LLVMEmitter
+  lines
+  counter
+  block
+  # The constants this function's String literals became, written at the
+  # top of the module, and the prefix that keeps their names its own.
+  globals
+  prefix
+  # The parameters and locals that hold a counted value, a String or an
+  # array, as [name, type]: each released on every way out of the function.
+  held
+  # The loops being written, innermost first, by the number in their
+  # labels: where `break` and `next` go.
+  loops
+  # The frames this function builds for the blocks it hands over, as
+  # the lines that make room for them. They are written at the top of
+  # the function, so a call inside a loop takes no more stack each turn.
+  frames
+  # The blocks written in this function, each a finished function's
+  # lines, written out after it.
+  routines
+end
+
+# A block written and its frame built: the text so far, the block's
+# function, and the frame to call it with.
+struct LLVMHanded
+  emitter
+  function
+  frame
+end
+
+# Two operands written, each as a plain value: the text so far, and how
+# to refer to each.
+struct LLVMPair
+  emitter
+  left
+  right
+end
+
+# A value written: the text so far, and how to refer to the value.
+struct LLVMValue
+  emitter
+  operand
+end
+
+# One element appended. A slot is a word: an Integer as it is, a Boolean
+# widened to one, and a String or an array as its address, whose hold
+# the array takes over.
+def llvm_append(emitter, array, type, operand)
+  word = case type
+         in ["integer"] then LLVMValue.new(emitter: emitter, operand: operand)
+         in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
+         else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
+         end
+  llvm_named(word.emitter, "call ptr @portland_array_append(ptr #{array}, i64 #{word.operand}, i64 #{llvm_array_kind(type)})")
+end
+
+# The kind the runtime writes on an array, by what an element is.
+def llvm_array_kind(type)
+  case type
+  in ["integer"] then 0
+  in ["boolean"] then 1
+  in ["string"] then 2
+  else 3
   end
-  (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
+end
+
+# A block handed over: its function written, and its frame built.
+def llvm_block(emitter, block)
+  number = emitter.counter
+  name = "@\"portland.block.#{emitter.prefix}.#{number}\""
+  named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
+  header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
+  written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
+  mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
+  return LLVMHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
+  frame = "%\"frame.#{number}\""
+  shape = llvm_frame_shape(block.captures, block.onward)
+  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
+  mutable position = 0
+  block.captures.each do |capture|
+    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
+    position += 1
+  end
+  if block.onward
+    function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
+    stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
+    carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
+    current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
+  end
+  LLVMHanded.new(emitter: current, function: name, frame: frame)
+end
+
+# A text's bytes as LLVM writes them between quotes: a printable ASCII
+# character as itself, and every other byte, the quote and the backslash
+# among them, as a backslash and two hex digits.
+def llvm_bytes(text)
+  digits = "0123456789ABCDEF"
+  written = text.bytes.map do |byte|
+    plain = byte >= 32 && byte <= 126 && byte != 34 && byte != 92
+    plain ? byte.chr : "\\" + digits.slice(byte / 16, 1) + digits.slice(byte % 16, 1)
+  end
+  written.join("")
+end
+
+# One checked operation: the intrinsic answers the result and whether it
+# overflowed, and an overflow leaves through the refusal.
+def llvm_checked(emitter, operator, left, right)
+  intrinsic = case operator
+              when "+" then "sadd"
+              when "-" then "ssub"
+              else "smul"
+              end
+  symbol = case operator
+           when "+" then "@.plus"
+           when "-" then "@.minus"
+           else "@.times"
+           end
+  pair = llvm_named(emitter, "call {i64, i1} @llvm.#{intrinsic}.with.overflow.i64(i64 #{left}, i64 #{right})")
+  flag = llvm_named(pair.emitter, "extractvalue {i64, i1} #{pair.operand}, 1")
+  number = flag.emitter.counter
+  branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %overflow#{number}, label %checked#{number}")
+  refused = llvm_line(llvm_label(branched, "overflow#{number}"), "call void @portland.overflow(i64 #{left}, ptr #{symbol}, i64 #{right})")
+  resumed = llvm_label(llvm_line(refused, "unreachable"), "checked#{number}")
+  llvm_named(resumed, "extractvalue {i64, i1} #{pair.operand}, 0")
+end
+
+def llvm_comparison(operator)
+  case operator
+  when "<" then "slt"
+  when "<=" then "sle"
+  when ">" then "sgt"
+  when ">=" then "sge"
+  when "==" then "eq"
+  else "ne"
+  end
+end
+
+# Whether a value of this type holds a counted block: a String, an
+# array, or a maybe of either.
+def llvm_counted?(type)
+  return llvm_counted?(type_at(type, 1)) if type in ["maybe", *]
+  type == ["string"] || (type in ["array", *])
+end
+
+# A value that was handed over and is done with: released if it is
+# counted, by the runtime function for what it is.
+def llvm_drop(emitter, type, operand)
+  return emitter unless llvm_counted?(type)
+  if type in ["maybe", *]
+    held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
+    return llvm_drop(held.emitter, type_at(type, 1), held.operand)
+  end
+  return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
+  llvm_line(emitter, "call void @portland_array_release(ptr #{operand})")
+end
+
+# One element read out of its slot, for whoever asked to hold: a Boolean
+# narrowed back from its word, and a String or an array retained, since
+# the array keeps its own hold.
+def llvm_element(emitter, type, slot)
+  return llvm_named(emitter, "load i64, ptr #{slot}") if type == ["integer"]
+  if type == ["boolean"]
+    word = llvm_named(emitter, "load i64, ptr #{slot}")
+    return llvm_named(word.emitter, "trunc i64 #{word.operand} to i1")
+  end
+  read = llvm_named(emitter, "load ptr, ptr #{slot}")
+  LLVMValue.new(emitter: llvm_line(read.emitter, "call void @portland_retain(ptr #{read.operand})"), operand: read.operand)
+end
+
+# `==` where a side is a maybe, which compares without opening it: two
+# values that are there are equal as their values are, and otherwise the
+# sides are equal only when neither is there.
+def llvm_equal_maybes(emitter, left_type, left, right_type, right)
+  first = llvm_sides(emitter, left_type, left)
+  second = llvm_sides(first.emitter, right_type, right)
+  both = llvm_named(second.emitter, "and i1 #{first.left}, #{second.left}")
+  number = both.emitter.counter
+  branched = llvm_line(both.emitter, "br i1 #{both.operand}, label %same#{number}.values, label %same#{number}.flags")
+  values = llvm_same(llvm_label(branched, "same#{number}.values"), llvm_plain(left_type), first.right, second.right)
+  values_block = values.emitter.block
+  flags = llvm_named(llvm_label(llvm_line(values.emitter, "br label %same#{number}.done"), "same#{number}.flags"), "icmp eq i1 #{first.left}, #{second.left}")
+  joined = llvm_label(llvm_line(flags.emitter, "br label %same#{number}.done"), "same#{number}.done")
+  equal = llvm_named(joined, "phi i1 [ #{values.operand}, %#{values_block} ], [ #{flags.operand}, %same#{number}.flags ]")
+  LLVMValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
+end
+
+# A frame's shape: a place for each captured slot's address, and two more
+# where the block yields.
+def llvm_frame_shape(captures, onward)
+  "[#{captures.length + (onward ? 2 : 0)} x ptr]"
 end
 
 # One function, as the emitter that wrote it: its lines, the constants
@@ -196,12 +340,140 @@ def llvm_function(function, prefix)
   llvm_routine(header, [], false, function.parameters, function.locals, function.body, prefix, entry)
 end
 
-# The names the block a function was handed and that block's frame go
-# by, and the frame a block's own function is handed. No local can be
-# named with a dot first.
-LLVM_BLOCK = "%\".block\""
-LLVM_BLOCK_FRAME = "%\".block.frame\""
-LLVM_FRAME = "%\".frame\""
+# A def's name as LLVM's. Quoted, since a Portland name may end in `?`, and
+# prefixed, so a def named for a libc function is its own.
+def llvm_function_name(name) = "@\"portland.#{name}\""
+
+# A block opened. The counter moves on so no two labels share a number.
+def llvm_label(emitter, label)
+  emitter.with(lines: emitter.lines + ["#{label}:"], counter: emitter.counter + 1, block: label)
+end
+
+def llvm_line(emitter, instruction)
+  emitter.with(lines: emitter.lines + ["  #{instruction}"])
+end
+
+# A String literal: its block written into the binary as a constant. The
+# count is the runtime's `LITERAL`, so no release ever frees it.
+def llvm_literal(emitter, text)
+  name = "@.text.#{emitter.prefix}.#{emitter.counter}"
+  length = text.bytesize
+  shape = "{ i64, i64, [#{length} x i8] }"
+  constant = "#{name} = private unnamed_addr constant #{shape} { i64 -1, i64 #{length}, [#{length} x i8] c\"#{llvm_bytes(text)}\" }"
+  LLVMValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
+end
+
+def llvm_local(name) = "%\"#{name}\""
+
+# A method with no arguments. What can refuse, or needs a table, is the
+# runtime's; a question about an Integer's sign or parity is one
+# instruction or two. A String asked is released once it has answered.
+def llvm_method(emitter, type, name, operand)
+  # An array's length is the second word of its block.
+  if type in ["array", *]
+    place = llvm_named(emitter, "getelementptr i64, ptr #{operand}, i64 1")
+    length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
+    released = llvm_drop(length.emitter, type, operand)
+    return LLVMValue.new(emitter: released, operand: length.operand) unless name == "empty?"
+    return llvm_named(released, "icmp eq i64 #{length.operand}, 0")
+  end
+  if type == ["string"]
+    counted = llvm_named(emitter, "call i64 @portland_string_length(ptr #{operand})")
+    released = llvm_drop(counted.emitter, ["string"], operand)
+    return LLVMValue.new(emitter: released, operand: counted.operand) unless name == "empty?"
+    return llvm_named(released, "icmp eq i64 #{counted.operand}, 0")
+  end
+  case name
+  when "abs" then llvm_named(emitter, "call i64 @portland_integer_abs(i64 #{operand})")
+  when "succ", "next" then llvm_named(emitter, "call i64 @portland_integer_succ(i64 #{operand})")
+  when "pred" then llvm_named(emitter, "call i64 @portland_integer_pred(i64 #{operand})")
+  when "zero?" then llvm_named(emitter, "icmp eq i64 #{operand}, 0")
+  when "positive?" then llvm_named(emitter, "icmp sgt i64 #{operand}, 0")
+  when "negative?" then llvm_named(emitter, "icmp slt i64 #{operand}, 0")
+  else
+    # Parity is the lowest bit, in two's complement for a negative too.
+    bit = llvm_named(emitter, "and i64 #{operand}, 1")
+    llvm_named(bit.emitter, "icmp #{name == "even?" ? "eq" : "ne"} i64 #{bit.operand}, 0")
+  end
+end
+
+# An instruction whose result gets the next temporary's name.
+def llvm_named(emitter, instruction)
+  name = "%t#{emitter.counter}"
+  LLVMValue.new(emitter: emitter.with(lines: emitter.lines + ["  #{name} = #{instruction}"], counter: emitter.counter + 1), operand: name)
+end
+
+# A maybe opened (#503): its value where there is one. Where there is
+# none, the block writes the refusal, which does not come back.
+def llvm_opened(emitter, type, operand)
+  return LLVMValue.new(emitter: emitter, operand: operand) unless type in ["maybe", *]
+  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
+  number = flag.emitter.counter
+  branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %open#{number}.some, label %open#{number}.none")
+  refused = yield(llvm_label(branched, "open#{number}.none"))
+  resumed = llvm_label(llvm_line(refused, "unreachable"), "open#{number}.some")
+  llvm_named(resumed, "extractvalue #{llvm_type(type)} #{operand}, 1")
+end
+
+# Both operands of an operator, each opened where it is a maybe. Both
+# are computed before either is opened, as the seed computes them, and
+# the refusal names the operator and each side: its source form, or nil.
+def llvm_operands(emitter, operator, left_type, left, right_type, right)
+  first = llvm_opened(emitter, left_type, left) do |refusing|
+    named = llvm_literal(refusing, operator)
+    other = llvm_source(named.emitter, right_type, right)
+    llvm_line(other.emitter, "call void @portland_refuse_nil_operand(ptr #{named.operand}, ptr null, ptr #{other.operand})")
+  end
+  second = llvm_opened(first.emitter, right_type, right) do |refusing|
+    named = llvm_literal(refusing, operator)
+    other = llvm_source(named.emitter, llvm_plain(left_type), first.operand)
+    llvm_line(other.emitter, "call void @portland_refuse_nil_operand(ptr #{named.operand}, ptr #{other.operand}, ptr null)")
+  end
+  LLVMPair.new(emitter: second.emitter, left: first.operand, right: second.operand)
+end
+
+# A maybe's type with the maybe taken off; any other type is itself.
+def llvm_plain(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
+
+# Whether there is a value: a maybe's flag, and always so for anything
+# else. What was asked is released once it has answered.
+def llvm_presence(emitter, type, name, operand)
+  unless type in ["maybe", *]
+    return LLVMValue.new(emitter: llvm_drop(emitter, type, operand), operand: name == "some?" ? "true" : "false")
+  end
+  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
+  released = llvm_drop(flag.emitter, type, operand)
+  return LLVMValue.new(emitter: released, operand: flag.operand) if name == "some?"
+  llvm_named(released, "xor i1 #{flag.operand}, true")
+end
+
+# The refusal for a method asked of nil, by the method's name.
+def llvm_refuse_method(emitter, name)
+  named = llvm_literal(emitter, name)
+  llvm_line(named.emitter, "call void @portland_refuse_nil_method(ptr #{named.operand})")
+end
+
+# Every counted value this function's slots hold, released: written
+# before each way out.
+def llvm_release_held(emitter)
+  mutable current = emitter
+  emitter.held.each do |slot|
+    loaded = llvm_named(current, "load #{llvm_type(type_at(slot, 1))}, ptr #{llvm_slot(slot[0])}")
+    current = llvm_drop(loaded.emitter, type_at(slot, 1), loaded.operand)
+  end
+  current
+end
+
+# One more holder for a counted value. A maybe is retained through its
+# value, which is nothing where there is none.
+def llvm_retain(emitter, type, operand)
+  return emitter unless llvm_counted?(type)
+  if type in ["maybe", *]
+    held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
+    return llvm_retain(held.emitter, type_at(type, 1), held.operand)
+  end
+  llvm_line(emitter, "call void @portland_retain(ptr #{operand})")
+end
 
 # A function's lines under a header written by the caller: a def's, the
 # entry function's, or a block's. A block's captures are read out of its
@@ -248,190 +520,12 @@ def llvm_routine(header, captures, onward, parameters, locals, body, prefix, ent
   finished.with(lines: finished.lines.slice(0, 2) + finished.frames + finished.lines.slice(2, finished.lines.length - 2))
 end
 
-# A block handed over: its function written, and its frame built.
-def llvm_block(emitter, block)
-  number = emitter.counter
-  name = "@\"portland.block.#{emitter.prefix}.#{number}\""
-  named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
-  header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
-  written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
-  mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
-  return LLVMHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
-  frame = "%\"frame.#{number}\""
-  shape = llvm_frame_shape(block.captures, block.onward)
-  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
-  mutable position = 0
-  block.captures.each do |capture|
-    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
-    position += 1
-  end
-  if block.onward
-    function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-    stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
-    carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
-    current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
-  end
-  LLVMHanded.new(emitter: current, function: name, frame: frame)
-end
-
-# A frame's shape: a place for each captured slot's address, and two more
-# where the block yields.
-def llvm_frame_shape(captures, onward)
-  "[#{captures.length + (onward ? 2 : 0)} x ptr]"
-end
-
-# Every counted value this function's slots hold, released: written
-# before each way out.
-def llvm_release_held(emitter)
-  mutable current = emitter
-  emitter.held.each do |slot|
-    loaded = llvm_named(current, "load #{llvm_type(type_at(slot, 1))}, ptr #{llvm_slot(slot[0])}")
-    current = llvm_drop(loaded.emitter, type_at(slot, 1), loaded.operand)
-  end
-  current
-end
-
-# Whether a value of this type holds a counted block: a String, an
-# array, or a maybe of either.
-def llvm_counted?(type)
-  return llvm_counted?(type_at(type, 1)) if type in ["maybe", *]
-  type == ["string"] || (type in ["array", *])
-end
-
-# A maybe's type with the maybe taken off; any other type is itself.
-def llvm_plain(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
-
-# What a slot of this type holds before anything is stored in it, and
-# what a maybe that is not there carries as its value.
-def llvm_zero(type)
-  case type
-  in ["integer"] then "0"
-  in ["boolean"] then "false"
-  in ["maybe", *] then "zeroinitializer"
-  else "null"
-  end
-end
-
-# One more holder for a counted value. A maybe is retained through its
-# value, which is nothing where there is none.
-def llvm_retain(emitter, type, operand)
-  return emitter unless llvm_counted?(type)
-  if type in ["maybe", *]
-    held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    return llvm_retain(held.emitter, type_at(type, 1), held.operand)
-  end
-  llvm_line(emitter, "call void @portland_retain(ptr #{operand})")
-end
-
-# A value that was handed over and is done with: released if it is
-# counted, by the runtime function for what it is.
-def llvm_drop(emitter, type, operand)
-  return emitter unless llvm_counted?(type)
-  if type in ["maybe", *]
-    held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    return llvm_drop(held.emitter, type_at(type, 1), held.operand)
-  end
-  return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
-  llvm_line(emitter, "call void @portland_array_release(ptr #{operand})")
-end
-
-# A maybe opened (#503): its value where there is one. Where there is
-# none, the block writes the refusal, which does not come back.
-def llvm_opened(emitter, type, operand)
-  return LLVMValue.new(emitter: emitter, operand: operand) unless type in ["maybe", *]
-  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
-  number = flag.emitter.counter
-  branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %open#{number}.some, label %open#{number}.none")
-  refused = yield(llvm_label(branched, "open#{number}.none"))
-  resumed = llvm_label(llvm_line(refused, "unreachable"), "open#{number}.some")
-  llvm_named(resumed, "extractvalue #{llvm_type(type)} #{operand}, 1")
-end
-
-# The refusal for a method asked of nil, by the method's name.
-def llvm_refuse_method(emitter, name)
-  named = llvm_literal(emitter, name)
-  llvm_line(named.emitter, "call void @portland_refuse_nil_method(ptr #{named.operand})")
-end
-
-# A value's source form as a String, for a refusal to quote, and nothing
-# where a maybe has no value. It is written only on a way out of the
-# program, so what it makes is never released.
-def llvm_source(emitter, type, operand)
-  case type
-  in ["integer"] then llvm_named(emitter, "call ptr @portland_string_from_integer(i64 #{operand})")
-  in ["boolean"] then llvm_named(emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{operand})")
-  in ["string"] then llvm_named(emitter, "call ptr @portland_string_inspect(ptr #{operand})")
-  in ["maybe", *]
-    flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
-    held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    written = llvm_source(held.emitter, type_at(type, 1), held.operand)
-    llvm_named(written.emitter, "select i1 #{flag.operand}, ptr #{written.operand}, ptr null")
-  else llvm_named(emitter, "call ptr @portland_array_to_string(ptr #{operand})")
-  end
-end
-
-# Both operands of an operator, each opened where it is a maybe. Both
-# are computed before either is opened, as the seed computes them, and
-# the refusal names the operator and each side: its source form, or nil.
-def llvm_operands(emitter, operator, left_type, left, right_type, right)
-  first = llvm_opened(emitter, left_type, left) do |refusing|
-    named = llvm_literal(refusing, operator)
-    other = llvm_source(named.emitter, right_type, right)
-    llvm_line(other.emitter, "call void @portland_refuse_nil_operand(ptr #{named.operand}, ptr null, ptr #{other.operand})")
-  end
-  second = llvm_opened(first.emitter, right_type, right) do |refusing|
-    named = llvm_literal(refusing, operator)
-    other = llvm_source(named.emitter, llvm_plain(left_type), first.operand)
-    llvm_line(other.emitter, "call void @portland_refuse_nil_operand(ptr #{named.operand}, ptr #{other.operand}, ptr null)")
-  end
-  LLVMPair.new(emitter: second.emitter, left: first.operand, right: second.operand)
-end
-
-# Whether there is a value: a maybe's flag, and always so for anything
-# else. What was asked is released once it has answered.
-def llvm_presence(emitter, type, name, operand)
-  unless type in ["maybe", *]
-    return LLVMValue.new(emitter: llvm_drop(emitter, type, operand), operand: name == "some?" ? "true" : "false")
-  end
-  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
-  released = llvm_drop(flag.emitter, type, operand)
-  return LLVMValue.new(emitter: released, operand: flag.operand) if name == "some?"
-  llvm_named(released, "xor i1 #{flag.operand}, true")
-end
-
-# A side of `==` as a flag and a value: a maybe's own, and for anything
-# else, there and itself.
-def llvm_sides(emitter, type, operand)
-  return LLVMPair.new(emitter: emitter, left: "true", right: operand) unless type in ["maybe", *]
-  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
-  held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-  LLVMPair.new(emitter: held.emitter, left: flag.operand, right: held.operand)
-end
-
 # Whether two values of one plain type are equal. A String's `==` is
 # canonical equivalence (ADR 0038), the runtime's to say, and never a
 # comparison of two addresses.
 def llvm_same(emitter, type, left, right)
   return llvm_named(emitter, "call zeroext i1 @portland_string_equal(ptr #{left}, ptr #{right})") if type == ["string"]
   llvm_named(emitter, "icmp eq #{llvm_type(type)} #{left}, #{right}")
-end
-
-# `==` where a side is a maybe, which compares without opening it: two
-# values that are there are equal as their values are, and otherwise the
-# sides are equal only when neither is there.
-def llvm_equal_maybes(emitter, left_type, left, right_type, right)
-  first = llvm_sides(emitter, left_type, left)
-  second = llvm_sides(first.emitter, right_type, right)
-  both = llvm_named(second.emitter, "and i1 #{first.left}, #{second.left}")
-  number = both.emitter.counter
-  branched = llvm_line(both.emitter, "br i1 #{both.operand}, label %same#{number}.values, label %same#{number}.flags")
-  values = llvm_same(llvm_label(branched, "same#{number}.values"), llvm_plain(left_type), first.right, second.right)
-  values_block = values.emitter.block
-  flags = llvm_named(llvm_label(llvm_line(values.emitter, "br label %same#{number}.done"), "same#{number}.flags"), "icmp eq i1 #{first.left}, #{second.left}")
-  joined = llvm_label(llvm_line(flags.emitter, "br label %same#{number}.done"), "same#{number}.done")
-  equal = llvm_named(joined, "phi i1 [ #{values.operand}, %#{values_block} ], [ #{flags.operand}, %same#{number}.flags ]")
-  LLVMValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
 end
 
 # A maybe in its source form: its value's, or `nil`. Only the arm taken
@@ -448,12 +542,32 @@ def llvm_shown_maybe(emitter, type, operand)
   llvm_named(joined, "phi ptr [ #{written.operand}, %#{written_block} ], [ #{absent.operand}, %shown#{number}.none ]")
 end
 
-def llvm_statements(emitter, statements)
-  mutable current = emitter
-  statements.each do |statement|
-    current = llvm_statement(current, statement)
+# A side of `==` as a flag and a value: a maybe's own, and for anything
+# else, there and itself.
+def llvm_sides(emitter, type, operand)
+  return LLVMPair.new(emitter: emitter, left: "true", right: operand) unless type in ["maybe", *]
+  flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
+  held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
+  LLVMPair.new(emitter: held.emitter, left: flag.operand, right: held.operand)
+end
+
+def llvm_slot(name) = "%\"#{name}.slot\""
+
+# A value's source form as a String, for a refusal to quote, and nothing
+# where a maybe has no value. It is written only on a way out of the
+# program, so what it makes is never released.
+def llvm_source(emitter, type, operand)
+  case type
+  in ["integer"] then llvm_named(emitter, "call ptr @portland_string_from_integer(i64 #{operand})")
+  in ["boolean"] then llvm_named(emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{operand})")
+  in ["string"] then llvm_named(emitter, "call ptr @portland_string_inspect(ptr #{operand})")
+  in ["maybe", *]
+    flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
+    held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
+    written = llvm_source(held.emitter, type_at(type, 1), held.operand)
+    llvm_named(written.emitter, "select i1 #{flag.operand}, ptr #{written.operand}, ptr null")
+  else llvm_named(emitter, "call ptr @portland_array_to_string(ptr #{operand})")
   end
-  current
 end
 
 def llvm_statement(emitter, statement)
@@ -526,6 +640,40 @@ def llvm_statement(emitter, statement)
     taken = llvm_statements(llvm_label(branched, "if#{number}.then"), then_body)
     other = llvm_statements(llvm_label(llvm_line(taken, "br label %if#{number}.done"), "if#{number}.else"), else_body)
     llvm_label(llvm_line(other, "br label %if#{number}.done"), "if#{number}.done")
+  end
+end
+
+def llvm_statements(emitter, statements)
+  mutable current = emitter
+  statements.each do |statement|
+    current = llvm_statement(current, statement)
+  end
+  current
+end
+
+# A whole program as LLVM IR text.
+def llvm_text(program)
+  mutable globals = []
+  mutable bodies = []
+  mutable index = 0
+  program.functions.each do |function|
+    written = llvm_function(function, "f#{index}")
+    globals += written.globals
+    bodies += [""] + written.lines + ["}"] + written.routines
+    index += 1
+  end
+  (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
+end
+
+def llvm_type(type)
+  case type
+  in ["integer"] then "i64"
+  in ["boolean"] then "i1"
+  in ["string"] then "ptr"
+  in ["array", *] then "ptr"
+  in ["maybe", *] then "{ i1, #{llvm_type(type_at(type, 1))} }"
+  in ["nothing"] then "void"
+  else panic("llvm.pdx: no machine type for #{render_type(type)}")
   end
 end
 
@@ -752,159 +900,13 @@ def llvm_value(emitter, value)
   end
 end
 
-# The kind the runtime writes on an array, by what an element is.
-def llvm_array_kind(type)
+# What a slot of this type holds before anything is stored in it, and
+# what a maybe that is not there carries as its value.
+def llvm_zero(type)
   case type
-  in ["integer"] then 0
-  in ["boolean"] then 1
-  in ["string"] then 2
-  else 3
+  in ["integer"] then "0"
+  in ["boolean"] then "false"
+  in ["maybe", *] then "zeroinitializer"
+  else "null"
   end
 end
-
-# One element appended. A slot is a word: an Integer as it is, a Boolean
-# widened to one, and a String or an array as its address, whose hold
-# the array takes over.
-def llvm_append(emitter, array, type, operand)
-  word = case type
-         in ["integer"] then LLVMValue.new(emitter: emitter, operand: operand)
-         in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
-         else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
-         end
-  llvm_named(word.emitter, "call ptr @portland_array_append(ptr #{array}, i64 #{word.operand}, i64 #{llvm_array_kind(type)})")
-end
-
-# One element read out of its slot, for whoever asked to hold: a Boolean
-# narrowed back from its word, and a String or an array retained, since
-# the array keeps its own hold.
-def llvm_element(emitter, type, slot)
-  return llvm_named(emitter, "load i64, ptr #{slot}") if type == ["integer"]
-  if type == ["boolean"]
-    word = llvm_named(emitter, "load i64, ptr #{slot}")
-    return llvm_named(word.emitter, "trunc i64 #{word.operand} to i1")
-  end
-  read = llvm_named(emitter, "load ptr, ptr #{slot}")
-  LLVMValue.new(emitter: llvm_line(read.emitter, "call void @portland_retain(ptr #{read.operand})"), operand: read.operand)
-end
-
-# A String literal: its block written into the binary as a constant. The
-# count is the runtime's `LITERAL`, so no release ever frees it.
-def llvm_literal(emitter, text)
-  name = "@.text.#{emitter.prefix}.#{emitter.counter}"
-  length = text.bytesize
-  shape = "{ i64, i64, [#{length} x i8] }"
-  constant = "#{name} = private unnamed_addr constant #{shape} { i64 -1, i64 #{length}, [#{length} x i8] c\"#{llvm_bytes(text)}\" }"
-  LLVMValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
-end
-
-# A text's bytes as LLVM writes them between quotes: a printable ASCII
-# character as itself, and every other byte, the quote and the backslash
-# among them, as a backslash and two hex digits.
-def llvm_bytes(text)
-  digits = "0123456789ABCDEF"
-  written = text.bytes.map do |byte|
-    plain = byte >= 32 && byte <= 126 && byte != 34 && byte != 92
-    plain ? byte.chr : "\\" + digits.slice(byte / 16, 1) + digits.slice(byte % 16, 1)
-  end
-  written.join("")
-end
-
-# A method with no arguments. What can refuse, or needs a table, is the
-# runtime's; a question about an Integer's sign or parity is one
-# instruction or two. A String asked is released once it has answered.
-def llvm_method(emitter, type, name, operand)
-  # An array's length is the second word of its block.
-  if type in ["array", *]
-    place = llvm_named(emitter, "getelementptr i64, ptr #{operand}, i64 1")
-    length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
-    released = llvm_drop(length.emitter, type, operand)
-    return LLVMValue.new(emitter: released, operand: length.operand) unless name == "empty?"
-    return llvm_named(released, "icmp eq i64 #{length.operand}, 0")
-  end
-  if type == ["string"]
-    counted = llvm_named(emitter, "call i64 @portland_string_length(ptr #{operand})")
-    released = llvm_drop(counted.emitter, ["string"], operand)
-    return LLVMValue.new(emitter: released, operand: counted.operand) unless name == "empty?"
-    return llvm_named(released, "icmp eq i64 #{counted.operand}, 0")
-  end
-  case name
-  when "abs" then llvm_named(emitter, "call i64 @portland_integer_abs(i64 #{operand})")
-  when "succ", "next" then llvm_named(emitter, "call i64 @portland_integer_succ(i64 #{operand})")
-  when "pred" then llvm_named(emitter, "call i64 @portland_integer_pred(i64 #{operand})")
-  when "zero?" then llvm_named(emitter, "icmp eq i64 #{operand}, 0")
-  when "positive?" then llvm_named(emitter, "icmp sgt i64 #{operand}, 0")
-  when "negative?" then llvm_named(emitter, "icmp slt i64 #{operand}, 0")
-  else
-    # Parity is the lowest bit, in two's complement for a negative too.
-    bit = llvm_named(emitter, "and i64 #{operand}, 1")
-    llvm_named(bit.emitter, "icmp #{name == "even?" ? "eq" : "ne"} i64 #{bit.operand}, 0")
-  end
-end
-
-# One checked operation: the intrinsic answers the result and whether it
-# overflowed, and an overflow leaves through the refusal.
-def llvm_checked(emitter, operator, left, right)
-  intrinsic = case operator
-              when "+" then "sadd"
-              when "-" then "ssub"
-              else "smul"
-              end
-  symbol = case operator
-           when "+" then "@.plus"
-           when "-" then "@.minus"
-           else "@.times"
-           end
-  pair = llvm_named(emitter, "call {i64, i1} @llvm.#{intrinsic}.with.overflow.i64(i64 #{left}, i64 #{right})")
-  flag = llvm_named(pair.emitter, "extractvalue {i64, i1} #{pair.operand}, 1")
-  number = flag.emitter.counter
-  branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %overflow#{number}, label %checked#{number}")
-  refused = llvm_line(llvm_label(branched, "overflow#{number}"), "call void @portland.overflow(i64 #{left}, ptr #{symbol}, i64 #{right})")
-  resumed = llvm_label(llvm_line(refused, "unreachable"), "checked#{number}")
-  llvm_named(resumed, "extractvalue {i64, i1} #{pair.operand}, 0")
-end
-
-# An instruction whose result gets the next temporary's name.
-def llvm_named(emitter, instruction)
-  name = "%t#{emitter.counter}"
-  LLVMValue.new(emitter: emitter.with(lines: emitter.lines + ["  #{name} = #{instruction}"], counter: emitter.counter + 1), operand: name)
-end
-
-def llvm_line(emitter, instruction)
-  emitter.with(lines: emitter.lines + ["  #{instruction}"])
-end
-
-# A block opened. The counter moves on so no two labels share a number.
-def llvm_label(emitter, label)
-  emitter.with(lines: emitter.lines + ["#{label}:"], counter: emitter.counter + 1, block: label)
-end
-
-def llvm_type(type)
-  case type
-  in ["integer"] then "i64"
-  in ["boolean"] then "i1"
-  in ["string"] then "ptr"
-  in ["array", *] then "ptr"
-  in ["maybe", *] then "{ i1, #{llvm_type(type_at(type, 1))} }"
-  in ["nothing"] then "void"
-  else panic("llvm.pdx: no machine type for #{render_type(type)}")
-  end
-end
-
-def llvm_comparison(operator)
-  case operator
-  when "<" then "slt"
-  when "<=" then "sle"
-  when ">" then "sgt"
-  when ">=" then "sge"
-  when "==" then "eq"
-  else "ne"
-  end
-end
-
-# A def's name as LLVM's. Quoted, since a Portland name may end in `?`, and
-# prefixed, so a def named for a libc function is its own.
-def llvm_function_name(name) = "@\"portland.#{name}\""
-
-def llvm_local(name) = "%\"#{name}\""
-
-def llvm_slot(name) = "%\"#{name}.slot\""

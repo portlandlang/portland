@@ -13,26 +13,35 @@
 # `def`, calls, a block handed to a def that yields, and `puts` of an
 # Integer or a String. Anything else refuses here, by name, before a line
 # of output exists.
+#
+# A value's struct carries the type it produces. A statement's carries
+# none: it is run for what it does.
 
 require_relative "pinning"
 
-# A program: its functions in written order, the top-level statements last
-# as the entry function, `main`.
-struct IntermediateProgram
-  functions
+# `name << value` on a local that holds an array: the local then holds
+# the array with the value after its last element. Values never mutate,
+# so an array another name holds is copied first, which the runtime
+# sees to.
+struct IntermediateAppend
+  name
+  type
+  value
 end
 
-# A function: parameters and locals as [name, type] pairs, the type it
-# answers, and its statements.
-struct IntermediateFunction
-  name
-  parameters
-  answer
-  locals
-  body
-  # What a def that yields hands its block and reads back, as pinning's
-  # PinnedBlock, or nil for a def that does not yield.
-  block
+# `+`, `-`, or `*` between two Integers, refusing on overflow (ADR 0070).
+struct IntermediateArithmetic
+  type
+  operator
+  left
+  right
+end
+
+# An array literal (#497): its elements in order, all of one type. The
+# empty one has no element type of its own, and takes its local's.
+struct IntermediateArray
+  type
+  elements
 end
 
 # A block (#493): a function of its own, written where it was handed
@@ -51,56 +60,34 @@ struct IntermediateBlock
   onward
 end
 
-# The values. Each carries the type it produces.
-
-# A literal: an Integer's digits, `true` or `false`, or a String's text.
-struct IntermediateConstant
-  type
-  value
+# An `if` run for what its arms do.
+struct IntermediateBranch
+  condition
+  then_body
+  else_body
 end
 
-# A parameter or a local, read.
-struct IntermediateLocal
+# `break` and `next` in a loop: out of it, and on to its next turn.
+struct IntermediateBreak
+  line
+end
+
+# A call to one of the program's functions, with the block it is handed,
+# or nil.
+struct IntermediateCall
   type
   name
+  arguments
+  block
 end
 
-# `+`, `-`, or `*` between two Integers, refusing on overflow (ADR 0070).
-struct IntermediateArithmetic
+# An `if` read for its value: one value per arm, and only the arm taken is
+# computed.
+struct IntermediateChoice
   type
-  operator
-  left
-  right
-end
-
-# `/` or `%` between two Integers: rounding toward negative infinity, the
-# remainder taking the divisor's sign, and refusing a zero divisor.
-struct IntermediateDivision
-  type
-  operator
-  left
-  right
-end
-
-# `-value`, refusing on the one Integer that has no negation.
-struct IntermediateNegation
-  type
-  value
-end
-
-# `&&` or `||` between two Booleans. The right side is computed only when
-# it decides the answer.
-struct IntermediateLogical
-  type
-  operator
-  left
-  right
-end
-
-# `!value`.
-struct IntermediateNot
-  type
-  value
+  condition
+  then_value
+  else_value
 end
 
 # A comparison between two values of one type, answering a Boolean.
@@ -118,49 +105,44 @@ struct IntermediateConcat
   right
 end
 
-# An Integer, a Boolean, or an array written out as a String, as `puts`,
-# `to_s`, and interpolation write one. An array's is its source form.
-struct IntermediateText
+# A literal: an Integer's digits, `true` or `false`, or a String's text.
+struct IntermediateConstant
   type
   value
 end
 
-# A String in its source form, between quotes with its escapes: what
-# `inspect` and `p` write.
-struct IntermediateInspect
+# `maybe || fallback`: the value where there is one, and otherwise the
+# fallback, which is computed only then.
+struct IntermediateDefault
   type
+  value
+  fallback
+end
+
+# `/` or `%` between two Integers: rounding toward negative infinity, the
+# remainder taking the divisor's sign, and refusing a zero divisor.
+struct IntermediateDivision
+  type
+  operator
+  left
+  right
+end
+
+# A value computed and dropped: a call made for what it does.
+struct IntermediateEvaluate
   value
 end
 
-# A method a value answers, with no arguments: an Integer's `abs` or
-# `even?`, a String's `length`. The receiver's type and the name say which.
-struct IntermediateMethod
-  type
-  receiver
+# A function: parameters and locals as [name, type] pairs, the type it
+# answers, and its statements.
+struct IntermediateFunction
   name
-end
-
-# A call to one of the program's functions, with the block it is handed,
-# or nil.
-struct IntermediateCall
-  type
-  name
-  arguments
-  block
-end
-
-# An array literal (#497): its elements in order, all of one type. The
-# empty one has no element type of its own, and takes its local's.
-struct IntermediateArray
-  type
-  elements
-end
-
-# `array.each { … }`: the block run once for each element, in order. It
-# answers the array it walked.
-struct IntermediateWalk
-  type
-  array
+  parameters
+  answer
+  locals
+  body
+  # What a def that yields hands its block and reads back, as pinning's
+  # PinnedBlock, or nil for a def that does not yield.
   block
 end
 
@@ -172,6 +154,57 @@ struct IntermediateIndex
   index
 end
 
+# A String in its source form, between quotes with its escapes: what
+# `inspect` and `p` write.
+struct IntermediateInspect
+  type
+  value
+end
+
+# A parameter or a local, read.
+struct IntermediateLocal
+  type
+  name
+end
+
+# `&&` or `||` between two Booleans. The right side is computed only when
+# it decides the answer.
+struct IntermediateLogical
+  type
+  operator
+  left
+  right
+end
+
+struct IntermediateLoop
+  condition
+  body
+end
+
+# A method a value answers, with no arguments: an Integer's `abs` or
+# `even?`, a String's `length`. The receiver's type and the name say which.
+struct IntermediateMethod
+  type
+  receiver
+  name
+end
+
+# `-value`, refusing on the one Integer that has no negation.
+struct IntermediateNegation
+  type
+  value
+end
+
+struct IntermediateNext
+  line
+end
+
+# `!value`.
+struct IntermediateNot
+  type
+  value
+end
+
 # A maybe used where its value is needed, opened when the line runs: the
 # value where there is one, and otherwise the seed's refusal for nil
 # asked that method, `puts` among them by its own name.
@@ -181,77 +214,8 @@ struct IntermediateOpen
   name
 end
 
-# `maybe || fallback`: the value where there is one, and otherwise the
-# fallback, which is computed only then.
-struct IntermediateDefault
-  type
-  value
-  fallback
-end
-
-# A plain value bound where a maybe is held: a maybe that is there.
-struct IntermediateSome
-  type
-  value
-end
-
-# A `yield`: a call of the block the function was handed.
-struct IntermediateYield
-  type
-  arguments
-end
-
-# An `if` read for its value: one value per arm, and only the arm taken is
-# computed.
-struct IntermediateChoice
-  type
-  condition
-  then_value
-  else_value
-end
-
-# The statements.
-
-# A local bound or rebound.
-struct IntermediateStore
-  name
-  value
-end
-
-# `name << value` on a local that holds an array: the local then holds
-# the array with the value after its last element. Values never mutate,
-# so an array another name holds is copied first, which the runtime
-# sees to.
-struct IntermediateAppend
-  name
-  type
-  value
-end
-
-# An `if` run for what its arms do.
-struct IntermediateBranch
-  condition
-  then_body
-  else_body
-end
-
-struct IntermediateLoop
-  condition
-  body
-end
-
-# `break` and `next` in a loop: out of it, and on to its next turn.
-struct IntermediateBreak
-  line
-end
-
-struct IntermediateNext
-  line
-end
-
-# A way out of a function, with the value it answers, or with none where
-# the function answers nothing.
-struct IntermediateReturn
+# `panic(message)`: the program stops, saying the message.
+struct IntermediatePanic
   value
 end
 
@@ -260,14 +224,55 @@ struct IntermediatePrint
   value
 end
 
-# `panic(message)`: the program stops, saying the message.
-struct IntermediatePanic
+# A program: its functions in written order, the top-level statements last
+# as the entry function, `main`.
+struct IntermediateProgram
+  functions
+end
+
+# A way out of a function, with the value it answers, or with none where
+# the function answers nothing.
+struct IntermediateReturn
   value
 end
 
-# A value computed and dropped: a call made for what it does.
-struct IntermediateEvaluate
+# A plain value bound where a maybe is held: a maybe that is there.
+struct IntermediateSome
+  type
   value
+end
+
+# A local bound or rebound.
+struct IntermediateStore
+  name
+  value
+end
+
+# An Integer, a Boolean, or an array written out as a String, as `puts`,
+# `to_s`, and interpolation write one. An array's is its source form.
+struct IntermediateText
+  type
+  value
+end
+
+# `array.each { … }`: the block run once for each element, in order. It
+# answers the array it walked.
+struct IntermediateWalk
+  type
+  array
+  block
+end
+
+# A `yield`: a call of the block the function was handed.
+struct IntermediateYield
+  type
+  arguments
+end
+
+# Statements lowered, and the bindings in scope after them.
+struct Lowered
+  nodes
+  bindings
 end
 
 # What lowering needs beside the statement in hand: the functions' answers
@@ -296,51 +301,93 @@ struct LoweringContext
   pinned
 end
 
-# Statements lowered, and the bindings in scope after them.
-struct Lowered
-  nodes
-  bindings
+# A value as the type that is to hold it (#505): itself where it is that
+# type, a maybe that is there where the type is a maybe of what it is,
+# and a maybe that is not there where it is nil. Nil where it does not
+# fit.
+def fitted(value, type)
+  return value if value.type == type
+  return nil unless type in ["maybe", *]
+  return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
+  return IntermediateSome.new(type: type, value: value) if type_at(type, 1) == value.type
+  nil
 end
 
-def lower_program(nodes)
-  pinned = pin_program(nodes)
-  definitions = nodes.select { it in DefNode }
-  statements = nodes.reject { it in DefNode }
-  mutable called = []
-  pinned.defs.each do |found|
-    if found.pinned?
-      called << found
-    elsif found.reason != "nothing calls it"
-      definition = definitions.find { it.name == found.name }
-      line = definition.nil? ? "" : " on line #{definition.line}"
-      panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
-    end
-  end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false, answer: nil, pinned: pinned.bindings)
-  mutable functions = []
-  called.each do |found|
-    definition = definitions.find { it.name == found.name }
-    next if definition.nil?
-    functions << lower_function(definition, found, context)
-  end
-  entry = lower_statements(statements, [], context)
-  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil)
-  IntermediateProgram.new(functions: functions)
+# What a name first bound here holds: what it is bound to, unless
+# pinning settled it as a maybe of that, because another binding of the
+# name is nil or a maybe.
+def held_type(name, type, context)
+  pinned = context.pinned.find { it[0] == name }
+  return type if pinned.nil?
+  settled = type_at(pinned, 1)
+  return settled if (settled in ["maybe", *]) && native_type?(settled) && (type == ["nil"] || type == type_at(settled, 1))
+  type
 end
 
-# A def: its statements, the last one read for its value, since a def
-# answers its last expression.
-def lower_function(definition, found, context)
-  found.parameters.each do |parameter|
-    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
+# A value in its source form, as `inspect` and `p` write it: a String
+# between quotes, a maybe as its value or `nil`, and everything else as
+# it is written out.
+def inspected(value, node)
+  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in ["maybe", *])
+  written_out(value, node)
+end
+
+# The one type two arms answer together: the type they share, or a maybe
+# where one is nil or already a maybe of the other. Nil where there is
+# none.
+def joined_type(first, second)
+  return first if first == second
+  return ["maybe", second] if first == ["nil"] && native_value?(second)
+  return ["maybe", first] if second == ["nil"] && native_value?(first)
+  return first if first == ["maybe", second]
+  return second if second == ["maybe", first]
+  nil
+end
+
+# `name << value` (#497). The parser writes it as a binding of the name
+# to the append, and that is the one shape built: the local takes the
+# grown array.
+def lower_append(statement, append, bindings, context)
+  refuse_native("a << bound to another name", statement) unless append.name == statement.name
+  found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
+  held = type_at(found, 1)
+  refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
+  written = lower_value(append.value, bindings, context)
+  # An empty array appended to an array of arrays is one of its elements.
+  value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
+  type = ["array", value.type]
+  refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
+  refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
+  # An empty array no append had named yet is named by this one.
+  after = bindings.map { it[0] == append.name ? [append.name, type] : it }
+  Lowered.new(nodes: [IntermediateAppend.new(name: append.name, type: type, value: value)], bindings: after)
+end
+
+# A block handed to a def (#493). Its parameters are bound to what the
+# def yields, in order; one it leaves unnamed is still handed over, and
+# takes a name no local can have. Every local of the writer's in scope
+# is captured, less the ones a parameter of the block's hides. A name
+# the block binds first is the block's own, and is not seen after it.
+def lower_block(block, handed, bindings, context)
+  refuse_native("a block that names more than it is yielded", block) if block.parameters.length > handed.parameters.length
+  refuse_native("a block answering #{with_article(handed.answer)}", block) unless handed.answer == NOTHING || native_type?(handed.answer)
+  mutable parameters = []
+  mutable index = 0
+  handed.parameters.each do |type|
+    refuse_native("a block handed #{with_article(type)}", block) unless native_type?(type)
+    name = type_at(block.parameters, index) or "unnamed #{index}"
+    refuse_native("a block parameter that is not a name", block) unless name in String
+    parameters << [name, type]
+    index += 1
   end
-  refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
-  names = context.arities.map { it[0] }
-  settled = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(context.answers, found.block), names)
-  inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, pinned: settled.bindings)
-  lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
-  locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
-  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
+  captures = bindings.reject { |binding| parameters.any? { it[0] == binding[0] } }
+  start = parameters.reverse + captures
+  # A `yield` inside the block is its writer's, so what the writer was
+  # handed stays what a `yield` reaches.
+  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer)
+  lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
+  locals = lowered.bindings.slice(0, lowered.bindings.length - start.length)
+  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: captures, onward: yields?(block.body))
 end
 
 # A def's body or a block's. One that answers nothing has every statement
@@ -373,84 +420,66 @@ def lower_body(body, owner, what, bindings, answer, context)
   Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
 end
 
-# A value as the type that is to hold it (#505): itself where it is that
-# type, a maybe that is there where the type is a maybe of what it is,
-# and a maybe that is not there where it is nil. Nil where it does not
-# fit.
-def fitted(value, type)
-  return value if value.type == type
-  return nil unless type in ["maybe", *]
-  return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
-  return IntermediateSome.new(type: type, value: value) if type_at(type, 1) == value.type
-  nil
+def lower_call(node, name, arguments, bindings, context)
+  arity = context.arities.find { it[0] == name }
+  refuse_native("a call to #{name}", node) if arity.nil?
+  answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
+  lowered = arguments.map { lower_value(it, bindings, context) }
+  handed = context.blocks.find { it[0] == name }
+  # A def called by its bare name is a name and not a call, and is
+  # handed no block.
+  written = (node in CallNode) ? node.block : nil
+  refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && handed.nil?
+  refuse_native("a call to #{name} without the block it yields to", node) if written.nil? && handed.some?
+  block = written.nil? ? nil : lower_block(written, type_at(handed, 1), bindings, context)
+  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: lowered, block: block)
 end
 
-# The one type two arms answer together: the type they share, or a maybe
-# where one is nil or already a maybe of the other. Nil where there is
-# none.
-def joined_type(first, second)
-  return first if first == second
-  return ["maybe", second] if first == ["nil"] && native_value?(second)
-  return ["maybe", first] if second == ["nil"] && native_value?(first)
-  return first if first == ["maybe", second]
-  return second if second == ["maybe", first]
-  nil
+def lower_condition(node, bindings, context)
+  value = lower_value(node, bindings, context)
+  refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == ["boolean"]
+  value
 end
 
-# What a name first bound here holds: what it is bound to, unless
-# pinning settled it as a maybe of that, because another binding of the
-# name is nil or a maybe.
-def held_type(name, type, context)
-  pinned = context.pinned.find { it[0] == name }
-  return type if pinned.nil?
-  settled = type_at(pinned, 1)
-  return settled if (settled in ["maybe", *]) && native_type?(settled) && (type == ["nil"] || type == type_at(settled, 1))
-  type
-end
-
-# A block handed to a def (#493). Its parameters are bound to what the
-# def yields, in order; one it leaves unnamed is still handed over, and
-# takes a name no local can have. Every local of the writer's in scope
-# is captured, less the ones a parameter of the block's hides. A name
-# the block binds first is the block's own, and is not seen after it.
-def lower_block(block, handed, bindings, context)
-  refuse_native("a block that names more than it is yielded", block) if block.parameters.length > handed.parameters.length
-  refuse_native("a block answering #{with_article(handed.answer)}", block) unless handed.answer == NOTHING || native_type?(handed.answer)
-  mutable parameters = []
-  mutable index = 0
-  handed.parameters.each do |type|
-    refuse_native("a block handed #{with_article(type)}", block) unless native_type?(type)
-    name = type_at(block.parameters, index) or "unnamed #{index}"
-    refuse_native("a block parameter that is not a name", block) unless name in String
-    parameters << [name, type]
-    index += 1
+# A def: its statements, the last one read for its value, since a def
+# answers its last expression.
+def lower_function(definition, found, context)
+  found.parameters.each do |parameter|
+    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
   end
-  captures = bindings.reject { |binding| parameters.any? { it[0] == binding[0] } }
-  start = parameters.reverse + captures
-  # A `yield` inside the block is its writer's, so what the writer was
-  # handed stays what a `yield` reaches.
-  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer)
-  lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
-  locals = lowered.bindings.slice(0, lowered.bindings.length - start.length)
-  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: captures, onward: yields?(block.body))
+  refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
+  names = context.arities.map { it[0] }
+  settled = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(context.answers, found.block), names)
+  inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, pinned: settled.bindings)
+  lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
+  locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
+  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
 end
 
-# A `yield`: what it hands over, and the type the block answers.
-def lower_yield(node, bindings, context)
-  handed = context.yielding or refuse_native("a yield outside a def", node)
-  arguments = node.values.map { lower_value(it, bindings, context) }
-  IntermediateYield.new(type: handed.answer, arguments: arguments)
-end
-
-def lower_statements(statements, bindings, context)
-  mutable nodes = []
-  mutable current = bindings
-  statements.each do |statement|
-    lowered = lower_statement(statement, current, context)
-    nodes += lowered.nodes
-    current = lowered.bindings
+def lower_program(nodes)
+  pinned = pin_program(nodes)
+  definitions = nodes.select { it in DefNode }
+  statements = nodes.reject { it in DefNode }
+  mutable called = []
+  pinned.defs.each do |found|
+    if found.pinned?
+      called << found
+    elsif found.reason != "nothing calls it"
+      definition = definitions.find { it.name == found.name }
+      line = definition.nil? ? "" : " on line #{definition.line}"
+      panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
+    end
   end
-  Lowered.new(nodes: nodes, bindings: current)
+  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false, answer: nil, pinned: pinned.bindings)
+  mutable functions = []
+  called.each do |found|
+    definition = definitions.find { it.name == found.name }
+    next if definition.nil?
+    functions << lower_function(definition, found, context)
+  end
+  entry = lower_statements(statements, [], context)
+  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil)
+  IntermediateProgram.new(functions: functions)
 end
 
 def lower_statement(statement, bindings, context)
@@ -534,64 +563,15 @@ def lower_statement(statement, bindings, context)
   end
 end
 
-# An empty array literal bound to a name takes the type the name has: a
-# local already bound, or what pinning settled for it from the appends
-# that follow.
-def settled_empty(lowered, name, bindings, context)
-  return lowered unless lowered.type == EMPTY_ARRAY
-  found = bindings.find { it[0] == name }
-  return lowered.with(type: type_at(found, 1)) if found.some? && (type_at(found, 1) in ["array", *])
-  pinned = context.pinned.find { it[0] == name }
-  return lowered if pinned.nil? || !native_type?(type_at(pinned, 1))
-  lowered.with(type: type_at(pinned, 1))
-end
-
-# `name << value` (#497). The parser writes it as a binding of the name
-# to the append, and that is the one shape built: the local takes the
-# grown array.
-def lower_append(statement, append, bindings, context)
-  refuse_native("a << bound to another name", statement) unless append.name == statement.name
-  found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
-  held = type_at(found, 1)
-  refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
-  written = lower_value(append.value, bindings, context)
-  # An empty array appended to an array of arrays is one of its elements.
-  value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
-  type = ["array", value.type]
-  refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
-  refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
-  # An empty array no append had named yet is named by this one.
-  after = bindings.map { it[0] == append.name ? [append.name, type] : it }
-  Lowered.new(nodes: [IntermediateAppend.new(name: append.name, type: type, value: value)], bindings: after)
-end
-
-# A value as `puts`, `to_s`, and interpolation write it: a String is
-# itself, and an Integer, a Boolean, or an array is written out.
-def written_out(value, node)
-  # A maybe is opened first, and nil refuses as the seed's `to_s` does.
-  return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
-  return value if value.type == ["string"]
-  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *])
-  refuse_native("writing out #{with_article(value.type)}", node) unless writable
-  IntermediateText.new(type: ["string"], value: value)
-end
-
-# A value in its source form, as `inspect` and `p` write it: a String
-# between quotes, a maybe as its value or `nil`, and everything else as
-# it is written out.
-def inspected(value, node)
-  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in ["maybe", *])
-  written_out(value, node)
-end
-
-# A type with a maybe opened: what an operation that needs the value
-# works on.
-def plain_of(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
-
-def lower_condition(node, bindings, context)
-  value = lower_value(node, bindings, context)
-  refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == ["boolean"]
-  value
+def lower_statements(statements, bindings, context)
+  mutable nodes = []
+  mutable current = bindings
+  statements.each do |statement|
+    lowered = lower_statement(statement, current, context)
+    nodes += lowered.nodes
+    current = lowered.bindings
+  end
+  Lowered.new(nodes: nodes, bindings: current)
 end
 
 # An expression, as a value with its type.
@@ -726,19 +706,11 @@ def lower_value(node, bindings, context)
   end
 end
 
-def lower_call(node, name, arguments, bindings, context)
-  arity = context.arities.find { it[0] == name }
-  refuse_native("a call to #{name}", node) if arity.nil?
-  answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
-  lowered = arguments.map { lower_value(it, bindings, context) }
-  handed = context.blocks.find { it[0] == name }
-  # A def called by its bare name is a name and not a call, and is
-  # handed no block.
-  written = (node in CallNode) ? node.block : nil
-  refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && handed.nil?
-  refuse_native("a call to #{name} without the block it yields to", node) if written.nil? && handed.some?
-  block = written.nil? ? nil : lower_block(written, type_at(handed, 1), bindings, context)
-  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: lowered, block: block)
+# A `yield`: what it hands over, and the type the block answers.
+def lower_yield(node, bindings, context)
+  handed = context.yielding or refuse_native("a yield outside a def", node)
+  arguments = node.values.map { lower_value(it, bindings, context) }
+  IntermediateYield.new(type: handed.answer, arguments: arguments)
 end
 
 # What a method with no arguments answers natively, by its receiver's
@@ -760,19 +732,6 @@ def native_method_answer(type, name)
   nil
 end
 
-# The types the native build holds: an Integer, a Boolean, a String, an
-# array of any of those or of such arrays (#497, #499), and a maybe of
-# any of them (#503). An array holds no maybe.
-def native_type?(type)
-  return native_value?(type_at(type, 1)) if type in ["maybe", *]
-  native_value?(type)
-end
-
-def native_value?(type)
-  return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
-  (type in ["array", *]) && native_value?(type_at(type, 1))
-end
-
 # What to call a node the slice does not hold, in the refusal.
 def native_name_of(node)
   case node
@@ -792,11 +751,35 @@ def native_name_of(node)
   end
 end
 
+# The types the native build holds: an Integer, a Boolean, a String, an
+# array of any of those or of such arrays (#497, #499), and a maybe of
+# any of them (#503). An array holds no maybe.
+def native_type?(type)
+  return native_value?(type_at(type, 1)) if type in ["maybe", *]
+  native_value?(type)
+end
+
+def native_value?(type)
+  return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
+  (type in ["array", *]) && native_value?(type_at(type, 1))
+end
+
+# A type with a maybe opened: what an operation that needs the value
+# works on.
+def plain_of(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
+
 # The one refusal for everything outside the slice: what the native build
 # does compile, then what it met and where.
 def refuse_native(what, node)
   line = node.nil? ? "" : " on line #{node.line}"
   panic("the native build compiles integers, strings, comparisons, if, while, def, yield, and puts — #{what}#{line} is unbuilt (#443)")
+end
+
+# A block in the dump: its parameters between bars, then its statements,
+# on one line.
+def render_handed_block(block)
+  parameters = block.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
+  "(block |#{parameters}| #{render_statements(block.body, "").map { it.strip }.join("; ")})"
 end
 
 # The dump: one line per function and statement, values as S-expressions.
@@ -872,9 +855,25 @@ def render_value(value)
   end
 end
 
-# A block in the dump: its parameters between bars, then its statements,
-# on one line.
-def render_handed_block(block)
-  parameters = block.parameters.map { "#{it[0]}: #{render_type(type_at(it, 1))}" }.join(", ")
-  "(block |#{parameters}| #{render_statements(block.body, "").map { it.strip }.join("; ")})"
+# An empty array literal bound to a name takes the type the name has: a
+# local already bound, or what pinning settled for it from the appends
+# that follow.
+def settled_empty(lowered, name, bindings, context)
+  return lowered unless lowered.type == EMPTY_ARRAY
+  found = bindings.find { it[0] == name }
+  return lowered.with(type: type_at(found, 1)) if found.some? && (type_at(found, 1) in ["array", *])
+  pinned = context.pinned.find { it[0] == name }
+  return lowered if pinned.nil? || !native_type?(type_at(pinned, 1))
+  lowered.with(type: type_at(pinned, 1))
+end
+
+# A value as `puts`, `to_s`, and interpolation write it: a String is
+# itself, and an Integer, a Boolean, or an array is written out.
+def written_out(value, node)
+  # A maybe is opened first, and nil refuses as the seed's `to_s` does.
+  return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
+  return value if value.type == ["string"]
+  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *])
+  refuse_native("writing out #{with_article(value.type)}", node) unless writable
+  IntermediateText.new(type: ["string"], value: value)
 end
