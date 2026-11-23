@@ -104,6 +104,7 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0090](0090-2026-11-22-a-modifier-after-a-def-guards-the-definition.md) — A modifier after a `def` guards the definition
 - [0091](0091-2026-11-22-a-matchs-slices-are-collections.md) — A match's slices are collections, and brackets take two values on a match
 - [0092](0092-2026-11-22-end-marker-and-data.md) — `__END__` ends the program, and `DATA` is the text after it
+- [0093](0093-2026-11-22-the-core-is-portland-source.md) — The core is Portland source, loaded before every program
 
 <!-- /generated -->
 
