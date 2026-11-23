@@ -24,4 +24,26 @@ context "Regexps with grouping" do
       $/x
     expect(found(pattern, "ab")).to eq(["ab", "a"])
   end
+
+  specify "support ()" do
+    expect(/(a)/.match("a").to_a).to eq(["a", "a"])
+  end
+
+  specify "allows groups to be nested" do
+    md = /(hay(st)a)ck/.match('haystack')
+    expect(md.to_a).to eq(['haystack','haysta', 'st'])
+  end
+
+  specify "supports (?: ) (non-capturing group)" do
+    expect(/(?:foo)(bar)/.match("foobar").to_a).to eq(["foobar", "bar"])
+    # Parsing precedence
+    expect(/(?:xdigit:)/.match("xdigit:").to_a).to eq(["xdigit:"])
+  end
+
+  specify "ignore capture groups in line comments" do
+    expect(/^
+     (a) # there is a capture group on this line
+     b   # there is no capture group on this line (not even here)
+     $/x.match("ab").to_a).to eq([ "ab", "a" ])
+  end
 end

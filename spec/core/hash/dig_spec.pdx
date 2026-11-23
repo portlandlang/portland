@@ -15,4 +15,29 @@ context "Hash#dig" do
     nested = {outer: {inner: 7}}
     expect(nested.dig(:nope, :inner)).to be_nil
   end
+
+  specify "returns #[] with one arg" do
+    h = { 0 => false, a: 1 }
+    expect(h.dig(:a)).to eq(1)
+    expect(h.dig(0)).to be_false
+    expect(h.dig(1)).to be_nil
+  end
+
+  specify "returns the nested value specified by the sequence of keys" do
+    h = { foo: { bar: { baz: 1 } } }
+    expect(h.dig(:foo, :bar, :baz)).to eq(1)
+    expect(h.dig(:foo, :bar, :nope)).to be_nil
+    expect(h.dig(:foo, :baz)).to be_nil
+    expect(h.dig(:bar, :baz, :foo)).to be_nil
+  end
+
+  specify "returns the nested value specified if the sequence includes an index" do
+    h = { foo: [1, 2, 3] }
+    expect(h.dig(:foo, 2)).to eq(3)
+  end
+
+  specify "returns nil if any intermediate step is nil" do
+    h = { foo: { bar: { baz: 1 } } }
+    expect(h.dig(:foo, :zot, :xyz)).to be_nil
+  end
 end
