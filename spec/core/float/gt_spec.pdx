@@ -9,4 +9,30 @@ context "Float#>" do
     expect(91.8 > 71.3).to be_true
     expect(5.5 > 5.5).to be_false
   end
+
+  specify "returns true if self is greater than other" do
+    expect(1.5 > 1).to be_true
+    expect(2.5 > 3).to be_false
+  end
+
+  specify "returns false if one side is NaN" do
+    [1.0, 42].each { |number|
+      expect(Float::NAN > number).to be_false
+      expect(number > Float::NAN).to be_false
+    }
+  end
+
+  specify "handles positive infinity" do
+    [1.0, 42].each { |number|
+      expect(Float::INFINITY > number).to be_true
+      expect(number > Float::INFINITY).to be_false
+    }
+  end
+
+  specify "handles negative infinity" do
+    [1.0, 42].each { |number|
+      expect((-Float::INFINITY) > number).to be_false
+      expect(number > (-Float::INFINITY)).to be_true
+    }
+  end
 end

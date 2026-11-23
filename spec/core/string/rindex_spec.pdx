@@ -107,6 +107,113 @@ context "String#rindex with String" do
 
     expect("hello".rindex("h", -6)).to be_nil
   end
+
+  specify "behaves the same as String#rindex(char) for one-character strings" do
+    "blablabla hello cruel world...!".split("").uniq.each do |text|
+      character = text[0]
+      expect(text.rindex(text)).to eq(text.rindex(character))
+
+      0.upto(text.size + 1) do |start|
+        expect(text.rindex(text, start)).to eq(text.rindex(character, start))
+      end
+
+      (-text.size - 1).upto(-1) do |start|
+        expect(text.rindex(text, start)).to eq(text.rindex(character, start))
+      end
+    end
+  end
+end
+
+context "String#rindex with Regexp" do
+  specify "returns the index of the first match from the end of string of regexp" do
+    expect("blablabla".rindex(/bla/)).to eq(6)
+    expect("blablabla".rindex(/BLA/i)).to eq(6)
+
+    expect("blablabla".rindex(/.{0}/)).to eq(9)
+    expect("blablabla".rindex(/.{1}/)).to eq(8)
+    expect("blablabla".rindex(/.{2}/)).to eq(7)
+    expect("blablabla".rindex(/.{6}/)).to eq(3)
+    expect("blablabla".rindex(/.{9}/)).to eq(0)
+
+    expect("blablabla".rindex(/.*/)).to eq(9)
+    expect("blablabla".rindex(/.+/)).to eq(8)
+
+    expect("blablabla".rindex(/bla|a/)).to eq(8)
+
+    expect("blablabla".rindex(/\A/)).to eq(0)
+    expect("blablabla".rindex(/\Z/)).to eq(9)
+    expect("blablabla".rindex(/\z/)).to eq(9)
+    expect("blablabla\n".rindex(/\Z/)).to eq(10)
+    expect("blablabla\n".rindex(/\z/)).to eq(10)
+
+    expect("blablabla".rindex(/^/)).to eq(0)
+    expect("\nblablabla".rindex(/^/)).to eq(1)
+    expect("b\nlablabla".rindex(/^/)).to eq(2)
+    expect("blablabla".rindex(/$/)).to eq(9)
+
+    expect("blablabla".rindex(/.l./)).to eq(6)
+  end
+
+  specify "starts the search at the given offset" do
+    expect("blablabla".rindex(/.{0}/, 5)).to eq(5)
+    expect("blablabla".rindex(/.{1}/, 5)).to eq(5)
+    expect("blablabla".rindex(/.{2}/, 5)).to eq(5)
+    expect("blablabla".rindex(/.{3}/, 5)).to eq(5)
+    expect("blablabla".rindex(/.{4}/, 5)).to eq(5)
+
+    expect("blablabla".rindex(/.{0}/, 3)).to eq(3)
+    expect("blablabla".rindex(/.{1}/, 3)).to eq(3)
+    expect("blablabla".rindex(/.{2}/, 3)).to eq(3)
+    expect("blablabla".rindex(/.{5}/, 3)).to eq(3)
+    expect("blablabla".rindex(/.{6}/, 3)).to eq(3)
+
+    expect("blablabla".rindex(/.l./, 0)).to eq(0)
+    expect("blablabla".rindex(/.l./, 1)).to eq(0)
+    expect("blablabla".rindex(/.l./, 2)).to eq(0)
+    expect("blablabla".rindex(/.l./, 3)).to eq(3)
+
+    expect("blablablax".rindex(/.x/, 10)).to eq(8)
+    expect("blablablax".rindex(/.x/, 9)).to eq(8)
+    expect("blablablax".rindex(/.x/, 8)).to eq(8)
+
+    expect("blablablax".rindex(/..x/, 10)).to eq(7)
+    expect("blablablax".rindex(/..x/, 9)).to eq(7)
+    expect("blablablax".rindex(/..x/, 8)).to eq(7)
+    expect("blablablax".rindex(/..x/, 7)).to eq(7)
+
+    expect("blablabla\n".rindex(/\Z/, 9)).to eq(9)
+  end
+
+  specify "starts the search at offset + self.length if offset is negative" do
+    text = "blablabla"
+
+    ["bl", "bla", "blab", "la", "lab", "ab", ""].each do |needle|
+      (-text.length..-1).each do |offset|
+        expect(text.rindex(needle, offset)).to eq(text.rindex(needle, offset + text.length))
+      end
+    end
+  end
+
+  specify "returns nil if the substring isn't found" do
+    expect("blablabla".rindex(/BLA/)).to be_nil
+    expect("blablabla".rindex(/.{10}/)).to be_nil
+    expect("blablablax".rindex(/.x/, 7)).to be_nil
+    expect("blablablax".rindex(/..x/, 6)).to be_nil
+
+    expect("blablabla".rindex(/\Z/, 5)).to be_nil
+    expect("blablabla".rindex(/\z/, 5)).to be_nil
+    expect("blablabla\n".rindex(/\z/, 9)).to be_nil
+  end
+
+  specify "returns the reverse character index of a multibyte character" do
+    expect("ありがりがとう".rindex("が")).to eq(4)
+    expect("ありがりがとう".rindex(/が/)).to eq(4)
+  end
+
+  specify "returns the character index before the finish" do
+    expect("ありがりがとう".rindex("が", 3)).to eq(2)
+    expect("ありがりがとう".rindex(/が/, 3)).to eq(2)
+  end
 end
 
 context "String#rindex with object" do
@@ -124,5 +231,44 @@ context "String#rindex with object" do
 
   specify "rindex finds a match that overlaps an earlier one" do
     expect("aaa".rindex(/aa/)).to eq(1)
+  end
+end
+
+context "String#rindex with Regexp" do
+  specify "behaves the same as String#rindex(string) for escaped string regexps" do
+    ["blablabla", "hello cruel world...!"].each do |text|
+      ["", "b", "bla", "lab", "o c", "d."].each do |needle|
+        pattern = Regexp.new(Regexp.escape(needle))
+        expect(text.rindex(pattern)).to eq(text.rindex(needle))
+
+        0.upto(text.size + 1) do |start|
+          expect(text.rindex(pattern, start)).to eq(text.rindex(needle, start))
+        end
+
+        (-text.size - 1).upto(-1) do |start|
+          expect(text.rindex(pattern, start)).to eq(text.rindex(needle, start))
+        end
+      end
+    end
+  end
+
+  specify "supports \\G which matches at the given start offset" do
+    expect("helloYOU.".rindex(/YOU\G/, 8)).to eq(5)
+    expect("helloYOU.".rindex(/YOU\G/)).to be_nil
+
+    position = "helloYOUall!".index("YOU")
+    pattern = /YOU.+\G.+/
+    # The # marks where \G will match.
+    [
+      ["helloYOU#all.", nil],
+      ["helloYOUa#ll.", position],
+      ["helloYOUal#l.", position],
+      ["helloYOUall#.", position],
+      ["helloYOUall.#", nil]
+    ].each do |marked, expected|
+      start = marked.index("#")
+      text = marked.delete("#")
+      expect(text.rindex(pattern, start)).to eq(expected)
+    end
   end
 end

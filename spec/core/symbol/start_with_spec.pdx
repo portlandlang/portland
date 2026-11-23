@@ -24,4 +24,29 @@ context "Symbol#start_with?" do
   specify "works for multibyte strings" do
     expect(:"céréale".start_with?("cér")).to eq(true)
   end
+
+  specify "returns true only if any beginning match" do
+    expect(:hello.start_with?("x", "y", "he", "z")).to eq(true)
+  end
+
+  specify "supports regexps" do
+    pattern = /[h1]/
+    expect(:hello.start_with?(pattern)).to eq(true)
+    expect(:"1337".start_with?(pattern)).to eq(true)
+    expect(:"foxes are 1337".start_with?(pattern)).to eq(false)
+    expect(:"chunky\n12bacon".start_with?(/12/)).to eq(false)
+  end
+
+  specify "supports regexps with ^ and $ modifiers" do
+    leading = /^\d{2}/
+    trailing = /\d{2}$/
+    expect(:"12test".start_with?(leading)).to eq(true)
+    expect(:test12.start_with?(leading)).to eq(false)
+    expect(:"12test".start_with?(trailing)).to eq(false)
+    expect(:test12.start_with?(trailing)).to eq(false)
+  end
+
+  specify "answers false when given no candidates" do
+    expect(:hello.start_with?()).to be_false
+  end
 end
