@@ -1348,6 +1348,33 @@ fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
     );
 }
 
+/// A def that yields is pinned with its block (#493): the block's
+/// parameters take the types of what the def yields, a `yield` is read as
+/// what the block answers, and a block that ends in what produces no
+/// value answers nothing. A def that yields two types at one position,
+/// or whose calls hand it blocks that answer two types, is declined by
+/// that reason.
+#[test]
+fn portland_pin_reads_a_block_with_the_def_it_is_handed_to() {
+    let sample = std::env::temp_dir().join("pinning_block_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def twice\n  yield\n  yield\nend\n\ndef apply(number)\n  yield(number) + 1\nend\n\ndef each_upto(limit)\n  mutable index = 0\n  while index < limit\n    yield(index)\n    index += 1\n  end\nend\n\ndef greet(name)\n  yield(\"hello, \" + name)\nend\n\ndef torn\n  yield(1)\n  yield(\"one\")\nend\n\ndef split(number)\n  yield(number)\nend\n\nmutable total = 0\ntwice { total += 5 }\nputs(apply(4) { |number| number * 2 })\neach_upto(3) { |index| puts index }\ngreet(\"Portland\") { |line| puts line }\ntorn { |value| puts 1 }\nsplit(1) { |number| number }\nsplit(2) { |number| \"two\" }\n",
+    )
+    .unwrap();
+    let driver = format!("{}/../compiler/pin.pdx", env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(output.status.success(), "pin.pdx should run");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "def twice { -> Integer } # -> Integer\ndef apply(number: Integer) { |Integer| -> Integer } # -> Integer\ndef each_upto(limit: Integer) { |Integer| -> nothing } # -> nothing\ndef greet(name: String) { |String| -> nothing } # -> nothing\ndef torn: not pinned — it yields an Integer at one place and a String at another\ndef split: not pinned — its block answers an Integer at one call and a String at another\ntotal: Integer\n"
+    );
+}
+
 /// `intermediate.pdx` — the native build's intermediate representation
 /// (#446): a program inside the slice, each function with its typed
 /// parameters and locals, each statement on a line, each value an
