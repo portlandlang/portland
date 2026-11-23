@@ -307,10 +307,24 @@ pub fn lex(source: &str) -> Vec<Token<'_>> {
                     });
                 }
                 let text = &source[start..end];
-                check_prefixed_literal(text);
+                // Ruby's `r` and `i` suffixes end a prefixed literal too
+                // (#291): `0xffr` is `(255/1)`, `0b1110i` is `(0+14i)`.
+                // Neither letter is a digit of any base, so the last one
+                // is the suffix and the digits before it are checked.
+                let kind = match text.as_bytes().last() {
+                    Some(b'r') => TokenKind::Rational,
+                    Some(b'i') => TokenKind::Imaginary,
+                    _ => TokenKind::Integer,
+                };
+                let digits = if kind == TokenKind::Integer {
+                    text
+                } else {
+                    &text[..text.len() - 1]
+                };
+                check_prefixed_literal(digits);
                 tokens.push(Token {
                     leading_space: false,
-                    kind: TokenKind::Integer,
+                    kind,
                     text,
                 });
             }

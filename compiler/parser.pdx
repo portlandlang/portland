@@ -1079,6 +1079,11 @@ end
 # is the power of ten.
 def rational_node(text, line: nil)
   digits = text.slice(0, text.length - 1).split("_").join("")
+  # A prefixed literal is a whole number in its base (#291).
+  letters = digits.chars
+  if letters.length > 2 && letters[0] == "0" && base_letter?(letters[1])
+    return RationalNode.new(kind: "rational", numerator: integer_digits(digits).to_i, denominator: 1, line: line)
+  end
   parts = digits.split(".")
   whole = parts.first or "0"
   fraction = parts.length > 1 ? (parts.last or "") : ""

@@ -4762,9 +4762,9 @@ language/numbered_parameters_spec.rb:
   link: docs/ruby/removed-syntax.md
 language/numbers_spec.rb:
   pdx: [spec/language/numbers_spec.pdx]
-  status: partial_planned
-  reason: "A bare leading-zero octal refuses; a prefixed literal with an r or i suffix refuses (#291), and the bignum and long-decimal r rows are past 64 bits."
-  link: https://github.com/portlandlang/portland/issues/291
+  status: partial_intentional
+  reason: "A bare leading-zero octal refuses, and the bignum and long-decimal r rows are past 64 bits."
+  link: docs/ruby/integer-literals.md
 language/rescue_spec.rb:
   status: skipped
   reason: "begin/rescue/raise do not exist: a fallible operation returns its failure."
