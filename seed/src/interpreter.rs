@@ -1976,6 +1976,14 @@ fn strippable(character: char) -> bool {
     character.is_whitespace() || character == '\0'
 }
 
+/// A trait named where a pattern goes (#300): no value is of a trait's
+/// type, so the arm could never match.
+fn trait_pattern_sentence(name: &str) -> String {
+    format!(
+        "'in {name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include {name}"
+    )
+}
+
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
 /// while they last; from the first float — or a float init — the rest go
 /// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
@@ -9088,6 +9096,13 @@ impl<W: std::io::Write> Interpreter<W> {
                             | ("Rational", Value::Rational { .. })
                     );
                     return if matched { Some(Vec::new()) } else { None };
+                }
+                // A trait is not a type a value has, so as a pattern it
+                // would match nothing, silently; it refuses instead (#300).
+                if Self::resolve(&self.module_path, name, &self.structs).is_none()
+                    && Self::resolve(&self.module_path, name, &self.traits).is_some()
+                {
+                    panic!("{}", trait_pattern_sentence(name));
                 }
                 let Value::Struct {
                     fields,

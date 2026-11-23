@@ -39,6 +39,8 @@ What changes from Ruby:
 
 Ruby's Enumerable takes a pattern where it also takes a block — `all?(1..3)`, `any?(2)`, `none?`, `one?`, `grep(3..7)`, `grep_v`, `slice_before(pattern)`, `slice_after(pattern)` — asking `pattern === element`. Here they take one too ([ADR 0066](../adr/0066-2026-10-25-pattern-arguments-take-the-when-rule.md)), under the `when` rule: a range covers a number, a regex matches a string or a symbol, anything else asks `==`. `grep(3..7) { it + 1 }` is `filter_map` under that rule. A pattern beside a block refuses — `'all?' takes a pattern or a block, not both` — and a type name is not a pattern argument, since a type is not a value: `all? { it in Integer }` is the spelling. A type held in a value, a set, and a struct that defines `===` are compared by `==` here, where `case/in` asks each its own question; [#403](https://github.com/portlandlang/portland/issues/403) decides them.
 
+A trait name is not a pattern. Ruby's `in Comparable` matches every value whose class includes the module; here no value is of a trait's type, so `in Basic` refuses, naming the structs to write, where it would have matched nothing without a word. [#364](https://github.com/portlandlang/portland/issues/364) decides whether a trait becomes a pattern.
+
 ## Migration
 
 - `case/in` code compiles verbatim where patterns are the supported set; non-exhaustive matches become compile errors naming the missing case — loud, never silent, and strictly fewer runtime crashes.

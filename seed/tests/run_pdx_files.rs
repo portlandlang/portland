@@ -1947,6 +1947,17 @@ fn inspect_escapes_control_characters_on_both_oracles() {
     );
 }
 
+/// A trait name in a `case/in` pattern refuses on both oracles (#300):
+/// no value is of a trait's type, so the arm could only ever miss.
+#[test]
+fn a_trait_name_as_a_pattern_refuses_on_both_oracles() {
+    let cases = [(
+        "trait Basic\n  def greet = \"hi\"\nend\nstruct Child\n  name\n  include Basic\nend\nanswer = case Child.new(name: \"x\")\nin Basic then \"basic\"\nelse \"other\"\nend\nputs answer\n",
+        "'in Basic' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include Basic",
+    )];
+    assert_both_oracles_refuse("trait_pattern.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.

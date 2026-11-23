@@ -1068,6 +1068,12 @@ def check_pattern(pattern, scope, mutable found)
     end
     found
   in StructPatternNode(fields:)
+    # A trait is not a type a value has, so as a pattern it would match
+    # nothing, silently; it refuses instead (#300) — the seed's sentence.
+    named = pattern.name.split("::").last or pattern.name
+    if scope.traits.any? { it.name == named }
+      found = noted(found, ["sentence", "'in #{pattern.name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include #{pattern.name}"], locate(pattern, scope))
+    end
     fields.each do |field|
       found = check_pattern(field[1], scope, found)
     end
