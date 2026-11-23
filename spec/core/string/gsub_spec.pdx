@@ -223,3 +223,31 @@ context "String#gsub with a string pattern" do
     expect("éa".gsub("é", "â")).to eq("âa")
   end
 end
+
+context "String#gsub with pattern and Hash" do
+  specify "returns a copy of self with all occurrences of pattern replaced with the value of the corresponding hash key" do
+    expect("hello".gsub(/./, {"l" => "L"})).to eq("LL")
+    expect("hello!".gsub(/(.)(.)/, {"he" => "she ", "ll" => "said"})).to eq("she said")
+    expect("hello".gsub("l", {"l" => "el"})).to eq("heelelo")
+  end
+
+  specify "ignores keys that don't correspond to matches" do
+    expect("hello".gsub(/./, {"z" => "L", "h" => "b", "o" => "ow"})).to eq("bow")
+  end
+
+  specify "returns an empty string if the pattern matches but the hash specifies no replacements" do
+    expect("hello".gsub(/./, {"z" => "L"})).to eq("")
+  end
+
+  specify "ignores non-String keys" do
+    expect("tattoo".gsub(/(tt)/, {"tt" => "b", tt: "z"})).to eq("taboo")
+  end
+
+  specify "uses a key's value as many times as needed" do
+    expect("food".gsub(/o/, {"o" => "0"})).to eq("f00d")
+  end
+
+  specify "coerces the hash values with #to_s" do
+    expect("food!".gsub(/./, {"o" => 0, "!" => :bang, "d" => [1, 2]})).to eq("00[1, 2]bang")
+  end
+end

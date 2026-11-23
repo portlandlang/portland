@@ -1801,6 +1801,32 @@ fn data_is_the_text_after_the_end_marker_of_the_file_that_is_run() {
     }
 }
 
+/// `sub` and `gsub` with a hash replacement (#311): a nil value refuses
+/// as nil's `to_s` does, and a replacement that is neither text nor a hash
+/// is the argument the refusal names, on both oracles.
+#[test]
+fn a_hash_replacement_refuses_by_the_argument_at_fault() {
+    let cases = [
+        (
+            "puts \"hello\".gsub(/l/, {\"l\" => nil})\n",
+            "nil has no method 'to_s' — handle the nil case first",
+        ),
+        (
+            "puts \"hello\".gsub(/l/, 3)\n",
+            "no implicit conversion of Integer into String",
+        ),
+        (
+            "puts \"hello\".sub(\"l\", 3)\n",
+            "no implicit conversion of Integer into String",
+        ),
+        (
+            "puts \"hello\".gsub(3, \"x\")\n",
+            "wrong argument type Integer (expected Regexp)",
+        ),
+    ];
+    assert_both_oracles_refuse("hash_replacement_refusal.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
