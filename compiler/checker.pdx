@@ -26,7 +26,8 @@
 # be had without types: a set the *arms themselves* establish — an enum
 # named by a payload-carrying arm, or the integers claimed by all-range
 # arms — can be proven uncovered, and an arm below a capture or below its
-# own case can be proven dead.
+# own case can be proven dead. Inference widens it to the closed sets a
+# subject's type names, a maybe and a Boolean, whatever the arms reveal.
 #
 # Where the checker cannot tell, it declines to check (principle 4): any
 # node kind it does not recognize passes through silently, a bare symbol is
@@ -328,8 +329,38 @@ def check_requires(nodes, inside, scope, mutable found)
   found
 end
 
-def declarations_of(nodes)
+def declarations_of(written)
+  nodes = with_guarded_definitions(written)
   Declarations.new(arities: declared_arities(nodes), constants: declared_constants(nodes, ""), contracts: declared_contracts(nodes), enums: declared_cases(nodes), globals: declared_globals(nodes), private_constants: declared_private_constants(nodes, ""), shapes: declared_shapes(nodes), traits: trait_declarations_in(nodes), visibilities: declared_visibilities(nodes))
+end
+
+# A def under a top-level condition or loop is defined when that statement
+# runs (ADR 0090), which the checker cannot know. It declares what a
+# top-level def declares, each one listed after the statement that holds
+# it, so a call to it reads as a call to a defined method.
+def with_guarded_definitions(nodes)
+  mutable declaring = []
+  nodes.each do |node|
+    declaring << node
+    declaring += guarded_definitions(node)
+  end
+  declaring
+end
+
+def guarded_definitions(node)
+  held = guarded_statements(node)
+  mutable definitions = []
+  held.each do |statement|
+    definitions << statement if statement in DefNode
+    definitions += guarded_definitions(statement)
+  end
+  definitions
+end
+
+def guarded_statements(node)
+  return (node.then_body or []) + (node.else_body or []) if node in IfNode
+  return node.body if node in WhileNode
+  []
 end
 
 def empty_declarations = Declarations.new(arities: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
@@ -849,6 +880,7 @@ def check_case_in(node, scope, mutable found)
   found = check_unreachable_arms(node, scope, found)
   return found unless node.else_body.nil?
   found = check_maybe_coverage(node, scope, found)
+  found = check_boolean_coverage(node, scope, found)
   check_coverage(node, scope, found)
 end
 
@@ -865,8 +897,64 @@ def check_maybe_coverage(node, scope, mutable found)
   patterns = unguarded_arms(node).map { it.pattern }
   found = noted(found, ["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
   inner = type_at(subject, 1)
-  found = noted(found, ["coverage", "the present case"], locate(node, scope)) unless patterns.any? { covers_present?(it, inner) }
-  found
+  return found if patterns.any? { covers_present?(it, inner) }
+  # A present Boolean is true or false, so arms that take both between
+  # them cover the present case, and arms that provably take one leave
+  # the other, named.
+  left_out = if inner == ["boolean"] then uncovered_booleans(patterns) else nil end
+  return found if left_out in []
+  return noted(found, ["coverage", left_out.first], locate(node, scope)) if left_out.some? && left_out.length == 1
+  noted(found, ["coverage", "the present case"], locate(node, scope))
+end
+
+# Coverage widened by inference (ADR 0035 §1): a subject inference knows
+# to be a Boolean is true or false and nothing else, so the unguarded arms
+# must take both whatever they reveal. An arm whose reach cannot be read
+# off its pattern — a pin, say — leaves the question open, and an open
+# question is silence.
+def check_boolean_coverage(node, scope, found)
+  subject = synthesize(node.subject, known_types(scope))
+  return found unless subject == ["boolean"]
+  left_out = uncovered_booleans(unguarded_arms(node).map { it.pattern })
+  return found if left_out.nil? || left_out.empty?
+  noted(found, ["coverage", left_out.join(", ")], locate(node, scope))
+end
+
+# Which of true and false the patterns leave untaken, or nil when one of
+# them cannot be read.
+def uncovered_booleans(patterns)
+  mutable taken = []
+  patterns.each do |pattern|
+    reach = booleans_taken(pattern)
+    return nil if reach.nil?
+    taken += reach
+  end
+  %w[true false].reject { taken.include?(it) }
+end
+
+# The Booleans a pattern matches: both for a capture or the type's name,
+# its own for a literal, none for a literal of another type, and nil for
+# a pattern whose reach depends on a value the checker does not have.
+def booleans_taken(pattern)
+  case pattern
+  in BooleanNode(value:) then [value]
+  in IdentifierNode then %w[true false]
+  in NilNode | IntegerNode | FloatNode | StringNode | SymbolNode then []
+  in BindingPatternNode then booleans_taken(pattern.pattern)
+  in AlternativePatternNode(options:)
+    mutable taken = []
+    options.each do |option|
+      reach = booleans_taken(option)
+      return nil if reach.nil?
+      taken += reach
+    end
+    taken
+  in StructPatternNode(name:, fields:)
+    return %w[true false] if name == "Boolean" && fields.empty?
+    nil
+  else
+    nil
+  end
 end
 
 def covers_nil?(pattern)
@@ -1395,6 +1483,10 @@ end
 # lacks the name refuses; anything without a table declines.
 def check_builtin_method(node, receiver, scope, found)
   return found unless known?(receiver)
+  # `found[start, length]` (ADR 0091) parses as a call of `[]`, which no
+  # table lists: a match answers it, and the run refuses it for any other
+  # receiver in a sentence that names `slice`.
+  return found if node.name == "[]"
   methods = builtin_methods(receiver)
   return found if methods.nil?
   return found if methods.include?(node.name)
@@ -1418,6 +1510,9 @@ def check_struct_method(node, receiver, scope, found)
   shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
   return found if shape.nil?
   return found if value_at_checked(shape, 1).include?(node.name)
+  # Two values between brackets (ADR 0091) refuse when they run, in the
+  # sentence every receiver but a match gets.
+  return found if node.name == "[]"
   # `value.class` is every struct's (ADR 0074).
   return found if node.name == "class"
   # Ruby's Struct lookups by a runtime name (ADR 0062): the fields are
@@ -1630,10 +1725,12 @@ end
 
 # — coverage and reachability (ADR 0035) —
 #
-# The checker has no types yet, so it refuses only where it can *prove*
-# non-coverage over a set the arms themselves establish, and stays silent
-# where it merely cannot prove coverage (ADR 0035 §1). Inference widens
-# where these apply; it does not gate whether they exist.
+# The checks below read the arms alone: each refuses only where it can
+# *prove* non-coverage over a set the arms themselves establish, and stays
+# silent where it merely cannot prove coverage (ADR 0035 §1). Inference
+# widens where coverage applies — check_maybe_coverage and
+# check_boolean_coverage read the set off the subject's type; it does not
+# gate whether these exist.
 
 # Guarded arms are outside the arithmetic in both directions (ADR 0035 §4):
 # they cover nothing, because the compiler cannot prove an `if`, and they

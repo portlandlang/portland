@@ -7,7 +7,7 @@
 
 <!-- /generated -->
 
-- **Status:** Accepted (ruled by the deciding user on [#360](https://github.com/portlandlang/portland/issues/360): "Keep both `__END__` and `DATA` in Portland"; built on both implementations 2026-11-22). Decision 3, what `DATA` is, is the builder's reading of a point the issue left open, and stands until the user rules otherwise.
+- **Status:** Accepted (ruled by the deciding user on [#360](https://github.com/portlandlang/portland/issues/360): "Keep both `__END__` and `DATA` in Portland"; built on both implementations 2026-11-22). Decision 3, what `DATA` is, was the builder's reading of a point the issue left open; the deciding user accepted it 2026-11-22.
 - **Date:** 2026-11-22
 - **Issue:** [#360](https://github.com/portlandlang/portland/issues/360)
 

@@ -6,9 +6,11 @@
 # `values_at`, `size`, `length`, `string`, `regexp`, `inspect`, `==` —
 # positions counted in graphemes (ADR 0038).
 #
-# From ruby/spec core/matchdata/*. Upstream: `[start, length]` and the
-# range forms of `[]` and `values_at`, `deconstruct` and `deconstruct_keys`
-# (`case/in` on a match waits for a pull), the byte-offset family, `dup`,
+# From ruby/spec core/matchdata/*. Upstream: `deconstruct` and
+# `deconstruct_keys` (`case/in` on a match waits for a pull), the rows where
+# a slice past the groups answers nil (it is empty here, ADR 0091; those
+# are in spec/portland/regex/matchdata_slice_spec.pdx), the `nil..nil`
+# range, the byte-offset family, `dup`,
 # `hash`, `allocate`, `integer_at` (Ruby 4.1), the mocks and `to_int`
 # coercions, the encoding rows, `frozen?`, and `$~` after `gsub`.
 
@@ -23,6 +25,32 @@ context "MatchData#[]" do
     expect(md[-3]).to eq("X")
     expect(md[10000]).to be_nil
     expect(md[-10000]).to be_nil
+  end
+
+  specify "supports accessors [start, length]" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[1, 2]).to eq(%w[H X])
+    expect(md[-3, 2]).to eq(%w[X 113])
+    expect(md[5, 2]).to eq([])
+    expect(md[3, 10]).to eq(%w[113 8])
+    expect(md[3, 0]).to eq([])
+  end
+
+  specify "supports ranges [start..end]" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[1..3]).to eq(%w[H X 113])
+    expect(md[3..10]).to eq(%w[113 8])
+    expect(md[3..1]).to eq([])
+  end
+
+  specify "supports endless ranges [start..]" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[3..]).to eq(%w[113 8])
+  end
+
+  specify "supports beginningless ranges [..end]" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[..1]).to eq(%w[HX1138 H])
   end
 
   specify "returns the corresponding named match when given a Symbol" do

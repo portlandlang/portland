@@ -536,7 +536,7 @@ fn cycled(elements: &[Value], count: i64) -> Vec<Value> {
 /// Resolve a range against a collection length into clamped `[from, to)`
 /// offsets (ADR 0019 §2). Negative bounds count from the end; everything
 /// out of range clamps, so a slice is always a collection.
-fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
+pub(crate) fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
     let (start, end, exclusive) = range_ends(range);
     // A position is an integer; a float truncates to one, as Ruby's does.
     let position = |end: &Value| match end {
@@ -1970,22 +1970,6 @@ fn spread_for_block(parameters: &[String], arguments: Vec<Value>) -> Vec<Value> 
     elements.iter().take(parameters.len()).cloned().collect()
 }
 
-/// `join` (#104): each element as `to_s` renders it, a nested array joined
-/// into the same string with the same separator, as Ruby's is. A nil
-/// element refuses as interpolating one does, since nil has no `to_s`
-/// (ADR 0005) — Ruby's silent "" would be the one place nil rendered.
-fn joined(elements: &[Value], separator: &str) -> String {
-    elements
-        .iter()
-        .map(|element| match element {
-            Value::Array(inner) => joined(inner, separator),
-            Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
-            other => other.to_string(),
-        })
-        .collect::<Vec<_>>()
-        .join(separator)
-}
-
 /// `sum`, Ruby's `rb_ary_sum` step for step (#104): integers add exactly
 /// while they last; from the first float — or a float init — the rest go
 /// through Kahan–Babuska compensated summation, so `[0.1, 0.2, 0.3].sum` is
@@ -2143,11 +2127,44 @@ fn rotated(elements: &[Value], count: i64) -> Value {
     Value::array(turned)
 }
 
+/// The refusal for `receiver[first, second]` on anything but a match (ADR
+/// 0091): an array and a string are pointed at `slice`, which takes the
+/// same two values.
+fn two_value_index_sentence(receiver: &Value, arguments: &[Value]) -> String {
+    let type_name = receiver.type_name();
+    let article = Value::article_for(&type_name);
+    match receiver {
+        Value::Array(_) | Value::String(_) => format!(
+            "{article} {type_name} takes one index between brackets — with two, write slice({}, {})",
+            arguments[0].shown(),
+            arguments[1].shown()
+        ),
+        _ => format!("{article} {type_name} takes one index between brackets, got 2"),
+    }
+}
+
+/// `slice(start, length)`: the run of `length` elements from `start`. A
+/// negative start counts from the end, as Ruby's does; a start past either
+/// end answers no elements, never nil (ADR 0019).
+pub(crate) fn run_from(elements: &[Value], start: i64, length: i64) -> Vec<Value> {
+    let length = usize::try_from(length)
+        .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
+    let start = if start < 0 {
+        start + elements.len() as i64
+    } else {
+        start
+    };
+    match usize::try_from(start) {
+        Ok(start) => elements.iter().skip(start).take(length).cloned().collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
 /// One `values_at` argument (#104), Ruby's `rb_range_component_beg_len`
 /// with its end unclamped: an integer picks one element, nil past either
 /// end; a range picks its run, padding with nil past the end. A range
 /// starting before the array refuses in Ruby's words.
-fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Value>) {
+pub(crate) fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Value>) {
     let length = elements.len() as i64;
     let element_at = |index: i64| {
         if (0..length).contains(&index) {
@@ -6037,7 +6054,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6072,7 +6089,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer =
                             answer.unwrap_or_else(|| panic!("{name} block produced no value"));
-                        result.push_str(&joined(&[answer], ""));
+                        result.push_str(&self.joined(&[answer], ""));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6989,10 +7006,10 @@ impl<W: std::io::Write> Interpreter<W> {
             // No separator joins with nothing between, as Ruby's does (#142),
             // and a nil one is none (#104).
             (Value::Array(elements), "join", [] | [Value::Nil]) => {
-                Value::String(joined(elements, ""))
+                Value::String(self.joined(elements, ""))
             }
             (Value::Array(elements), "join", [Value::String(separator)]) => {
-                Value::String(joined(elements, separator))
+                Value::String(self.joined(elements, separator))
             }
             (Value::Array(elements), "last", []) => {
                 elements.last().cloned().map_or(Value::Nil, Value::present)
@@ -7386,18 +7403,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // A negative start counts from the end, as Ruby's does; a start
             // past either end answers the empty array, never nil (ADR 0019).
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
-                let length = usize::try_from(*length)
-                    .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                let start = if *start < 0 {
-                    start + elements.len() as i64
-                } else {
-                    *start
-                };
-                let taken: Vec<Value> = match usize::try_from(start) {
-                    Ok(start) => elements.iter().skip(start).take(length).cloned().collect(),
-                    Err(_) => Vec::new(),
-                };
-                Value::array(taken)
+                Value::array(run_from(elements, *start, *length))
             }
             // `sort` takes a uniform array — all integers or all strings —
             // and refuses a mix, naming the first element that broke it.
@@ -8145,7 +8151,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         .count() as i64,
                 )
             }
-            (receiver, "to_s", []) => Value::String(receiver.to_string()),
+            (receiver, "to_s", []) => Value::String(self.rendered(receiver)),
             // `between?` and `clamp` (ADR 0054): on anything `<=>` orders.
             (receiver, "between?", [low, high]) if orderable(receiver) => {
                 let above_low = self.ordering_of(receiver, low) >= 0;
@@ -8201,6 +8207,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             (receiver, name, arguments) => {
+                // Two values between brackets read a match's groups only
+                // (ADR 0091); an array and a string spell the same slice by
+                // name.
+                if name == "[]" && arguments.len() == 2 {
+                    refusal("arguments");
+                    panic!("{}", two_value_index_sentence(receiver, arguments));
+                }
                 if let Some(survivor) = alias_survivor(name) {
                     refusal("alias");
                     panic!("{name} is spelled {survivor} here");
@@ -9153,6 +9166,54 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// A value as source, the way `p` and `inspect` show it (#285): a
+    /// struct that defines `inspect` renders by it wherever it sits — an
+    /// element, a hash key or value, a set member, another struct's field —
+    /// and everything else takes `Value::inspect`'s form.
+    fn inspected(&mut self, value: &Value) -> String {
+        value.inspect_with(&mut |inner| self.own_rendering(inner, "inspect"))
+    }
+
+    /// A value as text, the way `puts`, `to_s`, `join`, and interpolation
+    /// show it (#285): a struct's own `to_s` when it defines one. A
+    /// collection's `to_s` is its `inspect` (ADR 0060), and a struct
+    /// without a `to_s` shows its fields, so the values inside either
+    /// render by their own `inspect`.
+    fn rendered(&mut self, value: &Value) -> String {
+        if let Some(own) = self.own_rendering(value, "to_s") {
+            return own;
+        }
+        match value {
+            Value::Struct { .. } => {
+                value.inspect_inside_with(&mut |inner| self.own_rendering(inner, "inspect"))
+            }
+            Value::Array(_)
+            | Value::EnumCase { .. }
+            | Value::Failure(_)
+            | Value::Hash(_)
+            | Value::Set(_)
+            | Value::Some(_) => self.inspected(value),
+            other => other.to_string(),
+        }
+    }
+
+    /// `join` (#104): each element as `to_s` renders it, a nested array
+    /// joined into the same string with the same separator, as Ruby's is.
+    /// A nil element refuses as interpolating one does, since nil has no
+    /// `to_s` (ADR 0005) — Ruby's silent "" would be the one place nil
+    /// rendered.
+    fn joined(&mut self, elements: &[Value], separator: &str) -> String {
+        let mut parts = Vec::with_capacity(elements.len());
+        for element in elements {
+            parts.push(match element {
+                Value::Array(inner) => self.joined(inner, separator),
+                Value::Nil => panic!("nil has no method 'to_s' — handle the nil case first"),
+                other => self.rendered(other),
+            });
+        }
+        parts.join(separator)
+    }
+
     /// Evaluate an expression that must produce a value.
     fn value_of(&mut self, expression: &Expression) -> Value {
         self.expression(expression)
@@ -9432,9 +9493,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
                 // Ruby's rule: a line already ending in a newline gets no
                 // second one.
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_output(&format!("{text}{newline}"))
                     .expect("failed to write output");
@@ -9455,9 +9514,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "print got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(argument, "to_s")
-                    .unwrap_or_else(|| argument.to_string());
+                let text = self.rendered(argument);
                 self.emit_standard_output(&text)
                     .expect("failed to write output");
             }
@@ -9521,9 +9578,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         "warn got a failure — handle the failure case first (p renders it for debugging)"
                     );
                 }
-                let text = self
-                    .own_rendering(line, "to_s")
-                    .unwrap_or_else(|| line.to_string());
+                let text = self.rendered(line);
                 let newline = if text.ends_with('\n') { "" } else { "\n" };
                 self.emit_standard_error(&format!("{text}{newline}"));
             }
@@ -9555,9 +9610,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // `pp` is `p` here: there is no pretty-printer to defer to (#185).
         if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
             for argument in &arguments {
-                let inspected = self
-                    .own_rendering(argument, "inspect")
-                    .unwrap_or_else(|| argument.inspect());
+                let inspected = self.inspected(argument);
                 self.emit_standard_output(&format!("{inspected}\n"))
                     .expect("failed to write output");
             }
@@ -9576,7 +9629,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // input, and nil has no methods (ADR 0006).
         if self.lookup_method(name).is_none() && name == "inspect" {
             match arguments.as_slice() {
-                [argument] => return Some(Value::String(argument.inspect())),
+                [argument] => return Some(Value::String(self.inspected(argument))),
                 other => panic!("inspect takes one argument, got {}", other.len()),
             }
         }
