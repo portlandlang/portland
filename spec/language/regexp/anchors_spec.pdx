@@ -87,4 +87,32 @@ context "Regexps with anchors" do
     expect(found(/(?<=\bfoo)bar./, "1foobar1 foobar2")).to eq(["bar2"])
     expect(found(/(?<!\bfoo)bar./, "foobar1 1foobar2")).to eq(["bar2"])
   end
+
+  specify "does not match ^ after trailing \\n" do
+    expect(/^(?!\A)/.match("foo\n")).to be_nil
+  end
+
+  specify "supports (?= ) (positive lookahead)" do
+    expect(/foo.(?=bar)/.match("foo1 foo2bar").to_a).to eq(["foo2"])
+  end
+
+  specify "supports (?! ) (negative lookahead)" do
+    expect(/foo.(?!bar)/.match("foo1bar foo2").to_a).to eq(["foo2"])
+  end
+
+  specify "supports (?!<) (negative lookbehind)" do
+    expect(/(?<!foo)bar./.match("foobar1 bar2").to_a).to eq(["bar2"])
+  end
+
+  specify "supports (?<=) (positive lookbehind)" do
+    expect(/(?<=foo)bar./.match("bar1 foobar2").to_a).to eq(["bar2"])
+  end
+
+  specify "supports (?<=\\b) (positive lookbehind with word boundary)" do
+    expect(/(?<=\bfoo)bar./.match("1foobar1 foobar2").to_a).to eq(["bar2"])
+  end
+
+  specify "supports (?!<\\b) (negative lookbehind with word boundary)" do
+    expect(/(?<!\bfoo)bar./.match("foobar1 1foobar2").to_a).to eq(["bar2"])
+  end
 end

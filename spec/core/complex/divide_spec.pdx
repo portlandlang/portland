@@ -4,11 +4,51 @@
 
 require_relative "../../spec_helper"
 
+TOLERANCE = 0.00003
+
 context "Complex#/" do
   specify "divides exactly where the parts are exact" do
     expect(inspect(Complex(1, 2) / 2)).to eq("((1/2)+1i)")
     expect(inspect(Complex(1, 2) / 2.0)).to eq("(0.5+1.0i)")
     expect(inspect(Complex(1, 2) / Complex(3, 4))).to eq("((11/25)+(2/25)*i)")
     expect(inspect(Complex(1.0, 2) / Complex(3, 4))).to eq("(0.44+0.08i)")
+  end
+
+  describe "with Complex" do
+    specify "divides according to the usual rule for complex numbers" do
+      product = Complex((1 * 10) - (2 * 20), (1 * 20) + (2 * 10))
+      divisor = Complex(1, 2)
+      expect(product / divisor).to eq(Complex(10, 20))
+
+      float_product = Complex((1.5 * 100.2) - (2.1 * -30.3), (1.5 * -30.3) + (2.1 * 100.2))
+      float_divisor = Complex(1.5, 2.1)
+      # remember the floating-point arithmetic
+      expect(float_product / float_divisor).to be_close(Complex(100.2, -30.3), TOLERANCE)
+    end
+  end
+
+  describe "with Fixnum" do
+    specify "divides both parts of the Complex number" do
+      expect(Complex(20, 40) / 2).to eq(Complex(10, 20))
+      expect(Complex(30, 30) / 10).to eq(Complex(3, 3))
+    end
+
+    specify "produces Rational parts" do
+      expect(Complex(5, 9) / 2).to eql(Complex(Rational(5,2), Rational(9,2)))
+    end
+  end
+
+  describe "with Bignum" do
+    specify "divides both parts of the Complex number" do
+      expect(Complex(20, 40) / 2).to eq(Complex(10, 20))
+      expect(Complex(15, 16) / 2.0).to be_close(Complex(7.5, 8), TOLERANCE)
+    end
+  end
+
+  describe "with Float" do
+    specify "divides both parts of the Complex number" do
+      expect(Complex(3, 9) / 1.5).to eq(Complex(2, 6))
+      expect(Complex(15, 16) / 2.0).to be_close(Complex(7.5, 8), TOLERANCE)
+    end
   end
 end

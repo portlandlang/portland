@@ -132,3 +132,22 @@ context "String#index with String" do
     expect("</</h".index("</h")).to eq(2)
   end
 end
+
+context "String#index with Regexp" do
+  specify "behaves the same as String#index(string) for escaped string regexps" do
+    ["blablabla", "hello cruel world...!"].each do |str|
+      ["", "b", "bla", "lab", "o c", "d."].each do |needle|
+        regexp = Regexp.new(Regexp.escape(needle))
+        expect(str.index(regexp)).to eq(str.index(needle))
+
+        0.upto(str.size + 1) do |start|
+          expect(str.index(regexp, start)).to eq(str.index(needle, start))
+        end
+
+        (-str.size - 1).upto(-1) do |start|
+          expect(str.index(regexp, start)).to eq(str.index(needle, start))
+        end
+      end
+    end
+  end
+end
