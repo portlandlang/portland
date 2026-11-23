@@ -1797,8 +1797,8 @@ end
 # The interpolations of a double-quoted lexeme, each lexed and scanned as a
 # token range of its own — which recurses through a string inside a string.
 def interpolation_names_it?(lexeme)
-  return false if lexeme.slice(0, 1) == "'"
-  characters = lexeme.slice(1, lexeme.length - 2).chars
+  return false if lexeme.start_with?("'")
+  characters = lexable_characters(unquoted(lexeme))
   mutable index = 0
   while index < characters.length
     character = characters[index]
@@ -2361,10 +2361,21 @@ def read_inner_source(characters, start)
   Step.new(node: inner, position: index)
 end
 
+# A quoted lexeme without its quotes. The opening quote can share a
+# character with a combining mark or a joiner written after it (ADR 0038),
+# so a lexeme that is not all single bytes is cut by codepoint (#322).
+def unquoted(lexeme)
+  return lexeme.slice(1, lexeme.length - 2) if lexeme.length == lexeme.bytesize
+  codes = lexeme.codepoints
+  codes.slice(1, codes.length - 2).map { it.chr(Encoding::UTF_8) }.join("")
+end
+
 def string_expression(lexeme, line: nil)
-  content = lexeme.slice(1, lexeme.length - 2)
-  characters = content.chars
-  if lexeme.slice(0, 1) == "'"
+  content = unquoted(lexeme)
+  # Walked as the lexer walks: a brace that closes an interpolation can
+  # share a character with a mark written after it.
+  characters = lexable_characters(content)
+  if lexeme.start_with?("'")
     mutable result = ""
     mutable index = 0
     while index < characters.length
@@ -2425,17 +2436,20 @@ end
 # stays raw for the engine — a backslash escape is the pattern's own — and
 # only `#{...}` is read here, as in a string, each piece joined by `+`.
 def regex_expression(lexeme, line: nil)
-  mutable flags_start = lexeme.length
-  while flags_start > 0 && "imxo".include?(lexeme.slice(flags_start - 1, 1))
+  # Walked as the lexer walks, so a mark written after the opening
+  # delimiter does not hide it (#322).
+  letters = lexable_characters(lexeme)
+  mutable flags_start = letters.length
+  while flags_start > 0 && "imxo".include?(letters[flags_start - 1])
     flags_start -= 1
   end
-  flags = lexeme.slice(flags_start, lexeme.length - flags_start)
+  flags = letters.slice(flags_start, letters.length - flags_start).join("")
   if flags.include?("o")
     panic "the 'o' flag interpolates a pattern once, which Portland does not spell — drop the flag; a constant pattern is built once anyway"
   end
-  slashed = lexeme.slice(0, 1) == "/"
+  slashed = letters.first == "/"
   body_start = slashed ? 1 : 3
-  characters = lexeme.slice(body_start, flags_start - 1 - body_start).chars
+  characters = letters.slice(body_start, flags_start - 1 - body_start)
   mutable parts = []
   mutable literal = ""
   mutable index = 0

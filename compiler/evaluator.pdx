@@ -2313,10 +2313,12 @@ end
 # has no escape here, on purpose — the recorded divergence class no
 # literally-written program has met.
 def word_array_elements(lexeme)
-  opener = lexeme.slice(2, 1)
-  closer = lexeme.slice(lexeme.length - 1, 1)
-  content = lexeme.slice(3, lexeme.length - 4)
-  characters = content.chars
+  # Walked as the lexer walks, so a mark written after the opener, or
+  # after a space between words, does not hide it (#322).
+  letters = lexable_characters(lexeme)
+  opener = letters.slice(2, 1).join("")
+  closer = letters.slice(letters.length - 1, 1).join("")
+  characters = letters.slice(3, letters.length - 4)
   mutable words = []
   mutable current = ""
   mutable started = false
