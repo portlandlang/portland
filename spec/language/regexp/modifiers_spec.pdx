@@ -64,4 +64,26 @@ context "Regexps with modifiers" do
   specify "scans the absent operator's pieces" do
     expect("foo".scan(Regexp.new("(?~foo)"))).to eq(["fo", "o", ""])
   end
+
+  specify "supports /i (case-insensitive)" do
+    expect(/foo/i.match("FOO").to_a).to eq(["FOO"])
+  end
+
+  specify "supports /m (multiline)" do
+    expect(/foo.bar/m.match("foo\nbar").to_a).to eq(["foo\nbar"])
+    expect(/foo.bar/.match("foo\nbar")).to be_nil
+  end
+
+  specify "supports /x (extended syntax)" do
+    expect(/\d +/x.match("abc123").to_a).to eq(["123"])
+  end
+
+  specify "supports (?~) (absent operator)" do
+    expect(Regexp.new("(?~foo)").match("hello").to_a).to eq(["hello"])
+    expect("foo".scan(Regexp.new("(?~foo)"))).to eq(["fo","o",""])
+  end
+
+  specify "supports . with /m" do
+    expect(/./m.match("\n").to_a).to eq(["\n"])
+  end
 end

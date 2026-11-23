@@ -10,4 +10,49 @@ context "Complex#==" do
     expect(Complex(1, 2) == Complex(1.0, 2.0)).to be_true
     expect(Complex(1, 2) == 1).to be_false
   end
+
+  describe "with Complex" do
+    specify "returns true when self and other have numerical equality" do
+      expect(Complex(1, 2)).to eq(Complex(1, 2))
+      expect(Complex(3, 9)).to eq(Complex(3, 9))
+      expect(Complex(-3, -9)).to eq(Complex(-3, -9))
+
+      expect(Complex(1, 2)).not_to eq(Complex(3, 4))
+      expect(Complex(3, 9)).not_to eq(Complex(9, 3))
+
+      expect(Complex(1.0, 2.0)).to eq(Complex(1, 2))
+      expect(Complex(3.0, 9.0)).not_to eq(Complex(9.0, 3.0))
+
+      expect(Complex(1.5, 2.5)).to eq(Complex(1.5, 2.5))
+      expect(Complex(1.5, 2.5)).to eq(Complex(1.5, 2.5))
+      expect(Complex(-1.5, 2.5)).to eq(Complex(-1.5, 2.5))
+
+      expect(Complex(1.5, 2.5)).not_to eq(Complex(2.5, 1.5))
+      expect(Complex(3.75, 2.5)).not_to eq(Complex(1.5, 2.5))
+
+
+      expect(Complex(Float::NAN)).not_to eq(Complex(Float::NAN))
+    end
+  end
+
+  describe "with Numeric" do
+    specify "returns true when self's imaginary part is 0 and the real part and other have numerical equality" do
+      expect(Complex(3, 0)).to eq(3)
+      expect(Complex(-3, 0)).to eq(-3)
+
+      expect(Complex(3.5, 0)).to eq(3.5)
+      expect(Complex(-3.5, 0)).to eq(-3.5)
+
+
+      expect(Complex(3.0, 0)).to eq(3)
+      expect(Complex(-3.0, 0)).to eq(-3)
+
+      expect(Complex(3, 0)).not_to eq(4)
+      expect(Complex(-3, 0)).not_to eq(-4)
+
+      expect(Complex(3.5, 0)).not_to eq(-4.5)
+      expect(Complex(-3.5, 0)).not_to eq(2.5)
+
+    end
+  end
 end
