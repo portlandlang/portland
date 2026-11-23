@@ -576,11 +576,15 @@ fn quoted(text: &str) -> String {
 }
 
 /// `inspect` of a String: its source form, as a new String held once.
+/// The absence of a String, a maybe that is nil, is answered by absence.
 ///
 /// # Safety
-/// `text` points at a live String, whose bytes are UTF-8.
+/// `text` is null or points at a live String, whose bytes are UTF-8.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn portland_string_inspect(text: *const StringBlock) -> *mut StringBlock {
+    if text.is_null() {
+        return std::ptr::null_mut();
+    }
     unsafe { string_from(&[quoted(std::str::from_utf8_unchecked(bytes_of(text))).as_bytes()]) }
 }
 
@@ -609,12 +613,69 @@ unsafe fn array_source(array: *mut ArrayBlock) -> String {
 
 /// An array written out, which for an array is its source form whether
 /// `puts`, `inspect`, or interpolation asks: a new String, held once.
+/// The absence of an array is answered by absence.
 ///
 /// # Safety
-/// `array` points at a live array.
+/// `array` is null or points at a live array.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn portland_array_to_string(array: *mut ArrayBlock) -> *mut StringBlock {
+    if array.is_null() {
+        return std::ptr::null_mut();
+    }
     unsafe { string_from(&[array_source(array).as_bytes()]) }
+}
+
+/// What a refusal calls a value: its source form, or `nil` where there
+/// is none.
+///
+/// # Safety
+/// `text` is null or points at a live String, whose bytes are UTF-8.
+unsafe fn named_in_refusal(text: *const StringBlock) -> String {
+    if text.is_null() {
+        return "nil".to_string();
+    }
+    unsafe { std::str::from_utf8_unchecked(bytes_of(text)).to_string() }
+}
+
+/// A method asked of nil (ADR 0096): a maybe was used where its value
+/// was needed and had none. The seed's sentence.
+///
+/// # Safety
+/// `name` points at a live String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_refuse_nil_method(name: *const StringBlock) -> ! {
+    let name = unsafe { named_in_refusal(name) };
+    refuse_program(&format!(
+        "nil has no method '{name}' — handle the nil case first"
+    ));
+}
+
+/// `puts` handed nil. The seed's sentence.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_refuse_nil_puts() -> ! {
+    refuse_program("puts got nil — handle the nil case first (p renders nil for debugging)");
+}
+
+/// An operator handed nil on one side or both. Each side arrives in its
+/// source form, and absent where it is the nil. The seed's sentence.
+///
+/// # Safety
+/// `operator` points at a live String; `left` and `right` are each null
+/// or point at one.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_refuse_nil_operand(
+    operator: *const StringBlock,
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> ! {
+    let (operator, left, right) = unsafe {
+        (
+            named_in_refusal(operator),
+            named_in_refusal(left),
+            named_in_refusal(right),
+        )
+    };
+    refuse_program(&format!("cannot apply '{operator}' to {left} and {right}"));
 }
 
 /// A refusal of the runtime's own: what was written so far, then the
