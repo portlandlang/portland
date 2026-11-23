@@ -9,4 +9,14 @@ context "Complex#infinite?" do
     expect(Complex(1, 2).infinite?).to be_nil
     expect(Complex(Float::INFINITY, 0).infinite?).to eq(1)
   end
+
+  specify "returns 1 for positive complex with infinite imaginary" do
+    value = Complex(1, Float::INFINITY).infinite?
+    expect(value).to eq(1)
+  end
+
+  specify "returns nil for NaN" do
+    value = Complex(0, Float::NAN).infinite?
+    expect(value).to be_nil
+  end
 end

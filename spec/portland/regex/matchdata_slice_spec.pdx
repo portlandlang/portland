@@ -1,0 +1,32 @@
+# A slice of a match is a collection, never a maybe (ADR 0091, by ADR
+# 0019): past either end of the groups it is empty, where Ruby answers nil.
+# The rows Ruby answers the same way are in the ruby/spec mirror,
+# spec/core/matchdata/element_reference_spec.pdx.
+
+require_relative "../../spec_helper"
+
+context "MatchData#[] with a start and a length" do
+  specify "is empty for a start before the groups, never nil" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[-30, 2]).to eq([])
+  end
+
+  specify "is empty for a start past the groups, never nil" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[6, 2]).to eq([])
+    expect(md[30, 2]).to eq([])
+  end
+end
+
+context "MatchData#[] with a range" do
+  specify "clamps a start before the groups, as an array's slice does" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[-30..2]).to eq(%w[HX1138 H X])
+    expect(md[-30..2]).to eq(md.to_a[-30..2])
+  end
+
+  specify "is empty for a start past the groups, never nil" do
+    md = /(.)(.)(\d+)(\d)/.match("THX1138.") or panic("no match")
+    expect(md[6..]).to eq([])
+  end
+end

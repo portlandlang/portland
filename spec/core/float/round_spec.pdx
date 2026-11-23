@@ -10,4 +10,18 @@ context "Float#round" do
     expect((-2.5).round).to eq(-3)
     expect(2.4.round).to eq(2)
   end
+
+  specify "returns the nearest Integer" do
+    expect(5.5.round).to eq(6)
+    expect(0.4.round).to eq(0)
+    expect(0.6.round).to eq(1)
+    expect(-1.4.round).to eq(-1)
+    expect(-2.8.round).to eq(-3)
+    expect(0.0.round).to eq(0)
+  end
+
+  specify "returns the nearest Integer for Float near the limit" do
+    expect(0.49999999999999994.round).to eq(0)
+    expect(-0.49999999999999994.round).to eq(0)
+  end
 end
