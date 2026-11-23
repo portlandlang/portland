@@ -5775,6 +5775,21 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             return Some(receiver);
         }
+        // `split` with a block (#318), Ruby's: each piece the blockless
+        // call would answer is handed over, and the string comes back.
+        if let (Value::String(_), "split", Some(block)) = (&receiver, name, block) {
+            let pieces =
+                self.method_call(receiver.clone(), name, arguments.clone(), Vec::new(), None);
+            if let Some(Value::Array(pieces)) = pieces {
+                for piece in pieces.iter().cloned() {
+                    self.run_block(block, vec![piece]);
+                    if let Some(interrupted) = self.block_interrupt() {
+                        return interrupted;
+                    }
+                }
+                return Some(receiver);
+            }
+        }
         // The tower's methods (ADR 0085): a rational's and a complex's own,
         // and the names every real answers — before the integer and float
         // arms, so `1.quo(2)` is a rational and `3.to_r` exists.

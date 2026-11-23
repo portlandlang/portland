@@ -3476,9 +3476,9 @@ core/string/slice_spec.rb:
   link: docs/ruby/mutability.md
 core/string/split_spec.rb:
   pdx: [spec/core/string/split_spec.pdx]
-  status: partial_planned
-  reason: "split with a block waits on #318; the $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/318
+  status: partial_intentional
+  reason: "The $; and $~ rows, the to_str and to_int mocks, subclasses, and encodings stay behind by design."
+  link: docs/ruby/regex.md
 core/string/squeeze_spec.rb:
   pdx: [spec/core/string/squeeze_spec.pdx]
   status: partial_intentional

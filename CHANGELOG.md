@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`split` takes a block** ([#318](https://github.com/portlandlang/portland/issues/318)) — `"a b".split(" ") { |part| … }` refused on both implementations, the hosted evaluator printing a notice first. Each piece the blockless call would answer is handed to the block and the string comes back, Ruby's reading, with a String or a Regexp pattern and with a limit. The builtin table's string row reads `split/0-2&`.
+  - ruby/spec rows activated: the "when a block is given" rows of `core/string/split`, but for the two that slice a lazy substring.
 - **`chomp` takes a separator, and `ascii_only?` exists** ([#343](https://github.com/portlandlang/portland/issues/343)) — both refused on both implementations. `chomp(separator)` has Ruby's three readings: a line feed asks what the bare form asks, so `"hello\r".chomp("\n")` is `"hello"`; an empty string takes every trailing line ending off; anything else comes off once where the string ends with it, `"hello".chomp("llo")` being `"he"`. `ascii_only?` answers whether every character is ASCII. The builtin table's string row gains `ascii_only?/0` and reads `chomp/0-1`.
   - ruby/spec rows activated: the separator rows of `core/string/chomp`, and the non-ASCII row of `core/string/encoding`.
 - **`String#index` takes a String and a start position** ([#316](https://github.com/portlandlang/portland/issues/316)) — `"blablabla".index("bl", 1)` refused on both implementations, though the Regexp form took a position. The position counts characters, from the end when negative, and one outside the string finds nothing, as Ruby's reads: the answer is 3.
