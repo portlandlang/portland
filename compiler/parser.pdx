@@ -1861,6 +1861,16 @@ def parse_index(tokens, receiver, position)
   if operator_at?(tokens, inner.position, ["]"])
     return Step.new(node: index_node(receiver, inner.node, line: line_at(tokens, position)), position: inner.position + 1)
   end
+  # `found[start, length]` (ADR 0091): a second value between the brackets
+  # makes the read a call of `[]` with both, which a match answers and
+  # every other receiver refuses toward `slice`.
+  if operator_at?(tokens, inner.position, %w[,])
+    length = parse_expression(tokens, inner.position + 1)
+    if operator_at?(tokens, length.position, ["]"])
+      return Step.new(node: method_call_node(receiver, "[]", [inner.node, length.node], nil, line: line_at(tokens, position)), position: length.position + 1)
+    end
+    return Step.new(node: error_node("expected closing bracket"), position: length.position)
+  end
   Step.new(node: error_node("expected closing bracket"), position: inner.position)
 end
 

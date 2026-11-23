@@ -1479,6 +1479,10 @@ end
 # lacks the name refuses; anything without a table declines.
 def check_builtin_method(node, receiver, scope, found)
   return found unless known?(receiver)
+  # `found[start, length]` (ADR 0091) parses as a call of `[]`, which no
+  # table lists: a match answers it, and the run refuses it for any other
+  # receiver in a sentence that names `slice`.
+  return found if node.name == "[]"
   methods = builtin_methods(receiver)
   return found if methods.nil?
   return found if methods.include?(node.name)
@@ -1502,6 +1506,9 @@ def check_struct_method(node, receiver, scope, found)
   shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
   return found if shape.nil?
   return found if value_at_checked(shape, 1).include?(node.name)
+  # Two values between brackets (ADR 0091) refuse when they run, in the
+  # sentence every receiver but a match gets.
+  return found if node.name == "[]"
   # `value.class` is every struct's (ADR 0074).
   return found if node.name == "class"
   # Ruby's Struct lookups by a runtime name (ADR 0062): the fields are

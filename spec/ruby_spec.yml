@@ -1784,9 +1784,9 @@ core/matchdata/dup_spec.rb:
   link: docs/ruby/metaprogramming.md
 core/matchdata/element_reference_spec.rb:
   pdx: [spec/core/matchdata/element_reference_spec.pdx]
-  status: partial_planned
-  reason: "The [start, length] and range forms wait for a pull; the subclass row stays upstream."
-  link: https://github.com/portlandlang/portland/issues/214
+  status: partial_intentional
+  reason: "A slice that starts before or past the groups is empty here where the upstream rows expect nil (ADR 0091), and a negative length refuses; the nil..nil range, the subclass, and the encoding rows stay upstream."
+  link: docs/ruby/regex.md
 core/matchdata/end_spec.rb:
   pdx: [spec/core/matchdata/end_spec.pdx]
   status: partial_intentional
@@ -1867,9 +1867,9 @@ core/matchdata/to_s_spec.rb:
   link: docs/ruby/metaprogramming.md
 core/matchdata/values_at_spec.rb:
   pdx: [spec/core/matchdata/values_at_spec.pdx]
-  status: partial_planned
-  reason: "The range forms wait for a pull."
-  link: https://github.com/portlandlang/portland/issues/214
+  status: partial_intentional
+  reason: "A range that starts before the groups and an unsupported argument refuse where Ruby raises; those rows stay upstream."
+  link: docs/ruby/regex.md
 
 # — core/nil —
 # nil has no methods beyond nil? and some? (ADR 0005), so its conversions

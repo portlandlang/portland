@@ -536,7 +536,7 @@ fn cycled(elements: &[Value], count: i64) -> Vec<Value> {
 /// Resolve a range against a collection length into clamped `[from, to)`
 /// offsets (ADR 0019 §2). Negative bounds count from the end; everything
 /// out of range clamps, so a slice is always a collection.
-fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
+pub(crate) fn slice_bounds(range: &Value, length: usize) -> (usize, usize) {
     let (start, end, exclusive) = range_ends(range);
     // A position is an integer; a float truncates to one, as Ruby's does.
     let position = |end: &Value| match end {
@@ -2098,11 +2098,44 @@ fn rotated(elements: &[Value], count: i64) -> Value {
     Value::array(turned)
 }
 
+/// The refusal for `receiver[first, second]` on anything but a match (ADR
+/// 0091): an array and a string are pointed at `slice`, which takes the
+/// same two values.
+fn two_value_index_sentence(receiver: &Value, arguments: &[Value]) -> String {
+    let type_name = receiver.type_name();
+    let article = Value::article_for(&type_name);
+    match receiver {
+        Value::Array(_) | Value::String(_) => format!(
+            "{article} {type_name} takes one index between brackets — with two, write slice({}, {})",
+            arguments[0].shown(),
+            arguments[1].shown()
+        ),
+        _ => format!("{article} {type_name} takes one index between brackets, got 2"),
+    }
+}
+
+/// `slice(start, length)`: the run of `length` elements from `start`. A
+/// negative start counts from the end, as Ruby's does; a start past either
+/// end answers no elements, never nil (ADR 0019).
+pub(crate) fn run_from(elements: &[Value], start: i64, length: i64) -> Vec<Value> {
+    let length = usize::try_from(length)
+        .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
+    let start = if start < 0 {
+        start + elements.len() as i64
+    } else {
+        start
+    };
+    match usize::try_from(start) {
+        Ok(start) => elements.iter().skip(start).take(length).cloned().collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
 /// One `values_at` argument (#104), Ruby's `rb_range_component_beg_len`
 /// with its end unclamped: an integer picks one element, nil past either
 /// end; a range picks its run, padding with nil past the end. A range
 /// starting before the array refuses in Ruby's words.
-fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Value>) {
+pub(crate) fn values_at_position(elements: &[Value], position: &Value, picked: &mut Vec<Value>) {
     let length = elements.len() as i64;
     let element_at = |index: i64| {
         if (0..length).contains(&index) {
@@ -7296,18 +7329,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // A negative start counts from the end, as Ruby's does; a start
             // past either end answers the empty array, never nil (ADR 0019).
             (Value::Array(elements), "slice", [Value::Integer(start), Value::Integer(length)]) => {
-                let length = usize::try_from(*length)
-                    .unwrap_or_else(|_| panic!("slice length must not be negative, got {length}"));
-                let start = if *start < 0 {
-                    start + elements.len() as i64
-                } else {
-                    *start
-                };
-                let taken: Vec<Value> = match usize::try_from(start) {
-                    Ok(start) => elements.iter().skip(start).take(length).cloned().collect(),
-                    Err(_) => Vec::new(),
-                };
-                Value::array(taken)
+                Value::array(run_from(elements, *start, *length))
             }
             // `sort` takes a uniform array — all integers or all strings —
             // and refuses a mix, naming the first element that broke it.
@@ -8111,6 +8133,13 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             (receiver, name, arguments) => {
+                // Two values between brackets read a match's groups only
+                // (ADR 0091); an array and a string spell the same slice by
+                // name.
+                if name == "[]" && arguments.len() == 2 {
+                    refusal("arguments");
+                    panic!("{}", two_value_index_sentence(receiver, arguments));
+                }
                 if let Some(survivor) = alias_survivor(name) {
                     refusal("alias");
                     panic!("{name} is spelled {survivor} here");

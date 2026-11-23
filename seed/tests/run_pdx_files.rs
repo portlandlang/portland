@@ -1702,6 +1702,52 @@ fn a_guarded_def_is_defined_only_when_its_guard_holds() {
     assert_both_oracles_refuse("guarded_def_refusal.pdx", None, &cases);
 }
 
+/// A match's slices (ADR 0091, #214): two values between brackets and a
+/// range read its groups on both oracles, empty past either end; every
+/// other receiver refuses two values, an array and a string naming `slice`.
+#[test]
+fn a_match_takes_two_values_between_brackets() {
+    let found = "found = /(.)(.)(\\d+)(\\d)/.match(\"THX1138.\") or panic(\"no match\")\n";
+    assert_both_print(
+        "match_slices.pdx",
+        &format!(
+            "{found}p found[1, 2]\np found[6, 2]\np found[-30..2]\np found[3..]\np found.values_at(0..2, 4)\np found.values_at(3..6)\n"
+        ),
+        "[\"H\", \"X\"]\n[]\n[\"HX1138\", \"H\", \"X\"]\n[\"113\", \"8\"]\n[\"HX1138\", \"H\", \"X\", \"8\"]\n[\"113\", \"8\", nil, nil]\n",
+    );
+    let negative_length = format!("{found}p found[3, 0 - 1]\n");
+    let named_start = format!("{found}p found[\"a\", 2]\n");
+    let early_range = format!("{found}p found.values_at(-6..3)\n");
+    let cases = [
+        (
+            negative_length.as_str(),
+            "slice length must not be negative, got -1",
+        ),
+        (
+            named_start.as_str(),
+            "a match's [start, length] takes two integers, got \"a\" and 2",
+        ),
+        (early_range.as_str(), "-6..3 out of range"),
+        (
+            "list = [1, 2, 3]\np list[1, 2]\n",
+            "an Array takes one index between brackets — with two, write slice(1, 2)",
+        ),
+        (
+            "p \"haystack\"[/(a)(y)/, 1]\n",
+            "a String takes one index between brackets — with two, write slice(/(a)(y)/, 1)",
+        ),
+        (
+            "table = {\"a\" => 1}\np table[\"a\", 2]\n",
+            "a Hash takes one index between brackets, got 2",
+        ),
+        (
+            "struct Point\n  x\nend\npoint = Point.new(x: 1)\np point[1, 2]\n",
+            "a Point takes one index between brackets, got 2",
+        ),
+    ];
+    assert_both_oracles_refuse("match_slice_refusal.pdx", None, &cases);
+}
+
 /// The output functions write a struct's own `to_s`, and `p` its own
 /// `inspect`, on both oracles (#282); one that answers something other
 /// than a String refuses.
