@@ -14,3 +14,4 @@ crate-type = ["staticlib"]
 [dependencies]
 libc = { workspace = true }
 unicode-normalization = { workspace = true }
+unicode-segmentation = { workspace = true }

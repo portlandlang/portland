@@ -1,0 +1,5 @@
+# `abs` of the smallest Integer refuses, in the seed's sentence.
+
+smallest = 0 - 9223372036854775807 - 1
+puts smallest.succ
+puts smallest.abs

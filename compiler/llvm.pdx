@@ -81,6 +81,10 @@ LLVM_PRELUDE = [
 "declare i64 @portland_integer_divide(i64, i64)",
 "declare i64 @portland_integer_modulo(i64, i64)",
 "declare i64 @portland_integer_negate(i64)",
+"declare i64 @portland_integer_abs(i64)",
+"declare i64 @portland_integer_succ(i64)",
+"declare i64 @portland_integer_pred(i64)",
+"declare i64 @portland_string_length(ptr)",
 "declare void @portland_retain(ptr)",
 "declare void @portland_release(ptr)",
 "declare void @portland_exit_check()",
@@ -279,6 +283,9 @@ def llvm_value(emitter, value)
     second_block = second.emitter.block
     joined = llvm_label(llvm_line(second.emitter, "br label %logic#{number}.done"), "logic#{number}.done")
     llvm_named(joined, "phi i1 [ #{decided}, %#{first_block} ], [ #{second.operand}, %#{second_block} ]")
+  in IntermediateMethod(receiver:, name:)
+    asked = llvm_value(emitter, receiver)
+    llvm_method(asked.emitter, receiver.type, name, asked.operand)
   in IntermediateCall(type:, name:, arguments:)
     mutable current = emitter
     mutable operands = []
@@ -326,6 +333,30 @@ def llvm_bytes(text)
     plain ? byte.chr : "\\" + digits.slice(byte / 16, 1) + digits.slice(byte % 16, 1)
   end
   written.join("")
+end
+
+# A method with no arguments. What can refuse, or needs a table, is the
+# runtime's; a question about an Integer's sign or parity is one
+# instruction or two. A String asked is released once it has answered.
+def llvm_method(emitter, type, name, operand)
+  if type == ["string"]
+    counted = llvm_named(emitter, "call i64 @portland_string_length(ptr #{operand})")
+    released = llvm_drop(counted.emitter, ["string"], operand)
+    return LlvmValue.new(emitter: released, operand: counted.operand) unless name == "empty?"
+    return llvm_named(released, "icmp eq i64 #{counted.operand}, 0")
+  end
+  case name
+  when "abs" then llvm_named(emitter, "call i64 @portland_integer_abs(i64 #{operand})")
+  when "succ", "next" then llvm_named(emitter, "call i64 @portland_integer_succ(i64 #{operand})")
+  when "pred" then llvm_named(emitter, "call i64 @portland_integer_pred(i64 #{operand})")
+  when "zero?" then llvm_named(emitter, "icmp eq i64 #{operand}, 0")
+  when "positive?" then llvm_named(emitter, "icmp sgt i64 #{operand}, 0")
+  when "negative?" then llvm_named(emitter, "icmp slt i64 #{operand}, 0")
+  else
+    # Parity is the lowest bit, in two's complement for a negative too.
+    bit = llvm_named(emitter, "and i64 #{operand}, 1")
+    llvm_named(bit.emitter, "icmp #{name == "even?" ? "eq" : "ne"} i64 #{bit.operand}, 0")
+  end
 end
 
 # One checked operation: the intrinsic answers the result and whether it

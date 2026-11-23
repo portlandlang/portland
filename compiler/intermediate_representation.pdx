@@ -104,6 +104,14 @@ struct IntermediateText
   value
 end
 
+# A method a value answers, with no arguments: an Integer's `abs` or
+# `even?`, a String's `length`. The receiver's type and the name say which.
+struct IntermediateMethod
+  type
+  receiver
+  name
+end
+
 # A call to one of the program's functions.
 struct IntermediateCall
   type
@@ -360,6 +368,11 @@ def lower_value(node, bindings, context)
     return written if written.type == ["string"]
     refuse_native("to_s of #{with_article(written.type)}", node) unless written.type == ["integer"]
     IntermediateText.new(type: ["string"], value: written)
+  in MethodCallNode(receiver:, name:, arguments: [], block: nil)
+    asked = lower_value(receiver, bindings, context)
+    answer = native_method_answer(asked.type, name)
+    refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node) if answer.nil?
+    IntermediateMethod.new(type: answer, receiver: asked, name: name)
   in IfNode(condition:, then_body:, else_body:)
     taken = then_body or []
     other = else_body or []
@@ -378,6 +391,22 @@ def lower_call(node, name, arguments, bindings, context)
   refuse_native("a call to #{name}", node) if arity.nil?
   answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
   IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: arguments.map { lower_value(it, bindings, context) })
+end
+
+# What a method with no arguments answers natively, by its receiver's
+# type, or nil where the native build does not hold it.
+def native_method_answer(type, name)
+  case type
+  in ["integer"]
+    return ["integer"] if %w[abs succ next pred].include?(name)
+    return ["boolean"] if %w[even? odd? zero? positive? negative?].include?(name)
+  in ["string"]
+    return ["integer"] if %w[length size].include?(name)
+    return ["boolean"] if name == "empty?"
+  else
+    return nil
+  end
+  nil
 end
 
 def native_type?(type) = type == ["integer"] || type == ["boolean"] || type == ["string"]
@@ -458,6 +487,7 @@ def render_value(value)
   in IntermediateNot(value: inverted) then "(! #{render_value(inverted)})"
   in IntermediateCall(name:, arguments:) then "(call #{([name] + arguments.map { render_value(it) }).join(" ")})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
+  in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
