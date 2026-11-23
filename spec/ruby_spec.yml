@@ -4061,9 +4061,9 @@ core/module/name_spec.rb:
   link: docs/ruby/namespaces.md
 core/module/private_constant_spec.rb:
   pdx: [spec/core/module/private_constant_spec.pdx]
-  status: partial_planned
-  reason: "An outside read of a private constant refuses at build (ADR 0076), and a symbol is the only name form; naming a constant the module does not define waits on #301, and the subclass setup has no inheritance (ADR 0028)."
-  link: https://github.com/portlandlang/portland/issues/301
+  status: partial_intentional
+  reason: "An outside read of a private constant refuses at build (ADR 0076), as does naming a constant the module does not define, which a spec cannot assert; a symbol is the only name form, and the subclass setup has no inheritance (ADR 0028)."
+  link: docs/ruby/visibility.md
 core/module/protected_spec.rb:
   pdx: [spec/core/module/protected_spec.pdx]
   status: partial_intentional
