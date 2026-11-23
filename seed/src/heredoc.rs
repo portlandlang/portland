@@ -14,6 +14,12 @@ pub fn expand(source: &str) -> String {
     let mut output: Vec<String> = Vec::new();
     let mut index = 0;
     while index < lines.len() {
+        // Nothing after an `__END__` line is program text (ADR 0092), so
+        // nothing after it is rewritten: the rest passes through as written.
+        if lines[index] == crate::lexer::END_MARKER {
+            output.extend(lines[index..].iter().map(|line| line.to_string()));
+            break;
+        }
         let (rewritten, consumed) = expand_line(&lines, index);
         output.push(rewritten);
         index += 1 + consumed;

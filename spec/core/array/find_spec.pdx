@@ -9,4 +9,40 @@ context "Array#find" do
     expect([1, 2, 3].find { it > 1 }).to eq(2)
     expect([1, 2, 3].find { it > 9 }).to be_nil
   end
+
+  specify "returns the first element for which the block is not false" do
+    expect([1, 2, 3, 4, 5].find { |number| number % 2 == 0 }).to eq(2)
+  end
+
+  specify "iterates elements in forward order" do
+    mutable visited = []
+    [1, 2, 3].find do |element|
+      visited << element
+      false
+    end
+    expect(visited).to eq([1, 2, 3])
+  end
+
+  specify "stops iterating as soon as an element is found" do
+    mutable visited = []
+    [1, 2, 3, 4, 5].find do |element|
+      visited << element
+      element == 3
+    end
+    expect(visited).to eq([1, 2, 3])
+  end
+
+  specify "does not destructure elements" do
+    multi = [[1, 2], [3, 4, 5], [6, 7, 8, 9]]
+    expect(multi.find { |element| element == [1, 2] }).to eq([1, 2])
+  end
+
+  specify "passes through the values yielded by #each_with_index" do
+    mutable seen = []
+    [:a, :b].each_with_index.to_a.find do |item, index|
+      seen << [item, index]
+      false
+    end
+    expect(seen).to eq([[:a, 0], [:b, 1]])
+  end
 end

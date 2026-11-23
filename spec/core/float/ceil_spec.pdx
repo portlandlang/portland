@@ -9,4 +9,12 @@ context "Float#ceil" do
     expect(1.5.ceil).to eq(2)
     expect((-1.5).ceil).to eq(-1)
   end
+
+  specify "returns the smallest Integer greater than or equal to self" do
+    expect(-1.2.ceil).to eql(-1)
+    expect(-1.0.ceil).to eql(-1)
+    expect(0.0.ceil).to eql(0)
+    expect(1.3.ceil).to eql(2)
+    expect(3.0.ceil).to eql(3)
+  end
 end
