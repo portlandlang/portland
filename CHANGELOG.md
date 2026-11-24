@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A history note sorting the library surface into core and tiles** ([#174](https://github.com/portlandlang/portland/issues/174)) — `docs/history/2026-11-24-core-and-tiles-what-goes-where.md`: a draft of what sits in a core base, core tiles, default tiles, and external tiles, which of them take the language's version, and Ruby's core and standard library in the same terms. Exploration, not a decision.
 - **Pinning no longer goes round in a circle on a field** ([#545](https://github.com/portlandlang/portland/issues/545)) — a field made with two types was left out of what the next round knew, so where the second type was there only while the field was typed, the field came and went round after round. The linter's native build repeated the same four rounds until it was stopped at 47 minutes; seven lines did the same to the round limit. A field made with two types keeps the first and is named, so a round only adds to what the last knew.
   - Pinning remembers what each round knew. One that knows what an earlier round did ends the build at once, naming what was pinned one way in one round and another in the next, where it ran to the limit and said only that it did not settle.
   - Two rounds are compared by what they know, a line for each combination and field, and no longer by every def's whole body.
