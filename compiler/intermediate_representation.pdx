@@ -428,11 +428,18 @@ end
 
 # `name << value` (#497). The parser writes it as a binding of the name
 # to the append, and that is the one shape built: the local takes the
-# grown array.
+# grown array, or the String with the value after it.
 def lower_append(statement, append, bindings, context)
   refuse_native("a << bound to another name", statement) unless append.name == statement.name
   found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
   held = type_at(found, 1)
+  # A String takes what is appended as `+` does (#557): the name is bound
+  # to the two joined, and a maybe on either side is opened as `+` opens
+  # its operands.
+  if plain_of(held) == ["string"]
+    joined = binary_node("+", identifier_node(append.name, line: append.line), append.value, line: append.line)
+    return lower_statement(statement.with(value: joined), bindings, context)
+  end
   refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
   written = lower_value(append.value, bindings, context.with(root: "value"))
   # An empty array appended to an array of arrays is one of its elements.

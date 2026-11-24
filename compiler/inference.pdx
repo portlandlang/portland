@@ -1298,6 +1298,9 @@ end
 def synthesize_append(node, types)
   current = synthesize_name(node.name, types)
   return ["string"] if current == ["string"]
+  # Read as the native build runs it, a maybe of a String is opened to be
+  # appended to (#557).
+  return ["string"] if current == ["maybe", ["string"]] && native_reading?(types)
   value = synthesize(node.value, types)
   return ["array", value] if current == ["array", ["unknown"]]
   return current if (current in ["array", *]) && type_at(current, 1) == value

@@ -1,0 +1,39 @@
+# `<<` onto a String (#557): the name is bound to the two joined. A maybe
+# on either side, as a text read out of an array is, is opened first.
+def spelled(characters)
+  mutable text = ""
+  characters.each do |character|
+    text << character
+  end
+  text
+end
+
+def quoted(characters, start)
+  mutable text = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    character = characters[index]
+    if character == "\\"
+      text << character
+      text << characters[index + 1] if index + 1 < characters.length
+      index += 2
+      next
+    end
+    text << character
+    index += 1
+    return text if character == "'"
+  end
+  text
+end
+
+mutable greeting = "hello"
+greeting << ", "
+greeting << "world"
+puts greeting
+before = greeting
+greeting << "!"
+puts before
+puts greeting
+puts spelled(["p", "d", "x"])
+puts quoted(["'", "a", "\\", "'", "b", "'", "c"], 0)
+puts quoted(["'", "a"], 0)
