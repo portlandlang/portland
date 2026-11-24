@@ -945,10 +945,10 @@ def lower_value(node, bindings, context)
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
     refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
-    refuse_native("'#{operator}' between arrays", node) if before in ["array", *]
-    # A struct equals another by what its fields hold, which is unbuilt;
-    # comparing the two as they are held would compare where they live.
-    refuse_native("'#{operator}' between structs", node) if before in ["struct", *]
+    # Arrays and structs are equal or not, by what they hold (#579);
+    # ordering them is unbuilt.
+    refuse_native("'#{operator}' between arrays", node) if (before in ["array", *]) && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between structs", node) if (before in ["struct", *]) && !%w[== !=].include?(operator)
     # Strings are equal or not (ADR 0038); ordering them is unbuilt.
     refuse_native("'#{operator}' between Strings", node) if before == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
