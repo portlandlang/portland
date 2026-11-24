@@ -55,8 +55,44 @@ fn run() {
                 _ => parse_files(&paths),
             }
         }
+        // `pdx lint file.pdx` and `pdx report file.pdx` (#550): the tools
+        // written in Portland beside the compiler, run by name.
+        Some(tool @ ("lint" | "report")) => {
+            let files: Vec<String> = arguments.collect();
+            if files.is_empty() {
+                eprintln!("pdx {tool}: needs a file to read");
+                process::exit(64);
+            }
+            run_file(&tool_path(tool), load_path, files);
+        }
         Some(path) => run_file(path, load_path, arguments.collect()),
         None => repl(),
+    }
+}
+
+/// Where a tool written in Portland lives (#550): `lint.pdx` or
+/// `report.pdx`, in the directory `PORTLAND_COMPILER` names, or else
+/// beside the checkout this binary was built in, which is two levels
+/// above `target/<profile>/pdx`. Nothing says where an installed `pdx`
+/// keeps them, so that is the whole search.
+fn tool_path(tool: &str) -> String {
+    let named = std::env::var_os("PORTLAND_COMPILER").map(std::path::PathBuf::from);
+    let beside = std::env::current_exe()
+        .ok()
+        .and_then(|executable| Some(executable.parent()?.parent()?.parent()?.join("compiler")));
+    let found = named
+        .into_iter()
+        .chain(beside)
+        .map(|directory| directory.join(format!("{tool}.pdx")))
+        .find(|path| path.is_file());
+    match found {
+        Some(path) => path.to_string_lossy().into_owned(),
+        None => {
+            eprintln!(
+                "pdx {tool}: cannot find {tool}.pdx — set PORTLAND_COMPILER to the directory that holds it"
+            );
+            process::exit(69);
+        }
     }
 }
 
