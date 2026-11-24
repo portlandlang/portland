@@ -1074,6 +1074,13 @@ def lower_value(node, bindings, context)
       joined_first = before == EMPTY_ARRAY ? first.with(type: after) : first
       joined_second = after == EMPTY_ARRAY ? second.with(type: joined_first.type) : second
       return library_call("+", opened_for(joined_first, "+"), [opened_for(joined_second, "+")], node) if plain_of(joined_first.type) == plain_of(joined_second.type)
+      # An array of one struct joined with an array of another, or of one
+      # of several, is an array of one of several (#572): each is held
+      # the same way, so each is read as the array the two make together.
+      widest = joined_plain(plain_of(joined_first.type), plain_of(joined_second.type))
+      if widest.some?
+        return library_call("+", opened_for(joined_first, "+").with(type: widest), [opened_for(joined_second, "+").with(type: widest)], node)
+      end
     end
     if %w[/ %].include?(operator)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]

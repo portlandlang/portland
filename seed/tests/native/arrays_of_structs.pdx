@@ -55,3 +55,11 @@ puts rounds(board.tiles)
 puts rounds(other.tiles)
 p(picked(true))
 p(picked(false))
+
+# An array of one struct joined with an array of another.
+circles = [Circle.new(radius: 6)]
+squares = [Square.new(side: 7)]
+both = circles + squares
+p(both)
+p(both + circles)
+puts rounds(mixed + circles)
