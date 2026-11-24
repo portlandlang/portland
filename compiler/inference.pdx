@@ -828,6 +828,19 @@ def guard_proof(node, types)
   []
 end
 
+# Everything a node holds, for a tool that walks a whole file (#30,
+# #551): a def's body and a type's methods, which the checker reads one
+# at a time, and then whatever an expression holds.
+def held_by(node)
+  case node
+  in DefNode(body:) then body
+  in ModuleDefNode(body:) then body
+  in StructDefNode(methods:, type_functions:) then methods + type_functions
+  in TraitDefNode(methods:) then methods
+  else children_of(node).reject { it.nil? }
+  end
+end
+
 # Each top-level def's parameters, as [name, entry] pairs — an entry is a
 # type where a default gives one, or ["needs", demands].
 def infer_contracts(nodes)
@@ -1889,6 +1902,11 @@ def universal_answer(name)
   return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
   return ["string"] if name == "to_s"
   ["unknown"]
+end
+
+# Every node in a file, each before what it holds.
+def walked(nodes)
+  nodes.flat_map { [it] + walked(held_by(it)) }
 end
 
 def when_false(proof) = type_at(proof, 1)

@@ -31,19 +31,6 @@ struct TogetherSite
   line
 end
 
-# Everything a node holds that a report walks: a def's body and a type's
-# methods, which the checker reads one at a time, and then whatever an
-# expression holds.
-def held_by(node)
-  case node
-  in DefNode(body:) then body
-  in ModuleDefNode(body:) then body
-  in StructDefNode(methods:, type_functions:) then methods + type_functions
-  in TraitDefNode(methods:) then methods
-  else children_of(node).reject { it.nil? }
-  end
-end
-
 # Every node below these, a def's own body left out: a def's names are
 # its own.
 def inside_scope(nodes)
@@ -140,9 +127,4 @@ end
 # Every `together` block in these nodes, in the order written.
 def together_sites(path, nodes)
   walked(nodes).select { it in TogetherNode }.map { TogetherSite.new(path: path, line: (it.line or 1)) }
-end
-
-# Every node in a file, each before what it holds.
-def walked(nodes)
-  nodes.flat_map { [it] + walked(held_by(it)) }
 end
