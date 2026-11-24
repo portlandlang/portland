@@ -10,6 +10,7 @@
 
 require_relative "checker"
 require_relative "llvm"
+require_relative "native_core"
 require_relative "program"
 
 path = System.arguments[0] or panic "build.pdx: needs a file to build"
@@ -23,7 +24,7 @@ check_program_closure(path, [], default_load_path(path, []), core: core_nodes)
 build_note(progress, "gathering: the program's files into one") if progress.some?
 nodes = program_nodes(path)
 build_note(progress, "gathered: #{nodes.length} top-level statements") if progress.some?
-lowered = lower_program(nodes, core: core_nodes, progress: progress)
+lowered = lower_program(nodes, core: core_nodes + native_core_nodes, progress: progress)
 build_note(progress, "writing: #{lowered.functions.length} functions as LLVM text") if progress.some?
 System.write_file(destination, llvm_text(lowered))
 build_note(progress, "written: #{destination}") if progress.some?

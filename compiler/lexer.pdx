@@ -433,8 +433,8 @@ def lex(raw_source, first_line: 1, keep_data: false)
     # after it is lexed.
     if character == "_" && end_marker_at?(characters, index)
       if keep_data
-        after = index + END_MARKER.length + 1
-        text = after < characters.length ? characters.slice(after, characters.length - after).join("") : ""
+        data_start = index + END_MARKER.length + 1
+        text = data_start < characters.length ? characters.slice(data_start, characters.length - data_start).join("") : ""
         tokens << Token.new(kind: "data", text: text, leading_space: false, line: line)
       end
       break

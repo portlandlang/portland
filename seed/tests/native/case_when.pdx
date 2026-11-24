@@ -1,0 +1,71 @@
+# `case` over literals (#558), built as the `if`s it means: the subject
+# compared with each value by `==`, the first branch that matches taken.
+struct Word
+  text
+  size
+end
+
+def sentence(name)
+  case name
+  when "for" then "'for' is not a loop here"
+  when "begin", "rescue", "ensure" then "'#{name}' has no meaning here"
+  when "push", "pop"
+    stem = name + "!"
+    "'#{stem}' mutates"
+  else nil
+  end
+end
+
+def weight(count)
+  case count
+  when 0 then "none"
+  when 1, 2 then "few"
+  else "many"
+  end
+end
+
+def kind(word)
+  case word.text
+  when "if", "while" then "keyword"
+  when "" then "empty"
+  else "name"
+  end
+end
+
+def counted(word)
+  mutable total = 0
+  case word.size
+  when 1 then total += 10
+  when 2
+    total += 20
+    total += 1
+  end
+  total
+end
+
+puts(sentence("for") or "nothing")
+puts(sentence("rescue") or "nothing")
+puts(sentence("pop") or "nothing")
+puts(sentence("other") or "nothing")
+puts weight(0)
+puts weight(2)
+puts weight(7)
+puts kind(Word.new(text: "while", size: 5))
+puts kind(Word.new(text: "", size: 0))
+puts kind(Word.new(text: "total", size: 5))
+puts counted(Word.new(text: "a", size: 1))
+puts counted(Word.new(text: "ab", size: 2))
+puts counted(Word.new(text: "abc", size: 3))
+few = weight(1)
+label = case few
+when "few" then "a few"
+else "not a few"
+end
+puts label
+letters = "0x1f".chars
+base = case letters[1].downcase
+when "b" then "binary"
+when "x" then "hexadecimal"
+else "octal"
+end
+puts base

@@ -1,0 +1,20 @@
+# The walks an array answers that the native build compiles from its own
+# Portland source (#567), and a String's `count`.
+words = ["if", "while", "def", "end"]
+puts words.any? { it == "def" }
+puts words.any? { it.length > 9 }
+puts words.all? { it.length > 1 }
+puts words.all? { it.start_with?("d") }
+puts words.none? { it == "" }
+puts words.none? { it == "end" }
+puts words.count { it.length == 3 }
+puts(words.find_index { it == "def" } or -1)
+puts(words.find_index { it == "do" } or -1)
+words.each_with_index do |word, place|
+  puts "#{place}: #{word}"
+end
+numbers = [3, 8, 12]
+puts numbers.any? { it > 10 }
+puts numbers.count { it.even? }
+puts "a\nb\nc\n".count("\n")
+puts "héllo".count("l")

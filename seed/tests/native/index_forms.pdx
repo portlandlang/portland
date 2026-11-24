@@ -1,0 +1,28 @@
+# An index into a String, and an index by a range (#563).
+text = "héllo"
+p(text[1])
+p(text[-1])
+p(text[9])
+p(text[5])
+p(text[1..])
+p(text[5..])
+p(text[9..])
+p(text[-2..])
+p(text[1..2])
+p(text[1...2])
+p(text[..2])
+p(text[0..-2])
+list = [1, 2, 3, 4]
+p(list[1..])
+p(list[5..])
+p(list[0...2])
+p(list[1..2])
+p(list[0..-2])
+p(list[..1])
+words = ["ab", "cd"]
+picked = words[1]
+p(picked[0])
+p(picked[1..])
+from = 1
+p(list[from..(list.length - 2)])
+p(text[(from + 1)..])

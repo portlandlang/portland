@@ -1,0 +1,31 @@
+# A maybe appended to an array is opened first (#566): the array holds
+# the value itself.
+struct Line
+  text
+  size
+end
+
+def copied(words)
+  mutable output = []
+  mutable index = 0
+  while index < words.length
+    output << words[index]
+    index += 1
+  end
+  output
+end
+
+def texts(lines)
+  mutable output = []
+  lines.each do |line|
+    output << line.text
+  end
+  output
+end
+
+words = ["a", "b", "c"]
+p(copied(words))
+p(copied(words).length)
+lines = [Line.new(text: "one", size: 3), Line.new(text: words[0], size: 1)]
+p(texts(lines))
+puts texts(lines).join("-")

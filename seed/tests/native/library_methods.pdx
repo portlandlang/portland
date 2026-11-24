@@ -1,0 +1,61 @@
+# The methods of a String and of an array the native build holds by name
+# (#560), each held to what the seed answers.
+text = "Hello, Wörld"
+puts text.include?("lo,")
+puts text.include?("xyz")
+puts text.start_with?("Hell")
+puts text.start_with?("ell")
+puts text.end_with?("rld")
+puts text.end_with?("Wor")
+puts text.slice(0, 5)
+puts text.slice(7, 99)
+puts text.slice(-5, 3)
+puts text.slice(40, 2).length
+puts text.downcase
+puts text.upcase
+puts text.bytesize
+puts text.chop
+puts text.chr
+puts "".chr.length
+puts "  padded\t\n".strip
+p(text.chars)
+p("a,b,,c,,".split(","))
+p("one two  three ".split(" "))
+p("abc".split(""))
+p("".split(","))
+p("hé".codepoints)
+puts(text.index("W") or -1)
+puts(text.index("zz") or -1)
+words = ["if", "while", "def"]
+puts words.include?("while")
+puts words.include?("until")
+numbers = [3, 5, 8]
+puts numbers.include?(5)
+puts numbers.include?(4)
+puts words.join
+puts words.join(", ")
+p(words.slice(1, 5))
+p(words.slice(-1, 1))
+p(words.slice(7, 1))
+p(words.drop(1))
+p(words.drop(9))
+picked = words[1]
+puts picked.upcase
+puts words.include?(picked)
+puts "while loop".start_with?(picked)
+letters = "pdx".chars
+mutable spelled = ""
+letters.each do |letter|
+  spelled << letter.upcase
+end
+puts spelled
+p("a\nb\n\nc\n".split("\n", -1))
+p("ab".split("", -1))
+p("a,b,c,d".split(",", 2))
+p(" one  two ".split(" ", -1))
+p(65.chr)
+p(10.chr)
+p(233.chr(Encoding::UTF_8))
+p(8364.chr(Encoding::UTF_8))
+codes = "hé".codepoints
+p(codes.map { it.chr(Encoding::UTF_8) }.join(""))

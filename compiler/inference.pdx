@@ -61,6 +61,42 @@
 
 require_relative "parser"
 
+# The methods of a String and of an array the native build holds by name
+# (#560), each as what it is asked of, its name, what it takes, what it
+# answers, and the runtime function that does it. `element` stands for
+# what the array asked holds, and `self` for the array asked.
+NATIVE_LIBRARY = [
+  [["array", ["element"]], "+", [["self"]], ["self"], "portland_array_concat"],
+  [["array", ["element"]], "drop", [["integer"]], ["self"], "portland_array_drop"],
+  [["array", ["element"]], "include?", [["element"]], ["boolean"], "portland_array_include"],
+  [["array", ["string"]], "join", [], ["string"], "portland_array_join"],
+  [["array", ["string"]], "join", [["string"]], ["string"], "portland_array_join_with"],
+  [["array", ["element"]], "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],
+  [["integer"], "chr", [], ["string"], "portland_integer_chr"],
+  [["integer"], "chr", [["string"]], ["string"], "portland_integer_chr_encoded"],
+  [["string"], "bytesize", [], ["integer"], "portland_string_bytesize"],
+  [["string"], "chars", [], ["array", ["string"]], "portland_string_chars"],
+  [["string"], "chop", [], ["string"], "portland_string_chop"],
+  [["string"], "chr", [], ["string"], "portland_string_chr"],
+  [["string"], "codepoints", [], ["array", ["integer"]], "portland_string_codepoints"],
+  [["string"], "count", [["string"]], ["integer"], "portland_string_count"],
+  [["string"], "downcase", [], ["string"], "portland_string_downcase"],
+  [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
+  [["string"], "include?", [["string"]], ["boolean"], "portland_string_include"],
+  [["string"], "index", [["string"]], ["maybe", ["integer"]], "portland_string_index"],
+  [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
+  [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
+  [["string"], "split", [["string"], ["integer"]], ["array", ["string"]], "portland_string_split_limit"],
+  [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
+  [["string"], "strip", [], ["string"], "portland_string_strip"],
+  [["string"], "upcase", [], ["string"], "portland_string_upcase"],
+  # `text[index]`, and `text[from..to]` and an array's, which are written
+  # with brackets and reach the library under these names.
+  [["string"], "[]", [["integer"]], ["maybe", ["string"]], "portland_string_character"],
+  [["string"], "[..]", [["integer"], ["integer"], ["integer"]], ["string"], "portland_string_range"],
+  [["array", ["element"]], "[..]", [["integer"], ["integer"], ["integer"]], ["self"], "portland_array_range"]
+]
+
 # The name the native build's pinning reads under (#503): bound by it and
 # by nothing else, and spelled as no local can be. Under it, inference
 # answers the way a code generator needs and a checker does not: an
@@ -320,6 +356,8 @@ end
 # by a fixture whose `reduce(0) { |count, line| count + … }` read `count`
 # as the element and refused a working `+`.
 def block_parameter_type(receiver, index, name, argument_types, parameter_count: 1)
+  # `times` hands the turn it is on (#565).
+  return ["integer"] if name == "times" && receiver == ["integer"] && index == 0
   if name == "reduce" || name == "inject"
     return accumulator_type(argument_types) if index == 0
     return element_type(receiver) if index == 1
@@ -564,6 +602,27 @@ def call_answer(receiver, node, types)
   end
 end
 
+# A `case` over literals as the `if`s it means (#558): its subject
+# compared with each `when`'s values by `==`, the first branch that
+# matches taken, the `else` otherwise. Nil for anything else: a node that
+# is no `case`, a subject that may not read the same each time, or a
+# `when` that names a type, a range, or a regex, which match by `===`.
+def case_as_if(node)
+  return nil unless node in CaseNode
+  return nil unless steady_subject?(node.subject)
+  return nil unless node.branches.all? { |branch| branch.values.all? { compared_literal?(it) } }
+  mutable rest = node.else_body
+  node.branches.reverse.each do |branch|
+    mutable condition = nil
+    branch.values.each do |value|
+      test = binary_node("==", node.subject, value, line: branch.line)
+      condition = condition.nil? ? test : logical_node("||", condition, test, line: branch.line)
+    end
+    rest = [if_node(condition, branch.body, rest, line: branch.line)]
+  end
+  (rest or []).first
+end
+
 # A node's direct children — every expression and statement it holds,
 # blocks and branches included, patterns excluded — for a walk that looks
 # for something anywhere inside a body. Defs, structs, traits, and modules
@@ -646,6 +705,9 @@ def combination_key(name, arguments, handed, leaves)
   return "#{name}(#{types})" if handed.nil?
   "#{name}(#{types}) { #{render_native_type(handed)}#{leaves ? ", leaving" : ""} }"
 end
+
+# A literal a `when` names that `==` compares as `===` does.
+def compared_literal?(node) = (node in StringNode) || (node in IntegerNode) || (node in BooleanNode) || (node in NilNode)
 
 # `x == nil` and `x != nil`, either way round.
 def comparison_proof(node, types)
@@ -743,6 +805,10 @@ end
 # from here on. A name new to that body dies with it (ADR 0001) and needs
 # nothing.
 def forget_types(locals, names)
+  # Read as the native build runs it, nothing is forgotten (#556): a
+  # local has one type wherever it is bound, so a rebinding in a branch
+  # or a loop leaves it the type it had.
+  return locals if native_reading?(locals)
   mutable widened = locals
   names.each do |name|
     next if locals.none? { it[0] == name }
@@ -785,6 +851,24 @@ end
 # because the no-shadow rule already promises a name is never both.
 def infer_program(nodes)
   ordered_pairs(nodes, scan_program(nodes), "assignment")
+end
+
+# A value's type and a maybe of it, either way round, as the maybe; a
+# maybe and nil as the maybe; anything else unknown.
+def joined_with_maybe(first, second)
+  return first if first == ["maybe", second] || ((first in ["maybe", *]) && second == ["nil"])
+  return second if second == ["maybe", first] || ((second in ["maybe", *]) && first == ["nil"])
+  ["unknown"]
+end
+
+# A type the library's table writes, as it is for the value asked (#560):
+# `element` is what the array asked holds, and `self` the array itself.
+def library_type(written, receiver)
+  return type_at(receiver, 1) if written == ["element"]
+  return receiver if written == ["self"]
+  return ["maybe", library_type(type_at(written, 1), receiver)] if written in ["maybe", *]
+  return ["array", library_type(type_at(written, 1), receiver)] if (written in ["array", *]) && type_at(written, 1) == ["element"]
+  written
 end
 
 # `Math` (ADR 0083): the total functions answer a Float; one that may answer
@@ -897,6 +981,17 @@ def native_call_answer(node, types)
   found.nil? ? ["unknown"] : type_at(found, 1)
 end
 
+# The library's row for a method asked of a value with these arguments
+# (#560), or nil where it holds none.
+def native_library_entry(receiver, name, arguments)
+  NATIVE_LIBRARY.find do |entry|
+    asked = type_at(entry, 0)
+    taken = type_at(entry, 2)
+    fits = asked == receiver || (asked == ["array", ["element"]] && (receiver in ["array", *]))
+    fits && type_at(entry, 1) == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
+  end
+end
+
 # A call with a dot as the call of a def it is under the native reading
 # (#525), where the core writes a method for the receiver's type that
 # answers this call: the def named for the type and the method, handed
@@ -918,6 +1013,8 @@ end
 def native_nothing?(body, types)
   last = body.last
   return false if last.nil?
+  plain = case_as_if(last)
+  return native_nothing?(body.slice(0, body.length - 1) + [plain], types) if plain.some?
   return true if last in WhileNode
   if last in IfNode
     other = last.else_body or []
@@ -1240,6 +1337,16 @@ def statement_answer(statement, types)
   synthesize(statement, types)
 end
 
+# Whether an expression reads the same each time it is read, and costs
+# little to read again (#558): a name, `self`, a method with no
+# arguments asked of one, as a field is, or an element of one read by a
+# number or a name.
+def steady_subject?(node)
+  return true if (node in IdentifierNode) || (node in SelfNode) || (node in IntegerNode)
+  return steady_subject?(node.receiver) && steady_subject?(node.index) if node in IndexNode
+  (node in MethodCallNode) && node.arguments.empty? && node.block.nil? && steady_subject?(node.receiver)
+end
+
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
 # checking mode is 3b): every arm answers what it can prove from the node
 # alone plus the bindings already typed.
@@ -1271,6 +1378,9 @@ def synthesize(node, types)
   # `sprintf` (ADR 0067) answer a string.
   in CallNode then synthesize_bare_call(node, types)
   in IfNode then synthesize_if(node, types)
+  # The one encoding a String has (ADR 0069) is its name, a String.
+  in PathNode(parts: ["Encoding", "UTF_8"]) then ["string"]
+  in CaseNode then synthesize_case(node, types)
   in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
   # A `yield` is what the block answers, which only the native build's
@@ -1294,7 +1404,12 @@ end
 def synthesize_append(node, types)
   current = synthesize_name(node.name, types)
   return ["string"] if current == ["string"]
-  value = synthesize(node.value, types)
+  # Read as the native build runs it, a maybe of a String is opened to be
+  # appended to (#557).
+  return ["string"] if current == ["maybe", ["string"]] && native_reading?(types)
+  # Read as the native build runs it, a maybe appended is opened first
+  # (#566).
+  value = opened_natively(synthesize(node.value, types), types)
   return ["array", value] if current == ["array", ["unknown"]]
   return current if (current in ["array", *]) && type_at(current, 1) == value
   return ["array", ["unknown"]] if current in ["array", *]
@@ -1479,11 +1594,24 @@ def synthesize_call(node, types)
       field = types.find { it[0] == field_key(type_at(holder, 1), node.name) }
       return type_at(field, 1) if field.some?
     end
+    # A method the library holds answers what its row says (#560).
+    if node.block.nil?
+      handed = node.arguments.map { opened_natively(synthesize(it, types), types) }
+      library = native_library_entry(holder, node.name, handed)
+      return library_type(type_at(library, 3), holder) if library.some?
+    end
   end
   # `nil?` and `some?` are asked of the maybe itself; every other method
   # is asked of its value.
   asked = %w[nil? some?].include?(node.name) ? receiver : opened_natively(receiver, types)
   call_answer(asked, node, types)
+end
+
+# A `case` read as the native build runs it (#558), where it is one over
+# literals. The checker reads no type off a `case`.
+def synthesize_case(node, types)
+  plain = native_reading?(types) ? case_as_if(node) : nil
+  plain.nil? ? ["unknown"] : synthesize(plain, types)
 end
 
 # A `case/in` in value position: the arms' answers must agree, each arm
@@ -1546,7 +1674,12 @@ def synthesize_if(node, types)
   proof = narrowings(node.condition, types)
   yes = branch_answer(node.then_body, when_true(proof) + types)
   no = branch_answer(node.else_body, when_false(proof) + types)
-  merge_candidates([yes, no])
+  merged = merge_candidates([yes, no])
+  # Read as the native build runs it, a value on one side and a maybe of
+  # it on the other are a maybe of it (#558), as an `elsif` chain that
+  # ends in nil is.
+  return merged unless merged == ["unknown"] && native_reading?(types)
+  joined_with_maybe(yes, no)
 end
 
 # `array[index]` under the native reading: the element, or nil past
@@ -1554,6 +1687,15 @@ end
 def synthesize_index(node, types)
   return ["unknown"] unless native_reading?(types)
   receiver = synthesize(node.receiver, types)
+  # A run read by a range is the collection's own type, never a maybe
+  # (ADR 0019), and a String read by a number is a character or nothing
+  # (#563). A maybe is opened for either.
+  opened = opened_natively(receiver, types)
+  if node.index in RangeNode
+    return opened if opened == ["string"] || (opened in ["array", *])
+    return ["unknown"]
+  end
+  return ["maybe", ["string"]] if opened == ["string"] && synthesize(node.index, types) == ["integer"]
   return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
   maybe_of(type_at(receiver, 1))
 end

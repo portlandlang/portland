@@ -1,0 +1,13 @@
+# `+` between arrays (#564): a new array of the first and then the second.
+first = ["a", "b"]
+second = ["c"]
+both = first + second
+p(both)
+p(first)
+p(first + first + second)
+numbers = [1] + [2, 3]
+p(numbers)
+mutable grown = [4]
+grown = grown + [5]
+grown += [6]
+p(grown)

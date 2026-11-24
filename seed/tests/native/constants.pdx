@@ -1,0 +1,23 @@
+# A constant bound at the top level and read inside a def (#562): built
+# as a def with no parameters that answers its value.
+GREETING = "hello"
+LIMIT = 3
+KEYWORDS = %w[if while def]
+SHOUTED = GREETING.upcase
+
+def greet(name) = "#{GREETING}, #{name}"
+
+def keyword?(word) = KEYWORDS.include?(word)
+
+def within?(count)
+  count <= LIMIT
+end
+
+puts greet("pdx")
+puts keyword?("while")
+puts keyword?("until")
+puts within?(2)
+puts within?(9)
+puts SHOUTED
+puts KEYWORDS.length
+puts LIMIT + 1

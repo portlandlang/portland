@@ -19,6 +19,9 @@
 
 require_relative "pinning"
 
+# What a `case` the native build does not hold is called (#558).
+UNBUILT_CASE = "a case whose subject is more than a name or a field, or whose when names more than literals,"
+
 # `name << value` on a local that holds an array: the local then holds
 # the array with the value after its last element. Values never mutate,
 # so an array another name holds is copied first, which the runtime
@@ -121,6 +124,14 @@ struct IntermediateConstant
   value
 end
 
+# `count.times { … }` (#565): the block run that many times, handed the
+# turn it is on where it takes a parameter. It answers the count.
+struct IntermediateCount
+  type
+  count
+  block
+end
+
 # `maybe || fallback`: the value where there is one, and otherwise the
 # fallback, which is computed only then.
 struct IntermediateDefault
@@ -191,6 +202,17 @@ end
 struct IntermediateLeave
   kind
   value
+end
+
+# A method the runtime's library does (#560): the function, the value
+# asked, what it is handed, and for each of those whether it goes over as
+# the one word an array holds it as.
+struct IntermediateLibrary
+  type
+  symbol
+  receiver
+  arguments
+  words
 end
 
 # A parameter or a local, read.
@@ -373,6 +395,22 @@ struct LoweringContext
   pinned
 end
 
+# Whether one arm of an `if` is more than an expression (#559).
+def arm_is_body?(arm)
+  only = arm.first
+  return true if arm.length > 1
+  return false if only.nil?
+  (only in AssignmentNode) || (only in ReturnNode) || (only in WhileNode) || arms_are_bodies?((case_as_if(only) or only))
+end
+
+# Whether an `if` at the end of a body must be built arm by arm (#559):
+# an arm is more than one expression, or is one statement that is not an
+# expression, or is itself such an `if`.
+def arms_are_bodies?(node)
+  return false unless node in IfNode
+  [(node.then_body or []), (node.else_body or [])].any? { arm_is_body?(it) }
+end
+
 # Where a field starts among its struct's words (#553): a field takes
 # one word, and a maybe two, whether it is there and then its value.
 def field_offset(fields, place)
@@ -426,15 +464,30 @@ def joined_type(first, second)
   nil
 end
 
+# A call of the library's row for this name, asked of a value already
+# opened and handed values already lowered (#563).
+def library_call(name, holder, handed, node)
+  entry = native_library_entry(holder.type, name, handed.map { it.type }) or refuse_native("#{name} asked of #{with_article(holder.type)}", node)
+  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed, words: type_at(entry, 2).map { it == ["element"] })
+end
+
 # `name << value` (#497). The parser writes it as a binding of the name
 # to the append, and that is the one shape built: the local takes the
-# grown array.
+# grown array, or the String with the value after it.
 def lower_append(statement, append, bindings, context)
   refuse_native("a << bound to another name", statement) unless append.name == statement.name
   found = bindings.find { it[0] == append.name } or refuse_native("a << onto #{append.name}, which is not a local", statement)
   held = type_at(found, 1)
+  # A String takes what is appended as `+` does (#557): the name is bound
+  # to the two joined, and a maybe on either side is opened as `+` opens
+  # its operands.
+  if plain_of(held) == ["string"]
+    joined = binary_node("+", identifier_node(append.name, line: append.line), append.value, line: append.line)
+    return lower_statement(statement.with(value: joined), bindings, context)
+  end
   refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
-  written = lower_value(append.value, bindings, context.with(root: "value"))
+  # A maybe appended is opened first (#566): an array holds no maybe.
+  written = opened_for(lower_value(append.value, bindings, context.with(root: "value")), "<<")
   # An empty array appended to an array of arrays is one of its elements.
   value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
   type = ["array", value.type]
@@ -512,6 +565,17 @@ def lower_body(body, owner, what, bindings, answer, context)
     value = fitted(held, answer) or refuse_native("#{what} whose last expression is #{with_article(held.type)} where it answers #{with_article(answer)}", last)
     return Lowered.new(nodes: lowered.nodes + stored.nodes + [IntermediateReturn.new(value: value)], bindings: stored.bindings)
   end
+  # An `if` whose arms are more than one expression each answers from
+  # inside the arm taken (#559): each arm is a body of its own, and one
+  # that is missing or empty answers nil.
+  ending = (case_as_if(last) or last)
+  if arms_are_bodies?(ending)
+    test = lower_condition(ending.condition, lowered.bindings, context)
+    nothing = [nil_node(line: ending.line)]
+    taken = lower_body(((ending.then_body or []).empty? ? nothing : ending.then_body), owner, what, lowered.bindings, answer, context)
+    other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, taken.bindings, answer, context)
+    return Lowered.new(nodes: lowered.nodes + [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
+  end
   written = lower_value(last, lowered.bindings, context.with(root: "value"))
   value = fitted(written, answer) or refuse_native("#{what} whose last expression is #{with_article(written.type)} where it answers #{with_article(answer)}", last)
   Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
@@ -570,7 +634,28 @@ def lower_function(definition, found, context)
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
-def lower_program(nodes, core: nil, progress: nil)
+# A call of a method the library holds (#560), or nil where it holds none
+# for what is asked and handed. A maybe is opened, the value asked and
+# what it is handed alike, and nil refuses by the method's name.
+def lower_library(node, bindings, context)
+  # The library takes nothing by name.
+  return nil if node.arguments.any? { it in KeywordArgumentNode }
+  asked = lower_value(node.receiver, bindings, context)
+  handed = node.arguments.map { lower_value(it, bindings, context) }
+  entry = native_library_entry(plain_of(asked.type), node.name, handed.map { plain_of(it.type) })
+  return nil if entry.nil?
+  holder = opened_for(asked, node.name)
+  if node.name == "include?" && (holder.type in ["array", *])
+    held = type_at(holder.type, 1)
+    refuse_native("include? asked of an array of #{render_type(held)}", node) unless held == ["integer"] || held == ["boolean"] || held == ["string"]
+  end
+  words = type_at(entry, 2).map { it == ["element"] }
+  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed.map { opened_for(it, node.name) }, words: words)
+end
+
+def lower_program(written, core: nil, progress: nil)
+  # A constant is a def from here on, as pinning reads it (#562).
+  nodes = constants_as_defs(written)
   build_note(progress, "pinning: every value's type, from how the program calls its defs") if progress.some?
   pinned = pin_program(nodes, core: core, progress: progress)
   definitions = pinned.definitions
@@ -597,6 +682,20 @@ def lower_program(nodes, core: nil, progress: nil)
   IntermediateProgram.new(functions: functions, structs: pinned.structs.map { |made| [made.name, struct_fields(made, context)] })
 end
 
+# `held[from..to]` (#563): the run a range reads, or nil where the index
+# is no range. The library is handed where the range starts and ends,
+# and whether it leaves its last place out (1), has no end (2), or both.
+def lower_ranged(node, held, bindings, context)
+  range = node.index
+  return nil unless range in RangeNode
+  zero = IntermediateConstant.new(type: ["integer"], value: 0)
+  start = range.start.nil? ? zero : lower_value(range.start, bindings, context)
+  finish = range.finish.nil? ? zero : lower_value(range.finish, bindings, context)
+  refuse_native("an index by a range whose ends are not Integers", node) unless start.type == ["integer"] && finish.type == ["integer"]
+  mode = IntermediateConstant.new(type: ["integer"], value: (range.exclusive ? 1 : 0) + (range.finish.nil? ? 2 : 0))
+  library_call("[..]", opened_for(held, "[]"), [start, finish, mode], node)
+end
+
 # `Name.new(field: value)` (#532): each field of the struct handed its
 # value by name, in any order, and lowered in the order the struct
 # declares them. A field has the one type pinning settled for it.
@@ -621,6 +720,10 @@ def lower_record(node, made, bindings, context)
 end
 
 def lower_statement(statement, bindings, context)
+  # A `case` over literals is built as the `if`s it means (#558).
+  plain = case_as_if(statement)
+  return lower_statement(plain, bindings, context) if plain.some?
+  refuse_native(UNBUILT_CASE, statement) if statement in CaseNode
   case statement
   in AssignmentNode(name:, value:)
     refuse_native("a parameter declared mutable", statement) if value.nil?
@@ -738,6 +841,15 @@ end
 
 # An expression, as a value with its type.
 def lower_value(node, bindings, context)
+  # A `case` over literals is built as the `if`s it means (#558).
+  as_if = case_as_if(node)
+  return lower_value(as_if, bindings, context) if as_if.some?
+  refuse_native(UNBUILT_CASE, node) if node in CaseNode
+  # `%w[a b]` is the array of its words (#562).
+  if node in WordArrayNode
+    words = word_array_elements(node.text).map { string_node(it, line: node.line) }
+    return lower_value(array_node(words, line: node.line), bindings, context)
+  end
   # What is lowered below this value sits inside a larger expression,
   # where a call or a yield that can leave may not be written (#523).
   inner = context.with(root: nil)
@@ -761,6 +873,8 @@ def lower_value(node, bindings, context)
   in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
   in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
   in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
+  # The one encoding a String has (ADR 0069), by its name (#568).
+  in PathNode(parts: ["Encoding", "UTF_8"]) then IntermediateConstant.new(type: ["string"], value: "UTF-8")
   # A maybe handed to a method as its receiver is opened for it.
   in OpenedNode(value:, name:)
     held = lower_value(value, bindings, inner)
@@ -813,6 +927,13 @@ def lower_value(node, bindings, context)
     before = plain_of(first.type)
     after = plain_of(second.type)
     return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && before == ["string"] && after == ["string"]
+    # Two arrays of one type joined are a new array of it (#564). An
+    # empty array written out takes the other side's type.
+    if operator == "+" && (before in ["array", *]) && (after in ["array", *])
+      joined_first = before == EMPTY_ARRAY ? first.with(type: after) : first
+      joined_second = after == EMPTY_ARRAY ? second.with(type: joined_first.type) : second
+      return library_call("+", opened_for(joined_first, "+"), [opened_for(joined_second, "+")], node) if plain_of(joined_first.type) == plain_of(joined_second.type)
+    end
     if %w[/ %].include?(operator)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateDivision.new(type: ["integer"], operator: operator, left: first, right: second)
@@ -834,6 +955,15 @@ def lower_value(node, bindings, context)
   # `array[index]` (#503): the element, or nil past either end.
   in IndexNode(receiver:, index:)
     held = lower_value(receiver, bindings, inner)
+    # A range reads a run, of a String or of an array, and a number reads
+    # a String's character (#563).
+    ranged = lower_ranged(node, held, bindings, inner)
+    return ranged if ranged.some?
+    if plain_of(held.type) == ["string"]
+      place = lower_value(index, bindings, inner)
+      refuse_native("an index into a String by #{with_article(place.type)}", node) unless place.type == ["integer"]
+      return library_call("[]", opened_for(held, "[]"), [place], node)
+    end
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ["array", *]
     position = lower_value(index, bindings, inner)
     refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == ["integer"]
@@ -893,6 +1023,16 @@ def lower_value(node, bindings, context)
     refuse_leaving_inside(block, leaves, context.root, node)
     handed = PinnedBlock.new(parameters: [type_at(walked.type, 1)], answer: NOTHING, reason: nil, leaves: leaves)
     IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, inner))
+  # `times` on an Integer (#565): the block is handed the turn it is on,
+  # where it takes one, and answers nothing anyone reads.
+  in MethodCallNode(receiver:, name: "times", arguments: [], block:)
+    refuse_native("times without a block", node) if block.nil?
+    counted = lower_value(receiver, bindings, inner)
+    refuse_native("a call with a dot, .times, on #{with_article(counted.type)}", node) unless counted.type == ["integer"]
+    leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
+    refuse_leaving_inside(block, leaves, context.root, node)
+    handed = PinnedBlock.new(parameters: (block.parameters.empty? ? [] : [["integer"]]), answer: NOTHING, reason: nil, leaves: leaves)
+    IntermediateCount.new(type: ["integer"], count: counted, block: lower_block(block, handed, bindings, inner))
   in MethodCallNode(receiver:, name:, arguments: [], block: nil)
     asked = lower_value(receiver, bindings, inner)
     refuse_native("a call with a dot, .#{name}, on nil", node) if asked.type == ["nil"]
@@ -910,10 +1050,14 @@ def lower_value(node, bindings, context)
       holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
       return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: field_offset(fields, place)) if place.some?
     end
-    # Every other method is asked of the value, a maybe opened for it.
+    # Every other method is asked of the value, a maybe opened for it:
+    # one the build writes out itself, or one the library holds (#560).
     answer = native_method_answer(plain_of(asked.type), name)
-    refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node) if answer.nil?
-    IntermediateMethod.new(type: answer, receiver: asked, name: name)
+    return IntermediateMethod.new(type: answer, receiver: asked, name: name) if answer.some?
+    lower_library(node, bindings, inner) or refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node)
+  # A method with arguments that the library holds (#560).
+  in MethodCallNode(block: nil)
+    lower_library(node, bindings, inner) or refuse_native(native_name_of(node), node)
   in IfNode(condition:, then_body:, else_body:)
     taken = then_body or []
     other = else_body or []
@@ -999,6 +1143,12 @@ def native_value?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
   return true if type in ["struct", *]
   (type in ["array", *]) && native_value?(type_at(type, 1))
+end
+
+# A value with a maybe opened for a method of this name.
+def opened_for(value, name)
+  return value unless value.type in ["maybe", *]
+  IntermediateOpen.new(type: plain_of(value.type), value: value, name: name)
 end
 
 # A type with a maybe opened: what an operation that needs the value
@@ -1098,8 +1248,10 @@ def render_value(value)
   in IntermediateDefault(value: held, fallback:) then "(|| #{render_value(held)} #{render_value(fallback)})"
   in IntermediateSome(value: held) then "(some #{render_value(held)})"
   in IntermediateWalk(array:, block:) then "(each #{render_value(array)} #{render_handed_block(block)})"
+  in IntermediateCount(count:, block:) then "(times #{render_value(count)} #{render_handed_block(block)})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
+  in IntermediateLibrary(symbol:, receiver:, arguments:) then "(#{symbol} #{([receiver] + arguments).map { render_value(it) }.join(" ")})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"
   in IntermediateInspect(value: shown) then "(inspect #{render_value(shown)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)

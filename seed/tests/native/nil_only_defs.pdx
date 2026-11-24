@@ -1,0 +1,21 @@
+# A def whose every way out answers nil (#561) answers nothing: a bare
+# `return` where there is nothing to do, and a `panic` or a `puts` at the
+# end.
+def announce(text)
+  return if text == ""
+  puts "saw #{text}"
+  nil
+end
+
+def check(text, limit)
+  letters = text.chars
+  return unless letters.length > limit
+  panic "'#{text}' is longer than #{limit}"
+end
+
+announce("")
+announce("one")
+check("ab", 5)
+puts "checked"
+check("abcdefgh", 5)
+puts "not reached"

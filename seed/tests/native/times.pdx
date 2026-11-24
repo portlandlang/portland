@@ -1,0 +1,31 @@
+# `times` on an Integer (#565): the block run that many times, handed
+# the turn it is on where it takes a parameter.
+def padded(text, count)
+  mutable result = text
+  count.times do
+    result << "."
+  end
+  result
+end
+
+def first_past(limit)
+  10.times do |turn|
+    return turn if turn * turn > limit
+  end
+  -1
+end
+
+mutable total = 0
+4.times { |turn| total += turn }
+puts total
+puts padded("a", 3)
+puts padded("b", 0)
+puts first_past(10)
+puts first_past(500)
+mutable seen = 0
+9.times do |turn|
+  next if turn == 1
+  break if turn == 4
+  seen += 1
+end
+puts seen

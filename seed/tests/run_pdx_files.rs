@@ -1865,6 +1865,38 @@ fn a_required_file_that_binds_a_local_refuses_natively() {
     );
 }
 
+/// The compiler's own lexer builds natively (#511): `tokenize.pdx`, which
+/// is the lexer and a loop that prints each token, compiled and run on
+/// the lexer's own source, prints what the seed prints running the same
+/// file.
+#[test]
+fn the_lexer_built_natively_lexes_itself_as_the_seed_does() {
+    let compiler = format!("{}/../compiler", env!("CARGO_MANIFEST_DIR"));
+    let program = std::path::PathBuf::from(format!("{compiler}/tokenize.pdx"));
+    let built = native_build(&program, &[]);
+    assert!(
+        built.status.success(),
+        "tokenize.pdx should build: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+    let source = format!("{compiler}/lexer.pdx");
+    let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&program)
+        .arg(&source)
+        .output()
+        .expect("failed to run pdx");
+    let native = Command::new(&binary)
+        .arg(&source)
+        .output()
+        .expect("failed to run the native binary");
+    assert!(native.status.success(), "the native lexer should run");
+    assert!(
+        native.stdout == seed.stdout,
+        "the native lexer's tokens differ from the seed's"
+    );
+}
+
 /// A native program reads its command line and a file (#534), and says
 /// what the seed says: the arguments it was started with, the text of a
 /// file one of them names, and the message after `or panic` where a file
