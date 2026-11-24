@@ -1,11 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["crate", "runtime", "seed"]
+members = ["crate", "runtime", "seed", "source_form"]
 
 # What the seed and the runtime both use is pinned here, once, so the two
 # cannot carry different versions of one crate (ADR 0095).
 [workspace.dependencies]
 libc = "0.2.191"
+# How a String and a Symbol are written back out as source (#507): one
+# copy of Portland's own, so the seed and a native binary write a value
+# the same way.
+portland-source-form = { path = "source_form" }
 # The Unicode floor for ADR 0038, shared so that a String is equal to
 # another on the seed exactly when it is in a native binary.
 unicode-normalization = "0.1.26"
