@@ -356,32 +356,10 @@ impl Value {
     }
 
     /// How a symbol is written back out: `:paid`, or `:"odd key"` when the
-    /// name is not identifier-shaped.
-    /// A symbol as source: bare when its name is identifier-shaped — a
-    /// letter or underscore, then letters, digits, and underscores, with a
-    /// `?` or `!` allowed last — and quoted otherwise, so `:"9"` keeps its
-    /// quotes as Ruby's does.
+    /// name is not identifier-shaped. Written once, for the seed and the
+    /// runtime both (#507).
     fn symbol_source(name: &str) -> String {
-        let mut characters = name.chars().enumerate().peekable();
-        // A bare name is ASCII (#139), so a symbol with any other character
-        // keeps its quotes — the spelling that lexes here, which Ruby's
-        // bare `:ê` would not.
-        let starts_like_a_name = matches!(
-            characters.peek(),
-            Some((_, character)) if character.is_ascii_alphabetic() || *character == '_'
-        );
-        let plain = starts_like_a_name
-            && characters.all(|(index, character)| {
-                character.is_ascii_alphanumeric()
-                    || character == '_'
-                    || (index + 1 == name.len() && matches!(character, '?' | '!'))
-            });
-
-        if plain {
-            format!(":{name}")
-        } else {
-            format!(":{}", quoted(name))
-        }
+        portland_source_form::symbol_source(name)
     }
 
     /// Lift a found value out of a successful partial lookup: plain values
@@ -558,7 +536,7 @@ impl Value {
             }
             Value::Some(inner) => format!("some({})", inner.inspect_with(own)),
             Value::Failure(inner) => format!("failure({})", inner.inspect_with(own)),
-            Value::String(value) => quoted(value),
+            Value::String(value) => portland_source_form::quoted(value),
             Value::Symbol(name) => Value::symbol_source(name),
             Value::Type(name) => name.clone(),
             Value::Struct { fields, name } => {
@@ -574,43 +552,6 @@ impl Value {
 
 /// Ruby's float rendering: a float always shows its point (`1.0`, never
 /// `1`), and the infinities spell out (ADR 0018).
-/// A string as source: the closed escape set (docs/ruby/string-escapes.md)
-/// written back out — `\\`, `\"`, `\n`, `\r`, `\t`, and `\#` where a `#`
-/// would otherwise open an interpolation (before `{`, `$`, or `@`, as
-/// Ruby's `inspect` escapes it) — and every other character raw, as Ruby's
-/// `inspect` leaves a zero-width joiner or a flag's variation selector
-/// alone. Rust's `{:?}` would write those as `\u{200d}`, which no Portland
-/// literal can spell.
-fn quoted(text: &str) -> String {
-    let mut result = String::from("\"");
-    let mut characters = text.chars().peekable();
-    while let Some(character) = characters.next() {
-        match character {
-            '\\' => result.push_str("\\\\"),
-            '"' => result.push_str("\\\""),
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
-            // Ruby's named control escapes, then every other character
-            // that does not print — the controls and the two Unicode line
-            // separators — as `\uXXXX`, so an inspected string is readable
-            // whatever it holds (#345).
-            '\u{7}' => result.push_str("\\a"),
-            '\u{8}' => result.push_str("\\b"),
-            '\u{b}' => result.push_str("\\v"),
-            '\u{c}' => result.push_str("\\f"),
-            '\u{1b}' => result.push_str("\\e"),
-            '#' if matches!(characters.peek(), Some('{' | '$' | '@')) => result.push_str("\\#"),
-            other if other.is_control() || matches!(other, '\u{2028}' | '\u{2029}') => {
-                result.push_str(&format!("\\u{:04X}", other as u32));
-            }
-            other => result.push(other),
-        }
-    }
-    result.push('"');
-    result
-}
-
 fn format_float(value: f64) -> String {
     if value.is_nan() {
         return "NaN".to_string();

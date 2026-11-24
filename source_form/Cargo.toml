@@ -1,0 +1,15 @@
+[package]
+name = "portland-source-form"
+version = "0.0.0"
+edition = "2024"
+description = "How a Portland value is written back out as source. One copy, used by the seed and by the runtime."
+license = "MIT"
+publish = false
+
+# What `inspect` writes for a String and a Symbol (#507). The seed prints
+# with it, and so does the runtime every native program is linked with, so
+# the two cannot come to write a value differently. It depends on nothing.
+[lib]
+doctest = false
+
+[dependencies]

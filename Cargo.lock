@@ -98,6 +98,7 @@ name = "portland-runtime"
 version = "0.0.0"
 dependencies = [
  "libc",
+ "portland-source-form",
  "unicode-normalization",
  "unicode-segmentation",
 ]
@@ -107,10 +108,15 @@ name = "portland-seed"
 version = "0.0.0"
 dependencies = [
  "libc",
+ "portland-source-form",
  "rustyline",
  "unicode-normalization",
  "unicode-segmentation",
 ]
+
+[[package]]
+name = "portland-source-form"
+version = "0.0.0"
 
 [[package]]
 name = "radix_trie"

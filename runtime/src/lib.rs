@@ -10,7 +10,8 @@
 //! program: an `extern "C"` function never unwinds into its caller.
 //!
 //! Nothing here is the seed's code. The two share crates through the
-//! workspace, never source.
+//! workspace, never source: the Unicode crates, and `portland-source-form`,
+//! which writes a String back out as source for both (#507).
 
 /// A String as a native program holds it: a pointer to this header, with
 /// the text's UTF-8 bytes straight after it.
@@ -541,40 +542,6 @@ pub extern "C" fn portland_string_from_boolean(value: bool) -> *mut StringBlock 
     string_from(&[if value { b"true" } else { b"false" }])
 }
 
-/// A text as source, between quotes, in the language's closed escape
-/// set: `\\`, `\"`, `\n`, `\r`, `\t`, the named controls, `\#` where a
-/// `#` would otherwise open an interpolation, and `\uXXXX` for every
-/// other character that does not print. Everything else is written as
-/// it is. The seed writes the same form, and a fixture holds the two
-/// together.
-fn quoted(text: &str) -> String {
-    let mut result = String::from("\"");
-    let mut characters = text.chars().peekable();
-    while let Some(character) = characters.next() {
-        match character {
-            '\\' => result.push_str("\\\\"),
-            '"' => result.push_str("\\\""),
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
-            '\u{7}' => result.push_str("\\a"),
-            '\u{8}' => result.push_str("\\b"),
-            '\u{b}' => result.push_str("\\v"),
-            '\u{c}' => result.push_str("\\f"),
-            '\u{1b}' => result.push_str("\\e"),
-            '#' if matches!(characters.peek(), Some('{' | '$' | '@')) => result.push_str("\\#"),
-            unprintable
-                if unprintable.is_control() || matches!(unprintable, '\u{2028}' | '\u{2029}') =>
-            {
-                result.push_str(&format!("\\u{:04X}", unprintable as u32));
-            }
-            printable => result.push(printable),
-        }
-    }
-    result.push('"');
-    result
-}
-
 /// `inspect` of a String: its source form, as a new String held once.
 /// The absence of a String, a maybe that is nil, is answered by absence.
 ///
@@ -585,7 +552,11 @@ pub unsafe extern "C" fn portland_string_inspect(text: *const StringBlock) -> *m
     if text.is_null() {
         return std::ptr::null_mut();
     }
-    unsafe { string_from(&[quoted(std::str::from_utf8_unchecked(bytes_of(text))).as_bytes()]) }
+    unsafe {
+        string_from(&[
+            portland_source_form::quoted(std::str::from_utf8_unchecked(bytes_of(text))).as_bytes(),
+        ])
+    }
 }
 
 /// An array's source form, each element written by the kind on its
@@ -600,7 +571,7 @@ unsafe fn array_source(array: *mut ArrayBlock) -> String {
             let element = elements_of(array).add(index).read();
             written.push(match (*array).kind {
                 BOOLEANS => (element != 0).to_string(),
-                STRINGS => quoted(std::str::from_utf8_unchecked(bytes_of(
+                STRINGS => portland_source_form::quoted(std::str::from_utf8_unchecked(bytes_of(
                     element as *const StringBlock,
                 ))),
                 ARRAYS => array_source(element as *mut ArrayBlock),
