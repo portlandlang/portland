@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A native block leaves with `return` and `break`** ([#523](https://github.com/portlandlang/portland/issues/523), [ADR 0097](docs/adr/0097-2026-11-23-a-def-compiled-for-each-combination-of-types-and-leaving-a-block.md)) — `return` inside a block leaves the def the block is written in, with its value, and `break` leaves the call the block was handed to, as Ruby's do and as the seed's do.
+  - A flag passed up: the block stores a returned answer where its def will find it and answers where it is leaving to. Each caller between looks at that after the call, lets go of what it holds, and answers the same, until the frame it names.
+  - Only a block that can leave pays for it. Whether its block can leave is part of a def's combination, so a def handed blocks that cannot is compiled as before, with no test after a `yield`.
+  - A def's answer counts the returns in its blocks: one that returns an element from inside `each` and ends in nil answers a maybe.
+  - A call handed a block that leaves, or a `yield` to one, refuses at build inside a larger expression, where what the expression was holding would not be let go of. As a statement, the right side of a binding, or what a def answers, it builds. A `break` builds where its call is a statement.
 - **A def is compiled once for each combination of types it is called with** ([#521](https://github.com/portlandlang/portland/issues/521), [ADR 0097](docs/adr/0097-2026-11-23-a-def-compiled-for-each-combination-of-types-and-leaving-a-block.md)) — `twice(21)` beside `twice("ab")` builds natively, as two functions, where the build refused the second: `value is an Integer at one call and a String at another`. A combination is what a def's parameters are and, where it is handed a block, what the block answers; two calls with the same one share a function.
   - Pinning gathers combinations from the top level and from inside each combination's own body, until a round finds no new one. A call is read as what the combination it names answers.
   - Where one def is handed blocks that answer different types, each is a combination of its own. The rule that such a block answers nothing is gone, since nothing has to agree.

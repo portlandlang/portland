@@ -80,6 +80,10 @@ NOTHING = ["nothing"]
 # The name a `yield` is read under: a keyword, so no local has it.
 YIELD = "yield"
 
+# The name bound where the block a def was handed can leave it (#523):
+# a block written in that def which yields can then leave too.
+YIELD_LEAVES = "yield leaves"
+
 def accumulator_type(argument_types)
   initial = type_at(argument_types, 0)
   return ["unknown"] if initial.nil?
@@ -292,6 +296,13 @@ def block_body(block)
   block.body
 end
 
+# Whether a block has a `break` of its own (#523): one written in it and
+# outside any loop or block inside it, which would be that loop's or
+# that block's.
+def block_breaks?(body)
+  body.any? { node_breaks?(it) }
+end
+
 # A block parameter's type, by the receiver and the method: the element
 # for most, a hash's key then value. `reduce` and `inject` bind the
 # accumulator first — its type is the initial argument's, or unknown
@@ -336,6 +347,12 @@ def block_parameter_type(receiver, index, name, argument_types, parameter_count:
   end
   return ["unknown"] unless index == 0
   element_type(receiver)
+end
+
+# Whether a `return` is written anywhere inside a block (#523), the
+# blocks inside it included: each leaves the def they are all written in.
+def block_returns?(body)
+  body.any? { (it in ReturnNode) || block_returns?(children_of(it)) }
 end
 
 # A body that always leaves: its last statement returns, panics, or steps
@@ -611,12 +628,12 @@ end
 
 # The name one combination of a def goes by under the native reading
 # (ADR 0097): the def, the types it is called with, and where it is
-# handed a block, what the block answers. A def is compiled once for
-# each, so each has an answer of its own.
-def combination_key(name, arguments, handed)
+# handed a block, what the block answers and whether it can leave. A def
+# is compiled once for each, so each has an answer of its own.
+def combination_key(name, arguments, handed, leaves)
   types = arguments.map { render_native_type(it) }.join(", ")
   return "#{name}(#{types})" if handed.nil?
-  "#{name}(#{types}) { #{render_native_type(handed)} }"
+  "#{name}(#{types}) { #{render_native_type(handed)}#{leaves ? ", leaving" : ""} }"
 end
 
 # `x == nil` and `x != nil`, either way round.
@@ -827,13 +844,22 @@ def native_block_answer(node, arguments, types)
   found
 end
 
+# Whether a block can leave the call it is handed to before the call is
+# done (#523): by a `break` of its own, by a `return` anywhere inside it,
+# or by yielding to a block that can.
+def native_block_leaves?(block, types)
+  return true if block_breaks?(block.body) || block_returns?(block.body)
+  yields?(block.body) && types.any? { it[0] == YIELD_LEAVES }
+end
+
 # What a call to one of the program's defs answers under the native
 # reading: the answer of the combination the call names, or unknown
 # where there is none.
 def native_call_answer(node, types)
   arguments = node.arguments.map { synthesize(it, types) }
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
-  found = types.find { it[0] == combination_key(node.name, arguments, handed) }
+  leaves = node.block.some? && native_block_leaves?(node.block, types)
+  found = types.find { it[0] == combination_key(node.name, arguments, handed, leaves) }
   found.nil? ? ["unknown"] : type_at(found, 1)
 end
 
@@ -874,6 +900,16 @@ def nil_comparison_name(left, right)
 end
 
 def no_proof = [[], []]
+
+# Whether a node holds a `break` that is the block's own around it: not
+# one inside a loop, which is the loop's, nor one inside a block handed
+# to a call, which is that block's.
+def node_breaks?(node)
+  return true if node in BreakNode
+  return false if node in WhileNode
+  handing = (node in CallNode) || (node in MethodCallNode) || (node in SafeMethodCallNode)
+  block_breaks?(handing ? children_of(node.with(block: nil)) : children_of(node))
+end
 
 # The four floors of the tower (ADR 0085).
 def numeric?(type)
@@ -1399,7 +1435,7 @@ def synthesize_identifier(node, types)
   # A def with no parameters is called by its bare name; under the
   # native reading it is kept by its combination, which has none.
   return plain unless plain == ["unknown"] && native_reading?(types)
-  called = types.find { it[0] == combination_key(node.name, [], nil) }
+  called = types.find { it[0] == combination_key(node.name, [], nil, false) }
   called.nil? ? plain : type_at(called, 1)
 end
 
@@ -1617,6 +1653,12 @@ def when_false(proof) = type_at(proof, 1)
 
 def when_true(proof) = type_at(proof, 0)
 
+# Whether a body yields anywhere, the blocks written in it included: a
+# `yield` inside one reaches the def's own block.
+def yields?(body)
+  body.any? { (it in YieldNode) || yields?(children_of(it)) }
+end
+
 # The name what a combination yields goes by: the def and the types it
 # is called with, whatever its block answers.
-def yields_key(name, arguments) = combination_key(name, arguments, nil) + "&"
+def yields_key(name, arguments) = combination_key(name, arguments, nil, false) + "&"

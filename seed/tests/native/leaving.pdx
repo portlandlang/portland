@@ -1,0 +1,76 @@
+# `return` and `break` inside a block (#523): a `return` leaves the def the
+# block was written in, and a `break` the call the block was handed to.
+def each_upto(limit)
+  mutable index = 0
+  while index < limit
+    yield(index)
+    index += 1
+  end
+end
+
+def first_over(numbers, floor)
+  numbers.each do |number|
+    return number if number > floor
+  end
+  nil
+end
+
+def first_square_over(limit, floor)
+  each_upto(limit) do |index|
+    return index * index if index * index > floor
+  end
+  0
+end
+
+def each_pair(limit)
+  each_upto(limit) do |outer|
+    each_upto(limit) { |inner| yield(outer * 10 + inner) }
+  end
+end
+
+def found_pair(limit, wanted)
+  each_pair(limit) do |pair|
+    return "found #{pair}" if pair == wanted
+  end
+  "missing"
+end
+
+def announce(names)
+  names.each do |name|
+    return if name == "stop"
+    puts name
+  end
+  puts "all announced"
+end
+
+def first_long(names)
+  names.each do |name|
+    shout = name + "!"
+    return shout if shout.length > 4
+  end
+  "none"
+end
+
+p(first_over([3, 8, 12], 5))
+p(first_over([3, 8, 12], 50))
+puts first_square_over(10, 20)
+puts first_square_over(3, 20)
+puts found_pair(3, 21)
+puts found_pair(3, 99)
+announce(["a", "b"])
+announce(["a", "stop", "b"])
+each_upto(5) do |index|
+  break if index == 3
+  puts index
+end
+[10, 20, 30].each do |number|
+  break if number == 20
+  puts number
+end
+each_pair(3) do |pair|
+  break if pair > 11
+  puts pair
+end
+puts first_long(["ab", "abcd", "x"])
+puts first_long(["a"])
+puts "done"

@@ -1556,17 +1556,26 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a call with a dot, .map on line 2 is unbuilt (#443)"),
         ),
         // A block reaches past its own function with these (#493).
+        // A block that leaves is written where nothing else is held (#523).
         (
-            "def run\n  yield\nend\nrun do\n  break\nend\n",
-            format!("{compiles} — a break in a block on line 5 is unbuilt (#443)"),
+            "def run\n  yield\n  1\nend\nvalue = run { break }\n",
+            format!("{compiles} — a break in a block whose call is read for its value on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield\n  1\nend\ndef first\n  2 + run { return 1 }\nend\nputs first\n",
+            format!("{compiles} — a call handed a block that leaves, inside a larger expression, on line 6 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  1 + yield\nend\ndef first\n  run { return 1 }\n  2\nend\nputs first\n",
+            format!("{compiles} — a yield to a block that leaves, inside a larger expression, on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "def run\n  yield\nend\nrun { return 1 }\n",
+            format!("{compiles} — a return in a block outside a def on line 4 is unbuilt (#443)"),
         ),
         (
             "def run\n  yield(1) + 1\nend\nputs(run do |number|\n  next if number == 1\n  number\nend)\n",
             format!("{compiles} — a next in a block that answers a value on line 5 is unbuilt (#443)"),
-        ),
-        (
-            "def run\n  yield\nend\ndef first\n  run { return 1 }\n  2\nend\nputs first\n",
-            format!("{compiles} — a return in a block on line 5 is unbuilt (#443)"),
         ),
         (
             "def run\n  yield\nend\nrun { yield }\n",
