@@ -32,3 +32,12 @@ puts boxed.shape in Circle
 p(round)
 p(boxed)
 puts boxed.shape
+
+# Asked of a value that may not be there, `in` is true only where it is
+# there and is the struct named.
+tiles = [round, boxed]
+puts tiles[0].shape in Circle
+first = tiles[1]
+missing = tiles[5]
+puts first in Tile
+puts missing in Tile

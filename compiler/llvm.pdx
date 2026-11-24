@@ -151,6 +151,7 @@ LLVM_PRELUDE = [
   "declare void @portland_struct_release(ptr)",
   "declare ptr @portland_struct_to_string(ptr)",
   "declare ptr @portland_struct_slot(ptr, ptr)",
+  "declare zeroext i1 @portland_struct_is(ptr, ptr)",
   "declare void @portland_retain(ptr)",
   "declare void @portland_release(ptr)",
   "declare void @portland_exit_check()",
@@ -1277,6 +1278,13 @@ def llvm_value(emitter, value)
   # the second word of its block, and a struct's shape is written once.
   in IntermediateShaped(value: tested, name:)
     asked = llvm_value(emitter, tested)
+    # A maybe is the struct named only where it is there, which the
+    # runtime asks of an address that may be nothing.
+    if tested.type in ["maybe", *]
+      held = llvm_named(asked.emitter, "extractvalue #{llvm_type(tested.type)} #{asked.operand}, 1")
+      named = llvm_named(held.emitter, "call zeroext i1 @portland_struct_is(ptr #{held.operand}, ptr #{llvm_shape_name(name)})")
+      return LLVMValue.new(emitter: llvm_drop(named.emitter, tested.type, asked.operand), operand: named.operand)
+    end
     place = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 1")
     shape = llvm_named(place.emitter, "load ptr, ptr #{place.operand}")
     same = llvm_named(shape.emitter, "icmp eq ptr #{shape.operand}, #{llvm_shape_name(name)}")

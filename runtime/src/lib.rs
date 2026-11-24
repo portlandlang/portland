@@ -813,6 +813,20 @@ pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
     }
 }
 
+/// Whether a struct that may not be there is of this shape (#572): one
+/// that is not there is of none.
+///
+/// # Safety
+/// `record` is null or points at a live struct, and `shape` at a shape
+/// the compiler wrote.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_is(
+    record: *mut StructBlock,
+    shape: *const StructShape,
+) -> bool {
+    unsafe { !record.is_null() && std::ptr::eq((*record).shape, shape) }
+}
+
 /// Where the field of this name is in a struct that is one of several
 /// (#572): the compiled program knows the field's type, and the struct
 /// itself says where it keeps it. A struct with no such field refuses in

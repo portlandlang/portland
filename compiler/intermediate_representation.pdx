@@ -944,8 +944,9 @@ def lower_value(node, bindings, context)
     named = inner.structs.find { it.name == pattern.name }
     if named.some?
       asked = lower_value(subject, bindings, inner)
-      refuse_native("an in test of #{with_article(asked.type)}", node) unless asked.type in ["struct", *]
-      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT
+      refuse_native("an in test of #{with_article(asked.type)}", node) unless plain_of(asked.type) in ["struct", *]
+      # A maybe is the struct named only where it is there.
+      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in ["maybe", *])
       refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
       return IntermediateConstant.new(type: ["boolean"], value: type_at(asked.type, 1) == pattern.name)
     end
