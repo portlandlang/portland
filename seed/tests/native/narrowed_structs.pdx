@@ -66,3 +66,28 @@ puts large?(wide)
 puts sized(label)
 puts sized(wide)
 puts total([label, small, wide])
+
+# A call on the right of an `&&`, and in a ternary's arm, is handed what
+# the name was proved to be.
+def wide?(size)
+  size > 4
+end
+
+def shouted(text)
+  "#{text}!"
+end
+
+def checked(tile)
+  shape = tile.shape
+  (shape in Circle) && wide?(shape.size)
+end
+
+def called(tile)
+  shape = tile.shape
+  (shape in Label) ? shouted(shape.size) : "quiet"
+end
+
+puts checked(label)
+puts checked(wide)
+puts called(label)
+puts called(small)

@@ -556,6 +556,18 @@ def pin_expression(node, walk, answers, names)
   # `value&.name` is walked as the `if` it means (#572).
   guarded = safe_as_if(node)
   return pin_statement(guarded, walk, answers, names) if guarded.some?
+  # An `if` read for its value is walked as one run for what it does,
+  # each arm with what the condition proved (#572).
+  return pin_statement(node, walk, answers, names) if node in IfNode
+  # The right of an `&&` or an `||` is walked with what the left proved
+  # (#572), so a call there is gathered with the types it is read with.
+  if (node in LogicalNode) && %w[&& ||].include?(node.operator)
+    after_left = pin_statement(node.left, walk, answers, names)
+    proof = shape_narrowings(node.left, after_left.bindings + answers)
+    proved = node.operator == "&&" ? when_true(proof) : when_false(proof)
+    after_right = pin_statement(node.right, after_left.with(bindings: narrowed_bindings(after_left.bindings, proved)), answers, names)
+    return after_right.with(bindings: unnarrowed(after_left.bindings, after_right.bindings))
+  end
   return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
   # A method the core writes for the receiver's type is a def (#525), and
   # the call is gathered as a call of it.
