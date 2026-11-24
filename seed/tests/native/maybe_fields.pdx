@@ -1,0 +1,48 @@
+# A struct field that is a maybe (#553): made with a value in one place
+# and with nil, or with a maybe, in another. The struct holds it as
+# whether it is there and its value.
+struct Entry
+  name
+  note
+  count
+
+  def noted? = note != nil
+end
+
+def described(entry)
+  return entry.name if entry.note == nil
+  "#{entry.name}: #{entry.note}"
+end
+
+def total(entries)
+  mutable sum = 0
+  entries.each do |entry|
+    sum += (entry.count or 0)
+  end
+  sum
+end
+
+words = ["kept", "spare"]
+plain = Entry.new(name: "plain", note: nil, count: 3)
+noted = Entry.new(name: "noted", note: "by hand", count: nil)
+found = Entry.new(name: "found", note: words[0], count: 4)
+missed = Entry.new(name: "missed", note: words[9], count: nil)
+p(plain)
+p(noted)
+p(found)
+p(missed)
+puts plain
+puts noted
+puts described(plain)
+puts described(noted)
+puts described(found)
+puts described(missed)
+puts plain.noted?
+puts noted.noted?
+puts noted.note == "by hand"
+puts found.note == words[0]
+puts missed.note == nil
+puts total([plain, noted, found, missed])
+kept = noted.note
+puts(kept or "none")
+puts(missed.note or "none")

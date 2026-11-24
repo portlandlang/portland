@@ -668,10 +668,10 @@ pub fn live_structs() -> i64 {
     LIVE_STRUCTS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// The memory a struct of this many fields takes.
-fn struct_layout(fields: usize) -> std::alloc::Layout {
+/// The memory a struct takes whose fields are this many words.
+fn struct_layout(words: usize) -> std::alloc::Layout {
     std::alloc::Layout::from_size_align(
-        std::mem::size_of::<StructBlock>() + fields * std::mem::size_of::<i64>(),
+        std::mem::size_of::<StructBlock>() + words * std::mem::size_of::<i64>(),
         std::mem::align_of::<StructBlock>(),
     )
     .expect("a struct's size fits the address space")
@@ -692,6 +692,61 @@ unsafe fn field_of(shape: *const StructShape, index: usize) -> (i64, *const Stri
     }
 }
 
+/// Added to a field's kind where the field is a maybe (#553): such a field
+/// takes two words, whether it is there and then its value, where every
+/// other takes one.
+pub const MAYBE: i64 = 16;
+
+/// How many words a field of this kind takes in its struct.
+fn words_of(kind: i64) -> usize {
+    if kind >= MAYBE { 2 } else { 1 }
+}
+
+/// How many words a struct of this shape takes for its fields.
+///
+/// # Safety
+/// `shape` points at a shape the compiler wrote.
+unsafe fn struct_words(shape: *const StructShape) -> usize {
+    unsafe {
+        (0..(*shape).fields as usize)
+            .map(|index| words_of(field_of(shape, index).0))
+            .sum()
+    }
+}
+
+/// One field let go of as its kind says: a maybe's value only where it
+/// is there.
+///
+/// # Safety
+/// `slot` points at a field of that kind in a struct that is not freed.
+unsafe fn release_field(kind: i64, slot: *mut i64) {
+    unsafe {
+        if kind >= MAYBE {
+            if slot.read() != 0 {
+                hold_word(kind - MAYBE, slot.add(1).read(), false);
+            }
+            return;
+        }
+        hold_word(kind, slot.read(), false);
+    }
+}
+
+/// One field in its source form: a maybe that is not there is `nil`.
+///
+/// # Safety
+/// `slot` points at a field of that kind in a live struct.
+unsafe fn field_source(kind: i64, slot: *mut i64) -> String {
+    unsafe {
+        if kind >= MAYBE {
+            if slot.read() == 0 {
+                return "nil".to_string();
+            }
+            return word_source(kind - MAYBE, slot.add(1).read());
+        }
+        word_source(kind, slot.read())
+    }
+}
+
 /// Where a struct's fields begin.
 ///
 /// # Safety
@@ -708,10 +763,10 @@ unsafe fn fields_of(record: *mut StructBlock) -> *mut i64 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn portland_struct_new(shape: *const StructShape) -> *mut StructBlock {
     unsafe {
-        let fields = (*shape).fields as usize;
-        let block = std::alloc::alloc_zeroed(struct_layout(fields)).cast::<StructBlock>();
+        let words = struct_words(shape);
+        let block = std::alloc::alloc_zeroed(struct_layout(words)).cast::<StructBlock>();
         if block.is_null() {
-            std::alloc::handle_alloc_error(struct_layout(fields));
+            std::alloc::handle_alloc_error(struct_layout(words));
         }
         block.write(StructBlock { count: 1, shape });
         if cfg!(debug_assertions) {
@@ -741,9 +796,11 @@ pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
         if (*record).count == 0 {
             let shape = (*record).shape;
             let fields = (*shape).fields as usize;
+            let mut slot = fields_of(record);
             for index in 0..fields {
                 let (kind, _) = field_of(shape, index);
-                hold_word(kind, fields_of(record).add(index).read(), false);
+                release_field(kind, slot);
+                slot = slot.add(words_of(kind));
             }
             if cfg!(debug_assertions) {
                 // Left readable as freed, as a String is, so a second
@@ -751,7 +808,7 @@ pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
                 LIVE_STRUCTS.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                 return;
             }
-            std::alloc::dealloc(record.cast(), struct_layout(fields));
+            std::alloc::dealloc(record.cast(), struct_layout(struct_words(shape)));
         }
     }
 }
@@ -765,13 +822,15 @@ unsafe fn struct_source(record: *mut StructBlock) -> String {
     unsafe {
         let shape = (*record).shape;
         let mut written = Vec::with_capacity((*shape).fields as usize);
+        let mut slot = fields_of(record);
         for index in 0..(*shape).fields as usize {
             let (kind, name) = field_of(shape, index);
             written.push(format!(
                 "{}: {}",
                 std::str::from_utf8_unchecked(bytes_of(name)),
-                word_source(kind, fields_of(record).add(index).read())
+                field_source(kind, slot)
             ));
+            slot = slot.add(words_of(kind));
         }
         format!(
             "{}({})",

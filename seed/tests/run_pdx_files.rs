@@ -1703,8 +1703,8 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
     assert!(output.status.success(), "build.pdx should run");
     let text = std::fs::read_to_string(&written).expect("build.pdx should write the IR");
     for expected in [
-        "define i64 @\"portland.fib(Integer)\"(i64 %\"n\") {",
-        "define i1 @\"portland.small?(Integer)\"(i64 %\"number\") {",
+        "define i64 @\"portland.fib(Integer)\"(i64 %\"n.handed\") {",
+        "define i1 @\"portland.small?(Integer)\"(i64 %\"number.handed\") {",
         "define i32 @main(i32 %\".count\", ptr %\".values\") {",
         "call {i64, i1} @llvm.sadd.with.overflow.i64(",
         "call void @portland.overflow(",
