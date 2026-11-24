@@ -457,6 +457,14 @@ def llvm_equal_maybes(emitter, left_type, left, right_type, right)
   LLVMValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
 end
 
+# The kind the runtime reads for a struct's field (#553): an element's
+# kind, and sixteen more where the field is a maybe of it, which the
+# runtime's `MAYBE` is.
+def llvm_field_kind(type)
+  return 16 + llvm_array_kind(type_at(type, 1)) if type in ["maybe", *]
+  llvm_array_kind(type)
+end
+
 # What a block's frame carries, in order: each captured local by its
 # name, then, as each applies, the block its writer was handed and that
 # block's frame, the place its def keeps a returned answer, and the token
@@ -690,7 +698,8 @@ end
 # A struct's shape, as the lines that write it into the binary (#532):
 # its name and each field's name as Strings that are never freed, and
 # the shape itself, which is the name, the count of fields, and for each
-# field the kind of slot it is and its name.
+# field the kind of slot it is and its name. A field that is a maybe says
+# so in its kind (#553).
 def llvm_shape(name, fields)
   mutable lines = [llvm_text_constant("#{llvm_shape_text(name)}", name)]
   mutable words = []
@@ -698,7 +707,7 @@ def llvm_shape(name, fields)
   fields.each do |field|
     label = "@\".shape.#{name}.#{place}\""
     lines << llvm_text_constant(label, field[0])
-    words << "i64 #{llvm_array_kind(type_at(field, 1))}"
+    words << "i64 #{llvm_field_kind(type_at(field, 1))}"
     words << "i64 ptrtoint (ptr #{label} to i64)"
     place += 1
   end
@@ -1108,25 +1117,51 @@ def llvm_value(emitter, value)
     LLVMValue.new(emitter: llvm_label(stopped, "after#{stopped.counter}"), operand: llvm_zero(type))
   # A struct made: a block of its shape from the runtime, and each field
   # stored as a word, in order. A counted field's hold passes to the
-  # struct.
+  # struct. A field that is a maybe is two words, whether it is there and
+  # then its value (#553).
   in IntermediateRecord(type:, fields:)
     mutable made = llvm_named(emitter, "call ptr @portland_struct_new(ptr #{llvm_shape_name(type_at(type, 1))})")
     record = made.operand
     mutable place = 0
     fields.each do |field|
       written = llvm_value(made.emitter, field)
-      word = llvm_word(written.emitter, field.type, written.operand)
+      mutable storing = written.emitter
+      mutable stored = written.operand
+      mutable stored_type = field.type
+      if field.type in ["maybe", *]
+        stored_type = type_at(field.type, 1)
+        field_flag = llvm_named(storing, "extractvalue #{llvm_type(field.type)} #{written.operand}, 0")
+        field_there = llvm_word(field_flag.emitter, ["boolean"], field_flag.operand)
+        flag_slot = llvm_named(field_there.emitter, "getelementptr i64, ptr #{record}, i64 #{place + 2}")
+        field_value = llvm_named(llvm_line(flag_slot.emitter, "store i64 #{field_there.operand}, ptr #{flag_slot.operand}"), "extractvalue #{llvm_type(field.type)} #{written.operand}, 1")
+        storing = field_value.emitter
+        stored = field_value.operand
+        place += 1
+      end
+      word = llvm_word(storing, stored_type, stored)
       slot = llvm_named(word.emitter, "getelementptr i64, ptr #{record}, i64 #{place + 2}")
       made = LLVMValue.new(emitter: llvm_line(slot.emitter, "store i64 #{word.operand}, ptr #{slot.operand}"), operand: record)
       place += 1
     end
     made
   # A field read: its word, held by whoever asked where it is counted, and
-  # the struct asked let go of once it has answered.
+  # the struct asked let go of once it has answered. A maybe is read as
+  # its two words (#553).
   in IntermediateField(type:, record:, index:)
     asked = llvm_value(emitter, record)
     slot = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 2}")
-    read = llvm_element(slot.emitter, type, slot.operand)
+    mutable read = nil
+    if type in ["maybe", *]
+      maybe_shape = llvm_type(type)
+      inner_shape = llvm_type(type_at(type, 1))
+      field_flag = llvm_element(slot.emitter, ["boolean"], slot.operand)
+      value_slot = llvm_named(field_flag.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 3}")
+      field_value = llvm_element(value_slot.emitter, type_at(type, 1), value_slot.operand)
+      half_made = llvm_named(field_value.emitter, "insertvalue #{maybe_shape} undef, i1 #{field_flag.operand}, 0")
+      read = llvm_named(half_made.emitter, "insertvalue #{maybe_shape} #{half_made.operand}, #{inner_shape} #{field_value.operand}, 1")
+    else
+      read = llvm_element(slot.emitter, type, slot.operand)
+    end
     LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.

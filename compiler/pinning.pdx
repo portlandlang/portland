@@ -261,15 +261,17 @@ def definition_mentions(definitions)
   definitions.map { [it.name, (mentioned_names(it.body) + %w[inspect to_s]).uniq] }
 end
 
-# For each field of a struct made with more than one type, a sentence
+# For each field of a struct made with types that do not join, a sentence
 # saying so (#532). The native build gives a field one type, as it gives
-# an array's elements one.
+# an array's elements one; a value in one place and nil or a maybe of it
+# in another join as a maybe (#553).
 def field_conflicts(calls)
   mutable sentences = []
   made_fields(calls).each do |made|
     types = unique_types(type_at(made, 1).select { concrete?(it) })
-    next unless types.length > 1
-    sentences << "#{made[0]} is #{with_article(types[0])} where one is made and #{with_article(types[1])} where another is"
+    next unless types.length > 1 && joined_field(types).nil?
+    other = types.find { joined_field([types[0], it]).nil? } or types[1]
+    sentences << "#{made[0]} is #{with_article(types[0])} where one is made and #{with_article(other)} where another is"
   end
   sentences
 end
@@ -313,6 +315,24 @@ def gathered_round(statements, names, answers, pinned, changed, mentions, read_b
     calls += made
   end
   GatheredRound.new(walk: walk.with(calls: calls), read: read, again: again)
+end
+
+# The one type a field made with these holds (#553), or nil where they do
+# not join: the same type throughout, or a value and nil or a maybe of
+# it, which is a maybe of it, as a local bound both ways is (#505).
+def joined_field(types)
+  mutable joined = types.first
+  types.each do |type|
+    next if joined.nil? || type == joined || joined == ["maybe", type]
+    joined = if type == ["nil"] || type == ["maybe", joined]
+      maybe_of(joined)
+    elsif joined == ["nil"]
+      maybe_of(type)
+    else
+      nil
+    end
+  end
+  joined
 end
 
 # The names in an answer's key (#537): `Array#map([Token]) { Integer }`
@@ -798,8 +818,8 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
 end
 
 # Each struct's fields as bindings (#532): a field is bound to the type
-# its makings hand it. One handed more than one keeps the first, and is
-# named by `field_conflicts`. It is not dropped: a field left out is
+# its makings hand it, joined (#553). One handed types that do not join
+# keeps the first, and is named by `field_conflicts`. It is not dropped: a field left out is
 # forgotten by the next round, which may then find it made with one type
 # again, and so round in a circle (#545). A round only adds to what the
 # last one knew.
@@ -807,7 +827,7 @@ def settled_fields(calls)
   mutable bindings = []
   made_fields(calls).each do |made|
     types = unique_types(type_at(made, 1).select { concrete?(it) })
-    bindings << [made[0], types[0]] unless types.empty?
+    bindings << [made[0], (joined_field(types) or types[0])] unless types.empty?
   end
   bindings
 end

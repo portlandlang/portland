@@ -373,6 +373,16 @@ struct LoweringContext
   pinned
 end
 
+# Where a field starts among its struct's words (#553): a field takes
+# one word, and a maybe two, whether it is there and then its value.
+def field_offset(fields, place)
+  mutable offset = 0
+  fields.slice(0, place).each do |field|
+    offset += (type_at(field, 1) in ["maybe", *]) ? 2 : 1
+  end
+  offset
+end
+
 # A value as the type that is to hold it (#505): itself where it is that
 # type, a maybe that is there where the type is a maybe of what it is,
 # and a maybe that is not there where it is nil. Nil where it does not
@@ -602,9 +612,10 @@ def lower_record(node, made, bindings, context)
     argument = labelled.find { it.label == field[0] } or refuse_native("#{made.name}.new without #{field[0]}", node)
     written = lower_value(argument.value, bindings, context)
     type = type_at(field, 1)
-    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_value?(written.type)
-    refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node) unless written.type == type
-    written
+    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_type?(written.type) || written.type == ["nil"]
+    # A value handed to a field that is a maybe of it is one that is
+    # there, and nil is one that is not (#553).
+    fitted(written, type) or refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node)
   end
   IntermediateRecord.new(type: ["struct", made.name], fields: values)
 end
@@ -897,7 +908,7 @@ def lower_value(node, bindings, context)
       fields = made.nil? ? [] : struct_fields(made, context)
       place = fields.find_index { it[0] == name }
       holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
-      return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: place) if place.some?
+      return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: field_offset(fields, place)) if place.some?
     end
     # Every other method is asked of the value, a maybe opened for it.
     answer = native_method_answer(plain_of(asked.type), name)
