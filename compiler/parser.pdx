@@ -1585,8 +1585,9 @@ end
 # does, so it takes the statement's first token's line (#362) unless the
 # site that built it already said where.
 def located_refusal(step, line)
-  return step unless (step.node in ErrorNode) && step.node.line.nil?
-  Step.new(node: step.node.with(line: line), position: step.position)
+  refused = step.node
+  return step unless (refused in ErrorNode) && refused.line.nil?
+  Step.new(node: refused.with(line: line), position: step.position)
 end
 
 def logical_node(operator, left, right, line: nil)
