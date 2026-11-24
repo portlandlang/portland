@@ -34,18 +34,14 @@ require_relative "lexer"
 # struct's fields, and the seed refuses a collision — which it did, for
 # `arguments`, the moment CallNode carried this.
 trait Sexp
-  def sexp_list(items)
-    items.map { it.sexp }.join(" ")
+  def branch_sexp(head, items)
+    return "(#{head})" if items.nil?
+    headed_sexp(head, items)
   end
 
   def headed_sexp(head, items)
     return "(#{head})" if items.empty?
     "(#{head} #{sexp_list(items)})"
-  end
-
-  def branch_sexp(head, items)
-    return "(#{head})" if items.nil?
-    headed_sexp(head, items)
   end
 
   def method_call_sexp(node, dot)
@@ -55,6 +51,10 @@ trait Sexp
     opener << " |#{node.block.parameters.join(" ")}|" unless node.block.parameters.empty?
     inner = plain.slice(1, plain.length - 2)
     "(#{inner} #{headed_sexp(opener, node.block.body)})"
+  end
+
+  def sexp_list(items)
+    items.map { it.sexp }.join(" ")
   end
 end
 

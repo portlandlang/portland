@@ -26,24 +26,20 @@ struct Token
   # points at. Heredoc bodies are padded back in so the count holds.
   line
 
-  def identifier?
-    kind == "identifier"
-  end
-
   def float?
     kind == "float"
   end
 
-  def integer?
-    kind == "integer"
-  end
-
-  def rational?
-    kind == "rational"
+  def identifier?
+    kind == "identifier"
   end
 
   def imaginary?
     kind == "imaginary"
+  end
+
+  def integer?
+    kind == "integer"
   end
 
   def keyword?
@@ -56,6 +52,10 @@ struct Token
 
   def operator?
     kind == "operator"
+  end
+
+  def rational?
+    kind == "rational"
   end
 
   def string?

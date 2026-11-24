@@ -1342,6 +1342,38 @@ fn portland_lint_finds_a_line_at_the_margin_inside_a_statement() {
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "ok\n");
 }
 
+/// The linter holds a file to its order (#509): requires, constants,
+/// traits, structs, defs, and then what it runs, each kind alphabetical,
+/// the methods of a struct among themselves too. A constant built from
+/// another may follow it whatever their names.
+#[test]
+fn portland_lint_holds_a_file_to_its_order() {
+    let driver = format!("{}/../compiler/lint.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("lint_order_sample.pdx");
+    std::fs::write(
+        &sample,
+        "require_relative \"lexer\"\n\nLIMIT = 10\nBIGGER = LIMIT * 2\nALPHA = 1\n\nstruct Zebra\n  stripes\n\n  def wide? = stripes > 3\n\n  def narrow? = stripes < 2\nend\n\ntrait Late\n  def label = \"late\"\nend\n\nstruct Apple\n  seeds\nend\n\ndef zoo = 1\n\ndef aviary = 2\n\nSTRAY = 3\n\nputs zoo\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !output.status.success(),
+        "a file out of order should refuse"
+    );
+    let path = sample.display();
+    let order = "a file holds its requires, constants, traits, structs, and defs in that order, and then what it runs";
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!(
+            "{path}:5: ALPHA is written after BIGGER — constants are alphabetical\n{path}:15: a trait is written after a struct — {order}\n{path}:25: aviary is written after zoo — defs are alphabetical\n{path}:27: a constant is written after a def — {order}\n{path}:12: narrow? is written after wide? — the methods of Zebra are alphabetical\n"
+        )
+    );
+}
+
 /// `pin.pdx` — the native build's types (#445): a def's parameters pinned
 /// from its call sites, a recursive answer assumed and checked, and a
 /// `mutable` local keeping its type through a loop. A def that cannot be
