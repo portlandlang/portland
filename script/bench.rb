@@ -24,18 +24,20 @@
 #
 # A fourth column runs the workload built natively by script/build (#448),
 # where it builds: only a slice of the language compiles (#443), and every
-# other bench shows "—". The workloads that build are integers and calls,
-# so that column says nothing about collections, blocks, or the cost of
-# reference counting, which is where the time of a real program will go.
+# other bench shows "—". The workloads that build are integers, calls,
+# arrays, blocks, and the core's walks over an array (#525). Starting a
+# process is in every time, and a workload the native build finishes
+# sooner than that shows only the start: `treks` is `walks` at a length
+# the native build can be timed on.
 
 require "English"
 
 QUICK_RUNS = 3
 SLOW_WORKLOADS = %w[lex].freeze
-# Hosted, these take minutes: the compiler interpreting a million calls.
-# They run direct, native, and under Ruby in the quick set, and hosted
-# only with `slow`.
-HOSTED_SLOW_WORKLOADS = %w[count fib].freeze
+# Hosted, these take minutes or most of an hour: the compiler interpreting
+# a million calls. They run direct, native, and under Ruby in the quick
+# set, and hosted only with `slow`.
+HOSTED_SLOW_WORKLOADS = %w[count fib treks].freeze
 RUBY_UNRUNNABLE = { "lex" => "requires the Portland compiler" }.freeze
 
 def repo_root = File.expand_path("..", __dir__)
@@ -182,5 +184,5 @@ puts format("ruby's startup alone: %.3fs — the floor under every ruby (s) abov
 puts "skipped slow tier: #{skipped.join(", ")} — run `script/bench slow` to include" unless skipped.empty?
 puts "not run under Ruby: #{ruby_skipped.join(", ")}" unless ruby_skipped.empty?
 puts "not run hosted: #{hosted_skipped.join(", ")} — minutes each; run `script/bench slow` to include" unless hosted_skipped.empty?
-puts "native: built by script/build with #{clang_version}, startup included. The workloads that build are integers and calls, so the " \
-     "column says nothing about collections, blocks, or the cost of reference counting."
+puts "native: built by script/build with #{clang_version}, startup included. The workloads that build are integers, calls, arrays, " \
+     "blocks, and the core's walks; one the native build finishes sooner than a process starts shows only the start."
