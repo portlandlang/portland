@@ -699,10 +699,11 @@ def rebound(bindings, name, type)
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
   return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
   # A name that holds nil at one binding and a value at another holds a
-  # maybe of that value (#505), whichever came first.
+  # maybe of that value (#505), whichever came first, and one that holds
+  # one struct and then another holds one of several (#572).
   held = type_at(found, 1)
-  return bindings if held == ["maybe", type] || (type == ["nil"] && (held in ["maybe", *]))
-  widened = type == ["nil"] ? maybe_of(held) : (held == ["nil"] ? maybe_of(type) : (type == ["maybe", held] ? type : nil))
+  widened = joined_pair(held, type)
+  return bindings if widened == held
   return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
   bindings.map { it[0] == name ? [name, ["unknown"]] : it }
 end

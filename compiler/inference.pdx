@@ -892,9 +892,23 @@ def joined_pair(first, second)
   plain_first = (first in ["maybe", *]) ? type_at(first, 1) : first
   plain_second = (second in ["maybe", *]) ? type_at(second, 1) : second
   maybe = plain_first != first || plain_second != second
-  return maybe_of(plain_first) if plain_first == plain_second
-  return nil unless (plain_first in ["struct", *]) && (plain_second in ["struct", *])
-  maybe ? maybe_of(ANY_STRUCT) : ANY_STRUCT
+  plain = joined_plain(plain_first, plain_second) or return nil
+  maybe ? maybe_of(plain) : plain
+end
+
+# The one type two types make together where neither is nil or a maybe,
+# or nil where they make none: the same type is itself, two structs are
+# one of several structs, and two arrays are an array of what their
+# elements make together (#572). An array given no element is the other
+# array.
+def joined_plain(first, second)
+  return first if first == second
+  return ANY_STRUCT if (first in ["struct", *]) && (second in ["struct", *])
+  return nil unless (first in ["array", *]) && (second in ["array", *])
+  return second if first == ["array", ["unknown"]]
+  return first if second == ["array", ["unknown"]]
+  element = joined_plain(type_at(first, 1), type_at(second, 1)) or return nil
+  ["array", element]
 end
 
 # The one type these make together, each joined to the ones before it
@@ -1525,6 +1539,12 @@ def synthesize_append(node, types)
   value = opened_natively(synthesize(node.value, types), types)
   return ["array", value] if current == ["array", ["unknown"]]
   return current if (current in ["array", *]) && type_at(current, 1) == value
+  # Read as the native build runs it, one struct appended to an array of
+  # another makes it an array of one of several structs (#572).
+  if (current in ["array", *]) && native_reading?(types)
+    element = joined_plain(type_at(current, 1), value)
+    return ["array", element] if element.some?
+  end
   return ["array", ["unknown"]] if current in ["array", *]
   ["unknown"]
 end
@@ -1537,6 +1557,15 @@ def synthesize_array(node, types)
     uniform = false unless synthesize(element, types) == first
   end
   return ["array", first] if uniform
+  # Read as the native build runs it, a literal of more than one struct
+  # is an array of one of several structs (#572).
+  if native_reading?(types)
+    mutable joined = first
+    node.elements.each do |element|
+      joined = joined.nil? ? nil : joined_plain(joined, synthesize(element, types))
+    end
+    return ["array", joined] if joined.some?
+  end
   ["array", ["unknown"]]
 end
 

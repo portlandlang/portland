@@ -453,7 +453,10 @@ end
 
 # Whether a value of one type is held as another with nothing done to
 # it: the same type, or a struct held as one of several (#572).
-def held_as?(type, holding) = type == holding || (holding == ANY_STRUCT && (type in ["struct", *]))
+def held_as?(type, holding)
+  return true if type == holding || (holding == ANY_STRUCT && (type in ["struct", *]))
+  (type in ["array", *]) && (holding in ["array", *]) && held_as?(type_at(type, 1), type_at(holding, 1))
+end
 
 # What a name first bound here holds: what it is bound to, unless
 # pinning settled it as a maybe of that, because another binding of the
@@ -463,6 +466,9 @@ def held_type(name, type, context)
   return type if pinned.nil?
   settled = type_at(pinned, 1)
   return settled if (settled in ["maybe", *]) && native_type?(settled) && (type == ["nil"] || type == type_at(settled, 1))
+  # One bound to a struct here and to another elsewhere holds one of
+  # several (#572), and so with an array of them.
+  return settled if native_type?(settled) && held_as?(type, settled)
   type
 end
 
@@ -512,7 +518,8 @@ def lower_append(statement, append, bindings, context)
   written = opened_for(lower_value(append.value, bindings, context.with(root: "value")), "<<")
   # An empty array appended to an array of arrays is one of its elements.
   value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
-  type = ["array", value.type]
+  # An array of one of several structs takes any struct (#572).
+  type = held_as?(["array", value.type], held) ? held : ["array", value.type]
   refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
   refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
   # An empty array no append had named yet is named by this one.
@@ -760,7 +767,9 @@ def lower_statement(statement, bindings, context)
     holding = found.some? ? type_at(found, 1) : held_type(name, lowered.type, context)
     stored = fitted(lowered, holding) or refuse_native("#{name} rebound from #{with_article(holding)} to #{with_article(lowered.type)}", statement)
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
-    after = found.nil? ? [[name, stored.type]] + bindings : bindings
+    # The name holds what it was fitted to, which is more than the value
+    # where it is one of several structs (#572).
+    after = found.nil? ? [[name, holding]] + bindings : bindings
     Lowered.new(nodes: [IntermediateStore.new(name: name, value: stored)], bindings: after)
   # A struct or a trait written out declares, and runs nothing.
   in StructDefNode then Lowered.new(nodes: [], bindings: bindings)
@@ -947,9 +956,14 @@ def lower_value(node, bindings, context)
     return IntermediateArray.new(type: EMPTY_ARRAY, elements: []) if values.empty?
     # An empty array among arrays is one of them, whatever they hold.
     named = values.find { it.type != EMPTY_ARRAY }
-    first = named.nil? ? EMPTY_ARRAY : named.type
+    # More than one struct among them makes it an array of one of
+    # several (#572).
+    mutable first = named.nil? ? EMPTY_ARRAY : named.type
     values.each do |value|
-      fits = value.type == first || (value.type == EMPTY_ARRAY && (first in ["array", *]))
+      first = (joined_plain(first, value.type) or first)
+    end
+    values.each do |value|
+      fits = held_as?(value.type, first) || (value.type == EMPTY_ARRAY && (first in ["array", *]))
       refuse_native("an array holding #{with_article(first)} and #{with_article(value.type)}", node) unless fits
     end
     refuse_native("an array of #{render_type(first)}", node) unless native_type?(["array", first])
