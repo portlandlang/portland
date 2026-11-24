@@ -1540,10 +1540,11 @@ end
 
 # Whether an expression reads the same each time it is read, and costs
 # little to read again (#558): a name, `self`, a method with no
-# arguments asked of one, as a field is, or an element of one read by a
-# number or a name.
+# arguments asked of one, as a field is, an element of one read by a
+# number or a name, or two of these added or subtracted.
 def steady_subject?(node)
   return true if (node in IdentifierNode) || (node in SelfNode) || (node in IntegerNode)
+  return steady_subject?(node.left) && steady_subject?(node.right) if (node in BinaryNode) && %w[+ -].include?(node.operator)
   return steady_subject?(node.receiver) && steady_subject?(node.index) if node in IndexNode
   (node in MethodCallNode) && node.arguments.empty? && node.block.nil? && steady_subject?(node.receiver)
 end
