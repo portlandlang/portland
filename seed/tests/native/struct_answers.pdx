@@ -1,0 +1,40 @@
+# A def that answers one struct in one place and another elsewhere
+# answers one of several structs (#572), and its caller asks which. One
+# that calls itself does too.
+struct Found
+  word
+  position
+end
+
+struct Missing
+  reason
+  position
+end
+
+def read(words, position)
+  return Missing.new(reason: "nothing at #{position}", position: position) if position >= words.length
+  Found.new(word: (words[position] or ""), position: position + 1)
+end
+
+def shown(words, position)
+  step = read(words, position)
+  return step.reason if step in Missing
+  "#{step.word}, then #{step.position}"
+end
+
+def last_read(words, position)
+  step = read(words, position)
+  return step if step in Missing
+  following = last_read(words, step.position)
+  return step if following.position == words.length && (following in Missing)
+  following
+end
+
+words = ["one", "two", "three"]
+puts shown(words, 0)
+puts shown(words, 2)
+puts shown(words, 3)
+p(read(words, 1))
+p(read(words, 7))
+p(last_read(words, 0))
+p(last_read(words, 5))

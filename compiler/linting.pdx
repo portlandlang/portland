@@ -44,7 +44,11 @@ end
 # part of the first, and is indented under it.
 def lint_margins(path, source, nodes)
   lines = source.split("\n")
-  opened = nodes.map { it.line }.reject { it.nil? }
+  mutable opened = []
+  nodes.each do |node|
+    line = node.line
+    opened << line unless line.nil?
+  end
   mutable findings = []
   mutable index = 0
   while index < opened.length
@@ -94,7 +98,7 @@ def lint_order(path, nodes)
       before = kind_place(previous)
       if place < before
         findings << LintFinding.new(path: path, line: node.line, message: "#{KIND_NAMES[place]} is written after #{KIND_NAMES[before]} — a file holds its requires, constants, traits, structs, and defs in that order, and then what it runs")
-      elsif place == before && place >= 1 && place <= 4 && node.name < previous.name && !(place == 1 && mentions?(node.value, previous.name))
+      elsif place == before && place >= 1 && place <= 4 && node.name < previous.name && !(place == 1 && (node in AssignmentNode) && mentions?(node.value, previous.name))
         findings << LintFinding.new(path: path, line: node.line, message: "#{node.name} is written after #{previous.name} — #{KIND_NAMES[place].slice(2, 20)}s are alphabetical")
       end
     end

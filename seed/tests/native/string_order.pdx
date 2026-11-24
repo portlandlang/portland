@@ -1,0 +1,14 @@
+# Strings order by their canonical text (ADR 0054): `<`, `<=`, `>`, and
+# `>=` between two, a maybe opened for either side.
+words = ["pear", "apple", "étude", "étude", "zebra"]
+first = (words[0] or "")
+second = (words[1] or "")
+puts first < second
+puts second < first
+puts first >= second
+puts "a" <= "a"
+puts "a" > "a"
+puts((words[2] or "") < (words[4] or ""))
+puts((words[2] or "") <= (words[3] or ""))
+puts((words[3] or "") >= (words[2] or ""))
+puts words[0] > words[1]

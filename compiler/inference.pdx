@@ -19,6 +19,9 @@
 #   ["hash", key, value]
 #   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
 #   ["struct", "Name"]         — an instance
+#   ["struct", "*"]            — an instance of one of the program's structs,
+#                                whichever (#572): only the native build's
+#                                pinning makes it
 #   ["type", "Name"]           — the struct's name itself, what `new` is called on
 #   ["enum", "Name"]
 #   ["unknown"]                — the honest answer, and the default
@@ -60,6 +63,12 @@
 # on that read fired on the evaluator's own source.
 
 require_relative "parser"
+
+# A value that is one of the program's structs, whichever (#572): what
+# a field made with one struct in one place and another elsewhere holds.
+# No struct can be named `*`. It is a struct wherever one is asked for,
+# and the struct it holds says which it is.
+ANY_STRUCT = ["struct", "*"]
 
 # The methods of a String and of an array the native build holds by name
 # (#560), each as what it is asked of, its name, what it takes, what it
@@ -608,6 +617,7 @@ end
 # is no `case`, a subject that may not read the same each time, or a
 # `when` that names a type, a range, or a regex, which match by `===`.
 def case_as_if(node)
+  return case_in_as_if(node) if node in CaseInNode
   return nil unless node in CaseNode
   return nil unless steady_subject?(node.subject)
   return nil unless node.branches.all? { |branch| branch.values.all? { compared_literal?(it) } }
@@ -623,13 +633,37 @@ def case_as_if(node)
   (rest or []).first
 end
 
+# A `case/in` over structs as the `if`s it means (#572): each arm asks
+# whether the subject is its struct, binds the fields it names from the
+# subject, and runs its body; the `else` otherwise, and with none, the
+# refusal the seed makes. Nil for anything else: a subject that may not
+# read the same each time, an arm with a guard, or a pattern that is more
+# than a struct's name with fields bound to names.
+def case_in_as_if(node)
+  return nil unless steady_subject?(node.subject)
+  return nil unless node.branches.all? { struct_arm?(it) }
+  shown = call_node("inspect", [node.subject], line: node.line)
+  message = binary_node("+", binary_node("+", string_node("no pattern matched ", line: node.line), shown, line: node.line), string_node(" — add an in branch or an else", line: node.line), line: node.line)
+  mutable rest = (node.else_body or [call_node("panic", [message], line: node.line)])
+  node.branches.reverse.each do |branch|
+    named = struct_pattern_node(branch.pattern.name, [], line: branch.line)
+    test = match_test_node(node.subject, named, line: branch.line)
+    bound = branch.pattern.fields.map do |field|
+      read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
+      assignment_node(field.pattern.name, read, line: branch.line)
+    end
+    rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
+  end
+  rest.first
+end
+
 # A node's direct children — every expression and statement it holds,
 # blocks and branches included, patterns excluded — for a walk that looks
 # for something anywhere inside a body. Defs, structs, traits, and modules
 # are not descended into: their bodies bind their own names.
 def children_of(node)
   case node
-  in AssignmentNode(value:) then [value]
+  in AssignmentNode(value:) then one_if_there(value)
   in AppendNode(value:) then [value]
   in WhileNode(condition:, body:) then [condition] + body
   in IfNode(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
@@ -647,7 +681,7 @@ def children_of(node)
     end
     found + (else_body or [])
   in TogetherNode(lines:) then lines.map { if it in TaskLineNode then it.value else it end }
-  in ReturnNode(value:) then [value]
+  in ReturnNode(value:) then one_if_there(value)
   in CallNode(arguments:, block:) then arguments + block_body(block)
   in MethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
   in SafeMethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
@@ -768,6 +802,9 @@ def element_type(receiver)
   ["unknown"]
 end
 
+# Whether a statement is a loop left only from inside: `while true`.
+def endless_loop?(node) = (node in WhileNode) && (node.condition in BooleanNode) && node.condition.value == "true"
+
 def entry_name(entry) = entry.split("/").first
 
 # Every node in a file, each before what it holds.
@@ -797,6 +834,28 @@ end
 # The name a struct's field is bound under, with the one type the
 # native build settled for it (#532).
 def field_key(owner, field) = "#{owner}.#{field}"
+
+# What a call hands a def, with each empty array among it as the array
+# the def's other calls hand it in that place (#572): an empty literal
+# says nothing of what it holds, and the def it is handed to does. One
+# no other call names stays as it is.
+def filled_arguments(name, arguments, types)
+  empty = ["array", ["unknown"]]
+  return arguments unless arguments.any? { it == empty || ((it in ["keyword", *]) && type_at(it, 2) == empty) }
+  mutable place = 0
+  mutable filled = []
+  arguments.each do |argument|
+    if argument in ["keyword", *]
+      known = type_at(argument, 2) == empty ? types.assoc(handed_array_key(name, type_at(argument, 1))) : nil
+      filled << (known.nil? ? argument : ["keyword", type_at(argument, 1), type_at(known, 1)])
+    else
+      known = argument == empty ? types.assoc(handed_array_key(name, place.to_s)) : nil
+      filled << (known.nil? ? argument : type_at(known, 1))
+      place += 1
+    end
+  end
+  filled
+end
 
 # An array of arrays flattened all the way: an array of the innermost
 # element type.
@@ -832,6 +891,11 @@ def guard_proof(node, types)
   return when_true(proof) if else_exits && !then_exits
   []
 end
+
+# The name the array a def is handed in one place is bound under (#572):
+# the place by its number, or by its name where it is handed by name. No
+# def and no local is spelled with a bracket.
+def handed_array_key(name, place) = "#{name}[#{place}]"
 
 # Everything a node holds, for a tool that walks a whole file (#30,
 # #551): a def's body and a type's methods, which the checker reads one
@@ -869,6 +933,47 @@ end
 # because the no-shadow rule already promises a name is never both.
 def infer_program(nodes)
   ordered_pairs(nodes, scan_program(nodes), "assignment")
+end
+
+# The one type two types make together where a field, a local, or an
+# answer is one in one place and the other elsewhere, or nil where they
+# make none. The same type is itself; a value and nil, or a maybe of it,
+# are a maybe of it (#505, #553); and two structs are one of several
+# structs (#572), a maybe of that where either was one.
+def joined_pair(first, second)
+  return first if first == second
+  return maybe_of(second) if first == ["nil"]
+  return maybe_of(first) if second == ["nil"]
+  plain_first = (first in ["maybe", *]) ? type_at(first, 1) : first
+  plain_second = (second in ["maybe", *]) ? type_at(second, 1) : second
+  maybe = plain_first != first || plain_second != second
+  plain = joined_plain(plain_first, plain_second) or return nil
+  maybe ? maybe_of(plain) : plain
+end
+
+# The one type two types make together where neither is nil or a maybe,
+# or nil where they make none: the same type is itself, two structs are
+# one of several structs, and two arrays are an array of what their
+# elements make together (#572). An array given no element is the other
+# array.
+def joined_plain(first, second)
+  return first if first == second
+  return ANY_STRUCT if (first in ["struct", *]) && (second in ["struct", *])
+  return nil unless (first in ["array", *]) && (second in ["array", *])
+  return second if first == ["array", ["unknown"]]
+  return first if second == ["array", ["unknown"]]
+  element = joined_plain(type_at(first, 1), type_at(second, 1)) or return nil
+  ["array", element]
+end
+
+# The one type these make together, each joined to the ones before it
+# as `joined_pair` joins two, or nil where they make none.
+def joined_types(types)
+  mutable joined = types.first
+  types.each do |type|
+    joined = joined.nil? ? nil : joined_pair(joined, type)
+  end
+  joined
 end
 
 # A value's type and a maybe of it, either way round, as the maybe; a
@@ -941,6 +1046,13 @@ def method_shape_key(owner, name) = "#{owner}##{name}/"
 
 def names?(node, name) = (node in IdentifierNode) && node.name == name
 
+# Bindings with each name a proof narrowed bound to what it proved, where
+# it stood (#572).
+def narrowed_bindings(bindings, proved)
+  return bindings if proved.empty?
+  bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
+end
+
 def narrowings(condition, types)
   proof = proof_of(condition, types)
   # A match test in a condition — `if x in [head, tail]` — binds its
@@ -992,7 +1104,7 @@ end
 # reading: the answer of the combination the call names, or unknown
 # where there is none.
 def native_call_answer(node, types)
-  arguments = native_argument_types(node.arguments, types)
+  arguments = filled_arguments(node.name, native_argument_types(node.arguments, types), types)
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
   found = types.assoc(combination_key(node.name, arguments, handed, leaves))
@@ -1089,6 +1201,15 @@ def numeric?(type)
   type == ["integer"] || type == ["float"] || type == ["rational"] || type == ["complex"]
 end
 
+# A node that may not be there, as the nodes it is: one, or none. A
+# parameter declared `mutable` binds no value, and a bare `return`
+# answers none.
+def one_if_there(node)
+  mutable found = []
+  found << node unless node.nil?
+  found
+end
+
 # A maybe as the native build reads it where its value is needed.
 def opened_natively(type, types)
   return type unless (type in ["maybe", *]) && native_reading?(types)
@@ -1106,6 +1227,13 @@ def ordered_pairs(nodes, types, kind)
     ordered << [node.name, type_at(found, 1)]
   end
   ordered
+end
+
+# Whether a body ends in `panic`, and so answers nothing.
+def panics?(body)
+  return false if body.nil?
+  last = body.last
+  (last in CallNode) && last.name == "panic"
 end
 
 def parameter_entry(parameter, body, types)
@@ -1134,7 +1262,7 @@ def pattern_names(pattern)
   in HashPatternNode(pairs:, rest_kind:, rest_name:)
     mutable found = []
     pairs.each do |pair|
-      found += pattern_names(pair[1])
+      found += pattern_names(pair.pattern)
     end
     found << rest_name if rest_kind == "bind"
     found
@@ -1154,13 +1282,13 @@ def pattern_names(pattern)
   in StructPatternNode(fields:)
     mutable found = []
     fields.each do |field|
-      found += pattern_names(field[1])
+      found += pattern_names(field.pattern)
     end
     found
   in EnumCasePatternNode(payload:)
     mutable found = []
     payload.each do |entry|
-      found += pattern_names(entry[1])
+      found += pattern_names(entry.pattern)
     end
     found
   else
@@ -1198,6 +1326,7 @@ end
 def proof_of(condition, types)
   case condition
   in MethodCallNode then predicate_proof(condition, types)
+  in MatchTestNode then shape_proof(condition, types)
   in BinaryNode then comparison_proof(condition, types)
   in UnaryNode(operator:, operand:)
     return no_proof unless operator == "!"
@@ -1246,6 +1375,7 @@ def render_type(type)
   in ["array", element] then "[" + render_type(element) + "]"
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in ["maybe", inner] then render_type(inner) + "?"
+  in ["struct", "*"] then "Struct"
   in ["struct", name] then name
   in ["type", name] then name
   in ["enum", name] then name
@@ -1306,6 +1436,23 @@ def returns_in_body(body, mutable types)
   found
 end
 
+# Whether a `return` with a value is written anywhere in these
+# statements, a block's body among them.
+def returns_value?(nodes)
+  nodes.reject { it.nil? }.any? { |node| ((node in ReturnNode) && node.value.some?) || returns_value?(children_of(node)) }
+end
+
+# `value&.name` as the `if` it means (#572): nil where the value is not
+# there, and the method asked of it where it is. Nil for anything else: a
+# node that is no safe call, one handed a block, or a receiver that may
+# not read the same each time.
+def safe_as_if(node)
+  return nil unless (node in SafeMethodCallNode) && node.block.nil? && steady_subject?(node.receiver)
+  absent = method_call_node(node.receiver, "nil?", [], nil, line: node.line)
+  asked = method_call_node(node.receiver, node.name, node.arguments, nil, line: node.line)
+  if_node(absent, [nil_node(line: node.line)], [asked], line: node.line)
+end
+
 def scan_program(nodes)
   mutable types = []
   nodes.each do |node|
@@ -1336,6 +1483,53 @@ def shape_answers?(shape, node)
   named.all? { type_at(shape, 3).include?(it) }
 end
 
+# What stays proved below an `if` whose one branch always leaves (#572).
+def shape_guard(node, types)
+  proof = shape_narrowings(node.condition, types)
+  then_exits = body_exits?(node.then_body)
+  else_exits = body_exits?(node.else_body)
+  return when_false(proof) if then_exits && !else_exits
+  return when_true(proof) if else_exits && !then_exits
+  []
+end
+
+# What a condition proves of the names that hold one of several structs
+# (#572), as what holds where it is true and where it is false. The
+# native build's walks bind a name to what was proved for as long as the
+# proof stands; a maybe they leave as it is, since it is opened when the
+# line runs.
+def shape_narrowings(condition, types)
+  proof = proof_of(condition, types)
+  [when_true(proof), when_false(proof)].map do |proved|
+    proved.select { |entry| synthesize_name(entry[0], types) == ANY_STRUCT }
+  end
+end
+
+# `name in Struct`, asked of a name that holds one of several structs
+# (#572): where it holds, the name is that struct. Where it does not, the
+# name is still any of the others.
+def shape_proof(node, types)
+  return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
+  return no_proof unless synthesize_name(node.subject.name, types) == ANY_STRUCT
+  return no_proof unless synthesize_name(node.pattern.name, types) == ["type", node.pattern.name]
+  [[[node.subject.name, ["struct", node.pattern.name]]], []]
+end
+
+# The type a field of this name has, read off a value that is one of
+# several structs (#572): the one type every struct that is made with
+# such a field holds there, or nil where there is no such field or they
+# hold types that do not join.
+def shared_field(name, types)
+  ending = ".#{name}"
+  held = types.select { (it[0].end_with?(ending)) && !it[0].include?("#") && !it[0].include?("(") }
+  return nil if held.empty?
+  mutable joined = type_at(held[0], 1)
+  held.each do |entry|
+    joined = joined.nil? ? nil : joined_pair(joined, type_at(entry, 1))
+  end
+  joined
+end
+
 def signature_continues?(line)
   stripped = line.strip
   stripped.end_with?(",") || stripped.end_with?("(")
@@ -1357,12 +1551,20 @@ end
 
 # Whether an expression reads the same each time it is read, and costs
 # little to read again (#558): a name, `self`, a method with no
-# arguments asked of one, as a field is, or an element of one read by a
-# number or a name.
+# arguments asked of one, as a field is, an element of one read by a
+# number or a name, or two of these added or subtracted.
 def steady_subject?(node)
   return true if (node in IdentifierNode) || (node in SelfNode) || (node in IntegerNode)
+  return steady_subject?(node.left) && steady_subject?(node.right) if (node in BinaryNode) && %w[+ -].include?(node.operator)
   return steady_subject?(node.receiver) && steady_subject?(node.index) if node in IndexNode
   (node in MethodCallNode) && node.arguments.empty? && node.block.nil? && steady_subject?(node.receiver)
+end
+
+# Whether a `case/in` arm is one the native build reads as an `if`
+# (#572): no guard, and a struct's name with each field bound to a name.
+def struct_arm?(branch)
+  return false unless branch.guard.nil? && (branch.pattern in StructPatternNode)
+  branch.pattern.fields.all? { it.pattern in IdentifierNode }
 end
 
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
@@ -1410,6 +1612,9 @@ def synthesize(node, types)
   # as the first parameter of a method (#525).
   in SelfNode then synthesize_name("self", types)
   in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
+  # Whether a value matches is a Boolean, which the native build reads
+  # (#572). The checker reads no type off a test.
+  in MatchTestNode then native_reading?(types) ? ["boolean"] : ["unknown"]
   else
     ["unknown"]
   end
@@ -1430,18 +1635,35 @@ def synthesize_append(node, types)
   value = opened_natively(synthesize(node.value, types), types)
   return ["array", value] if current == ["array", ["unknown"]]
   return current if (current in ["array", *]) && type_at(current, 1) == value
+  # Read as the native build runs it, one struct appended to an array of
+  # another makes it an array of one of several structs (#572).
+  if (current in ["array", *]) && native_reading?(types)
+    element = joined_plain(type_at(current, 1), value)
+    return ["array", element] if element.some?
+  end
   return ["array", ["unknown"]] if current in ["array", *]
   ["unknown"]
 end
 
 def synthesize_array(node, types)
   return ["array", ["unknown"]] if node.elements.empty?
-  first = synthesize(node.elements.first, types)
+  # Read as the native build runs it, a maybe written into an array is
+  # opened first, as one appended is (#566).
+  first = opened_natively(synthesize(node.elements.first, types), types)
   mutable uniform = true
   node.elements.each do |element|
-    uniform = false unless synthesize(element, types) == first
+    uniform = false unless opened_natively(synthesize(element, types), types) == first
   end
   return ["array", first] if uniform
+  # Read as the native build runs it, a literal of more than one struct
+  # is an array of one of several structs (#572).
+  if native_reading?(types)
+    mutable joined = first
+    node.elements.each do |element|
+      joined = joined.nil? ? nil : joined_plain(joined, opened_natively(synthesize(element, types), types))
+    end
+    return ["array", joined] if joined.some?
+  end
   ["array", ["unknown"]]
 end
 
@@ -1479,6 +1701,11 @@ def synthesize_binary(node, types)
   when "+", "-", "*", "%"
     return tower_answer(left, right) if numeric?(left) && numeric?(right)
     return ["string"] if left == ["string"] && right == ["string"]
+    # Read as the native build runs it, two arrays joined are an array of
+    # what theirs make together, and an empty one is the other (#572).
+    if native_reading?(types) && node.operator == "+" && (left in ["array", *]) && (right in ["array", *])
+      return (joined_plain(left, right) or left)
+    end
     return left if (left in ["array", *]) && (right in ["array", *])
     # A set's union and difference answer a set (ADR 0082).
     return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
@@ -1609,6 +1836,10 @@ def synthesize_call(node, types)
     # settled for it (#532).
     holder = opened_natively(receiver, types)
     if (holder in ["struct", *]) && node.arguments.empty? && node.block.nil?
+      # Asked of one of several structs, a field is read where every
+      # struct that has it holds one type there (#572).
+      shared = holder == ANY_STRUCT ? shared_field(node.name, types) : nil
+      return shared if shared.some?
       field = types.assoc(field_key(type_at(holder, 1), node.name))
       return type_at(field, 1) if field.some?
     end
@@ -1636,6 +1867,10 @@ end
 # read with its captures bound (arm_bindings). An absent else answers nil
 # (ADR 0012) — unless an unguarded bare capture makes the arms total.
 def synthesize_case_in(node, types)
+  # Read as the native build runs it, one over structs is the `if`s it
+  # means (#572).
+  plain = native_reading?(types) ? case_as_if(node) : nil
+  return synthesize(plain, types) if plain.some?
   mutable answers = []
   mutable nil_seen = false
   node.branches.each do |branch|
@@ -1692,12 +1927,18 @@ def synthesize_if(node, types)
   proof = narrowings(node.condition, types)
   yes = branch_answer(node.then_body, when_true(proof) + types)
   no = branch_answer(node.else_body, when_false(proof) + types)
+  # Read as the native build runs it, an arm that ends in `panic`
+  # answers nothing, so the `if` answers what the other arm does (#572).
+  if native_reading?(types)
+    return no if panics?(node.then_body)
+    return yes if panics?(node.else_body)
+  end
   merged = merge_candidates([yes, no])
   # Read as the native build runs it, a value on one side and a maybe of
   # it on the other are a maybe of it (#558), as an `elsif` chain that
-  # ends in nil is.
+  # ends in nil is, and one struct and another are one of several (#572).
   return merged unless merged == ["unknown"] && native_reading?(types)
-  joined_with_maybe(yes, no)
+  (joined_pair(yes, no) or ["unknown"])
 end
 
 # `array[index]` under the native reading: the element, or nil past
@@ -1782,6 +2023,9 @@ end
 # form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
 def synthesize_safe_call(node, types)
   return type_function_answer(node) if builtin_type_function?(node, types)
+  # Read as the native build runs it, it is the `if` it means (#572).
+  guarded = native_reading?(types) ? safe_as_if(node) : nil
+  return synthesize(guarded, types) if guarded.some?
   receiver = synthesize(node.receiver, types)
   plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
   maybe_of(call_answer(plain, node, types))
@@ -1907,6 +2151,15 @@ def universal_answer(name)
   return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
   return ["string"] if name == "to_s"
   ["unknown"]
+end
+
+# Bindings as a body leaves them, with each name that went in holding
+# one of several structs holding that again (#572): what a body proved
+# of a name is proved no further than the body.
+def unnarrowed(before, after)
+  wide = before.select { type_at(it, 1) == ANY_STRUCT }
+  return after if wide.empty?
+  after.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
 end
 
 def when_false(proof) = type_at(proof, 1)

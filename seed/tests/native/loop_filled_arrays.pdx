@@ -1,0 +1,34 @@
+# An array that starts empty and is appended to late in a loop's body is
+# the same array where the body reads it earlier (#572): a local has one
+# type, and the loop's body is read with it.
+def already?(words, word)
+  words.include?(word)
+end
+
+def distinct(words)
+  mutable kept = []
+  mutable index = 0
+  while index < words.length
+    word = (words[index] or "")
+    index += 1
+    next if already?(kept, word)
+    kept << word
+  end
+  kept
+end
+
+def first_repeat(words)
+  mutable seen = []
+  mutable index = 0
+  while index < words.length
+    word = (words[index] or "")
+    return word if already?(seen, word)
+    seen << word
+    index += 1
+  end
+  "none"
+end
+
+p(distinct(["a", "b", "a", "c", "b"]))
+puts first_repeat(["a", "b", "c", "b"])
+puts first_repeat(["a", "b"])

@@ -1,0 +1,38 @@
+# A name bound to nil and to nothing else is nil wherever it is read
+# (#572): a parameter left out whose default is nil, a local, and one a
+# block reads.
+struct Note
+  text
+  line
+end
+
+def noted(text, line: nil)
+  Note.new(text: text, line: line)
+end
+
+def blank
+  nothing = nil
+  [1, 2].each do |number|
+    puts "#{number}: #{nothing.nil?}"
+  end
+end
+
+p(noted("plain"))
+p(noted("placed", line: 4))
+blank
+
+# A parameter handed nil by every call of one combination is nil in it.
+def marked(text, mark, count)
+  return "#{text} x#{count}" if mark.nil?
+  "#{text} #{mark} x#{count}"
+end
+
+puts marked("plain", nil, 2)
+puts marked("starred", "*", 3)
+puts noted("by name", line: nil).line.nil?
+
+# Nil itself in its source form, and written out, which refuses as the
+# seed does.
+nothing = nil
+p(nothing)
+puts "#{nothing}"

@@ -524,7 +524,7 @@ def check_case_pattern(pattern, scope, mutable found)
     found = noted(found, ["sentence", "in :#{pattern.name} can never match — no enum declares a case :#{pattern.name}"], locate(pattern, scope))
   end
   pattern.payload.each do |entry|
-    found = check_pattern(entry[1], scope, found)
+    found = check_pattern(entry.pattern, scope, found)
   end
   found
 end
@@ -955,7 +955,7 @@ def check_pattern(pattern, scope, mutable found)
   in BindingPatternNode(pattern: inner) then check_pattern(inner, scope, found)
   in HashPatternNode(pairs:)
     pairs.each do |pair|
-      found = check_pattern(pair[1], scope, found)
+      found = check_pattern(pair.pattern, scope, found)
     end
     found
   in AlternativePatternNode(options:)
@@ -976,7 +976,7 @@ def check_pattern(pattern, scope, mutable found)
       found = noted(found, ["sentence", "'in #{pattern.name}' names a trait, and no value is of a trait's type, so the arm would never match — name the structs that include #{pattern.name}"], locate(pattern, scope))
     end
     fields.each do |field|
-      found = check_pattern(field[1], scope, found)
+      found = check_pattern(field.pattern, scope, found)
     end
     found
   else
@@ -1323,7 +1323,7 @@ def covers_present?(pattern, inner)
   # plain capture.
   in StructPatternNode(name:, fields:)
     return false unless render_type(inner) == name
-    fields.all? { it[1] in IdentifierNode }
+    fields.all? { it.pattern in IdentifierNode }
   else
     false
   end
@@ -1938,7 +1938,7 @@ end
 def whole_case_name(pattern)
   return pattern.value if pattern in SymbolNode
   return nil unless pattern in EnumCasePatternNode
-  return nil unless pattern.payload.all? { it[1] in IdentifierNode }
+  return nil unless pattern.payload.all? { it.pattern in IdentifierNode }
   pattern.name
 end
 
