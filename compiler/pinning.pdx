@@ -171,6 +171,12 @@ def body_answer(body, parameters, answers, names)
   merge_answers(leaving + [last])
 end
 
+# One line of what the build is doing (#543), on standard error, with
+# the time since the build began. `started` is the clock's reading then.
+def build_note(started, message)
+  System.write_standard_error("[#{seconds_between(started, System.monotonic_time).rjust(8)}] #{message}\n")
+end
+
 # A def as one way of calling it has it (#536): `placed` handed by place
 # and `named` by name. Its parameters are the ones handed over, by place
 # and then by name in the order written, and each parameter left out is
@@ -406,7 +412,7 @@ def pin_expression(node, walk, answers, names)
   current
 end
 
-def pin_program(nodes, core: nil)
+def pin_program(nodes, core: nil, progress: nil)
   own = nodes.select { it in DefNode }
   structs = nodes.select { it in StructDefNode }
   methods = type_methods(nodes, core)
@@ -423,8 +429,8 @@ def pin_program(nodes, core: nil)
   # itself is pinned, and takes a def that calls itself at the answer its
   # known ways out give. The second holds each such answer to the def's
   # whole body.
-  reached = settle_pins(definitions, statements, names, fixed, Settled.new(pinned: [], fields: []), false)
-  settled = settle_pins(definitions, statements, names, fixed, reached, true)
+  reached = settle_pins(definitions, statements, names, fixed, Settled.new(pinned: [], fields: []), false, progress)
+  settled = settle_pins(definitions, statements, names, fixed, reached, true, progress)
   pinned = settled.pinned
   answers = fixed + settled.fields + pinned_answers(pinned)
   walk = gathered_calls(definitions, statements, names, answers, pinned)
@@ -601,19 +607,36 @@ def returns_gathered(walk)
   walk.calls.select { it[0] == RETURN }.map { type_at(type_at(it, 1), 0) }
 end
 
+# The time between two readings of the clock, which counts in
+# billionths of a second, as seconds to one place.
+def seconds_between(earlier, later)
+  tenths = (later - earlier) / 100000000
+  "#{tenths / 10}.#{tenths % 10}s"
+end
+
 # Rounds of pinning until one changes nothing. Each round walks the top
 # level and the body of every combination pinned so far, gathers the
 # combinations those calls name, and pins them; a combination's body may
 # name another, which the next round reaches.
-def settle_pins(definitions, statements, names, fixed, starting, strict)
+def settle_pins(definitions, statements, names, fixed, starting, strict, progress)
   mutable pinned = starting.pinned
   mutable fields = starting.fields
   mutable round = 0
   while round <= ROUND_LIMIT
+    began = progress.nil? ? 0 : System.monotonic_time
     answers = fixed + fields + pinned_answers(pinned)
     walk = gathered_calls(definitions, statements, names, answers, pinned)
     settled = pin_combinations(definitions, walk.calls, answers, names, strict)
     made = settled_fields(walk.calls)
+    # Said while it works, where the build was asked to (#543): a round
+    # that finds fewer new combinations each time is settling.
+    if progress.some?
+      fresh = settled.count { |found| pinned.none? { it.key == found.key } }
+      most = definitions.max_by { |definition| settled.count { it.name == definition.name } }
+      crowded = most.nil? ? "" : "; most: #{most.name} with #{settled.count { it.name == most.name }}"
+      pass = strict ? "second pass" : "first pass"
+      build_note(progress, "pinning, #{pass}, round #{round + 1}: #{settled.length} combinations, #{fresh} new, #{made.length} fields, #{walk.calls.length} calls read in #{seconds_between(began, System.monotonic_time)}#{crowded}")
+    end
     break if settled == pinned && made == fields
     busiest = definitions.find { |definition| settled.count { it.name == definition.name } > COMBINATION_LIMIT }
     if busiest.some?

@@ -6,7 +6,7 @@
 # The compiler cannot run a process (#179), so `script/build` runs this and
 # then `clang`.
 #
-# Usage: pdx compiler/build.pdx some_file.pdx some_file.ll
+# Usage: pdx compiler/build.pdx some_file.pdx some_file.ll [verbose]
 
 require_relative "checker"
 require_relative "llvm"
@@ -15,5 +15,15 @@ require_relative "program"
 path = System.arguments[0] or panic "build.pdx: needs a file to build"
 destination = System.arguments[1] or panic "build.pdx: needs a path to write the LLVM IR to"
 System.read_file(path) or panic "build.pdx: cannot read #{path}"
+# Asked to, the build says what it is doing as it goes (#543), on
+# standard error: each stage, and each round of pinning.
+progress = System.arguments[2] == "verbose" ? System.monotonic_time : nil
+build_note(progress, "checking: the program and everything it requires") if progress.some?
 check_program_closure(path, [], default_load_path(path, []), core: core_nodes)
-System.write_file(destination, llvm_text(lower_program(program_nodes(path), core: core_nodes)))
+build_note(progress, "gathering: the program's files into one") if progress.some?
+nodes = program_nodes(path)
+build_note(progress, "gathered: #{nodes.length} top-level statements") if progress.some?
+lowered = lower_program(nodes, core: core_nodes, progress: progress)
+build_note(progress, "writing: #{lowered.functions.length} functions as LLVM text") if progress.some?
+System.write_file(destination, llvm_text(lowered))
+build_note(progress, "written: #{destination}") if progress.some?
