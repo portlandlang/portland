@@ -411,6 +411,14 @@ struct LoweringContext
   pinned
 end
 
+# One arm of an `if` a name is bound to, ending in the binding.
+def arm_binding(statement, arm)
+  last = arm.last
+  return [statement.with(value: nil_node(line: statement.line))] if last.nil?
+  return arm if exit?(last)
+  arm.slice(0, arm.length - 1) + [statement.with(value: last)]
+end
+
 # Whether one arm of an `if` is more than an expression (#559).
 def arm_is_body?(arm)
   only = arm.first
@@ -425,6 +433,16 @@ end
 def arms_are_bodies?(node)
   return false unless node in IfNode
   [(node.then_body or []), (node.else_body or [])].any? { arm_is_body?(it) }
+end
+
+# A binding of an `if` as the `if` with the binding in each arm (#572):
+# the arm's statements, and the name bound to what the arm ends in. An
+# arm that is missing or empty binds nil, and one that ends by leaving
+# binds nothing.
+def bound_in_arms(statement, chosen)
+  taken = arm_binding(statement, (chosen.then_body or []))
+  other = arm_binding(statement, (chosen.else_body or []))
+  if_node(chosen.condition, taken, other, line: chosen.line)
 end
 
 # Where a field starts among its struct's words (#553): a field takes
@@ -804,6 +822,10 @@ def lower_statement(statement, bindings, context)
   in AssignmentNode(name:, value:)
     refuse_native("a parameter declared mutable", statement) if value.nil?
     return lower_append(statement, value, bindings, context) if value in AppendNode
+    # Bound to an `if` whose arms are more than one expression each, the
+    # name is bound in each arm to what the arm ends in (#572).
+    chosen = (case_as_if(value) or value)
+    return lower_statement(bound_in_arms(statement, chosen), bindings, context) if arms_are_bodies?(chosen)
     lowered = settled_empty(lower_value(value, bindings, context.with(root: "value")), name, bindings, context)
     found = bindings.assoc(name)
     # A local that holds a maybe takes a plain value as a maybe that is
