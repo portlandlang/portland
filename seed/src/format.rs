@@ -38,16 +38,40 @@ struct Formatter<'a> {
     named: &'a [(String, Value)],
     next: usize,
     sourcing: Sourcing,
+    /// How a value is written for `%s` and for `%p`: its text, or with
+    /// the flag set, its source form. The interpreter hands in its own,
+    /// which knows a struct's `to_s` and `inspect` (#372).
+    shown: &'a mut dyn FnMut(&Value, bool) -> String,
 }
 
 /// Format `template` with `values` and the keyword `named` as Ruby's
-/// `format` would.
+/// `format` would, each value written as it is on its own: a struct by
+/// its fields.
 pub fn format_values(template: &str, values: &[Value], named: &[(String, Value)]) -> String {
+    format_values_shown(template, values, named, &mut |value, source| {
+        if source {
+            value.inspect()
+        } else {
+            value.to_string()
+        }
+    })
+}
+
+/// Format `template` as `format_values` does, with `shown` writing each
+/// value a `%s` or a `%p` takes: its text, or with the flag set, its
+/// source form (#372).
+pub fn format_values_shown(
+    template: &str,
+    values: &[Value],
+    named: &[(String, Value)],
+    shown: &mut dyn FnMut(&Value, bool) -> String,
+) -> String {
     let mut formatter = Formatter {
         values,
         named,
         next: 0,
         sourcing: Sourcing::Unset,
+        shown,
     };
     formatter.run(template)
 }
@@ -183,7 +207,7 @@ impl Formatter<'_> {
                         let text = if matches!(value, Value::Nil) {
                             String::new()
                         } else {
-                            value.to_string()
+                            (self.shown)(&value, false)
                         };
                         output.push_str(&pad_text(&text, flags, width, precision));
                         return at;
@@ -206,7 +230,9 @@ impl Formatter<'_> {
                         (None, Some(index)) => self.numbered_value(index).clone(),
                         (None, None) => self.next_value().clone(),
                     };
-                    output.push_str(&render(character, &value, flags, width, precision));
+                    output.push_str(&render(
+                        character, &value, flags, width, precision, self.shown,
+                    ));
                     return at + 1;
                 }
             }
@@ -461,6 +487,7 @@ fn render(
     flags: Flags,
     width: Option<i64>,
     precision: Option<i64>,
+    shown: &mut dyn FnMut(&Value, bool) -> String,
 ) -> String {
     match kind {
         'b' | 'B' | 'd' | 'i' | 'u' | 'o' | 'x' | 'X' => {
@@ -484,12 +511,12 @@ fn render(
             };
             pad_text(&text, flags, width, None)
         }
-        'p' => pad_text(&value.inspect(), flags, width, precision),
+        'p' => pad_text(&shown(value, true), flags, width, precision),
         _ => {
             let text = if matches!(value, Value::Nil) {
                 String::new()
             } else {
-                value.to_string()
+                shown(value, false)
             };
             pad_text(&text, flags, width, precision)
         }

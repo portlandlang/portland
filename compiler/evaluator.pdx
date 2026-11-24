@@ -2043,7 +2043,7 @@ def evaluate_call(node, mutable bindings)
     arguments.each_with_index do |argument, index|
       rest << argument if index > 0
     end
-    System.write_standard_output(format_template(template, rest, keyword_values))
+    System.write_standard_output(format_template(template, rest, keyword_values, bindings))
     outcome([nil], bindings)
   # `warn` is `puts` to standard error, answering nil (#185): each argument
   # on its own line, an array's elements each on theirs.
@@ -2104,7 +2104,7 @@ def evaluate_call(node, mutable bindings)
     arguments.each_with_index do |argument, index|
       rest << argument if index > 0
     end
-    outcome([format_template(template, rest, keyword_values)], bindings)
+    outcome([format_template(template, rest, keyword_values, bindings)], bindings)
   when "rand" then outcome([arguments.empty? ? rand : rand(value_at(arguments, 0))], bindings)
   when "srand" then outcome([arguments.empty? ? srand : srand(value_at(arguments, 0))], bindings)
   when "panic"
@@ -3559,7 +3559,7 @@ end
 # One directive, `at` just past its `%`. Answers `[text, after, sourcing,
 # used]`: what it rendered, where the template continues, and the sourcing
 # state it leaves behind.
-def format_directive(letters, start, values, named, start_sourcing, start_used)
+def format_directive(letters, start, values, named, start_sourcing, start_used, bindings)
   mutable at = start
   mutable sourcing = start_sourcing
   mutable used = start_used
@@ -3643,7 +3643,7 @@ def format_directive(letters, start, values, named, start_sourcing, start_used)
         # `%{name}` takes no type: it is `%s` of the value, and whatever
         # follows is the template's own text.
         value = named_value(named, key, "{", "}")
-        text = format(single_directive(flags, width, precision, "s"), format_text(value))
+        text = format(single_directive(flags, width, precision, "s"), format_text(value, bindings))
         return [text, at, sourcing, used]
       end
     elsif letter == "%"
@@ -3656,7 +3656,7 @@ def format_directive(letters, start, values, named, start_sourcing, start_used)
       found = directive_value(name, position, values, named, sourcing, used)
       # Read raw: an index lifts a stored nil to some(nil), and the host
       # must see the guest's nil as nil.
-      text = format_one(flags, width, precision, letter, value_at(found, 0))
+      text = format_one(flags, width, precision, letter, value_at(found, 0), bindings)
       return [text, at + 1, found[1], found[2]]
     end
   end
@@ -3666,9 +3666,11 @@ end
 # host reads as Ruby would: text directives take the guest's own rendering
 # (a tagged symbol or struct is not a host string), numbers pass through,
 # and anything else refuses in Ruby's words before the host sees a tag.
-def format_one(flags, width, precision, letter, value)
-  return format(single_directive(flags, width, precision, "s"), format_text(value)) if letter == "s"
-  return format(single_directive(flags, width, precision, "s"), render_inspect(value)) if letter == "p"
+def format_one(flags, width, precision, letter, value, bindings)
+  # The bindings ride along so a struct renders by its own `to_s` and
+  # `inspect`, which are guest methods (#372).
+  return format(single_directive(flags, width, precision, "s"), format_text(value, bindings)) if letter == "s"
+  return format(single_directive(flags, width, precision, "s"), render_inspect(value, bindings)) if letter == "p"
   if letter == "c"
     return format(single_directive(flags, width, precision, "c"), value) if value.nil? || (value in Integer) || (value in String)
     panic("no implicit conversion of #{format_type_name(value)} into Integer")
@@ -3698,7 +3700,7 @@ end
 
 # The formatted string: `values` are the positional arguments after the
 # template, `named` the keyword arguments as `[label, value]` pairs.
-def format_template(template, values, named)
+def format_template(template, values, named, bindings)
   letters = template.chars
   mutable output = ""
   mutable at = 0
@@ -3711,7 +3713,7 @@ def format_template(template, values, named)
       output += letters[at]
       at += 1
     else
-      step = format_directive(letters, at + 1, values, named, sourcing, used)
+      step = format_directive(letters, at + 1, values, named, sourcing, used, bindings)
       output += step[0]
       at = step[1]
       sourcing = step[2]
@@ -3722,9 +3724,9 @@ def format_template(template, values, named)
 end
 
 # `%s` of a guest value: Ruby's `to_s`, with nil as the empty string.
-def format_text(value)
+def format_text(value, bindings)
   return "" if value.nil?
-  render(value)
+  render(value, bindings)
 end
 
 # A guest value's type as a refusal names it, Ruby's way: nil, true, and
