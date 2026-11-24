@@ -87,6 +87,12 @@ struct PinnedDef
   name
   # The name this combination goes by, which the compiled function takes.
   key
+  # What the calls of this combination hand the def, by place and by
+  # name, and the def as that way of calling it has it (#536): its
+  # parameters the ones handed over, the rest bound to their defaults
+  # ahead of its body.
+  arguments
+  definition
   parameters
   answer
   reason
@@ -165,8 +171,47 @@ def body_answer(body, parameters, answers, names)
   merge_answers(leaving + [last])
 end
 
+# A def as one way of calling it has it (#536): `placed` handed by place
+# and `named` by name. Its parameters are the ones handed over, by place
+# and then by name in the order written, and each parameter left out is
+# bound to its default ahead of the body, in the order written, so a
+# default may read a parameter before it. Nil where the def cannot be
+# called that way: too few or too many by place, a name it does not
+# take, or a parameter left out that has no default.
+def called_definition(definition, placed, named)
+  by_place = definition.parameters.reject { it in KeywordParameterNode }
+  by_name = definition.parameters.select { it in KeywordParameterNode }
+  return nil if placed > by_place.length
+  return nil unless named.all? { |label| by_name.any? { it.name == label } }
+  mutable handed = []
+  mutable defaulted = []
+  mutable place = 0
+  definition.parameters.each do |parameter|
+    if parameter in KeywordParameterNode
+      if named.include?(parameter.name)
+        handed << parameter
+      else
+        defaulted << [parameter, parameter.default]
+      end
+    else
+      if place < placed
+        handed << parameter
+      else
+        defaulted << [parameter, (parameter in AssignmentNode) ? parameter.value : nil]
+      end
+      place += 1
+    end
+  end
+  return nil if defaulted.any? { type_at(it, 1).nil? }
+  # By place first, then by name: the order a call's arguments arrive in.
+  ordered = handed.reject { it in KeywordParameterNode } + handed.select { it in KeywordParameterNode }
+  parameters = ordered.map { IdentifierNode.new(kind: "identifier", name: it.name, line: definition.line) }
+  prelude = defaulted.map { AssignmentNode.new(kind: "assignment", name: it[0].name, value: type_at(it, 1), rebindable: true, line: definition.line) }
+  definition.with(parameters: parameters, body: prelude + definition.body)
+end
+
 # Whether a type says everything a code generator needs: no unknown in it.
-def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
+def concrete?(type) = type == NOTHING || !render_native_type(type).include?("Unknown")
 
 # For each field of a struct made with more than one type, a sentence
 # saying so (#532). The native build gives a field one type, as it gives
@@ -199,9 +244,8 @@ end
 def gathered_calls(definitions, statements, names, answers, pinned)
   mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
   pinned.each do |found|
-    definition = definitions.find { it.name == found.name }
-    next if definition.nil? || found.parameters.length != definition.parameters.length
-    inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
+    next if found.parameters.length != found.definition.parameters.length
+    inner = pin_statements(found.definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
     walk = walk.with(calls: inner.calls)
   end
   walk
@@ -236,6 +280,15 @@ def merge_answers(candidates)
   candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
 end
 
+# A method's shape, for a call to be held to (ADR 0093, #536): the
+# fewest parameters it takes by place and the most, whether it yields,
+# and the names it takes.
+def parameters_shape(parameters, yielding)
+  by_place = parameters.reject { it in KeywordParameterNode }
+  required = by_place.reject { (it in AssignmentNode) && it.value.some? }
+  [required.length, by_place.length, yielding, parameters.select { it in KeywordParameterNode }.map { it.name }]
+end
+
 # A call that hands one of the program's defs a block (#493). The block's
 # parameters are bound to what that combination of the def yields, as far
 # as that is pinned; its body is walked for the calls inside it; and what
@@ -249,7 +302,7 @@ def pin_block_call(node, walk, answers, names)
     current = pin_statement(argument, current, answers, names)
   end
   scope = current.bindings + answers
-  arguments = node.arguments.map { synthesize(it, scope) }
+  arguments = native_argument_types(node.arguments, scope)
   answer = native_block_answer(node, arguments, scope)
   leaves = native_block_leaves?(node.block, scope)
   yielded = answers.find { it[0] == yields_key(node.name, arguments) }
@@ -270,24 +323,26 @@ end
 # what it yields from its body, and then its answer.
 def pin_combination(definition, arguments, handed, leaves, answers, names, strict)
   key = combination_key(definition.name, arguments, handed, leaves)
-  unpinned = PinnedDef.new(name: definition.name, key: key, parameters: [], answer: ["unknown"], reason: nil, block: nil)
-  if arguments.length != definition.parameters.length
-    return unpinned.with(reason: "it takes #{definition.parameters.length} and one call hands it #{arguments.length}")
-  end
+  unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: ["unknown"], reason: nil, block: nil)
+  placed = arguments.reject { it in ["keyword", *] }
+  named = arguments.select { it in ["keyword", *] }
+  called = called_definition(definition, placed.length, named.map { type_at(it, 1) })
+  return unpinned.with(reason: "its parameters do not take what one call hands it") if called.nil?
   mutable parameters = []
   mutable index = 0
-  while index < definition.parameters.length
-    parameter = definition.parameters[index]
-    parameters << [parameter.name, (type_at(arguments, index) or ["unknown"])]
+  called.parameters.each do |parameter|
+    handed_by_name = named.find { type_at(it, 1) == parameter.name }
+    type = index < placed.length ? type_at(placed, index) : (handed_by_name.nil? ? nil : type_at(handed_by_name, 2))
+    parameters << [parameter.name, (type or ["unknown"])]
     index += 1
   end
-  block = pinned_block(definition, parameters, handed, leaves, answers, names, strict)
+  block = pinned_block(called, parameters, handed, leaves, answers, names, strict)
   # A combination refused for its block keeps what it yields, which a
   # call site reads its block with.
-  return unpinned.with(parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
-  answer = solved_answer(definition, key, parameters, yielding_answers(answers, block), names, strict)
+  return unpinned.with(definition: called, parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
+  answer = solved_answer(called, key, parameters, yielding_answers(answers, block), names, strict)
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
-  PinnedDef.new(name: definition.name, key: key, parameters: parameters, answer: answer, reason: reason, block: block)
+  PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
 end
 
 # Every combination the calls gathered name, the defs in written order
@@ -334,7 +389,7 @@ def pin_expression(node, walk, answers, names)
   end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil, false]])
+    current = current.with(calls: current.calls + [[node.name, native_argument_types(node.arguments, scope), nil, false]])
   end
   if node in YieldNode
     scope = current.bindings + answers
@@ -382,7 +437,7 @@ def pin_program(nodes, core: nil)
     combinations = pinned.select { it.name == definition.name }
     if combinations.empty? && own.include?(definition)
       reason = walk.calls.any? { it[0] == definition.name } ? "it is called with a value whose type is not known" : "nothing calls it"
-      listed << PinnedDef.new(name: definition.name, key: nil, parameters: [], answer: ["unknown"], reason: reason, block: nil)
+      listed << PinnedDef.new(name: definition.name, key: nil, arguments: [], definition: definition, parameters: [], answer: ["unknown"], reason: reason, block: nil)
     else
       listed += combinations
     end
@@ -456,7 +511,7 @@ end
 def pinned_answers(pinned)
   answers = pinned.select { it.pinned? }.map { [it.key, it.answer] }
   yielding = pinned.reject { it.block.nil? }
-  yielded = yielding.map { |found| [yields_key(found.name, found.parameters.map { type_at(it, 1) }), found.block.parameters] }
+  yielded = yielding.map { |found| [yields_key(found.name, found.arguments), found.block.parameters] }
   # Everything pinning reads, it reads the way the native build runs it
   # (#503): the name that says so rides with the answers into every scope,
   # and is kept last, which is where inference looks for it.
@@ -629,7 +684,7 @@ def type_methods(nodes, core)
     methods.each do |method|
       receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
       definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + method.body)
-      shapes << [method_shape(node.name, method.name, method.parameters.length, yields?(method.body)), ["boolean"]]
+      shapes << [method_shape_key(node.name, method.name), parameters_shape(method.parameters, yields?(method.body))]
     end
   end
   CoreMethods.new(definitions: definitions, shapes: shapes)

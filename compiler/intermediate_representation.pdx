@@ -511,8 +511,11 @@ def lower_call(node, name, arguments, bindings, context, root)
   arity = context.arities.find { it[0] == name }
   refuse_native("a call to #{name}", node) if arity.nil?
   below = context.with(root: nil)
-  lowered = arguments.map { lower_value(it, bindings, below) }
-  types = lowered.map { it.type }
+  # What the call hands over by place, and then by name in the names'
+  # own order (#536), which is how the combination is named.
+  placed = arguments.reject { it in KeywordArgumentNode }.map { lower_value(it, bindings, below) }
+  named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }.map { [it.label, lower_value(it.value, bindings, below)] }
+  types = placed.map { it.type } + named.map { ["keyword", it[0], type_at(it, 1).type] }
   # A def called by its bare name is a name and not a call, and is
   # handed no block.
   written = (node in CallNode) ? node.block : nil
@@ -527,7 +530,13 @@ def lower_call(node, name, arguments, bindings, context, root)
   refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && found.block.nil?
   refuse_leaving_inside(written, leaves, root, node) if written.some?
   block = written.nil? ? nil : lower_block(written, found.block, bindings, below)
-  IntermediateCall.new(type: found.answer, name: name, target: key, arguments: lowered, block: block)
+  # The function takes what is handed by place and then what is handed
+  # by name, in the order the def writes those parameters.
+  by_name = found.parameters.slice(placed.length, found.parameters.length - placed.length).map do |parameter|
+    handed_by_name = named.find { it[0] == parameter[0] } or refuse_native("a call to #{name} without #{parameter[0]}", node)
+    type_at(handed_by_name, 1)
+  end
+  IntermediateCall.new(type: found.answer, name: name, target: key, arguments: placed + by_name, block: block)
 end
 
 def lower_condition(node, bindings, context)
@@ -563,17 +572,13 @@ def lower_program(nodes, core: nil)
     if found.pinned?
       called << found
     elsif found.key.some?
-      definition = definitions.find { it.name == found.name }
-      line = definition.nil? ? "" : " on line #{definition.line}"
-      panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
+      panic("the native build needs one type for every value — def #{found.name} on line #{found.definition.line} has none: #{found.reason}")
     end
   end
   context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   mutable functions = []
   called.each do |found|
-    definition = definitions.find { it.name == found.name }
-    next if definition.nil?
-    functions << lower_function(definition, found, context)
+    functions << lower_function(found.definition, found, context)
   end
   entry = lower_statements(statements, [], context)
   functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil, returned: false)

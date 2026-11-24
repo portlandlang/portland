@@ -1544,6 +1544,15 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "System.write_file(\"x\", \"y\")\n",
             format!("{compiles} — System.write_file on line 1 is unbuilt (#443)"),
         ),
+        // A def called a way its parameters do not take (#536).
+        (
+            "def greet(name, mark: \"!\") = name + mark\nputs greet(\"a\", loud: true)\n",
+            "the native build needs one type for every value — def greet on line 1 has none: its parameters do not take what one call hands it".to_string(),
+        ),
+        (
+            "def greet(name, mark:) = name + mark\nputs greet(\"a\")\n",
+            "the native build needs one type for every value — def greet on line 1 has none: its parameters do not take what one call hands it".to_string(),
+        ),
         // A struct outside the first step (#532).
         (
             "struct Pair\n  left\n  right\nend\nfirst = Pair.new(left: 1, right: 2)\nsecond = Pair.new(left: \"one\", right: 2)\np(first)\n",

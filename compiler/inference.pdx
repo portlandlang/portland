@@ -832,11 +832,10 @@ end
 # type, and the method.
 def method_def_name(owner, name) = "#{owner}##{name}"
 
-# The name bound for each shape of call a core method answers: a method,
-# the count of arguments it takes, and whether it is handed a block. A
+# The name a method's shape is bound under: the calls it answers. A
 # method answers only the calls it was written for, and anything else is
 # the floor's (ADR 0093).
-def method_shape(owner, name, count, handed) = "#{owner}##{name}/#{count}#{handed ? "&" : ""}"
+def method_shape_key(owner, name) = "#{owner}##{name}/"
 
 def names?(node, name) = (node in IdentifierNode) && node.name == name
 
@@ -846,6 +845,16 @@ def narrowings(condition, types)
   # captures on both sides, since the runtime binds them regardless.
   captured = condition_captures(condition).map { [it, ["unknown"]] }
   [captured + when_true(proof), captured + when_false(proof)]
+end
+
+# The types a call hands a def under the native reading (#536): what it
+# hands by place, in order, and then what it hands by name, in the
+# names' own order, each as ["keyword", name, type]. Which parameters a
+# call hands over is part of the combination it names.
+def native_argument_types(arguments, types)
+  placed = arguments.reject { it in KeywordArgumentNode }.map { synthesize(it, types) }
+  named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }
+  placed + named.map { ["keyword", it.label, synthesize(it.value, types)] }
 end
 
 # What a block handed to one of the program's defs answers, under the
@@ -881,7 +890,7 @@ end
 # reading: the answer of the combination the call names, or unknown
 # where there is none.
 def native_call_answer(node, types)
-  arguments = node.arguments.map { synthesize(it, types) }
+  arguments = native_argument_types(node.arguments, types)
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
   found = types.find { it[0] == combination_key(node.name, arguments, handed, leaves) }
@@ -895,8 +904,8 @@ end
 def native_method_call(node, receiver, types)
   owner = native_owner(opened_natively(receiver, types))
   return nil if owner.nil?
-  shape = method_shape(owner, node.name, node.arguments.length, node.block.some?)
-  return nil unless types.any? { it[0] == shape }
+  shape = types.find { it[0] == method_shape_key(owner, node.name) }
+  return nil if shape.nil? || !shape_answers?(type_at(shape, 1), node)
   # A receiver that is a maybe is opened for the method, which is handed
   # the value, and nil refuses by the method's name (#503).
   handed = (receiver in ["maybe", *]) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
@@ -1107,7 +1116,12 @@ def register_struct(node, mutable types)
 end
 
 # A type as a combination's name writes it.
-def render_native_type(type) = type == NOTHING ? "nothing" : render_type(type)
+def render_native_type(type)
+  return "nothing" if type == NOTHING
+  # What a call hands a def by name (#536): the name, and the type.
+  return "#{type_at(type, 1)}: #{render_native_type(type_at(type, 2))}" if type in ["keyword", *]
+  render_type(type)
+end
 
 # How a type is written back out, for the debug driver. This rendering is
 # NOT ratified surface — the error-voice decision owns the real spelling —
@@ -1193,6 +1207,18 @@ def scan_program(nodes)
     end
   end
   types
+end
+
+# Whether a method answers a call (ADR 0093, #536), by its shape: [the
+# fewest it takes by place, the most, whether it yields, the names it
+# takes]. The count by place fits, a block is handed exactly when the
+# method yields, and every name handed is one it takes.
+def shape_answers?(shape, node)
+  placed = node.arguments.reject { it in KeywordArgumentNode }.length
+  named = node.arguments.select { it in KeywordArgumentNode }.map { it.label }
+  return false unless placed >= type_at(shape, 0) && placed <= type_at(shape, 1)
+  return false unless node.block.some? == type_at(shape, 2)
+  named.all? { type_at(shape, 3).include?(it) }
 end
 
 def signature_continues?(line)
