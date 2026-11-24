@@ -1959,6 +1959,9 @@ def evaluate_call(node, mutable bindings)
   unless self_slot.empty?
     receiver = value_at(self_slot.first, 2)
     own = struct_method_for(receiver, node.name, bindings)
+    # A block handed to the bare call goes to the method with it (#490),
+    # for its `yield` to reach, as a call with a dot hands one.
+    return invoke_struct_method_with_block(receiver, own, arguments, node.block, bindings) unless own.nil? || node.block.nil?
     return invoke_struct_method(receiver, own, arguments, keyword_values, bindings) unless own.nil?
   end
   # `fields(...)` — the raw constructor, and only inside `def self.new`

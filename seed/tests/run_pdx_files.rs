@@ -2257,6 +2257,18 @@ fn the_pointer_to_each_is_given_only_by_a_method_the_language_defines() {
     }
 }
 
+/// A method that calls another of its receiver's by its bare name hands
+/// it the block written there (#490), on both implementations: a trait's
+/// method walking with the `each` of the struct that includes it.
+#[test]
+fn a_bare_call_hands_its_block_to_the_receivers_own_method() {
+    assert_both_print(
+        "bare_call_with_a_block.pdx",
+        "trait Walkable\n  def gathered\n    mutable found = []\n    each { |item| found << item }\n    found\n  end\nend\n\nstruct Basket\n  items\n\n  include Walkable\n\n  def each\n    items.each { |item| yield(item) }\n  end\nend\n\np(Basket.new(items: [1, 2]).gathered)\n",
+        "[1, 2]\n",
+    );
+}
+
 /// A program cannot reopen a core type (ADR 0093, #437): a struct named
 /// for one refuses on both implementations, naming the closed runtime and
 /// the rewrites. A struct of that name inside a module is another name.
