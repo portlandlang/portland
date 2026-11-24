@@ -897,6 +897,16 @@ def joined_pair(first, second)
   maybe ? maybe_of(ANY_STRUCT) : ANY_STRUCT
 end
 
+# The one type these make together, each joined to the ones before it
+# as `joined_pair` joins two, or nil where they make none.
+def joined_types(types)
+  mutable joined = types.first
+  types.each do |type|
+    joined = joined.nil? ? nil : joined_pair(joined, type)
+  end
+  joined
+end
+
 # A value's type and a maybe of it, either way round, as the maybe; a
 # maybe and nil as the maybe; anything else unknown.
 def joined_with_maybe(first, second)

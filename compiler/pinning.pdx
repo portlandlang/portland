@@ -331,13 +331,7 @@ end
 # not join: the same type throughout; a value and nil or a maybe of it,
 # which is a maybe of it, as a local bound both ways is (#505); or one
 # struct and another, which is one of several structs (#572).
-def joined_field(types)
-  mutable joined = types.first
-  types.each do |type|
-    joined = joined.nil? ? nil : joined_pair(joined, type)
-  end
-  joined
-end
+def joined_field(types) = joined_types(types)
 
 # The names in an answer's key (#537): `Array#map([Token]) { Integer }`
 # gives `Array` and `map`, and `Token.text` gives `Token` and `text`.
@@ -383,11 +377,10 @@ end
 # The one type a body's ways out answer together. Where they are one
 # value's type, with nil or a maybe of it among them, that is a maybe of
 # the value (#505): `return "none"` beside a last expression that is a
-# String or nil. Otherwise inference's own rule stands.
+# String or nil. Where they are one struct and another, that is one of
+# several structs (#572). Otherwise inference's own rule stands.
 def merge_answers(candidates)
-  values = unique_types(candidates.reject { it == ["nil"] }.map { (it in ["maybe", *]) ? type_at(it, 1) : it })
-  return merge_candidates(candidates) unless values.length == 1
-  candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
+  (joined_types(candidates) or merge_candidates(candidates))
 end
 
 # A method's shape, for a call to be held to (ADR 0093, #536): the
@@ -876,8 +869,8 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
-  return ["unknown"] unless known.length == 1
-  found = known.first or ["unknown"]
+  # The ways out that are known answer one type, or types that join.
+  found = joined_types(known) or return ["unknown"]
   return found unless strict
   whole = body_answer(definition.body, parameters, [[key, found]] + others, names)
   whole == found ? found : ["unknown"]
