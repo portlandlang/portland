@@ -354,6 +354,32 @@ def gathered_round(statements, names, answers, pinned, changed, mentions, read_b
   GatheredRound.new(walk: walk.with(calls: calls), read: read, again: again)
 end
 
+# The array each def is handed in each place, by the combinations pinned
+# (#572), as bindings: what an empty array handed there is read as. Where
+# the combinations hand different arrays there, what those make together.
+def handed_arrays(pinned)
+  mutable found = []
+  pinned.each do |combination|
+    mutable place = 0
+    combination.arguments.each do |argument|
+      named = argument in ["keyword", *]
+      label = named ? type_at(argument, 1) : place.to_s
+      type = named ? type_at(argument, 2) : argument
+      place += 1 unless named
+      next unless (type in ["array", *]) && concrete?(type)
+      key = handed_array_key(combination.name, label)
+      held = found.assoc(key)
+      if held.nil?
+        found << [key, type]
+      else
+        joined = joined_plain(type_at(held, 1), type)
+        found = found.map { it[0] == key ? [key, joined] : it } if joined.some?
+      end
+    end
+  end
+  found
+end
+
 # The one type a field made with these holds (#553), or nil where they do
 # not join: the same type throughout; a value and nil or a maybe of it,
 # which is a maybe of it, as a local bound both ways is (#505); or one
@@ -363,7 +389,7 @@ def joined_field(types) = joined_types(types)
 # The names in an answer's key (#537): `Array#map([Token]) { Integer }`
 # gives `Array` and `map`, and `Token.text` gives `Token` and `text`.
 def key_names(key)
-  head = (key.split("(").first or key)
+  head = ((key.split("(").first or key).split("[").first or key)
   head.split("#").flat_map { it.split(".") }
 end
 
@@ -432,7 +458,7 @@ def pin_block_call(node, walk, answers, names)
     current = pin_statement(argument, current, answers, names)
   end
   scope = current.bindings + answers
-  arguments = native_argument_types(node.arguments, scope)
+  arguments = filled_arguments(node.name, native_argument_types(node.arguments, scope), scope)
   answer = native_block_answer(node, arguments, scope)
   leaves = native_block_leaves?(node.block, scope)
   yielded = answers.assoc(yields_key(node.name, arguments))
@@ -538,7 +564,7 @@ def pin_expression(node, walk, answers, names)
   end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, native_argument_types(node.arguments, scope), nil, false]])
+    current = current.with(calls: current.calls + [[node.name, filled_arguments(node.name, native_argument_types(node.arguments, scope), scope), nil, false]])
   end
   if node in YieldNode
     scope = current.bindings + answers
@@ -679,7 +705,7 @@ def pinned_answers(pinned)
   # Everything pinning reads, it reads the way the native build runs it
   # (#503): the name that says so rides with the answers into every scope,
   # and is kept last, which is where inference looks for it.
-  answers + yielded + [[NATIVE_READING, ["boolean"]]]
+  answers + yielded + handed_arrays(pinned) + [[NATIVE_READING, ["boolean"]]]
 end
 
 # A yielding combination's block, or nil for a def that does not yield.

@@ -1,0 +1,25 @@
+# An empty array handed to a def is the array the def's other calls hand
+# it in that place (#572), by place and by name.
+def counted(label, words)
+  "#{label}: #{words.length}"
+end
+
+def joined(words, extra: ["none"])
+  (words + extra).join(" ")
+end
+
+def listed(label, numbers)
+  mutable total = 0
+  numbers.each do |number|
+    total += number
+  end
+  "#{label} #{total}"
+end
+
+puts counted("none", [])
+puts counted("two", ["a", "b"])
+puts joined(["a"], extra: [])
+puts joined([], extra: ["b"])
+puts joined(["c"])
+puts listed("sum", [1, 2, 3])
+puts listed("sum", [])

@@ -631,16 +631,28 @@ def lower_call(node, name, arguments, bindings, context, root)
   below = context.with(root: nil)
   # What the call hands over by place, and then by name in the names'
   # own order (#536), which is how the combination is named.
-  placed = arguments.reject { it in KeywordArgumentNode }.map { lower_value(it, bindings, below) }
-  named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }.map { [it.label, lower_value(it.value, bindings, below)] }
-  types = placed.map { it.type } + named.map { ["keyword", it[0], type_at(it, 1).type] }
+  scope = bindings + yielding_answers(context.answers, context.yielding)
+  # An empty array handed over is the array the def's other calls hand
+  # it in that place (#572), as pinning read it.
+  written_placed = arguments.reject { it in KeywordArgumentNode }.map { lower_value(it, bindings, below) }
+  written_named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }.map { [it.label, lower_value(it.value, bindings, below)] }
+  types = filled_arguments(name, written_placed.map { it.type } + written_named.map { ["keyword", it[0], type_at(it, 1).type] }, scope)
+  mutable placed = []
+  written_placed.each do |value|
+    placed << (value.type == EMPTY_ARRAY ? value.with(type: (type_at(types, placed.length) or EMPTY_ARRAY)) : value)
+  end
+  mutable named = []
+  written_named.each do |pair|
+    value = type_at(pair, 1)
+    filled = type_at(types, placed.length + named.length) or ["keyword", pair[0], EMPTY_ARRAY]
+    named << [pair[0], (value.type == EMPTY_ARRAY ? value.with(type: type_at(filled, 2)) : value)]
+  end
   # A def called by its bare name is a name and not a call, and is
   # handed no block.
   written = (node in CallNode) ? node.block : nil
   # The call names a combination of the def's types (ADR 0097): what it
   # is handed, what its block answers, and whether its block can leave,
   # each read as pinning read it.
-  scope = bindings + yielding_answers(context.answers, context.yielding)
   handed = written.nil? ? nil : native_block_answer(node, types, scope)
   leaves = written.some? && native_block_leaves?(written, scope)
   key = combination_key(name, types, handed, leaves)

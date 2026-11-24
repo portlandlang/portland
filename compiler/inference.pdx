@@ -835,6 +835,28 @@ end
 # native build settled for it (#532).
 def field_key(owner, field) = "#{owner}.#{field}"
 
+# What a call hands a def, with each empty array among it as the array
+# the def's other calls hand it in that place (#572): an empty literal
+# says nothing of what it holds, and the def it is handed to does. One
+# no other call names stays as it is.
+def filled_arguments(name, arguments, types)
+  empty = ["array", ["unknown"]]
+  return arguments unless arguments.any? { it == empty || ((it in ["keyword", *]) && type_at(it, 2) == empty) }
+  mutable place = 0
+  mutable filled = []
+  arguments.each do |argument|
+    if argument in ["keyword", *]
+      known = type_at(argument, 2) == empty ? types.assoc(handed_array_key(name, type_at(argument, 1))) : nil
+      filled << (known.nil? ? argument : ["keyword", type_at(argument, 1), type_at(known, 1)])
+    else
+      known = argument == empty ? types.assoc(handed_array_key(name, place.to_s)) : nil
+      filled << (known.nil? ? argument : type_at(known, 1))
+      place += 1
+    end
+  end
+  filled
+end
+
 # An array of arrays flattened all the way: an array of the innermost
 # element type.
 def flattened_type(receiver)
@@ -869,6 +891,11 @@ def guard_proof(node, types)
   return when_true(proof) if else_exits && !then_exits
   []
 end
+
+# The name the array a def is handed in one place is bound under (#572):
+# the place by its number, or by its name where it is handed by name. No
+# def and no local is spelled with a bracket.
+def handed_array_key(name, place) = "#{name}[#{place}]"
 
 # Everything a node holds, for a tool that walks a whole file (#30,
 # #551): a def's body and a type's methods, which the checker reads one
@@ -1077,7 +1104,7 @@ end
 # reading: the answer of the combination the call names, or unknown
 # where there is none.
 def native_call_answer(node, types)
-  arguments = native_argument_types(node.arguments, types)
+  arguments = filled_arguments(node.name, native_argument_types(node.arguments, types), types)
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
   found = types.assoc(combination_key(node.name, arguments, handed, leaves))
