@@ -1,0 +1,55 @@
+# A program as the native build reads it (#530): an entry file and
+# everything `require_relative` pulls in, each file once, as one list of
+# statements in the order they run.
+#
+# Both interpreters load a required file where the line that names it
+# runs, and a second line naming it does nothing. So the gathered program
+# is the entry file's statements with each such line replaced by that
+# file's own statements, the first time the file is named. The checker
+# reads the same closure, file by file (ADR 0049).
+#
+# A required file's locals do not cross into the file that requires it.
+# Gathered into one list they would, so a required file that binds one at
+# its top level is refused: what crosses is defs, and nothing else here.
+
+require_relative "parser"
+require_relative "paths"
+
+# What gathering has read: the files so far, and their statements.
+struct ProgramLoad
+  files
+  nodes
+end
+
+# One file's statements gathered, and those of the files it requires in
+# their places. `entry` is whether this is the file the build was handed,
+# which may bind what it likes at its top level.
+def load_program_file(path, entry, loading)
+  return loading if loading.files.include?(path)
+  source = System.read_file(path) or panic "cannot read #{path}"
+  mutable current = loading.with(files: loading.files + [path])
+  parse_program(lex(source)).each do |node|
+    required = relative_require_of(node)
+    if required.some?
+      current = load_program_file(required_path_from(path, required), false, current)
+    else
+      if !entry && (node in AssignmentNode) && !constant_name?(node.name)
+        panic("the native build gathers a program's files into one — #{path} binds #{node.name} at its top level on line #{node.line}, and a required file's locals do not cross into the file that requires it (#530)")
+      end
+      current = current.with(nodes: current.nodes + [node])
+    end
+  end
+  current
+end
+
+# A program's statements, from the path of its entry file.
+def program_nodes(path) = load_program_file(canonical_path(path), true, ProgramLoad.new(files: [], nodes: [])).nodes
+
+# The path a `require_relative "name"` line names, as written, or nil for
+# any other statement.
+def relative_require_of(node)
+  return nil unless (node in CallNode) && node.name == "require_relative" && node.arguments.length == 1
+  written = node.arguments.first
+  return nil unless written in StringNode
+  written.value
+end

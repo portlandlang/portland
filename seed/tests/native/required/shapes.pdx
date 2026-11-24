@@ -1,0 +1,8 @@
+# Required by requires.pdx, and by counting.pdx beside it.
+require_relative "counting"
+
+def square(side) = side * side
+
+def describe(side) = "a square of #{side} holds #{square(side)}, counted #{count_upto(side)}"
+
+puts "shapes loaded"

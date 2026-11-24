@@ -1,0 +1,8 @@
+# A program in more than one file (#530): each `require_relative` runs the
+# file it names where the line is, the first time the file is named.
+puts "before"
+require_relative "required/shapes"
+require_relative "required/counting"
+require_relative "required/shapes.pdx"
+puts describe(4)
+puts count_upto(3)
