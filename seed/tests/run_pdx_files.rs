@@ -1553,6 +1553,12 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "def greet(name, mark:) = name + mark\nputs greet(\"a\")\n",
             "the native build needs one type for every value — def greet on line 1 has none: its parameters do not take what one call hands it".to_string(),
         ),
+        // A field whose second type is there only while the field is typed
+        // (#545): pinning went round in a circle on it, and names it.
+        (
+            "struct Box\n  value\nend\n\nfirst = Box.new(value: 1)\nsecond = Box.new(value: [first.value])\np(second)\n",
+            "the native build gives each field of a struct one type — Box.value is an Integer where one is made and a [Integer] where another is (#532)".to_string(),
+        ),
         // A struct outside the first step (#532).
         (
             "struct Pair\n  left\n  right\nend\nfirst = Pair.new(left: 1, right: 2)\nsecond = Pair.new(left: \"one\", right: 2)\np(first)\n",

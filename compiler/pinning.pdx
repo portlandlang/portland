@@ -607,6 +607,20 @@ def returns_gathered(walk)
   walk.calls.select { it[0] == RETURN }.map { type_at(type_at(it, 1), 0) }
 end
 
+# What a round of pinning knows, as one line for each thing: every
+# combination with what it answers, what it hands its block, or why it
+# could not be pinned, and every field with its type. Two rounds that
+# know the same are the same round, and these are what a refusal names
+# where rounds do not agree (#545).
+def round_entries(pinned, fields)
+  combinations = pinned.map do |found|
+    handed = found.block.nil? ? "" : " #{render_pinned_block(found.block)}"
+    outcome = found.reason.nil? ? "-> #{render_pinned_type(found.answer)}" : "not pinned, #{found.reason}"
+    "#{found.key}#{handed} #{outcome}"
+  end
+  combinations + fields.map { "#{it[0]}: #{render_pinned_type(type_at(it, 1))}" }
+end
+
 # The time between two readings of the clock, which counts in
 # billionths of a second, as seconds to one place.
 def seconds_between(earlier, later)
@@ -621,6 +635,10 @@ end
 def settle_pins(definitions, statements, names, fixed, starting, strict, progress)
   mutable pinned = starting.pinned
   mutable fields = starting.fields
+  mutable known = round_entries(pinned, fields)
+  # Every round so far, as what it knew: a round that knows what an
+  # earlier one did, and is not the one before it, is a circle (#545).
+  mutable seen = [known]
   mutable round = 0
   while round <= ROUND_LIMIT
     began = progress.nil? ? 0 : System.monotonic_time
@@ -628,36 +646,48 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
     walk = gathered_calls(definitions, statements, names, answers, pinned)
     settled = pin_combinations(definitions, walk.calls, answers, names, strict)
     made = settled_fields(walk.calls)
+    found = round_entries(settled, made)
     # Said while it works, where the build was asked to (#543): a round
     # that finds fewer new combinations each time is settling.
     if progress.some?
-      fresh = settled.count { |found| pinned.none? { it.key == found.key } }
+      fresh = settled.count { |combination| pinned.none? { it.key == combination.key } }
       most = definitions.max_by { |definition| settled.count { it.name == definition.name } }
       crowded = most.nil? ? "" : "; most: #{most.name} with #{settled.count { it.name == most.name }}"
       pass = strict ? "second pass" : "first pass"
       build_note(progress, "pinning, #{pass}, round #{round + 1}: #{settled.length} combinations, #{fresh} new, #{made.length} fields, #{walk.calls.length} calls read in #{seconds_between(began, System.monotonic_time)}#{crowded}")
     end
-    break if settled == pinned && made == fields
+    break if found == known
+    if seen.include?(found)
+      turning = (found.reject { known.include?(it) } + known.reject { found.include?(it) })
+      shown = turning.slice(0, 6).join("; ")
+      more = turning.length > 6 ? "; and #{turning.length - 6} more" : ""
+      panic("the native build's types go round in a circle and do not settle (#545) — pinned one way in one round and another in the next: #{shown}#{more}")
+    end
     busiest = definitions.find { |definition| settled.count { it.name == definition.name } > COMBINATION_LIMIT }
     if busiest.some?
       panic("the native build compiles a def once for each combination of types it is called with, and stopped at #{COMBINATION_LIMIT} — def #{busiest.name} on line #{busiest.line} is called with a new one each time it is called")
     end
     pinned = settled
     fields = made
+    known = found
+    seen << found
     round += 1
   end
   panic("the native build's types did not settle in #{ROUND_LIMIT} rounds") if round > ROUND_LIMIT
   Settled.new(pinned: pinned, fields: fields)
 end
 
-# Each struct's fields as bindings (#532): a field whose every making
-# hands it one known type is bound to it. One handed more than one is
-# left out here and named by `field_conflicts`.
+# Each struct's fields as bindings (#532): a field is bound to the type
+# its makings hand it. One handed more than one keeps the first, and is
+# named by `field_conflicts`. It is not dropped: a field left out is
+# forgotten by the next round, which may then find it made with one type
+# again, and so round in a circle (#545). A round only adds to what the
+# last one knew.
 def settled_fields(calls)
   mutable bindings = []
   made_fields(calls).each do |made|
     types = unique_types(type_at(made, 1).select { concrete?(it) })
-    bindings << [made[0], types[0]] if types.length == 1
+    bindings << [made[0], types[0]] unless types.empty?
   end
   bindings
 end
