@@ -560,8 +560,9 @@ def lower_function(definition, found, context)
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
-def lower_program(nodes, core: nil)
-  pinned = pin_program(nodes, core: core)
+def lower_program(nodes, core: nil, progress: nil)
+  build_note(progress, "pinning: every value's type, from how the program calls its defs") if progress.some?
+  pinned = pin_program(nodes, core: core, progress: progress)
   definitions = pinned.definitions
   statements = nodes.reject { it in DefNode }
   # A field has one type (#532), as an array's elements have.
@@ -576,6 +577,7 @@ def lower_program(nodes, core: nil)
     end
   end
   context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  build_note(progress, "lowering: #{called.length} combinations of #{unique_types(called.map { it.name }).length} defs") if progress.some?
   mutable functions = []
   called.each do |found|
     functions << lower_function(found.definition, found, context)
