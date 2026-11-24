@@ -1,0 +1,39 @@
+# A program's own loud choices, read back to it (#30): every `panic` with
+# the reason its writer gave, every `mutable` name with the lines that
+# rebind it, and every `together`. It judges nothing and never refuses.
+#
+# Usage: pdx compiler/report.pdx [panic | mutable | together] file.pdx [more.pdx ...]
+
+require_relative "reporting"
+
+CONCERNS = ["panic", "mutable", "together"]
+
+# A count with what it counts: `1 site`, `2 sites`.
+def counted(count, word) = count == 1 ? "1 #{word}" : "#{count} #{word}s"
+
+named = System.arguments.first or panic "report.pdx: needs a file to read"
+wanted = CONCERNS.include?(named) ? [named] : CONCERNS
+paths = CONCERNS.include?(named) ? System.arguments.drop(1) : System.arguments
+mutable panics = []
+mutable mutables = []
+mutable togethers = []
+paths.each do |path|
+  source = System.read_file(path) or panic "report.pdx: cannot read #{path}"
+  nodes = parse_program(lex(source))
+  panics += panic_sites(path, source, nodes)
+  mutables += mutable_names(path, nodes)
+  togethers += together_sites(path, nodes)
+end
+if wanted.include?("panic")
+  puts "panic: #{counted(panics.length, "site")}"
+  report_lines(panics).each { puts it }
+end
+if wanted.include?("mutable")
+  rebindings = mutables.map { it.rebindings.length }.sum
+  puts "mutable: #{counted(mutables.length, "name")}, #{counted(rebindings, "rebinding")}"
+  report_lines(mutables).each { puts it }
+end
+if wanted.include?("together")
+  puts "together: #{counted(togethers.length, "site")}"
+  report_lines(togethers).each { puts it }
+end

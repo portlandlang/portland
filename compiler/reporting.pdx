@@ -1,0 +1,148 @@
+# A program's own loud choices, read back to it (#30). Portland gives
+# each thing worth a second look one spelling, so each can be found
+# exactly: `panic` is the only way to crash (ADR 0010), and `mutable` the
+# only name that can be rebound (ADR 0001). This finds them in a file's
+# tree, as the linter finds what it holds a file to (ADR 0098).
+#
+# It is not the linter. It judges nothing: a site is where the writer
+# made a choice, with the writer's own words beside it, and no number of
+# sites is too many.
+
+require_relative "inference"
+
+# A name bound `mutable`: where, and each line that rebinds it.
+struct MutableName
+  path
+  line
+  name
+  rebindings
+end
+
+# One `panic`: where, and the reason as its writer wrote it.
+struct PanicSite
+  path
+  line
+  reason
+end
+
+# A `together` block: where the program fans out.
+struct TogetherSite
+  path
+  line
+end
+
+# Everything a node holds that a report walks: a def's body and a type's
+# methods, which the checker reads one at a time, and then whatever an
+# expression holds.
+def held_by(node)
+  case node
+  in DefNode(body:) then body
+  in ModuleDefNode(body:) then body
+  in StructDefNode(methods:, type_functions:) then methods + type_functions
+  in TraitDefNode(methods:) then methods
+  else children_of(node).reject { it.nil? }
+  end
+end
+
+# Every node below these, a def's own body left out: a def's names are
+# its own.
+def inside_scope(nodes)
+  nodes.flat_map do |node|
+    below = (node in DefNode) ? [] : inside_scope(held_by(node))
+    [node] + below
+  end
+end
+
+# Every `mutable` name these files bind, each with the lines that rebind
+# it, in the order written.
+def mutable_names(path, nodes)
+  scopes_of(nodes).flat_map { scope_mutables(path, it) }.sort_by { it.line }
+end
+
+# The reason a `panic` was written with, read off its line: the text
+# inside the quotes where it is a String, with what it interpolates as
+# written, and otherwise what follows the word.
+def panic_reason(text)
+  place = text.index("panic")
+  return "" if place.nil?
+  rest = text.slice(place + 5, text.length).strip
+  written = rest.start_with?("(") ? rest.slice(1, rest.length).strip : rest
+  return written unless written.start_with?("\"")
+  characters = written.chars
+  mutable reason = ""
+  mutable depth = 0
+  mutable index = 1
+  while index < characters.length
+    character = characters[index] or ""
+    following = characters[index + 1] or ""
+    break if character == "\"" && depth == 0
+    if character == "\\"
+      reason << character
+      reason << following
+      index += 2
+      next
+    end
+    depth += 1 if character == "#" && following == "{"
+    depth -= 1 if character == "}" && depth > 0
+    reason << character
+    index += 1
+  end
+  reason
+end
+
+# Every `panic` in these nodes, in the order written.
+def panic_sites(path, source, nodes)
+  lines = source.split("\n", -1)
+  walked(nodes).select { (it in CallNode) && it.name == "panic" }.map do |call|
+    text = lines[(call.line or 1) - 1] or ""
+    PanicSite.new(path: path, line: (call.line or 1), reason: panic_reason(text))
+  end
+end
+
+# What a report says of the lines that rebind a name.
+def rebound_on(lines)
+  return "never rebound" if lines.empty?
+  return "rebound on line #{lines[0]}" if lines.length == 1
+  "rebound on lines #{lines.join(", ")}"
+end
+
+# A file's sites of one kind, as the lines a report prints for them.
+def report_lines(sites)
+  sites.map do |site|
+    case site
+    in MutableName(path:, line:, name:, rebindings:) then "  #{path}:#{line}  #{name}, #{rebound_on(rebindings)}"
+    in PanicSite(path:, line:, reason:) then "  #{path}:#{line}  #{reason}"
+    in TogetherSite(path:, line:) then "  #{path}:#{line}"
+    end
+  end
+end
+
+# The `mutable` names one scope binds. A name bound `mutable` is rebound
+# by every later binding of it in the scope, a block's included: `=`,
+# `+=` and its kin, `<<`, and `[]=` are all bindings of the name.
+def scope_mutables(path, scope)
+  bindings = inside_scope(scope).select { (it in AssignmentNode) && it.value.some? }
+  declared = bindings.select { it.rebindable }
+  declared.map do |declaration|
+    later = bindings.select { !it.rebindable && it.name == declaration.name && (it.line or 0) >= (declaration.line or 0) }
+    MutableName.new(path: path, line: (declaration.line or 1), name: declaration.name, rebindings: later.map { it.line or 0 })
+  end
+end
+
+# The scopes a file holds: what it runs at the top, and each def's body,
+# a type's methods among them.
+def scopes_of(nodes)
+  top = nodes.reject { (it in DefNode) || (it in StructDefNode) || (it in TraitDefNode) || (it in ModuleDefNode) }
+  defs = walked(nodes).select { it in DefNode }
+  [top] + defs.map { it.body }
+end
+
+# Every `together` block in these nodes, in the order written.
+def together_sites(path, nodes)
+  walked(nodes).select { it in TogetherNode }.map { TogetherSite.new(path: path, line: (it.line or 1)) }
+end
+
+# Every node in a file, each before what it holds.
+def walked(nodes)
+  nodes.flat_map { [it] + walked(held_by(it)) }
+end
