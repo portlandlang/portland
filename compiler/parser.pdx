@@ -4102,7 +4102,7 @@ def regex_expression(lexeme, line: nil)
     index += 1
   end
   parts << string_node(literal, line: line) if !literal.empty? || parts.empty?
-  mutable chain = parts.first
+  mutable chain = parts.first or panic "a literal with no parts"
   index = 1
   while index < parts.length
     chain = binary_node("+", chain, parts[index])
@@ -4215,7 +4215,7 @@ def string_expression(lexeme, line: nil)
   end
   return string_node(literal, line: line) if parts.empty?
   parts << string_node(literal, line: line) unless literal.empty?
-  mutable chain = parts.first
+  mutable chain = parts.first or panic "a literal with no parts"
   index = 1
   while index < parts.length
     chain = binary_node("+", chain, parts[index])
