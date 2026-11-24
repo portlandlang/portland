@@ -26,6 +26,7 @@
 # that is its own proposal. Expressions are still read by inference's
 # `synthesize`; only the bindings around them are kept differently.
 
+require_relative "core"
 require_relative "inference"
 
 # How many combinations of types one def may have. A def that calls
@@ -46,6 +47,14 @@ RETURN = "return"
 # round reaches one call deeper, so a program needs as many as its calls
 # nest; past this, two rounds are answering each other back and forth.
 ROUND_LIMIT = 200
+
+# The core's methods as the native build compiles them (#525): each a def
+# that takes `self` first, and the shapes of call each answers, as
+# bindings.
+struct CoreMethods
+  definitions
+  shapes
+end
 
 # What a walk over statements has gathered: the bindings in scope, and the
 # calls seen, each as [def name, argument types, what the block it was
@@ -86,10 +95,14 @@ end
 
 # A whole program's pinned types: each def's combinations, the defs in
 # written order, and its top-level bindings as [name, type] pairs in
-# first-appearance order.
+# first-appearance order. With them, every def a combination may be of,
+# the core's among them, and the shapes of call the core's methods
+# answer.
 struct PinnedProgram
   defs
   bindings
+  definitions
+  shapes
 end
 
 # Every way out of a body, each with the type it answers: the early
@@ -139,6 +152,34 @@ end
 
 # Whether a type says everything a code generator needs: no unknown in it.
 def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
+
+# The core's methods as defs (#525). In the core, `class Array` gives the
+# builtin array its methods (ADR 0093), its own and those of the traits
+# it includes. Each becomes a def named for the type and the method,
+# taking `self` first, and is then pinned and compiled as any def is.
+def core_methods(core)
+  return CoreMethods.new(definitions: [], shapes: []) if core.nil?
+  traits = core.select { it in TraitDefNode }
+  mutable definitions = []
+  mutable shapes = []
+  core.each do |node|
+    next unless (node in StructDefNode) && core_type_name?(node.name)
+    mutable methods = node.methods
+    node.includes.each do |included|
+      found = traits.find { it.name == included }
+      next if found.nil?
+      found.methods.each do |method|
+        methods = methods + [method] unless methods.any? { it.name == method.name }
+      end
+    end
+    methods.each do |method|
+      receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
+      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters)
+      shapes << [method_shape(node.name, method.name, method.parameters.length, yields?(method.body)), ["boolean"]]
+    end
+  end
+  CoreMethods.new(definitions: definitions, shapes: shapes)
+end
 
 # The one type a body's ways out answer together. Where they are one
 # value's type, with nil or a maybe of it among them, that is a maybe of
@@ -227,6 +268,13 @@ end
 # its arguments' types as the bindings in scope give them.
 def pin_expression(node, walk, answers, names)
   return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
+  # A method the core writes for the receiver's type is a def (#525), and
+  # the call is gathered as a call of it.
+  if node in MethodCallNode
+    scope = walk.bindings + answers
+    called = native_method_call(node, synthesize(node.receiver, scope), scope)
+    return pin_expression(called, walk, answers, names) if called.some?
+  end
   return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
   mutable current = walk
   if (node in CallNode) && names.include?(node.name)
@@ -248,8 +296,12 @@ def pin_expression(node, walk, answers, names)
   current
 end
 
-def pin_program(nodes)
-  definitions = nodes.select { it in DefNode }
+def pin_program(nodes, core: nil)
+  own = nodes.select { it in DefNode }
+  methods = core_methods(core)
+  # The core's functions and methods are defs like the program's own, and
+  # are compiled where the program calls them.
+  definitions = own + (core or []).select { it in DefNode } + methods.definitions
   statements = nodes.reject { it in DefNode }
   names = definitions.map { it.name }
   # Two passes. The first pins from the arguments whose types are known,
@@ -257,23 +309,24 @@ def pin_program(nodes)
   # itself is pinned, and takes a def that calls itself at the answer its
   # known ways out give. The second holds each such answer to the def's
   # whole body.
-  reached = settle_pins(definitions, statements, names, [], false)
-  pinned = settle_pins(definitions, statements, names, reached, true)
-  answers = pinned_answers(pinned)
+  reached = settle_pins(definitions, statements, names, methods.shapes, [], false)
+  pinned = settle_pins(definitions, statements, names, methods.shapes, reached, true)
+  answers = methods.shapes + pinned_answers(pinned)
   walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
   # A def with no combination is one nothing calls, or one called only
-  # with a value whose type is not known.
+  # with a value whose type is not known. Of those, the program's own are
+  # listed; the core's are most of the core.
   mutable listed = []
   definitions.each do |definition|
-    own = pinned.select { it.name == definition.name }
-    if own.empty?
+    combinations = pinned.select { it.name == definition.name }
+    if combinations.empty? && own.include?(definition)
       reason = walk.calls.any? { it[0] == definition.name } ? "it is called with a value whose type is not known" : "nothing calls it"
       listed << PinnedDef.new(name: definition.name, key: nil, parameters: [], answer: ["unknown"], reason: reason, block: nil)
     else
-      listed += own
+      listed += combinations
     end
   end
-  PinnedProgram.new(defs: listed, bindings: walk.bindings.reverse)
+  PinnedProgram.new(defs: listed, bindings: walk.bindings.reverse, definitions: definitions, shapes: methods.shapes)
 end
 
 # One statement: the calls inside it are recorded with the bindings above
@@ -431,11 +484,11 @@ end
 # level and the body of every combination pinned so far, gathers the
 # combinations those calls name, and pins them; a combination's body may
 # name another, which the next round reaches.
-def settle_pins(definitions, statements, names, starting, strict)
+def settle_pins(definitions, statements, names, shapes, starting, strict)
   mutable pinned = starting
   mutable round = 0
   while round <= ROUND_LIMIT
-    answers = pinned_answers(pinned)
+    answers = shapes + pinned_answers(pinned)
     mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
     pinned.each do |found|
       definition = definitions.find { it.name == found.name }

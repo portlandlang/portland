@@ -1551,9 +1551,16 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "numbers = [1, 2]\nheld = [numbers[0]]\n",
             format!("{compiles} — an array of Integer? on line 2 is unbuilt (#443)"),
         ),
+        // A walk the core does not write is the floor's, and unbuilt; so is a
+        // call of one it does write in a shape the method does not answer
+        // (#525).
         (
-            "numbers = [1, 2]\ndoubled = numbers.map { |number| number * 2 }\n",
-            format!("{compiles} — a call with a dot, .map on line 2 is unbuilt (#443)"),
+            "numbers = [1, 2]\ntotal = numbers.sum { |number| number * 2 }\n",
+            format!("{compiles} — a call with a dot, .sum on line 2 is unbuilt (#443)"),
+        ),
+        (
+            "numbers = [1, 2]\np(numbers.find(42) { |number| number > 1 })\n",
+            format!("{compiles} — a call with a dot, .find on line 2 is unbuilt (#443)"),
         ),
         // A block reaches past its own function with these (#493).
         // A block that leaves is written where nothing else is held (#523).

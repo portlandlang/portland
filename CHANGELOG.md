@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The native build compiles a method written in the core** ([#525](https://github.com/portlandlang/portland/issues/525), [ADR 0093](docs/adr/0093-2026-11-22-the-core-is-portland-source.md)) — `map`, `collect`, `select`, `filter`, `find_all`, `reject`, `find`, `detect`, and `empty?` on an array build natively, and each is the core's own source, `core/enumerable.pdx` and `core/array.pdx`, compiled.
+  - A method of a core type is a def that is handed `self` first, compiled once for each combination of types it is called with, the type of `self` among them.
+  - A call with a dot is the core's where the method answers that shape of call: the count of arguments fits, and a block is handed exactly when the method yields. Otherwise it is the floor's, as `each`, `length`, and `[]` are.
+  - `self` builds inside a method, and `value in Boolean` on a local is settled by the local's type.
+  - The drivers `build.pdx`, `intermediate.pdx`, and `pin.pdx` read the core, so a dump shows the core's methods a program calls.
 - **A native block leaves with `return` and `break`** ([#523](https://github.com/portlandlang/portland/issues/523), [ADR 0097](docs/adr/0097-2026-11-23-a-def-compiled-for-each-combination-of-types-and-leaving-a-block.md)) — `return` inside a block leaves the def the block is written in, with its value, and `break` leaves the call the block was handed to, as Ruby's do and as the seed's do.
   - A flag passed up: the block stores a returned answer where its def will find it and answers where it is leaving to. Each caller between looks at that after the call, lets go of what it holds, and answers the same, until the frame it names.
   - Only a block that can leave pays for it. Whether its block can leave is part of a def's combination, so a def handed blocks that cannot is compiled as before, with no test after a `yield`.

@@ -16,4 +16,4 @@ destination = System.arguments[1] or panic "build.pdx: needs a path to write the
 source = System.read_file(path) or panic "build.pdx: cannot read #{path}"
 program = parse_program(lex(source))
 check_program_closure(path, [], default_load_path(path, []), core: core_nodes)
-System.write_file(destination, llvm_text(lower_program(program)))
+System.write_file(destination, llvm_text(lower_program(program, core: core_nodes)))
