@@ -1,0 +1,22 @@
+# The walks of walks.pdx, two hundred times as many: long enough for the
+# native build's time to show above the cost of starting a process (#528).
+# The walks are the core's, core/enumerable.pdx, compiled (#525).
+
+mutable numbers = []
+mutable index = 0
+while index < 500
+  numbers << index
+  index += 1
+end
+
+mutable round = 0
+mutable total = 0
+while round < 2000
+  doubled = numbers.map { |number| number * 2 }
+  evens = doubled.select { |number| number % 4 == 0 }
+  odds = numbers.reject { |number| number % 2 == 0 }
+  found = numbers.find { |number| number > 400 } or 0
+  total += evens.length + odds.length + found
+  round += 1
+end
+puts total
