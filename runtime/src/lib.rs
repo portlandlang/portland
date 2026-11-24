@@ -1252,3 +1252,5 @@ mod tests {
         assert_eq!(text_of(pointer), "hi");
     }
 }
+
+mod library;

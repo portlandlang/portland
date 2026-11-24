@@ -504,6 +504,26 @@ def llvm_label(emitter, label)
   emitter.with(lines: emitter.lines + ["#{label}:"], counter: emitter.counter + 1, block: label)
 end
 
+# What a library function answers, as LLVM writes it (#560): a Boolean
+# widened as C hands one back, an Integer that may not be there as an
+# Integer, and anything else as its own type.
+def llvm_library_answer(type)
+  return "zeroext i1" if type == ["boolean"]
+  return "i64" if type == ["maybe", ["integer"]]
+  llvm_type(type)
+end
+
+# The library's functions, declared (#560): one line for each function,
+# from the table the calls are read by.
+def llvm_library_declarations
+  NATIVE_LIBRARY.map do |entry|
+    taken = type_at(entry, 2).map { (it == ["integer"] || it == ["element"]) ? "i64" : "ptr" }
+    answer = type_at(entry, 3)
+    answered = answer == ["boolean"] ? "zeroext i1" : ((answer == ["integer"] || answer == ["maybe", ["integer"]]) ? "i64" : "ptr")
+    "declare #{answered} @#{type_at(entry, 4)}(#{(["ptr"] + taken).join(", ")})"
+  end
+end
+
 def llvm_line(emitter, instruction)
   emitter.with(lines: emitter.lines + ["  #{instruction}"])
 end
@@ -871,7 +891,7 @@ def llvm_text(program)
     bodies += [""] + written.lines + ["}"] + written.routines
     index += 1
   end
-  (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
+  (globals + LLVM_PRELUDE + llvm_library_declarations + bodies).join("\n") + "\n"
 end
 
 # A String written into the binary under a name: the block a literal is,
@@ -986,6 +1006,38 @@ def llvm_value(emitter, value)
     # refuses by the method's name.
     held = llvm_opened(asked.emitter, receiver.type, asked.operand) { |refusing| llvm_refuse_method(refusing, name) }
     llvm_method(held.emitter, llvm_plain(receiver.type), name, held.operand)
+  # A method the runtime's library does (#560): the value asked and what
+  # it is handed go over, each let go of once the call has answered, and
+  # what comes back is held once. An Integer that may not be there comes
+  # back as the least Integer where it is not.
+  in IntermediateLibrary(type:, symbol:, receiver:, arguments:, words:)
+    asked = llvm_value(emitter, receiver)
+    mutable calling = asked.emitter
+    mutable operands = ["ptr #{asked.operand}"]
+    mutable passed = []
+    mutable place = 0
+    arguments.each do |argument|
+      written = llvm_value(calling, argument)
+      calling = written.emitter
+      if type_at(words, place) == true
+        word = llvm_word(calling, argument.type, written.operand)
+        calling = word.emitter
+        operands << "i64 #{word.operand}"
+      else
+        operands << "#{llvm_type(argument.type)} #{written.operand}"
+      end
+      passed << [argument.type, written.operand]
+      place += 1
+    end
+    answered = llvm_named(calling, "call #{llvm_library_answer(type)} @#{symbol}(#{operands.join(", ")})")
+    mutable done = llvm_drop(answered.emitter, receiver.type, asked.operand)
+    passed.each do |given|
+      done = llvm_drop(done, type_at(given, 0), type_at(given, 1))
+    end
+    return LLVMValue.new(emitter: done, operand: answered.operand) unless type == ["maybe", ["integer"]]
+    found = llvm_named(done, "icmp ne i64 #{answered.operand}, -9223372036854775808")
+    flagged = llvm_named(found.emitter, "insertvalue { i1, i64 } undef, i1 #{found.operand}, 0")
+    llvm_named(flagged.emitter, "insertvalue { i1, i64 } #{flagged.operand}, i64 #{answered.operand}, 1")
   # A maybe opened for `puts` or for a method: nil refuses in the seed's
   # sentence for that.
   in IntermediateOpen(value: held, name:)

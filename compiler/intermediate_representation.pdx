@@ -196,6 +196,17 @@ struct IntermediateLeave
   value
 end
 
+# A method the runtime's library does (#560): the function, the value
+# asked, what it is handed, and for each of those whether it goes over as
+# the one word an array holds it as.
+struct IntermediateLibrary
+  type
+  symbol
+  receiver
+  arguments
+  words
+end
+
 # A parameter or a local, read.
 struct IntermediateLocal
   type
@@ -607,6 +618,23 @@ def lower_function(definition, found, context)
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
+# A call of a method the library holds (#560), or nil where it holds none
+# for what is asked and handed. A maybe is opened, the value asked and
+# what it is handed alike, and nil refuses by the method's name.
+def lower_library(node, bindings, context)
+  asked = lower_value(node.receiver, bindings, context)
+  handed = node.arguments.map { lower_value(it, bindings, context) }
+  entry = native_library_entry(plain_of(asked.type), node.name, handed.map { plain_of(it.type) })
+  return nil if entry.nil?
+  holder = opened_for(asked, node.name)
+  if node.name == "include?" && (holder.type in ["array", *])
+    held = type_at(holder.type, 1)
+    refuse_native("include? asked of an array of #{render_type(held)}", node) unless held == ["integer"] || held == ["boolean"] || held == ["string"]
+  end
+  words = type_at(entry, 2).map { it == ["element"] }
+  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed.map { opened_for(it, node.name) }, words: words)
+end
+
 def lower_program(nodes, core: nil, progress: nil)
   build_note(progress, "pinning: every value's type, from how the program calls its defs") if progress.some?
   pinned = pin_program(nodes, core: core, progress: progress)
@@ -955,10 +983,14 @@ def lower_value(node, bindings, context)
       holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
       return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: field_offset(fields, place)) if place.some?
     end
-    # Every other method is asked of the value, a maybe opened for it.
+    # Every other method is asked of the value, a maybe opened for it:
+    # one the build writes out itself, or one the library holds (#560).
     answer = native_method_answer(plain_of(asked.type), name)
-    refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node) if answer.nil?
-    IntermediateMethod.new(type: answer, receiver: asked, name: name)
+    return IntermediateMethod.new(type: answer, receiver: asked, name: name) if answer.some?
+    lower_library(node, bindings, inner) or refuse_native("a call with a dot, .#{name}, on #{with_article(asked.type)}", node)
+  # A method with arguments that the library holds (#560).
+  in MethodCallNode(block: nil)
+    lower_library(node, bindings, inner) or refuse_native(native_name_of(node), node)
   in IfNode(condition:, then_body:, else_body:)
     taken = then_body or []
     other = else_body or []
@@ -1044,6 +1076,12 @@ def native_value?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
   return true if type in ["struct", *]
   (type in ["array", *]) && native_value?(type_at(type, 1))
+end
+
+# A value with a maybe opened for a method of this name.
+def opened_for(value, name)
+  return value unless value.type in ["maybe", *]
+  IntermediateOpen.new(type: plain_of(value.type), value: value, name: name)
 end
 
 # A type with a maybe opened: what an operation that needs the value
@@ -1145,6 +1183,7 @@ def render_value(value)
   in IntermediateWalk(array:, block:) then "(each #{render_value(array)} #{render_handed_block(block)})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
+  in IntermediateLibrary(symbol:, receiver:, arguments:) then "(#{symbol} #{([receiver] + arguments).map { render_value(it) }.join(" ")})"
   in IntermediateText(value: number) then "(text #{render_value(number)})"
   in IntermediateInspect(value: shown) then "(inspect #{render_value(shown)})"
   in IntermediateChoice(type:, condition:, then_value:, else_value:)

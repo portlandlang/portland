@@ -61,6 +61,32 @@
 
 require_relative "parser"
 
+# The methods of a String and of an array the native build holds by name
+# (#560), each as what it is asked of, its name, what it takes, what it
+# answers, and the runtime function that does it. `element` stands for
+# what the array asked holds, and `self` for the array asked.
+NATIVE_LIBRARY = [
+  [["array", ["element"]], "drop", [["integer"]], ["self"], "portland_array_drop"],
+  [["array", ["element"]], "include?", [["element"]], ["boolean"], "portland_array_include"],
+  [["array", ["string"]], "join", [], ["string"], "portland_array_join"],
+  [["array", ["string"]], "join", [["string"]], ["string"], "portland_array_join_with"],
+  [["array", ["element"]], "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],
+  [["string"], "bytesize", [], ["integer"], "portland_string_bytesize"],
+  [["string"], "chars", [], ["array", ["string"]], "portland_string_chars"],
+  [["string"], "chop", [], ["string"], "portland_string_chop"],
+  [["string"], "chr", [], ["string"], "portland_string_chr"],
+  [["string"], "codepoints", [], ["array", ["integer"]], "portland_string_codepoints"],
+  [["string"], "downcase", [], ["string"], "portland_string_downcase"],
+  [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
+  [["string"], "include?", [["string"]], ["boolean"], "portland_string_include"],
+  [["string"], "index", [["string"]], ["maybe", ["integer"]], "portland_string_index"],
+  [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
+  [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
+  [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
+  [["string"], "strip", [], ["string"], "portland_string_strip"],
+  [["string"], "upcase", [], ["string"], "portland_string_upcase"]
+]
+
 # The name the native build's pinning reads under (#503): bound by it and
 # by nothing else, and spelled as no local can be. Under it, inference
 # answers the way a code generator needs and a checker does not: an
@@ -823,6 +849,16 @@ def joined_with_maybe(first, second)
   ["unknown"]
 end
 
+# A type the library's table writes, as it is for the value asked (#560):
+# `element` is what the array asked holds, and `self` the array itself.
+def library_type(written, receiver)
+  return type_at(receiver, 1) if written == ["element"]
+  return receiver if written == ["self"]
+  return ["maybe", library_type(type_at(written, 1), receiver)] if written in ["maybe", *]
+  return ["array", library_type(type_at(written, 1), receiver)] if (written in ["array", *]) && type_at(written, 1) == ["element"]
+  written
+end
+
 # `Math` (ADR 0083): the total functions answer a Float; one that may answer
 # a domain failure is unknown, as every fallible builtin is; `frexp` and
 # `lgamma` answer a pair.
@@ -931,6 +967,17 @@ def native_call_answer(node, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
   found = types.find { it[0] == combination_key(node.name, arguments, handed, leaves) }
   found.nil? ? ["unknown"] : type_at(found, 1)
+end
+
+# The library's row for a method asked of a value with these arguments
+# (#560), or nil where it holds none.
+def native_library_entry(receiver, name, arguments)
+  NATIVE_LIBRARY.find do |entry|
+    asked = type_at(entry, 0)
+    taken = type_at(entry, 2)
+    fits = asked == receiver || (asked == ["array", ["element"]] && (receiver in ["array", *]))
+    fits && type_at(entry, 1) == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
+  end
 end
 
 # A call with a dot as the call of a def it is under the native reading
@@ -1528,6 +1575,12 @@ def synthesize_call(node, types)
     if (holder in ["struct", *]) && node.arguments.empty? && node.block.nil?
       field = types.find { it[0] == field_key(type_at(holder, 1), node.name) }
       return type_at(field, 1) if field.some?
+    end
+    # A method the library holds answers what its row says (#560).
+    if node.block.nil?
+      handed = node.arguments.map { opened_natively(synthesize(it, types), types) }
+      library = native_library_entry(holder, node.name, handed)
+      return library_type(type_at(library, 3), holder) if library.some?
     end
   end
   # `nil?` and `some?` are asked of the maybe itself; every other method
