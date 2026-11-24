@@ -1627,8 +1627,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — an array holding an Integer and a String on line 1 is unbuilt (#443)"),
         ),
         (
-            "left = [1]\nright = [1]\nif left == right\n  puts 1\nend\n",
-            format!("{compiles} — '==' between arrays on line 3 is unbuilt (#443)"),
+            "left = [1]\nright = [1]\nif left < right\n  puts 1\nend\n",
+            format!("{compiles} — '<' between arrays on line 3 is unbuilt (#443)"),
         ),
         (
             "empty = []\nputs empty.length\n",
@@ -1678,8 +1678,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — Pair.new without right on line 5 is unbuilt (#443)"),
         ),
         (
-            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nputs first == first\n",
-            format!("{compiles} — '==' between structs on line 5 is unbuilt (#443)"),
+            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nputs first < first\n",
+            format!("{compiles} — '<' between structs on line 5 is unbuilt (#443)"),
         ),
         (
             "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nother = first.with(right: 2)\n",

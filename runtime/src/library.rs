@@ -590,3 +590,93 @@ pub unsafe extern "C" fn portland_integer_chr_encoded(
         None => refuse_program(&format!("invalid codepoint 0x{scalar:X} in UTF-8")),
     }
 }
+
+/// Whether two words of one kind are equal: a String by the equality a
+/// String has, an array or a struct by what it holds, and anything else
+/// as the word it is.
+///
+/// # Safety
+/// Each is a word of that kind, and a pointer among them is null or
+/// points at a live block.
+unsafe fn words_equal(kind: i64, left: i64, right: i64) -> bool {
+    unsafe {
+        match kind {
+            STRINGS => {
+                portland_string_equal(left as *const StringBlock, right as *const StringBlock)
+            }
+            ARRAYS => portland_array_equal(left as *mut ArrayBlock, right as *mut ArrayBlock),
+            STRUCTS => portland_struct_equal(left as *mut StructBlock, right as *mut StructBlock),
+            _ => left == right,
+        }
+    }
+}
+
+/// `left == right` between arrays (#579): as long as each other, and each
+/// element equal to the one at its place. An array not yet bound is the
+/// empty one.
+///
+/// # Safety
+/// Each is null or points at a live array, and the two are of one kind.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_equal(
+    left: *mut ArrayBlock,
+    right: *mut ArrayBlock,
+) -> bool {
+    unsafe {
+        let length = |array: *mut ArrayBlock| if array.is_null() { 0 } else { (*array).length };
+        if length(left) != length(right) {
+            return false;
+        }
+        if length(left) == 0 {
+            return true;
+        }
+        let kind = (*left).kind;
+        (0..length(left) as usize).all(|index| {
+            words_equal(
+                kind,
+                elements_of(left).add(index).read(),
+                elements_of(right).add(index).read(),
+            )
+        })
+    }
+}
+
+/// `left == right` between structs (#579): the same type, and each field
+/// equal to the other's. A field that may not be there is equal where
+/// neither is, or where both are and their values are equal.
+///
+/// # Safety
+/// Each points at a live struct whose fields are what its shape says.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_equal(
+    left: *mut StructBlock,
+    right: *mut StructBlock,
+) -> bool {
+    unsafe {
+        if left == right {
+            return true;
+        }
+        let shape = (*left).shape;
+        if !std::ptr::eq(shape, (*right).shape) {
+            return false;
+        }
+        let (mut first, mut second) = (fields_of(left), fields_of(right));
+        for index in 0..(*shape).fields as usize {
+            let (kind, _) = field_of(shape, index);
+            let same = if kind >= MAYBE {
+                let (there, also) = (first.read() != 0, second.read() != 0);
+                there == also
+                    && (!there
+                        || words_equal(kind - MAYBE, first.add(1).read(), second.add(1).read()))
+            } else {
+                words_equal(kind, first.read(), second.read())
+            };
+            if !same {
+                return false;
+            }
+            first = first.add(words_of(kind));
+            second = second.add(words_of(kind));
+        }
+        true
+    }
+}
