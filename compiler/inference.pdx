@@ -617,6 +617,7 @@ end
 # is no `case`, a subject that may not read the same each time, or a
 # `when` that names a type, a range, or a regex, which match by `===`.
 def case_as_if(node)
+  return case_in_as_if(node) if node in CaseInNode
   return nil unless node in CaseNode
   return nil unless steady_subject?(node.subject)
   return nil unless node.branches.all? { |branch| branch.values.all? { compared_literal?(it) } }
@@ -630,6 +631,30 @@ def case_as_if(node)
     rest = [if_node(condition, branch.body, rest, line: branch.line)]
   end
   (rest or []).first
+end
+
+# A `case/in` over structs as the `if`s it means (#572): each arm asks
+# whether the subject is its struct, binds the fields it names from the
+# subject, and runs its body; the `else` otherwise, and with none, the
+# refusal the seed makes. Nil for anything else: a subject that may not
+# read the same each time, an arm with a guard, or a pattern that is more
+# than a struct's name with fields bound to names.
+def case_in_as_if(node)
+  return nil unless steady_subject?(node.subject)
+  return nil unless node.branches.all? { struct_arm?(it) }
+  shown = call_node("inspect", [node.subject], line: node.line)
+  message = binary_node("+", binary_node("+", string_node("no pattern matched ", line: node.line), shown, line: node.line), string_node(" — add an in branch or an else", line: node.line), line: node.line)
+  mutable rest = (node.else_body or [call_node("panic", [message], line: node.line)])
+  node.branches.reverse.each do |branch|
+    named = struct_pattern_node(branch.pattern.name, [], line: branch.line)
+    test = match_test_node(node.subject, named, line: branch.line)
+    bound = branch.pattern.fields.map do |field|
+      read = method_call_node(node.subject, field[0], [], nil, line: branch.line)
+      assignment_node(type_at(field, 1).name, read, line: branch.line)
+    end
+    rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
+  end
+  rest.first
 end
 
 # A node's direct children — every expression and statement it holds,
@@ -1478,6 +1503,13 @@ def steady_subject?(node)
   (node in MethodCallNode) && node.arguments.empty? && node.block.nil? && steady_subject?(node.receiver)
 end
 
+# Whether a `case/in` arm is one the native build reads as an `if`
+# (#572): no guard, and a struct's name with each field bound to a name.
+def struct_arm?(branch)
+  return false unless branch.guard.nil? && (branch.pattern in StructPatternNode)
+  branch.pattern.fields.all? { type_at(it, 1) in IdentifierNode }
+end
+
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
 # checking mode is 3b): every arm answers what it can prove from the node
 # alone plus the bindings already typed.
@@ -1771,6 +1803,10 @@ end
 # read with its captures bound (arm_bindings). An absent else answers nil
 # (ADR 0012) — unless an unguarded bare capture makes the arms total.
 def synthesize_case_in(node, types)
+  # Read as the native build runs it, one over structs is the `if`s it
+  # means (#572).
+  plain = native_reading?(types) ? case_as_if(node) : nil
+  return synthesize(plain, types) if plain.some?
   mutable answers = []
   mutable nil_seen = false
   node.branches.each do |branch|

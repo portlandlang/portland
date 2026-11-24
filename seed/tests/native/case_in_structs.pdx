@@ -1,0 +1,47 @@
+# A `case/in` over structs (#572): each arm asks whether the subject is
+# its struct, and binds the fields it names. With no arm for the struct
+# and no `else`, it refuses as the seed does.
+struct Circle
+  radius
+end
+
+struct Square
+  side
+end
+
+struct Label
+  text
+  size
+end
+
+struct Blank
+  width
+end
+
+def described(shape)
+  case shape
+  in Circle(radius:) then "circle of #{radius}"
+  in Square(side:)
+    doubled = side * 2
+    "square of #{side}, twice #{doubled}"
+  in Label(text: words, size:) then "#{words} at #{size}"
+  else
+    "something else"
+  end
+end
+
+def area(shape)
+  case shape
+  in Circle(radius:) then radius * radius * 3
+  in Square(side:) then side * side
+  in Label then 0
+  end
+end
+
+shapes = [Circle.new(radius: 2), Square.new(side: 3), Label.new(text: "exit", size: 12), Blank.new(width: 1)]
+shapes.each do |shape|
+  puts described(shape)
+end
+shapes.each do |shape|
+  puts area(shape)
+end

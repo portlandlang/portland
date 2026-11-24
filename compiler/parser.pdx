@@ -1751,7 +1751,7 @@ def parse_alias(tokens, position)
   Step.new(node: AliasNode.new(kind: "alias", new_name: first.name, old_name: second.name, line: line_at(tokens, position)), position: second.position)
 end
 
-# One of alias's two names: Step.node is the name string, or an error node.
+# One of alias's two names, as a NameStep, or a Step holding the refusal.
 def parse_alias_name(tokens, position)
   if position >= tokens.length || !tokens[position].identifier?
     return Step.new(node: error_node("alias takes two method names — alias new_name old_name"), position: position)
@@ -2034,8 +2034,8 @@ end
 # A branch body (ADR 0042): a `then` row holding one statement on the same
 # line, `then` as a bare separator before an indented body, or the indented
 # body alone. `then` against a terminator is an empty branch — ADR 0012's
-# nil wearing a `then`. Step.node is the statement array (an error node
-# rides inside it, so evaluation says the words).
+# nil wearing a `then`. It answers a NodesStep of the statements (an error
+# node rides inside it, so evaluation says the words).
 def parse_branch_body(tokens, mutable position, terminators)
   if keyword_at?(tokens, position, %w[then])
     after = position + 1
@@ -4000,7 +4000,7 @@ def rational_node(text, line: nil)
   RationalNode.new(kind: "rational", numerator: numerator / divisor, denominator: scale / divisor, line: line)
 end
 
-# Collect the source inside #{...}: Step.node is the inner source text.
+# Collect the source inside #{...}, as a TextStep holding the inner source.
 def read_inner_source(characters, start)
   mutable inner = ""
   mutable index = start
