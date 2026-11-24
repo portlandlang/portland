@@ -446,7 +446,9 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   # A combination refused for its block keeps what it yields, which a
   # call site reads its block with.
   return unpinned.with(definition: called, parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
-  answer = solved_answer(called, key, parameters, yielding_answers(answers, block), names, strict)
+  solved = solved_answer(called, key, parameters, yielding_answers(answers, block), names, strict)
+  # A def whose every way out answers nil answers nothing (#561).
+  answer = solved == ["nil"] ? NOTHING : solved
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
   PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
 end
