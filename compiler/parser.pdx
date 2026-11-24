@@ -3220,7 +3220,7 @@ def parse_statement(tokens, position)
     operator = tokens[position + 1].text.slice(0, 1)
     value = parse_expression(tokens, position + 2)
     desugared = binary_node(operator, identifier_node(token.text), value.node, line: line_at(tokens, position))
-    return Step.new(node: assignment_node(token.text, desugared), position: value.position)
+    return Step.new(node: assignment_node(token.text, desugared, line: token.line), position: value.position)
   end
   # `x ||= e` desugars to `x = x || e` (ADR 0043): the or-guard's question
   # as a rebind — absent takes the fallback, a Boolean left refuses
@@ -3228,7 +3228,7 @@ def parse_statement(tokens, position)
   if token.identifier? && operator_at?(tokens, position + 1, %w[||=])
     value = parse_expression(tokens, position + 2)
     desugared = logical_node("||", identifier_node(token.text), value.node, line: line_at(tokens, position))
-    return Step.new(node: assignment_node(token.text, desugared), position: value.position)
+    return Step.new(node: assignment_node(token.text, desugared, line: token.line), position: value.position)
   end
   step = parse_expression(tokens, position)
   # The compound family on a slot (ADR 0043): `name[index] += v` and
