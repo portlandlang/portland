@@ -1,0 +1,12 @@
+# Required by shapes.pdx, and again by requires.pdx, which loads it once.
+def count_upto(limit)
+  mutable total = 0
+  mutable index = 1
+  while index <= limit
+    total += index
+    index += 1
+  end
+  total
+end
+
+puts "counting loaded"

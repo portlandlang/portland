@@ -6,7 +6,8 @@
 # Usage: pdx compiler/intermediate.pdx some_file.pdx
 
 require_relative "intermediate_representation"
+require_relative "program"
 
 path = System.arguments.first or panic "intermediate.pdx: needs a file to lower"
-source = System.read_file(path) or panic "intermediate.pdx: cannot read #{path}"
-render_intermediate(lower_program(parse_program(lex(source)), core: core_nodes)).each { puts it }
+System.read_file(path) or panic "intermediate.pdx: cannot read #{path}"
+render_intermediate(lower_program(program_nodes(path), core: core_nodes)).each { puts it }

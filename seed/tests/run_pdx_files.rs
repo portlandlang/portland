@@ -1795,6 +1795,34 @@ fn every_native_fixture_matches_the_seed() {
     }
 }
 
+/// The native build gathers a program's files into one (#530), where a
+/// required file's locals would cross into the file that requires it,
+/// which they do not on either interpreter. So a required file that
+/// binds a local at its top level refuses at build, naming the file and
+/// the local.
+#[test]
+fn a_required_file_that_binds_a_local_refuses_natively() {
+    let directory = std::env::temp_dir().join("native_requires_probe");
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("helper.pdx"),
+        "def twice(value) = value * 2\ncounter = 5\n",
+    )
+    .unwrap();
+    let entry = directory.join("entry.pdx");
+    std::fs::write(&entry, "require_relative \"helper\"\nputs twice(4)\n").unwrap();
+    let refused = native_build(&entry, &[]);
+    assert!(
+        !refused.status.success(),
+        "a required file's local should refuse"
+    );
+    let stderr = String::from_utf8(refused.stderr).unwrap();
+    assert!(
+        stderr.contains("binds counter at its top level on line 2, and a required file's locals do not cross into the file that requires it (#530)"),
+        "expected the gathering refusal, got: {stderr}"
+    );
+}
+
 /// A program outside the native slice refuses at build (#448): the
 /// sentence names what it met, and neither the IR nor a binary is left
 /// under target/portland — a stale one from an earlier build included.
