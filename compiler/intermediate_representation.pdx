@@ -489,7 +489,8 @@ def joined_type(first, second)
   return ["maybe", first] if second == ["nil"] && native_value?(first)
   return first if first == ["maybe", second]
   return second if second == ["maybe", first]
-  nil
+  # One struct and another are one of several (#572).
+  joined_plain(first, second)
 end
 
 # A call of the library's row for this name, asked of a value already
@@ -1127,6 +1128,19 @@ def lower_value(node, bindings, context)
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1
     # Each arm is read with what the condition proved for it (#572).
     proof = shape_narrowings(condition, bindings + inner.answers)
+    # An arm that is a `panic` stops the program, so it answers nothing
+    # and is given the type of the other arm (#572).
+    if panics?(taken) || panics?(other)
+      refuse_native("an if read for its value whose arms both panic", node) if panics?(taken) && panics?(other)
+      stopping = panics?(taken) ? taken[0] : other[0]
+      refuse_native("panic of anything but one message", stopping) unless stopping.arguments.length == 1 && stopping.block.nil?
+      message = lower_value(stopping.arguments[0], bindings, inner)
+      refuse_native("panic of #{with_article(message.type)}", stopping) unless message.type == ["string"]
+      staying = panics?(taken) ? (other[0] or nil_node(line: node.line)) : taken[0]
+      value = lower_value(staying, narrowed_bindings(bindings, panics?(taken) ? when_false(proof) : when_true(proof)), inner)
+      stop = IntermediateStop.new(type: value.type, message: message)
+      return IntermediateChoice.new(type: value.type, condition: lower_condition(condition, bindings, inner), then_value: panics?(taken) ? stop : value, else_value: panics?(taken) ? value : stop)
+    end
     first = lower_value(taken[0], narrowed_bindings(bindings, when_true(proof)), inner)
     # A missing `else` answers nil (ADR 0012).
     second = other.empty? ? IntermediateConstant.new(type: ["nil"], value: nil) : lower_value(other[0], narrowed_bindings(bindings, when_false(proof)), inner)

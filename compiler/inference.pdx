@@ -1165,6 +1165,13 @@ def ordered_pairs(nodes, types, kind)
   ordered
 end
 
+# Whether a body ends in `panic`, and so answers nothing.
+def panics?(body)
+  return false if body.nil?
+  last = body.last
+  (last in CallNode) && last.name == "panic"
+end
+
 def parameter_entry(parameter, body, types)
   typed = parameter_type(parameter, types)
   return typed unless typed == ["unknown"]
@@ -1820,12 +1827,18 @@ def synthesize_if(node, types)
   proof = narrowings(node.condition, types)
   yes = branch_answer(node.then_body, when_true(proof) + types)
   no = branch_answer(node.else_body, when_false(proof) + types)
+  # Read as the native build runs it, an arm that ends in `panic`
+  # answers nothing, so the `if` answers what the other arm does (#572).
+  if native_reading?(types)
+    return no if panics?(node.then_body)
+    return yes if panics?(node.else_body)
+  end
   merged = merge_candidates([yes, no])
   # Read as the native build runs it, a value on one side and a maybe of
   # it on the other are a maybe of it (#558), as an `elsif` chain that
-  # ends in nil is.
+  # ends in nil is, and one struct and another are one of several (#572).
   return merged unless merged == ["unknown"] && native_reading?(types)
-  joined_with_maybe(yes, no)
+  (joined_pair(yes, no) or ["unknown"])
 end
 
 # `array[index]` under the native reading: the element, or nil past
