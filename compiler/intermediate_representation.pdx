@@ -914,6 +914,13 @@ def lower_value(node, bindings, context)
     before = plain_of(first.type)
     after = plain_of(second.type)
     return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && before == ["string"] && after == ["string"]
+    # Two arrays of one type joined are a new array of it (#564). An
+    # empty array written out takes the other side's type.
+    if operator == "+" && (before in ["array", *]) && (after in ["array", *])
+      joined_first = before == EMPTY_ARRAY ? first.with(type: after) : first
+      joined_second = after == EMPTY_ARRAY ? second.with(type: joined_first.type) : second
+      return library_call("+", opened_for(joined_first, "+"), [opened_for(joined_second, "+")], node) if plain_of(joined_first.type) == plain_of(joined_second.type)
+    end
     if %w[/ %].include?(operator)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateDivision.new(type: ["integer"], operator: operator, left: first, right: second)

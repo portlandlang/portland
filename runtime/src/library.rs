@@ -486,3 +486,33 @@ pub unsafe extern "C" fn portland_string_range(
         string_of(&characters[from..to].concat())
     }
 }
+
+/// `left + right` between arrays: a new array of the first's elements and
+/// then the second's, each held once more.
+///
+/// # Safety
+/// Each is null or points at a live array, and the two are of one kind.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_concat(
+    left: *mut ArrayBlock,
+    right: *mut ArrayBlock,
+) -> *mut ArrayBlock {
+    unsafe {
+        let kind = [left, right]
+            .into_iter()
+            .find(|array| !array.is_null())
+            .map_or(INTEGERS, |array| (*array).kind);
+        let mut joined = array_with(kind, SMALLEST_ROOM);
+        for array in [left, right] {
+            if array.is_null() {
+                continue;
+            }
+            for index in 0..(*array).length as usize {
+                let word = elements_of(array).add(index).read();
+                hold_word(kind, word, true);
+                joined = portland_array_append(joined, word, kind);
+            }
+        }
+        joined
+    }
+}

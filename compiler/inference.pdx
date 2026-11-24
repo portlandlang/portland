@@ -66,6 +66,7 @@ require_relative "parser"
 # answers, and the runtime function that does it. `element` stands for
 # what the array asked holds, and `self` for the array asked.
 NATIVE_LIBRARY = [
+  [["array", ["element"]], "+", [["self"]], ["self"], "portland_array_concat"],
   [["array", ["element"]], "drop", [["integer"]], ["self"], "portland_array_drop"],
   [["array", ["element"]], "include?", [["element"]], ["boolean"], "portland_array_include"],
   [["array", ["string"]], "join", [], ["string"], "portland_array_join"],
