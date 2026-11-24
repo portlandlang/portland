@@ -44,7 +44,14 @@ EMPTY_ARRAY = ["array", ["unknown"]]
 # and the type of each field it was handed.
 MAKING = "new"
 
-# The name a `return` is gathered under: a keyword, so no def has it.
+# The name a `return` is gathered under where it is written straight in
+# a def's body, which nothing reads: what it answers is read with the
+# body, by what the conditions around it prove. One inside a block is
+# gathered under `RETURN` by the walk of the block.
+PLAIN_RETURN = "return here"
+
+# The name a `return` inside a block is gathered under: a keyword, so no
+# def has it.
 RETURN = "return"
 
 # How many rounds pinning takes before it is not going to settle. A
@@ -168,6 +175,14 @@ def answers_nothing?(body, parameters, answers, names)
   return false if returns_value?(body)
   above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: parameters, calls: []), answers, names)
   native_nothing?(body, above.bindings + answers)
+end
+
+# The calls a walk of a block's body gathered, with each `return` written
+# in the body gathered as one that leaves from inside a block (#523).
+# `before` is how many calls were gathered ahead of the body.
+def block_returns(calls, before)
+  inside = calls.slice(before, calls.length - before).map { it[0] == PLAIN_RETURN ? [RETURN] + it.slice(1, it.length - 1) : it }
+  calls.slice(0, before) + inside
 end
 
 # What a body answers: its last statement and its early returns, as
@@ -431,7 +446,7 @@ def pin_block_call(node, walk, answers, names)
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
   kept = unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer))
-  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer, leaves]])
+  PinWalk.new(bindings: kept, calls: block_returns(walked.calls, current.calls.length) + [[node.name, arguments, answer, leaves]])
 end
 
 # One combination of a def's types: its parameters from the arguments,
@@ -596,9 +611,9 @@ def pin_statement(statement, walk, answers, names)
   # A `return` is gathered with what it answers, wherever it is written:
   # one inside a block leaves the def as one outside it does (#523).
   in ReturnNode(value:)
-    return walk.with(calls: walk.calls + [[RETURN, [["nil"]], nil, false]]) if value.nil?
+    return walk.with(calls: walk.calls + [[PLAIN_RETURN, [["nil"]], nil, false]]) if value.nil?
     seen = pin_expression(value, walk, answers, names)
-    seen.with(calls: seen.calls + [[RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
+    seen.with(calls: seen.calls + [[PLAIN_RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
   # What a guard in a loop's body proved of a name holds no further than
   # the body (#572).
   in WhileNode(condition:, body:)
@@ -649,7 +664,7 @@ def pin_walk(node, walk, answers, names)
   end
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
-  walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)))
+  walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)), calls: block_returns(walked.calls, current.calls.length))
 end
 
 # The pinned combinations' answers as bindings, each under the name its

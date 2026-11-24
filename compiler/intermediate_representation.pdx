@@ -570,7 +570,7 @@ def lower_block_return(statement, value, bindings, context)
   end
   refuse_native("a return with no value", statement) if value.nil?
   written = lower_value(value, bindings, context.with(root: "value"))
-  returned = fitted(written, home) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(home)}", statement)
+  returned = returned_as(written, home) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(home)}", statement)
   Lowered.new(nodes: [IntermediateLeave.new(kind: "return", value: returned)], bindings: bindings)
 end
 
@@ -825,7 +825,7 @@ def lower_statement(statement, bindings, context)
     end
     refuse_native("a return with no value", statement) if value.nil?
     written = lower_value(value, bindings, context.with(root: "value"))
-    returned = fitted(written, context.answer) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(context.answer or ["nil"])}", statement)
+    returned = returned_as(written, context.answer) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(context.answer or ["nil"])}", statement)
     Lowered.new(nodes: [IntermediateReturn.new(value: returned)], bindings: bindings)
   # `panic(message)` (#505).
   in CallNode(name: "panic", arguments:, block:)
@@ -1383,6 +1383,18 @@ def render_value(value)
   in IntermediateChoice(type:, condition:, then_value:, else_value:)
     "(if #{render_type(type)} #{render_value(condition)} #{render_value(then_value)} #{render_value(else_value)})"
   end
+end
+
+# A value a `return` hands back, as the type the def answers: fitted to
+# it, or a maybe opened where the def answers its value. Pinning read the
+# return with what the conditions around it prove, so a maybe returned
+# where a value is answered is one a guard found there, as in
+# `return found unless found.nil?`.
+def returned_as(value, answer)
+  held = fitted(value, answer)
+  return held if held.some?
+  return nil unless (value.type in ["maybe", *]) && answer.some? && held_as?(type_at(value.type, 1), answer)
+  IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "return")
 end
 
 # Whether a `return` is written inside a block somewhere in a def's
