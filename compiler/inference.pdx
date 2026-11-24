@@ -663,7 +663,7 @@ end
 # are not descended into: their bodies bind their own names.
 def children_of(node)
   case node
-  in AssignmentNode(value:) then [value]
+  in AssignmentNode(value:) then one_if_there(value)
   in AppendNode(value:) then [value]
   in WhileNode(condition:, body:) then [condition] + body
   in IfNode(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
@@ -681,7 +681,7 @@ def children_of(node)
     end
     found + (else_body or [])
   in TogetherNode(lines:) then lines.map { if it in TaskLineNode then it.value else it end }
-  in ReturnNode(value:) then [value]
+  in ReturnNode(value:) then one_if_there(value)
   in CallNode(arguments:, block:) then arguments + block_body(block)
   in MethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
   in SafeMethodCallNode(receiver:, arguments:, block:) then [receiver] + arguments + block_body(block)
@@ -1172,6 +1172,15 @@ end
 # The four floors of the tower (ADR 0085).
 def numeric?(type)
   type == ["integer"] || type == ["float"] || type == ["rational"] || type == ["complex"]
+end
+
+# A node that may not be there, as the nodes it is: one, or none. A
+# parameter declared `mutable` binds no value, and a bare `return`
+# answers none.
+def one_if_there(node)
+  mutable found = []
+  found << node unless node.nil?
+  found
 end
 
 # A maybe as the native build reads it where its value is needed.
