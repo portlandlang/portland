@@ -24,6 +24,9 @@ path = "src/main.rs"
 # its random source is private, and `Instant` has no absolute reading — so
 # the seed declares them through libc, which rustyline already pulls in.
 libc = { workspace = true }
+# Ruby's rules for text and numbers (#581), shared with the runtime so the
+# two cannot come to differ.
+portland-ruby-rules = { workspace = true }
 # How a String and a Symbol are written back out as source (#507), shared
 # with the runtime so the two cannot come to differ.
 portland-source-form = { workspace = true }

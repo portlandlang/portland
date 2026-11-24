@@ -278,72 +278,6 @@ pub unsafe extern "C" fn portland_string_slice(
     }
 }
 
-/// `String#split` by Ruby's rules, the seed's `ruby_split` line for line
-/// (#142): a single space splits on runs of whitespace, an empty
-/// separator into characters, a positive limit caps the pieces, and
-/// trailing empty fields drop unless a limit is given.
-fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
-    if text.is_empty() {
-        return Vec::new();
-    }
-    let cap = usize::try_from(limit).ok().filter(|cap| *cap > 0);
-    let full = |pieces: &Vec<String>| cap.is_some_and(|cap| pieces.len() + 1 == cap);
-    let mut pieces: Vec<String> = Vec::new();
-    // Ruby's whitespace is ASCII's six — a U+2008 punctuation space is not
-    // a field break.
-    let ascii_space =
-        |character: char| matches!(character, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
-    match separator {
-        None | Some(" ") => {
-            let mut rest = text.trim_start_matches(ascii_space);
-            let mut took_the_rest = false;
-            while !rest.is_empty() {
-                if full(&pieces) {
-                    pieces.push(rest.to_string());
-                    took_the_rest = true;
-                    break;
-                }
-                let end = rest.find(ascii_space).unwrap_or(rest.len());
-                pieces.push(rest[..end].to_string());
-                rest = rest[end..].trim_start_matches(ascii_space);
-            }
-            // Trailing whitespace is one empty field, which a limit keeps:
-            // `" 1 2 ".split(" ", 3)` is `["1", "2", ""]`, and `" "` with a
-            // limit is `[""]`. Without one it drops below with the rest.
-            if limit != 0 && !took_the_rest && text.ends_with(ascii_space) {
-                pieces.push(String::new());
-            }
-        }
-        Some("") => {
-            let characters: Vec<&str> = text.graphemes(true).collect();
-            for (index, character) in characters.iter().enumerate() {
-                if full(&pieces) {
-                    pieces.push(characters[index..].concat());
-                    break;
-                }
-                pieces.push((*character).to_string());
-            }
-            // A limit past the last character — or a negative one — keeps
-            // the empty field after it, as Ruby's `"ab".split("", -1)` does.
-            if limit < 0 || cap.is_some_and(|cap| cap > characters.len()) {
-                pieces.push(String::new());
-            }
-        }
-        Some(separator) => {
-            pieces = match cap {
-                Some(cap) => text.splitn(cap, separator).map(str::to_string).collect(),
-                None => text.split(separator).map(str::to_string).collect(),
-            };
-        }
-    }
-    if limit == 0 {
-        while pieces.last().is_some_and(String::is_empty) {
-            pieces.pop();
-        }
-    }
-    pieces
-}
-
 /// `text.split(separator)`.
 ///
 /// # Safety
@@ -367,7 +301,7 @@ pub unsafe extern "C" fn portland_string_split_limit(
     limit: i64,
 ) -> *mut ArrayBlock {
     unsafe {
-        let pieces = ruby_split(text_of(text), Some(text_of(separator)), limit);
+        let pieces = portland_ruby_rules::split(text_of(text), Some(text_of(separator)), limit);
         strings_of(pieces.iter().map(String::as_str))
     }
 }
@@ -679,4 +613,54 @@ pub unsafe extern "C" fn portland_struct_equal(
         }
         true
     }
+}
+
+/// What a rule the runtime shares with the seed answered (#581), or the
+/// refusal it answered with, made as a native program makes one.
+fn refused<Answer>(answered: Result<Answer, String>) -> Answer {
+    answered.unwrap_or_else(|sentence| refuse_program(&sentence))
+}
+
+/// `text.to_i`: the Integer a String begins with, by Ruby's rule, which
+/// the seed shares.
+///
+/// # Safety
+/// `text` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_to_i(text: *const StringBlock) -> i64 {
+    unsafe { refused(portland_ruby_rules::to_i(text_of(text), 10)) }
+}
+
+/// `text.rjust(width, padding)`: the text with `padding` repeated on its
+/// left until it is `width` characters, by the rule the seed shares.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_rjust(
+    text: *const StringBlock,
+    width: i64,
+    padding: *const StringBlock,
+) -> *mut StringBlock {
+    unsafe {
+        string_of(&refused(portland_ruby_rules::padded(
+            text_of(text),
+            width,
+            text_of(padding),
+            "rjust",
+        )))
+    }
+}
+
+/// `number.gcd(other)`: what the two share, by the rule the seed shares.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_gcd(number: i64, other: i64) -> i64 {
+    refused(portland_ruby_rules::gcd(number, other))
+}
+
+/// `number.to_s(base)`: the Integer written in a base, by the rule the
+/// seed shares.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_to_s_base(number: i64, base: i64) -> *mut StringBlock {
+    string_of(&refused(portland_ruby_rules::in_base(number, base)))
 }

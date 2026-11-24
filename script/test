@@ -72,6 +72,9 @@ cargo test --package portland-runtime --quiet
 step "source form unit tests — source_form/src/lib.rs: how a String and a Symbol are written back out, for the seed and the runtime both"
 cargo test --package portland-source-form --quiet
 
+step "ruby rules unit tests — ruby_rules/src/lib.rs: Ruby's rules for text and numbers, for the seed and the runtime both"
+cargo test --package portland-ruby-rules --quiet
+
 step "integration tests — seed/tests/run_pdx_files.rs"
 cargo test --package portland-seed --quiet --test run_pdx_files
 

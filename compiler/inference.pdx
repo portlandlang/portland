@@ -74,6 +74,8 @@ NATIVE_LIBRARY = [
   [["array", ["element"]], "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],
   [["integer"], "chr", [], ["string"], "portland_integer_chr"],
   [["integer"], "chr", [["string"]], ["string"], "portland_integer_chr_encoded"],
+  [["integer"], "gcd", [["integer"]], ["integer"], "portland_integer_gcd"],
+  [["integer"], "to_s", [["integer"]], ["string"], "portland_integer_to_s_base"],
   [["string"], "bytesize", [], ["integer"], "portland_string_bytesize"],
   [["string"], "chars", [], ["array", ["string"]], "portland_string_chars"],
   [["string"], "chop", [], ["string"], "portland_string_chop"],
@@ -84,11 +86,13 @@ NATIVE_LIBRARY = [
   [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
   [["string"], "include?", [["string"]], ["boolean"], "portland_string_include"],
   [["string"], "index", [["string"]], ["maybe", ["integer"]], "portland_string_index"],
+  [["string"], "rjust", [["integer"], ["string"]], ["string"], "portland_string_rjust"],
   [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
   [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
   [["string"], "split", [["string"], ["integer"]], ["array", ["string"]], "portland_string_split_limit"],
   [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
   [["string"], "strip", [], ["string"], "portland_string_strip"],
+  [["string"], "to_i", [], ["integer"], "portland_string_to_i"],
   [["string"], "upcase", [], ["string"], "portland_string_upcase"],
   # `text[index]`, and `text[from..to]` and an array's, which are written
   # with brackets and reach the library under these names.

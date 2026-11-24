@@ -1,0 +1,19 @@
+# The rules the runtime shares with the seed (#581): a String read as an
+# Integer, one padded on the left, what two Integers share, and an
+# Integer written in a base.
+words = ["42", "  -17 apples", "1_000", "0x1f", "none", "9_", ""]
+words.each do |word|
+  puts word.to_i
+end
+puts "7".rjust(4, "0")
+puts "seven".rjust(3, "0")
+puts "ab".rjust(7, "xyz")
+puts 12.gcd(18)
+puts((0 - 12).gcd(0))
+puts 0.gcd(0)
+puts 255.to_s(16)
+puts((0 - 255).to_s(2))
+puts 35.to_s(36)
+codes = [10, 955]
+puts "\\u" + (codes[1] or 0).to_s(16).upcase.rjust(4, "0")
+puts "a".rjust(3, "")
