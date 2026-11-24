@@ -155,10 +155,11 @@ def answer_candidates(body, parameters, answers, names)
   mutable found = []
   mutable last = [["nil"]]
   body.each do |statement|
-    scope = walk.bindings + answers
+    after = pin_statement(statement, walk, answers, names)
+    scope = loop_scope(statement, walk, after) + answers
     found += return_types_in(statement, scope)
     last = value_candidates(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
+    walk = after
   end
   # A loop at the end answers nil where it can end, and nothing where it
   # cannot (#572).
@@ -192,10 +193,11 @@ def body_answer(body, parameters, answers, names)
   mutable early = []
   mutable last = ["nil"]
   body.each do |statement|
-    scope = walk.bindings + answers
+    after = pin_statement(statement, walk, answers, names)
+    scope = loop_scope(statement, walk, after) + answers
     early += return_types_in(statement, scope)
     last = statement_answer(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
+    walk = after
   end
   # A body that ends in `panic` hands nothing back that way, so its
   # answer is what its returns say (#505).
@@ -326,6 +328,16 @@ def field_prelude(fields, method)
   end
 end
 
+# Bindings with each array that holds nothing bound to the array a walk
+# left it as, and every other binding as it was.
+def filled_arrays(before, after)
+  return before unless before.any? { type_at(it, 1) == EMPTY_ARRAY }
+  before.map do |binding|
+    left = type_at(binding, 1) == EMPTY_ARRAY ? after.assoc(binding[0]) : nil
+    left.nil? || !concrete?(type_at(left, 1)) ? binding : left
+  end
+end
+
 # The calls every body reached names: the top level's, and those of each
 # combination pinned so far, read with its own parameters.
 def gathered_calls(definitions, statements, names, answers, pinned)
@@ -391,6 +403,15 @@ def joined_field(types) = joined_types(types)
 def key_names(key)
   head = ((key.split("(").first or key).split("[").first or key)
   head.split("#").flat_map { it.split(".") }
+end
+
+# The bindings a statement is read with: the ones above it, and for a
+# loop, each of those as the loop leaves it (#572). A local has one type,
+# so an array that goes into a loop empty is, inside it, the array the
+# loop's appends make it.
+def loop_scope(statement, walk, after)
+  return walk.bindings unless statement in WhileNode
+  filled_arrays(walk.bindings, after.bindings)
 end
 
 # Every field the gathered calls made, as [its key, the types it was
@@ -642,8 +663,16 @@ def pin_statement(statement, walk, answers, names)
     seen.with(calls: seen.calls + [[PLAIN_RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
   # What a guard in a loop's body proved of a name holds no further than
   # the body (#572).
+  # An array that goes in empty and is appended to in the body is that
+  # array wherever the body reads it, so the body is walked again with
+  # what it left, and the calls of that walk are the ones kept.
   in WhileNode(condition:, body:)
-    turned = pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+    entering = pin_expression(condition, walk, answers, names)
+    first = pin_statements(body, entering, answers, names)
+    left = unnarrowed(walk.bindings, first.bindings)
+    kept = filled_arrays(entering.bindings, left)
+    return first.with(bindings: left) if kept == entering.bindings
+    turned = pin_statements(body, entering.with(bindings: kept), answers, names)
     turned.with(bindings: unnarrowed(walk.bindings, turned.bindings))
   # A name that holds one of several structs is the one the condition
   # proved it to be, in the arm where that holds, and below the `if`
