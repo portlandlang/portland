@@ -425,7 +425,7 @@ def pin_block_call(node, walk, answers, names)
   end
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
-  kept = walked.bindings.slice(walked.bindings.length - outer, outer)
+  kept = unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer))
   PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer, leaves]])
 end
 
@@ -594,12 +594,23 @@ def pin_statement(statement, walk, answers, names)
     return walk.with(calls: walk.calls + [[RETURN, [["nil"]], nil, false]]) if value.nil?
     seen = pin_expression(value, walk, answers, names)
     seen.with(calls: seen.calls + [[RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
+  # What a guard in a loop's body proved of a name holds no further than
+  # the body (#572).
   in WhileNode(condition:, body:)
-    pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+    turned = pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+    turned.with(bindings: unnarrowed(walk.bindings, turned.bindings))
+  # A name that holds one of several structs is the one the condition
+  # proved it to be, in the arm where that holds, and below the `if`
+  # where the other arm always leaves (#572).
   in IfNode(condition:, then_body:, else_body:)
     after_condition = pin_expression(condition, walk, answers, names)
-    after_then = pin_statements((then_body or []), after_condition, answers, names)
-    pin_statements((else_body or []), after_then, answers, names)
+    entering = after_condition.bindings
+    proof = shape_narrowings(condition, entering + answers)
+    taken = pin_statements((then_body or []), after_condition.with(bindings: narrowed_bindings(entering, when_true(proof))), answers, names)
+    after_then = taken.with(bindings: unnarrowed(entering, taken.bindings))
+    other = pin_statements((else_body or []), after_then.with(bindings: narrowed_bindings(after_then.bindings, when_false(proof))), answers, names)
+    after_else = other.with(bindings: unnarrowed(entering, other.bindings))
+    after_else.with(bindings: narrowed_bindings(after_else.bindings, shape_guard(statement, entering + answers)))
   else
     pin_expression(statement, walk, answers, names)
   end
@@ -633,7 +644,7 @@ def pin_walk(node, walk, answers, names)
   end
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
-  walked.with(bindings: walked.bindings.slice(walked.bindings.length - outer, outer))
+  walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)))
 end
 
 # The pinned combinations' answers as bindings, each under the name its

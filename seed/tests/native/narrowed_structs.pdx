@@ -1,0 +1,68 @@
+# A name that holds one of several structs is the struct `in` proved it
+# to be (#572): inside the `if` that asked, below a guard that left
+# otherwise, and on the right of an `&&`. So a field two structs hold
+# with different types is read once the name is known to be one of them.
+struct Label
+  size
+  text
+end
+
+struct Circle
+  size
+end
+
+struct Tile
+  shape
+end
+
+def described(tile)
+  shape = tile.shape
+  if shape in Label
+    "#{shape.text} in #{shape.size}"
+  else
+    "something else"
+  end
+end
+
+def doubled(tile)
+  shape = tile.shape
+  return 0 unless shape in Circle
+  shape.size * 2
+end
+
+def large?(tile)
+  shape = tile.shape
+  (shape in Circle) && shape.size > 4
+end
+
+def sized(tile)
+  shape = tile.shape
+  width = (shape in Circle) ? shape.size : 1
+  width + 1
+end
+
+def total(tiles)
+  mutable sum = 0
+  tiles.each do |tile|
+    shape = tile.shape
+    if shape in Circle
+      grown = shape.size + 1
+      sum += grown
+    end
+  end
+  sum
+end
+
+label = Tile.new(shape: Label.new(size: "bold", text: "exit"))
+small = Tile.new(shape: Circle.new(size: 3))
+wide = Tile.new(shape: Circle.new(size: 7))
+puts described(label)
+puts described(small)
+puts doubled(label)
+puts doubled(wide)
+puts large?(label)
+puts large?(small)
+puts large?(wide)
+puts sized(label)
+puts sized(wide)
+puts total([label, small, wide])

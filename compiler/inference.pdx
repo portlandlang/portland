@@ -967,6 +967,13 @@ def method_shape_key(owner, name) = "#{owner}##{name}/"
 
 def names?(node, name) = (node in IdentifierNode) && node.name == name
 
+# Bindings with each name a proof narrowed bound to what it proved, where
+# it stood (#572).
+def narrowed_bindings(bindings, proved)
+  return bindings if proved.empty?
+  bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
+end
+
 def narrowings(condition, types)
   proof = proof_of(condition, types)
   # A match test in a condition — `if x in [head, tail]` — binds its
@@ -1224,6 +1231,7 @@ end
 def proof_of(condition, types)
   case condition
   in MethodCallNode then predicate_proof(condition, types)
+  in MatchTestNode then shape_proof(condition, types)
   in BinaryNode then comparison_proof(condition, types)
   in UnaryNode(operator:, operand:)
     return no_proof unless operator == "!"
@@ -1363,6 +1371,38 @@ def shape_answers?(shape, node)
   named.all? { type_at(shape, 3).include?(it) }
 end
 
+# What stays proved below an `if` whose one branch always leaves (#572).
+def shape_guard(node, types)
+  proof = shape_narrowings(node.condition, types)
+  then_exits = body_exits?(node.then_body)
+  else_exits = body_exits?(node.else_body)
+  return when_false(proof) if then_exits && !else_exits
+  return when_true(proof) if else_exits && !then_exits
+  []
+end
+
+# What a condition proves of the names that hold one of several structs
+# (#572), as what holds where it is true and where it is false. The
+# native build's walks bind a name to what was proved for as long as the
+# proof stands; a maybe they leave as it is, since it is opened when the
+# line runs.
+def shape_narrowings(condition, types)
+  proof = proof_of(condition, types)
+  [when_true(proof), when_false(proof)].map do |proved|
+    proved.select { |entry| synthesize_name(entry[0], types) == ANY_STRUCT }
+  end
+end
+
+# `name in Struct`, asked of a name that holds one of several structs
+# (#572): where it holds, the name is that struct. Where it does not, the
+# name is still any of the others.
+def shape_proof(node, types)
+  return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
+  return no_proof unless synthesize_name(node.subject.name, types) == ANY_STRUCT
+  return no_proof unless synthesize_name(node.pattern.name, types) == ["type", node.pattern.name]
+  [[[node.subject.name, ["struct", node.pattern.name]]], []]
+end
+
 # The type a field of this name has, read off a value that is one of
 # several structs (#572): the one type every struct that is made with
 # such a field holds there, or nil where there is no such field or they
@@ -1452,6 +1492,9 @@ def synthesize(node, types)
   # as the first parameter of a method (#525).
   in SelfNode then synthesize_name("self", types)
   in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
+  # Whether a value matches is a Boolean, which the native build reads
+  # (#572). The checker reads no type off a test.
+  in MatchTestNode then native_reading?(types) ? ["boolean"] : ["unknown"]
   else
     ["unknown"]
   end
@@ -1953,6 +1996,15 @@ def universal_answer(name)
   return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
   return ["string"] if name == "to_s"
   ["unknown"]
+end
+
+# Bindings as a body leaves them, with each name that went in holding
+# one of several structs holding that again (#572): what a body proved
+# of a name is proved no further than the body.
+def unnarrowed(before, after)
+  wide = before.select { type_at(it, 1) == ANY_STRUCT }
+  return after if wide.empty?
+  after.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
 end
 
 def when_false(proof) = type_at(proof, 1)

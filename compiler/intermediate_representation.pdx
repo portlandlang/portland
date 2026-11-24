@@ -594,9 +594,12 @@ def lower_body(body, owner, what, bindings, answer, context)
   if arms_are_bodies?(ending)
     test = lower_condition(ending.condition, lowered.bindings, context)
     nothing = [nil_node(line: ending.line)]
-    taken = lower_body(((ending.then_body or []).empty? ? nothing : ending.then_body), owner, what, lowered.bindings, answer, context)
-    other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, taken.bindings, answer, context)
-    return Lowered.new(nodes: lowered.nodes + [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
+    # Each arm is read with what the condition proved for it (#572).
+    proof = shape_narrowings(ending.condition, lowered.bindings + context.answers)
+    taken = lower_body(((ending.then_body or []).empty? ? nothing : ending.then_body), owner, what, narrowed_bindings(lowered.bindings, when_true(proof)), answer, context)
+    after_then = unnarrowed(lowered.bindings, taken.bindings)
+    other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, narrowed_bindings(after_then, when_false(proof)), answer, context)
+    return Lowered.new(nodes: lowered.nodes + [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: unnarrowed(lowered.bindings, other.bindings))
   end
   written = lower_value(last, lowered.bindings, context.with(root: "value"))
   value = fitted(written, answer) or refuse_native("#{what} whose last expression is #{with_article(written.type)} where it answers #{with_article(answer)}", last)
@@ -765,7 +768,8 @@ def lower_statement(statement, bindings, context)
   in WhileNode(condition:, body:)
     test = lower_condition(condition, bindings, context)
     inner = lower_statements(body, bindings, context.with(looping: true))
-    Lowered.new(nodes: [IntermediateLoop.new(condition: test, body: inner.nodes)], bindings: inner.bindings)
+    # What a guard in the body proved of a name holds no further (#572).
+    Lowered.new(nodes: [IntermediateLoop.new(condition: test, body: inner.nodes)], bindings: unnarrowed(bindings, inner.bindings))
   in BreakNode
     # In a block and outside any loop of its own, `break` leaves the call
     # the block was handed to (#523).
@@ -781,11 +785,17 @@ def lower_statement(statement, bindings, context)
     end
     refuse_native("a next outside a while", statement) unless context.looping
     Lowered.new(nodes: [IntermediateNext.new(line: statement.line)], bindings: bindings)
+  # A name that holds one of several structs is the one the condition
+  # proved it to be, in the arm where that holds, and below the `if`
+  # where the other arm always leaves (#572), as pinning read it.
   in IfNode(condition:, then_body:, else_body:)
     test = lower_condition(condition, bindings, context)
-    taken = lower_statements((then_body or []), bindings, context)
-    other = lower_statements((else_body or []), taken.bindings, context)
-    Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
+    proof = shape_narrowings(condition, bindings + context.answers)
+    taken = lower_statements((then_body or []), narrowed_bindings(bindings, when_true(proof)), context)
+    after_then = unnarrowed(bindings, taken.bindings)
+    other = lower_statements((else_body or []), narrowed_bindings(after_then, when_false(proof)), context)
+    after_else = unnarrowed(bindings, other.bindings)
+    Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: narrowed_bindings(after_else, shape_guard(statement, bindings + context.answers)))
   in ReturnNode(value:)
     return lower_block_return(statement, value, bindings, context) if context.inside_block
     if context.procedure
@@ -1033,7 +1043,9 @@ def lower_value(node, bindings, context)
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
     end
     refuse_native("a condition that is #{with_article(first.type)}", left) unless first.type == ["boolean"]
-    second = lower_condition(right, bindings, inner)
+    # The right of an `&&` is read with what the left proved (#572).
+    proof = shape_narrowings(left, bindings + inner.answers)
+    second = lower_condition(right, narrowed_bindings(bindings, operator == "&&" ? when_true(proof) : when_false(proof)), inner)
     IntermediateLogical.new(type: ["boolean"], operator: operator, left: first, right: second)
   in UnaryNode(operator: "-", operand:)
     negated = lower_value(operand, bindings, inner)
@@ -1099,9 +1111,11 @@ def lower_value(node, bindings, context)
     taken = then_body or []
     other = else_body or []
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1
-    first = lower_value(taken[0], bindings, inner)
+    # Each arm is read with what the condition proved for it (#572).
+    proof = shape_narrowings(condition, bindings + inner.answers)
+    first = lower_value(taken[0], narrowed_bindings(bindings, when_true(proof)), inner)
     # A missing `else` answers nil (ADR 0012).
-    second = other.empty? ? IntermediateConstant.new(type: ["nil"], value: nil) : lower_value(other[0], bindings, inner)
+    second = other.empty? ? IntermediateConstant.new(type: ["nil"], value: nil) : lower_value(other[0], narrowed_bindings(bindings, when_false(proof)), inner)
     type = joined_type(first.type, second.type) or refuse_native("an if whose arms are #{with_article(first.type)} and #{with_article(second.type)}", node)
     IntermediateChoice.new(type: type, condition: lower_condition(condition, bindings, inner), then_value: (fitted(first, type) or first), else_value: (fitted(second, type) or second))
   else
