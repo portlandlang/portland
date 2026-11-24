@@ -3358,9 +3358,9 @@ core/string/grapheme_clusters_spec.rb:
   link: docs/ruby/enumerators.md
 core/string/gsub_spec.rb:
   pdx: [spec/core/string/gsub_spec.pdx]
-  status: partial_planned
-  reason: "A struct's own to_s as a block's value waits on #370; a block beside a replacement refuses where Ruby ignores the block (docs/ruby/regex.md), and a hash's default value has no counterpart (ADR 0063); the $~, to_str, encoding, and gsub! rows stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/370
+  status: partial_intentional
+  reason: "A block beside a replacement refuses where Ruby ignores the block (docs/ruby/regex.md), and a hash's default value has no counterpart (ADR 0063); the $~, to_str, encoding, and gsub! rows stay behind by design."
+  link: docs/ruby/regex.md
 core/string/hex_spec.rb:
   pdx: [spec/core/string/hex_spec.pdx]
 core/string/include_spec.rb:
@@ -3500,9 +3500,9 @@ core/string/strip_spec.rb:
   link: https://github.com/portlandlang/portland/issues/398
 core/string/sub_spec.rb:
   pdx: [spec/core/string/sub_spec.pdx]
-  status: partial_planned
-  reason: "A struct's own to_s as a block's value waits on #370; a block beside a replacement refuses where Ruby ignores the block (docs/ruby/regex.md), and a hash's default value has no counterpart (ADR 0063); the $~, to_str, encoding, and sub! rows, and a block's arguments gathered by a splat, stay behind by design."
-  link: https://github.com/portlandlang/portland/issues/370
+  status: partial_intentional
+  reason: "A block beside a replacement refuses where Ruby ignores the block (docs/ruby/regex.md), and a hash's default value has no counterpart (ADR 0063); the $~, to_str, encoding, and sub! rows, and a block's arguments gathered by a splat, stay behind by design."
+  link: docs/ruby/regex.md
 core/string/succ_spec.rb:
   pdx: [spec/core/string/succ_spec.pdx]
 core/string/swapcase_spec.rb:
