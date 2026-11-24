@@ -1137,7 +1137,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           break
         end
         panic(silent_block_sentence(node.name)) if step.value.empty?
-        result = result + joined_guest([slot_value(step.value)], "", scope)
+        result = result + replacement_text(slot_value(step.value), scope)
       elsif position > 0
         result = result + pattern
       end
@@ -3956,7 +3956,7 @@ def guest_replacement(block, matched, scope, interrupt, entry, name)
   settled = compacted_since(entry, step.bindings)
   return ["", settled, step] if step.signal != "none"
   panic(silent_block_sentence(name)) if step.value.empty?
-  [joined_guest([slot_value(step.value)], "", settled), settled, nil]
+  [replacement_text(slot_value(step.value), settled), settled, nil]
 end
 
 # A guest set: the tag, then its members in insertion order, distinct by
@@ -5132,6 +5132,15 @@ def replacement_for_host(replacement)
     [key, value.nil? ? nil : render(value)]
   end
   pairs.to_h
+end
+
+# What a `sub` or `gsub` block answered, as the text put in the match's
+# place: its `to_s`, as Ruby converts it (#370). An array's `to_s` is its
+# source form (ADR 0060), where joining it would have run its elements
+# together.
+def replacement_text(value, bindings)
+  return render(value, bindings) if plain_array?(value)
+  joined_guest([value], "", bindings)
 end
 
 # Where a require points, by the rule paths.pdx holds for the checker too.
