@@ -1,0 +1,66 @@
+# The walks an array answers that the native build compiles from Portland
+# source of its own (#567). The core writes a few of an array's methods
+# in Portland (ADR 0093), and the native build compiles those as defs
+# (#525); every other is the seed's own, in Rust, with nothing for a
+# native build to compile. These are the ones the front end calls.
+#
+# Only a native build reads this. The seed and the hosted compiler go on
+# answering these from the floor, so nothing they run is slower for it.
+# Moving more of Array into the core is held (#491); when that ends,
+# these belong there.
+
+require_relative "parser"
+
+NATIVE_CORE_SOURCE = <<~PORTLAND
+  class Array
+    def all?
+      self.each do |element|
+        return false unless yield(element)
+      end
+      true
+    end
+
+    def any?
+      self.each do |element|
+        return true if yield(element)
+      end
+      false
+    end
+
+    def count
+      mutable counted = 0
+      self.each do |element|
+        counted += 1 if yield(element)
+      end
+      counted
+    end
+
+    def each_with_index
+      mutable index = 0
+      self.each do |element|
+        yield(element, index)
+        index += 1
+      end
+      self
+    end
+
+    def find_index
+      mutable index = 0
+      self.each do |element|
+        return index if yield(element)
+        index += 1
+      end
+      nil
+    end
+
+    def none?
+      self.each do |element|
+        return false if yield(element)
+      end
+      true
+    end
+  end
+  PORTLAND
+
+# The source above as the nodes a native build reads beside the core's.
+def native_core_nodes = parse_program(lex(NATIVE_CORE_SOURCE))

@@ -77,6 +77,7 @@ NATIVE_LIBRARY = [
   [["string"], "chop", [], ["string"], "portland_string_chop"],
   [["string"], "chr", [], ["string"], "portland_string_chr"],
   [["string"], "codepoints", [], ["array", ["integer"]], "portland_string_codepoints"],
+  [["string"], "count", [["string"]], ["integer"], "portland_string_count"],
   [["string"], "downcase", [], ["string"], "portland_string_downcase"],
   [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
   [["string"], "include?", [["string"]], ["boolean"], "portland_string_include"],

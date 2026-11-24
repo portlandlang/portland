@@ -516,3 +516,29 @@ pub unsafe extern "C" fn portland_array_concat(
         joined
     }
 }
+
+/// `text.count(character)`: how many of its characters are that one, by
+/// the equality a String has. More than one character refuses, in the
+/// seed's sentence.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_count(
+    text: *const StringBlock,
+    needle: *const StringBlock,
+) -> i64 {
+    use unicode_normalization::UnicodeNormalization;
+    unsafe {
+        let needle = text_of(needle);
+        if needle.graphemes(true).count() != 1 {
+            refuse_program(
+                "count takes a single character — Ruby's multi-character count is a character set, not a substring, and Portland does not guess",
+            );
+        }
+        text_of(text)
+            .graphemes(true)
+            .filter(|character| *character == needle || character.nfc().eq(needle.nfc()))
+            .count() as i64
+    }
+}
